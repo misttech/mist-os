@@ -178,7 +178,7 @@ impl Provider {
     async fn disable_fast_pair(&mut self) {
         // Stop advertising over LE.
         let _ = self.advertiser.stop_advertising().await;
-        // TODO(fxbug.dev/105509): Close ongoing pairing procedures.
+        // TODO(https://fxbug.dev/105509): Close ongoing pairing procedures.
 
         // Reset the upstream connection.
         self.upstream.reset();
@@ -195,7 +195,7 @@ impl Provider {
                 self.inspect_node.active_host.set(true);
             }
             HostEvent::NotAvailable => {
-                // TODO(fxbug.dev/94166): It might make sense to shut down the GATT service.
+                // TODO(https://fxbug.dev/94166): It might make sense to shut down the GATT service.
                 let _ = self.advertiser.stop_advertising().await;
                 self.inspect_node.active_host.set(false);
             }
@@ -286,7 +286,7 @@ impl Provider {
         };
 
         // Some key-based pairing requests require additional steps.
-        // TODO(fxbug.dev/96217): Track the salt in `request` to prevent replay attacks.
+        // TODO(https://fxbug.dev/96217): Track the salt in `request` to prevent replay attacks.
         debug!(%peer_id, "Received key based pairing request: {:?}", request);
         let pairing_type = PairingType::from_action(&request.action, discoverable);
         use bt_metrics::FastpairProviderPeerRequestMetricDimensionRequestType as PeerRequestType;
@@ -308,11 +308,11 @@ impl Provider {
                 }
             }
             KeyBasedPairingAction::ProviderInitiatesPairing { .. } => {
-                // TODO(fxbug.dev/120378): Use `sys.Access/Pair` to pair to peer.
+                // TODO(https://fxbug.dev/120378): Use `sys.Access/Pair` to pair to peer.
                 log_peer_request(&self.metrics, PeerRequestType::ProviderInitiatesPairing);
             }
             KeyBasedPairingAction::RetroactiveWrite { seeker_address: _ } => {
-                // TODO(fxbug.dev/115567): This can be improved by using a timeout after an
+                // TODO(https://fxbug.dev/115567): This can be improved by using a timeout after an
                 // OnPairingComplete signal is received. A retroactive write can only occur within
                 // some finite period of time.
                 log_peer_request(&self.metrics, PeerRequestType::RetroactivePairing);
@@ -1364,7 +1364,7 @@ mod tests {
         let (_, _server_fut) = run_while(&mut exec, server_fut, write_fut);
     }
 
-    // TODO(fxbug.dev/102963): This test will be obsolete if the PairingManager is resilient to
+    // TODO(https://fxbug.dev/102963): This test will be obsolete if the PairingManager is resilient to
     // ordering of events.
     #[fuchsia::test]
     fn account_key_write_before_pairing_complete_is_error() {

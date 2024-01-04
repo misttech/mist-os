@@ -45,7 +45,7 @@ pub fn allow(
     let mut created_issues = Vec::new();
     for (ownership, files) in ownership_to_lints.iter() {
         let issue = issue_template.create(monorail, ownership, files)?;
-        let bug_link = format!("fxbug.dev/{}", issue.id());
+        let bug_link = format!("https://fxbug.dev/{}", issue.id());
         created_issues.push(issue);
 
         if !dryrun {

@@ -43,12 +43,12 @@ class MetricsSpecSet {
 
   MetricsSpecSet(
       {required this.metricsSpecs,
-      // TODO(fxbug.dev/59861): Make the testSuite argument required after transition
+      // TODO(https://fxbug.dev/59861): Make the testSuite argument required after transition
       // is done.
       this.testSuite,
-      // TODO(fxbug.dev/59861): Make testName required after migration is done.
+      // TODO(https://fxbug.dev/59861): Make testName required after migration is done.
       this.testName}) {
-    // TODO(fxbug.dev/59861): Remove the if block below, which is used for backward
+    // TODO(https://fxbug.dev/59861): Remove the if block below, which is used for backward
     // compatible transition purpose.
     if (testName == null && testSuite != null) {
       testName = testSuite;

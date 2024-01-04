@@ -79,7 +79,7 @@ template("dart_test") {
     infer_package_name = true
     testonly = true
 
-    # TODO(fxbug.dev/71902): replace the enclosing dart_library with an analysis
+    # TODO(https://fxbug.dev/71902): replace the enclosing dart_library with an analysis
     # target when they are decoupled.
     #
     # Skip source verification because the purpose of this target is to run

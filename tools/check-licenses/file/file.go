@@ -122,7 +122,7 @@ func (f *File) Search() error {
 }
 
 // Setters
-// TODO(fxbug.dev/125736): Remove all setters.
+// TODO(https://fxbug.dev/125736): Remove all setters.
 func (f *File) SetURL(url string) { f.url = url }
 
 // TODO: Remove once bazel-based license collection is enabled.

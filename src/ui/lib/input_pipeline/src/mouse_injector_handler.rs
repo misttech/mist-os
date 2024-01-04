@@ -33,7 +33,7 @@ use {
 /// on the display by 10 logical pixels.
 /// Because pointer_display_scale_handler scaled for device pixel ratio, here
 /// only need to apply mm * logical pixel scale factor to get physical pixel.
-/// TODO(fxbug.dev/115618): need to revisit this
+/// TODO(https://fxbug.dev/115618): need to revisit this
 /// 1. allow users to adjust how fast the mouse move.
 /// 2. allow different value per monitor model.
 const MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL: f32 = 10.0;
@@ -100,7 +100,7 @@ impl InputHandler for MouseInjectorHandler {
             } => {
                 self.inspect_status
                     .count_received_event(input_device::InputEvent::from(input_event.clone()));
-                // TODO(fxbug.dev/90317): Investigate latency introduced by waiting for update_cursor_renderer
+                // TODO(https://fxbug.dev/90317): Investigate latency introduced by waiting for update_cursor_renderer
                 if let Err(e) =
                     self.update_cursor_renderer(mouse_event, &mouse_device_descriptor).await
                 {

@@ -14,7 +14,7 @@ namespace fidl::flat {
 // An |Object| is anything that can be encoded in the FIDL wire format. Thus, all objects have
 // information such as as their size, alignment, and depth (how many levels of sub-objects are
 // contained within an object). See the FIDL wire format's definition of "object" for more details.
-// TODO(fxbug.dev/37535): Remove this Object class, since it forms a third type hierarchy along with
+// TODO(https://fxbug.dev/37535): Remove this Object class, since it forms a third type hierarchy along with
 // Type & Decl.
 struct Object {
   virtual ~Object() = default;
@@ -44,7 +44,7 @@ struct Object {
   // <https://eli.thegreenplace.net/2018/type-erasure-and-reification/> for a good introduction to
   // type erasure in C++.
   //
-  // TODO(fxbug.dev/37535): Refactor the visitor pattern here to be the simpler kind-enum + switch()
+  // TODO(https://fxbug.dev/37535): Refactor the visitor pattern here to be the simpler kind-enum + switch()
   // dispatch.
   template <typename T>
   struct Visitor;

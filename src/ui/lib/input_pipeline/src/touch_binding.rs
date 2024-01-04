@@ -39,7 +39,7 @@ use {
 /// signalling that the event is no longer directed towards the receiver.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TouchScreenEvent {
-    /// Deprecated. To be removed with fxbug.dev/75817.
+    /// Deprecated. To be removed with https://fxbug.dev/75817.
     /// The contacts associated with the touch event. For example, a two-finger touch would result
     /// in one touch event with two [`TouchContact`]s.
     ///

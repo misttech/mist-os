@@ -63,7 +63,7 @@ class Magnifier2 {
 
  private:
   // Indicates magnification mode.
-  // TODO(fxb/69736): Mention that there are more details in README doc.
+  // TODO(https://fxbug.dev/69736): Mention that there are more details in README doc.
   enum class Mode {
     // In the unmagnified state, the magnifier is at "normal zoom" and is
     // unresponsive to two-finger drags.

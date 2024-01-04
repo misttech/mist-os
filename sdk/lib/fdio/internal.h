@@ -35,7 +35,7 @@ using fdio_ptr = fbl::RefPtr<fdio>;
 //
 // The "null" transport absorbs writes and is never readable.
 //
-// TODO(fxbug.dev/43267): Eventually, with the exception of the "local" and "null"
+// TODO(https://fxbug.dev/43267): Eventually, with the exception of the "local" and "null"
 // transport, the different transports should become an implementation detail
 // in zxio.
 

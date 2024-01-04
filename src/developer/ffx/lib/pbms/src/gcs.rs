@@ -252,7 +252,7 @@ where
 mod tests {
     use super::*;
 
-    // TODO(fxbug.dev/92773): This test requires mocks for interactivity and
+    // TODO(https://fxbug.dev/92773): This test requires mocks for interactivity and
     // https. The test is currently disabled.
     #[ignore]
     #[fuchsia_async::run_singlethreaded(test)]

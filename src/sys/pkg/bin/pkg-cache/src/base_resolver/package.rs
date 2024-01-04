@@ -145,7 +145,7 @@ pub(crate) async fn resolve_impl(
             return Err(ResolverError::PackageHashNotSupported);
         }
         fuchsia_url::AbsolutePackageUrl::Unpinned(url) => {
-            // TODO(fxbug.dev/53911) Remove zero-variant fallback once variant concept is removed.
+            // TODO(https://fxbug.dev/53911) Remove zero-variant fallback once variant concept is removed.
             // Base packages must have a variant of zero, and the variant is cleared before adding
             // the URL to the base_packages map. Clients are allowed to specify or omit the
             // variant (clients generally omit so we minimize the number of allocations in that

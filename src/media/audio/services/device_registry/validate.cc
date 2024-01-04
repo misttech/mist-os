@@ -17,11 +17,11 @@
 namespace media_audio {
 
 // Frame rates must be listed in ascending order, but some drivers don't do this.
-// TODO(fxbug.dev/116959): once this is fixed, clean out this workaround.
+// TODO(https://fxbug.dev/116959): once this is fixed, clean out this workaround.
 inline constexpr bool kStrictFrameRateOrdering = true;
 
 // We define these here only temporarily, as we publish no frame-rate limits for audio devices.
-// TODO(fxbug.dev/116961): officially define frame-rate limits/expectations for audio devices.
+// TODO(https://fxbug.dev/116961): officially define frame-rate limits/expectations for audio devices.
 const uint32_t kMinFrameRate = 1000;
 const uint32_t kMaxFrameRate = 192000;
 

@@ -26,7 +26,7 @@ const BLOBFS_FVM_PATH: &'static str = "/part-000/block/fvm/blobfs-p-1/block";
 const DATA_FVM_PATH: &'static str = "/part-000/block/fvm/data-p-2/block";
 
 // Ensure fuchsia.fshost.Admin/WipeStorage fails if we cannot identify a storage device to wipe.
-// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
+// TODO(https://fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
 #[cfg_attr(feature = "f2fs", ignore)]
 async fn no_fvm_device() {
@@ -51,7 +51,7 @@ async fn no_fvm_device() {
 }
 
 // Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method.
-// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
+// TODO(https://fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
 #[cfg_attr(feature = "f2fs", ignore)]
 async fn write_blob() {
@@ -105,7 +105,7 @@ async fn write_blob() {
 
 // Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method when a data
 // data partition does not already exist.
-// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
+// TODO(https://fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
 #[cfg_attr(feature = "f2fs", ignore)]
 async fn write_blob_no_existing_data_partition() {
@@ -160,7 +160,7 @@ async fn write_blob_no_existing_data_partition() {
 }
 
 // Verify that all existing blobs are purged after running fuchsia.fshost.Admin/WipeStorage.
-// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
+// TODO(https://fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
 #[cfg_attr(feature = "f2fs", ignore)]
 async fn blobfs_formatted() {
@@ -219,7 +219,7 @@ async fn blobfs_formatted() {
 }
 
 // Verify that the data partition is wiped and remains unformatted.
-// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
+// TODO(https://fxbug.dev/113970): this test doesn't work on f2fs.
 // This test is very specific to fvm, so we don't run it against fxblob. Since both volumes are in
 // fxfs anyway with fxblob, this test is somewhat redundant with the basic tests.
 #[fuchsia::test]
@@ -312,7 +312,7 @@ async fn data_unformatted() {
 }
 
 // Verify that WipeStorage can handle a completely corrupted FVM.
-// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
+// TODO(https://fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
 #[cfg_attr(feature = "f2fs", ignore)]
 async fn handles_corrupt_fvm() {

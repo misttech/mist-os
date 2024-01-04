@@ -168,7 +168,7 @@ void StreamImpl::OnFrameAvailable(FrameAvailableEvent info) {
   ++frame_counter_;
 
   // Discard the frame if there are too many frames outstanding.
-  // TODO(fxbug.dev/64801): Recycle LRU frames.
+  // TODO(https://fxbug.dev/64801): Recycle LRU frames.
   if (frame_waiters_.size() == max_camping_buffers_) {
     // record_.FrameDropped(cobalt::FrameDropReason::kTooManyFramesInFlight);
     ReleaseClientFrame(info.buffer_id);

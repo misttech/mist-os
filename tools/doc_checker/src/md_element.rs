@@ -218,11 +218,11 @@ pub struct DocContext<'a> {
 
 impl<'a> DocContext<'a> {
     fn link_callback(reference: &str, normalized: &str) -> Option<(String, String)> {
-        // TODO(fxbug.dev/118482): Glossary reference links are hard to validate.
+        // TODO(https://fxbug.dev/118482): Glossary reference links are hard to validate.
         if !reference.starts_with("glossary.")  &&  
-       // TODO(fxbug.dev/118522): Consider removing [TOC]
+       // TODO(https://fxbug.dev/118522): Consider removing [TOC]
        reference != "TOC" &&
-       // TODO(fxbug.dev/117520): need to check for anchors and classes.
+       // TODO(https://fxbug.dev/117520): need to check for anchors and classes.
        !reference.starts_with("#")
         {
             Some((reference.to_string(), normalized.to_string()))

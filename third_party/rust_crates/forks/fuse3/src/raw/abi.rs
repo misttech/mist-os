@@ -150,7 +150,7 @@ pub const FUSE_ABORT_ERROR: u32 = 1 << 21;
 pub const FUSE_MAX_PAGES: u32 = 1 << 22;
 
 /// cache READLINK responses
-/// TODO(fxbug.dev/117461): Fix problem with symlinks cache in fuse3.
+/// TODO(https://fxbug.dev/117461): Fix problem with symlinks cache in fuse3.
 /// Currently the symlinks cannot show correctly when this is enabled.
 pub const FUSE_CACHE_SYMLINKS: u32 = 0 << 23;
 
@@ -196,7 +196,7 @@ pub const FUSE_LK_FLOCK: u32 = 1 << 0;
 #[allow(dead_code)]
 // Write flags
 /// delayed write from page cache, file handle is guessed
-/// # TODO(fxbug.dev/106164) This is a Google change in our fuse3 fork
+/// # TODO(https://fxbug.dev/106164) This is a Google change in our fuse3 fork
 /// Without enabling FUSE_WRITE_CACHE, write_back() in
 /// mount_options.rs won't work and each kernel write() call
 /// received only has a content size of 4096.

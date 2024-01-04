@@ -25,7 +25,7 @@ use {
     thiserror::Error,
 };
 
-// TODO(fxbug.dev/49198): The out/diagnostics directory propagation for runners includes a retry.
+// TODO(https://fxbug.dev/49198): The out/diagnostics directory propagation for runners includes a retry.
 // The reason of this is that flutter fills the out/ directory *after*
 // serving it. Therefore we need to watch that directory to notify.
 // Sadly the PseudoDir exposed in the SDK (and used by flutter) returns ZX_ERR_NOT_SUPPORTED on
@@ -241,7 +241,7 @@ impl DirectoryReadyNotifier {
         }
         let (node, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         outgoing_dir.open(
-            // TODO(fxbug.dev/118292): we might be able to remove READABLE from here, but at the
+            // TODO(https://fxbug.dev/118292): we might be able to remove READABLE from here, but at the
             // moment driver_manager fails to expose inspect if we remove it.
             rights.into_legacy()
                 | fio::OpenFlags::DESCRIBE

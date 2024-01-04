@@ -44,7 +44,7 @@ async fn update_tuf_client_timeout() {
 
     // pkg-resolver uses this timeout when creating and updating tuf metadata, so since this test
     // hangs the update, the timeout needs to be long enough for the create to succeed.
-    // TODO(fxbug.dev/66946) have separate tuf client create and update timeout durations.
+    // TODO(https://fxbug.dev/66946) have separate tuf client create and update timeout durations.
     let env = TestEnvBuilder::new().tuf_metadata_timeout_seconds(10).build().await;
 
     // pkg-resolver uses tuf::client::Client::with_trusted_root_keys to create its TUF client.
@@ -65,7 +65,7 @@ async fn update_tuf_client_timeout() {
     let result = env.resolve_package("fuchsia-pkg://test/missing-package").await;
 
     // The resolve will still fail, even though pkg-resolver normally ignores failed tuf updates,
-    // see fxbug.dev/43646, because the tuf client actually downloads most of the metadata during
+    // see https://fxbug.dev/43646, because the tuf client actually downloads most of the metadata during
     // the first update, not during creation.
     assert_eq!(result.unwrap_err(), fpkg::ResolveError::Internal);
 

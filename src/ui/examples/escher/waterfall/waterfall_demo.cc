@@ -63,7 +63,7 @@ WaterfallDemo::WaterfallDemo(escher::EscherWeakPtr escher_in, vk::Format swapcha
   // Determine the allowable MSAA sample counts to cycle through with "M" key.
   {
     auto filtered =
-        // TODO(fxbug.dev/44326): 8x MSAA causes a segfault on NVIDIA/Linux.
+        // TODO(https://fxbug.dev/44326): 8x MSAA causes a segfault on NVIDIA/Linux.
         // device_caps.GetAllMatchingSampleCounts({1U, 2U, 4U, 8});
         device_caps.GetAllMatchingSampleCounts({1U, 2U, 4U});
     FX_CHECK(!filtered.empty());
@@ -404,7 +404,7 @@ static void UpdateLighting(PaperScene* paper_scene, const escher::Stopwatch& sto
 
     // Choose a light intensity that looks good with the falloff.  If an object
     // is too close to the light it will appear washed out.
-    // TODO(fxbug.dev/7260): add HDR support to address this.
+    // TODO(https://fxbug.dev/7260): add HDR support to address this.
     pl.color *= 2.5f;
     pl.falloff = 0.001f;
   }

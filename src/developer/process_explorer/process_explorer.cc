@@ -79,7 +79,7 @@ zx_status_t GetProcessesData(std::vector<Process>* processes_data) {
     return status;
   }
 
-  // TODO(fxbug.dev/60170): Remove call to FillPeerOwnerKoid (and remove
+  // TODO(https://fxbug.dev/60170): Remove call to FillPeerOwnerKoid (and remove
   // FillPeerOwnerKoid itself) after peer owner koids become populated by
   // the kernel.
   FillPeerOwnerKoid(*processes_data);
@@ -113,7 +113,7 @@ void Explorer::WriteJsonProcessesData(WriteJsonProcessesDataRequest& request,
 
   const std::string json_string = WriteProcessesDataAsJson(std::move(processes_data));
 
-  // TODO(fxbug.dev/108528): change to asynchronous
+  // TODO(https://fxbug.dev/108528): change to asynchronous
   fsl::BlockingCopyFromString(json_string, request.socket());
 }
 

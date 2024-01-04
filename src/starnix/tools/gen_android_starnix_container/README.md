@@ -35,7 +35,7 @@ manifest fragments, when those files are found in a HAL package. Specifically:
 If no such keys are found, the remote bundle will contain an empty `etc/init`
 and an empty `etc/vintf/manifest` directory.
 
-TODO(fxbug.dev/130789): After documenting the remote bundle format, replace this
+TODO(https://fxbug.dev/130789): After documenting the remote bundle format, replace this
 link.
 
 [1]: /src/starnix/kernel/fs/fuchsia/remote_bundle.rs

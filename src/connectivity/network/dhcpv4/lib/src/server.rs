@@ -742,7 +742,7 @@ impl<DS: DataStore, TS: SystemTimeSource> Server<DS, TS> {
                     Err(ServerError::IncorrectDHCPServer(addr))
                 }
             }
-            // TODO(fxbug.dev/21423): This IP should be chosen based on the
+            // TODO(https://fxbug.dev/21423): This IP should be chosen based on the
             // subnet of the client.
             None => Ok(*self.params.server_ips.first().ok_or(ServerError::ServerMissingIpAddr)?),
         }

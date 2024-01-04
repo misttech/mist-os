@@ -20,7 +20,7 @@ use {
 /// `WritablePackageList` represents a collection of packages that can be populated and
 /// written into a file. This allows for gradual migration for packages index config
 /// files (boot, base, cache) to JSON incrementally.
-/// TODO(fxb/94601): refactor out once base_packages are migrated to JSON format.
+/// TODO(https://fxbug.dev/94601): refactor out once base_packages are migrated to JSON format.
 pub trait WritablePackageList {
     /// Add a new package with `name` and `merkle`.
     fn insert(
@@ -62,7 +62,7 @@ pub trait WritablePackageList {
         name: &str,
         destination: impl AsRef<str>,
     ) -> Result<(String, String)> {
-        // TODO(fxbug.dev/76326) Decide on a consistent pattern for using gendir and
+        // TODO(https://fxbug.dev/76326) Decide on a consistent pattern for using gendir and
         //   how intermediate files should be named and where in gendir they should
         //   be placed.
         //

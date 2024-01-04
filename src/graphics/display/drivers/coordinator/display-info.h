@@ -115,7 +115,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
   // applied, and will be evicted when the config (or a newer config) is
   // already presented on the display at Vsync time.
   //
-  // TODO(fxbug.dev/72588): Remove once we remove image IDs in OnVsync() events.
+  // TODO(https://fxbug.dev/72588): Remove once we remove image IDs in OnVsync() events.
   struct ConfigImages {
     const ConfigStamp config_stamp;
 

@@ -60,7 +60,7 @@ void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch
   iframe.spsr = static_cast<uint64_t>(state.cpsr);
 
   // Restore TPIDR_EL0 from restricted mode.
-  // TODO(fxbug.dev/125257): Eventually the TPIDR register should be
+  // TODO(https://fxbug.dev/125257): Eventually the TPIDR register should be
   // inside the iframe.
   __arm_wsr64("tpidr_el0", state.tpidr_el0);
 
@@ -133,7 +133,7 @@ void RestrictedState::ArchSaveRestrictedIframeState(zx_restricted_state_t& state
   DEBUG_ASSERT(arch_ints_disabled());
 
   // Restore TPIDR_EL0 from saved normal state.
-  // TODO(fxbug.dev/125257): Eventually the TPIDR register should be
+  // TODO(https://fxbug.dev/125257): Eventually the TPIDR register should be
   // inside the iframe.
   __arm_wsr64("tpidr_el0", arch_state.tpidr_el0);
 

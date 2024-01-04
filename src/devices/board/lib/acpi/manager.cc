@@ -212,7 +212,7 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   std::string name =
       "acpi-" + std::string(reinterpret_cast<char*>(&info->Name), sizeof(info->Name));
 
-  // TODO(fxbug.dev/80491): newer versions of ACPICA return this from GetObjectInfo().
+  // TODO(https://fxbug.dev/80491): newer versions of ACPICA return this from GetObjectInfo().
   auto state_result = acpi_->EvaluateObject(handle, "_STA", std::nullopt);
   bool examine_children;
   uint64_t state;
@@ -280,7 +280,7 @@ acpi::status<> Manager::PublishPciBus(zx_device_t* platform_bus, DeviceBuilder* 
     return acpi::ok();
   }
 
-  // Publish the PCI bus. TODO(fxbug.dev/78349): we might be able to move this out of the
+  // Publish the PCI bus. TODO(https://fxbug.dev/78349): we might be able to move this out of the
   // board driver when ACPI work is done. For now we do this here because we need to ensure
   // that we've published the child metadata before the PCI bus driver sees it. This also
   // means we have two devices that represent the PCI bus: one sits in the right place in the

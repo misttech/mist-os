@@ -61,11 +61,11 @@ struct DecoderEncoderStatus {
 
   // First encoding data, relevant for `progress >= DecoderEncoderProgress::FirstEncodeSuccess`.
   std::vector<uint8_t> first_encoded_bytes;
-  // TODO(fxbug.dev/136523): Add first handles for koid check.
+  // TODO(https://fxbug.dev/136523): Add first handles for koid check.
 
   // Second encoding data, relevant for `progress >= DecoderEncoderProgress::SecondEncodeSuccess`.
   std::vector<uint8_t> second_encoded_bytes;
-  // TODO(fxbug.dev/136523): Add second handles for koid check.
+  // TODO(https://fxbug.dev/136523): Add second handles for koid check.
 };
 
 // An DecoderEncoder is a function that encapsulates the FIDL type-specific logic for attempting to
@@ -157,7 +157,7 @@ DecoderEncoderStatus DecoderEncoderImpl(uint8_t* bytes, uint32_t num_bytes, zx_h
 
   // By specifying |AllowUnownedInputRef|, we fuzz the code paths used in production message
   // passing, which uses multiple iovecs referencing input objects instead of copying.
-  // TODO(fxbug.dev/45252): Use FIDL at rest.
+  // TODO(https://fxbug.dev/45252): Use FIDL at rest.
   fidl::internal::OwnedEncodedMessage<Body> encoded(::fidl::internal::AllowUnownedInputRef{},
                                                     fidl::internal::WireFormatVersion::kV2, value);
 
@@ -171,7 +171,7 @@ DecoderEncoderStatus DecoderEncoderImpl(uint8_t* bytes, uint32_t num_bytes, zx_h
   status.first_encoded_bytes =
       ::std::vector<uint8_t>(message_bytes.data(), message_bytes.data() + message_bytes.size());
 
-  // TODO(fxbug.dev/136523): Add handles for koid check.
+  // TODO(https://fxbug.dev/136523): Add handles for koid check.
 
   auto conversion = ::fidl::OutgoingToEncodedMessage(encoded.GetOutgoingMessage());
 
@@ -196,7 +196,7 @@ DecoderEncoderStatus DecoderEncoderImpl(uint8_t* bytes, uint32_t num_bytes, zx_h
   // encoded by users and fully owns the content of the encoded message. One example of this is
   // in-process messaging.
   Body* value2 = decoded2.value().pointer();
-  // TODO(fxbug.dev/45252): Use FIDL at rest.
+  // TODO(https://fxbug.dev/45252): Use FIDL at rest.
   fidl::internal::OwnedEncodedMessage<Body> encoded2(fidl::internal::WireFormatVersion::kV2,
                                                      value2);
 
@@ -210,7 +210,7 @@ DecoderEncoderStatus DecoderEncoderImpl(uint8_t* bytes, uint32_t num_bytes, zx_h
   status.second_encoded_bytes =
       ::std::vector<uint8_t>(message_bytes2.data(), message_bytes2.data() + message_bytes2.size());
 
-  // TODO(fxbug.dev/136523): Add handles for koid check.
+  // TODO(https://fxbug.dev/136523): Add handles for koid check.
 
   return status;
 }

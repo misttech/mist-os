@@ -4236,21 +4236,21 @@ static void vma_aligned_free(void* ptr)
     #if VMA_USE_STL_SHARED_MUTEX
         // Use std::shared_mutex from C++17.
         #include <shared_mutex>
-        // TODO(fxbug.dev/130250): Add __TA_CAPABILITY("m_Mutex") here after clang roll.
+        // TODO(https://fxbug.dev/130250): Add __TA_CAPABILITY("m_Mutex") here after clang roll.
         class VmaRWMutex
         {
         public:
-            // TODO(fxbug.dev/130250): __TA_ACQUIRE_SHARED()
+            // TODO(https://fxbug.dev/130250): __TA_ACQUIRE_SHARED()
             void LockRead() __TA_NO_THREAD_SAFETY_ANALYSIS { m_Mutex.lock_shared(); }
-            // TODO(fxbug.dev/130250): __TA_RELEASE_SHARED()
+            // TODO(https://fxbug.dev/130250): __TA_RELEASE_SHARED()
             void UnlockRead() __TA_NO_THREAD_SAFETY_ANALYSIS { m_Mutex.unlock_shared(); }
-            // TODO(fxbug.dev/130250): __TA_TRY_ACQUIRE_SHARED(true)
+            // TODO(https://fxbug.dev/130250): __TA_TRY_ACQUIRE_SHARED(true)
             bool TryLockRead() __TA_NO_THREAD_SAFETY_ANALYSIS { return m_Mutex.try_lock_shared(); }
-            // TODO(fxbug.dev/130250): __TA_ACQUIRE()
+            // TODO(https://fxbug.dev/130250): __TA_ACQUIRE()
             void LockWrite() __TA_NO_THREAD_SAFETY_ANALYSIS { m_Mutex.lock(); }
-            // TODO(fxbug.dev/130250): __TA_RELEASE()
+            // TODO(https://fxbug.dev/130250): __TA_RELEASE()
             void UnlockWrite() __TA_NO_THREAD_SAFETY_ANALYSIS { m_Mutex.unlock(); }
-            // TODO(fxbug.dev/130250): __TA_TRY_ACQUIRE(true)
+            // TODO(https://fxbug.dev/130250): __TA_TRY_ACQUIRE(true)
             bool TryLockWrite() __TA_NO_THREAD_SAFETY_ANALYSIS { return m_Mutex.try_lock(); }
         private:
             std::shared_mutex m_Mutex;

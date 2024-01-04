@@ -113,7 +113,7 @@ void DebuggedThread::OnException(std::unique_ptr<ExceptionHandle> exception_hand
   exception.exception = thread_handle_->GetExceptionRecord();
   exception.timestamp = GetNowTimestamp();
 
-  // TODO(fxbug.dev/136510) clean up the single-step queue here (currently only handled in the
+  // TODO(https://fxbug.dev/136510) clean up the single-step queue here (currently only handled in the
   // HandleSingleStep() function to advance the single-step queue when the stepped-over instruction
   // crashes rather than issues a single-step exception.
 
@@ -176,7 +176,7 @@ void DebuggedThread::ResumeFromException() {
 void DebuggedThread::HandleSingleStep(debug_ipc::NotifyException* exception,
                                       const GeneralRegisters& regs) {
   if (current_breakpoint_) {
-    // TODO(fxbug.dev/136510) this single-step cleanup needs to be unconditionally executed for any
+    // TODO(https://fxbug.dev/136510) this single-step cleanup needs to be unconditionally executed for any
     // exception on the thread (not just here in the "single step" handler) because the thread could
     // crash on the instruction being stepped over and then the step over queue will never be
     // cleaned up.

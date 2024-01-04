@@ -163,7 +163,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
   {
     fbl::AutoLock lock(vc_client.mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(ZX_OK,
@@ -229,7 +229,7 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
   {
     fbl::AutoLock lock(vc_client.mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(ZX_OK,
@@ -291,7 +291,7 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
   // acknowledge
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
@@ -329,7 +329,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
   // now let's acknowledge vsync
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
@@ -373,7 +373,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
   // now let's acknowledge vsync
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
@@ -418,7 +418,7 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
   // now let's acknowledge vsync with invalid cookie
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)primary_client->dc_->AcknowledgeVsync(0xdeadbeef);
   }
   EXPECT_FALSE(RunLoopWithTimeoutOrUntil(
@@ -461,7 +461,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   // now let's acknowledge vsync
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
@@ -503,7 +503,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   // now let's acknowledge vsync with old cookie
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)primary_client->dc_->AcknowledgeVsync(ToFidlVsyncAckCookieValue(old_vsync_ack_cookie));
   }
   EXPECT_FALSE(RunLoopWithTimeoutOrUntil(
@@ -523,7 +523,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   // now let's acknowledge with valid cookie
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
@@ -600,12 +600,12 @@ TEST_F(IntegrationTest, ClampRgb) {
   {
     fbl::AutoLock lock(vc_client.mtx());
     // set mode to Fallback
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)vc_client.dc_->SetVirtconMode(fuchsia_hardware_display::VirtconMode::kFallback);
     EXPECT_TRUE(
         RunLoopWithTimeoutOrUntil([&]() { return virtcon_client_connected(); }, zx::sec(1)));
     // Clamp RGB to a minimum value
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)vc_client.dc_->SetMinimumRgb(32);
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil([&]() { return display()->GetClampRgbValue() == 32; },
                                           zx::sec(1)));
@@ -619,7 +619,7 @@ TEST_F(IntegrationTest, ClampRgb) {
   {
     fbl::AutoLock lock(primary_client->mtx());
     // Clamp RGB to a new value
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)primary_client->dc_->SetMinimumRgb(1);
     EXPECT_TRUE(RunLoopWithTimeoutOrUntil([&]() { return display()->GetClampRgbValue() == 1; },
                                           zx::sec(1)));
@@ -629,7 +629,7 @@ TEST_F(IntegrationTest, ClampRgb) {
   // Apply a config for virtcon client to become active.
   {
     fbl::AutoLock lock(vc_client.mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(ZX_OK,
@@ -656,7 +656,7 @@ TEST_F(IntegrationTest, EmptyConfigIsNotApplied) {
   ASSERT_TRUE(vc_client.Bind(dispatcher()));
   {
     fbl::AutoLock lock(vc_client.mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(ZX_OK,
@@ -716,7 +716,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(
@@ -796,7 +796,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
   // Hide the existing layer.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(
@@ -845,7 +845,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(
@@ -978,7 +978,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(
@@ -1066,7 +1066,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   // and thus use the latest configuration stamp.
   {
     fbl::AutoLock lock(primary_client->mtx());
-    // TODO(fxbug.dev/129849): Do not hardcode the display ID, read from
+    // TODO(https://fxbug.dev/129849): Do not hardcode the display ID, read from
     // display events instead.
     const DisplayId virtcon_display_id(1);
     EXPECT_EQ(
@@ -1252,7 +1252,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(present_config_stamp_4, apply_config_stamp_2);
 }
 
-// TODO(fxbug.dev/90423): Currently the fake-display driver only supports one
+// TODO(https://fxbug.dev/90423): Currently the fake-display driver only supports one
 // primary layer. In order to better test ApplyConfig() / OnVsync() behavior,
 // we should make fake-display driver support multi-layer configurations and
 // then we could add more multi-layer tests.

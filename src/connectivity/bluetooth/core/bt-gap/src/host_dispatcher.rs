@@ -266,7 +266,7 @@ impl HostDispatcherState {
                 // Old pairing dispatcher dropped; this drops all host pairings
                 self.pairing_dispatcher = Some(handle);
                 // Spawn handling of the new pairing requests
-                // TODO(fxbug.dev/72961) - We should avoid detach() here, and consider a more
+                // TODO(https://fxbug.dev/72961) - We should avoid detach() here, and consider a more
                 // explicit way to track this task
                 fasync::Task::spawn(dispatcher.run()).detach();
                 Ok(())
@@ -532,7 +532,7 @@ impl HostDispatcher {
         Ok(dispatcher_session)
     }
 
-    // TODO(fxbug.dev/61352) - This is susceptible to the same ToCtoToU race condition as
+    // TODO(https://fxbug.dev/61352) - This is susceptible to the same ToCtoToU race condition as
     // start_discovery. We can fix with the same tri-state pattern as for discovery
     pub async fn set_discoverable(&self) -> types::Result<Arc<HostDiscoverableSession>> {
         let strong_current_token =
@@ -759,7 +759,7 @@ impl HostDispatcher {
             // If we fail to restore bonds to a given host, that is not a failure on a part of
             // Bootstrap.Commit(), but a failure on the host. So do not return error from this
             // function, but instead log and continue.
-            // TODO(fxbug.dev/45325) - if a host fails we should close it and clean up after it
+            // TODO(https://fxbug.dev/45325) - if a host fails we should close it and clean up after it
             if let Err(error) =
                 try_restore_bonds(host.clone(), self.clone(), &host.public_address()).await
             {
@@ -777,7 +777,7 @@ impl HostDispatcher {
     async fn add_host_device(&self, host_device: &HostDevice) -> Result<(), Error> {
         let dbg_ids = host_device.debug_identifiers();
 
-        // TODO(fxbug.dev/66615): Make sure that the bt-host device is left in a well-known state if
+        // TODO(https://fxbug.dev/66615): Make sure that the bt-host device is left in a well-known state if
         // any of these operations fails.
 
         let address = host_device.public_address();
@@ -840,7 +840,7 @@ impl HostDispatcher {
         fasync::Task::spawn(host_device.watch_events(self.clone()).map(|r| {
             r.unwrap_or_else(|err| {
                 warn!("Error handling host event: {:?}", err);
-                // TODO(fxbug.dev/44180): This should probably remove the bt-host since termination of the
+                // TODO(https://fxbug.dev/44180): This should probably remove the bt-host since termination of the
                 // `watch_events` task indicates that it no longer functions properly.
             })
         }))

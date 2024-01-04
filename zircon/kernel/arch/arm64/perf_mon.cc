@@ -8,8 +8,8 @@
 // "event", but some events are not counters. Internally, we use the
 // term "counter" when we know the event is a counter.
 //
-// TODO(fxbug.dev/33108): combine common parts with x86 (after things settle)
-// TODO(fxbug.dev/33109): chain event handling
+// TODO(https://fxbug.dev/33108): combine common parts with x86 (after things settle)
+// TODO(https://fxbug.dev/33109): chain event handling
 
 #include <assert.h>
 #include <lib/perfmon.h>
@@ -185,7 +185,7 @@ static void arm64_perfmon_init_once(uint level) {
       (ARM64_PMOVSCLR_EL0_C_MASK | ((1 << perfmon_num_programmable_counters) - 1));
 
   // Note: The IRQ handler is configured separately.
-  // If we don't have an IRQ (or a usable one - fxbug.dev/33106) then we can still
+  // If we don't have an IRQ (or a usable one - https://fxbug.dev/33106) then we can still
   // use tally mode and leave it to an external entity to periodically
   // collect the data.
 
@@ -534,7 +534,7 @@ static zx_status_t arm64_perfmon_map_buffers_locked(PerfmonState* state, Guard<M
     // The buffer_vmo is provided by userspace and may need pages committed, which could potentially
     // block. As we currently are holding a lock this operation is generally not permitted, using
     // CallUntracked allows us to suppress the warning.
-    // TODO(fxbug.dev/108303): Restructure this mapping code to performing the pinning externally.
+    // TODO(https://fxbug.dev/108303): Restructure this mapping code to performing the pinning externally.
     guard.CallUntracked([&] {
       status = PinnedVmObject::Create(data->buffer_vmo, vmo_offset, size, true, &buf_pin);
     });
@@ -607,7 +607,7 @@ static void arm64_perfmon_start_task(void* raw_context) TA_NO_THREAD_SAFETY_ANAL
   __arm_wsr64("pmcntenset_el0", state->pm_counter_ctrl);
   __arm_wsr64("pmintenset_el1", state->pmintenset_el1);
 
-  // TODO(fxbug.dev/33106): arm64_pmu_enable_our_irq(true); - needs irq support
+  // TODO(https://fxbug.dev/33106): arm64_pmu_enable_our_irq(true); - needs irq support
 
   // Enable counters as late as possible so that our setup doesn't contribute
   // to the data.
@@ -744,7 +744,7 @@ static void arm64_perfmon_finalize_buffer(PerfmonState* state,
 static void arm64_perfmon_stop_task(void* raw_context) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Disable all counters ASAP.
   disable_counters();
-  // TODO(fxbug.dev/33106): arm64_pmu_enable_our_irq(false); - needs irq support
+  // TODO(https://fxbug.dev/33106): arm64_pmu_enable_our_irq(false); - needs irq support
 
   DEBUG_ASSERT(arch_ints_disabled());
   DEBUG_ASSERT(!perfmon_active.load());
@@ -812,7 +812,7 @@ static void arm64_perfmon_reset_task(void* raw_context) TA_NO_THREAD_SAFETY_ANAL
   // Also, reset the counters, don't leave old values lying around.
   uint32_t pmcr = ARM64_PMCR_EL0_P_MASK | ARM64_PMCR_EL0_C_MASK;
   __arm_wsr64("pmcr_el0", pmcr);
-  // TODO(fxbug.dev/33106): arm64_pmu_enable_our_irq(false); - needs irq support
+  // TODO(https://fxbug.dev/33106): arm64_pmu_enable_our_irq(false); - needs irq support
   arm64_perfmon_clear_overflow_indicators();
 
   __arm_wsr64("pmcntenclr_el0", ~0u);

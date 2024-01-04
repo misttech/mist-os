@@ -243,7 +243,7 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
     return;
   }
 
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   controller_->driver()->ReleaseBufferCollection(it->second.driver_buffer_collection_id);
 
   collection_map_.erase(it);
@@ -282,13 +282,13 @@ void Client::SetBufferCollectionConstraints(
 void Client::ReleaseEvent(ReleaseEventRequestView request,
                           ReleaseEventCompleter::Sync& /*_completer*/) {
   const EventId event_id = ToEventId(request->id);
-  // TODO(fxbug.dev/129990): Check if the ID is valid (i.e. imported but not
+  // TODO(https://fxbug.dev/129990): Check if the ID is valid (i.e. imported but not
   // yet released) before calling ReleaseEvent().
   fences_.ReleaseEvent(event_id);
 }
 
 void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
-  // TODO(fxbug.dev/129036): Layer IDs should be client-managed.
+  // TODO(https://fxbug.dev/129036): Layer IDs should be client-managed.
 
   if (layers_.size() == kMaxLayers) {
     completer.Reply(ZX_ERR_NO_RESOURCES, ToFidlLayerId(kInvalidLayerId));
@@ -307,7 +307,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   layers_.insert(std::move(new_layer));
 
   // Driver-side layer IDs are currently exposed to coordinator clients.
-  // fxbug.dev/129036 tracks having client-managed IDs. When that happens,
+  // https://fxbug.dev/129036 tracks having client-managed IDs. When that happens,
   // Client instances will be responsible for translating between driver-side
   // and client-side IDs.
   LayerId layer_id(driver_layer_id.value());
@@ -318,7 +318,7 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
                           DestroyLayerCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
 
@@ -421,7 +421,7 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
   for (uint64_t i = request->layer_ids.count() - 1; i != UINT64_MAX; i--) {
     LayerId layer_id = ToLayerId(request->layer_ids[i]);
 
-    // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+    // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
     // driver-side ID will have to be looked up in a map.
     DriverLayerId driver_layer_id(layer_id.value());
     auto layer = layers_.find(driver_layer_id);
@@ -448,7 +448,7 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
                                    SetLayerPrimaryConfigCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -467,7 +467,7 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
                                      SetLayerPrimaryPositionCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -490,7 +490,7 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
                                   SetLayerPrimaryAlphaCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -515,7 +515,7 @@ void Client::SetLayerCursorConfig(SetLayerCursorConfigRequestView request,
                                   SetLayerCursorConfigCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -534,7 +534,7 @@ void Client::SetLayerCursorPosition(SetLayerCursorPositionRequestView request,
                                     SetLayerCursorPositionCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -552,7 +552,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
                                  SetLayerColorConfigCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -579,7 +579,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
                            SetLayerImageCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -602,7 +602,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     return;
   }
   const image_t* cur_image = layer->pending_image();
-  // TODO(fxbug.dev/126156): Warning: Currently we only compare size and usage
+  // TODO(https://fxbug.dev/126156): Warning: Currently we only compare size and usage
   // type between `image` and `layer`. This implicitly assume that images can
   // be applied to any layer as long as the format is negotiated by sysmem,
   // which may not be true in the future. We should figure out a way to better
@@ -618,7 +618,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
 
   const EventId wait_event_id = ToEventId(request->wait_event_id);
   const EventId signal_event_id = ToEventId(request->signal_event_id);
-  // TODO(fxbug.dev/129990): Check if the IDs are valid (i.e. imported but not
+  // TODO(https://fxbug.dev/129990): Check if the IDs are valid (i.e. imported but not
   // yet released) before calling SetImage().
   layer->SetImage(image.CopyPointer(), wait_event_id, signal_event_id);
   // no Reply defined
@@ -880,7 +880,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   const display_config_t* configs[configs_.size()];
   layer_t* layers[layers_size];
 
-  // TODO(fxbug.dev/130605): Do not use VLA. We should introduce a limit on
+  // TODO(https://fxbug.dev/130605): Do not use VLA. We should introduce a limit on
   // totally supported layers instead.
   client_composition_opcode_t client_composition_opcodes[layers_size];
   memset(client_composition_opcodes, 0, layers_size * sizeof(client_composition_opcode_t));
@@ -935,7 +935,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         // and display engine drivers when being imported, so they are always
         // accepted by the display coordinator.
       } else if (layer_node.layer->pending_layer_.type == LAYER_TYPE_CURSOR) {
-        // TODO(fxbug.dev/126123): Currently we don't check the pixel formats,
+        // TODO(https://fxbug.dev/126123): Currently we don't check the pixel formats,
         // nor sizes of the imported image. These should be done when we import
         // cursor images to the display driver, and the clients should only use
         // images imported for cursor use on cursor layers.
@@ -1026,7 +1026,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         }
       }
 
-      // TODO(fxbug.dev/192036): When switching to client-managed IDs, the
+      // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
       // client-side ID will have to be looked up in a map.
       const LayerId layer_id(layer_node.layer->id.value());
 
@@ -1496,7 +1496,7 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
             }
             sysmem_allocator_ = fidl::WireSyncClient(std::move(sysmem_allocator_client));
 
-            // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+            // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
             std::string debug_name = std::string("display[") + fsl::GetCurrentProcessName() + "]";
             fidl::OneWayStatus status = sysmem_allocator_->SetDebugClientInfo(
                 fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
@@ -1504,7 +1504,7 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
           }();
       status != ZX_OK) {
     // Not a fatal error, but BufferCollection functions won't work.
-    // TODO(fxbug.dev/33157) TODO: Fail creation once all drivers implement this.
+    // TODO(https://fxbug.dev/33157) TODO: Fail creation once all drivers implement this.
     zxlogf(ERROR, "GetSysmemConnection failed (continuing) - status: %d", status);
   }
 
@@ -1822,7 +1822,7 @@ ClientProxy::~ClientProxy() {
 // Checks the FIDL ClientCompositionOpcode enum matches the corresponding bits
 // in banjo ClientCompositionOpcode bitfield.
 //
-// TODO(fxbug.dev/130427): In the short term, instead of checking this in
+// TODO(https://fxbug.dev/130427): In the short term, instead of checking this in
 // Coordinator, a bridging type should be used for conversion of the types. In
 // the long term, these two types should be unified.
 namespace {

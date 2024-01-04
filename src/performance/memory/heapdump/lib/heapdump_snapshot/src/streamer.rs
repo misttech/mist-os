@@ -9,11 +9,11 @@ use measure_tape_for_snapshot_element::Measurable;
 use crate::Error;
 
 // Number of bytes the header of a vector occupies in a fidl message.
-// TODO(fxbug.dev/98653): This should be a constant in a FIDL library.
+// TODO(https://fxbug.dev/98653): This should be a constant in a FIDL library.
 const FIDL_VECTOR_HEADER_BYTES: usize = 16;
 
 // Number of bytes the header of a fidl message occupies.
-// TODO(fxbug.dev/98653): This should be a constant in a FIDL library.
+// TODO(https://fxbug.dev/98653): This should be a constant in a FIDL library.
 const FIDL_HEADER_BYTES: usize = 16;
 
 // Size of the fixed part of a `SnapshotReceiver/Batch` FIDL message. The actual size is given by

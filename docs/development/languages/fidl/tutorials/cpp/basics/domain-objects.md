@@ -73,8 +73,8 @@ fx test -vo fidl-examples-domain-objects-cpp-test
 
 * {Bazel build}
 
-  <!-- TODO(fxbug.dev/111377): Link to real samples once those are ready.-->
-  <!-- TODO(fxbug.dev/98989): `llcpp` should be renamed to `cpp` -->
+  <!-- TODO(https://fxbug.dev/111377): Link to real samples once those are ready.-->
+  <!-- TODO(https://fxbug.dev/98989): `llcpp` should be renamed to `cpp` -->
 
   When depending on the FIDL library from the Bazel build, an extra build rule
   is required if the FIDL library is not from the SDK:

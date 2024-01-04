@@ -39,7 +39,7 @@ type DeviceReleaseNumber = table {
 };
 
 /// A table of attributes providing information about the device.
-// TODO(fxbug.dev/85943): Expand this table to include attributes defined in the Device Information
+// TODO(https://fxbug.dev/85943): Expand this table to include attributes defined in the Device Information
 // GATT service when supported.
 type DeviceIdentificationRecord = table {
     /// Mandatory - the vendor of the device.

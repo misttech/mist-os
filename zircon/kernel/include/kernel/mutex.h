@@ -42,7 +42,7 @@ class TA_CAP("mutex") Mutex
   DISALLOW_COPY_ASSIGN_AND_MOVE(Mutex);
 
   // The maximum duration to spin before falling back to blocking.
-  // TODO(fxbug.dev/34646): Decide how to make this configurable per device/platform
+  // TODO(https://fxbug.dev/34646): Decide how to make this configurable per device/platform
   // and describe how to optimize this value.
   static constexpr zx_duration_t SPIN_MAX_DURATION = ZX_USEC(150);
 

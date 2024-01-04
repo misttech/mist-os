@@ -91,7 +91,7 @@ void ControllerImpl::CreateStream(uint32_t config_index, uint32_t stream_index,
     return;
   }
 
-  // TODO(fxbug.dev/100525): Move config index management into the pipeline manager, then delete
+  // TODO(https://fxbug.dev/100525): Move config index management into the pipeline manager, then delete
   // shutdown/queueing in this component.
   //
   // If the requested config is different from the current

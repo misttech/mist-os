@@ -63,5 +63,5 @@ type OperatingBand = strict enum {
 };
 
 /// Empty struct used in place of optional values.
-// TODO: fxbug.dev/7913
+// TODO: https://fxbug.dev/7913
 type Empty = struct {};

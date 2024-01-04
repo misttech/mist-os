@@ -102,7 +102,7 @@ impl<'a> CompiledBindRules<'a> {
     }
 }
 
-// TODO(fxb/103352): Use enable debug flag.
+// TODO(https://fxbug.dev/103352): Use enable debug flag.
 #[derive(Debug, PartialEq)]
 pub struct BindRules<'a> {
     pub symbol_table: SymbolTable,

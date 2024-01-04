@@ -343,7 +343,7 @@ struct InspectData {
 
 impl InspectData {
     /// Number of inspect samples to store in the `temperature_readings` BoundedListNode.
-    // Store the last 60 seconds of temperature readings (fxbug.dev/59774)
+    // Store the last 60 seconds of temperature readings (https://fxbug.dev/59774)
     const NUM_INSPECT_TEMPERATURE_SAMPLES: usize = 60;
 
     fn new(parent: &inspect::Node, name: String) -> Self {

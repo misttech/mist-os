@@ -58,7 +58,7 @@ type ModeFlag = strict bits : uint32 {
 };
 
 /// The video parameters which specify the display mode.
-/// TODO(fxbug.dev/42085013): Replace this type with something more similar
+/// TODO(https://fxbug.dev/42085013): Replace this type with something more similar
 /// to //src/graphics/display/lib/api-types-cpp/display-timing.h.
 type DisplayMode = struct {
     pixel_clock_khz uint32;
@@ -141,7 +141,7 @@ open protocol Engine {
     /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
     flexible ImportBufferCollection(resource struct {
         collection_id uint64;
-        // TODO(fxbug.dev/89649): This is a client end channel of FIDL protocol
+        // TODO(https://fxbug.dev/89649): This is a client end channel of FIDL protocol
         // fuchsia.sysmem.BufferCollectionToken. The raw channel needs to be
         // replaced with FIDL client end once banjo to FIDL migration finishes.
         collection_token zx.Handle:CHANNEL;

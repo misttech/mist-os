@@ -287,7 +287,7 @@ class ElementMeta(object):
         meta_one = self._meta
         meta_two = other._meta
 
-        # TODO(fxbug.dev/5362): verify that the common parts of the metadata files are in
+        # TODO(https://fxbug.dev/5362): verify that the common parts of the metadata files are in
         # fact identical.
         type = self.type
         if type != other.type:

@@ -43,7 +43,7 @@ zx_status_t PowerSourceProtocolServer::SignalClient() {
   return status;
 }
 
-// TODO(fxbug.dev/131463): when a cli is being developed, this will be made adjustable.
+// TODO(https://fxbug.dev/131463): when a cli is being developed, this will be made adjustable.
 void PowerSourceProtocolServer::GetPowerInfo(GetPowerInfoCompleter::Sync& completer) {
   SourceInfo source_info{PowerType::kBattery, fuchsia_hardware_powersource::kPowerStateCharging |
                                                   fuchsia_hardware_powersource::kPowerStateOnline};

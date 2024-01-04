@@ -31,7 +31,7 @@ namespace i915 {
 namespace {
 
 // Value used to allocate space for the fake i915 register MMIO space.
-// TODO(fxbug.dev/83998): Remove this once DpDisplay no longer depends on Controller.
+// TODO(https://fxbug.dev/83998): Remove this once DpDisplay no longer depends on Controller.
 constexpr uint32_t kMmioSize = 0xd0000;
 
 class TestDpll : public DisplayPll {
@@ -170,7 +170,7 @@ class DpDisplayTest : public ::testing::Test {
 
   std::unique_ptr<DpDisplay> MakeDisplay(DdiId ddi_id,
                                          display::DisplayId id = display::DisplayId{1}) {
-    // TODO(fxbug.dev/86038): In normal operation a DpDisplay is not fully constructed until it
+    // TODO(https://fxbug.dev/86038): In normal operation a DpDisplay is not fully constructed until it
     // receives a call to DisplayDevice::Query, then either DisplayDevice::Init() (for a hotplug or
     // initially powered-off display) OR DisplayDevice::AttachPipe() and
     // DisplayDevice::LoadACtiveMode() (for a pre-initialized display, e.g. bootloader-configured
@@ -195,7 +195,7 @@ class DpDisplayTest : public ::testing::Test {
   fdf::MmioBuffer* mmio_buffer() { return &mmio_buffer_; }
 
  private:
-  // TODO(fxbug.dev/83998): Remove DpDisplay's dependency on Controller which will remove
+  // TODO(https://fxbug.dev/83998): Remove DpDisplay's dependency on Controller which will remove
   // the need for much of what's in SetUp() and TearDown().
   Controller controller_;
   uint8_t buffer_[kMmioSize];
@@ -252,7 +252,7 @@ TEST_F(DpDisplayTest, LinkRateSelectionViaInit) {
   // DpDisplay::Init() to succeed. Configuring the IGD op region to indicate eDP will cause
   // Controller to assign DPLL0 to the display.
 
-  // TODO(fxbug.dev/83998): It shouldn't be necessary to rely on this logic in Controller to test
+  // TODO(https://fxbug.dev/83998): It shouldn't be necessary to rely on this logic in Controller to test
   // DpDisplay. Can DpDisplay be told that it is eDP during construction time instead of querying
   // Controller for it every time?
   controller()->igd_opregion_for_testing()->SetIsEdpForTesting(DdiId::DDI_A, true);

@@ -155,7 +155,7 @@ impl UpdateAlgorithm for TestUpdateAlgorithm {
     }
 
     async fn next_possible_sample_time(&self) -> zx::Time {
-        // TODO(fxb/113722): Implement rate limiting.
+        // TODO(https://fxbug.dev/113722): Implement rate limiting.
         zx::Time::get_monotonic()
     }
 }

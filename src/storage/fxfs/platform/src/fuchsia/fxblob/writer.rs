@@ -112,7 +112,7 @@ impl Inner {
             if seek_table.is_empty() {
                 return 0;
             }
-            // TODO(fxbug.dev/127530): If the uncompressed size of the blob is smaller than the
+            // TODO(https://fxbug.dev/127530): If the uncompressed size of the blob is smaller than the
             // filesystem's block size, we should decompress it before persisting it on disk.
             return seek_table.last().unwrap().compressed_range.end;
         }
@@ -526,7 +526,7 @@ fn parse_seek_table(
         .map(|entry| TryInto::<u64>::try_into(entry.compressed_range.start))
         .collect::<Result<Vec<_>, _>>()?;
 
-    // TODO(fxbug.dev/127530): The pager assumes chunk_size alignment is at least the size of a
+    // TODO(https://fxbug.dev/127530): The pager assumes chunk_size alignment is at least the size of a
     // Merkle tree block. We should allow arbitrary chunk sizes. For now, we reject archives with
     // multiple chunks that don't meet this requirement (since we control archive generation), and
     // round up the chunk size for archives with a single chunk, as we won't read past the file end.

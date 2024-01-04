@@ -709,7 +709,7 @@ fn start_dhcpv6_client(
         // now because we do not use the prefix variant, but if we did we need
         // to support pretty-printing prefixes as it is considered PII and only
         // pretty-printed prefixes/addresses are properly redacted.
-        todo!("http://fxbug.dev/117848: Support pretty-printing configured prefix");
+        todo!("https://fxbug.dev/117848: Support pretty-printing configured prefix");
     }
 
     let source = DnsServersUpdateSource::Dhcpv6 { interface_id: id.get() };
@@ -1225,7 +1225,7 @@ impl<'a> NetCfg<'a> {
                 let servers = match res {
                     Ok(s) => s,
                     Err(e) => {
-                        // TODO(fxbug.dev/57484): Restart the DNS server watcher.
+                        // TODO(https://fxbug.dev/57484): Restart the DNS server watcher.
                         warn!(
                             "non-fatal error getting next event from DNS server watcher stream
                             with source = {:?}: {:?}",
@@ -1247,7 +1247,7 @@ impl<'a> NetCfg<'a> {
 
                 self.update_dns_servers(source, servers).await;
             }
-            // TODO(fxbug.dev/130449): Add tests to ensure we do not offer
+            // TODO(https://fxbug.dev/130449): Add tests to ensure we do not offer
             // these services when interface has ProvisioningAction::Delegated
             // state.
             ProvisioningEvent::RequestStream(req_stream) => {
@@ -1688,7 +1688,7 @@ impl<'a> NetCfg<'a> {
                         config: InterfaceConfigState::WlanAp(WlanApInterfaceState {}),
                         ..
                     }) => {
-                        // TODO(fxbug.dev/55879): Stop the DHCP server when the address it is
+                        // TODO(https://fxbug.dev/55879): Stop the DHCP server when the address it is
                         // listening on is removed.
                         let dhcp_server = if let Some(dhcp_server) = dhcp_server {
                             dhcp_server
@@ -2889,12 +2889,12 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
     .await
     .context("error creating new netcfg instance")?;
 
-    // TODO(fxbug.dev/130394): Once non-Fuchsia components can control filtering rules, disable
+    // TODO(https://fxbug.dev/130394): Once non-Fuchsia components can control filtering rules, disable
     // setting filters when interfaces are in Delegated provisioning mode.
     let () =
         netcfg.update_filters(filter_config).await.context("update filters based on config")?;
 
-    // TODO(fxbug.dev/129708): Once non-Fuchsia components can control DNS servers, disable
+    // TODO(https://fxbug.dev/129708): Once non-Fuchsia components can control DNS servers, disable
     // setting default DNS servers when interfaces are in Delegated provisioning mode.
     let servers = servers.into_iter().map(static_source_from_ip).collect();
     debug!("updating default servers to {:?}", servers);
@@ -3027,7 +3027,7 @@ fn map_address_state_provider_error(
 
 /// If we can't reach netstack via fidl, log an error and exit.
 //
-// TODO(fxbug.dev/119295): add a test that works as intended.
+// TODO(https://fxbug.dev/119295): add a test that works as intended.
 fn exit_with_fidl_error(cause: fidl::Error) -> ! {
     error!(%cause, "exiting due to fidl error");
     std::process::exit(1);

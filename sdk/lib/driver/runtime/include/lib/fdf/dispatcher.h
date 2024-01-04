@@ -35,7 +35,7 @@ __BEGIN_CDECLS
 //
 //   void driver_start(void) {
 //     const char* name = "my_driver";
-//     TODO(fxb/85946): update this once scheduler_role is supported.
+//     TODO(https://fxbug.dev/85946): update this once scheduler_role is supported.
 //     const char* scheduler_role = "";
 //     struct dispatcher_shutdown_observer my_observer;
 //     my_observer.fdf_observer.handler = shutdown_handler;
@@ -89,7 +89,7 @@ struct fdf_dispatcher_shutdown_observer {
 // threads with the dispatcher.
 // |scheduler_role_len | is the length of the string, without including the terminating
 // NULL character.
-// TODO(fxb/85946): currently |scheduler_role| is not implemented.
+// TODO(https://fxbug.dev/85946): currently |scheduler_role| is not implemented.
 //
 // |observer| will be called after |fdf_dispatcher_shutdown_async| has been called,
 // and the dispatcher has completed its asynchronous shutdown.

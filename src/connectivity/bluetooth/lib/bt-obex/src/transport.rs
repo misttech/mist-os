@@ -69,7 +69,7 @@ impl<'a> ObexTransport<'a> {
 
     /// Attempts to receive and parse an OBEX response packet from the `channel`.
     /// Returns the parsed packet on success, Error otherwise.
-    // TODO(fxbug.dev/125307): Make this more generic to decode either request or response packets
+    // TODO(https://fxbug.dev/125307): Make this more generic to decode either request or response packets
     // when OBEX Server functionality is needed.
     pub async fn receive_response(&mut self, code: OpCode) -> Result<ResponsePacket, Error> {
         if self.channel.is_terminated() {

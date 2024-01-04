@@ -6,7 +6,7 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-// TODO(fxbug.dev/40804): delete once log output is properly interleaved.e
+// TODO(https://fxbug.dev/40804): delete once log output is properly interleaved.e
 #include <lib/syslog/cpp/macros.h>
 
 #include <chrono>

@@ -30,7 +30,7 @@ group("tests") {
     ":zbi-storage-kernel-test",
   ]
   if (!is_mac) {
-    # TODO(fxbug.dev/85167): when bug fixed, add the dep below
+    # TODO(https://fxbug.dev/85167): when bug fixed, add the dep below
     # unconditionally.
     deps += [ ":zbi-input-chrdev-test" ]
   }

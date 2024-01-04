@@ -298,7 +298,7 @@ func (r *Root) ServicesForTransport() func(string) []*Service {
 					associatedTransport = m.ProtocolTransport.Name
 				}
 				if associatedTransport != m.ProtocolTransport.Name {
-					fidlgen.TemplateFatalf("Mismatched transports: %s, %s. See fxbug.dev/106184",
+					fidlgen.TemplateFatalf("Mismatched transports: %s, %s. See https://fxbug.dev/106184",
 						associatedTransport, m.ProtocolTransport.Name)
 				}
 			}
@@ -505,7 +505,7 @@ func (c *compiler) isInExternalLibrary(ci fidlgen.CompoundIdentifier) bool {
 func (c *compiler) compileNameVariants(eci fidlgen.EncodedCompoundIdentifier) nameVariants {
 	ci := eci.Parse()
 
-	// TODO(fxbug.dev/136041): We special case zx, e.g. if ci is "zx/Rights" we
+	// TODO(https://fxbug.dev/136041): We special case zx, e.g. if ci is "zx/Rights" we
 	// emit "zx_rights_t" instead of "fidl_zx::Rights". But don't do that when
 	// compiling library zx itself, since it would apply to the left-hand side
 	// of its own definitions. Really we shouldn't be generating bindings for
@@ -775,7 +775,7 @@ func Compile(r fidlgen.Root) *Root {
 		// at context ["foo", "bar"] has a child "baz"
 		key := toKey(layout.GetNamingContext()[:len(layout.GetNamingContext())-1])
 		c.anonymousChildren[key] = append(c.anonymousChildren[key], ScopedLayout{
-			// TODO(fxbug.dev/60240): change this when other bindings use name transforms
+			// TODO(https://fxbug.dev/60240): change this when other bindings use name transforms
 			scopedName:    stringNamePart(fidlgen.ToUpperCamelCase(layout.GetNamingContext()[len(layout.GetNamingContext())-1])),
 			flattenedName: c.compileNameVariants(layout.GetName()),
 		})

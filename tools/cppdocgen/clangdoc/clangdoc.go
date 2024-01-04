@@ -29,7 +29,7 @@ type Location struct {
 // PathNameToFullyQualified converts a Path + Name that is used for types and references into a
 // fully-qualified C++ name.
 //
-// TODO(fxbug.dev/119082): This will skip template parameters which are not encoded in the path.
+// TODO(https://fxbug.dev/119082): This will skip template parameters which are not encoded in the path.
 // Implementing this properly will require looking up each USR in the index and getting the template
 // parameters. If you can get a QualName (on a Reference) it will contain the template parameters
 // and should be used instead.

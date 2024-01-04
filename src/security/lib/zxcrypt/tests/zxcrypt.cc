@@ -34,7 +34,7 @@ void TestBind(Volume::Version version, bool fvm) {
 }
 DEFINE_EACH_DEVICE(ZxcryptTest, TestBind)
 
-// TODO(aarongreen): When fxbug.dev/31073 is resolved, add tests that check zxcrypt_rekey and
+// TODO(aarongreen): When https://fxbug.dev/31073 is resolved, add tests that check zxcrypt_rekey and
 // zxcrypt_shred.
 
 // FIDL tests
@@ -395,7 +395,7 @@ void TestVmoManyToOne(Volume::Version version, bool fvm) {
 }
 DEFINE_EACH_DEVICE(ZxcryptTest, TestVmoManyToOne)
 
-// Disabled due to flakiness (see fxbug.dev/31974).
+// Disabled due to flakiness (see https://fxbug.dev/31974).
 void DISABLED_TestVmoStall(Volume::Version version, bool fvm) {
   TestDevice device;
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());

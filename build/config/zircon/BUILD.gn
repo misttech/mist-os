@@ -258,7 +258,7 @@ config("no_fuzzer") {
   }
 }
 
-# TODO(fxbug.dev/27266) Remove this once the warning with fit::variant is addressed.
+# TODO(https://fxbug.dev/27266) Remove this once the warning with fit::variant is addressed.
 config("no_maybe_uninitialized") {
   if (is_gcc) {
     cflags = [ "-Wno-maybe-uninitialized" ]
@@ -267,7 +267,7 @@ config("no_maybe_uninitialized") {
 
 config("machine") {
   if (is_fuchsia && is_gcc) {
-    # TODO(fxbug.dev/32157): Really need to get this nailed down once and for all
+    # TODO(https://fxbug.dev/32157): Really need to get this nailed down once and for all
     # and set by default in the compiler driver (Clang at least).
     ldflags = [ "-Wl,-z,max-page-size=4096" ]
   }
@@ -331,7 +331,7 @@ config("static-libc++") {
   } else {
     ldflags = [ "-static-libstdc++" ]
 
-    # TODO(fxbug.dev/26846): The implicitly linked static libc++.a depends on these.
+    # TODO(https://fxbug.dev/26846): The implicitly linked static libc++.a depends on these.
     if (current_os == "linux") {
       libs = [
         "dl",
@@ -347,7 +347,7 @@ config("static-libc++") {
 # to ensure the code with this requirement doesn't get compiled in ways that won't
 # work.  This config can be changed to add switches when those needs arise.
 config("pure") {
-  # TODO(fxbug.dev/125225): This disables the SwitchToLookupTable optimization,
+  # TODO(https://fxbug.dev/125225): This disables the SwitchToLookupTable optimization,
   # which is not PIC-friendly under LTO.
   if ((current_toolchain == shlib_toolchain ||
        toolchain_variant.is_pic_default) &&

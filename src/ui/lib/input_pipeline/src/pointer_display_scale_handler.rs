@@ -17,7 +17,7 @@ use {
     std::{convert::From, rc::Rc},
 };
 
-// TODO(fxbug.dev/91272) Add trackpad support
+// TODO(https://fxbug.dev/91272) Add trackpad support
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq)]
 pub struct PointerDisplayScaleHandler {

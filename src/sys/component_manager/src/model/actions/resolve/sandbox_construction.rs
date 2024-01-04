@@ -103,7 +103,7 @@ pub fn build_component_sandbox(
                 collection_dicts.entry(name.clone()).or_insert(Dict::new())
             }
             cm_rust::OfferTarget::Capability(_name) => {
-                // TODO(fxbug.dev/301674053): Support dictionary routing.
+                // TODO(https://fxbug.dev/301674053): Support dictionary routing.
                 continue;
             }
         };

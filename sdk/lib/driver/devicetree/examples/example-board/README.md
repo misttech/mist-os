@@ -14,12 +14,12 @@ publish all the devices/nodes.
 
 ## Schemas and custom visitors
 
-TODO(fxbug.dev/133361) Add devicetree schema support.
+TODO(https://fxbug.dev/133361) Add devicetree schema support.
 All non standard bindings present in the devicetree which are custom to specific devices or drivers
 need to parsed into a metadata and passed on to the driver. It is expected that the metadata is
 represented as FIDL and should be parsed from the devicetree node properties. `DriverVisitor` class can
 be used to add this support for each metadata type. Currently such parsers need to manually coded
-(fxbug.dev/133362). These visitors however cannot be part of the devicetree manager library. They need
+(https://fxbug.dev/133362). These visitors however cannot be part of the devicetree manager library. They need
 to be included as `devicetree_schema` dependencies into the `devicetree` target. The board driver can then
 include `$devicetree_target_name.visitors` as it's package dependency to place all visitor libraries under
 `/pkg/visitors/`. At runtime the board driver can load all these visitors using the `load-visitors` helper library.

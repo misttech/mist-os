@@ -50,7 +50,7 @@ Pick any build target that is marked as non-hermetic. They look as follows:
 ```gn
 action("foo") {
   ...
-  # TODO(fxbug.dev/xxxxx): delete the line below and fix this
+  # TODO(https://fxbug.dev/xxxxx): delete the line below and fix this
   hermetic_deps = false
 }
 ```
@@ -81,7 +81,7 @@ If there's already a bug filed for the issue then the bug should include the
 information that's in the error. If there isn't a bug, please file one and
 record the information that you've gathered.
 
-Example: [fxbug.dev/68307](https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=68307)
+Example: [https://fxbug.dev/68307](https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=68307)
 
 #### Fixing the issue
 

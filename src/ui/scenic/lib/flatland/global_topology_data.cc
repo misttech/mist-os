@@ -239,7 +239,7 @@ std::optional<std::pair<size_t, zx_koid_t>> FindRoot(
     const GlobalTopologyData::TopologyVector& topology_vector,
     const GlobalTopologyData::ViewRefMap& view_refs) {
   for (size_t index = 0; index < topology_vector.size(); ++index) {
-    // TODO(fxbug.dev/109352): Make sure the root view is not anonymous?
+    // TODO(https://fxbug.dev/109352): Make sure the root view is not anonymous?
     if (const auto koid = GetViewRefKoid(topology_vector[index], view_refs)) {
       return std::make_pair(index, *koid);
     }

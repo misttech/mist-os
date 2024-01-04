@@ -263,7 +263,7 @@ rustc_toolchain_spec = {
   version_description = rustc_version_description
   flag_vars = [ "rustflags" ]
 
-  # TODO(http://fxbug.dev/310271984): Move to canonical triple.
+  # TODO(https://fxbug.dev/310271984): Move to canonical triple.
   target_tuple = current_target_tuple
   if (target_tuple == "x86_64-unknown-fuchsia" ||
       target_tuple == "aarch64-unknown-fuchsia") {

@@ -26,7 +26,7 @@ group("tests") {
     "ubpf:tests",
     "usercopy:tests",
 
-    # TODO(fxbug.dev/132040): Disabled due to flakiness.
+    # TODO(https://fxbug.dev/132040): Disabled due to flakiness.
     # "kill_job_on_panic:tests",
   ]
 }

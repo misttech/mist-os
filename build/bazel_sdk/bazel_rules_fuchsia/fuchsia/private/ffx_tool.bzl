@@ -4,11 +4,11 @@
 
 """Common definition for rules using the ffx tool."""
 
-# TODO(fxbug.dev/287355615): This logic actually belongs in the IDK, not the
+# TODO(https://fxbug.dev/287355615): This logic actually belongs in the IDK, not the
 # SDK. The SDK should just read this data from the IDK's json manifests.
 #
 # If you are considering adding another method here, please ping
-# fxbug.dev/287355615, and we can potentially prioritize fixing this the Right
+# https://fxbug.dev/287355615, and we can potentially prioritize fixing this the Right
 # Way™.
 
 def get_ffx_assembly_inputs(fuchsia_toolchain):

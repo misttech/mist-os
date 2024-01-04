@@ -126,7 +126,7 @@ REMOTE_RUSTC_SUBDIR = Path("prebuilt", "third_party", "rust", REMOTE_PLATFORM)
 REMOTE_CLANG_SUBDIR = Path("prebuilt", "third_party", "clang", REMOTE_PLATFORM)
 REMOTE_GCC_SUBDIR = Path("prebuilt", "third_party", "gcc", REMOTE_PLATFORM)
 
-# TODO(http://fxbug.dev/125627): use platform-dependent location
+# TODO(https://fxbug.dev/125627): use platform-dependent location
 # Until then, this remote fsatrace only works from linux-x64 hosts.
 FSATRACE_PATH = Path("prebuilt", "fsatrace", "fsatrace")
 
@@ -181,7 +181,7 @@ def check_determinism_command(
 
 def determinism_repetitions(paths: Iterable[Path]) -> Optional[int]:
     """Override the maximum number of determinism repetitions for specific files."""
-    # For http://fxbug.dev/130161: Increase repetition count to increase
+    # For https://fxbug.dev/130161: Increase repetition count to increase
     # chances of repro in infra.
     if any("libminfs.vnode.cc" in str(path) for path in paths):
         # Historically, this failed around 5% of the time in infra.

@@ -29,7 +29,7 @@ use std::sync::Arc;
 const STASH_IDENTITY: &str = "settings_service";
 
 lazy_static! {
-    // TODO(fxb/93842): replace with a dependency injected value instead of a static.
+    // TODO(https://fxbug.dev/93842): replace with a dependency injected value instead of a static.
     static ref SETTING_PROXY_INSPECT_INFO: SettingProxyInspectInfo =
         SettingProxyInspectInfo::new(component::inspector().root());
 

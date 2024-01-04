@@ -161,7 +161,7 @@ void PaperDrawCallFactory::EnqueueDrawCalls(const PaperShapeCacheEntry& cache_en
   // objects to be stencil-tested and others not, this info would be included.
   {
     Hasher h;
-    // TODO(fxbug.dev/7241): add this back in some way, with a more abstract pipeline
+    // TODO(https://fxbug.dev/7241): add this back in some way, with a more abstract pipeline
     // identifier instead of the actual program uid (which can change from pass
     // to pass). h.u64(shadow_volume_program_->uid());
     pipeline_hash = h.value();
@@ -233,7 +233,7 @@ void PaperDrawCallFactory::EnqueueDrawCalls(const PaperShapeCacheEntry& cache_en
                                                   /*gamma_power*/ 1.f, shader_list,
                                                   cache_entry.num_shadow_volume_indices);
 
-    // TODO(fxbug.dev/7241): revisit sort key... we expect that a subsequent CL will add a
+    // TODO(https://fxbug.dev/7241): revisit sort key... we expect that a subsequent CL will add a
     // ShaderProgram as a field in the |instance_data| created by NewMeshDrawData().  Then, we'll
     // want the sort key to reflect the fact that a different pipeline is being used.
     render_queue_->PushDrawCall(
@@ -321,7 +321,7 @@ PaperDrawCallFactory::SortKey PaperDrawCallFactory::SortKey::NewOpaque(Hash pipe
   // Prioritize minimizing pipeline changes over depth-sorting; both are more
   // important than minimizing mesh/texture state changes (in practice, almost
   // every draw call uses a separate mesh/texture anyway).
-  // TODO(fxbug.dev/7241): We currently don't have multiple pipelines used in the opaque
+  // TODO(https://fxbug.dev/7241): We currently don't have multiple pipelines used in the opaque
   // pass, so we sort primarily by depth.  However, when we eventually do have
   // multiple pipelines, we may want to rewrite the pipeline hashes with a value
   // that reflects whether objects drawn using that pipeline tend to be drawn

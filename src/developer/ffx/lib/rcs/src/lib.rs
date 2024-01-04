@@ -247,7 +247,7 @@ You can use `ffx component explore '<moniker>'` to explore the component topolog
 of your target device to fix this moniker if this is the case.
 
 If you believe you have encountered a bug after walking through the above please report it at
-http://fxbug.dev/new/ffx+User+Bug")).into()
+https://fxbug.dev/new/ffx+User+Bug")).into()
                         }
                         _ => {
                             anyhow::anyhow!(
@@ -259,7 +259,7 @@ http://fxbug.dev/new/ffx+User+Bug")).into()
         })).await.map_err(|_| errors::ffx_error!("Timed out connecting to capability: '{capability_name}'
 with moniker: '{moniker}'.
 This is likely due to a sudden shutdown or disconnect of the target.
-If you have encountered what you think is a bug, Please report it at http://fxbug.dev/new/ffx+User+Bug
+If you have encountered what you think is a bug, Please report it at https://fxbug.dev/new/ffx+User+Bug
 
 To diagnose the issue, use `ffx doctor`.").into()).and_then(|r| r)
 }

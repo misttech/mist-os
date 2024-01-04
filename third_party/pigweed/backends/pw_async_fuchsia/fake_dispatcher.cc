@@ -22,7 +22,7 @@ void NativeFakeDispatcher::PostAfter(Task& task, chrono::SystemClock::duration d
 }
 
 void NativeFakeDispatcher::PostAt(Task& task, chrono::SystemClock::time_point time) {
-  // TODO(fxbug.dev/125112): Return errors once these methods return a Status.
+  // TODO(https://fxbug.dev/125112): Return errors once these methods return a Status.
   if (!fake_loop_.Runnable()) {
     Context ctx{.dispatcher = &dispatcher_, .task = &task};
     task(ctx, Status::Cancelled());

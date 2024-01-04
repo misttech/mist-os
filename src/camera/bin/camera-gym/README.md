@@ -6,7 +6,7 @@ Example app to exercise the various stream configurations available for Sherlock
 See go/try-flatland
 
 Note: Currently flatland support is limited to showing only camera streams on supported physical device.
-Bug that tracks full flatland migration for camera-gym is fxb/122163.
+Bug that tracks full flatland migration for camera-gym is https://fxbug.dev/122163.
 
 ### Run camera-gym
 
@@ -138,7 +138,7 @@ $ ls /ns/tmp
 
 #### Copy out frames that were captured
 
-TODO(fxb/100465): Update this once `ffx component copy` is mature.
+TODO(https://fxbug.dev/100465): Update this once `ffx component copy` is mature.
 
 #### Post process NV12 raw dumps to PNG and view the PNG images
 

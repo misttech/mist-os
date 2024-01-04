@@ -284,7 +284,7 @@ LOCK_DEP_POLICY_OPTION(BrwLockNoPi, BrwLockNoPi::Reader, BrwLockNoPi::ReaderPoli
 }  // namespace internal
 
 #ifdef __riscv
-// TODO(fxbug.dev/124881) Optimally implement BrwLock
+// TODO(https://fxbug.dev/124881) Optimally implement BrwLock
 // Workaround for lack of doubleword CAS in the brwlock implementation on RISC-V that is only
 // used in the PI path. Simply switch to using the no PI version for this architecture.
 using BrwLockPi = ::internal::BrwLockNoPi;

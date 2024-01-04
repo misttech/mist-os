@@ -34,7 +34,7 @@ pub async fn start_gatt_loop<'a>(proxy: ClientProxy) -> Result<(), Error> {
 
     println!("  discovering services...");
 
-    // TODO(fxbug.dev/109239): This only gets the list of initial services. We should watch for
+    // TODO(https://fxbug.dev/109239): This only gets the list of initial services. We should watch for
     // future service updates as well.
     let (services, _) =
         client.read().proxy.watch_services(&[]).await.context("Failed to watch services")?;

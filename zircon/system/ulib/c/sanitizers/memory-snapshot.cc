@@ -22,7 +22,7 @@
 
 namespace {
 
-// TODO(fxbug.dev/93847): ThreadSuspender synchronizes using _dl_wrlock.  If a
+// TODO(https://fxbug.dev/93847): ThreadSuspender synchronizes using _dl_wrlock.  If a
 // vDSO entry point used during the snapshot code is interpoosed by a version
 // that calls dlsym, this can deadlock since dlsym takes the write lock too for
 // its own arcane reasons.  The known interposer implementations such as

@@ -63,7 +63,7 @@ config("compiler") {
 
   if (support_rust) {
     if (!is_debug || rust_rbe_enable) {
-      # fxbug.dev/85921#c15: forcing one codegen unit produces
+      # https://fxbug.dev/85921#c15: forcing one codegen unit produces
       # smaller binaries but makes builds slower.
       # Enforce one codegen unit only when we really care about
       # size (release builds), or when RBE is enabled (and then
@@ -86,7 +86,7 @@ config("compiler") {
     # When linking C++ runtime libraries into Rust binaries, we should use
     # the correct multilib variant.
     #
-    # TODO(fxbug.dev/95670): Rather then hardcoding the directory names here,
+    # TODO(https://fxbug.dev/95670): Rather then hardcoding the directory names here,
     # these should ideally come from runtime.json.
     _multilib_dir = ""
     if (toolchain_variant.tags + [ "asan" ] - [ "asan" ] !=
@@ -123,7 +123,7 @@ config("compiler") {
       rustflags += [ "--remote-flag=--cxx-stdlibdir=${_libcxx_dir}" ]
     }
 
-    # TODO(fxbug.dev/53078): Eventually the default in the compler driver.
+    # TODO(https://fxbug.dev/53078): Eventually the default in the compler driver.
     rustflags += [ "-Clink-arg=-zrel" ]
   }
 }
@@ -243,7 +243,7 @@ config("integer-paranoia") {
 # clang_libunwind is only available on fuchsia.
 # See the definition in //build/config/clang/clang.gni.
 if (is_fuchsia) {
-  # TODO(fxbug.dev/57729): Get this information from runtime.json instead.
+  # TODO(https://fxbug.dev/57729): Get this information from runtime.json instead.
   _clang_libunwind = exec_script("$clang_prefix/clang++",
                                  [
                                    "--target=$current_target_tuple",
@@ -280,7 +280,7 @@ group("maybe_scudo_default_options") {
 sanitizer_default_options("scudo_default_options") {
 }
 
-# TODO(fxbug.dev/98632): This works around a toolchain issue in LTO builds
+# TODO(https://fxbug.dev/98632): This works around a toolchain issue in LTO builds
 # where code generation results in a dependency on a Zircon vDSO call but
 # doesn't link -lzircon to supply it at link time.  This is added to deps of
 # the few targets where this has caused link failures to just explicitly link

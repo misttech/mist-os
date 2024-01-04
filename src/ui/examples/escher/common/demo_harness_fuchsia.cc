@@ -46,7 +46,7 @@ DemoHarnessFuchsia::DemoHarnessFuchsia(async::Loop* loop, WindowParams window_pa
 
 std::string DemoHarnessFuchsia::GetCacheDirectoryPath() { return kCacheDirectoryPath; }
 
-// TODO(fxbug.dev/124389): Support input via /dev/class/input-report.
+// TODO(https://fxbug.dev/124389): Support input via /dev/class/input-report.
 void DemoHarnessFuchsia::InitWindowSystem() {}
 
 vk::SurfaceKHR DemoHarnessFuchsia::CreateWindowAndSurface(const WindowParams& params) {

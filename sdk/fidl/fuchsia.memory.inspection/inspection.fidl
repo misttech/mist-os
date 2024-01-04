@@ -14,7 +14,7 @@ closed protocol Collector {
     /// The socket is closed by the server after all the data is written into
     /// it.
     ///
-    /// TODO(fxbug.dev/122104): Document the schema of the JSON.
+    /// TODO(https://fxbug.dev/122104): Document the schema of the JSON.
     ///
     /// Sample output:
     /// {"Capture":

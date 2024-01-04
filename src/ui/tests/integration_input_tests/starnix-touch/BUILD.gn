@@ -83,7 +83,7 @@ fuchsia_test_package("starnix-touch-test") {
   subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
   test_specs = {
     log_settings = {
-      # TODO(fxbug.dev/93081): Investigate removal of allowing ERROR severity.
+      # TODO(https://fxbug.dev/93081): Investigate removal of allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = [

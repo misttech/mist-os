@@ -113,7 +113,7 @@ func (c *APICommand) Execute(out io.Writer) error {
 	case PutData:
 		return instance.Put(c.fuzzer, c.srcPath, c.dstPath)
 	case RunFuzzer:
-		// TODO(fxbug.dev/45431): buffer output so we don't get prematurely terminated by CF
+		// TODO(https://fxbug.dev/45431): buffer output so we don't get prematurely terminated by CF
 		return instance.RunFuzzer(out, c.fuzzer, c.dstPath, c.extraArgs...)
 	case Version:
 		fmt.Fprintf(out, "v%d.%d.%d\n", VersionMajor, VersionMinor, VersionPatch)

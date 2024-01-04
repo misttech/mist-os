@@ -46,7 +46,7 @@ const OVERRIDE_HT_CAP_INFO_TX_STBC: bool = false;
 /// Supported channel bandwidth set can only be non-zero if the associating channel is 160 MHz or
 /// 80+80 MHz Channel bandwidth. Otherwise it will be set to 0. 0 is a purely numeric value without
 /// a name. See IEEE Std 802.11-2016 Table 9-250 for more details.
-/// TODO(fxbug.dev/39546): finer control over CBW if necessary.
+/// TODO(https://fxbug.dev/39546): finer control over CBW if necessary.
 const OVERRIDE_VHT_CAP_INFO_SUPPORTED_CBW_SET: u32 = 0;
 
 /// A driver may not properly populate an interface's Capabilities to reflect the selected role.
@@ -75,7 +75,7 @@ pub fn derive_join_capabilities(
         .ok_or_else(|| format_err!("iface does not support BSS channel {}", bss_channel.primary))?;
 
     // Step 2.1 - Override CapabilityInfo
-    // TODO(fxbug.dev/54923): The WlanSoftmacHardwareCapability type is u32 and used here to override
+    // TODO(https://fxbug.dev/54923): The WlanSoftmacHardwareCapability type is u32 and used here to override
     // the capability info for joining a BSS. The upper bits are removed but shouldn't have to be.
     let capability_info =
         override_capability_info(CapabilityInfo(device_info.softmac_hardware_capability as u16));
@@ -144,7 +144,7 @@ fn override_vht_capabilities(mut vht_cap: VhtCapabilities, cbw: Cbw) -> VhtCapab
         // Supported channel bandwidth set can only be non-zero if the associating channel is
         // 160 MHz or 80+80 MHz Channel bandwidth. Otherwise it will be set to 0. 0 is a purely
         // numeric value without a name. See IEEE Std 802.11-2016 Table 9-250 for more details.
-        // TODO(fxbug.dev/39546): finer control over CBW if necessary.
+        // TODO(https://fxbug.dev/39546): finer control over CBW if necessary.
         match cbw {
             Cbw::Cbw160 | Cbw::Cbw80P80 { secondary80: _ } => (),
             _ => vht_cap_info.set_supported_cbw_set(OVERRIDE_VHT_CAP_INFO_SUPPORTED_CBW_SET),
@@ -154,7 +154,7 @@ fn override_vht_capabilities(mut vht_cap: VhtCapabilities, cbw: Cbw) -> VhtCapab
     vht_cap
 }
 
-// TODO(fxbug.dev/91038): Using channel number to determine band is incorrect.
+// TODO(https://fxbug.dev/91038): Using channel number to determine band is incorrect.
 fn get_band(primary_channel: u8) -> fidl_common::WlanBand {
     if primary_channel <= 14 {
         fidl_common::WlanBand::TwoGhz

@@ -254,7 +254,7 @@ func scanForPIDs(conn Connector, out io.WriteCloser, in io.ReadCloser) chan erro
 	return scanErr
 }
 
-// TODO(fxbug.dev/107801): We can rely less on these fragile regexes if we
+// TODO(https://fxbug.dev/107801): We can rely less on these fragile regexes if we
 // switch to machine-parseable output streams.
 func scanForArtifacts(out io.WriteCloser, in io.ReadCloser, artifactPrefix,
 	hostArtifactDir string, config *ffxFuzzRunConfig) (chan error, chan []string) {
@@ -391,7 +391,7 @@ func (f *Fuzzer) Prepare(conn Connector) error {
 		return nil
 
 	} else {
-		// TODO(fxbug.dev/61521): We shouldn't rely on executing these commands
+		// TODO(https://fxbug.dev/61521): We shouldn't rely on executing these commands
 		if err := conn.Command("pkgctl", "resolve", f.pkgUrl).Run(); err != nil {
 			return fmt.Errorf("error resolving fuzzer package %q: %s", f.pkgUrl, err)
 		}
@@ -449,7 +449,7 @@ var optionMapping = map[string]*cffOption{
 	"merge_control_file":  nil,
 	"jobs":                nil,
 
-	// TODO(fxbug.dev/108878): Translate this once ffx fuzz supports it
+	// TODO(https://fxbug.dev/108878): Translate this once ffx fuzz supports it
 	"dict": nil,
 }
 
@@ -529,7 +529,7 @@ type ffxFuzzRunConfig struct {
 }
 
 func (f *Fuzzer) parseArgsForFfx(conn Connector) (*ffxFuzzRunConfig, error) {
-	// TODO(fxbug.dev/110231): overnet fails when given too much data on a `zx.socket`. This can be
+	// TODO(https://fxbug.dev/110231): overnet fails when given too much data on a `zx.socket`. This can be
 	// observed with targets that emit syslogs on every iteration. Since libFuzzer prints all relevant
 	// info to stderr, workaround this issue by disabling stdout and syslog.
 	config := ffxFuzzRunConfig{
@@ -549,7 +549,7 @@ func (f *Fuzzer) parseArgsForFfx(conn Connector) (*ffxFuzzRunConfig, error) {
 		}
 	}
 
-	// TODO(fxbug.dev/108878): Support cleanse
+	// TODO(https://fxbug.dev/108878): Support cleanse
 
 	// Make sure we weren't passed conflicting args
 	minimizeRequested := f.options["minimize_crash"] == "1"
@@ -789,7 +789,7 @@ func (f *Fuzzer) Run(conn Connector, out io.Writer, hostArtifactDir string) ([]s
 
 	// In the Merge case, the output corpus is auto-fetched, so to avoid
 	// redundant work we just copy it into place in the cache now.
-	// TODO(fxbug.dev/108877): Avoid the extra copy here once we can override
+	// TODO(https://fxbug.dev/108877): Avoid the extra copy here once we can override
 	// the corpus output directory.
 	if f.useFfxFuzz() && ffxConfig.command == "merge" {
 		fetchedDir := filepath.Join(ffxConfig.outputDir, "corpus")

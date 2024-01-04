@@ -13,7 +13,7 @@
 #include <memory>
 #include <type_traits>
 
-// These definitions implement fxbug.dev/94402, a DSL to teach two-way client
+// These definitions implement https://fxbug.dev/94402, a DSL to teach two-way client
 // calls about lifetimes of their result receivers, in doing so discouraging
 // use-after-frees. At a high level:
 //

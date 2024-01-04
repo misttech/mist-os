@@ -74,7 +74,7 @@ template("bazel_fuchsia_package") {
     # which is an unpredictable path.
     # Instead, build the `.publish` target and read the runfiles of the
     # `.publish.sh` script under `bazel-bin/`.
-    # See: fxbug.dev/115699#c4
+    # See: https://fxbug.dev/115699#c4
     bazel_targets = [ bazel_target + ".publish" ]
     copy_outputs = [
       {

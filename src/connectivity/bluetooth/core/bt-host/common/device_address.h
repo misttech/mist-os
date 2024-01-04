@@ -66,7 +66,7 @@ static_assert(sizeof(DeviceAddressBytes) == 6, "DeviceAddressBytes must take up 
 // device address and the address type. A DeviceAddress is comparable and can be
 // used as a key in ordered and unordered associative STL containers.
 //
-// TODO(fxbug.dev/2761): Using the underlying DeviceAddressBytes for equality, comparison, and
+// TODO(https://fxbug.dev/2761): Using the underlying DeviceAddressBytes for equality, comparison, and
 // hashing effectively obsoletes DeviceAddressBytes as a separate class. Removing the |type_| field
 // (see bug for rationale) will make this class compatible with serialization.
 class DeviceAddress {

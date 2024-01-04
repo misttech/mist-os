@@ -53,7 +53,8 @@ template("icu_rustc_library") {
                                "icu_non_rust_deps",
                                "icu_public_deps",
                                "icu_test_deps",
-                               "target_name",  # Workaround for fxb/133723.
+                               "target_name",  # Workaround for
+                                               # https://fxbug.dev/133723.
                                "testonly",
                                "visibility",
                                "with_unit_tests",

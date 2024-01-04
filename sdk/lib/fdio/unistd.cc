@@ -381,7 +381,7 @@ zx::result<fdio_ptr> opendir_containing_at(int dirfd, const char* path, NameBuff
   if (is_dir_out) {
     *is_dir_out = is_dir;
   } else if (is_dir) {
-    // TODO(fxbug.dev/37408): Propagate whether path is directory without using
+    // TODO(https://fxbug.dev/37408): Propagate whether path is directory without using
     // trailing backslash to simplify server-side path parsing.
     // This might require refactoring trailing backslash checks out of
     // lower filesystem layers and associated FIDL APIs.
@@ -813,7 +813,7 @@ int dup3(int oldfd, int newfd, int flags) {
     return ERRNO(EINVAL);
   }
 
-  // TODO(fxbug.dev/30920) Implement O_CLOEXEC.
+  // TODO(https://fxbug.dev/30920) Implement O_CLOEXEC.
   return dup2(oldfd, newfd);
 }
 
@@ -831,7 +831,7 @@ int fcntl(int fd, int cmd, ...) {
   switch (cmd) {
     case F_DUPFD:
     case F_DUPFD_CLOEXEC: {
-      // TODO(fxbug.dev/30920) Implement CLOEXEC.
+      // TODO(https://fxbug.dev/30920) Implement CLOEXEC.
       GET_INT_ARG(starting_fd);
       if (starting_fd < 0) {
         return ERRNO(EINVAL);
@@ -864,7 +864,7 @@ int fcntl(int fd, int cmd, ...) {
         return ERRNO(EBADF);
       }
       GET_INT_ARG(flags);
-      // TODO(fxbug.dev/30920) Implement CLOEXEC.
+      // TODO(https://fxbug.dev/30920) Implement CLOEXEC.
       io->ioflag() &= ~IOFLAG_FD_FLAGS;
       io->ioflag() |= static_cast<uint32_t>(flags) & IOFLAG_FD_FLAGS;
       return 0;

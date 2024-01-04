@@ -68,7 +68,7 @@ For example, when adding a **new component** the policy file might look somethin
         // new component:
         // <High-level description of how to configure new component>
         "fuchsia-pkg://fuchsia.com/new-frobinator#meta/new-frobinator.cm": {
-            // TODO(fxbug.dev/####): Remove transitional once `new-frobinator` is integrated into
+            // TODO(https://fxbug.dev/####): Remove transitional once `new-frobinator` is integrated into
             // the build.
             transitional: true,
             fields: {
@@ -97,7 +97,7 @@ something like this:
                 // configuration to ship to users>
                 frobinator_debugging_enabled: {
                     expected_value: false,
-                    // TODO(fxbug.dev/####): Remove transitional once `frobinator_debugging_enabled`
+                    // TODO(https://fxbug.dev/####): Remove transitional once `frobinator_debugging_enabled`
                     // is integrated into the build.
                     transitional: true,
                 },
@@ -108,7 +108,7 @@ something like this:
 ```
 
 The policy must include all structured configuration fields that may vary between eng and non-eng
-builds. Be sure not to skip any of the `<Description>` or `TODO(fxbug.dev/####)` comments outlined
+builds. Be sure not to skip any of the `<Description>` or `TODO(https://fxbug.dev/####)` comments outlined
 above.
 
 Fields with values specified in the policy must not have a `mutability` specifier because it would
@@ -169,7 +169,7 @@ And the final policy file for a **new field** for an **existing component** look
 Once these changes land, assuming work on the new component or feature is complete, it is safe to
 close the bug mentioned in Step 2.
 
-<!-- TODO(fxbug.dev/104819): Link to fxbug.dev page when better documentation is available.  -->
+<!-- TODO(https://fxbug.dev/104819): Link to fxbug.dev page when better documentation is available.  -->
 [build-types]: /docs/contribute/governance/rfcs/0115_build_types.md
 [ffx-scrutiny]: https://fuchsia.dev/reference/tools/sdk/ffx#scrutiny
 [scrutiny-verifiers]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/security/verifier/

@@ -103,7 +103,7 @@ void ValidateSharedObject(const zx::vmo& vmo) {
   for (const auto& [name, symbol] : *dynamic_symbols) {
     // We could also consider weak symbol references here, as resolving a weak symbol could change
     // the behavior of the ICD. However, the Intel ICD uses a lot of weak symbols.
-    // TODO(fxbug.dev/103444): Consider checking weak symbols.
+    // TODO(https://fxbug.dev/103444): Consider checking weak symbols.
     if (symbol.getBinding() == elflib::STB_GLOBAL && symbol.st_shndx == elflib::SHN_UNDEF) {
       EXPECT_TRUE(symbol_allowlist.count(name))
           << "Disallowed import: " << name << " type " << symbol.getType();

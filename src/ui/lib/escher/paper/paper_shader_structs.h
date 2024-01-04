@@ -23,7 +23,7 @@ namespace escher {
 template <typename StructT>
 static std::pair<StructT*, UniformBinding> NewPaperShaderUniformBinding(const FramePtr& frame,
                                                                         size_t count = 1) {
-  // TODO(fxbug.dev/7193): should be queried from device.
+  // TODO(https://fxbug.dev/7193): should be queried from device.
   constexpr vk::DeviceSize kMinUniformBufferOffsetAlignment = 256;
   UniformAllocation allocation =
       frame->AllocateUniform(count * sizeof(StructT), kMinUniformBufferOffsetAlignment);
@@ -46,7 +46,7 @@ struct PaperShaderMeshInstance {
   float __padding0;
   float __padding1;
   float __padding2;
-  // TODO(fxbug.dev/7243): field for vertex-shader clip-planes.
+  // TODO(https://fxbug.dev/7243): field for vertex-shader clip-planes.
 
   static constexpr size_t kDescriptorSet = 1;
   static constexpr size_t kDescriptorBinding = 0;

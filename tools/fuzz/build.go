@@ -40,7 +40,7 @@ type Build interface {
 	// Reads input from `in`, symbolizes it, and writes it back to `out`.
 	// Returns on error, or when `in` has no more data to read.  Processing
 	// will be streamed, line-by-line.
-	// TODO(fxbug.dev/47482): does this belong elsewhere?
+	// TODO(https://fxbug.dev/47482): does this belong elsewhere?
 	Symbolize(in io.ReadCloser, out io.Writer) error
 
 	// Returns a list of the names of the fuzzers that are available to run

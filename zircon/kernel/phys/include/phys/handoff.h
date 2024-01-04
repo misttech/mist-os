@@ -71,7 +71,7 @@ struct PhysVmo {
 
   void set_name(ktl::string_view new_name) { new_name.copy(name.data(), name.size() - 1); }
 
-  // TODO(fxbug.dev/84107): Currently these are actually copied like everything
+  // TODO(https://fxbug.dev/84107): Currently these are actually copied like everything
   // else into temporary handoff space (the only kind), so only the actual
   // content size is allocated.  Eventually these will just be handed off here
   // as a paddr and size of whole physical pages plus a precise content size.
@@ -89,13 +89,13 @@ struct PhysHandoff {
 
   const uint64_t magic = kMagic;
 
-  // TODO(fxbug.dev/84107): This will eventually be made a permanent pointer.
+  // TODO(https://fxbug.dev/84107): This will eventually be made a permanent pointer.
   PhysHandoffTemporaryPtr<const BootOptions> boot_options;
 
   PhysBootTimes times;
   static_assert(ktl::is_default_constructible_v<PhysBootTimes>);
 
-  // TODO(fxbug.dev/84107): This will eventually be made a permanent pointer.
+  // TODO(https://fxbug.dev/84107): This will eventually be made a permanent pointer.
   PhysHandoffTemporaryString version_string;
 
   // VMOs to be published to userland as is and not otherwise used by the
@@ -109,7 +109,7 @@ struct PhysHandoff {
   ktl::optional<crypto::EntropyPool> entropy_pool;
 
   // ZBI container of items to be propagated in mexec.
-  // TODO(fxbug.dev/84107): later this will be propagated
+  // TODO(https://fxbug.dev/84107): later this will be propagated
   // as a whole page the kernel can stuff into a VMO.
   PhysHandoffTemporarySpan<const ktl::byte> mexec_data;
 

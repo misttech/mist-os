@@ -145,7 +145,7 @@ struct RelocationTraits<ElfMachine::kNone> {
   // The runtime setup updates that slot to hold state used by its callback.
   static constexpr std::optional<uint32_t> kTlsDesc = std::nullopt;
 
-  // TODO(fxbug.dev/84273): TLS computations
+  // TODO(https://fxbug.dev/84273): TLS computations
 };
 
 // Specialization for AArch64.  TODO(mcgrathr): Different types used for same

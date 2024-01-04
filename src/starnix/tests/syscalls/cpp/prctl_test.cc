@@ -22,7 +22,7 @@
 namespace {
 
 TEST(PrctlTest, SubReaperTest) {
-  // TODO(fxbug.dev/129749): Find out why this test does not work on host in CQ
+  // TODO(https://fxbug.dev/129749): Find out why this test does not work on host in CQ
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
@@ -66,7 +66,7 @@ TEST(PrctlTest, SecureBits) {
 }
 
 TEST(PrctlTest, DropCapabilities) {
-  // TODO(fxbug.dev/129749): Find out why this test does not work on host in CQ
+  // TODO(https://fxbug.dev/129749): Find out why this test does not work on host in CQ
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }

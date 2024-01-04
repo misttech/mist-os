@@ -12,7 +12,7 @@
     },
     children: [
         {
-            // TODO(fxbug.dev/33880): Don't hardcode the cppvfs URL here. This
+            // TODO(https://fxbug.dev/33880): Don't hardcode the cppvfs URL here. This
             // needs to work for all the different filesystem test harnesses.
             name: "fs_test",
             url: "fuchsia-pkg://fuchsia.com/cppvfs-io1-conformance-test#meta/cppvfs-harness.cm",

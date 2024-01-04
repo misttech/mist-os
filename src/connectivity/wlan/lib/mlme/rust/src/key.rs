@@ -52,7 +52,7 @@ impl From<&fidl_mlme::SetKeyDescriptor> for KeyConfig {
         key[..key_desc.key.len()].copy_from_slice(&key_desc.key[..]);
 
         Self {
-            // TODO(fxbug.dev/39764): This value was default initialized to 0 in the original code:
+            // TODO(https://fxbug.dev/39764): This value was default initialized to 0 in the original code:
             // we need to figure out if the driver still needs this.
             bssid: 0,
             protection: Protection::RX_TX,

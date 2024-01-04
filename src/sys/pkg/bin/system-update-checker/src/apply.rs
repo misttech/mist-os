@@ -492,7 +492,7 @@ mod test_apply_system_update_impl {
 
     struct ProgressUpdateInstaller {
         states: Vec<State>,
-        // TODO(fxbug.dev/69496): Remove this or explain why it's here.
+        // TODO(https://fxbug.dev/69496): Remove this or explain why it's here.
         #[allow(dead_code)]
         reboot_controller_server_end: Option<ServerEnd<RebootControllerMarker>>,
     }

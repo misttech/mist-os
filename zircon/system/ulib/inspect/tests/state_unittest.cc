@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/4755): Use std::map instead of FBL in this file.
+// TODO(https://fxbug.dev/4755): Use std::map instead of FBL in this file.
 #include <lib/inspect/cpp/vmo/block.h>
 #include <lib/inspect/cpp/vmo/limits.h>
 #include <lib/inspect/cpp/vmo/scanner.h>
@@ -72,7 +72,7 @@ std::shared_ptr<State> InitState(size_t size) {
 }
 
 // Container for scanned blocks from the buffer.
-// TODO(fxbug.dev/4130): Use std::map instead of intrusive containers when
+// TODO(https://fxbug.dev/4130): Use std::map instead of intrusive containers when
 // libstd++ is available.
 struct ScannedBlock : public fbl::WAVLTreeContainable<std::unique_ptr<ScannedBlock>> {
   BlockIndex index;

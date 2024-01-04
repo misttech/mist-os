@@ -17,7 +17,7 @@ Scenic's 3D scene representation and the 2D representation experienced by the us
 that Gfx API is no longer suitable for the demands being placed on Scenic, both from a product
 standpoint and a performance standpoint. See
 [Flatland roadmap entry](/docs/contribute/roadmap/2021/flatland.md) for details on this decision.
-All of Fuchsia's graphics clients are [being migrated](http://fxbug.dev/93979) to Flatland API.
+All of Fuchsia's graphics clients are [being migrated](https://fxbug.dev/93979) to Flatland API.
 
 ## Design
 

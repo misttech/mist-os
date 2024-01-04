@@ -1,6 +1,6 @@
 {
     "metrics": [
-        // TODO(fxbug.dev/120759): move to audio-drivers.json
+        // TODO(https://fxbug.dev/120759): move to audio-drivers.json
         {
             "event_codes": [],
             "metric_id": 1,
@@ -30,7 +30,7 @@
             "project_id": 14
         },
 
-        // TODO(fxbug.dev/120759): move to bthost.json
+        // TODO(https://fxbug.dev/120759): move to bthost.json
         {
             "event_codes": [
                 0,
@@ -372,7 +372,7 @@
             "project_id": 2322225253
         },
 
-        // TODO(fxbug.dev/120759): move to connectivity-wlan.json
+        // TODO(https://fxbug.dev/120759): move to connectivity-wlan.json
         {
             "event_codes": [],
             "metric_id": 340,
@@ -381,7 +381,7 @@
             "project_id": 3708719327
         },
 
-        // TODO(fxbug.dev/120759): move to display.json
+        // TODO(https://fxbug.dev/120759): move to display.json
         {
             "event_codes": [],
             "metric_id": 1,
@@ -397,7 +397,7 @@
             "project_id": 10
         },
 
-        // TODO(fxbug.dev/120759): move to ftl.json
+        // TODO(https://fxbug.dev/120759): move to ftl.json
         {
             "event_codes": [
                 1
@@ -646,7 +646,7 @@
             "project_id": 3676913920
         },
 
-        // TODO(fxbug.dev/120759): move to fvm.json
+        // TODO(https://fxbug.dev/120759): move to fvm.json
         {
             "event_codes": [
                 0
@@ -675,7 +675,7 @@
             "project_id": 3676913920
         },
 
-        // TODO(fxbug.dev/120759): move to radar.json
+        // TODO(https://fxbug.dev/120759): move to radar.json
         {
             "event_codes": [],
             "metric_id": 1,
@@ -698,7 +698,7 @@
             "project_id": 12
         },
 
-        // TODO(fxbug.dev/120759): move to sdmmc.json
+        // TODO(https://fxbug.dev/120759): move to sdmmc.json
         {
             "event_codes": [],
             "metric_id": 3,
@@ -742,7 +742,7 @@
             "project_id": 9
         },
 
-        // TODO(fxbug.dev/120759): move to sysmem.json
+        // TODO(https://fxbug.dev/120759): move to sysmem.json
         {
             "event_codes": [
                 1

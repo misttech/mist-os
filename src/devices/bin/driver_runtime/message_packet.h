@@ -26,7 +26,7 @@ struct MessagePacketDestroyer {
 using MessagePacketOwner = std::unique_ptr<MessagePacket, MessagePacketDestroyer>;
 
 // Holds the contents of a message written to a channel.
-// TODO(fxbug.dev/86856): we should consider recycling deleted packets.
+// TODO(https://fxbug.dev/86856): we should consider recycling deleted packets.
 class MessagePacket : public fbl::DoublyLinkedListable<MessagePacketOwner> {
  public:
   static MessagePacketOwner Create(fbl::RefPtr<fdf_arena_t> arena, void* data, uint32_t num_bytes,

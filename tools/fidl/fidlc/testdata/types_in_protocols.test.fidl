@@ -101,7 +101,7 @@ type VectorOptional = struct {
     opt_vector_uint8 vector<uint8>:optional;
     opt_vector_string vector<string>:optional;
 
-    // TODO(fxbug.dev/124974): Fix libfuzzer. Also denied in HLCPP since libfuzzer uses it.
+    // TODO(https://fxbug.dev/124974): Fix libfuzzer. Also denied in HLCPP since libfuzzer uses it.
     @bindings_denylist("hlcpp, libfuzzer")
     opt_vector_struct vector<Struct>:optional;
 

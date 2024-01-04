@@ -297,7 +297,7 @@ class TestLibrary final : public SharedInterface {
     return ok;
   }
 
-  // TODO(fxbug.dev/118282): remove (or rename this class to be more general), as this does not use
+  // TODO(https://fxbug.dev/118282): remove (or rename this class to be more general), as this does not use
   // a library.
   bool Parse(std::unique_ptr<fidl::raw::File>* out_ast_ptr) {
     ZX_ASSERT_MSG(all_sources_.size() == 1, "parse can only be used with one source");

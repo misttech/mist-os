@@ -51,7 +51,7 @@ closed protocol ProcessLimbo {
     ///
     /// Returns information on all the processes currently waiting on an exception.
     /// The information provided will not contain any handle, so that it can be
-    /// transported over Overnet (see fxbug.dev/99649).
+    /// transported over Overnet (see https://fxbug.dev/99649).
     ///
     /// The implementation should ensure that at any time there are no more than
     /// MAX_EXCEPTIONS exceptions held in the limbo, so that no pagination is needed.

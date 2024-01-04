@@ -1062,4 +1062,4 @@ async fn open2_request_attributes_rights_failure() {
     );
 }
 
-// TODO(fxbug.dev/77623): Add open2 connect tests.
+// TODO(https://fxbug.dev/77623): Add open2 connect tests.

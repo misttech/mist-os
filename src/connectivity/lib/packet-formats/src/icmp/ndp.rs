@@ -869,7 +869,7 @@ pub mod options {
     }
 
     impl OptionParseLayout for NdpOptionsImpl {
-        // TODO(fxbug.dev/52288): Return more verbose logs on parsing errors.
+        // TODO(https://fxbug.dev/52288): Return more verbose logs on parsing errors.
         type Error = OptionParseErr;
 
         // NDP options don't have END_OF_OPTIONS or NOP.

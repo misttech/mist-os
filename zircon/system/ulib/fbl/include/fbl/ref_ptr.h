@@ -44,7 +44,7 @@ T* LeakToRawPtr(RefPtr<T>* ptr) __WARN_UNUSED_RESULT;
 // type does not support vending weak pointers, introspecting the reference
 // count, or any operations that would result in allocating memory (unless
 // T::AddRef or T::Release allocate memory).
-// TODO(fxbug.dev/65796): Align RefPtr more closely with standard library smart
+// TODO(https://fxbug.dev/65796): Align RefPtr more closely with standard library smart
 // pointers.
 //
 // Construction:  To create a RefPtr around a freshly created object, use the

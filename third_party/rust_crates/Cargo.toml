@@ -95,7 +95,7 @@ elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
 either = "1.5.0"
 eui48 = { version = "1.1.0", default-features = false, features = ["serde", "disp_hexstring"] }
 event-listener = "2.5.1"
-# TODO(fxbug.dev/112722): We're importing this explicitly for now, but eventually
+# TODO(https://fxbug.dev/112722): We're importing this explicitly for now, but eventually
 # it will be imported by valico and the dt-schema tool.
 # Remove this line when valico uses fancy-regex.
 fancy-regex = "0.8"
@@ -120,7 +120,7 @@ hkdf = "0.12.3"
 hound = "3.5.0"
 humansize = "1.1.1"
 http = "0.2.4"
-# TODO(fxbug.dev/100964): We intentionally did not enable http2, since we're
+# TODO(https://fxbug.dev/100964): We intentionally did not enable http2, since we're
 # currently not using it on Fuchsia. Please see this ticket if you want to
 # enable it.
 hyper = { version = "0.14.19", default-features = false, features = ["stream", "http1", "client", "server"] }
@@ -143,7 +143,7 @@ md-5 = "0.10.5"
 memchr = "2.0"
 memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
-# TODO(fxbug.dev/66092) limit to tests
+# TODO(https://fxbug.dev/66092) limit to tests
 mockall = "0.9"
 netlink-packet-core = "0.7.0"
 netlink-packet-route = "0.17.0"
@@ -248,7 +248,7 @@ features = ["env-filter", "fmt", "registry", "std", "tracing-log"]
 
 # Target-side only dependencies
 [target.'cfg(target_os = "fuchsia")'.dependencies]
-# do not add back without verifying certificate transparency is ready to use - see fxbug.dev/25100
+# do not add back without verifying certificate transparency is ready to use - see https://fxbug.dev/25100
 # ct-logs = "0.6"
 euclid = { version = "0.22.1", features = [ "serde" ] }
 getopts = "0.2"
@@ -288,7 +288,7 @@ home = "0.5.3"
 hyper-rustls = { version = "0.22.1", default-features = false, features = ["rustls-native-certs"] }
 indoc = "1.0.3"
 loom = "0.7.0"
-# TODO(fxbug.dev/106164) Remove this explicit mio dependency when it can be
+# TODO(https://fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio
 mio = { version = "0.8.5", features = ["net", "os-ext", "os-poll"] }
 notify = { version = "5.1.0", default-features = false, features = ["macos_fsevent"] }
@@ -311,7 +311,7 @@ tar = "0.4.25"
 term_grid = "0.2.0"
 termios = "0.3.2"
 tinyjson = "2.5.0"
-# TODO(fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
+# TODO(https://fxbug.dev/106164) Enable the "rt" and "net" features here once gnaw
 # supports target-specific feature resolution
 tokio = { version = "=1.25.2", default-features = false }
 tokio-stream = "0.1.14"
@@ -376,7 +376,7 @@ zeroize = { path = "forks/zeroize" }
 zstd-sys = { path = "forks/zstd-sys" }
 
 ### Mirrors: forked crates managed as separate git repos
-serde_json5 = { path = "mirrors/serde_json5" } # TODO(fxbug.dev/75491) remove
+serde_json5 = { path = "mirrors/serde_json5" } # TODO(https://fxbug.dev/75491) remove
 
 #################################################################################
 ###                            Cargo GNaw Configs                             ###
@@ -465,7 +465,7 @@ rustflags = ["--cfg=crc32fast_stdarchx86"]
 rustflags = []
 
 [gn.package.fancy-regex."0.8.0"]
-# TODO(fxbug.dev/112722): We're importing this explicitly for now, but eventually
+# TODO(https://fxbug.dev/112722): We're importing this explicitly for now, but eventually
 # it will be imported by valico and the dt-schema tool.
 # Remove this line when valico uses fancy-regex.
 visibility = [":*"]
@@ -638,7 +638,7 @@ rustflags = ["--cfg=rust_1_26"]
 rustflags = []
 
 [gn.package.ring."0.16.16"]
-# See fxbug.dev/104855 if you want to change this: Please talk to Security team.
+# See https://fxbug.dev/104855 if you want to change this: Please talk to Security team.
 # Thank you!
 visibility = [
   ":ring",
@@ -692,7 +692,7 @@ rustflags = []
 group_visibility = { import = "//third_party/rust_crates/private_visibility.gni", variable = "private_visibility" }
 
 
-# TODO(fxbug.dev/106164) This manual configuration enables the "rt", "net"
+# TODO(https://fxbug.dev/106164) This manual configuration enables the "rt", "net"
 # "fs" and "sync" features on non-Fuchsia targets. It should be removed
 # once gnaw supports target-specific features.
 [gn.package.tokio."1.25.2".platform."cfg(not(target_os = \"fuchsia\"))"]
@@ -721,7 +721,7 @@ rustflags = [
   "--cfg=feature=\\\"time\\\"",
 ]
 
-# TODO(fxbug.dev/106164) This manual configuration enables the "log" so that
+# TODO(https://fxbug.dev/106164) This manual configuration enables the "log" so that
 # tracing macros also emit log events and binaries with setting up a
 # log::Logger receive tracing events as logs. On Fuchsia we don't need that
 # since all binaries set up a tracing Subscriber.

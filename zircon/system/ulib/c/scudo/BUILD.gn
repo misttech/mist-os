@@ -66,7 +66,7 @@ libc_source_set("scudo-allocator") {
   # test code must be compiled with `-D__scudo_default_options=<some other
   # name>` to make the test code safe.
   #
-  # TODO(fxbug.dev/64175): The second reason is similar but more subtle and it
+  # TODO(https://fxbug.dev/64175): The second reason is similar but more subtle and it
   # affects much of the code, both the Scudo code proper and the gwp_asan code
   # it incorporates.  These both use thread-local state that is directly
   # located in the thread structure when the code is built into libc, because
@@ -100,7 +100,7 @@ config("common.config") {
     "SCUDO_DEBUG=$scudo_debug",
     "SCUDO_ENABLE_HOOKS=1",
 
-    # TODO(fxbug.dev/132760): Scudo, which lives in the C library, cannot
+    # TODO(https://fxbug.dev/132760): Scudo, which lives in the C library, cannot
     # see the hooks defined by the wrapper-tests in the test executable.
     "SCUDO_ENABLE_HOOKS_TESTS=0",
   ]
@@ -115,7 +115,7 @@ libc_source_set("wrappers") {
 
   sources = [
     "wrappers_c.cpp",
-    # TODO(fxbug.dev/132773): Disable c++ wrappers provided by Scudo.
+    # TODO(https://fxbug.dev/132773): Disable c++ wrappers provided by Scudo.
     #"wrappers_cpp.cpp",
   ]
 
@@ -148,7 +148,7 @@ config("libc.config") {
 
   # This library is linked into libc, which is used by libfuzzer.
   # Don't instrument it to avoid getting noise in code coverage.
-  # TODO(fxbug.dev/25073): Once a cleaner solution is found, remove this.
+  # TODO(https://fxbug.dev/25073): Once a cleaner solution is found, remove this.
   configs = [ "//build/config/zircon:no_fuzzer" ]
 }
 
@@ -288,7 +288,7 @@ libc_test("wrapper-tests") {
 
   sources = [
     "tests/wrappers_c_test.cpp",
-    # TODO(fxbug.dev/132773): see src/wrappers_cpp.cpp inclusion above.
+    # TODO(https://fxbug.dev/132773): see src/wrappers_cpp.cpp inclusion above.
     #"tests/wrappers_cpp_test.cpp",
   ]
 }
@@ -309,7 +309,7 @@ libc_test("gwp_asan-unittests") {
     "tests/harness.h",
     "tests/iterate.cpp",
 
-    # TODO(fxbug.dev/65522): flaky due to TLS pollution
+    # TODO(https://fxbug.dev/65522): flaky due to TLS pollution
     #"tests/late_init.cpp",
     "tests/mutex_test.cpp",
     "tests/never_allocated.cpp",

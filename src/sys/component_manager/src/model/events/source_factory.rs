@@ -22,7 +22,7 @@ pub struct EventSourceFactory {
 
     /// The event registry. It subscribes to all events happening in the system and
     /// routes them to subscribers.
-    // TODO(fxbug.dev/48512): instead of using a global registry integrate more with the hooks model.
+    // TODO(https://fxbug.dev/48512): instead of using a global registry integrate more with the hooks model.
     event_registry: Weak<EventRegistry>,
 
     // The static event stream provider.

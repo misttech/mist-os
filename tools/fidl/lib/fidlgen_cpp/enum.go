@@ -166,7 +166,7 @@ func (c *compiler) compileEnum(val fidlgen.Enum) *Enum {
 		r.Members = append(r.Members, EnumMember{
 			Attributes:   Attributes{v.Attributes},
 			nameVariants: enumMemberContext.transform(v.Name),
-			// TODO(fxbug.dev/7660): When we expose types consistently in the IR, we
+			// TODO(https://fxbug.dev/7660): When we expose types consistently in the IR, we
 			// will not need to plug this here.
 			Value: c.compileConstant(v.Value, nil, fidlgen.Type{
 				Kind:             fidlgen.PrimitiveType,

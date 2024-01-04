@@ -119,7 +119,7 @@ class ShutdownHelper {
 
   NodeState node_state() const { return node_state_; }
 
-  // TODO(fxb/132254): Handle shutdown intent priority. Currently it's possible
+  // TODO(https://fxbug.dev/132254): Handle shutdown intent priority. Currently it's possible
   // for rebind or restart to override a a removal in process.
   void set_shutdown_intent(ShutdownIntent intent) { shutdown_intent_ = intent; }
   ShutdownIntent shutdown_intent() const { return shutdown_intent_; }

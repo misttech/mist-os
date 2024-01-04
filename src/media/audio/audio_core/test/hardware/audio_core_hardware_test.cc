@@ -11,7 +11,7 @@
 #include <optional>
 #include <sstream>
 
-// TODO(fxbug.dev/49807): This test should automatically fail if underflows are detected. That
+// TODO(https://fxbug.dev/49807): This test should automatically fail if underflows are detected. That
 // functionality should be ported from HermeticAudioTest to here.
 
 namespace media::audio::test {

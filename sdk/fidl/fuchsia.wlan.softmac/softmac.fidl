@@ -23,7 +23,7 @@ type WlanSoftmacBandCapability = table {
     /// that target platform versions wherein `basic_rate_count` is deprecated
     /// should omit it and write basic rates to the `basic_rates` field instead.
     /// Clients attempt to read `basic_rates` before `basic_rate_count`.
-    // TODO(fxbug.dev/135356): Remove this deprecated field.
+    // TODO(https://fxbug.dev/135356): Remove this deprecated field.
     @available(deprecated=15)
     2: basic_rate_count uint8;
     /// Set of supported basic rates in units of 500 Kbit/s (as defined in IEEE
@@ -40,7 +40,7 @@ type WlanSoftmacBandCapability = table {
     /// that target platform versions wherein `basic_rate_list` is deprecated
     /// should omit it and write basic rates to the `basic_rates` field instead.
     /// Clients attempt to read `basic_rates` before `basic_rate_list`.
-    // TODO(fxbug.dev/135356): Remove this deprecated field.
+    // TODO(https://fxbug.dev/135356): Remove this deprecated field.
     @available(deprecated=15)
     3: basic_rate_list array<uint8, ieee80211.MAX_SUPPORTED_BASIC_RATES>;
 
@@ -58,7 +58,7 @@ type WlanSoftmacBandCapability = table {
     /// versions wherein `ht_supported` is deprecated should always set the
     /// field to true and set `ht_caps` if the device supports HT PHY mode or
     /// unset `ht_caps` if the device does not.
-    // TODO(fxbug.dev/135357): Remove this deprecated field.
+    // TODO(https://fxbug.dev/135357): Remove this deprecated field.
     @available(deprecated=15)
     4: ht_supported bool;
     5: ht_caps ieee80211.HtCapabilities;
@@ -77,7 +77,7 @@ type WlanSoftmacBandCapability = table {
     /// versions wherein `vht_supported` is deprecated should always set the
     /// field to true and set `vht_caps` if the device supports VHT PHY mode or
     /// unset `vht_caps` if the device does not.
-    // TODO(fxbug.dev/135357): Remove this deprecated field.
+    // TODO(https://fxbug.dev/135357): Remove this deprecated field.
     @available(deprecated=15)
     6: vht_supported bool;
     7: vht_caps ieee80211.VhtCapabilities;
@@ -93,7 +93,7 @@ type WlanSoftmacBandCapability = table {
     /// is deprecated should omit it and write operating channels to the
     /// `operating_channels` field instead. Clients attempt to read
     /// `operating_channels` before `operating_channel_count`.
-    // TODO(fxbug.dev/135356): Remove this deprecated field.
+    // TODO(https://fxbug.dev/135356): Remove this deprecated field.
     @available(deprecated=15)
     8: operating_channel_count uint16;
     /// Set of valid operating channels per regulatory information as determined
@@ -110,7 +110,7 @@ type WlanSoftmacBandCapability = table {
     /// is deprecated should omit it and write operating channels to the
     /// `operating_channels` field instead. Clients attempt to read
     /// `operating_channels` before `operating_channel_list`.
-    // TODO(fxbug.dev/135356): Remove this deprecated field.
+    // TODO(https://fxbug.dev/135356): Remove this deprecated field.
     @available(deprecated=15)
     9: operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
 
@@ -210,7 +210,7 @@ type WlanTxInfoFlags = flexible bits : uint32 {
     /// _reliably_ rather than fast, and is exempt from rate probing
     FAVOR_RELIABILITY = 0x2;
     /// Indicate that this packet should be sent out with QoS header when possible (11n+).
-    // TODO(fxbug.dev/29622): remove this when MLME supports QoS tag.
+    // TODO(https://fxbug.dev/29622): remove this when MLME supports QoS tag.
     QOS = 0x4;
 };
 
@@ -290,7 +290,7 @@ type WlanTxPacket = struct {
     @buffer
     mac_frame vector<uint8>:MAX;
     /// Additional data needed to transmit the packet.
-    /// TODO(fxbug.dev/105579): This field is ignored by iwlwifi.
+    /// TODO(https://fxbug.dev/105579): This field is ignored by iwlwifi.
     info WlanTxInfo;
 };
 
@@ -437,15 +437,15 @@ type WlanAssociationConfig = table {
 // NOTE: Some methods in this protocol use a `selector` attribute to maintain
 //       their ordinal following migration from `WlanSoftmac` into this
 //       protocol. This is necessary to preserve API compatibility.
-// TODO(fxbug.dev/126613): Merge `WlanSoftmacBridge` into `WlanSoftmac` when
+// TODO(https://fxbug.dev/126613): Merge `WlanSoftmacBridge` into `WlanSoftmac` when
 //                         FIDL supports generating multiple transports for the
 //                         same protocol or generating Rust bindings for driver-
 //                         transported protocols.
-// TODO(fxbug.dev/124830): This protocol allows `wlansoftmac` to migrate from
+// TODO(https://fxbug.dev/124830): This protocol allows `wlansoftmac` to migrate from
 //                         Banjo to FIDL and eventually completely remove Banjo.
 //                         This TODO comment will remain until the migration to
 //                         FIDL is complete.
-// TODO(fxbug.dev/135499): Revisit documentation about safety and when methods
+// TODO(https://fxbug.dev/135499): Revisit documentation about safety and when methods
 //                         can be called for clarity. See for example `Query`.
 /// The `wlansoftmac` C++ driver establishes a FIDL channel serving the
 /// `WlanSoftmacBridge` protocol to the `wlan-mlme` Rust library. The
@@ -667,7 +667,7 @@ closed protocol WlanSoftmacBridge {
 closed protocol WlanSoftmac {
     compose WlanSoftmacBridge;
 
-    // TODO(fxbug.dev/87050): the need to nest query response within a struct {} is no longer
+    // TODO(https://fxbug.dev/87050): the need to nest query response within a struct {} is no longer
     // necessary. However if the response is a struct, then ReplySuccess() expects each field to be
     // passed individually, which makes the code harder to read. Once all Query responses switch to
     // tables, this can beconsidered.

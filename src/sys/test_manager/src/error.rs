@@ -90,7 +90,7 @@ impl From<LaunchTestError> for LaunchError {
     fn from(e: LaunchTestError) -> Self {
         // log the error so that we don't lose it while converting to
         // fidl equivalent.
-        // TODO(fxbug.dev/105820): remove this warning.
+        // TODO(https://fxbug.dev/105820): remove this warning.
         warn!("Error launching test: {:?}", e);
         match e {
             LaunchTestError::InitializeTestRealm(_)

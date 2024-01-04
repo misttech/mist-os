@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxb/68069): Add module documentation describing Setting Proxy's role in
+// TODO(https://fxbug.dev/68069): Add module documentation describing Setting Proxy's role in
 // setting handling.
 use crate::base::{SettingInfo, SettingType};
 use crate::handler::base::{

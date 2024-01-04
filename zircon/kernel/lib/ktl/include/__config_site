@@ -57,7 +57,7 @@
 // do any multithreading.
 #define _LIBCPP_PSTL_CPU_BACKEND_SERIAL
 
-// TODO(fxbug.dev/132170): make the hardening mode selectable through build
+// TODO(https://fxbug.dev/132170): make the hardening mode selectable through build
 // configurations.
 // This sets the default to tell libc++ to not enable assertions to prevent
 // undefined behavior, but may be overridden if _LIBCPP_HARDENING_MODE is

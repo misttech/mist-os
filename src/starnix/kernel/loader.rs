@@ -688,7 +688,7 @@ mod tests {
         assert!(current_task.mm().get_mapping_count() > 0);
     }
 
-    // TODO(fxbug.dev/121659): Figure out why this snapshot fails.
+    // TODO(https://fxbug.dev/121659): Figure out why this snapshot fails.
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     async fn test_snapshot_hello_starnix() {

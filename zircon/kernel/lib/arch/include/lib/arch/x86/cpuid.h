@@ -769,7 +769,7 @@ struct CpuidMaximumExtendedLeaf
 // AMD's lead, and as Intel has already nabbed the more appropriate name of
 // "extended features" - this being the extended leaf range - with leaf 0x7.
 //
-// TODO(fxbug.dev/68404): Pass hwreg::EnableAsmGeneration when safe to do so.
+// TODO(https://fxbug.dev/68404): Pass hwreg::EnableAsmGeneration when safe to do so.
 
 struct CpuidAmdFeatureFlagsC
     : public CpuidIoValueBase<CpuidAmdFeatureFlagsC, 0x8000'0001, 0x0, CpuidIo::kEcx> {

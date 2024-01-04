@@ -144,7 +144,7 @@ library example;
 library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  // TODO(fxbug.dev/111624): Check for duplicate attributes earlier in
+  // TODO(https://fxbug.dev/111624): Check for duplicate attributes earlier in
   // compilation so that this is ErrDuplicateAttribute instead.
   library.ExpectFail(fidl::ErrReferenceInLibraryAttribute);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -867,7 +867,7 @@ const CONST uint32 = 1;
 @available(added=1)
 alias Alias = string;
 
-// TODO(fxbug.dev/7807): Uncomment.
+// TODO(https://fxbug.dev/7807): Uncomment.
 // @available(added=1)
 // type Type = string;
 
@@ -940,7 +940,7 @@ resource_definition Resource : uint32 {
   EXPECT_EQ(unfiltered_decls.size(), filtered_decls.size());
 }
 
-// TODO(fxbug.dev/67858): Currently attributes `@HERE type Foo = struct {};` and
+// TODO(https://fxbug.dev/67858): Currently attributes `@HERE type Foo = struct {};` and
 // `type Foo = @HERE struct {};` are interchangeable. We just disallow using
 // both at once (ErrRedundantAttributePlacement). However, @available on the
 // anonymous layout is confusing so maybe we should rethink this design.
@@ -3155,7 +3155,7 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// TODO(fxbug.dev/101849): Generalize this with more comprehensive tests in
+// TODO(https://fxbug.dev/101849): Generalize this with more comprehensive tests in
 // availability_interleaving_tests.cc.
 TEST(VersioningTests, GoodRegularDeprecatedReferencesVersionedDeprecated) {
   TestLibrary library(R"FIDL(

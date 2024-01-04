@@ -11,7 +11,7 @@ use stream_processor_test::*;
 
 #[derive(Debug)]
 pub struct VideoFrame {
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     format: sysmem::ImageFormat2,
     data: Vec<u8>,

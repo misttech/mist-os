@@ -34,7 +34,7 @@ pub enum Cbw {
 }
 
 impl Cbw {
-    // TODO(fxbug.dev/83769): Implement `From `instead.
+    // TODO(https://fxbug.dev/83769): Implement `From `instead.
     pub fn to_fidl(&self) -> (fidl_common::ChannelBandwidth, u8) {
         match self {
             Cbw::Cbw20 => (fidl_common::ChannelBandwidth::Cbw20, 0),
@@ -203,7 +203,7 @@ impl Channel {
 
     /// Returns true if the primary channel index, channel bandwidth, and the secondary consecutive
     /// frequency segment (Cbw80P80 only) are all consistent and meet regulatory requirements of
-    /// the USA. TODO(fxbug.dev/29490): Other countries.
+    /// the USA. TODO(https://fxbug.dev/29490): Other countries.
     pub fn is_valid_in_us(&self) -> bool {
         if self.is_primary_2ghz() {
             self.is_valid_2ghz_in_us()

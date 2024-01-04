@@ -57,7 +57,7 @@ rustc_binary("starnix_kernel_bin") {
   edition = "2021"
   with_unit_tests = true
 
-  # TODO(fxbug.dev/107698): Re-enable starnix in these environments.
+  # TODO(https://fxbug.dev/107698): Re-enable starnix in these environments.
   exclude_toolchain_tags = [
     "asan",
     "hwasan",
@@ -106,7 +106,7 @@ rustc_library("starnix_core") {
   with_unit_tests = true
   source_root = "lib.rs"
 
-  # TODO(fxbug.dev/107698): Re-enable starnix in these environments.
+  # TODO(https://fxbug.dev/107698): Re-enable starnix in these environments.
   exclude_toolchain_tags = [
     "asan",
     "hwasan",

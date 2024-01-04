@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(fxbug.dev/73858): Possibly replace this script with a GN bindgen target
+# TODO(https://fxbug.dev/73858): Possibly replace this script with a GN bindgen target
 #                        when there is in-tree support.
 
 # Move to our source directory, that's where platgen.h will be.

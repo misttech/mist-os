@@ -21,7 +21,7 @@ zx_library("cpuid") {
 }
 
 source_set("test") {
-  # TODO(fxbug.dev/67010): testonly = true
+  # TODO(https://fxbug.dev/67010): testonly = true
   sources = [ "cpuid_test.cc" ]
   deps = [ "//zircon/kernel/lib/unittest" ]
   public_deps = [ ":headers" ]

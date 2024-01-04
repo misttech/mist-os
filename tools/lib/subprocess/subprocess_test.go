@@ -203,7 +203,7 @@ func TestRun(t *testing.T) {
 		if runtime.GOOS == "darwin" {
 			// Setting the pgid doesn't work on Mac OS, so this test
 			// will hang because it can't kill the sleep process.
-			// TODO(fxbug.dev/86162): Enable if we can find a way to kill
+			// TODO(https://fxbug.dev/86162): Enable if we can find a way to kill
 			// the child processes.
 			t.Skip("Skipping on Mac because setting pgid doesn't work")
 		}

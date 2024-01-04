@@ -10,7 +10,7 @@
 
 #include <string>
 
-// TODO(fxbug.dev/127771): Switch to use std::format.
+// TODO(https://fxbug.dev/127771): Switch to use std::format.
 // Formats |printf()|-like input and returns it as an |fbl::String|.
 std::string StringPrintf(const char* format, ...) __PRINTFLIKE(1, 2) __WARN_UNUSED_RESULT;
 

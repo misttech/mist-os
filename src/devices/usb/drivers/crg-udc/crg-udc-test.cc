@@ -20,7 +20,7 @@ TEST(UdcTest, DdkLifecycle) {
   ASSERT_OK(dev->DdkAdd("udc"));
   // Release dev so it can be deleted on release().
   dev.release();
-  // TODO(fxbug.dev/79639): Removed the obsolete fake_ddk.Ok() check.
+  // TODO(https://fxbug.dev/79639): Removed the obsolete fake_ddk.Ok() check.
   // To test Unbind and Release behavior, call UnbindOp and ReleaseOp directly.
 }
 

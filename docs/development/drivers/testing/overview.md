@@ -42,4 +42,4 @@ There are a number of helpful mock libraries:
 * [mock-mmio-reg](/src/devices/testing/mock-mmio-reg/include/mock-mmio-reg/mock-mmio-reg.h) Mocking Mmio registers
 * [fake-object](/src/devices/testing/fake-object/README.md) - fake userspace versions of kernel objects
 
-TODO(fxbug.dev/51320): Fill out more detail here.
+TODO(https://fxbug.dev/51320): Fill out more detail here.

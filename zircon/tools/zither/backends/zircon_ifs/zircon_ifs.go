@@ -33,7 +33,7 @@ func (gen Generator) DeclCallback(zither.Decl) {}
 
 func (gen *Generator) Generate(summary zither.LibrarySummary, outputDir string) ([]string, error) {
 	symbols := []symbol{
-		// TODO(fxbug.dev/49971): These are not syscalls, but are a part of the
+		// TODO(https://fxbug.dev/49971): These are not syscalls, but are a part of the
 		// vDSO interface today (they probably shouldn't be). For now, we
 		// hardcode these symbols here.
 		{Name: "_zx_exception_get_string", Weak: false},

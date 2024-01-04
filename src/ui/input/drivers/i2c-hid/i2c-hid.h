@@ -65,7 +65,7 @@ class I2cHidbus : public DeviceType, public ddk::HidbusProtocol<I2cHidbus, ddk::
                               size_t* out_len);
   zx_status_t HidbusSetReport(uint8_t rpt_type, uint8_t rpt_id, const uint8_t* data, size_t len);
 
-  // TODO(fxbug.dev/34503): implement the rest of the HID protocol
+  // TODO(https://fxbug.dev/34503): implement the rest of the HID protocol
   zx_status_t HidbusGetIdle(uint8_t rpt_id, uint8_t* duration) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t HidbusSetIdle(uint8_t rpt_id, uint8_t duration) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t HidbusGetProtocol(uint8_t* protocol) { return ZX_ERR_NOT_SUPPORTED; }

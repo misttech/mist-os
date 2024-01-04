@@ -222,7 +222,7 @@ TEST_F(PowerTestCase, AddDevicePowerCaps_MakeVisible_Success) {
   AddChildWithPowerArgs(states, std::size(states), true);
 }
 
-// TODO(http://fxbug.dev/119962): Re-enable this test after fixing.
+// TODO(https://fxbug.dev/119962): Re-enable this test after fixing.
 // This test is not easy to replicate without a lot of plumbing changes to allow test to modify the
 // response to fuchsia.device.manager/SystemStateTransition.GetTerminationSystemState.
 TEST_F(PowerTestCase, DISABLED_SystemSuspend_SuspendReasonReboot) {
@@ -278,7 +278,7 @@ TEST_F(PowerTestCase, DISABLED_SystemSuspend_SuspendReasonReboot) {
             DevicePowerState::kDevicePowerStateD3Cold);
 }
 
-// TODO(http://fxbug.dev/119962): Re-enable this test after fixing.
+// TODO(https://fxbug.dev/119962): Re-enable this test after fixing.
 // This test is not easy to replicate without a lot of plumbing changes to allow test to modify the
 // response to fuchsia.device.manager/SystemStateTransition.GetTerminationSystemState.
 TEST_F(PowerTestCase, DISABLED_SystemSuspend_SuspendReasonRebootRecovery) {
@@ -295,7 +295,7 @@ TEST_F(PowerTestCase, DISABLED_SystemSuspend_SuspendReasonRebootRecovery) {
   states[2].restore_latency = 1000;
   AddChildWithPowerArgs(states, std::size(states));
 
-  // TODO(http://fxbug.dev/119962): Modify GetTerminationSystemState response.
+  // TODO(https://fxbug.dev/119962): Modify GetTerminationSystemState response.
 
   ASSERT_OK(devmgr.SuspendDriverManager());
 

@@ -27,7 +27,7 @@ pub use host::*;
 
 // NOTE: This logic is partially duplicated in //src/virtualization/bin/guest/src/services.rs,
 // but that will be removed once this migration to a common codebase is finished.
-// TODO(fxbug.dev/116682): Remove other implementation.
+// TODO(https://fxbug.dev/116682): Remove other implementation.
 pub enum Stdio {
     Stdin,
     Stdout,

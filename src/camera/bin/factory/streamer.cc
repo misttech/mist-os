@@ -67,7 +67,7 @@ void Streamer::WatchDevicesCallback(std::vector<fuchsia::camera3::WatchDevicesEv
   for (auto& event : events) {
     if (event.is_added()) {
       // Connect to device.
-      // TODO(fxbug.dev/48506) Properly detect expected device id.
+      // TODO(https://fxbug.dev/48506) Properly detect expected device id.
       watcher_->ConnectToDevice(event.added(), device_.NewRequest(loop_.dispatcher()));
 
       // Fetch camera configurations
@@ -166,13 +166,13 @@ void Streamer::WaitForBuffersAllocatedCallback(uint32_t stream_index, zx_status_
 
   connected_stream_count_++;
 
-  // BEGIN: Daisy-chain work around for fxbug.dev/42241
+  // BEGIN: Daisy-chain work around for https://fxbug.dev/42241
   const uint32_t stream_count =
       static_cast<uint32_t>(configurations_[connected_config_index_].streams.size());
   if (connected_stream_count_ < stream_count) {
     ConnectToStream(connected_config_index_, connected_stream_count_);
   }
-  // END: Daisy-chain work around for fxbug.dev/42241
+  // END: Daisy-chain work around for https://fxbug.dev/42241
 
   auto& stream = stream_infos_[stream_index].stream;
   stream->GetNextFrame([this, stream_index](fuchsia::camera3::FrameInfo frame_info) {

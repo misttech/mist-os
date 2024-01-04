@@ -81,7 +81,7 @@ impl SuitablePhysicalDevice {
         };
 
         // Check if the device supports the desired format, and bail if it isn't.
-        // TODO(fxbug.dev/104692): instead of hardcoding a single format, we should filter a list of
+        // TODO(https://fxbug.dev/104692): instead of hardcoding a single format, we should filter a list of
         // acceptable formats, and only bail if none of them are supported.
         let format_properties = unsafe {
             instance.get_physical_device_format_properties(physical_device, FRAMEBUFFER_FORMAT)
@@ -125,7 +125,7 @@ impl Renderer for VulkanRenderer {
         duplicate_buffer_collection_import_token(&self.import_token).unwrap()
     }
 
-    // TODO(fxbug.dev/104692): there are a number of shortcomings in the implementation of this
+    // TODO(https://fxbug.dev/104692): there are a number of shortcomings in the implementation of this
     // function; see the bug report for more details.  The main shortcoming is that this fills the
     // whole view with a single color, instead of filling each quadrant with a different color.
     // This is a temporary hack which avoids the need to create pipelines and draw geometry.
@@ -207,7 +207,7 @@ impl Renderer for VulkanRenderer {
         }
 
         // Submit the command buffer.
-        // TODO(fxbug.dev/104692): we wait on the CPU for the fence to finish.  It would be more
+        // TODO(https://fxbug.dev/104692): we wait on the CPU for the fence to finish.  It would be more
         // optimal to pass a signal semaphore here, which corresponds to a `zx::event` which would
         // be passed to Flatland via `PresentArgs.server_wait_fences`.
         let submit_info = [vk::SubmitInfo::builder().command_buffers(&[command_buffer]).build()];
@@ -350,7 +350,7 @@ impl VulkanRenderer {
             vk::FuchsiaBufferCollectionFn::name().as_ptr(),
             vk::FuchsiaExternalMemoryFn::name().as_ptr(),
             vk::KhrExternalMemoryFn::name().as_ptr(),
-            // TODO(fxbug.dev/104692): see the comment in `render_rgba()` about using semaphores
+            // TODO(https://fxbug.dev/104692): see the comment in `render_rgba()` about using semaphores
             // instead of a VkFence.  To this, we need to add the external semaphore extensions.
             // vk::KhrExternalSemaphoreFn::name().as_ptr(),
             // vk::FuchsiaExternalSemaphoreFn::name().as_ptr(),
@@ -466,7 +466,7 @@ impl VulkanRenderer {
             .samples(vk::SampleCountFlags::TYPE_1)
             .tiling(vk::ImageTiling::OPTIMAL)
             // - TRANSFER_DST required to clear framebuffers via `vkCmdClearColorImage()`
-            // TODO(fxbug.dev/104692): if we start using shader pipelines to render into the image,
+            // TODO(https://fxbug.dev/104692): if we start using shader pipelines to render into the image,
             // we'll need to add COLOR_ATTACHMENT to the usage flags.
             .usage(vk::ImageUsageFlags::TRANSFER_DST)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -481,7 +481,7 @@ impl VulkanRenderer {
         // Also used to set buffer collection constraints.
         let vk_image_format_constraints_info = [vk::ImageFormatConstraintsInfoFUCHSIA::builder()
             .image_create_info(vk_image_create_info)
-            // TODO(fxbug.dev/104692): if we start using shader pipelines to render into the image,
+            // TODO(https://fxbug.dev/104692): if we start using shader pipelines to render into the image,
             // we'll need to add COLOR_ATTACHMENT to the usage flags.
             .required_format_features(
                 vk::FormatFeatureFlags::TRANSFER_SRC | vk::FormatFeatureFlags::TRANSFER_DST,

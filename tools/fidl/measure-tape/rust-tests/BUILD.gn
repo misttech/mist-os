@@ -228,7 +228,7 @@ supported_conformance_types = [
   "test.conformance/XUnionWithXUnionStruct",
 
   # Measure tape generated code won't build for these types.
-  # TODO(fxbug.dev/101585) Fix this.
+  # TODO(https://fxbug.dev/101585) Fix this.
   # "test.conformance/ArrayStruct",
   # "test.conformance/EmptyStructUnionStruct",
   # "test.conformance/GoldenNullableUnionStruct",
@@ -272,7 +272,7 @@ supported_conformance_types = [
   # "test.conformance/UnionWithBoundStringStruct",
 
   # These types build, but tests that use them fail.
-  # TODO(fxbug.dev/101585) Fix this.
+  # TODO(https://fxbug.dev/101585) Fix this.
   # "test.conformance/GoldenNullableStruct",
   # "test.conformance/NoCodingTablesStressor",
   # "test.conformance/OptionalEmptyStructWrapper",

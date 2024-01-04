@@ -287,8 +287,8 @@ encode_failure("HandlesBeforeAndAfterFailureAreClosed") {
 // in the test to ensure that there are no double-closes in encoders that
 // do not exit early upon failure.
 decode_failure("HandlesBeforeAndAfterFailureAreClosed") {
-    // TODO(fxbug.dev/100931) In rust, this is failing for an unknown reason.
-    // TODO(fxbug.dev/100945) In dart, this is failing for an unknown reason.
+    // TODO(https://fxbug.dev/100931) In rust, this is failing for an unknown reason.
+    // TODO(https://fxbug.dev/100945) In dart, this is failing for an unknown reason.
     bindings_denylist = [rust, dart],
     handle_defs = {
         #0 = event(),
@@ -491,7 +491,7 @@ success("ChannelMaxHandles") {
 
 // There should be support for at least 64 handles in unknown fields.
 decode_success("ChannelMaxUnknownHandlesDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     handle_defs = {
         #0 = event(), #1 = event(), #2 = event(), #3 = event(),
@@ -536,8 +536,8 @@ decode_success("ChannelMaxUnknownHandlesDropped") {
 }
 
 encode_success("ChannelMaxUnknownHandlesDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(), #1 = event(), #2 = event(), #3 = event(),
@@ -591,7 +591,7 @@ encode_success("ChannelMaxUnknownHandlesDropped") {
 // this test is the same as ChannelMaxUnknownHandlesDropped, but expects
 // that the unknown data is stored in the value instead of discarded
 success("ChannelMaxUnknownHandlesStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of ChannelMaxUnknownHandlesDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of ChannelMaxUnknownHandlesDropped.
     bindings_allowlist = [dart, go],
     handle_defs = {
         #0 = event(), #1 = event(), #2 = event(), #3 = event(),

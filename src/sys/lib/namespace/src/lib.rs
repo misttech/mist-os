@@ -90,7 +90,7 @@ impl Clone for Namespace {
         use fidl::AsHandleRef;
         use fuchsia_zircon as zx;
 
-        // TODO(fxbug.dev/132998): The unsafe block can go away if Rust FIDL bindings exposed the
+        // TODO(https://fxbug.dev/132998): The unsafe block can go away if Rust FIDL bindings exposed the
         // feature of calling FIDL methods (e.g. Clone) on a borrowed client endpoint.
         let tree = self.tree.map_ref(|dir| {
             let raw_handle = dir.channel().as_handle_ref().raw_handle();

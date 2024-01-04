@@ -129,7 +129,7 @@ void FactoryServer::CaptureFrames(std::string dir_path, CaptureFramesCallback ca
                             return;
                           }
 
-                          // TODO(fxbug.dev/58498): Check if frame->properties_.image_format ==
+                          // TODO(https://fxbug.dev/58498): Check if frame->properties_.image_format ==
                           // fuchsia::sysmem::PixelFormatType::NV12
                           if (bypass_) {
                             frame->WritePNGUnprocessed(filefp, true);

@@ -19,7 +19,7 @@ use {
 };
 
 /// Contains a reference to the currently connected key.
-// TODO(fxbug.dev/109408): Handle multiple security keys connected at once instead of ignoring new
+// TODO(https://fxbug.dev/109408): Handle multiple security keys connected at once instead of ignoring new
 // keys if one is already bound and still accessible.
 type DeviceBinding = Arc<Mutex<Option<CtapHidDevice>>>;
 

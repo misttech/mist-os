@@ -107,7 +107,7 @@ template("fuchsia_driver") {
       inputs = []
     }
 
-    # TODO(fxbug.dev/111929): Mitigate linker errors on driver tests after
+    # TODO(https://fxbug.dev/111929): Mitigate linker errors on driver tests after
     # "--no-undefined-version" was enabled by default.
     ldflags += [ "-Wl,--undefined-version" ]
 

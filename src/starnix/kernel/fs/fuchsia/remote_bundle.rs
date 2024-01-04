@@ -150,7 +150,7 @@ impl Inner {
             {
                 Ok(vmo) => Arc::new(vmo),
                 Err(zx::Status::BAD_STATE) => {
-                    // TODO(fxbug.dev/305272765): ZX_ERR_BAD_STATE is returned for the empty
+                    // TODO(https://fxbug.dev/305272765): ZX_ERR_BAD_STATE is returned for the empty
                     // blob, but Blobfs/Fxblob should be changed to handle this case
                     // successfully.  Remove the error-swallowing when the behaviour is fixed.
                     Arc::new(
@@ -195,7 +195,7 @@ impl FsNodeOps for File {
             content_size: vmo
                 .get_content_size()
                 .map_err(|status| from_status_like_fdio!(status))?,
-            // TODO(fxbug.dev/293607051): Plumb through storage size from underlying connection.
+            // TODO(https://fxbug.dev/293607051): Plumb through storage size from underlying connection.
             storage_size: 0,
             link_count: 1,
             has: zxio_node_attr_has_t {

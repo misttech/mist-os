@@ -18,7 +18,7 @@ FIDLCAT_TIMEOUT = 60  # timeout when invoking fidlcat
 
 # Convert FUCHSIA_SSH_KEY into an absolute path. Otherwise ffx cannot find
 # key and complains "Timeout attempting to reach target".
-# See fxbug.dev/101081.
+# See https://fxbug.dev/101081.
 os.environ.update(
     FUCHSIA_ANALYTICS_DISABLED="1",
     FUCHSIA_SSH_KEY=os.path.abspath(os.environ["FUCHSIA_SSH_KEY"]),
@@ -228,7 +228,7 @@ class FidlcatE2eTests(unittest.TestCase):
     def tearDownClass(cls):
         Fidlcat.teardown()
 
-    # Ensure debug_agent exits correctly after each test case. See fxbug.dev/101078.
+    # Ensure debug_agent exits correctly after each test case. See https://fxbug.dev/101078.
     def tearDown(self):
         # FUCHSIA_DEVICE_ADDR and FUCHSIA_SSH_KEY must be defined.
         # FUCHSIA_SSH_PORT is only defined when invoked from `fx test`.
@@ -273,7 +273,7 @@ class FidlcatE2eTests(unittest.TestCase):
             fidlcat.stdout,
         )
 
-    # TODO(fxbug.dev/113425): This test flakes on core.x64-debug, where fidlcat fails to exit after
+    # TODO(https://fxbug.dev/113425): This test flakes on core.x64-debug, where fidlcat fails to exit after
     # receiving the SIGTERM signal.
     def disabled_test_stay_alive(self):
         fidlcat = Fidlcat(

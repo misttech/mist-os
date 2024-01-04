@@ -338,7 +338,7 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
   fidl::Client<fuchsia_component::Realm> realm_client_;
 };
 
-// TODO: fxbug.dev/132413 - Test for DPR=2.0, too.
+// TODO: https://fxbug.dev/132413 - Test for DPR=2.0, too.
 TEST_F(StarnixTouchTest, Tap) {
   LaunchClient();
   LaunchDumper();

@@ -38,7 +38,7 @@ struct MutableState {
 /// pixel.
 const PIXELS_PER_TICK: f32 = 120.0;
 
-/// TODO(fxb/108541): Temporary apply a linear scale factor to scroll to make it feel
+/// TODO(https://fxbug.dev/108541): Temporary apply a linear scale factor to scroll to make it feel
 /// faster.
 const SCALE_SCROLL: f32 = 2.0;
 

@@ -216,7 +216,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                     }
                 }
             }
-            // TODO(fxbug.dev/128857): Support additionl Ctrl commands.
+            // TODO(https://fxbug.dev/128857): Support additionl Ctrl commands.
             other => log_error!(tag = NETLINK_LOG_TAG, "Unsupported GenlCtrlCmd: {:?}", other),
         }
     }
@@ -370,7 +370,7 @@ async fn run_generic_netlink<S: Sender<GenericMessage> + Send>(
 
 impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
     pub fn new() -> (Self, impl Future<Output = ()> + Send) {
-        // TODO(fxbug.dev/128857): Add dynamic family support. Right now this is only
+        // TODO(https://fxbug.dev/128857): Add dynamic family support. Right now this is only
         // structured to support static family additions.
         let (generic_netlink, netlink_fut) = Self::new_internal();
         let server = generic_netlink.server.clone();

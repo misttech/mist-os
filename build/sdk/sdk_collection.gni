@@ -343,7 +343,7 @@ template("sdk_collection") {
       public_deps += [ ":${labels.final_archive}" ]
     }
 
-    # TODO(fxbug.dev/93205): Block all metadata traversals such as the following:
+    # TODO(https://fxbug.dev/93205): Block all metadata traversals such as the following:
     # metadata = {
     #   expect_includes_barrier = []
     # }

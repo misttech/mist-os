@@ -354,7 +354,7 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   // Enable MIPI-DSY PHY clock.
   MipiDsiPhyClockControl::Get().ReadFrom(&*hhi_mmio_).set_enabled(true).WriteTo(&*hhi_mmio_);
   // Set divider to 1.
-  // TODO(fxbug.dev/131925): This should occur before enabling the clock.
+  // TODO(https://fxbug.dev/131925): This should occur before enabling the clock.
   MipiDsiPhyClockControl::Get().ReadFrom(&*hhi_mmio_).SetDivider(1).WriteTo(&*hhi_mmio_);
 
   // Set the Video clock 2 divider.

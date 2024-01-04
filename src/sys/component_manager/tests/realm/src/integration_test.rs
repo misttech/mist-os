@@ -269,7 +269,7 @@ pub async fn echo_server() {
         .unwrap();
     let mut entries = fuchsia_fs::directory::readdir(&elf_dir).await.unwrap();
 
-    // TODO(http://fxbug.dev/99823): The existence of "process_start_time_utc_estimate" is flaky.
+    // TODO(https://fxbug.dev/99823): The existence of "process_start_time_utc_estimate" is flaky.
     if let Some(position) = entries.iter().position(|e| e.name == "process_start_time_utc_estimate")
     {
         entries.remove(position);

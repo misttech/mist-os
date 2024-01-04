@@ -29,7 +29,7 @@ lazy_static! {
 /// over the yielded items without risking starvation. New streams can be added to the multiplexer
 /// by sending them on a channel.
 pub struct Multiplexer<I> {
-    // TODO(fxbug.dev/68257) explore using a BinaryHeap for sorting substreams
+    // TODO(https://fxbug.dev/68257) explore using a BinaryHeap for sorting substreams
     current: Vec<SubStream<I>>,
     incoming: UnboundedReceiver<IncomingStream<PinStream<I>>>,
     incoming_is_live: bool,

@@ -90,7 +90,7 @@ async fn exec_server() -> Result<(), Error> {
     std::mem::drop(router);
     let usb_fut = async move {
         // TODO: Change this info! to error! Once we can return normally if USB support is disabled
-        // (fxbug.dev/95554)
+        // (https://fxbug.dev/95554)
         if let Err(e) = usb::run_usb_links(weak_router.clone()).await {
             info!("USB scanner failed with error {e:?}");
         }

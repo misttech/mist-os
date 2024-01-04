@@ -95,7 +95,7 @@ pub enum KeyBasedPairingAction {
     RetroactiveWrite { seeker_address: Address },
     /// Seeker wants to write a personalized name for this device.
     PersonalizedNameWrite { received_provider_address: [u8; 6] },
-    // TODO(fxbug.dev/99734): Add Device Action requests.
+    // TODO(https://fxbug.dev/99734): Add Device Action requests.
 }
 
 /// A parsed and validated key-based pairing request.
@@ -173,7 +173,7 @@ pub fn decrypt_key_based_pairing_request(
                 let err = format!("Additional Data request with invalid ID ({})", request[10]);
                 return Err(Error::internal(&err));
             }
-            // TODO(fxbug.dev/99734): Support Device Action requests.
+            // TODO(https://fxbug.dev/99734): Support Device Action requests.
             return Err(Error::internal("Device Action requests not supported"));
         }
     }
@@ -365,7 +365,7 @@ decodable_enum! {
 /// A packet that is sent over the RFCOMM Message Stream.
 pub struct MessageStreamPacket {
     group: MessageGroupName,
-    // TODO(fxbug.dev/111268): This should be encapsulated in a wrapper type for all
+    // TODO(https://fxbug.dev/111268): This should be encapsulated in a wrapper type for all
     // MessageGroupName types. This is scoped to MessageGroupName::DeviceInformation requests
     // because that is what we currently support.
     code: DeviceInformationCode,

@@ -71,7 +71,7 @@ const runesBufLen = 8
 
 // A Doc represents a Markdown document.
 //
-// TODO(fxbug.dev/62964): Avoid duplicating a document's content between the
+// TODO(https://fxbug.dev/62964): Avoid duplicating a document's content between the
 // content in the token, and the content in the doc. To support reading the
 // content of a token while a line is being read, we need to either lookup the
 // content in the accumulated lines, or in the accumulated line buffer.
@@ -283,7 +283,7 @@ func (t *tokenizer) next() (Token, error) {
 			return t.newToken(Newline), nil
 		}
 		if r == '[' {
-			// TODO(fxbug.dev/62964): Consider unifying code span handling here
+			// TODO(https://fxbug.dev/62964): Consider unifying code span handling here
 			// with top-level code span + fenced code block handling below.
 			// Precedence rules and handling of HTML tags will make that
 			// particularly important, see
@@ -367,7 +367,7 @@ func (t *tokenizer) next() (Token, error) {
 				return t.newToken(HTMLComment), nil
 			}
 		}
-		// TODO(fxbug.dev/62964): We need to handle more than three backticks,
+		// TODO(https://fxbug.dev/62964): We need to handle more than three backticks,
 		// and possibly tildes (~). See
 		// https://spec.commonmark.org/0.29/#fenced-code-blocks.
 		if r == '`' {

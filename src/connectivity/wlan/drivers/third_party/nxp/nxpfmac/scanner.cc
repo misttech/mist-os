@@ -366,7 +366,7 @@ void Scanner::ProcessScanResults(wlan_fullmac_wire::WlanScanResult result) {
         .timestamp_nanos = zx::clock::get_monotonic().get(),
         .bss{
             .bss_type =
-                fuchsia_wlan_common::wire::BssType::kInfrastructure,  // TODO(fxbug.dev/80230):
+                fuchsia_wlan_common::wire::BssType::kInfrastructure,  // TODO(https://fxbug.dev/80230):
                                                                       // Remove hardcoding?
             .beacon_period = results[i].beacon_period,
             .capability_info = cap_info,

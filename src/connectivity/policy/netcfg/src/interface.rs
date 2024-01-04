@@ -261,7 +261,7 @@ where
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum MatchingRule {
     BusTypes(Vec<BusType>),
-    // TODO(fxbug.dev/135495): Use a lightweight regex crate with the basic
+    // TODO(https://fxbug.dev/135495): Use a lightweight regex crate with the basic
     // regex features to allow for more configurations than glob.
     #[serde(deserialize_with = "deserialize_glob_pattern")]
     TopologicalPath(glob::Pattern),
@@ -331,7 +331,7 @@ impl ProvisioningMatchingRule {
     }
 }
 
-// TODO(fxbug.dev/135106): Create dynamic naming rules
+// TODO(https://fxbug.dev/135106): Create dynamic naming rules
 // A naming rule that uses device information to produce a component of
 // the interface's name.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Deserialize)]
@@ -495,7 +495,7 @@ fn generate_name_from_naming_rules(
     interfaces: &HashMap<InterfaceNamingIdentifier, String>,
     info: &DeviceInfoRef<'_>,
 ) -> Result<String, NameGenerationError> {
-    // TODO(fxbug.dev/136397): Consider adding an option to the rules to allow
+    // TODO(https://fxbug.dev/136397): Consider adding an option to the rules to allow
     // fallback rules when name generation fails.
     // Use the first naming rule that matches the interface to enforce consistent
     // interface names, even if there are other matching rules.

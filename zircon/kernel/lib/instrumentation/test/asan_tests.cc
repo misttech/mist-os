@@ -31,7 +31,7 @@ namespace {
 
 unsigned char global_buffer[8];
 
-// TODO(fxbug.dev/30033): Enable for x86_64 once it can add shadow mappings after early init.
+// TODO(https://fxbug.dev/30033): Enable for x86_64 once it can add shadow mappings after early init.
 #if !defined(__x86_64__)
 inline uint8_t* test_addr2shadow(uintptr_t address) {
   uint8_t* const kasan_shadow_map = reinterpret_cast<uint8_t*>(KASAN_SHADOW_OFFSET);
@@ -58,7 +58,7 @@ bool kasan_test_malloc_poisons() {
 // Makes sure that a region recently freed is poisoned.
 bool kasan_test_free_poisons() {
   BEGIN_TEST;
-  // TODO(fxbug.dev/52129): Test is flaky. Fix and re-enable.
+  // TODO(https://fxbug.dev/52129): Test is flaky. Fix and re-enable.
   END_TEST;
 
   constexpr size_t sizes[] = {1, 10, 32, 1023, 1024};
@@ -259,7 +259,7 @@ bool kasan_test_walk_shadow() {
 NO_ASAN bool kasan_test_map_shadow_for() {
   BEGIN_TEST;
 
-// TODO(fxbug.dev/30033): Enable for x86_64 once it can add shadow mappings after early init.
+// TODO(https://fxbug.dev/30033): Enable for x86_64 once it can add shadow mappings after early init.
 #if !defined(__x86_64__)
   auto kernel_vmar = VmAspace::kernel_aspace()->RootVmar()->as_vm_address_region();
   fbl::RefPtr<VmAddressRegion> test_vmar;
@@ -297,7 +297,7 @@ bool kasan_test_globals_are_poisoned() {
 }
 
 // Verify that (asan-instrumented) memcpy succeeds when dst equals src even though they overlap
-// (fxbug.dev/65228).
+// (https://fxbug.dev/65228).
 bool kasan_test_memcpy_dst_src_equal() {
   BEGIN_TEST;
 

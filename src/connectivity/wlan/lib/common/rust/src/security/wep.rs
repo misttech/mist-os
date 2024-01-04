@@ -10,7 +10,7 @@
 //! WEP has no dedicated descriptor data. Only WEP-40 and WEP-104 are supported and key size is not
 //! negotiated with remote stations.
 
-// TODO(fxbug.dev/96000): Name items in this module in a way that makes it clear that they
+// TODO(https://fxbug.dev/96000): Name items in this module in a way that makes it clear that they
 //                        implement an insecure security protocol.
 
 use fidl_fuchsia_wlan_common_security as fidl_security;

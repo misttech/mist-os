@@ -183,14 +183,14 @@ pub extern "C" fn match_bind_rules(
 
     let bytecode = unsafe { std::slice::from_raw_parts(bytecode_c, bytecode_sz).to_vec() };
 
-    // TODO(fxb/73943): Return the error instead of returning false.
+    // TODO(https://fxbug.dev/73943): Return the error instead of returning false.
     match_bytecode(bytecode, &device_properties).unwrap_or_else(|e| {
         println!("Error evaluating the bytecode: {}", e);
         false
     })
 }
 
-#[allow(clippy::missing_safety_doc)] // TODO(fxbug.dev/99060)
+#[allow(clippy::missing_safety_doc)] // TODO(https://fxbug.dev/99060)
 #[no_mangle]
 pub unsafe extern "C" fn dump_bytecode(
     bytecode_c: *const u8,

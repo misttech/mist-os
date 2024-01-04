@@ -35,7 +35,7 @@ TEST(VulkanExtension, GetMemoryZirconHandlePropertiesFUCHSIA) {
   // set_device_info() during unique context construction.
   VulkanContext::Builder builder;
 
-  // TODO(fxbug.dev/73025): remove this disable when it's time.
+  // TODO(https://fxbug.dev/73025): remove this disable when it's time.
   builder.set_validation_layers_enabled(false);
 
   vk::DeviceCreateInfo device_info = builder.DeviceInfo();
@@ -55,7 +55,7 @@ TEST(VulkanExtension, GetMemoryZirconHandlePropertiesFUCHSIA) {
   reinterpret_cast<VkMemoryZirconHandlePropertiesFUCHSIA*>(&handle_properties)->sType =
       static_cast<VkStructureType>(VK_STRUCTURE_TYPE_MEMORY_ZIRCON_HANDLE_PROPERTIES_FUCHSIA);
 
-  // TODO(fxbug.dev/69211): Emulator GPU devices (under device type
+  // TODO(https://fxbug.dev/69211): Emulator GPU devices (under device type
   // |eVirtualGpu|) cannot import arbitrary VMOs as VkDeviceMemory since it
   // doesn't have a unified memory architecture. Thus we skip this test case
   // and we'll need a new test case covering FEMU cases.

@@ -91,7 +91,7 @@ if [ $UPDATE -eq 1 ]; then
   # The following two lines used to be in the opposite order, which incorrectly
   # caused `go get -u` to fetch gvisor from the default branch instead of the
   # go branch.
-  echo "WARNING(fxb/137140): Before the go version update, build will fail if \
+  echo "WARNING(https://fxbug.dev/137140): Before the go version update, build will fail if \
 we try to update gVisor. Remove this line once go version is updated."
   $GO get -u gvisor.dev/gvisor@go
   $GO get -u

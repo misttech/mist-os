@@ -14,7 +14,7 @@ namespace ram_metrics = fuchsia_hardware_ram_metrics;
 
 namespace {
 
-// TODO(fxbug.dev/48254): Get default channel information through the FIDL API.
+// TODO(https://fxbug.dev/48254): Get default channel information through the FIDL API.
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc99-designator"

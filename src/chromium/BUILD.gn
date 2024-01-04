@@ -30,7 +30,7 @@ declare_args() {
   use_chromium_canary = false
 }
 
-# TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
+# TODO(https://fxbug.dev/70573): Replace with solution that does not rely on GN args.
 # Consider abstracting the `_pkg` aspect of the target name.
 if (use_chromium_canary) {
   package_flavor_selections += [
@@ -53,7 +53,7 @@ generate_fuchsia_web_test_targets("chromium") {
 
 # The targets below do not use generate_package_flavors(), so the paths must be
 # modified manually.
-# TODO(fxbug.dev/70573, fxbug.dev/119526): Replace with a solution that
+# TODO(https://fxbug.dev/70573, https://fxbug.dev/119526): Replace with a solution that
 # does not rely on GN args.
 if (use_chromium_canary) {
   _flavor_suffix = "_latest"

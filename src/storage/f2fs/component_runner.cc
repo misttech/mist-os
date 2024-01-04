@@ -108,7 +108,7 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BcacheMapper> bcache,
   // Specify to fall back to DeepCopy mode instead of Live mode (the default) on failures to send
   // a Frozen copy of the tree (e.g. if we could not create a child copy of the backing VMO).
   // This helps prevent any issues with querying the inspect tree while the filesystem is under
-  // load, since snapshots at the receiving end must be consistent. See fxbug.dev/57330 for
+  // load, since snapshots at the receiving end must be consistent. See https://fxbug.dev/57330 for
   // details.
   exposed_inspector_.emplace(inspect::ComponentInspector{
       dispatcher_,

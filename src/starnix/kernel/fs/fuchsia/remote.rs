@@ -44,7 +44,7 @@ pub struct RemoteFs {
     // If true, trust the remote file system's IDs (which requires that the remote file system does
     // not span mounts).  This must be true to properly support hard links.  If this is false, the
     // same node can end up having different IDs as it leaves and reenters the node cache.
-    // TODO(fxbug.dev/131807): At the time of writing, package directories do not have unique IDs so
+    // TODO(https://fxbug.dev/131807): At the time of writing, package directories do not have unique IDs so
     // this *must* be false in that case.
     use_remote_ids: bool,
 
@@ -707,7 +707,7 @@ impl FsNodeOps for RemoteNode {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let update_timestamps = self.filesystem_manages_timestamps(&node);
-        // TODO(fxbug.dev/294318193): when Fxfs supports tracking atime, we should refresh with the
+        // TODO(https://fxbug.dev/294318193): when Fxfs supports tracking atime, we should refresh with the
         // corresponding value.
         let attrs = self
             .zxio

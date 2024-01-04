@@ -61,7 +61,7 @@
     }                                                                                             \
   }
 
-// TODO(fxb/61311): Remove once this verbose logging is no longer needed in
+// TODO(https://fxbug.dev/61311): Remove once this verbose logging is no longer needed in
 // brcmf_indicate_client_disconnect().
 #define BRCMF_INFO_EVENT(ifp, event_msg, REASON_FMT, reason_formatter)                             \
   {                                                                                                \
@@ -156,7 +156,7 @@ class Debug {
   // All changes made to this filter must be approved by privacy to ensure sensitive data is not
   // unintentionally printed in logs.
   //
-  // http://fxbug.dev/29792 - Remove WLAN_FULLMAC once things have stabilized.
+  // https://fxbug.dev/29792 - Remove WLAN_FULLMAC once things have stabilized.
   static constexpr uint32_t kBrcmfMsgFilter =
       static_cast<uint32_t>(Filter::kWLANIF) | static_cast<uint32_t>(Filter::kWLANPHY);
 

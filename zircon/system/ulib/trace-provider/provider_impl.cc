@@ -87,7 +87,7 @@ void TraceProviderImpl::Initialize(
 void TraceProviderImpl::Start(fuchsia_tracing_provider::wire::ProviderStartRequest* request,
                               StartCompleter::Sync& completer) {
   const fuchsia_tracing_provider::wire::StartOptions& options = request->options;
-  // TODO(fxbug.dev/22973): Add support for additional categories.
+  // TODO(https://fxbug.dev/22973): Add support for additional categories.
   Session::StartEngine(FidlBufferingDispositionToTraceEngineStartMode(options.buffer_disposition));
 }
 
@@ -120,7 +120,7 @@ void TraceProviderImpl::GetKnownCategories(GetKnownCategoriesCompleter::Sync& co
     return;
   }
 
-  // TODO(fxb/117525): Return the trace categories that were registered with the category string
+  // TODO(https://fxbug.dev/117525): Return the trace categories that were registered with the category string
   // literal.
   completer.Reply({});
 }

@@ -62,7 +62,7 @@ class Renderer : public allocation::BufferCollectionImporter {
                                         const std::array<float, 3>& postoffsets) = 0;
 
   // Returns the pixel format that the renderer prefers to use for render targets.
-  // TODO(fxbug.dev/114033): Rename this to reflect that it's for a render target.
+  // TODO(https://fxbug.dev/114033): Rename this to reflect that it's for a render target.
   virtual fuchsia_images2::PixelFormat ChoosePreferredPixelFormat(
       const std::vector<fuchsia_images2::PixelFormat>& available_formats) const = 0;
 
@@ -72,7 +72,7 @@ class Renderer : public allocation::BufferCollectionImporter {
   // Returns true if the renderer has to switch to protected mode to render the given |images|. If
   // true, the caller is responsible for providing a render target using the protected memory when
   // calling Render().
-  // TODO(fxbug.dev/111107): The caller should be able to figure out if the images are protected.
+  // TODO(https://fxbug.dev/111107): The caller should be able to figure out if the images are protected.
   // Remove this after moving to prunable tokens in the callers.
   virtual bool RequiresRenderInProtected(
       const std::vector<allocation::ImageMetadata>& images) const = 0;

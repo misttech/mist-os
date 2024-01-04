@@ -5,4 +5,4 @@ relied upon for manual end-to-end and integration testing, so when making any
 changes please ensure that the `//tool/fuzz:tests` e2e tests still pass and
 update if necessary. For `cpp:crash_fuzzer` and `cpp:overflow_fuzzer` in
 particular, behavioral changes should additionally be validated against the
-ClusterFuzz integration tests. See fxbug.dev/61973 for more details.
+ClusterFuzz integration tests. See https://fxbug.dev/61973 for more details.

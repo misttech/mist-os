@@ -33,7 +33,7 @@ zx_status_t Timer::Stop() {
   // for race conditions for the section below where we don't hold unlock handler_mutex_ and wait
   // for handler completion. std::lock locks both std::unique_locks without deadlocks.
   // Note: std::scoped_lock can cause a double unlock in this case, since need handler_mutex_ to be
-  // unlocked while start_stop_mutex_ is still locked. see fxbug.dev/121807 for context.
+  // unlocked while start_stop_mutex_ is still locked. see https://fxbug.dev/121807 for context.
   std::unique_lock start_stop_lock(start_stop_mutex_, std::defer_lock);
   std::unique_lock handler_lock(handler_mutex_, std::defer_lock);
   std::lock(start_stop_lock, handler_lock);
@@ -85,7 +85,7 @@ zx_status_t Timer::Start(zx_duration_t interval, bool periodic) {
   // for race conditions for the section below where we have to unlock handler_mutex_ and wait for
   // handler completion. std::lock locks both mutexes without deadlocks.
   // Note: std::scoped_lock can cause a double unlock in this case, since need handler_mutex_ to be
-  // unlocked while start_stop_mutex_ is still locked. see fxbug.dev/121807 for context.
+  // unlocked while start_stop_mutex_ is still locked. see https://fxbug.dev/121807 for context.
   std::unique_lock start_stop_lock(start_stop_mutex_, std::defer_lock);
   std::unique_lock handler_lock(handler_mutex_, std::defer_lock);
   std::lock(start_stop_lock, handler_lock);

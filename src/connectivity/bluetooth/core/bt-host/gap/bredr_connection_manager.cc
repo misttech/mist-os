@@ -383,7 +383,7 @@ bool BrEdrConnectionManager::Disconnect(PeerId peer_id, DisconnectReason reason)
   bt_log(INFO, "gap-bredr", "Disconnect Requested (reason %hhu - %s) (peer: %s)",
          static_cast<unsigned char>(reason), ReasonAsString(reason).c_str(), bt_str(peer_id));
 
-  // TODO(fxbug.dev/65157) - If a disconnect request is received when we have a pending connection,
+  // TODO(https://fxbug.dev/65157) - If a disconnect request is received when we have a pending connection,
   // we should instead abort the connection, by either:
   //   * removing the request if it has not yet been processed
   //   * sending a cancel command to the controller and waiting for it to be processed
@@ -688,7 +688,7 @@ void BrEdrConnectionManager::CompleteConnectionSetup(Peer::WeakPtr peer,
     self->Disconnect(peer_id, DisconnectReason::kAclLinkError);
   };
 
-  // TODO(fxbug.dev/37650): Implement this callback as a call to InitiatePairing().
+  // TODO(https://fxbug.dev/37650): Implement this callback as a call to InitiatePairing().
   auto security_callback = [peer_id](hci_spec::ConnectionHandle handle, sm::SecurityLevel level,
                                      auto cb) {
     bt_log(INFO, "gap-bredr",
@@ -886,7 +886,7 @@ void BrEdrConnectionManager::CompleteRequest(PeerId peer_id, DeviceAddress addre
   } else {
     // This incoming connection arrived while we're trying to make an outgoing connection; not an
     // impossible coincidence but log it in case it's interesting.
-    // TODO(fxbug.dev/92299): Added to investigate timing and can be removed if it adds no value
+    // TODO(https://fxbug.dev/92299): Added to investigate timing and can be removed if it adds no value
     if (pending_request_.has_value()) {
       bt_log(INFO, "gap-bredr",
              "doesn't complete pending outgoing connection to peer %s (addr: %s)",
@@ -987,11 +987,11 @@ hci::CommandChannel::EventCallbackResult BrEdrConnectionManager::OnIoCapabilityR
 
   const pw::bluetooth::emboss::IoCapability io_capability = *reply;
 
-  // TODO(fxbug.dev/601): Add OOB status from PeerCache.
+  // TODO(https://fxbug.dev/601): Add OOB status from PeerCache.
   const pw::bluetooth::emboss::OobDataPresent oob_data_present =
       pw::bluetooth::emboss::OobDataPresent::NOT_PRESENT;
 
-  // TODO(fxbug.dev/1249): Determine this based on the service requirements.
+  // TODO(https://fxbug.dev/1249): Determine this based on the service requirements.
   const pw::bluetooth::emboss::AuthenticationRequirements auth_requirements =
       io_capability == pw::bluetooth::emboss::IoCapability::NO_INPUT_NO_OUTPUT
           ? pw::bluetooth::emboss::AuthenticationRequirements::GENERAL_BONDING

@@ -241,7 +241,7 @@ TEST(VmoTestCase, MapRead) {
 // The expected behavior is that the writes succeed without crashing
 // the kernel.
 //
-// See fxbug.dev/66978 for more details.
+// See https://fxbug.dev/66978 for more details.
 TEST(VmoTestCase, ParallelWriteAndDecommit) {
   const size_t kVmoSize = zx_system_get_page_size();
 

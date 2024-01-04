@@ -199,7 +199,7 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcf
     if (UFSTAT::Get().ReadFrom(io.io()).rx_fifo_count() == 0) {
       return {};
     }
-    // TODO(fxbug.dev/86569) handle clearing a rx fifo error
+    // TODO(https://fxbug.dev/86569) handle clearing a rx fifo error
     return URXH::Get().ReadFrom(io.io()).data();
   }
 
@@ -216,14 +216,14 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcf
   template <class IoProvider, typename EnableInterruptCallback>
   void InitInterrupt(IoProvider& io, EnableInterruptCallback&& enable_interrupt_callback) {
     // Stubbed out implementation.
-    // TODO(fxbug.dev/115620): implement me
+    // TODO(https://fxbug.dev/115620): implement me
     enable_interrupt_callback();
   }
 
   template <class IoProvider, class Lock, class Waiter, class Tx, class Rx>
   void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& tx, Rx&& rx) {
     // Stubber out implementation.
-    // TODO(fxbug.dev/115620): implement me
+    // TODO(https://fxbug.dev/115620): implement me
   }
 
  private:

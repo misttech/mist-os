@@ -114,7 +114,7 @@ impl TimerFile {
                         // Since Zircon does not have realtime timers, compute what the value would
                         // be in the monotonic clock assuming realtime progresses linearly.
                         //
-                        // TODO(fxbug.dev/117507) implement proper realtime timers that will work
+                        // TODO(https://fxbug.dev/117507) implement proper realtime timers that will work
                         // when the realtime clock changes, and implement TFD_TIMER_CANCEL_ON_SET.
                         let utc_clock: Unowned<'static, Clock> = unsafe {
                             let handle = zx_utc_reference_get();

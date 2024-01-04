@@ -26,7 +26,7 @@ type Metrics = table {
 };
 
 /// Get information about Scenic's primary display.
-// TODO(fxbug.dev/23687): in the future there will probably be a DisplayManager, and
+// TODO(https://fxbug.dev/23687): in the future there will probably be a DisplayManager, and
 // info about which displays to use will be explicitly specified to Scenic.
 @discoverable
 closed protocol Info {

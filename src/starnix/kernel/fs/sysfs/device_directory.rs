@@ -37,7 +37,7 @@ impl DeviceDirectory {
     }
 
     fn create_file_ops_entries() -> Vec<VecDirectoryEntry> {
-        // TODO(fxb/121327): Add power and subsystem nodes.
+        // TODO(https://fxbug.dev/121327): Add power and subsystem nodes.
         vec![
             VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/89234): Check what happens with the modifier keys - we should perhaps maintain
+// TODO(https://fxbug.dev/89234): Check what happens with the modifier keys - we should perhaps maintain
 // them.
 
 //! Implements hardware key autorepeat.

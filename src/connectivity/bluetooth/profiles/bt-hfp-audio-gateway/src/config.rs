@@ -63,19 +63,19 @@ impl From<hfp_profile_config::Config> for AudioGatewayFeatureSupport {
         AudioGatewayFeatureSupport {
             reject_incoming_voice_call: src.reject_incoming_voice_call,
             three_way_calling: src.three_way_calling,
-            // TODO(fxbug.dev/75538): not supported yet
+            // TODO(https://fxbug.dev/75538): not supported yet
             in_band_ringtone: false,
             echo_canceling_and_noise_reduction: src.echo_canceling_and_noise_reduction,
-            // TODO(fxbug.dev/66016): not supported yet
+            // TODO(https://fxbug.dev/66016): not supported yet
             voice_recognition: false,
             attach_phone_number_to_voice_tag: src.attach_phone_number_to_voice_tag,
-            // TODO(fxbug.dev/74091): not supported yet
+            // TODO(https://fxbug.dev/74091): not supported yet
             respond_and_hold: false,
             enhanced_call_controls: src.enhanced_call_controls,
             wide_band_speech: src.wide_band_speech,
-            // TODO(fxbug.dev/66016): not supported yet
+            // TODO(https://fxbug.dev/66016): not supported yet
             enhanced_voice_recognition: false,
-            // TODO(fxbug.dev/66016): not supported yet
+            // TODO(https://fxbug.dev/66016): not supported yet
             enhanced_voice_recognition_with_text: false,
         }
     }

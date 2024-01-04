@@ -161,7 +161,7 @@ var (
 	}
 	// Name of a service declaration
 	// https://google.github.io/styleguide/cppguide.html#Type_Names
-	// TODO(fxbug.dev/118283): Protocols and services should not have DeclName.
+	// TODO(https://fxbug.dev/118283): Protocols and services should not have DeclName.
 	// Not all bindings generate these types.
 	serviceContext = declarationContext{
 		NameContext: fidlgen.NewNameContext(),
@@ -173,7 +173,7 @@ var (
 	}
 	// Name of a protocol declaration
 	// https://google.github.io/styleguide/cppguide.html#Type_Names
-	// TODO(fxbug.dev/118283): Protocols and services should not have DeclName.
+	// TODO(https://fxbug.dev/118283): Protocols and services should not have DeclName.
 	// Not all bindings generate these types.
 	protocolContext = declarationContext{
 		NameContext: fidlgen.NewNameContext(),
@@ -767,7 +767,7 @@ func init() {
 		"ZX_PKT_TYPE_SIGNAL_ONE",
 		"ZX_PKT_TYPE_USER",
 		"ZX_PORT_BIND_TO_INTERRUPT",
-		// TODO(fxbug.dev/51002): These names occur both in zircon/vdso/profile.fidl
+		// TODO(https://fxbug.dev/51002): These names occur both in zircon/vdso/profile.fidl
 		// and zircon/system/public/zircon/syscalls/profile.h. If/when the latter
 		// becomes generated from the former, we should remove these from the list
 		// so they don't get escaped.
@@ -969,7 +969,7 @@ func init() {
 	}
 
 	// Non-ZX_ macro definitions defined in files that generated bindings outputs may import.
-	// TODO(fxbug.dev/94622): this list is incomplete, downstream uses of some colliding names need
+	// TODO(https://fxbug.dev/94622): this list is incomplete, downstream uses of some colliding names need
 	// to be rectified first.
 	macroNames := []string{
 		"stderr",
@@ -978,7 +978,7 @@ func init() {
 	}
 
 	// misc other names
-	// TODO(fxbug.dev/118283): confirm which of these can be removed
+	// TODO(https://fxbug.dev/118283): confirm which of these can be removed
 	miscNames := []string{
 		"assert",
 		"import",

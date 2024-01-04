@@ -7,7 +7,7 @@
 # //src/devices/bin/driver_tools/tests:start_driver_test_realm_and_hang in your
 # build for this test to work correctly.
 
-# This is a regression test for fxb/113457 that tests that the `--select` flag to
+# This is a regression test for https://fxbug.dev/113457 that tests that the `--select` flag to
 # `ffx driver dump` works. Specifically, we are testing that we can connect to
 # an instance of driver manager inside a Driver Test Realm.
 

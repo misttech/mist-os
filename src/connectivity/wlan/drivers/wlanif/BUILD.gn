@@ -37,7 +37,7 @@ all_deps = [
   "//src/devices/lib/driver:driver_runtime",
   "//src/lib/ddk",
 
-  # TODO(fxbug.dev/38599): The fdio dependency here is purely due to
+  # TODO(https://fxbug.dev/38599): The fdio dependency here is purely due to
   # a problem with transitive Rust static library dependencies when linking
   # C++ programs
   "//sdk/lib/fdio",

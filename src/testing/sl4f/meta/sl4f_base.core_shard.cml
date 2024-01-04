@@ -245,7 +245,7 @@
             from: "#factory_store_providers",
             to: "#sl4f",
 
-            // See: fxbug.dev/103037
+            // See: https://fxbug.dev/103037
             source_availability: "unknown",
         },
 

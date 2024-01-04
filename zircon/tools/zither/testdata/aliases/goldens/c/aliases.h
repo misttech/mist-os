@@ -34,7 +34,7 @@ typedef uint32_t zither_aliases_uint32_alias_t;
 
 typedef uint64_t zither_aliases_uint64_alias_t;
 
-// TODO(fxbug.dev/105758): The IR currently does not propagate enough
+// TODO(https://fxbug.dev/105758): The IR currently does not propagate enough
 // information for bindings to express this type as an alias.
 #define ZITHER_ALIASES_CONST_FROM_ALIAS ((uint8_t)(0xffu))
 

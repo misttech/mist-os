@@ -233,7 +233,7 @@ void LowEnergyConnection::RegisterEventHandlers() {
 // Connection parameter updates by the peripheral are not allowed until the central has been idle
 // for kLEConnectionPauseCentral and kLEConnectionPausePeripheral has passed since the connection
 // was established (Core Spec v5.2, Vol 3, Part C, Sec 9.3.12).
-// TODO(fxbug.dev/79491): Wait to update connection parameters until all initialization
+// TODO(https://fxbug.dev/79491): Wait to update connection parameters until all initialization
 // procedures have completed.
 void LowEnergyConnection::StartConnectionPausePeripheralTimeout() {
   BT_ASSERT(!conn_pause_peripheral_timeout_.has_value());
@@ -254,7 +254,7 @@ void LowEnergyConnection::StartConnectionPausePeripheralTimeout() {
 // Connection parameter updates by the central are not allowed until the central is idle and the
 // peripheral has been idle for kLEConnectionPauseCentral (Core Spec v5.2, Vol 3, Part
 // C, Sec 9.3.12).
-// TODO(fxbug.dev/79491): Wait to update connection parameters until all initialization
+// TODO(https://fxbug.dev/79491): Wait to update connection parameters until all initialization
 // procedures have completed.
 void LowEnergyConnection::StartConnectionPauseCentralTimeout() {
   BT_ASSERT(!conn_pause_central_timeout_.has_value());
@@ -333,7 +333,7 @@ void LowEnergyConnection::RequestConnectionParameterUpdate(
   // Ensure interrogation has completed.
   BT_ASSERT(peer_->le()->features().has_value());
 
-  // TODO(fxbug.dev/49714): check local controller support for LL Connection Parameters Request
+  // TODO(https://fxbug.dev/49714): check local controller support for LL Connection Parameters Request
   // procedure (mask is currently in Adapter le state, consider propagating down)
   bool ll_connection_parameters_req_supported =
       peer_->le()->features()->le_features &
@@ -409,7 +409,7 @@ void LowEnergyConnection::L2capRequestConnectionParameterUpdate(
     }
   };
 
-  // TODO(fxbug.dev/49717): don't send request until after kLEConnectionParameterTimeout of an
+  // TODO(https://fxbug.dev/49717): don't send request until after kLEConnectionParameterTimeout of an
   // l2cap conn parameter update response being received (Core Spec v5.2, Vol 3, Part C,
   // Sec 9.3.9).
   l2cap_->RequestConnectionParameterUpdate(handle(), params, std::move(response_cb));
@@ -423,7 +423,7 @@ void LowEnergyConnection::UpdateConnectionParams(
           hci_spec::kLEConnectionUpdate);
   auto view = command.view_t();
   view.connection_handle().Write(handle());
-  // TODO(fxbug.dev/123377): Handle invalid connection parameters before sending them to the
+  // TODO(https://fxbug.dev/123377): Handle invalid connection parameters before sending them to the
   // controller.
   view.connection_interval_min().UncheckedWrite(params.min_interval());
   view.connection_interval_max().UncheckedWrite(params.max_interval());
@@ -495,7 +495,7 @@ void LowEnergyConnection::MaybeUpdateConnectionParameters() {
   if (link_->role() == pw::bluetooth::emboss::ConnectionRole::CENTRAL) {
     // If the GAP service preferred connection parameters characteristic has not been read by now,
     // just use the default parameters.
-    // TODO(fxbug.dev/66031): Wait for preferred connection parameters to be read.
+    // TODO(https://fxbug.dev/66031): Wait for preferred connection parameters to be read.
     BT_ASSERT(peer_.is_alive());
     auto conn_params = peer_->le()->preferred_connection_parameters().value_or(
         kDefaultPreferredConnectionParameters);
@@ -527,7 +527,7 @@ bool LowEnergyConnection::InitializeGatt(l2cap::Channel::WeakPtr att_channel,
 
   std::vector<UUID> service_uuids;
   if (service_uuid) {
-    // TODO(fxbug.dev/65592): De-duplicate services.
+    // TODO(https://fxbug.dev/65592): De-duplicate services.
     service_uuids = {*service_uuid, kGenericAccessService};
   }
   gatt_->InitializeClient(peer_id(), std::move(service_uuids));

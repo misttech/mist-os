@@ -99,7 +99,7 @@ _FpsResult _computeFps(Model model, Thread uiThread, Thread rasterThread) {
       maybeNewEnd = event.start + event.duration!;
     } else if (event is DurationEvent &&
         event.category == 'flutter' &&
-        // TODO(fxbug.dev/48263): Only match "VsyncProcessCallback".
+        // TODO(https://fxbug.dev/48263): Only match "VsyncProcessCallback".
         (event.name == 'vsync callback' ||
             event.name == 'VsyncProcessCallback')) {
       final maybeFollowingVsync = findFollowingVsync(event);
@@ -147,7 +147,7 @@ _FpsResult _computeFps(Model model, Thread uiThread, Thread rasterThread) {
     // Hitting this indicates a logic error in the above grouping code.
     assert(group.events.isNotEmpty);
 
-    // TODO(fxbug.dev/48263): Only match "VsyncProcessCallback".
+    // TODO(https://fxbug.dev/48263): Only match "VsyncProcessCallback".
     final vsyncCallbacks = filterEventsTyped<DurationEvent>(group.events,
             category: 'flutter', name: 'vsync callback')
         .followedBy(filterEventsTyped<DurationEvent>(group.events,
@@ -256,7 +256,7 @@ double computeDiscrepancy(List<double> timestamps) {
 List<double> _computeFrameLatencies(Thread uiThread) {
   return filterEventsTyped<DurationEvent>(uiThread.events,
           category: 'flutter', name: 'vsync callback')
-      // TODO(fxbug.dev/48263): Only match "VsyncProcessCallback"
+      // TODO(https://fxbug.dev/48263): Only match "VsyncProcessCallback"
       .followedBy(filterEventsTyped<DurationEvent>(uiThread.events,
           category: 'flutter', name: 'VsyncProcessCallback'))
       .map((event) {
@@ -272,7 +272,7 @@ List<double> _computeFrameLatencies(Thread uiThread) {
       .toList();
 }
 
-/// TODO(fxbug.dev/73367): Modify this test to only include VsyncProcessCallback
+/// TODO(https://fxbug.dev/73367): Modify this test to only include VsyncProcessCallback
 List<double> _computeRenderFrameTotalDurations(Model model) {
   final modelEvents = getAllEvents(model);
   final startRenderingEvents = filterEventsTyped<DurationEvent>(modelEvents,
@@ -386,7 +386,7 @@ ${results.appName} Flutter Frame Stats
 /// Returns a list of results with an entry for each flutter app found.
 List<_Results> _flutterFrameStats(Model model, {String? flutterAppName}) {
   final results = <_Results>[];
-  // TODO(fxbug.dev/23073): Should only iterate on flutter processes.
+  // TODO(https://fxbug.dev/23073): Should only iterate on flutter processes.
   // final flutterProcesses = model.processes
   //     .where((process) => process.name.startsWith('io.flutter.'));
   final flutterProcesses = model.processes;
@@ -442,7 +442,7 @@ List<_Results> _flutterFrameStats(Model model, {String? flutterAppName}) {
       results.add(_Results()
         ..appName = appName
         ..fpsResult = _computeFps(model, uiThread, rasterThread)
-        // TODO(fxbug.dev/48263): Only match "VsyncProcessCallback".
+        // TODO(https://fxbug.dev/48263): Only match "VsyncProcessCallback".
         ..frameBuildTimes = filterEventsTyped<DurationEvent>(uiThread.events,
                 category: 'flutter', name: 'vsync callback')
             .followedBy(filterEventsTyped<DurationEvent>(uiThread.events,

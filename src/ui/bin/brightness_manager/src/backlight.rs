@@ -149,7 +149,7 @@ impl Backlight {
     }
 
     async fn set(&self, value: f64) -> Result<(), Error> {
-        // TODO(fxbug.dev/36302): Handle error here as well, similar to get_brightness above. Might involve
+        // TODO(https://fxbug.dev/36302): Handle error here as well, similar to get_brightness above. Might involve
         let regulated_value =
             num_traits::clamp(value, MIN_REGULATED_BRIGHTNESS, MAX_REGULATED_BRIGHTNESS);
         let backlight_on = value > 0.0;

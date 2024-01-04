@@ -123,7 +123,7 @@ start the component, then connect and pair to headphones or a speaker.
        If you know the name of the device, you can filter the results by adding part of the name
        as an argument.  Repeat until your device shows up.
     1. Run `stop-discovery` when your device shows up to stop discovery.
-    1. Wait 10 seconds. (this is a (known bug)[http://fxbug.dev/2758] and will not be necessary soon)
+    1. Wait 10 seconds. (this is a (known bug)[https://fxbug.dev/2758] and will not be necessary soon)
     1. Run `connect <BT address>` - you can type a partial address and use tab completion
 1. You should be connected to the headphones/speaker - you may hear a tone on them to confirm.
 1. You should be able to play some audio on Fuchsia and hear it from your Bluetooth device:

@@ -303,7 +303,7 @@ impl EventStreamCapability {
 
 /// Defines the manifest data in terms of the component framework version it
 /// represents.
-// TODO(fxbug.dev/134100): Use cm_rust type or ComponentDecl type.
+// TODO(https://fxbug.dev/134100): Use cm_rust type or ComponentDecl type.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct ManifestData {
     pub cm_base64: String,

@@ -18,7 +18,7 @@ class StreamConverter {
   StreamConverter(const Format& source_format, const Format& dest_format);
 
   // Creates a new `StreamConverter` with the assumption that the source sample type is `float`.
-  // TODO(fxbug.dev/114920): remove when old audio_core code is gone
+  // TODO(https://fxbug.dev/114920): remove when old audio_core code is gone
   static StreamConverter CreateFromFloatSource(const Format& dest_format);
 
   // Converts `frame_count` frames in `source_samples` from the source format into the destination

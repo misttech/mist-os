@@ -206,5 +206,5 @@ TEST_F(IntegrationTest, ConfigCppRealmBuilderParentOverride) {
   EXPECT_EQ(rapidjson::Value("parent component"), data.GetByPath({"root", "config", "greeting"}));
 }
 
-// TODO(fxbug.dev/102211): Include a subpackaged child component in the examples
+// TODO(https://fxbug.dev/102211): Include a subpackaged child component in the examples
 //  and tests, including the Rust version of this suite.

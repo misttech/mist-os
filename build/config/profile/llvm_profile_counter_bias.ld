@@ -3,7 +3,7 @@
  * found in the LICENSE file.
  */
 
-/* TODO(fxbug.dev/83653): This symbol is normally provided by the compiler
+/* TODO(https://fxbug.dev/83653): This symbol is normally provided by the compiler
  * only when profile runtime is needed, but due to a compiler bug, we're
  * seeing undefined reference to this symbol even in cases when the runtime
  * isn't needed hence this workaround.

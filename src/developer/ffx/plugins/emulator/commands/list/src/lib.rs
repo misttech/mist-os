@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(http://fxbug.dev/125953): ffx_plugin template always adds anyhow as a dep.
+// TODO(https://fxbug.dev/125953): ffx_plugin template always adds anyhow as a dep.
 use anyhow as _;
 
 use async_trait::async_trait;
@@ -12,13 +12,13 @@ use fho::{FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO, TryFromEnv, TryFr
 use serde::Serialize;
 use std::marker::PhantomData;
 
-// TODO(http://fxbug.dev/94232): Update this error message once shut down is more robust.
+// TODO(https://fxbug.dev/94232): Update this error message once shut down is more robust.
 const BROKEN_MESSAGE: &str = r#"
 One or more emulators are in a 'Broken' state. This is an uncommon state, but usually happens if
 the Fuchsia source tree or SDK is updated while the emulator is still running. Communication with
 a "Broken" emulator may still be possible, but errors will be encountered for any further `ffx emu`
 commands. Running `ffx emu stop` will not shut down a broken emulator (this should be fixed as part
-of fxbug.dev/94232), but it will clear that emulator's state from the system, so this error won't
+of https://fxbug.dev/94232), but it will clear that emulator's state from the system, so this error won't
 appear anymore.
 "#;
 

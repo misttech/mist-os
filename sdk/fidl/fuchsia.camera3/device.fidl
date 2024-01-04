@@ -14,7 +14,7 @@ closed protocol Device {
     /// Returns an identifier for the camera. If present, identical devices on different systems
     /// will have the same identifier. Clients may use this to determine if additional semantics
     /// known a priori for a given device apply to the current camera.
-    // TODO(fxbug.dev/43247): unify device identification
+    // TODO(https://fxbug.dev/43247): unify device identification
     // go/unified-device-discovery will eliminate the need for this protocol
     strict GetIdentifier() -> (struct {
         identifier string:<MAX_IDENTIFIER_LENGTH, optional>;

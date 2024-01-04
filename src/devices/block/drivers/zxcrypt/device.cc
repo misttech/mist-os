@@ -95,7 +95,7 @@ zx_status_t Device::DdkGetProtocol(uint32_t proto_id, void* out) {
   }
 }
 
-// TODO(aarongreen): See fxbug.dev/31081.  Currently, there's no good way to trigger
+// TODO(aarongreen): See https://fxbug.dev/31081.  Currently, there's no good way to trigger
 // this on demand.
 void Device::DdkUnbind(ddk::UnbindTxn txn) {
   LOG_ENTRY();

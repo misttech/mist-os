@@ -465,7 +465,7 @@ zx_status_t Vp9Decoder::InitializeHardware() {
     }
     uint8_t* data;
     uint32_t firmware_size;
-    // TODO(fxbug.dev/43496): In "CL3", we'll filter video_ucode.bin firmwares by current device,
+    // TODO(https://fxbug.dev/43496): In "CL3", we'll filter video_ucode.bin firmwares by current device,
     // which will let loading by this more generic ID work, assuming new video_ucode.bin.  For now,
     // if we were to take this path (which we don't), this would likely get the wrong firmware.
     status = owner_->firmware_blob()->GetFirmwareData(FirmwareBlob::FirmwareType::kDec_Vp9_Mmu,
@@ -1163,7 +1163,7 @@ void Vp9Decoder::ConfigureFrameOutput(bool bit_depth_8) {
     // allocated ahead of time. The hardware will read them from
     // frame_map_mmu.buffer as needed.
     //
-    // TODO(fxbug.dev/13434): Return unused frames could be returned to a pool and use
+    // TODO(https://fxbug.dev/13434): Return unused frames could be returned to a pool and use
     // them for decoding a different frame.
     {
       uint32_t frame_count = frame_buffer_size / PAGE_SIZE;
@@ -1416,7 +1416,7 @@ void Vp9Decoder::PrepareNewFrame(bool params_checked_previously) {
   // same PTS if they're part of a superframe, but only one of the frames should
   // have show_frame set, so only that frame will be output with that PTS.
   //
-  // TODO(fxbug.dev/49102): PtsManager needs to be able to help extend stream_offset from < 64 bits
+  // TODO(https://fxbug.dev/49102): PtsManager needs to be able to help extend stream_offset from < 64 bits
   // to 64 bits.
   uint32_t stream_offset = HevcShiftByteCount::Get().ReadFrom(owner_->dosbus()).reg_value();
 

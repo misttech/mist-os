@@ -106,7 +106,7 @@ class ByteBuffer {
   // type, the return value will be a std::array with the same element type and extents.
   //
   // This or ReadMember should always be used in place of reinterpret_cast on raw pointers because
-  // of dangerous UB related to object lifetimes and alignment issues (see fxbug.dev/46637).
+  // of dangerous UB related to object lifetimes and alignment issues (see https://fxbug.dev/46637).
   // Moreover, this will perform bounds checking on the data being read.
   template <typename T>
   [[nodiscard]] auto To() const {

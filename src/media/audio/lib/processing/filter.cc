@@ -143,7 +143,7 @@ SincFilter::CacheT* CreateSincFilterCoefficientTableCache() {
   });
 
   // To avoid lengthy construction time, cache some coefficient tables persistently.
-  // See fxbug.dev/45074 and fxbug.dev/57666.
+  // See https://fxbug.dev/45074 and https://fxbug.dev/57666.
   SincFilter::persistent_cache_ = new std::vector<SincFilter::CacheT::SharedPtr>;
 
   // First load any coefficient tables that were built into this executable.
@@ -155,7 +155,7 @@ SincFilter::CacheT* CreateSincFilterCoefficientTableCache() {
 
   // Now make sure we have all the coefficient tables we need.
   // In practice, this should be a superset of the prebuilt tables.
-  // TODO(fxbug.dev/86662): Move these to a shared header, to eliminate duplication with
+  // TODO(https://fxbug.dev/86662): Move these to a shared header, to eliminate duplication with
   // gen_coefficient_tables.cc. Any "superset" items here that are NOT in gen_coefficient_tables
   // would be in a separate list also in that shared header.
   SincFilter::persistent_cache_->push_back(

@@ -68,7 +68,7 @@ impl SysFs {
         sysfs_kernel_directory(current_task, &mut dir);
         sysfs_power_directory(current_task, &mut dir);
 
-        // TODO(fxbug.dev/121327): Temporary fix of flakeness in tcp_socket_test.
+        // TODO(https://fxbug.dev/121327): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.
         registry
             .root_kobject()

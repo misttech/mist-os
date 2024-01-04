@@ -7,7 +7,7 @@
 namespace affine {
 
 Transform Transform::Compose(const Transform& bc, const Transform& ab, Exact exact) {
-  // TODO(fxbug.dev/13293)
+  // TODO(https://fxbug.dev/13293)
   return Transform(ab.a_offset(), bc.Apply(ab.b_offset()),
                    Ratio::Product(ab.ratio(), bc.ratio(), exact));
 }

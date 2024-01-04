@@ -44,7 +44,7 @@ std::optional<LookupResult> LookupPage(MemoryManager& allocator, PageTableNode* 
 // Returns ZX_ERR_ALREADY_EXISTS if part of the input range has already
 // been mapped.
 //
-// TODO(fxbug.dev/67632): Add support for permissions, page attributes.
+// TODO(https://fxbug.dev/67632): Add support for permissions, page attributes.
 zx_status_t MapPage(MemoryManager& allocator, PageTableNode* node, Vaddr virt_addr, Paddr phys_addr,
                     PageSize page_size);
 

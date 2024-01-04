@@ -16,7 +16,7 @@
             "projects": [
               "third_party/gfxstream"
             ],
-            "bug": "fxbug.dev/134252",
+            "bug": "https://fxbug.dev/134252",
             "notes": []
           },
           {

@@ -34,7 +34,7 @@ struct StashInspectInfo {
 }
 
 lazy_static! {
-    // TODO(fxb/93842): replace with a dependency injected value instead of a static.
+    // TODO(https://fxbug.dev/93842): replace with a dependency injected value instead of a static.
     pub(crate) static ref STASH_LOGGER: Arc<Mutex<StashInspectLogger>> =
         Arc::new(Mutex::new(StashInspectLogger::new()));
 }

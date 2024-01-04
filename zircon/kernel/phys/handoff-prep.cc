@@ -90,7 +90,7 @@ constexpr ktl::string_view VmoNameString(const PhysVmo::Name& name) {
 }  // namespace
 
 void HandoffPrep::Init(ktl::span<ktl::byte> buffer) {
-  // TODO(fxbug.dev/84107): Use the buffer inside the data ZBI via a
+  // TODO(https://fxbug.dev/84107): Use the buffer inside the data ZBI via a
   // SingleHeapAllocator.  Later allocator() will return a real(ish) allocator.
   allocator_.allocate_function() = AllocateFunction(buffer);
 
@@ -246,7 +246,7 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
 
   // Copy any post-Init() serial state from the live driver here in physboot
   // into the handoff BootOptions.  There should be no more printing from here
-  // on.  TODO(fxbug.dev/84107): Actually there is some printing in BootZbi,
+  // on.  TODO(https://fxbug.dev/84107): Actually there is some printing in BootZbi,
   // but no current drivers carry post-Init() state so it's harmless for now.
   uart.Visit([&handoff_options](const auto& driver) { handoff_options.serial = driver.uart(); });
 

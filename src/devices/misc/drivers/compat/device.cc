@@ -41,7 +41,7 @@ static constexpr ProtocolInfo kProtocolInfos[] = {
 #include <lib/ddk/protodefs.h>
 };
 
-// TODO(fxbug.dev/126978): we pass a bad URL to |NodeController::RequestBind|
+// TODO(https://fxbug.dev/126978): we pass a bad URL to |NodeController::RequestBind|
 // to unbind the driver of a node but not rebind it. This is a temporary
 // workaround to pass the fshost tests in DFv2.
 static constexpr std::string_view kKnownBadDriverUrl = "not-a-real-driver-url-see-fxb-126978";
@@ -523,7 +523,7 @@ zx_status_t Device::CreateNode() {
         if (auto ptr = device.lock()) {
           ptr->controller_ = {};
           if (ptr->pending_removal_) {
-            // TODO(fxbug.dev/100470): We currently do not remove the DFv1 child
+            // TODO(https://fxbug.dev/100470): We currently do not remove the DFv1 child
             // if the NodeController is removed but the driver didn't asked to be
             // removed. We need to investigate the correct behavior here.
             FDF_LOGL(INFO, ptr->logger(), "Device %s has its NodeController unexpectedly removed",
@@ -969,10 +969,10 @@ zx_status_t Device::AddComposite(const char* name, const composite_device_desc_t
     return composite.error_value();
   }
 
-  // TODO(fxb/111891): Support metadata for AddComposite().
+  // TODO(https://fxbug.dev/111891): Support metadata for AddComposite().
   if (comp_desc->metadata_count > 0) {
     FDF_LOGL(WARNING, *logger_,
-             "AddComposite() currently doesn't support metadata. See fxb/111891.");
+             "AddComposite() currently doesn't support metadata. See https://fxbug.dev/111891.");
   }
 
   auto result = fidl::WireCall(*creator)->AddCompositeDevice(fidl::StringView::FromExternal(name),
@@ -1016,10 +1016,10 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
     parents[i] = std::move(parents_result.value());
   }
 
-  // TODO(fxb/111891): Support metadata for AddCompositeNodeSpec().
+  // TODO(https://fxbug.dev/111891): Support metadata for AddCompositeNodeSpec().
   if (spec->metadata_count > 0) {
     FDF_LOGL(WARNING, *logger_,
-             "AddCompositeNodeSpec() currently doesn't support metadata. See fxb/111891.");
+             "AddCompositeNodeSpec() currently doesn't support metadata. See https://fxbug.dev/111891.");
   }
 
   auto fidl_spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
@@ -1151,7 +1151,7 @@ void Device::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {
 
   // If we don't have children, we need to check if there is a driver bound to us,
   // and if so unbind it.
-  // TODO(fxbug.dev/126978): we pass a bad URL to |NodeController::RequestBind|
+  // TODO(https://fxbug.dev/126978): we pass a bad URL to |NodeController::RequestBind|
   // to unbind the driver of a node but not rebind it. This is a temporary
   // workaround to pass the fshost tests in DFv2.
   fidl::Arena arena;

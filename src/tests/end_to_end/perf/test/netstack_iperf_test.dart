@@ -297,7 +297,7 @@ void main(List<String> args) {
     if (direction == Direction.loopback) {
       serverIp = '127.0.0.1';
     } else {
-      // TODO(fxbug.dev/47782): Currently, we are using the link used for ssh to also
+      // TODO(https://fxbug.dev/47782): Currently, we are using the link used for ssh to also
       // inject data traffic. This is prone to interference to ssh and to the tests.
       // On NUC7, we can use a separate usb-ethernet interface for the test traffic.
       serverIp = helper.sl4fDriver.ssh.target;
@@ -335,7 +335,7 @@ void main(List<String> args) {
             // For localhost test, use maximum possible bandwidth.
             bwValue = '0';
           } else {
-            // TODO(fxbug.dev/47782): Until we define separate link for ssh and data,
+            // TODO(https://fxbug.dev/47782): Until we define separate link for ssh and data,
             // enforce a < 1Gbps rate on NUC7. After the bug is resolved, this can
             // be changed to '0' which means as much as the system and link can
             // transmit.

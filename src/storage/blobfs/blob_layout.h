@@ -59,7 +59,7 @@ class BlobLayout {
   // The number of bytes used to store the blob's data.
   // When reading a compressed blob this may not be the exact size but a safe upper bound.  All
   // bytes between the actual compressed size and |DataSizeUpperBound| will be zeros.  This is
-  // because the size of the compressed file is not stored.  See fxbug.dev/44547.
+  // because the size of the compressed file is not stored.  See https://fxbug.dev/44547.
   uint64_t DataSizeUpperBound() const;
   // The size of buffer required to hold |DataBlockCount| blocks.
   uint64_t DataBlockAlignedSize() const;

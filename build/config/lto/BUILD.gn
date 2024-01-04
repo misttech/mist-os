@@ -27,7 +27,7 @@ variant("lto") {
     "-fwhole-program-vtables",
   ]
 
-  # TODO(fxbug.dev/110476): Temporarily disable branch funneling on lto. Branch
+  # TODO(https://fxbug.dev/110476): Temporarily disable branch funneling on lto. Branch
   # funneling likely generates bad code involving return values not propagated
   # correctly to other functions. Once this is resolved, come back and remove this.
   if (is_fuchsia) {
@@ -38,7 +38,7 @@ variant("lto") {
     ]
     ldflags = [ "-Wl,-mllvm,$disable_branch_funneling" ]
 
-    # TODO(fxbug.dev/136557): The linker flags below are required to avoid code
+    # TODO(https://fxbug.dev/136557): The linker flags below are required to avoid code
     # generation bugs during LTO. They can be removed once LTO properly handles
     # target features
     if (target_cpu == "riscv64") {
@@ -79,7 +79,7 @@ variant("thinlto") {
     "-Wl,${_cache_dir}$thinlto_cache_dir",
   ]
 
-  # TODO(fxbug.dev/136557): The linker flags below are required to avoid code
+  # TODO(https://fxbug.dev/136557): The linker flags below are required to avoid code
   # generation bugs during LTO. They can be removed once LTO properly handles
   # target features
   if (target_cpu == "riscv64") {

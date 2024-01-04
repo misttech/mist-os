@@ -81,7 +81,7 @@ impl Manager {
                 .await
             {
                 Ok(true) => {}
-                // TODO(fxbug.dev/118209): //src/tests/installer and //src/tests/femu look for
+                // TODO(https://fxbug.dev/118209): //src/tests/installer and //src/tests/femu look for
                 // "/dev/class/block/008 ignored"
                 Ok(false) => tracing::info!("{} ignored", device.path()),
                 Err(e) => {

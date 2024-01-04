@@ -36,7 +36,8 @@ source_set("asan") {
     # The former could be addressed via `#pragma clang attribute`, but the
     # latter cannot be.
     configs -= [ _asan_config ]
-    sources = []  # TODO(fxbug.dev/30333): setup code, diagnostic code, etc.
+    sources =
+        []  # TODO(https://fxbug.dev/30333): setup code, diagnostic code, etc.
     deps = [
       ":stubs",
       "..:headers",
@@ -87,7 +88,7 @@ if (is_asan) {
 }
 
 config("kasan-defines") {
-  # TODO(fxbug.dev/64808): KASAN may raise the amount of required kernel stack
+  # TODO(https://fxbug.dev/64808): KASAN may raise the amount of required kernel stack
   # space, particularly in interruptible kernel code. Raise the stack size to
   # avoid blowouts.
   configs = [ "//build/config/zircon/instrumentation:instrumented-stack-size" ]
@@ -107,7 +108,7 @@ config("kasan") {
     # allocation semantics.
     "-fsanitize-address-poison-custom-array-cookie",
 
-    # TODO(fxbug.dev/30033): Disable poisoning around stack allocations until later.
+    # TODO(https://fxbug.dev/30033): Disable poisoning around stack allocations until later.
     "-mllvm",
     "-asan-stack=0",
 
@@ -124,7 +125,7 @@ config("kasan") {
   ]
   if (current_cpu == "arm64") {
     cflags += [
-      # TODO(fxbug.dev/30033): Disable inline instrumentation on arm64 until we
+      # TODO(https://fxbug.dev/30033): Disable inline instrumentation on arm64 until we
       # preallocate/pre-map the ASAN shadow.
       "-mllvm",
       "-asan-instrumentation-with-call-threshold=0",

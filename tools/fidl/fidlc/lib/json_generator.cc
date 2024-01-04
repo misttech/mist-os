@@ -223,7 +223,7 @@ void JSONGenerator::Generate(const flat::Type* value) {
       }
       // We treat client_end the same as an IdentifierType of a protocol to avoid changing
       // the JSON IR.
-      // TODO(fxbug.dev/70186): clean up client/server end representation in the IR
+      // TODO(https://fxbug.dev/70186): clean up client/server end representation in the IR
       case flat::Type::Kind::kTransportSide: {
         const auto* type = static_cast<const flat::TransportSideType*>(value);
         // This code path should only apply to client ends. The server end code
@@ -286,7 +286,7 @@ void JSONGenerator::GenerateDeclName(const flat::Name& name) {
 }
 
 void JSONGenerator::Generate(const flat::Name& name) {
-  // TODO(fxbug.dev/92422): NameFlatName omits the library name for builtins,
+  // TODO(https://fxbug.dev/92422): NameFlatName omits the library name for builtins,
   // since we want error messages to say "uint32" not "fidl/uint32". However,
   // builtins MAX and HEAD can end up in the JSON IR as identifier constants,
   // and to satisfy the schema we must produce a proper compound identifier
@@ -307,7 +307,7 @@ void JSONGenerator::Generate(const flat::Bits& value) {
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateTypeAndFromAlias(value.subtype_ctor.get());
-    // TODO(fxbug.dev/7660): When all numbers are wrapped as string, we can simply
+    // TODO(https://fxbug.dev/7660): When all numbers are wrapped as string, we can simply
     // call GenerateObjectMember directly.
     GenerateObjectPunctuation(Position::kSubsequent);
     EmitObjectKey("mask");
@@ -344,7 +344,7 @@ void JSONGenerator::Generate(const flat::Enum& value) {
     GenerateObjectMember("location", NameSpan(value.name));
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    // TODO(fxbug.dev/7660): Due to legacy reasons, the 'type' of enums is actually
+    // TODO(https://fxbug.dev/7660): Due to legacy reasons, the 'type' of enums is actually
     // the primitive subtype, and therefore cannot use
     // GenerateTypeAndFromAlias here.
     GenerateObjectMember("type", value.type->name);
@@ -773,7 +773,7 @@ void JSONGenerator::Generate(const flat::TypeConstructor& value) {
   GenerateObject([&]() {
     const auto* type = value.type;
     bool is_box = false;
-    // TODO(fxbug.dev/70186): We need to coerce client/server
+    // TODO(https://fxbug.dev/70186): We need to coerce client/server
     // ends into the same representation as P, request<P>; and box<S> into S?
     // For box, we just need to access the inner IdentifierType and the rest
     // mostly works (except for the correct value for nullability)
@@ -812,7 +812,7 @@ void JSONGenerator::Generate(const flat::TypeConstructor& value) {
       Indent();
       EmitNewlineWithIndent();
       if (server_end) {
-        // TODO(fxbug.dev/70186): Because the JSON IR still uses request<P>
+        // TODO(https://fxbug.dev/70186): Because the JSON IR still uses request<P>
         // instead of server_end:P, we have to hardcode the P argument here.
         GenerateObject([&]() {
           GenerateObjectMember("name", server_end->protocol_decl->name, Position::kFirst);
@@ -854,7 +854,7 @@ void JSONGenerator::Generate(const flat::Alias& value) {
     GenerateObjectMember("location", NameSpan(value.name));
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    // TODO(fxbug.dev/7807): Remove "partial_type_ctor".
+    // TODO(https://fxbug.dev/7807): Remove "partial_type_ctor".
     GenerateObjectMember("partial_type_ctor", value.partial_type_ctor);
     GenerateTypeAndFromAlias(value.partial_type_ctor.get());
   });

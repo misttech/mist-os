@@ -173,7 +173,7 @@ pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Opt
         | cm_rust::ExposeDecl::Resolver(_)
         | cm_rust::ExposeDecl::Config(_) => None,
         cm_rust::ExposeDecl::Dictionary(_) => {
-            // TODO(fxbug.dev/301674053): Support this.
+            // TODO(https://fxbug.dev/301674053): Support this.
             None
         }
     }
@@ -243,7 +243,7 @@ pub async fn report_routing_failure(
                     // they build and/or assemble different product
                     // configurations so declared routes are always end-to-end
                     // complete routes.
-                    // TODO(fxbug.dev/109112): if we change the log for
+                    // TODO(https://fxbug.dev/109112): if we change the log for
                     // `Required` capabilities to `error!()`, consider also
                     // changing this log for `Optional` to `warn!()`.
                     info!(
@@ -256,7 +256,7 @@ pub async fn report_routing_failure(
                     );
                 }
                 _ => {
-                    // TODO(fxbug.dev/109112): consider changing this to `error!()`
+                    // TODO(https://fxbug.dev/109112): consider changing this to `error!()`
                     warn!(
                         "Required {} `{}` was not available for target component `{}`: {}\n{}",
                         cap.type_name(),

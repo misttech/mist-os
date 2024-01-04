@@ -47,7 +47,7 @@ fuchsia_driver("platform-bus-driver") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
 
-    # TODO(fxb/38132): Migrate to the new bind rules and delete the below
+    # TODO(https://fxbug.dev/38132): Migrate to the new bind rules and delete the below
     "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
@@ -128,7 +128,7 @@ test("platform-bus-unittest") {
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
 
-    # TODO(fxb/38132): Migrate to the new bind rules and delete the below
+    # TODO(https://fxbug.dev/38132): Migrate to the new bind rules and delete the below
     "//src/devices/testing/driver-runtime-main:zxtest",
     "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/lib/ddktl",

@@ -122,7 +122,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(uint32_t slot_i
   auto state = device_state_[slot_id - 1];
   if (!state) {
     zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
-    // TODO(fxbug.dev/116231): Use and test appropriate result status.
+    // TODO(https://fxbug.dev/116231): Use and test appropriate result status.
     return fpromise::make_error_promise<zx_status_t>(ZX_OK);
   }
   return DisableSlotCommand(*state);
@@ -135,7 +135,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(DeviceState& st
     fbl::AutoLock _(&state.transaction_lock());
     if (!state.IsValid()) {
       zxlogf(ERROR, "DisableSlotCommand state is not valid");
-      // TODO(fxbug.dev/116231): Use and test appropriate result status.
+      // TODO(https://fxbug.dev/116231): Use and test appropriate result status.
       return fpromise::make_error_promise<zx_status_t>(ZX_OK);
     }
     state.Disconnect();
@@ -532,7 +532,7 @@ void UsbXhci::DdkSuspend(ddk::SuspendTxn txn) {
     txn.Reply(ZX_ERR_BAD_STATE, 0);
     return;
   }
-  // TODO(fxbug.dev/42612): do different things based on the requested_state and suspend reason.
+  // TODO(https://fxbug.dev/42612): do different things based on the requested_state and suspend reason.
   // for now we shutdown the driver in preparation for mexec
   USBCMD::Get(cap_length_).ReadFrom(&mmio_.value()).set_ENABLE(0).WriteTo(&mmio_.value());
   while (!USBSTS::Get(cap_length_).ReadFrom(&mmio_.value()).HCHalted()) {
@@ -572,7 +572,7 @@ void UsbXhci::DdkUnbind(ddk::UnbindTxn txn) {
       }
       // Ensure that we've actually invoked the completions above
       // before moving to the next step.
-      // TODO(fxbug.dev/44375): Migrate to joins
+      // TODO(https://fxbug.dev/44375): Migrate to joins
       RunUntilIdle();
       for (size_t i = 0; i < max_slots_; i++) {
         auto state = device_state_[i];
@@ -601,7 +601,7 @@ void UsbXhci::DdkUnbind(ddk::UnbindTxn txn) {
         }
       }
       // Flush any outstanding async I/O
-      // TODO(fxbug.dev/44375): Migrate to joins
+      // TODO(https://fxbug.dev/44375): Migrate to joins
       RunUntilIdle();
     } while (pending);
 
@@ -792,7 +792,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
         .set_Type(Control::ConfigureEndpointCommand)
         .ToTrb(&trb);
   }
-  // TODO(fxbug.dev/34140): Implement async support
+  // TODO(https://fxbug.dev/34140): Implement async support
   hw_mb();
   return SubmitCommand(trb, std::move(context))
       .then(
@@ -807,7 +807,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
             }
             auto completion = static_cast<CommandCompletionEvent*>(result.value());
             if (completion->CompletionCode() == CommandCompletionEvent::BandwidthError) {
-              // TODO(fxbug.dev/117713): We could handle this by implementing bandwidth negotiation
+              // TODO(https://fxbug.dev/117713): We could handle this by implementing bandwidth negotiation
               // (see Section 4.16.1). For now just return an error to the client.
               return fpromise::error(ZX_ERR_NO_RESOURCES);
             }
@@ -855,7 +855,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(uint32_t dev
         .set_Type(Control::ConfigureEndpointCommand)
         .ToTrb(&trb);
   }
-  // TODO(fxbug.dev/34140): Implement async support
+  // TODO(https://fxbug.dev/34140): Implement async support
   hw_mb();
   return SubmitCommand(trb, std::move(context))
       .then(
@@ -1088,7 +1088,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t 
       .box();
 }
 
-// TODO(fxbug.dev/34637): Either decide what these reset methods should do,
+// TODO(https://fxbug.dev/34637): Either decide what these reset methods should do,
 // or get rid of them.
 zx_status_t UsbXhci::UsbHciResetDevice(uint32_t hub_address, uint32_t device_id) {
   return ZX_ERR_NOT_SUPPORTED;

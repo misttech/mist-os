@@ -416,13 +416,13 @@ class OsdBlk0CfgW0Reg : public RegisterBase<OsdBlk0CfgW0Reg, uint32_t> {
   DEF_FIELD(23, 16, tbl_addr);
   DEF_BIT(15, little_endian);
 
-  // TODO(fxbug.dev/124949): Replace the uint32_t value with strong-typed enum
+  // TODO(https://fxbug.dev/124949): Replace the uint32_t value with strong-typed enum
   // classes.
   static constexpr uint32_t kBlockMode32Bit = 5;
   DEF_FIELD(11, 8, blk_mode);
   DEF_BIT(6, alpha_en);
 
-  // TODO(fxbug.dev/124949): Replace the uint32_t values with strong-typed enum
+  // TODO(https://fxbug.dev/124949): Replace the uint32_t values with strong-typed enum
   // classes.
   static constexpr uint32_t kColorMatrixArgb8888 = 1;
   static constexpr uint32_t kColorMatrixAbgr8888 = 2;

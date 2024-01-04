@@ -23,7 +23,7 @@ pub(crate) struct ServeSyslogOutcome {
     /// should resolve before tearing down the realm. This is a workaround that
     /// ensures that Archivist isn't torn down before it receives all ArchiveAccessor
     /// requests.
-    // TODO(fxbug.dev/105308): Remove this hack once component events are ordered.
+    // TODO(https://fxbug.dev/105308): Remove this hack once component events are ordered.
     pub archivist_responding_task: fasync::Task<()>,
 }
 

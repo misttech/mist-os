@@ -223,7 +223,7 @@ TEST_F(MinfsFvmTest, QueryInitialState) {
   ASSERT_NO_FATAL_FAILURE(QueryInfo(fs(), &info));
 
   EXPECT_EQ(fs().options().fvm_slice_size, info.total_bytes);
-  // TODO(fxbug.dev/31276): Adjust this once minfs accounting on truncate is fixed.
+  // TODO(https://fxbug.dev/31276): Adjust this once minfs accounting on truncate is fixed.
   EXPECT_EQ(2 * minfs::kMinfsBlockSize, info.used_bytes);
   // The inodes will use the required slices (rounded up). Since the current default inode data size
   // divides evenly into the slice size, the values should match exactly.

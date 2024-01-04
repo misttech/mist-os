@@ -71,7 +71,7 @@ Attaching to processes by a component URL
   "fuchsia-boot://", will be interpreted as a component URL. This will create a
   filter that matches all processes in components with the given URL.
 
-  NOTE: a component URL could be partial (fxbug.dev/103293) so it's recommended
+  NOTE: a component URL could be partial (https://fxbug.dev/103293) so it's recommended
   to use "attaching by a component name" below.
 
 Attaching to processes by a component name

@@ -63,7 +63,7 @@ class ModuleProxy final {
 
   std::vector<uint64_t*> counters_;
 
-  // TODO(fxbug.dev/84363): Smaller inputs that cover previously observed features are currently
+  // TODO(https://fxbug.dev/84363): Smaller inputs that cover previously observed features are currently
   // discarded. To help minimize the corpus, this object could also track the smallest input size
   // for each feature, in order to save smaller inputs and prefer them in a subsequent (possibly
   // periodic) merge.

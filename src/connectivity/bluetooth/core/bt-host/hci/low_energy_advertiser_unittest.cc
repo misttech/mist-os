@@ -481,7 +481,7 @@ TYPED_TEST(LowEnergyAdvertiserTest, AdvertisingParameters) {
 }
 
 // Tests that a previous advertisement's advertising data isn't accidentally kept around. This test
-// was added to address fxbug.dev/131260.
+// was added to address https://fxbug.dev/131260.
 TYPED_TEST(LowEnergyAdvertiserTest, PreviousAdvertisingParameters) {
   AdvertisingData scan_data = this->GetExampleData();
   auto flags = AdvFlag::kLEGeneralDiscoverableMode;

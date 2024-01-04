@@ -45,7 +45,7 @@ class BootZbi {
   // The boot_alloc code uses arbitrary pages after the official bss space.
   // So make sure to allocate some extra slop for the kernel.
   //
-  // TODO(fxbug.dev/84107): Remove this when ZBI kernels in use actually
+  // TODO(https://fxbug.dev/84107): Remove this when ZBI kernels in use actually
   // conform to the protocol and don't clobber extra memory.
   static constexpr uint64_t kKernelBootAllocReserve = 1024 * 1024 * 32;
 

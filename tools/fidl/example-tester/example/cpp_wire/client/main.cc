@@ -47,7 +47,7 @@ int main(int argc, const char** argv) {
     FX_LOGS(INFO) << "Response: " << result.value().sum;
   }
 
-  // TODO(fxbug.dev/76579): We need to sleep here to make sure all logs get drained. Once the
+  // TODO(https://fxbug.dev/76579): We need to sleep here to make sure all logs get drained. Once the
   // referenced bug has been resolved, we can remove the sleep.
   sleep(2);
   return 0;

@@ -14,7 +14,7 @@ namespace ddk_mock {
 
 namespace {
 
-// TODO(fxbug.dev/105644): Move this file to a directory where it can be reused
+// TODO(https://fxbug.dev/105644): Move this file to a directory where it can be reused
 //                         by all drivers, or deprecate in favor of a library in
 //                         the SDK.
 

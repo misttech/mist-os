@@ -4,7 +4,7 @@
 library fuchsia.identity.credential;
 
 /// Parameters to AddCredential method.
-/// TODO(fxbug.dev/88343): Replace with anonymous tables when available as
+/// TODO(https://fxbug.dev/88343): Replace with anonymous tables when available as
 /// parameter arguments.
 type AddCredentialParams = table {
     /// The low entropy credential.
@@ -19,7 +19,7 @@ type AddCredentialParams = table {
 };
 
 /// Parameters to CheckCredential method.
-/// TODO(fxbug.dev/88343): Replace with anonymous tables when available as
+/// TODO(https://fxbug.dev/88343): Replace with anonymous tables when available as
 /// parameter arguments.
 type CheckCredentialParams = table {
     /// The label of the credential you want to authenticate.
@@ -29,7 +29,7 @@ type CheckCredentialParams = table {
 };
 
 /// Response to CheckCredential method.
-/// TODO(fxbug.dev/88343): Replace with anonymous tables when available as
+/// TODO(https://fxbug.dev/88343): Replace with anonymous tables when available as
 /// parameter arguments.
 type CheckCredentialResponse = table {
     /// The high entropy secret associated with the label.

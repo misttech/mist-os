@@ -55,7 +55,7 @@ closed protocol ProducerConnector {
     /// The lifetime of `producer_socket` may outlive the connection lifetime
     /// of ProducerConnector.
     /// Multiple Producers may be connected simultaneously.
-    // TODO(fxb/85561): Define error conditions and status codes.
+    // TODO(https://fxbug.dev/85561): Define error conditions and status codes.
     strict ConnectProducer(resource struct {
         producer_socket zx.Handle:SOCKET;
         buffer TraceBuffer;

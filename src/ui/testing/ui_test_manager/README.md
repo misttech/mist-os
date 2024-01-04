@@ -4,7 +4,7 @@
 
 The UI Test Manager is a [library class](./ui_test_manager.h) to manage test realm and scene setup on behalf of UI integration test clients.
 
-**The UI Test Manager is deprecated; see fxbug.dev/127742.**
+**The UI Test Manager is deprecated; see https://fxbug.dev/127742.**
 
 ## Test Realm
 

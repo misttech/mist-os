@@ -45,16 +45,16 @@ class RunnerServer : public fidl::clientsuite::Runner {
       case fidl::clientsuite::Test::UNKNOWN_FLEXIBLE_EVENT_CLOSED_PROTOCOL:
       case fidl::clientsuite::Test::UNKNOWN_STRICT_SERVER_INITIATED_TWO_WAY:
       case fidl::clientsuite::Test::UNKNOWN_FLEXIBLE_SERVER_INITIATED_TWO_WAY:
-      // TODO(fxbug.dev/116294): HLCPP bindings should reject responses with the
+      // TODO(https://fxbug.dev/116294): HLCPP bindings should reject responses with the
       // wrong ordinal.
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_KNOWN:
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_UNKNOWN:
-      // TODO(fxbug.dev/132059): HLCPP should validate header even when there's no payload.
+      // TODO(https://fxbug.dev/132059): HLCPP should validate header even when there's no payload.
       case fidl::clientsuite::Test::V1_TWO_WAY_NO_PAYLOAD:
-      // TODO(fxbug.dev/113160): Peer-closed errors should be
+      // TODO(https://fxbug.dev/113160): Peer-closed errors should be
       // hidden from one-way calls.
       case fidl::clientsuite::Test::ONE_WAY_CALL_DO_NOT_REPORT_PEER_CLOSED:
-      // TODO(fxbug.dev/129829): Should validate magic number.
+      // TODO(https://fxbug.dev/129829): Should validate magic number.
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_BAD_MAGIC_NUMBER:
         callback(false);
         return;

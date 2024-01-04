@@ -42,7 +42,7 @@ test("vkreadback_test") {
     deps += [ "//src/graphics/tests/common:config_query" ]
   }
 
-  # TODO(fxbug.dev/102268): Add macOS support to VulkanContext and remove this.
+  # TODO(https://fxbug.dev/102268): Add macOS support to VulkanContext and remove this.
   if (is_host) {
     environments = [ linux_env ]
   }
@@ -89,7 +89,7 @@ fuchsia_test_package("vkreadback_test_package") {
   test_components = [ ":vkreadback_test_component" ]
   subpackages = [ ":vkreadback_test_child_package" ]
   test_specs = {
-    # TODO(fxbug.dev/47373): Restore astro_env when fxbug.dev/44570 is fixed.
+    # TODO(https://fxbug.dev/47373): Restore astro_env when https://fxbug.dev/44570 is fixed.
     environments = vulkan_envs + [ astro_env ] - [ astro_env ]
   }
 }
@@ -98,7 +98,7 @@ group("vkreadback") {
   testonly = true
   deps = [ ":vkreadback_test_package" ]
   if (is_host && !is_mac) {
-    # TODO(fxbug.dev/102268): Add macOS support to VulkanContext and run this everywhere
+    # TODO(https://fxbug.dev/102268): Add macOS support to VulkanContext and run this everywhere
     deps += [ ":vkreadback_test($host_toolchain)" ]
   }
 }

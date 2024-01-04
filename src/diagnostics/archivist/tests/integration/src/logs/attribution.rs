@@ -52,7 +52,7 @@ async fn log_attribution() {
     }
 }
 
-// TODO(fxbug.dev/297211132): re-enable when we actually support unattributed connections again.
+// TODO(https://fxbug.dev/297211132): re-enable when we actually support unattributed connections again.
 #[ignore]
 #[fuchsia::test]
 async fn log_unattributed_stream() {

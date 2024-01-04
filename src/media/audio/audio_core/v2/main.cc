@@ -22,7 +22,7 @@ std::shared_ptr<const FidlThread> CreateMainThread(async_dispatcher_t* dispatche
 
   // We receive audio payloads over FIDL, which means the FIDL thread has real time requirements
   // just like the mixing threads.
-  // TODO(fxbug.dev/98652): the mixer service's graph threads should do this too
+  // TODO(https://fxbug.dev/98652): the mixer service's graph threads should do this too
   auto result =
       media::audio::AcquireSchedulerRole(zx::thread::self(), "fuchsia.media.audio.core.dispatch");
   if (result.is_error()) {
@@ -49,7 +49,7 @@ int main(int argc, const char** argv) {
   component::OutgoingDirectory outgoing(main_loop.dispatcher());
   AudioCoreComponent audio_core(outgoing, main_thread, enable_cobalt);
 
-  // TODO(fxbug.dev/98652): also publish mixer and ADR services
+  // TODO(https://fxbug.dev/98652): also publish mixer and ADR services
 
   // Run the FIDL loop.
   if (auto status = outgoing.ServeFromStartupInfo().status_value(); status != ZX_OK) {

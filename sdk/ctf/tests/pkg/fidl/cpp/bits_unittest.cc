@@ -10,7 +10,7 @@
 // The following APIs tested are shared between strict and flexible bits, but
 // are tested separately.
 
-// TODO(fxb/62890): Update these to use TYPED_TEST equivalents when they become
+// TODO(https://fxbug.dev/62890): Update these to use TYPED_TEST equivalents when they become
 // implemented in zxtest.
 
 TEST(StrictBits, StrictBitwiseOperators) {

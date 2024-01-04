@@ -33,7 +33,7 @@ enum class FocusChangeStatus {
 
 // Callback that should receive either the focused koid or ZX_KOID_INVALID every time the focus
 // chain updates. Used by GFX to send focus events over the SessionListener.
-// TODO(fxbug.dev/64376): Remove when we remove GFX input.
+// TODO(https://fxbug.dev/64376): Remove when we remove GFX input.
 using LegacyFocusListener = fit::function<void(zx_koid_t, zx_koid_t)>;
 
 // Class for tracking focus state.
@@ -123,7 +123,7 @@ class FocusManager final : public fuchsia::ui::focus::FocusChainListenerRegistry
   // Map of ViewRef koid to that View's auto focus target (if it has one).
   std::unordered_map<zx_koid_t, zx_koid_t> auto_focus_targets_;
 
-  // TODO(fxbug.dev/64376): Remove when we remove GFX input.
+  // TODO(https://fxbug.dev/64376): Remove when we remove GFX input.
   const LegacyFocusListener legacy_focus_listener_;
 
   // Manages endpoints for fuchsia.ui.views.ViewRefFocused.

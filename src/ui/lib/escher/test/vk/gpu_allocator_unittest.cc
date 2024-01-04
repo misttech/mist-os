@@ -488,7 +488,7 @@ VK_TEST(NaiveAllocator, NaiveAllocator) {
 
   TestAllocationOfMemory(&allocator);
 
-  // TODO(fxbug.dev/7263): This test crashes because we pass a null ResourceManager into
+  // TODO(https://fxbug.dev/7263): This test crashes because we pass a null ResourceManager into
   // GpuAllocator. Creating a ResourceManager requires a functional Escher
   // object, but this test only needs a VulkanContext. This bug tracks
   // simplifying the dependency chain, so that all we need is a VulkanContext,

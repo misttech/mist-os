@@ -66,7 +66,7 @@ class [[nodiscard]] {{ .WireUnownedResult }} final : public {{ .BaseWireResult }
 {{- $args = (List $args "::fidl::internal::AnyBufferAllocator& allocator") }}
 {{- $args = (List $args (printf "%s* request" .WireTransactionalRequest)) }}
 {{ .WireUnownedResult }}::{{ .WireUnownedResult.Self }}({{ RenderParams $args }}) {
-  {{/* TODO(fxbug.dev/86367): Factor out common buffer allocation logic once we have other instances
+  {{/* TODO(https://fxbug.dev/86367): Factor out common buffer allocation logic once we have other instances
   of this pattern. */ -}}
 
   {{/* Allocate one buffer for both request/response (if applicable). */ -}}
@@ -79,7 +79,7 @@ class [[nodiscard]] {{ .WireUnownedResult }} final : public {{ .BaseWireResult }
   uint8_t* buffer = allocation->data;
 
   {{- if .HasResponse -}}
-    {{/* TODO(fxbug.dev/85843): We should be able optimize this to just the max of
+    {{/* TODO(https://fxbug.dev/85843): We should be able optimize this to just the max of
     the send/receive size, once Zircon channel calls guarantee that the
     send/receive buffers can overlap.
 

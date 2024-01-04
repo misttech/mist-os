@@ -408,7 +408,7 @@ fn spawn_watcher_handler(
 struct ClientStateInspect {
     thermal_state: inspect::UintProperty,
 
-    // TODO(fxbug.dev/93970): track # of active connections instead of just connect count
+    // TODO(https://fxbug.dev/93970): track # of active connections instead of just connect count
     connect_count: inspect::UintProperty,
     _client_node: inspect::Node,
 }

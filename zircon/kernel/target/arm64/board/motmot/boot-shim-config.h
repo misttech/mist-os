@@ -73,7 +73,7 @@ static const zbi_dcfg_arm_generic_timer_driver_t timer_driver = {
     .freq_override = 24000000,
 };
 
-// TODO: fxb/86566 implement proper watchdog driver for hardware
+// TODO: https://fxbug.dev/86566 implement proper watchdog driver for hardware
 #define WDT_CLUSTER0 (0x10060000)
 static const zbi_dcfg_generic32_watchdog_t watchdog_driver = {
     .pet_action =

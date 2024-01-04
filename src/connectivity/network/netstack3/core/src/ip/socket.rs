@@ -692,7 +692,7 @@ pub(crate) mod ipv6_source_address_selection {
         a: &SasCandidate<D>,
         b: &SasCandidate<D>,
     ) -> Ordering {
-        // TODO(fxbug.dev/46822): Implement rules 2, 4, 5.5, 6, and 7.
+        // TODO(https://fxbug.dev/46822): Implement rules 2, 4, 5.5, 6, and 7.
 
         let a_addr = a.addr_sub.addr().into_specified();
         let b_addr = b.addr_sub.addr().into_specified();

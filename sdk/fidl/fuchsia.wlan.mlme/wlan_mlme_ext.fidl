@@ -54,11 +54,11 @@ type DeviceInfo = struct {
     role fuchsia.wlan.common.WlanMacRole;
     bands vector<BandCapability>:fuchsia.wlan.common.MAX_BANDS;
 
-    // TODO(fxbug.dev/88315): This field will be replaced in the new driver features
+    // TODO(https://fxbug.dev/88315): This field will be replaced in the new driver features
     // framework.
     softmac_hardware_capability fuchsia.wlan.common.WlanSoftmacHardwareCapability;
 
-    // TODO(fxbug.dev/43938): This field is stubbed out for future use.
+    // TODO(https://fxbug.dev/43938): This field is stubbed out for future use.
     qos_capable bool;
 };
 
@@ -76,13 +76,13 @@ type SetKeysConfirm = struct {
     results vector<SetKeyResult>;
 };
 
-// TODO(fxbug.dev/83621): Move this to wlan_internal.fidl after fxbug.dev/85462 is fixed
+// TODO(https://fxbug.dev/83621): Move this to wlan_internal.fidl after https://fxbug.dev/85462 is fixed
 type GetIfaceCounterStatsResponse = strict union {
     1: stats fuchsia.wlan.stats.IfaceCounterStats;
     2: error_status int32;
 };
 
-// TODO(fxbug.dev/83621): Move this to wlan_internal.fidl after fxbug.dev/85462 is fixed
+// TODO(https://fxbug.dev/83621): Move this to wlan_internal.fidl after https://fxbug.dev/85462 is fixed
 type GetIfaceHistogramStatsResponse = strict union {
     1: stats fuchsia.wlan.stats.IfaceHistogramStats;
     2: error_status int32;
@@ -150,7 +150,7 @@ type CapturedFrameResult = struct {
 };
 
 /// Non-IEEE custom structure to inform a SoftMAC device about the association negotiation outcome.
-// TODO(fxbug.dev/43063): Remove if we are able to intersect the capabilities with beacon before associating
+// TODO(https://fxbug.dev/43063): Remove if we are able to intersect the capabilities with beacon before associating
 type NegotiatedCapabilities = struct {
     channel fuchsia.wlan.common.WlanChannel;
     capability_info internal.CapabilityInfo;

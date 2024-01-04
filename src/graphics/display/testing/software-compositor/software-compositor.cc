@@ -76,18 +76,18 @@ void SoftwareCompositor::ClearCanvas(const PixelData& color, PixelFormat pixel_f
 
 void SoftwareCompositor::CompositeImage(const InputImage& input_image,
                                         const CompositionProperties& composition_properties) const {
-  // TODO(fxbug.dev/124683): Currently alpha compositing is not supported.
+  // TODO(https://fxbug.dev/124683): Currently alpha compositing is not supported.
   // Callers must guarantee that alpha blending is disabled.
   ZX_ASSERT(composition_properties.alpha_mode == ::display::AlphaMode::kDisable);
 
-  // TODO(fxbug.dev/124683): Currently image transformation is not supported.
+  // TODO(https://fxbug.dev/124683): Currently image transformation is not supported.
   // Callers must guarantee that the image to draw is not rotated nor flipped.
   ZX_ASSERT(composition_properties.transform == ::display::Transform::kIdentity);
 
   const ::display::Frame& canvas_frame = composition_properties.canvas_frame;
   const ::display::Frame& source_frame = composition_properties.source_frame;
 
-  // TODO(fxbug.dev/124683): Currently this doesn't support clipping of the
+  // TODO(https://fxbug.dev/124683): Currently this doesn't support clipping of the
   // input image. Callers must guarantee that the source frame starts at (0, 0)
   // and has the same size as the input image.
   ZX_ASSERT(source_frame.y_pos == 0);
@@ -95,13 +95,13 @@ void SoftwareCompositor::CompositeImage(const InputImage& input_image,
   ZX_ASSERT(source_frame.height == input_image.properties.height);
   ZX_ASSERT(source_frame.width == input_image.properties.width);
 
-  // TODO(fxbug.dev/124683): Currently this doesn't support scaling.
+  // TODO(https://fxbug.dev/124683): Currently this doesn't support scaling.
   // Callers must guarantee that the destination frame size is the same as the
   // original image size.
   ZX_ASSERT(canvas_frame.height == input_image.properties.height);
   ZX_ASSERT(canvas_frame.width == input_image.properties.width);
 
-  // TODO(fxbug.dev/124683): Currently this doesn't support clipping.
+  // TODO(https://fxbug.dev/124683): Currently this doesn't support clipping.
   // Callers must guarantee that the destination frame falls within the canvas.
   ZX_ASSERT(canvas_frame.y_pos + canvas_frame.height <= canvas_.properties.height);
   ZX_ASSERT(canvas_frame.x_pos + canvas_frame.width <= canvas_.properties.width);

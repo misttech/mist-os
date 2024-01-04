@@ -19,7 +19,7 @@ type TimeZonesError = flexible enum : int32 {
 /// civil time can correspond to two possible absolute times. This setting determines which of those
 /// times should be assumed during the conversion to absolute time.
 ///
-/// TODO(fxbug.dev/82309): Implement `AFTER_TRANSITION`.
+/// TODO(https://fxbug.dev/82309): Implement `AFTER_TRANSITION`.
 type RepeatedTimeConversion = flexible enum : int32 {
     /// Returns the wall clock time before the transition.
     ///
@@ -32,7 +32,7 @@ type RepeatedTimeConversion = flexible enum : int32 {
 /// forward), a span of civil times is skipped (usually one hour). This setting determines how
 /// invalid civil times within this span should be treated.
 ///
-/// TODO(fxbug.dev/82309): Implement `BEFORE_TRANSITION` and `AFTER_TRANSITION`.
+/// TODO(https://fxbug.dev/82309): Implement `BEFORE_TRANSITION` and `AFTER_TRANSITION`.
 type SkippedTimeConversion = flexible enum : int32 {
     /// Returns `TimeZonesError::INVALID_DATE` when trying to convert a skipped civil time.
     REJECT = 1;
@@ -60,7 +60,7 @@ type CivilToAbsoluteTimeOptions = table {
 
 /// Provides information about time zones and offers date-time conversion methods.
 ///
-/// TODO(fxbug.dev/81902): Add time zone info methods, including offsets from UTC.
+/// TODO(https://fxbug.dev/81902): Add time zone info methods, including offsets from UTC.
 @discoverable
 closed protocol TimeZones {
 
@@ -132,7 +132,7 @@ type CivilTime = table {
 
 /// Describes a Time Zone's properties at a particular moment in time.
 ///
-/// TODO(fxbug.dev/81902): Additional fields with a breakdown of offsets and DST status.
+/// TODO(https://fxbug.dev/81902): Additional fields with a breakdown of offsets and DST status.
 type TimeZoneInfo = table {
     /// The time zone's IANA ID.
     1: id TimeZoneId;

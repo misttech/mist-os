@@ -298,7 +298,7 @@ std::string LibraryName(const std::vector<std::string_view>& components,
 
 // static
 std::unique_ptr<Library> Library::CreateRootLibrary() {
-  // TODO(fxbug.dev/67858): Because this library doesn't get compiled, we have
+  // TODO(https://fxbug.dev/67858): Because this library doesn't get compiled, we have
   // to simulate what AvailabilityStep would do (set the platform, inherit the
   // availabilities). Perhaps we could make the root library less special and
   // compile it as well. That would require addressing circularity issues.

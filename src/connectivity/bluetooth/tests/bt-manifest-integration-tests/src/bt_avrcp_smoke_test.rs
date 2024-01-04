@@ -52,7 +52,7 @@ async fn mock_avrcp_client(
         .send(Event::PeerManagerExt(Some(peer_manager_ext_svc)))
         .await
         .expect("failed sending ack to test");
-    // TODO(fxbug.dev/303919602): pending! is a workaround to never exit this component so
+    // TODO(https://fxbug.dev/303919602): pending! is a workaround to never exit this component so
     // we don't trigger this bug, which can cause a flake.
     pending!();
     Ok(())

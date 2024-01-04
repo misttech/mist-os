@@ -204,7 +204,7 @@ async fn do_copy<S: Directory, D: Directory, W: std::io::Write>(
             // TODO(https://fxbug.dev/116065): add recursive copy support.
             writeln!(
                 writer,
-                "Directory \"{}\" ignored as recursive copying is unsupported. (See fxbug.dev/116065)",
+                "Directory \"{}\" ignored as recursive copying is unsupported. (See https://fxbug.dev/116065)",
                 path.display()
             )?;
         }

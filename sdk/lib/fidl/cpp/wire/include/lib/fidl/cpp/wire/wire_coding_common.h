@@ -50,7 +50,7 @@ class WireDecoder;
 // The false template instantiation performs no checks.
 // Skipping these checks has a significant code size impact.
 //
-// TODO(fxbug.dev/100403) Explore further recursion depth optimizations.
+// TODO(https://fxbug.dev/100403) Explore further recursion depth optimizations.
 template <bool IsRecursive>
 class RecursionDepth {
  public:

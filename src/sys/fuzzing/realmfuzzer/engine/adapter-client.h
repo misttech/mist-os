@@ -34,7 +34,7 @@ class TargetAdapterClient final {
   void Configure(const OptionsPtr& options);
 
   // FIDL binding methods.
-  // TODO(fxbug.dev/92490): This handler will become asynchronous and return a promise. The alias
+  // TODO(https://fxbug.dev/92490): This handler will become asynchronous and return a promise. The alias
   // will be modified in the same change as the test fixtures.
   using RequestHandler = fidl::InterfaceRequestHandler<TargetAdapter>;
   void set_handler(RequestHandler handler) { handler_ = std::move(handler); }

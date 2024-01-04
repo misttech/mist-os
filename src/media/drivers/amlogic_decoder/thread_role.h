@@ -9,7 +9,7 @@ namespace amlogic_decoder {
 
 // Loosely defined roles for the various threads of the amlogic decoder. Used to specify which
 // profile to use on a thread.
-// TODO(fxbug.dev/40858): When we switch to a role-based API, this enum can probably be removed in
+// TODO(https://fxbug.dev/40858): When we switch to a role-based API, this enum can probably be removed in
 // favor of role strings.
 enum class ThreadRole {
   kSharedFidl,

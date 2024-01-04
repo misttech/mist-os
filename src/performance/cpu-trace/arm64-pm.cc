@@ -105,7 +105,7 @@ zx_status_t PerfmonController::StageFixedConfig(const FidlPerfmonConfig* icfg, S
   if (rate == 0) {
     ocfg->fixed_initial_value[ss->num_fixed] = 0;
   } else {
-#if 0  // TODO(fxbug.dev/33106): Disable until overflow interrupts are working.
+#if 0  // TODO(https://fxbug.dev/33106): Disable until overflow interrupts are working.
        // The cycle counter is 64 bits so there's no need to check
        // |icfg->rate[ii]| here.
         ZX_DEBUG_ASSERT(ss->max_fixed_value == UINT64_MAX);
@@ -117,7 +117,7 @@ zx_status_t PerfmonController::StageFixedConfig(const FidlPerfmonConfig* icfg, S
 #endif
   }
 
-  // TODO(fxbug.dev/33106): Disable until overflow interrupts are working.
+  // TODO(https://fxbug.dev/33106): Disable until overflow interrupts are working.
   if (uses_timebase) {
     FX_LOGS(ERROR) << "data collection rates not supported yet";
     return ZX_ERR_NOT_SUPPORTED;
@@ -130,7 +130,7 @@ zx_status_t PerfmonController::StageFixedConfig(const FidlPerfmonConfig* icfg, S
   if (flags & fidl_perfmon::wire::EventConfigFlags::kCollectUser) {
     pmu_flags |= kPmuConfigFlagUser;
   }
-  // TODO(fxbug.dev/33106): PC flag.
+  // TODO(https://fxbug.dev/33106): PC flag.
   ocfg->fixed_flags[ss->num_fixed] = pmu_flags;
 
   ++ss->num_fixed;
@@ -158,7 +158,7 @@ zx_status_t PerfmonController::StageProgrammableConfig(const FidlPerfmonConfig* 
   if (rate == 0) {
     ocfg->programmable_initial_value[ss->num_programmable] = 0;
   } else {
-#if 0  // TODO(fxbug.dev/33106): Disable until overflow interrupts are working.
+#if 0  // TODO(https://fxbug.dev/33106): Disable until overflow interrupts are working.
        // The cycle counter is 64 bits so there's no need to check
        // |icfg->rate[ii]| here.
         if (icfg->rate[ii] > ss->max_programmable_value) {
@@ -195,7 +195,7 @@ zx_status_t PerfmonController::StageProgrammableConfig(const FidlPerfmonConfig* 
 
   ocfg->programmable_hw_events[ss->num_programmable] = details->event;
 
-  // TODO(fxbug.dev/33106): Disable until overflow interrupts are working.
+  // TODO(https://fxbug.dev/33106): Disable until overflow interrupts are working.
   if (uses_timebase) {
     FX_LOGS(ERROR) << "data collection rates not supported yet";
     return ZX_ERR_NOT_SUPPORTED;
@@ -208,7 +208,7 @@ zx_status_t PerfmonController::StageProgrammableConfig(const FidlPerfmonConfig* 
   if (flags & fidl_perfmon::wire::EventConfigFlags::kCollectUser) {
     pmu_flags |= kPmuConfigFlagUser;
   }
-  // TODO(fxbug.dev/33106): PC flag.
+  // TODO(https://fxbug.dev/33106): PC flag.
   ocfg->programmable_flags[ss->num_programmable] = pmu_flags;
 
   ++ss->num_programmable;

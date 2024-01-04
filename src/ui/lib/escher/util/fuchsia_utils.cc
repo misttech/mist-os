@@ -141,7 +141,7 @@ const vk::Format kPreferredImageFormats[] = {vk::Format::eR8G8B8A8Srgb, vk::Form
                                              vk::Format::eG8B8R82Plane420Unorm};
 
 // Color spaces supported by Escher / Scenic.
-// TODO(fxbug.dev/91778): Currently Escher converts all YUV images to RGBA using
+// TODO(https://fxbug.dev/91778): Currently Escher converts all YUV images to RGBA using
 // BT709 color conversion matrix; however, the images may use other color
 // spaces, which will cause inaccurate color presentation when using non-BT709
 // images. Escher should support sampling such images as well.

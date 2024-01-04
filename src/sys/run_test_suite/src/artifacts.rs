@@ -79,7 +79,7 @@ where
                 let directory = directory.into_proxy()?;
                 let result =
                     artifacts::copy_custom_artifact_directory(directory, directory_artifact).await;
-                // TODO(fxbug.dev/84882): Remove this signal once Overnet
+                // TODO(https://fxbug.dev/84882): Remove this signal once Overnet
                 // supports automatically signalling EVENTPAIR_CLOSED when the
                 // handle is closed.
                 let _ = token.signal_peer(fidl::Signals::empty(), fidl::Signals::USER_0);

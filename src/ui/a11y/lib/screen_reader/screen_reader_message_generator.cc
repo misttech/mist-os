@@ -26,7 +26,7 @@ static constexpr zx::duration kLongDelay = zx::msec(100);
 
 // Currently, this just checks if the node has a DEFAULT action.
 //
-// todo(fxbug.dev/106566): implement better handling for secondary actions.
+// todo(https://fxbug.dev/106566): implement better handling for secondary actions.
 bool NodeIsClickable(const Node* node) {
   if (!node->has_actions()) {
     return false;
@@ -401,7 +401,7 @@ ScreenReaderMessageGenerator::DescribeCharacterForSpelling(const std::string& ch
     return GenerateUtteranceByMessageId(it->second);
   }
 
-  // TODO(fxbug.dev/89506): Logic to detect uppercase letters may lead to bugs in non English
+  // TODO(https://fxbug.dev/89506): Logic to detect uppercase letters may lead to bugs in non English
   // locales. Checks if this character is uppercase.
   if (character.size() == 1 && std::isupper(character[0])) {
     return GenerateUtteranceByMessageId(MessageIds::CAPITALIZED_LETTER, zx::msec(0), {"letter"},

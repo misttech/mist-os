@@ -29,7 +29,7 @@ namespace pci {
 
 class PciBusTests : public zxtest::Test {
  public:
-  // TODO(fxb/124464): Migrate test to use dispatcher integration.
+  // TODO(https://fxbug.dev/124464): Migrate test to use dispatcher integration.
   PciBusTests() : pciroot_(0, 1), parent_(MockDevice::FakeRootParent()) {
     parent_->AddProtocol(ZX_PROTOCOL_PCIROOT, pciroot_.proto()->ops, pciroot_.proto()->ctx);
   }

@@ -23,7 +23,7 @@
 
 #include "src/lib/fxl/strings/string_printf.h"
 
-// TODO(fxbug.dev/131696): names changed in the .inc file Handle both old and
+// TODO(https://fxbug.dev/131696): names changed in the .inc file Handle both old and
 // new names by defining the old names as macros for the new ones. Remove these
 // after the toolchain rolls in the new .inc file version.
 #define DataSize NumData

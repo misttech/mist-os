@@ -133,7 +133,7 @@ zx::result<std::tuple<VolumeHandle, ManagerHandle>> FindPartitions(DIR* dir) {
 
 // Waits for the guest partition to be allocated.
 //
-// TODO(fxbug.dev/90469): Use a directory watcher instead of scanning for
+// TODO(https://fxbug.dev/90469): Use a directory watcher instead of scanning for
 // new partitions.
 zx::result<VolumeHandle> WaitForPartition(DIR* dir) {
   for (size_t retry = 0; retry != kNumRetries; retry++) {
@@ -304,7 +304,7 @@ zx::result<fidl::InterfaceHandle<fuchsia::hardware::block::Block>> GetFxfsPartit
   }
   auto [device_client, device_server] = *std::move(device_endpoints);
   flags |= fio::OpenFlags::kBlockDevice;
-  // TODO(fxbug.dev/103241): Consider using io2 for the Open() call.
+  // TODO(https://fxbug.dev/103241): Consider using io2 for the Open() call.
   auto device_open_result =
       fidl::WireCall(dir_client)
           ->Open(flags, {}, fidl::StringView::FromExternal(image_path.filename().c_str()),

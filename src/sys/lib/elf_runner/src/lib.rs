@@ -56,7 +56,7 @@ const MAX_WAIT_BREAK_ON_START: zx::Duration = zx::Duration::from_millis(300);
 // Minimum timer slack amount and default mode. The amount should be large enough to allow for some
 // coalescing of timers, but small enough to ensure applications don't miss deadlines.
 //
-// TODO(fxbug.dev/43934): For now, set the value to 50us to avoid delaying performance-critical
+// TODO(https://fxbug.dev/43934): For now, set the value to 50us to avoid delaying performance-critical
 // timers in Scenic and other system services.
 const TIMER_SLACK_DURATION: zx::Duration = zx::Duration::from_micros(50);
 
@@ -574,7 +574,7 @@ async fn start(
                 .map(|_: fidl::Signals| ()) // Discard.
                 .unwrap_or_else(|error| warn!(%error, "error creating signal handler"));
             // Process exit code '0' is considered a clean return.
-            // TODO(fxbug.dev/57024) If we create an epitaph that indicates
+            // TODO(https://fxbug.dev/57024) If we create an epitaph that indicates
             // intentional, non-zero exit, use that for all non-0 exit
             // codes.
             let exit_status: ChannelEpitaph = match proc_copy.info() {
@@ -840,7 +840,7 @@ mod tests {
         (job, component)
     }
 
-    // TODO(fxbug.dev/122225): A variation of this is used in a couple of places. We should consider
+    // TODO(https://fxbug.dev/122225): A variation of this is used in a couple of places. We should consider
     // refactoring this into a test util file.
     async fn read_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str) -> String {
         let file_proxy = fuchsia_fs::directory::open_file_no_describe(
@@ -1286,7 +1286,7 @@ mod tests {
         }
     }
 
-    // TODO(fxbug.dev/69634): Following function shares a lot of code with
+    // TODO(https://fxbug.dev/69634): Following function shares a lot of code with
     // //src/sys/component_manager/src/model/namespace.rs tests. Shared
     // functionality should be refactored into a common test util lib.
     #[fuchsia::test]

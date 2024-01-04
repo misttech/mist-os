@@ -39,7 +39,7 @@ void MessagePacket::Delete(MessagePacket* message_packet) {
 
   if (!arena) {
     // The user wrote an empty message that did not provide an arena.
-    // TODO(fxbug.dev/86856): we should consider recycling deleted packets.
+    // TODO(https://fxbug.dev/86856): we should consider recycling deleted packets.
     free(message_packet);
   }
 }

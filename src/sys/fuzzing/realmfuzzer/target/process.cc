@@ -94,7 +94,7 @@ void __sanitizer_cov_pcs_init(const uintptr_t* start, const uintptr_t* stop) {
   }
 }
 
-// TODO(fxbug.dev/85308): Add value-profile support.
+// TODO(https://fxbug.dev/85308): Add value-profile support.
 void __sanitizer_cov_trace_pc_indir(uintptr_t Callee) {}
 void __sanitizer_cov_trace_const_cmp1(uint8_t Arg1, uint8_t Arg2) {}
 void __sanitizer_cov_trace_const_cmp2(uint16_t Arg1, uint16_t Arg2) {}
@@ -264,7 +264,7 @@ void Process::Configure(Options options) {
   SetOptions(&options_, options);
 
   // Configure allocator purging.
-  // TODO(fxbug.dev/85284): Add integration tests that produce these and following logs.
+  // TODO(https://fxbug.dev/85284): Add integration tests that produce these and following logs.
   auto purge_interval = options_.purge_interval();
   if (purge_interval && !__sanitizer_purge_allocator) {
     FX_LOGS(WARNING) << "Missing '__sanitizer_purge_allocator'.";
@@ -475,7 +475,7 @@ bool Process::DetectLeak() {
       _Exit(options_.leak_exitcode());
     }
   }
-  // TODO(fxbug.dev/84368): The check for OOM is missing!
+  // TODO(https://fxbug.dev/84368): The check for OOM is missing!
   if (next_purge_ < zx::clock::get_monotonic()) {
     __sanitizer_purge_allocator();
     next_purge_ = zx::deadline_after(zx::duration(options_.purge_interval()));

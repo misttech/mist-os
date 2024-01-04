@@ -132,7 +132,7 @@ inline struct percpu* arch_get_curr_percpu() { return READ_PERCPU_FIELD(high_lev
 
 inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD(cpu_num); }
 
-// TODO(fxbug.dev/32903) get num_cpus from topology.
+// TODO(https://fxbug.dev/32903) get num_cpus from topology.
 // This needs to be set very early (before arch_init).
 inline void arch_set_num_cpus(uint cpu_count) { arm_num_cpus = cpu_count; }
 

@@ -31,7 +31,7 @@ alias Koid = uint64;
 // zx_off_t: offset.
 alias Off = uint64;
 
-// TODO(fxbug.dev/51002): These are currently duplicated with zircon/types.h.
+// TODO(https://fxbug.dev/51002): These are currently duplicated with zircon/types.h.
 // Eventually the definitions in zircon/types.h will be generated from this
 // source.
 const CHANNEL_MAX_MSG_BYTES uint64 = 65536;

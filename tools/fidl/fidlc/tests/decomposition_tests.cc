@@ -1101,7 +1101,7 @@ const CONST uint32 = VALUE;
 
 alias Alias = Type;
 
-// TODO(fxbug.dev/7807): Uncomment.
+// TODO(https://fxbug.dev/7807): Uncomment.
 // type Newtype = Type;
 
 type BitsUnderlying = bits : IntegerType {

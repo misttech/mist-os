@@ -414,7 +414,7 @@ void OutputDevicePipeline::Create(Args args) {
 
 void OutputDevicePipeline::Start(fidl::AnyArena& arena, fuchsia_media2::wire::RealTime when,
                                  fuchsia_media2::wire::StreamTime stream_time) {
-  // TODO(fxbug.dev/98652): revisit after fixing start/stop semantics in the mixer service
+  // TODO(https://fxbug.dev/98652): revisit after fixing start/stop semantics in the mixer service
   FX_CHECK(!pending_start_);
   FX_CHECK(!pending_stop_);
 
@@ -435,7 +435,7 @@ void OutputDevicePipeline::Start(fidl::AnyArena& arena, fuchsia_media2::wire::Re
 
 void OutputDevicePipeline::Stop(fidl::AnyArena& arena,
                                 fuchsia_media2::wire::RealOrStreamTime when) {
-  // TODO(fxbug.dev/98652): revisit after fixing start/stop semantics in the mixer service
+  // TODO(https://fxbug.dev/98652): revisit after fixing start/stop semantics in the mixer service
   FX_CHECK(!pending_start_);
   FX_CHECK(!pending_stop_);
 

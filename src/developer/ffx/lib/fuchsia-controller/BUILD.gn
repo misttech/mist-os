@@ -218,7 +218,7 @@ group("tests") {
     "tests:fuchsia_controller_ir_test",
   ]
 
-  # TODO(fxbug.dev/127523): These tests fail on mac builders. This is most likely
+  # TODO(https://fxbug.dev/127523): These tests fail on mac builders. This is most likely
   # because of the infra machines running OSX 10.15
   if (host_os != "mac") {
     deps += [

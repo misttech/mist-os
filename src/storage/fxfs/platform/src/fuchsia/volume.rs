@@ -594,7 +594,7 @@ impl FxVolumeAndRoot {
 
 // The correct number here is arguably u64::MAX - 1 (because node 0 is reserved). There's a bug
 // where inspect test cases fail if we try and use that, possibly because of a signed/unsigned bug.
-// See fxbug.dev/87152.  Until that's fixed, we'll have to use i64::MAX.
+// See https://fxbug.dev/87152.  Until that's fixed, we'll have to use i64::MAX.
 const TOTAL_NODES: u64 = i64::MAX as u64;
 
 // An array used to initialize the FilesystemInfo |name| field. This just spells "fxfs" 0-padded to
@@ -615,7 +615,7 @@ pub fn info_to_filesystem_info(
         used_bytes: info.used_bytes,
         total_nodes: TOTAL_NODES,
         used_nodes: object_count,
-        // TODO(fxbug.dev/93770): Support free_shared_pool_bytes.
+        // TODO(https://fxbug.dev/93770): Support free_shared_pool_bytes.
         free_shared_pool_bytes: 0,
         fs_id,
         block_size: block_size as u32,

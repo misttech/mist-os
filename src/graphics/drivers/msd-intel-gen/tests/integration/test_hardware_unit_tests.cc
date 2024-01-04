@@ -15,7 +15,7 @@
 // The test build of the MSD runs a bunch of unit tests automatically when it loads. We need to
 // unload the normal MSD to replace it with the test MSD so we can run those tests and query the
 // test results.
-// TODO(fxbug.dev/13208) - enable
+// TODO(https://fxbug.dev/13208) - enable
 #if ENABLE_HARDWARE_UNIT_TESTS
 TEST(HardwareUnitTests, All) {
 #else

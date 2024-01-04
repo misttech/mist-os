@@ -306,7 +306,7 @@ bool ComboDdiTigerLake::Initialize() {
   // DG1: IHD-OS-DG1-Vol 12-2.21 pages 337-338
   // Ice Lake: IHD-OS-ICLLP-Vol 12-1.22-Rev2.0 pages 334-335
 
-  // TODO(fxbug.dev/113870): Implement the compensation source dependency
+  // TODO(https://fxbug.dev/113870): Implement the compensation source dependency
   // between DDI A and DDIs B-C.
 
   auto procmon_status =
@@ -514,7 +514,7 @@ bool ComboDdiTigerLake::Deinitialize() {
   // DG1: IHD-OS-DG1-Vol 12-2.21 page 338
   // Ice Lake: IHD-OS-ICLLP-Vol 12-1.22-Rev2.0 page 335
 
-  // TODO(fxbug.dev/113870): Implement the compensation source dependency
+  // TODO(https://fxbug.dev/113870): Implement the compensation source dependency
   // between DDI A and DDIs B-C.
 
   auto phy_misc = registers::PhyMisc::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
@@ -717,7 +717,7 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
       // the driver need to wait for the microcontroller health bit on
       // DKL_CMN_UC_DW27 register after enabling AUX power.
       //
-      // TODO(fxbug.dev/99980): Currently Thunderbolt is not supported, so we
+      // TODO(https://fxbug.dev/99980): Currently Thunderbolt is not supported, so we
       // always check health bit of the IO subsystem microcontroller.
       //
       // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0, Page 417, "Type-C PHY
@@ -767,7 +767,7 @@ bool TypeCDdiTigerLake::SetPhySafeModeDisabled(bool target_disabled) const {
 }
 
 bool TypeCDdiTigerLake::BlockTypeCColdPowerState() {
-  // TODO(fxbug.dev/111088): TCCOLD (Type C cold power state) blocking should
+  // TODO(https://fxbug.dev/111088): TCCOLD (Type C cold power state) blocking should
   // be decided at the display engine level. We may have already blocked TCCOLD
   // while bringing up another Type C DDI.
   zxlogf(TRACE, "Asking PCU firmware to block Type C cold power state");
@@ -786,7 +786,7 @@ bool TypeCDdiTigerLake::BlockTypeCColdPowerState() {
 }
 
 bool TypeCDdiTigerLake::UnblockTypeCColdPowerState() {
-  // TODO(fxbug.dev/111088): TCCOLD (Type C cold power state) blocking should
+  // TODO(https://fxbug.dev/111088): TCCOLD (Type C cold power state) blocking should
   // be decided at the display engine level. We may have already blocked TCCOLD
   // while bringing up another Type C DDI.
   zxlogf(TRACE, "Asking PCU firmware to unblock Type C cold power state");

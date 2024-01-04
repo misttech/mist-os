@@ -88,7 +88,7 @@ group("tests") {
   testonly = true
   deps = [ ":netemul-runner-tests" ]
 
-  # TODO(fxbug.dev/95120): deflake the following test on coverage bots and
+  # TODO(https://fxbug.dev/95120): deflake the following test on coverage bots and
   # re-enable.
   if (!is_coverage) {
     deps += [ ":netemul-runner-errors-tests" ]

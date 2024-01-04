@@ -46,7 +46,7 @@ const uint8_t TOP_TWO_BITS = 0x0C;
 const uint8_t BOTTOM_TWO_BITS = 0x03;
 
 namespace bthost::fidl_helpers {
-// TODO(fxbug.dev/125641): Add remaining codecs
+// TODO(https://fxbug.dev/125641): Add remaining codecs
 std::optional<bt::hci_spec::vendor::android::A2dpCodecType> FidlToCodecType(
     const fbredr::AudioOffloadFeatures& codec) {
   switch (codec.Which()) {
@@ -374,7 +374,7 @@ bool AddProtocolDescriptorList(bt::sdp::ServiceRecord* rec,
 // fuchsia.bluetooth.Appearance, which is a subset of Bluetooth Assigned Numbers, "Appearance
 // Values" (https://www.bluetooth.com/specifications/assigned-numbers/).
 //
-// TODO(fxbug.dev/66358): Remove this compatibility check with the strict Appearance enum.
+// TODO(https://fxbug.dev/66358): Remove this compatibility check with the strict Appearance enum.
 [[nodiscard]] bool IsAppearanceValid(uint16_t appearance_raw) {
   switch (appearance_raw) {
     case 0u:  // UNKNOWN
@@ -773,7 +773,7 @@ fsys::Peer PeerToFidl(const bt::gap::Peer& peer) {
                    std::back_inserter(*output.mutable_bredr_services()), UuidToFidl);
   }
 
-  // TODO(fxbug.dev/57344): Populate le_service UUIDs based on GATT results as well as advertising
+  // TODO(https://fxbug.dev/57344): Populate le_service UUIDs based on GATT results as well as advertising
   // and inquiry data.
 
   return output;
@@ -789,7 +789,7 @@ std::optional<bt::DeviceAddress> AddressFromFidlBondingData(
       bt_log(WARN, "fidl", "BR/EDR or Dual-Mode bond cannot have a random identity address!");
       return std::nullopt;
     }
-    // TODO(fxbug.dev/2761): We currently assign kBREDR as the address type for dual-mode bonds.
+    // TODO(https://fxbug.dev/2761): We currently assign kBREDR as the address type for dual-mode bonds.
     // This makes address management for dual-mode devices a bit confusing as we have two "public"
     // address types (i.e. kBREDR and kLEPublic). We should align the stack address types with
     // the FIDL address types, such that both kBREDR and kLEPublic are represented as the same
@@ -870,7 +870,7 @@ fuchsia::bluetooth::sys::BondingData PeerToFidlBondingData(const bt::gap::Adapte
     const bt::sm::PairingData& bond = *peer.le()->bond_data();
 
     // TODO(armansito): Store the peer's preferred connection parameters.
-    // TODO(fxbug.dev/59645): Store GATT and AD service UUIDs.
+    // TODO(https://fxbug.dev/59645): Store GATT and AD service UUIDs.
 
     if (bond.local_ltk) {
       out_le.set_local_ltk(LtkToFidl(*bond.local_ltk));
@@ -892,7 +892,7 @@ fuchsia::bluetooth::sys::BondingData PeerToFidlBondingData(const bt::gap::Adapte
   if (peer.bredr() && peer.bredr()->link_key()) {
     fsys::BredrBondData out_bredr;
 
-    // TODO(fxbug.dev/1262): Populate with history of role switches.
+    // TODO(https://fxbug.dev/1262): Populate with history of role switches.
 
     const auto& services = peer.bredr()->services();
     std::transform(services.begin(), services.end(),
@@ -1109,7 +1109,7 @@ fble::AdvertisingData AdvertisingDataToFidl(const bt::AdvertisingData& input) {
     output.set_name(input.local_name()->name);
   }
   if (input.appearance()) {
-    // TODO(fxbug.dev/66358): Remove this to allow for passing arbitrary appearance values to
+    // TODO(https://fxbug.dev/66358): Remove this to allow for passing arbitrary appearance values to
     // clients in a way that's forward-compatible with future BLE revisions.
     const uint16_t appearance_raw = input.appearance().value();
     if (auto appearance = AppearanceToFidl(appearance_raw)) {
@@ -1273,7 +1273,7 @@ bt::gatt::ReliableMode ReliableModeFromFidl(const fgatt::WriteOptions& write_opt
              : bt::gatt::ReliableMode::kDisabled;
 }
 
-// TODO(fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a bt:att::Handle
+// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a bt:att::Handle
 // that underlies CharacteristicHandles when directly casted. Fix this.
 bt::gatt::CharacteristicHandle CharacteristicHandleFromFidl(uint64_t fidl_gatt_id) {
   if (fidl_gatt_id > std::numeric_limits<bt::att::Handle>::max()) {
@@ -1285,7 +1285,7 @@ bt::gatt::CharacteristicHandle CharacteristicHandleFromFidl(uint64_t fidl_gatt_i
   return bt::gatt::CharacteristicHandle(static_cast<bt::att::Handle>(fidl_gatt_id));
 }
 
-// TODO(fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a bt:att::Handle
+// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a bt:att::Handle
 // that underlies DescriptorHandles when directly casted. Fix this.
 bt::gatt::DescriptorHandle DescriptorHandleFromFidl(uint64_t fidl_gatt_id) {
   if (fidl_gatt_id > std::numeric_limits<bt::att::Handle>::max()) {
@@ -1476,7 +1476,7 @@ pw::bluetooth::emboss::ScoDataPath FidlToScoDataPath(const fbredr::DataPath& pat
     case fbredr::DataPath::HOST:
       return pw::bluetooth::emboss::ScoDataPath::HCI;
     case fbredr::DataPath::OFFLOAD: {
-      // TODO(fxbug.dev/58458): Use path from stack configuration file instead of this hardcoded
+      // TODO(https://fxbug.dev/58458): Use path from stack configuration file instead of this hardcoded
       // value. "6" is the data path usually used in Broadcom controllers.
       return static_cast<pw::bluetooth::emboss::ScoDataPath>(6);
     }
@@ -1576,7 +1576,7 @@ FidlToScoParameters(const fbredr::ScoConnectionParameters& params) {
 
   // For HCI Host transport the transport unit size should be "0". For PCM transport the unit size
   // is vendor specific. A unit size of "0" indicates "not applicable".
-  // TODO(fxbug.dev/58458): Use unit size from stack configuration file instead of hardcoding "not
+  // TODO(https://fxbug.dev/58458): Use unit size from stack configuration file instead of hardcoding "not
   // applicable".
   view.input_transport_unit_size_bits().Write(0u);
   view.output_transport_unit_size_bits().Write(0u);

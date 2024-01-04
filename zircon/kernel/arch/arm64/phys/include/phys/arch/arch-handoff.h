@@ -51,7 +51,7 @@ struct ArchPhysHandoff {
 
 // This must match what the kernel's page-table bootstrapping actually uses as
 // the virtual address of the kernel load image.
-// TODO(fxbug.dev/84107): Matches //zircon/kernel/arch/arm64/mmu.cc, which
+// TODO(https://fxbug.dev/84107): Matches //zircon/kernel/arch/arm64/mmu.cc, which
 // will no longer need to define it when the ELF kernel is the only kernel.
 #if DISABLE_KASLR
 inline constexpr uint64_t kArchHandoffVirtualAddress = KERNEL_BASE;

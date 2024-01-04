@@ -292,7 +292,7 @@ TEST_F(LowEnergyAdvertisingManagerTest, DataSize) {
   EXPECT_EQ(1u, ad_store().size());
 }
 
-// TODO(fxbug.dev/1335): Revise this test to use multiple advertising instances when
+// TODO(https://fxbug.dev/1335): Revise this test to use multiple advertising instances when
 // multi-advertising is supported.
 //  - Stopping one that is registered stops it in the advertiser
 //    (and stops the right address)

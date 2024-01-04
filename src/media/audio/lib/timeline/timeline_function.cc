@@ -49,7 +49,7 @@ int64_t TimelineFunction::Apply(int64_t subject_time, int64_t reference_time, Ti
 TimelineFunction TimelineFunction::Compose(const TimelineFunction& bc, const TimelineFunction& ab,
                                            bool exact) {
   // This composition approach may compromise range and accuracy (in some cases) for simplicity.
-  // TODO(fxbug.dev/13293): more accuracy here
+  // TODO(https://fxbug.dev/13293): more accuracy here
   auto scaled_subject_time = bc.Apply(ab.subject_time());
   if (exact) {
     ZX_ASSERT(scaled_subject_time != TimelineRate::kOverflow);

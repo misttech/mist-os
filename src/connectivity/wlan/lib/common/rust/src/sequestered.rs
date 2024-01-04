@@ -4,7 +4,7 @@
 
 //! Data isolation.
 
-// TODO(fxbug.dev/116570): This type should not derive `PartialEq`. Though it only allows trivial
+// TODO(https://fxbug.dev/116570): This type should not derive `PartialEq`. Though it only allows trivial
 //                         observation (i.e., "is this black box the same as that black box?"),
 //                         that is observation nonetheless and client code could foreseeably branch
 //                         based on this query. It is implemented to ease the implementation of
@@ -30,7 +30,7 @@
 /// copied out of fields via `release`. This is not only implicit, but can be counterintuitive in
 /// some contexts, because `release` moves a copy of the `Sequestered`.
 ///
-/// `Sequestered` also implements `PartialEq` largely for testing. See fxbug.dev/116570.
+/// `Sequestered` also implements `PartialEq` largely for testing. See https://fxbug.dev/116570.
 #[derive(Clone, Debug, PartialEq)]
 #[repr(transparent)]
 pub struct Sequestered<T>(T);

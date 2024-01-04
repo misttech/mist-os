@@ -89,7 +89,7 @@ fuchsia_test_package("optee_test") {
   test_components = [ ":optee_test_cmp" ]
   deps = [ ":tee_manager_optee_test_cmp" ]
   test_specs = {
-    # TODO(fxbug.dev/93347) add astro_env, sherlock_env and nelson_env once
+    # TODO(https://fxbug.dev/93347) add astro_env, sherlock_env and nelson_env once
     # the bug will be fixed
     environments = []
   }
@@ -138,7 +138,7 @@ executable("optee_smoke_test_bin") {
     "//sdk/lib/fit",
   ]
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

@@ -144,7 +144,7 @@ type Target = strict resource union {
 ///
 /// All fields required.
 ///
-/// TODO(fxbug.dev/81800): Rename Viewport, it is used in Flatland.
+/// TODO(https://fxbug.dev/81800): Rename Viewport, it is used in Flatland.
 type Viewport = table {
     /// The viewport's minimal and maximal extents in the viewport coordinate
     /// system.

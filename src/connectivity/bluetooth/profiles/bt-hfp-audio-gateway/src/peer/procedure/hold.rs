@@ -14,7 +14,7 @@ use {
     std::slice::Iter,
 };
 
-// TODO(fxbug.dev/94440): Add support for multi-party calls and enhanced call control
+// TODO(https://fxbug.dev/94440): Add support for multi-party calls and enhanced call control
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum State {

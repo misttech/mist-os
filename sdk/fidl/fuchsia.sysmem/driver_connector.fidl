@@ -18,7 +18,7 @@ using fuchsia.io;
 /// the driver without needing a round-trip open and without managing the channel
 /// as a file descriptor.
 ///
-/// A secondary current reason tracked by fxbug.dev/32924 is that the current devhost
+/// A secondary current reason tracked by https://fxbug.dev/32924 is that the current devhost
 /// dispatching code doesn't permit async processing of requests, which we want
 /// for proper functioning of at least the BufferCollection interface since
 /// that interface has requests that don't complete until the devhost has

@@ -13,7 +13,7 @@ closed protocol Items {
     /// Get a `payload` for a boot item of `type` and `extra`.
     /// NOTE: We return the `length` of the item, as VMOs must be page-aligned.
     ///
-    /// TODO: Refactor API: fxbug.dev/34597
+    /// TODO: Refactor API: https://fxbug.dev/34597
     ///
     /// For a list of `type`s, refer to <lib/zbi-format/zbi.h>.
     /// For a list of `extra`s, refer to <lib/zbi-format/driver-config.h>.

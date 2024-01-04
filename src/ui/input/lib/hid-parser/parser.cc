@@ -18,13 +18,13 @@ namespace {
 
 // The maximum size in bytes for all the HID descriptor data. While in theory
 // we can support much more, our memory use checkers are not happy with more.
-// See http://fxbug.dev/64791.
+// See https://fxbug.dev/64791.
 constexpr size_t kMaxTotalDescriptorByteCount = 1 << 30;  // 1GB
 
 // The maximum number of reports that we support for a single device. This
 // prevents malformed descriptors from using up useful memory, and should be
 // generous enough to handle most devices.
-// See http://fxbug.dev/106491
+// See https://fxbug.dev/106491
 constexpr size_t kMaxReports = 10000;
 
 // Maximum number of state table entries we allow. See above for the rationale.
@@ -387,7 +387,7 @@ class ParseState {
     // whole parsing process, the parser treats it the same way as an
     // Application one.
     //
-    // TODO(fxbug.dev/136142): We should print out a warning if the top-level
+    // TODO(https://fxbug.dev/136142): We should print out a warning if the top-level
     // collection is not of Application type, so that users can know that
     // this library made the best effort to parse the descriptor and it may
     // deviate from the behavior expected by the manufacturers. Currently,

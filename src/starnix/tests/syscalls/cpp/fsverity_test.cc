@@ -28,7 +28,7 @@ class FsverityTest : public ::testing::Test {
  public:
   void SetUp() override {
     if (!test_helper::IsStarnix()) {
-      // TODO(fxbug.dev/302596745): Find a way to support this.
+      // TODO(https://fxbug.dev/302596745): Find a way to support this.
       GTEST_SKIP()
           << "This test does not generally work on Linux as it requires a kernel with fsverity.";
     }
@@ -53,7 +53,7 @@ class FsverityTest : public ::testing::Test {
 
 TEST(FsverityUnitTest, OriginalFileHandle) {
   if (!test_helper::IsStarnix()) {
-    // TODO(fxbug.dev/302596745): Find a way to support this.
+    // TODO(https://fxbug.dev/302596745): Find a way to support this.
     GTEST_SKIP()
         << "This test does not generally work on Linux as it requires a kernel with fsverity.";
   }
@@ -178,7 +178,7 @@ TEST_F(FsverityTest, MeasureVerityWhenNotVerity) {
 TEST_F(FsverityTest, EnableVerity) {
   int fd = open(fname(), O_RDONLY);
   ASSERT_GT(fd, 0);
-  // TODO(fxbug.dev/300003181): Replace this when we switch to native support.
+  // TODO(https://fxbug.dev/300003181): Replace this when we switch to native support.
   // We are currently storing these ioctls in extended attributes which minfs
   // does not support. Minfs here acts as a test of the "ENOTSUP" case.
   bool is_minfs;
@@ -266,7 +266,7 @@ TEST_F(FsverityTest, EnableVerity) {
     ASSERT_EQ(ioctl(fd, FS_IOC_ENABLE_VERITY, &arg), -1);
     ASSERT_EQ(errno, EEXIST);
   }
-  // TODO(fxbug.dev/300003181): Test FS_IOC_READ_VERITY_METADATA -- Merkle Tree (not supported)
+  // TODO(https://fxbug.dev/300003181): Test FS_IOC_READ_VERITY_METADATA -- Merkle Tree (not supported)
   {
     uint8_t buf[64];
     fsverity_read_metadata_arg arg = {
@@ -330,6 +330,6 @@ TEST_F(FsverityTest, EnableVerity) {
   }
 }
 //
-// TODO(fxbug.dev/302604990): Test statx.
+// TODO(https://fxbug.dev/302604990): Test statx.
 
 }  // namespace

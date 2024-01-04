@@ -106,7 +106,7 @@ constexpr fuchsia_sysmem::wire::PixelFormatType kPixelFormatTypes[2] = {
     fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8,
 };
 
-// TODO(fxbug.dev/85601): Remove after YUV buffers can be imported to Intel display.
+// TODO(https://fxbug.dev/85601): Remove after YUV buffers can be imported to Intel display.
 constexpr fuchsia_sysmem::wire::PixelFormatType kYuvPixelFormatTypes[2] = {
     fuchsia_sysmem::wire::PixelFormatType::kI420,
     fuchsia_sysmem::wire::PixelFormatType::kNv12,
@@ -164,7 +164,7 @@ struct FramebufferInfo {
 // The bootloader (UEFI and Depthcharge) informs zircon of the framebuffer information using a
 // ZBI_TYPE_FRAMEBUFFER entry. We assume this information to be valid and unmodified by an
 // unauthorized call to zx_framebuffer_set_range(), however this is potentially an issue.
-// See fxbug.dev/77501.
+// See https://fxbug.dev/77501.
 zx::result<FramebufferInfo> GetFramebufferInfo(zx_device_t* parent) {
   FramebufferInfo info;
   zx_status_t status = zx_framebuffer_get_info(get_framebuffer_resource(parent), &info.format,
@@ -308,7 +308,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     return false;
   }
 
-  // TODO(fxbug.dev/109785): Currently the driver relies on the assumption that
+  // TODO(https://fxbug.dev/109785): Currently the driver relies on the assumption that
   // PG1 and Misc IO are always enabled by firmware. We should manually ensure
   // them they are enabled here and disable them on driver teardown.
 
@@ -664,7 +664,7 @@ void Controller::InitDisplays() {
         // the pipe / transcoder / DDI should be all reset and reinitialized.
         // By doing this we can keep the display state fully controlled by the
         // driver.
-        // TODO(fxbug.dev/111746): Consider doing this on all platforms.
+        // TODO(https://fxbug.dev/111746): Consider doing this on all platforms.
         if (is_tgl(device_id())) {
           device_needs_init.push_back(device);
         }
@@ -689,7 +689,7 @@ void Controller::InitDisplays() {
         if (is_tgl(device_id())) {
           // On Tiger Lake, devices pre-initialized by the BIOS must be reset
           // and reinitialized by the driver.
-          // TODO(fxbug.dev/111747): We should fix the device reset logic so
+          // TODO(https://fxbug.dev/111747): We should fix the device reset logic so
           // that we don't need to delete the old device.
           const DdiId ddi_id = device->ddi_id();
           const display::DisplayId display_id = device->id();
@@ -948,7 +948,7 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
   }
 
   fidl::WireResult check_result = collection->CheckBuffersAllocated();
-  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
@@ -965,7 +965,7 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
   }
 
   fidl::WireResult wait_result = collection->WaitForBuffersAllocated();
-  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
@@ -1196,7 +1196,7 @@ bool Controller::CalculateMinimumAllocations(
         uint32_t plane_source_width;
         uint32_t min_scan_lines;
 
-        // TODO(fxbug.dev/126049): Currently we assume only RGBA/BGRA formats
+        // TODO(https://fxbug.dev/126049): Currently we assume only RGBA/BGRA formats
         // are supported and hardcode the bytes-per-pixel value to avoid pixel
         // format check and stride calculation (which requires holding the GTT
         // lock). This may change when we need to support non-RGBA/BGRA images.
@@ -1375,7 +1375,7 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> ban
         uint32_t scaled_height =
             primary->src_frame.height * primary->src_frame.height / primary->dest_frame.height;
 
-        // TODO(fxbug.dev/126049): Currently we assume only RGBA/BGRA formats
+        // TODO(https://fxbug.dev/126049): Currently we assume only RGBA/BGRA formats
         // are supported and hardcode the bytes-per-pixel value to avoid pixel
         // format check and stride calculation (which requires holding the GTT
         // lock). This may change when we need to support non-RGBA/BGRA images.
@@ -1883,7 +1883,7 @@ uint16_t Controller::DataBufferBlockCount() const {
   static constexpr uint16_t kKabyLakeDataBufferBlockCount = 892;
 
   // Tiger Lake display engines have two DBUF slice with 1024 blocks each.
-  // TODO(fxbug.dev/111716): We should be able to use 2048 blocks, since we
+  // TODO(https://fxbug.dev/111716): We should be able to use 2048 blocks, since we
   // power up both slices.
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev2.0 page 297
   // DG1: IHD-OS-DG1-Vol 12-2.21 page 250
@@ -2095,7 +2095,7 @@ zx_status_t Controller::IntelGpuCoreMapPciMmio(uint32_t pci_bar, uint8_t** addr_
     }
   }
 
-  // TODO(fxbug.dev/56253): Add MMIO_PTR to cast. This cannot be done as long as
+  // TODO(https://fxbug.dev/56253): Add MMIO_PTR to cast. This cannot be done as long as
   // IntelGpuCoreMapPciMmio is a signature provided by banjo.
   *addr_out = reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(mapped_bars_[pci_bar]->get()));
   *size_out = mapped_bars_[pci_bar]->get_size();
@@ -2246,7 +2246,7 @@ void Controller::DdkRelease() {
 }
 
 void Controller::DdkSuspend(ddk::SuspendTxn txn) {
-  // TODO(fxbug.dev/43204): Implement the suspend hook based on suspendtxn
+  // TODO(https://fxbug.dev/43204): Implement the suspend hook based on suspendtxn
   if (txn.suspend_reason() == DEVICE_SUSPEND_REASON_MEXEC) {
     zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(parent());
     if (fb_status.is_error()) {
@@ -2286,7 +2286,7 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
         if (display->pipe() == nullptr) {
           continue;
         }
-        // TODO(fxbug.dev/31310): Reset/scale the display to ensure the buffer displays properly
+        // TODO(https://fxbug.dev/31310): Reset/scale the display to ensure the buffer displays properly
         registers::PipeRegs pipe_regs(display->pipe()->pipe_id());
 
         auto plane_stride = pipe_regs.PlaneSurfaceStride(0).ReadFrom(mmio_space());
@@ -2310,7 +2310,7 @@ void Controller::DdkResume(ddk::ResumeTxn txn) {
   pch_engine_->RestoreNonClockParameters();
 
   if (!is_tgl(device_id_)) {
-    // TODO(fxbug.dev/109227): Intel's documentation states that this field
+    // TODO(https://fxbug.dev/109227): Intel's documentation states that this field
     // should only be written once, at system boot. Either delete this, or
     // document an experiment confirming that this write works as intended.
     //

@@ -124,7 +124,7 @@ impl DataController for ZbiExtractBootfsPackageIndex {
                     }
                 }
 
-                // TODO(fxbug.dev/97517) After the first bootfs package is migrated to a component, an
+                // TODO(https://fxbug.dev/97517) After the first bootfs package is migrated to a component, an
                 // absence of a bootfs package index is an error.
                 return Ok(json!(BootfsPackageIndex { bootfs_pkgs: None }));
             }

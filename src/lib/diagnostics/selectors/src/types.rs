@@ -187,7 +187,7 @@ impl Into<fdiagnostics::Selector> for Selector<'_> {
         fdiagnostics::Selector {
             component_selector: Some(self.component.into()),
             tree_selector: Some(self.tree.into()),
-            ..Default::default() // TODO(fxbug.dev/55118): add metadata.
+            ..Default::default() // TODO(https://fxbug.dev/55118): add metadata.
         }
     }
 }

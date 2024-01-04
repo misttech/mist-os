@@ -289,7 +289,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   bool power_suspended_ TA_GUARDED(lock_) = false;
   uint32_t clk_div_saved_ = 0;
 
-  // TODO(fxbug.dev/134787): Remove redundant locking when Banjo is removed.
+  // TODO(https://fxbug.dev/134787): Remove redundant locking when Banjo is removed.
   fbl::Mutex lock_ TA_ACQ_AFTER(tuning_lock_);
   fbl::Mutex tuning_lock_ TA_ACQ_BEFORE(lock_);
   bool shutdown_ TA_GUARDED(lock_) = false;

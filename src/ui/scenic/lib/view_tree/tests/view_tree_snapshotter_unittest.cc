@@ -148,7 +148,7 @@ TEST(ViewTreeSnapshotterTest, BasicTreeTest) {
 
 // Check that the subscriber fires on the supplied dispatcher and doesn't rely on the default
 // dispatcher.
-// TODO(fxbug.dev/75864): Re-enable or delete.
+// TODO(https://fxbug.dev/75864): Re-enable or delete.
 TEST(ViewTreeSnapshotterTest, DISABLED_Subscriber_RunsOnCorrectDispatcher) {
   std::vector<ViewTreeSnapshotter::Subscriber> subscribers;
   async::TestLoop loop1;
@@ -190,7 +190,7 @@ TEST(ViewTreeSnapshotterTest, MultipleSubscribers) {
   loop.RunUntilIdle();
   EXPECT_TRUE(snapshot1);
   EXPECT_TRUE(snapshot2);
-  // TODO(fxbug.dev/75864): Re-enable or fix up.
+  // TODO(https://fxbug.dev/75864): Re-enable or fix up.
   // EXPECT_FALSE(snapshot3);
   loop2.RunUntilIdle();
   EXPECT_TRUE(snapshot3);
@@ -265,7 +265,7 @@ TEST(ViewTreeSnapshotterTest, SubscriberCallbackLifetime) {
   tree->UpdateSnapshot();
   tree->UpdateSnapshot();
   tree.reset();
-  // TODO(fxbug.dev/75864): Re-enable or fix up.
+  // TODO(https://fxbug.dev/75864): Re-enable or fix up.
   // EXPECT_EQ(called_count, 0);
 
   loop.RunUntilIdle();

@@ -268,7 +268,7 @@ class IgdOpRegion {
 
   double GetMinBacklightBrightness() const { return min_backlight_brightness_; }
 
-  // TODO(fxbug.dev/112092): Instead of adding the helper functions, these DDI
+  // TODO(https://fxbug.dev/112092): Instead of adding the helper functions, these DDI
   // features should be exported as a data-only struct that can be easily
   // injected by tests.
   void SetIsEdpForTesting(DdiId ddi_id, bool is_edp) { ddi_features_[ddi_id].is_edp = is_edp; }

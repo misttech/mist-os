@@ -18,7 +18,7 @@ namespace minfs {
 namespace {
 
 // Trivial BlockBuffer that doesn't own the underlying buffer.
-// TODO(fxbug.dev/47947): Remove this.
+// TODO(https://fxbug.dev/47947): Remove this.
 class UnownedBuffer : public storage::BlockBuffer {
  public:
   UnownedBuffer(vmoid_t vmoid) : vmoid_(vmoid) {}

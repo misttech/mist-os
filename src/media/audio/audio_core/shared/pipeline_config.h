@@ -61,7 +61,7 @@ class PipelineConfig {
     std::optional<float> min_gain_db;
     std::optional<float> max_gain_db;
     bool loopback = false;
-    // TODO(fxbug.dev/70642): rename these fields require that they be specified explicitly
+    // TODO(https://fxbug.dev/70642): rename these fields require that they be specified explicitly
     int32_t output_rate = kDefaultMixGroupRate;
     int16_t output_channels = kDefaultMixGroupChannels;
   };

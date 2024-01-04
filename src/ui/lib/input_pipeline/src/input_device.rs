@@ -295,7 +295,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
                     InputPipelineErrorMetricDimensionEvent::InputDeviceCreateInputReportProxyFailed,
                     std::format!("error creating InputReport proxy: {:?}", &e),
                 );
-                return; // TODO(fxbug.dev/54445): signal error
+                return; // TODO(https://fxbug.dev/54445): signal error
             }
         };
         let result = device_proxy.get_input_reports_reader(server_end);
@@ -304,7 +304,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
                 InputPipelineErrorMetricDimensionEvent::InputDeviceGetInputReportsReaderError,
                 std::format!("error on GetInputReportsReader: {:?}", &result),
             );
-            return; // TODO(fxbug.dev/54445): signal error
+            return; // TODO(https://fxbug.dev/54445): signal error
         }
         let mut report_stream = HangingGetStream::new(
             report_reader,
@@ -342,7 +342,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
                 None => break,
             }
         }
-        // TODO(fxbug.dev/54445): Add signaling for when this loop exits, since it means the device
+        // TODO(https://fxbug.dev/54445): Add signaling for when this loop exits, since it means the device
         // binding is no longer functional.
         tracing::warn!("initialize_report_stream exited - device binding no longer works");
     })

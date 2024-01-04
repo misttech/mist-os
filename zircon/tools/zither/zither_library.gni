@@ -14,7 +14,7 @@ if (support_rust) {
   import("//build/rust/rustc_library.gni")
 }
 
-# TODO(fxbug.dev/91102, fxbug.dev/93393): "cpp"
+# TODO(https://fxbug.dev/91102, https://fxbug.dev/93393): "cpp"
 supported_zither_backends = [
   "asm",  # Assembly data layout bindings.
   "c",  # C data layout bindings.

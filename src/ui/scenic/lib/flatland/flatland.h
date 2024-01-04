@@ -95,7 +95,7 @@ class Flatland : public fuchsia::ui::composition::Flatland,
                    fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
                        parent_viewport_watcher) override;
   // |fuchsia::ui::composition::Flatland|
-  // TODO(fxbug.dev/81576): Consider returning tokens for re-linking.
+  // TODO(https://fxbug.dev/81576): Consider returning tokens for re-linking.
   void ReleaseView() override;
   // |fuchsia::ui::composition::Flatland|
   void Clear() override;

@@ -14,7 +14,7 @@
 // To dump a v1 corpus file for sysmem_fuzz.cc test, enable SYSMEM_FUZZ_CORPUS. Files can be found
 // under /data/cache/r/sys/fuchsia.com:sysmem-test-v1:0#meta:sysmem.cm/ on the device.
 //
-// TODO(fxb/115937): Make this and sysmem_fuzz.cc work for sysmem2.
+// TODO(https://fxbug.dev/115937): Make this and sysmem_fuzz.cc work for sysmem2.
 #define SYSMEM_FUZZ_CORPUS 0
 
 #define SYSMEM_CLASS_PATH "/dev/class/sysmem"

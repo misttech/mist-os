@@ -156,7 +156,7 @@ impl PowerManager {
                 cpu_manager::CpuManagerBuilder::new_from_json(json_data, &self.nodes).build()?
             }
 
-            // TODO(fxbug.dev/111155): Remove async node creation
+            // TODO(https://fxbug.dev/111155): Remove async node creation
             "CpuStatsHandler" => {
                 cpu_stats_handler::CpuStatsHandlerBuilder::new_from_json(json_data, &self.nodes)
                     .build()
@@ -184,7 +184,7 @@ impl PowerManager {
                     .build(node_futures)?
             }
 
-            // TODO(fxbug.dev/111155): Remove async node creation
+            // TODO(https://fxbug.dev/111155): Remove async node creation
             "SyscallHandler" => syscall_handler::SyscallHandlerBuilder::new().build().await?,
             "SystemPowerModeHandler" => {
                 system_power_mode_handler::SystemPowerModeHandlerBuilder::new_from_json(
@@ -228,7 +228,7 @@ impl PowerManager {
             )
             .build()?,
 
-            // TODO(fxbug.dev/111155): Remove async node creation
+            // TODO(https://fxbug.dev/111155): Remove async node creation
             "ThermalPolicy" => {
                 thermal_policy::ThermalPolicyBuilder::new_from_json(json_data, &self.nodes)
                     .build(node_futures)

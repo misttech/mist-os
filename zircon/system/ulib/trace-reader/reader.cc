@@ -47,7 +47,7 @@ bool TraceReader::ReadRecords(Chunk& chunk) {
       return false;  // fatal error
     }
 
-    // TODO(fxbug.dev/23072): Here we assume that the entire blob payload can
+    // TODO(https://fxbug.dev/23072): Here we assume that the entire blob payload can
     // fit into the read buffer.
     std::optional record_opt = chunk.ReadChunk(size - 1);
     if (!record_opt.has_value()) {

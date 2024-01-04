@@ -45,7 +45,7 @@ constexpr T* to_address(T* pointer) noexcept {
   return pointer;
 }
 
-// TODO(fxbug.dev/70523): This std::pointer_traits stuff is only to be bug-compatible with the
+// TODO(https://fxbug.dev/70523): This std::pointer_traits stuff is only to be bug-compatible with the
 // standard library implementations; switch back to auto when the linked bug is resolved.
 template <typename T>
 constexpr typename std::pointer_traits<T>::element_type* to_address(const T& pointer) noexcept {

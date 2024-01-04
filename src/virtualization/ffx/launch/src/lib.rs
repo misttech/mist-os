@@ -15,11 +15,11 @@ pub async fn guest_launch(
 ) -> Result<()> {
     let services = guest_cli::platform::HostPlatformServices::new(remote_control);
 
-    // TODO(fxbug.dev/116879): Remove when overnet supports duplicated socket handles.
+    // TODO(https://fxbug.dev/116879): Remove when overnet supports duplicated socket handles.
     if !args.detach {
         println!("The ffx guest plugin doesn't support attaching to a running guest.");
         println!("Re-run using the -d flag to detach, or use the guest tool via fx shell.");
-        println!("See fxbug.dev/116879 for updates.");
+        println!("See https://fxbug.dev/116879 for updates.");
         return Ok(());
     }
 

@@ -58,7 +58,7 @@ pub struct RouteSourcesConfig {
 /// Each route must be listed, either to be verified or skipped by the verifier.
 #[derive(Deserialize, Serialize)]
 pub struct RouteSourcesSpec {
-    /// TODO(fxbug.dev/102801): rename to `target_moniker`.
+    /// TODO(https://fxbug.dev/102801): rename to `target_moniker`.
     /// `Moniker` of the component instance whose routes are to be verified.
     pub target_node_path: Moniker,
     /// If true, verification of the component instance will be skipped if the
@@ -118,7 +118,7 @@ pub struct RouteMatch {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct SourceSpec {
     /// `Moniker` prefix expected at the source instance.
-    /// TODO(fxbug.dev/102801): Rename serde key to to `source_moniker`.
+    /// TODO(https://fxbug.dev/102801): Rename serde key to to `source_moniker`.
     #[serde(rename = "source_node_path")]
     moniker: Moniker,
     /// Capability declaration expected at the source instance.

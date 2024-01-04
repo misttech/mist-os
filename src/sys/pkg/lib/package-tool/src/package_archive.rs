@@ -108,7 +108,7 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
         .write_with_relative_paths(&package_manifest_path)
         .with_context(|| format!("creating {package_manifest_path}"))?;
 
-    // FIXME(fxbug.dev/101304): Some tools still depend on the legacy `blobs.json` file. We
+    // FIXME(https://fxbug.dev/101304): Some tools still depend on the legacy `blobs.json` file. We
     // should migrate them over to using `package_manifest.json` so we can stop producing this file.
     if cmd.blobs_json {
         let blobs_json_path = cmd.out.join(BLOBS_JSON_NAME);

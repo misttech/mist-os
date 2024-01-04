@@ -42,7 +42,7 @@ const MDNS_MCAST_V6: Ipv6Addr = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 0, 0x00fb);
 #[derive(Debug)]
 pub struct CachedTarget {
     target: ffx::TargetInfo,
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     eviction_task: Option<Task<()>>,
 }
@@ -361,7 +361,7 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
         ttl,
         mdns_port,
     } = config;
-    // See fxbug.dev/62617#c10 for details. A macOS system can end up in
+    // See https://fxbug.dev/62617#c10 for details. A macOS system can end up in
     // a situation where the default routes for protocols are on
     // non-functional interfaces, and under such conditions the wildcard
     // listen socket binds will fail. We will repeat attempting to bind

@@ -201,7 +201,7 @@ type WlanSoftmacHardwareCapabilityBit = strict enum : uint32 {
     RADIO_MSMT = 0x1000;
 
     // Supports simutaneous client-ap use
-    // TODO(fxbug.dev/54923): Move SIMULTANEOUS_CLIENT_AP to a different Fuchsia specific
+    // TODO(https://fxbug.dev/54923): Move SIMULTANEOUS_CLIENT_AP to a different Fuchsia specific
     // capability enum. This enum should only be used for IEEE 802.11 fields. This type
     // should also be reduced to uint16_t once this is done.
     SIMULTANEOUS_CLIENT_AP = 0x10000;

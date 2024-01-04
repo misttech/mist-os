@@ -72,7 +72,7 @@ test_platforms = [
     cpu = "arm64"
   },
 
-  # TODO(fxbug.dev/110600): While mac-arm64 hosts are not actually targetable
+  # TODO(https://fxbug.dev/110600): While mac-arm64 hosts are not actually targetable
   # at this time, it is easy evaluate code for this environment today as a
   # matter of course (e.g., in bringing up the mac-arm64 host as a development
   # environment or in evaluating an arm64 boot test on a mac host of a different
@@ -157,19 +157,19 @@ test_platforms = [
   },
 
   # Experimental/FYI.
-  # fxbug.dev/43946
+  # https://fxbug.dev/43946
   {
     device_type = "Nelson"
     cpu = "arm64"
   },
 
-  # fxbug.dev/62836
+  # https://fxbug.dev/62836
   {
     device_type = "Vim3"
     cpu = "arm64"
   },
 
-  # fxbug.dev/9127
+  # https://fxbug.dev/9127
   {
     device_type = "GCE"
   },

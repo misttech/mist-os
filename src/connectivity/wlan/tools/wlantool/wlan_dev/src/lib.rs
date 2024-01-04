@@ -91,7 +91,7 @@ impl TryFrom<SecurityContext> for fidl_security::Authentication {
         let SecurityContext { bss, unparsed_password_text, unparsed_psk_text } = context;
         match bss.protection() {
             // Unsupported.
-            // TODO(fxbug.dev/92693): Implement conversions for WPA Enterprise.
+            // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise.
             Protection::Unknown | Protection::Wpa2Enterprise | Protection::Wpa3Enterprise => {
                 Err(SecurityError::Unsupported)
             }
@@ -362,7 +362,7 @@ async fn do_client_connect(
                     // Write the first matching `BssDescription`. Any additional information is
                     // ignored.
                     if let Some(bss_info) = scan_result_list.into_iter().find(|scan_result| {
-                        // TODO(fxbug.dev/83708): Until the error produced by
+                        // TODO(https://fxbug.dev/83708): Until the error produced by
                         // `ScanResult::try_from` includes some details about the scan result
                         // which failed conversion, `scan_result` must be cloned for debug
                         // logging if conversion fails.
@@ -629,7 +629,7 @@ fn print_scan_result(scan_result: fidl_sme::ClientSmeScanResult) {
             scan_result_list
                 .into_iter()
                 .filter_map(
-                    // TODO(fxbug.dev/83708): Until the error produced by
+                    // TODO(https://fxbug.dev/83708): Until the error produced by
                     // ScanResult::TryFrom includes some details about the
                     // scan result which failed conversion, scan_result must
                     // be cloned for debug logging if conversion fails.

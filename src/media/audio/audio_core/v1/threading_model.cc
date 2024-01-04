@@ -27,7 +27,7 @@ namespace {
 void SetMixDispatcherThreadProfile(const MixProfileConfig& mix_profile_config,
                                    async_dispatcher_t* dispatcher) {
   async::PostTask(dispatcher, [] {
-    // TODO(fxbug.dev/40858): Pass mix profile config params when the role API supports arguments.
+    // TODO(https://fxbug.dev/40858): Pass mix profile config params when the role API supports arguments.
     auto result = AcquireSchedulerRole(zx::thread::self(), "fuchsia.media.audio.core.mixer");
     if (result.is_error()) {
       FX_PLOGS(ERROR, result.status_value())

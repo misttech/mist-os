@@ -43,7 +43,7 @@ llvm_libc_source_set("parser") {
   public = [ "parser.h" ]
   functions = []
 
-  # TODO(fxbug.dev/62780): There are parser tests that can be built though
+  # TODO(https://fxbug.dev/62780): There are parser tests that can be built though
   # there is no "parser" source file so the build machinery will have to be
   # custom for those tests. But that test code requires the fancier test
   # machinery that we don't yet support since zxtest doesn't have the features.

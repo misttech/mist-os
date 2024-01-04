@@ -132,7 +132,7 @@ void UsbHubDevice::DdkInit(ddk::InitTxn txn) {
     txn_->Reply(status);
     return;
   }
-  // TODO(fxbug.dev/56002): Support multi-TT hubs properly. Currently, we
+  // TODO(https://fxbug.dev/56002): Support multi-TT hubs properly. Currently, we
   // operate in single-TT mode even if the hub supports multiple TTs.
   status = bus_.ConfigureHub(reinterpret_cast<uint64_t>(zxdev()), speed_, &raw_desc, false);
   if (status != ZX_OK) {
@@ -255,7 +255,7 @@ void UsbHubDevice::InterruptCallback() {
 
     // bit zero is hub status
     if (data[0] & hubStatusBit) {
-      // TODO(fxbug.dev/58148) what to do here?
+      // TODO(https://fxbug.dev/58148) what to do here?
       zxlogf(ERROR, "usb_hub_interrupt_complete hub status changed");
     }
     // Iterate through the bitmap (bitmap length and port count is the same)
@@ -477,7 +477,7 @@ zx_status_t UsbHubDevice::Shutdown() {
     zxlogf(ERROR, "CancelAll() error: %s", zx_status_get_string(status));
     return status;
   }
-  // TODO(fxbug.dev/82530): Cancel Control endpoint when supported
+  // TODO(https://fxbug.dev/82530): Cancel Control endpoint when supported
   sync_completion_signal(&xfer_done_);
   return ZX_OK;
 }

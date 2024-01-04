@@ -94,7 +94,7 @@ class PackageManifest:
     package: PackageMetaData
     blobs: List[BlobEntry]
     version: str = "1"
-    # TODO(fxbug.dev/114780): Change this to `paths_relative`, because it
+    # TODO(https://fxbug.dev/114780): Change this to `paths_relative`, because it
     # applies to both blob source and subpackage manifest.
     blob_sources_relative: Optional[str] = None
     subpackages: List[SubpackageEntry] = field(default_factory=list)

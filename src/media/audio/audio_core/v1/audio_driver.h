@@ -149,7 +149,7 @@ class AudioDriver {
   std::shared_ptr<Clock> reference_clock() { return audio_clock_; }
   zx::duration turn_on_delay() const { return turn_on_delay_; }
 
-  // TODO(fxbug.dev/113705): obey the flag when it is false. We behave as if it is always true.
+  // TODO(https://fxbug.dev/113705): obey the flag when it is false. We behave as if it is always true.
   bool needs_cache_flush_or_invalidate() const { return needs_cache_flush_or_invalidate_; }
   std::vector<ChannelAttributes> channel_config() { return configured_channel_config_; }
 

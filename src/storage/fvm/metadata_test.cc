@@ -21,7 +21,7 @@ static std::default_random_engine rand(::zxtest::Runner::GetInstance()->random_s
 
 SliceEntry CreateSliceEntry(uint16_t vpart) {
   // Slices are 1-indexed.
-  // TODO(fxb/59980) include the zero entry, too.
+  // TODO(https://fxbug.dev/59980) include the zero entry, too.
   static uint64_t vslice = 1;
   return SliceEntry(vpart, vslice++);
 }
@@ -104,7 +104,7 @@ void CheckMetadataContainSameEntries(const Metadata& a, const Metadata& b) {
   }
 }
 
-// TODO(fxbug.dev/40192): Re-enable this test when partition table size is configurable.
+// TODO(https://fxbug.dev/40192): Re-enable this test when partition table size is configurable.
 /*
 TEST(CreateMetadata, HeaderPartitionTableCapacityTooSmallFails) {
   constexpr size_t kSliceSize = 32 * 1024;

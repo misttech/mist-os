@@ -276,7 +276,7 @@ type RepositoryError = strict enum : uint32 {
     /// There was an error communicating with the target. This may mean that
     /// the target does not exist, is down or unreachable, or that there was an
     /// error communicating with a proxy on target.
-    /// TODO(fxbug.dev/77904) make this more specific when we have more specific
+    /// TODO(https://fxbug.dev/77904) make this more specific when we have more specific
     /// errors from the underlying API.
     TARGET_COMMUNICATION_FAILURE = 3;
     /// There was an error from the fuchsia.pkg.RepositoryRegistry.

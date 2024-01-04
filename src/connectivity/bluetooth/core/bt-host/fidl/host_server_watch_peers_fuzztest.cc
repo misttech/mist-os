@@ -38,7 +38,7 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
       peer_fuzzer.FuzzOneField();
     }
 
-    // TODO(fxbug.dev/65461): WatchPeers will trigger this test as a failure if we try to encode a
+    // TODO(https://fxbug.dev/65461): WatchPeers will trigger this test as a failure if we try to encode a
     // lot of peers, even though fuzzing multiple peers would be helpful.
     int watch_peers_responses = 0;
     host_client()->WatchPeers([this, peer, &watch_peers_responses](auto updated, auto removed) {

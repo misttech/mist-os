@@ -537,7 +537,7 @@ impl EventLoop {
             neighbors: neighbor_cache.get_interface_neighbors(properties.id.get()),
         };
 
-        // TODO(fxbug.dev/123564): Move watchdog into its own future in the eventloop to prevent
+        // TODO(https://fxbug.dev/123564): Move watchdog into its own future in the eventloop to prevent
         // network check reliance on the watchdog completing.
         let () = watchdog
             .check_interface_state(zx::Time::get_monotonic(), &SystemDispatcher {}, view)
@@ -564,7 +564,7 @@ impl EventLoop {
             .await;
     }
 
-    // TODO(fxbug.dev/125657): handle_netcheck_response and handle_network_check_message are missing
+    // TODO(https://fxbug.dev/125657): handle_netcheck_response and handle_network_check_message are missing
     // tests because they reply on NetworkCheckCookie, which cannot be created in the event loop.
     async fn handle_netcheck_response(
         &mut self,
@@ -597,7 +597,7 @@ impl EventLoop {
 
 /// If we can't reach netstack via fidl, log an error and exit.
 //
-// TODO(fxbug.dev/119295): add a test that works as intended.
+// TODO(https://fxbug.dev/119295): add a test that works as intended.
 fn exit_with_fidl_error(cause: fidl::Error) -> ! {
     error!(%cause, "exiting due to fidl error");
     std::process::exit(1);
@@ -605,7 +605,7 @@ fn exit_with_fidl_error(cause: fidl::Error) -> ! {
 
 /// If we can't get route events from netstack, log an error and exit.
 //
-// TODO(fxbug.dev/119295): add a test that works as intended.
+// TODO(https://fxbug.dev/119295): add a test that works as intended.
 fn exit_with_route_watch_error(cause: fnet_routes_ext::WatchError) -> ! {
     error!(%cause, "exiting due to route watch error");
     std::process::exit(1);

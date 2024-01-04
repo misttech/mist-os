@@ -782,7 +782,7 @@ impl<'a> Transaction<'a> {
         {
             match &key.data {
                 ObjectKeyData::Attribute(..) => {
-                    // TODO(fxbug.dev/122977): Check lock requirements.
+                    // TODO(https://fxbug.dev/122977): Check lock requirements.
                 }
                 ObjectKeyData::Child { .. } => {
                     let id = key.object_id;
@@ -801,7 +801,7 @@ impl<'a> Transaction<'a> {
                     }
                 }
                 ObjectKeyData::GraveyardEntry { .. } => {
-                    // TODO(fxbug.dev/122974): Check lock requirements.
+                    // TODO(https://fxbug.dev/122974): Check lock requirements.
                 }
                 ObjectKeyData::Keys => {
                     let id = key.object_id;

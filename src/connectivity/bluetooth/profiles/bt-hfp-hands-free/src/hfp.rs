@@ -38,7 +38,7 @@ pub struct Hfp {
     /// The client connection to the `fuchsia.bluetooth.bredr.Profile` protocol.
     profile_svc: bredr::ProfileProxy,
     /// A collection of discovered and/or connected Bluetooth peers that support the AG role.
-    // TODO(fxb/132337) Convert this to a FutureMap and await peer tasks finishing and clean up.
+    // TODO(https://fxbug.dev/132337) Convert this to a FutureMap and await peer tasks finishing and clean up.
     peers: HashMap<PeerId, Peer>,
     /// Timers for asynchronously handling search result profile events.
     search_result_timers: FuturesUnordered<SearchResultTimer>,

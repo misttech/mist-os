@@ -196,7 +196,7 @@ template("ffx_action") {
   env_target_name = target_name + ".ffx_env"
   env_file = "$target_out_dir/ffx.env." + target_name
 
-  # TODO(fxbug.dev/126769): We could avoid creating an extra file if ffx
+  # TODO(https://fxbug.dev/126769): We could avoid creating an extra file if ffx
   # could have its env passed in on the command line.
   generated_file(env_target_name) {
     outputs = [ env_file ]

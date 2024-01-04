@@ -150,7 +150,7 @@ pub enum FvmFilesystem {
 
     /// An empty data partition.
     /// This reserves the data volume, which will be formatted as fxfs/minfs on boot.
-    // TODO(fxbug.dev/85134): Remove empty-minfs alias after updating sdk-integration.
+    // TODO(https://fxbug.dev/85134): Remove empty-minfs alias after updating sdk-integration.
     #[serde(rename = "empty-data", alias = "empty-minfs")]
     EmptyData(EmptyData),
 

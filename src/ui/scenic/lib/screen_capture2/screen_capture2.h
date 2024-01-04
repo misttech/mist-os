@@ -83,7 +83,7 @@ class ScreenCapture : public fuchsia::ui::composition::internal::ScreenCapture {
 
   // Acts as a lock to MaybeRenderFrame() so it can not be used while it is still on a previous
   // call.
-  // TODO(fxbug.dev/104367): If we make ScreenCapture multi-threaded, this will need to be a mutex.
+  // TODO(https://fxbug.dev/104367): If we make ScreenCapture multi-threaded, this will need to be a mutex.
   bool render_frame_in_progress_ = false;
 
   GetRenderables get_renderables_;

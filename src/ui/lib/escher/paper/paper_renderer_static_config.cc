@@ -12,7 +12,7 @@ const std::vector<std::string> kPaperRendererShaderPaths = {
     "shaders/paper/frag/main_ambient_light.frag",
     "shaders/paper/frag/main_point_light.frag",
     "shaders/paper/vert/main_shadow_volume_extrude.vert",
-    // TODO(fxbug.dev/70252): the following files are not part of PaperRenderer; they're used only
+    // TODO(https://fxbug.dev/70252): the following files are not part of PaperRenderer; they're used only
     // by tests.  They should be moved elsewhere.
     "shaders/test/main.frag",
     "shaders/test/shadow_map_generation.frag",
@@ -27,7 +27,7 @@ const ShaderProgramData kAmbientLightProgramData = {
     .args = ShaderVariantArgs({
         {"USE_ATTRIBUTE_UV", "1"},
         {"USE_PAPER_SHADER_PUSH_CONSTANTS", "1"},
-        // TODO(fxbug.dev/7244): currently required by main.vert.
+        // TODO(https://fxbug.dev/7244): currently required by main.vert.
         {"NO_SHADOW_LIGHTING_PASS", "1"},
     }),
 };
@@ -38,7 +38,7 @@ const ShaderProgramData kNoLightingProgramData = {
     .args = ShaderVariantArgs({
         {"USE_ATTRIBUTE_UV", "1"},
         {"USE_PAPER_SHADER_PUSH_CONSTANTS", "1"},
-        // TODO(fxbug.dev/7244): currently required by main.vert.
+        // TODO(https://fxbug.dev/7244): currently required by main.vert.
         {"NO_SHADOW_LIGHTING_PASS", "1"},
         {"DISABLE_AMBIENT_LIGHT", "1"},
     }),

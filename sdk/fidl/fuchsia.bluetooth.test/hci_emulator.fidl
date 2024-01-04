@@ -19,7 +19,7 @@ type EmulatorPeerError = strict enum {
     NOT_FOUND = 3;
 };
 
-// TODO(fxbug.dev/822): Add state structures for other LE and BR/EDR operations.
+// TODO(https://fxbug.dev/822): Add state structures for other LE and BR/EDR operations.
 // TODO(armansito): Add ability to publish GATT services
 // TODO(armansito): Add ability to publish SDP records
 // TODO(armansito): Add ability to specify Bluetooth HCI version.

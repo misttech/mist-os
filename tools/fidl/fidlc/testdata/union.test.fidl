@@ -113,7 +113,7 @@ type StrictSimpleUnion = strict union {
 type Empty = struct {};
 
 type UnionContainingEmptyStruct = flexible union {
-    // This is a test to prevent regressions for fxbug.dev/8084.
+    // This is a test to prevent regressions for https://fxbug.dev/8084.
     1: empty Empty;
 };
 
@@ -155,11 +155,11 @@ type UnionWithAttributes = flexible union {
     2: reserved;
 };
 
-// TODO(fxbug.dev/118943): Support empty flexible unions in libfuzzer.
+// TODO(https://fxbug.dev/118943): Support empty flexible unions in libfuzzer.
 @bindings_denylist("libfuzzer")
 type EmptyFlexibleUnion = flexible union {};
 
-// TODO(fxbug.dev/118943): Support empty flexible unions in libfuzzer.
+// TODO(https://fxbug.dev/118943): Support empty flexible unions in libfuzzer.
 @bindings_denylist("libfuzzer")
 type OnlyReservedFlexibleUnion = flexible union {
     1: reserved;

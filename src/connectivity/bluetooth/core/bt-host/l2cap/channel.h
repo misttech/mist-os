@@ -71,7 +71,7 @@ constexpr uint16_t kDefaultTxMaxQueuedCount = 500;
 // Activate().
 class Channel : public WeakSelf<Channel> {
  public:
-  // TODO(fxbug.dev/1022): define a preferred MTU somewhere
+  // TODO(https://fxbug.dev/1022): define a preferred MTU somewhere
   Channel(ChannelId id, ChannelId remote_id, bt::LinkType link_type,
           hci_spec::ConnectionHandle link_handle, ChannelInfo info, uint16_t max_tx_queued);
   virtual ~Channel() = default;

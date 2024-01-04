@@ -74,7 +74,7 @@ const MAX_PROCESS_STATS uint16 = 256;
 
 /// See `Controller.GetStatus`.
 //
-// TODO(fxbug.dev/124032): Include workflow enum.
+// TODO(https://fxbug.dev/124032): Include workflow enum.
 type Status = table {
     /// True if the fuzzer is working on a commands, e.g. it is fuzzing.
     1: running bool;

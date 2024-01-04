@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxb/117319): remove this file once transition to use `include_codecfactory_testonly.shard.cml` is completed.
+// TODO(https://fxbug.dev/117319): remove this file once transition to use `include_codecfactory_testonly.shard.cml` is completed.
 {
     children: [
         {

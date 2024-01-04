@@ -74,7 +74,7 @@ fn dump_condition(cond: DecodedCondition) -> String {
     format!("{} {} {}", lhs_dump, op, cond.rhs)
 }
 
-// TODO(fxb/93365): Print the label IDs in the jump and label statements.
+// TODO(https://fxbug.dev/93365): Print the label IDs in the jump and label statements.
 fn dump_instructions(instructions: Vec<DecodedInstruction>) -> String {
     let mut bind_rules_dump = String::new();
     for inst in instructions {

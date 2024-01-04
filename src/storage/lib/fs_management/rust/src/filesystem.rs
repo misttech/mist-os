@@ -321,7 +321,7 @@ impl Drop for NamespaceBinding {
     }
 }
 
-// TODO(fxbug.dev/93066): Soft migration; remove this after completion
+// TODO(https://fxbug.dev/93066): Soft migration; remove this after completion
 pub type ServingFilesystem = ServingSingleVolumeFilesystem;
 
 /// Asynchronously manages a serving filesystem. Created from [`Filesystem::serve()`].
@@ -406,7 +406,7 @@ impl ServingSingleVolumeFilesystem {
     /// recover the [`Filesystem`] from this error.
     pub async fn kill(self) -> Result<(), Error> {
         // For components, just shut down the filesystem.
-        // TODO(fxbug.dev/293949323): Figure out a way to make this more abrupt - the use-cases are
+        // TODO(https://fxbug.dev/293949323): Figure out a way to make this more abrupt - the use-cases are
         // either testing or when the filesystem isn't responding.
         self.shutdown().await?;
         Ok(())
@@ -1126,7 +1126,7 @@ mod tests {
         std::fs::File::open(test_path).expect_err("test file was not unbound");
     }
 
-    // TODO(fxbug.dev/93066): Re-enable this test; it depends on Fxfs failing repeated calls to
+    // TODO(https://fxbug.dev/93066): Re-enable this test; it depends on Fxfs failing repeated calls to
     // Start.
     #[ignore]
     #[fuchsia::test]
@@ -1180,7 +1180,7 @@ mod tests {
             .expect("Create volume failed");
         vol.query().await.expect("Query volume failed");
         fs.close_volume("foo");
-        // TODO(fxbug.dev/106555) Closing the volume is not synchronous. Immediately reopening the
+        // TODO(https://fxbug.dev/106555) Closing the volume is not synchronous. Immediately reopening the
         // volume will race with the asynchronous close and sometimes fail because the volume is
         // still mounted.
         // fs.open_volume("foo", MountOptions{crypt: None, as_blob: false}).await

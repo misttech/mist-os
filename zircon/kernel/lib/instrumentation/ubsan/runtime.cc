@@ -202,7 +202,7 @@ auto UbsanPanicStart(const char* check, SourceLocation& loc,
 }
 
 void PrintTypeDescriptor(const TypeDescriptor& type, const char* prefix = NULL) {
-  // TODO(fxbug.dev/105063): Improve logging by interpreting TypeDescriptor values.
+  // TODO(https://fxbug.dev/105063): Improve logging by interpreting TypeDescriptor values.
   if (prefix) {
     printf("%s:", prefix);
   }

@@ -97,7 +97,7 @@ impl<'a> AppModel<'a> {
             )
             .expect("fidl error");
 
-        // TODO(fxbug.dev/104411): `flatland.present()` is required before
+        // TODO(https://fxbug.dev/104411): `flatland.present()` is required before
         // calling `present_view()` to avoid scenic deadlock.
         self.flatland.present(fland::PresentArgs::default()).expect("flatland present");
 
@@ -149,7 +149,7 @@ impl<'a> AppModel<'a> {
             )
             .expect("fidl error");
 
-        // TODO(fxbug.dev/104411): `flatland.present()` is required before
+        // TODO(https://fxbug.dev/104411): `flatland.present()` is required before
         // calling `present_view()` to avoid scenic deadlock.
         self.flatland.present(fland::PresentArgs::default()).expect("flatland present");
 
@@ -274,7 +274,7 @@ fn setup_handle_flatland_events(
 
 #[fuchsia::main]
 async fn main() {
-    // TODO(fxb/81740): remove args once the view_provider refactoring is done.
+    // TODO(https://fxbug.dev/81740): remove args once the view_provider refactoring is done.
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 || !(args[1] == "view_provider" || args[1] == "graphical_presenter") {
         error!("Param must be 'view_provider' or 'graphical_presenter', got {:?}", args);

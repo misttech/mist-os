@@ -62,7 +62,7 @@ void SceneProvider::RegisterViewTreeWatcher(
   callback();
 }
 
-// TODO(fxbug.dev/112819): Refactor to accommodate Flatland + Geometry
+// TODO(https://fxbug.dev/112819): Refactor to accommodate Flatland + Geometry
 // Observation.
 void SceneProvider::PresentView(
     fuchsia::element::ViewSpec view_spec,
@@ -77,7 +77,7 @@ void SceneProvider::PresentView(
     fake_view_controller_.emplace(std::move(view_controller), [this] { this->DismissView(); });
   }
 
-  // TODO(fxbug.dev/106094): Register client's scoped view tree watcher, if
+  // TODO(https://fxbug.dev/106094): Register client's scoped view tree watcher, if
   // requested.
 
   if (view_spec.has_viewport_creation_token()) {
@@ -112,7 +112,7 @@ SceneProvider::GetGraphicalPresenterHandler() {
 }
 
 void SceneProvider::DismissView() {
-  FX_LOGS(FATAL) << "Dismissing views on flatland is not yet supported (fxbug.dev/114431)";
+  FX_LOGS(FATAL) << "Dismissing views on flatland is not yet supported (https://fxbug.dev/114431)";
 }
 
 }  // namespace ui_testing

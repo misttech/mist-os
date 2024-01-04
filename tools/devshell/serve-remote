@@ -278,7 +278,7 @@ if "${serve}"; then
     fi
   else
     # Check if the remote repository server is running on a different port.
-    # FIXME(http://fxbug.dev/120327): Remove the `ffx_repository=true` once this command is stable.
+    # FIXME(https://fxbug.dev/120327): Remove the `ffx_repository=true` once this command is stable.
     remote_server_status=$(
       ssh "${host}" "${ssh_base_args[@]}" "cd ${dir} && \
         ./.jiri_root/bin/ffx \

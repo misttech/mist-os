@@ -199,7 +199,7 @@ bool ChannelImpl::Send(ByteBufferPtr sdu) {
   if (!active_)
     return false;
 
-  return tx_engine_->QueueSdu(std::move(sdu));  // TODO(fxbug.dev/123081): Refactor to queue PDUs
+  return tx_engine_->QueueSdu(std::move(sdu));  // TODO(https://fxbug.dev/123081): Refactor to queue PDUs
 }
 
 std::unique_ptr<hci::ACLDataPacket> ChannelImpl::GetNextOutboundPacket() {

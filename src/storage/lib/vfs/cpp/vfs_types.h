@@ -304,7 +304,7 @@ struct VnodeConnectionOptions {
 
   // Some flags (e.g. POSIX) only affect the interpretation of rights at the time of Open/Clone, and
   // should have no effects thereafter. Hence we filter them here.
-  // TODO(fxbug.dev/33336): Some of these flag groups should be defined in fuchsia.io and use that
+  // TODO(https://fxbug.dev/33336): Some of these flag groups should be defined in fuchsia.io and use that
   // as the source of truth.
   static VnodeConnectionOptions FilterForNewConnection(VnodeConnectionOptions options);
 #endif  // __Fuchsia__

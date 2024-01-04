@@ -17,7 +17,7 @@ use {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
-    // TODO(fxbug.dev/83257): change this to ReadOnly.
+    // TODO(https://fxbug.dev/83257): change this to ReadOnly.
     ReadWrite,
     WriteOnly,
 }

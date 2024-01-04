@@ -13,7 +13,7 @@ driver_bind_rules("amlogic_display_bind") {
   bind_output = "amlogic-display.bindbc"
   tests = "bind_tests.json"
 
-  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # TODO(https://fxbug.dev/115757): Remove this once we no longer need to generate
   # fragments for composite bind rules.
   disable_fragment_gen = true
 
@@ -116,7 +116,7 @@ source_set("common_srcs") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 

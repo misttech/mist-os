@@ -60,7 +60,7 @@ class RouteGraph : public DeviceRouter {
   void RemoveDeviceFromRoutes(AudioDevice* device) final;
 
   //
-  // TODO(fxbug.dev/13339): Remove throttle_output_.
+  // TODO(https://fxbug.dev/13339): Remove throttle_output_.
   // Sets a throttle output which is linked to all AudioRenderers to throttle the rate at which we
   // return packets to clients.
   void SetThrottleOutput(ThreadingModel* threading_model,
@@ -130,14 +130,14 @@ class RouteGraph : public DeviceRouter {
 
   Targets targets_ = {};
 
-  // TODO(fxbug.dev/39624): convert to weak_ptr when ownership is explicit.
+  // TODO(https://fxbug.dev/39624): convert to weak_ptr when ownership is explicit.
   std::deque<AudioDevice*> devices_;
 
   std::unordered_map<const AudioObject*, RoutableOwnedObject> capturers_;
   std::unordered_map<const AudioObject*, RoutableOwnedObject> renderers_;
   std::unordered_map<const AudioObject*, RoutableOwnedObject> loopback_capturers_;
 
-  // TODO(fxbug.dev/13339): Remove throttle_output_.
+  // TODO(https://fxbug.dev/13339): Remove throttle_output_.
   std::optional<fpromise::completer<void, void>> throttle_release_fence_;
   std::shared_ptr<AudioOutput> throttle_output_;
 

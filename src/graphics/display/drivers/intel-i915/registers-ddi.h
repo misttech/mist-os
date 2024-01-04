@@ -828,7 +828,7 @@ class DdiClockConfig : public hwreg::RegisterBase<DdiClockConfig, uint32_t> {
       case DdiClockDisplayPllSelect::kDisplayPll1:
         return i915::PllId::DPLL_1;
       case DdiClockDisplayPllSelect::kDisplayPll4:
-        // TODO(fxbug.dev/110351): Add support for DPLL4.
+        // TODO(https://fxbug.dev/110351): Add support for DPLL4.
         break;
     }
     // The field is set to an undocumented value.
@@ -849,7 +849,7 @@ class DdiClockConfig : public hwreg::RegisterBase<DdiClockConfig, uint32_t> {
         dpll_select = DdiClockDisplayPllSelect::kDisplayPll1;
         break;
 
-      // TODO(fxbug.dev/110351): Add support for DPLL4.
+      // TODO(https://fxbug.dev/110351): Add support for DPLL4.
       default:
         ZX_DEBUG_ASSERT_MSG(false, "Unsupported DDI PLL: %d", pll_id);
         dpll_select = DdiClockDisplayPllSelect::kDisplayPll0;
@@ -1058,7 +1058,7 @@ class DpTransportControl : public hwreg::RegisterBase<DpTransportControl, uint32
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;

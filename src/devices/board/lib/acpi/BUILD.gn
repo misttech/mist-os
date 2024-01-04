@@ -8,7 +8,7 @@ import("//src/devices/bus/drivers/pci/pci.gni")
 
 declare_args() {
   # If true, power on the Atlas camera at boot.
-  # TODO(fxbug.dev/81684): remove once we have a better way to manage ACPI device power.
+  # TODO(https://fxbug.dev/81684): remove once we have a better way to manage ACPI device power.
   i_can_haz_atlas_camera = false
 }
 
@@ -75,7 +75,7 @@ source_set("host-acpi") {
   deps = shared_deps
   defines = shared_defines
 
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -114,7 +114,7 @@ source_set("acpi") {
   deps = shared_deps + shared_fuchsia_deps + [ "//src/lib/ddk" ]
   defines += shared_defines
 
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -152,7 +152,7 @@ test("acpi-test") {
          ]
   defines += shared_defines
 
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

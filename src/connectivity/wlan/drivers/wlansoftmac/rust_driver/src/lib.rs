@@ -263,7 +263,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
     };
 
-    // TODO(fxbug.dev/113677): Get persistence working by adding the appropriate configs
+    // TODO(https://fxbug.dev/113677): Get persistence working by adding the appropriate configs
     //                         in *.cml files
     let (persistence_proxy, _persistence_server_end) = match fidl::endpoints::create_proxy::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
@@ -283,7 +283,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         wpa1_supported: legacy_privacy_support.wpa1_supported,
     };
 
-    // TODO(fxbug.dev/126324): The MLME event stream should be moved out
+    // TODO(https://fxbug.dev/126324): The MLME event stream should be moved out
     // of DeviceOps entirely.
     let mlme_event_stream = match device.take_mlme_event_stream() {
         Some(mlme_event_stream) => mlme_event_stream,

@@ -228,7 +228,7 @@ pub trait SendFrameContext<BC, Meta> {
 /// A context that stores counters.
 ///
 /// `CounterContext` exposes access to counters for observation and debugging.
-// TODO(http://fxbug.dev/134635): rename CounterContext once the deprecated
+// TODO(https://fxbug.dev/134635): rename CounterContext once the deprecated
 // trait of that name is removed.
 pub(crate) trait CounterContext<T> {
     /// Call the function with an immutable reference to counter type T.

@@ -62,7 +62,7 @@ pub async fn media_button_event_command(
 ///    quickly as possible.
 ///
 /// # Future directions
-/// Per fxbug.dev/63532, this method will be replaced with a method that deals in
+/// Per https://fxbug.dev/63532, this method will be replaced with a method that deals in
 /// `fuchsia.input.Key`s, instead of HID Usage IDs.
 pub async fn keyboard_event_command(usage: u32, key_event_duration: Duration) -> Result<(), Error> {
     keyboard_event(usage, key_event_duration, get_backend().await?.as_mut()).await

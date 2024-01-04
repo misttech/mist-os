@@ -92,7 +92,7 @@ constexpr int64_t kFreqTestBufSize = 65536;
 // When testing fidelity, we compare actual measured dB to expected dB. These tests are designed
 // to pass if 'actual >= expected', OR less but within the following tolerance. This tolerance
 // also sets the digits of precision for 'expected' values, when stored or displayed.
-// TODO(fxbug.dev/116506): Revisit our "measurement vs. enforcement" stance; revert this to 0.001.
+// TODO(https://fxbug.dev/116506): Revisit our "measurement vs. enforcement" stance; revert this to 0.001.
 constexpr double kFidelityDbTolerance = 1.0;
 // If kDisplayAnalysisDataOnFailureDbTolerance, display freq bins with magnitude >= this val.
 constexpr double kMinAnalysisMagnitudeToDisplay = 1e-4;
@@ -746,7 +746,7 @@ void HermeticFidelityTest::Run(
                                          device, tc.renderer_clock_mode, tc.gain_db);
 
     // In case of underflows, exit NOW (don't assess this buffer or run other frequencies).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(device_id))) {
       FX_LOGS(INFO) << "Test case will exit early: underflows were detected";
       break;
@@ -893,7 +893,7 @@ void HermeticFidelityTest::Run(
 
   // Only check results and pass/fail if we made a complete set of measurements without underflows.
   // If there were underflows, SKIP (don't fail) so it won't look like a fidelity regression.
-  // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+  // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
   if (DeviceHasUnderflows(DeviceUniqueIdToString(device_id))) {
     GTEST_SKIP() << "Skipping threshold checks due to underflows";
     __builtin_unreachable();

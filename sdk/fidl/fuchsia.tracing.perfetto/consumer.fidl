@@ -17,7 +17,7 @@ closed protocol ConsumerConnector {
     /// The lifetime of `consumer_socket` may outlive the connection lifetime
     /// of ConsumerConnector.
     /// Multiple producers may be connected simultaneously.
-    // TODO(fxb/85561): Define error conditions and status codes.
+    // TODO(https://fxbug.dev/85561): Define error conditions and status codes.
     strict ConnectConsumer(resource struct {
         consumer_socket zx.Handle:SOCKET;
     }) -> () error zx.Status;

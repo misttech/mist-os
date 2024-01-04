@@ -382,7 +382,7 @@ zx_status_t ContiguousPooledMemoryAllocator::InitCommon(zx::vmo local_contiguous
   // result from speculative prefetch from a physical page under a HW-protected range.  A non-cached
   // mapping prevents speculative prefetch.
   //
-  // TODO(fxbug.dev/96853): Currently Zircon's physmap has !is_always_cpu_accessible_ pages mapped
+  // TODO(https://fxbug.dev/96853): Currently Zircon's physmap has !is_always_cpu_accessible_ pages mapped
   // cached, which we believe is likely the cause of some SError(s) related to
   // protected_memory_size.  One way to fix would be to change the physmap mapping to non-cached
   // when a contiguous VMO
@@ -442,7 +442,7 @@ zx_status_t ContiguousPooledMemoryAllocator::Allocate(
 
   const uint64_t guard_region_size = has_internal_guard_regions_ ? guard_region_size_ : 0;
   uint64_t allocation_size = size + guard_region_size_ * 2;
-  // TODO(fxbug.dev/43184): Use a fragmentation-reducing allocator (such as best fit).
+  // TODO(https://fxbug.dev/43184): Use a fragmentation-reducing allocator (such as best fit).
   //
   // The "region" param is an out ref.
   zx_status_t status =
@@ -1474,7 +1474,7 @@ void ContiguousPooledMemoryAllocator::RangesControl::AddProtectedRange(
   // HW-protected pages between when sysmem hypothetically crashes and when that sysmem crash
   // triggers a hard reboot.
   //
-  // TODO(fxbug.dev/96061): When possible, configure sysmem to trigger reboot on driver remove.
+  // TODO(https://fxbug.dev/96061): When possible, configure sysmem to trigger reboot on driver remove.
   zx::pmt pmt;
   zx_paddr_t paddr;
   zx_status_t pin_result = parent_->parent_device_->bti().pin(

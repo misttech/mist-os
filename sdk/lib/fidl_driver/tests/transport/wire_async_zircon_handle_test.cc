@@ -95,7 +95,7 @@ TEST(DriverTransport, WireSendZirconHandleAsync) { TestImpl<TestServer, true>();
 // Instead of echoing the handles, create new handles.
 // This ensures CloseHandles() is called on the request object before the fdf::Arena
 // is destructed. In the case of echo, the handle is moved out of the request object
-// so this corner case is never encountered. (See fxbug.dev/102974 for motivation).
+// so this corner case is never encountered. (See https://fxbug.dev/102974 for motivation).
 TEST(DriverTransport, WireSendNewZirconHandleAsync) {
   TestImpl<CreateNewHandlesTestServer, false>();
 }

@@ -92,7 +92,7 @@ class CompactMerkleTreeAtEndBlobLayout : public BlobLayout {
       return blob_layout;
     }
     // The exact compressed size of a blob isn't stored.  An upper bound can be determined from the
-    // total size of the blob minus the Merkle tree size.  See fxbug.dev/44547.
+    // total size of the blob minus the Merkle tree size.  See https://fxbug.dev/44547.
     uint64_t total_size = BytesThatFitInBlocks(inode.block_count, blobfs_block_size);
     uint64_t merkle_tree_size = CalculateMerkleTreeSize(inode.blob_size);
     uint64_t data_size;
@@ -181,7 +181,7 @@ class PaddedMerkleTreeAtStartBlobLayout : public BlobLayout {
     }
 
     // The exact compressed size of a blob isn't stored.  An upper bound can be determined from the
-    // total number of blocks minus the number of Merkle tree blocks.  See fxbug.dev/44547.
+    // total number of blocks minus the number of Merkle tree blocks.  See https://fxbug.dev/44547.
     uint64_t merkle_tree_size = CalculateMerkleTreeSize(inode.blob_size);
     if (merkle_tree_size > MaxBytesThatCanFitInBlocks(blobfs_block_size)) {
       return zx::error(ZX_ERR_OUT_OF_RANGE);

@@ -17,7 +17,7 @@
 
 namespace fdf_testing {
 // This provides a helper to quickly create an MmioBuffer for use in tests.
-// TODO(fxb/115988): This use of mmio_buffer_t is temporary to ease the
+// TODO(https://fxbug.dev/115988): This use of mmio_buffer_t is temporary to ease the
 // transition of clients over to MmioBuffer, and can be switched over once we
 // have no unmigrated users touching MmioBufferOps.
 [[maybe_unused]] static fdf::MmioBuffer CreateMmioBuffer(

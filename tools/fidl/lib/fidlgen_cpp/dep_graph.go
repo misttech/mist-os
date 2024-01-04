@@ -17,7 +17,7 @@ import (
 //
 // We do not create edges to nullable types. This makes it possible to write
 // some recursive types in FIDL. However, we do not have comprehensive support
-// for recursive types. See fxbug.dev/35218 for details.
+// for recursive types. See https://fxbug.dev/35218 for details.
 //
 // Similarly, we do not create edges to protocols via endpoint dependencies, as
 // that same protocol may freely appear in the response type of one its
@@ -275,7 +275,7 @@ func (g *DeclDepGraph) addDepsFromType(node *declDepNode, typ fidlgen.Type) {
 	case fidlgen.ArrayType, fidlgen.VectorType:
 		g.addDepsFromType(node, *typ.ElementType)
 	case fidlgen.HandleType:
-		// TODO(fxbug.dev/7660): ResourceIdentifier should be an
+		// TODO(https://fxbug.dev/7660): ResourceIdentifier should be an
 		// `fidlgen.EncodedCompoundIdentifier`.
 		g.addDep(node, fidlgen.EncodedCompoundIdentifier(typ.ResourceIdentifier))
 	case fidlgen.IdentifierType:

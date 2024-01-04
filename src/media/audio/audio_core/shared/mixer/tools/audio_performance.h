@@ -13,7 +13,7 @@
 
 namespace media::audio::tools {
 
-// TODO(fxbug.dev/50811): Consider migrating to google/benchmark
+// TODO(https://fxbug.dev/50811): Consider migrating to google/benchmark
 
 // The AudioPerformance class profiles the performance of the Mixer, Gain and OutputProducer
 // classes. These micro-benchmark tests use *zx::clock::get_monotonic()* to measure the time

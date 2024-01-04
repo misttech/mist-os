@@ -107,7 +107,7 @@ if (is_host) {
   }
 
   sdk_host_tool("bin_sdk") {
-    # TODO(fxbug.dev/57313): partner only at this time while we shake
+    # TODO(https://fxbug.dev/57313): partner only at this time while we shake
     # out alpha bugs and fill-in docs, etc.
     category = "partner"
     output_name = "ffx"

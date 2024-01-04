@@ -39,7 +39,7 @@ __BEGIN_CDECLS
 typedef struct fdf_arena fdf_arena_t;
 
 typedef uint32_t fdf_arena_tag_t;
-// TODO(fxbug.dev/107594): support arena tags.
+// TODO(https://fxbug.dev/107594): support arena tags.
 
 // Creates a FDF arena for allocating memory.
 //

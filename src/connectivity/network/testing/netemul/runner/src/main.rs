@@ -224,7 +224,7 @@ async fn handle_runner_request(
                         // (in this case, the test root) is destroyed, component manager will close
                         // the event stream, in which case we expect PEER_CLOSED.
                         //
-                        // TODO(fxbug.dev/114562): PEER_CLOSED is not enough to between normal
+                        // TODO(https://fxbug.dev/114562): PEER_CLOSED is not enough to between normal
                         // channel closure that happens on component destruction and an internal
                         // error in component manager that caused the channel to close
                         // unexpectedly. Ideally, it should be possible to precisely check whether

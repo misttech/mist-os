@@ -340,7 +340,7 @@ impl FileOps for UEventFile {
         if offset != 0 {
             return error!(EINVAL);
         }
-        // TODO(fxb/127713): Support parsing synthetic variables.
+        // TODO(https://fxbug.dev/127713): Support parsing synthetic variables.
         let content = data.read_all()?;
         for command in Self::parse_commands(&content) {
             // Ignore empty lines.

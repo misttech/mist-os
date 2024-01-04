@@ -67,7 +67,7 @@ zx_status_t Vim3::SdInit() {
   fit::result sdmmc_metadata =
       fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
                         .removable(true)
-                        // TODO(fxbug.dev/134787): Use the FIDL SDMMC protocol.
+                        // TODO(https://fxbug.dev/134787): Use the FIDL SDMMC protocol.
                         .use_fidl(false)
                         .Build());
   if (!sdmmc_metadata.is_ok()) {

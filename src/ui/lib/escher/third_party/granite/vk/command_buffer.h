@@ -35,7 +35,7 @@
 
 #include <vulkan/vulkan.hpp>
 
-// TODO(fxbug.dev/7174): CommandBuffer currently wraps an old-style impl::CommandBuffer.
+// TODO(https://fxbug.dev/7174): CommandBuffer currently wraps an old-style impl::CommandBuffer.
 #include "src/ui/lib/escher/impl/command_buffer.h"
 
 namespace escher {
@@ -88,7 +88,7 @@ class CommandBuffer : public Reffable {
 
   vk::CommandBuffer vk() const { return vk_; }
   vk::Device vk_device() const { return vk_device_; }
-  // TODO(fxbug.dev/7174): deprecated from the get-go.
+  // TODO(https://fxbug.dev/7174): deprecated from the get-go.
   impl::CommandBuffer* impl() const { return impl_; }
 
   bool use_protected_memory() const { return impl_->use_protected_memory(); }
@@ -143,7 +143,7 @@ class CommandBuffer : public Reffable {
   // graphics and compute tasks, and the transfer queue for dedicated transfer
   // operations.
   //
-  // TODO(fxbug.dev/7174): this is a placeholder; the submission API will be refined.
+  // TODO(https://fxbug.dev/7174): this is a placeholder; the submission API will be refined.
   bool Submit(CommandBufferFinishedCallback callback);
   bool Submit(vk::Queue queue, CommandBufferFinishedCallback callback) {
     return impl_->Submit(queue, std::move(callback));
@@ -275,9 +275,9 @@ class CommandBuffer : public Reffable {
   // passed in, that sampler will be used as the immutable sampler for every
   // sampler descriptor set in the associated PipelineLayout.
   //
-  // TODO(fxbug.dev/7291): This code-flow assumes that ShaderPrograms source from, at
+  // TODO(https://fxbug.dev/7291): This code-flow assumes that ShaderPrograms source from, at
   // most, a single sampler. This is a blocking bug for implementing, e.g.,
-  // fxbug.dev/7250.
+  // https://fxbug.dev/7250.
   void SetShaderProgram(ShaderProgram* program, const SamplerPtr& immutable_sampler = nullptr);
   void SetShaderProgram(const ShaderProgramPtr& program,
                         const SamplerPtr& immutable_sampler = nullptr) {
@@ -343,11 +343,11 @@ class CommandBuffer : public Reffable {
   // internally.  The only reason that they're not private is that they are
   // aggregated in SavedState.
   //
-  // TODO(fxbug.dev/7174): SavedState is not yet used.
-  // TODO(fxbug.dev/7174): Experiment with making them private except for SavedState,
+  // TODO(https://fxbug.dev/7174): SavedState is not yet used.
+  // TODO(https://fxbug.dev/7174): Experiment with making them private except for SavedState,
   // which means that SavedState would be a fully-opaque representation.
 
-  // TODO(fxbug.dev/7174): Not saved in SavedState.  Should it be?  Otherwise, make
+  // TODO(https://fxbug.dev/7174): Not saved in SavedState.  Should it be?  Otherwise, make
   // private?
   struct IndexBindingState {
     vk::Buffer buffer;
@@ -459,7 +459,7 @@ class CommandBuffer : public Reffable {
   };
   using DirtyFlags = uint32_t;
 
-  // TODO(fxbug.dev/7174): impl::CommandBuffer is deprecated from the get-go.
+  // TODO(https://fxbug.dev/7174): impl::CommandBuffer is deprecated from the get-go.
   CommandBuffer(EscherWeakPtr escher, Type type, impl::CommandBuffer* command_buffer);
 
   // Sets all flags to dirty, and zeros out DescriptorSetBindings uids.
@@ -544,7 +544,7 @@ class CommandBuffer : public Reffable {
   EscherWeakPtr const escher_;
   Type type_;
 
-  // TODO(fxbug.dev/7174): deprecated from the get-go.
+  // TODO(https://fxbug.dev/7174): deprecated from the get-go.
   impl::CommandBuffer* const impl_;
   vk::CommandBuffer vk_;
   vk::Device vk_device_;

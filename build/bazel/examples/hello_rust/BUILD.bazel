@@ -21,7 +21,7 @@ rust_binary(
         "-Cpanic=abort",
     ],
 
-    # TODO(fxbug.dev/114636) make this be included automatically for all rust binaries.
+    # TODO(https://fxbug.dev/114636) make this be included automatically for all rust binaries.
     deps = ["@fuchsia_sdk//pkg/fdio"],
 )
 
@@ -82,7 +82,7 @@ fuchsia_test_package(
     visibility = ["//visibility:public"],
 )
 
-# TODO(fxbug.dev/118195): fix and uncomment below.
+# TODO(https://fxbug.dev/118195): fix and uncomment below.
 #rust_doc(
 #    name = "hello_rust_doc",
 #    crate = ":hello_rust_native",

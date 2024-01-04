@@ -15,7 +15,7 @@ alias Uint16Alias = uint16;
 alias Uint32Alias = uint32;
 alias Uint64Alias = uint64;
 
-/// TODO(fxbug.dev/105758): The IR currently does not propagate enough
+/// TODO(https://fxbug.dev/105758): The IR currently does not propagate enough
 /// information for bindings to express this type as an alias.
 const CONST_FROM_ALIAS Uint8Alias = 0xff;
 
@@ -43,7 +43,7 @@ alias ArrayAlias = array<uint32, 4>;
 
 alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 
-// TODO(fxbug.dev/105758, fxbug.dev/91360): Aliases are currently broken.
+// TODO(https://fxbug.dev/105758, https://fxbug.dev/91360): Aliases are currently broken.
 // Exercise more complicated alias declarations when fixed:
 // * alias of alias
 // * array of aliases

@@ -310,10 +310,10 @@ void convert_std_to_timing(const BaseEdid& edid, const StandardTimingDescriptor&
 
   zxlogf(WARNING,
          "This EDID contains a non-DMT standard timing (%" PRIu32 "x%" PRIu32 " @%" PRIu32
-         "Hz). The timing is not supported and will be ignored. See fxbug.dev/135772 for "
+         "Hz). The timing is not supported and will be ignored. See https://fxbug.dev/135772 for "
          "details.",
          width, height, v_rate);
-  // TODO(fxbug.dev/135820): timing_iterator uses vertical_addressable == 0 or
+  // TODO(https://fxbug.dev/135820): timing_iterator uses vertical_addressable == 0 or
   // horizontal_addressable == 0 to determine whether a timing is valid.
   // Instead we should use a std::optional<> to represent invalid timings.
   *params = {};

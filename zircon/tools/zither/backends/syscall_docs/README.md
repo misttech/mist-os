@@ -4,7 +4,7 @@ The zither syscall documentation backend is responsible for generating the
 official syscall documentation markdown found at
 [//docs/reference/syscalls](/docs/reference/syscalls/).
 
-TODO(fxbug.dev/110021): Once we have a first-class representation of syscalls
+TODO(https://fxbug.dev/110021): Once we have a first-class representation of syscalls
 in FIDL, this backend should be retired in favour of `fidldoc` support.
 
 ## Output layout

@@ -71,7 +71,7 @@ impl DirTree {
         // If there are multiple exposes, choosing the first expose for `cap`. `cap` is only used
         // for debug info.
         //
-        // TODO(fxbug.dev/4776): This could lead to incomplete debug output because the source name
+        // TODO(https://fxbug.dev/4776): This could lead to incomplete debug output because the source name
         // is what's printed, so if the exposes have different source names only one of them will
         // appear in the output. However, in practice routing is unlikely to fail for an aggregate
         // because the algorithm typically terminates once an aggregate is found. Find a more robust
@@ -93,7 +93,7 @@ impl DirTree {
         _type_name: CapabilityTypeName,
         routing_fn: RoutingFn,
     ) {
-        // TODO(fxbug.dev/126066): Don't set this to Unknown, set it based on the type_name.
+        // TODO(https://fxbug.dev/126066): Don't set this to Unknown, set it based on the type_name.
         let dirent_type = fio::DirentType::Unknown;
         let tree = self.to_directory_node(&path);
         tree.broker_nodes.insert(path.basename().to_string(), (routing_fn, dirent_type));

@@ -58,7 +58,7 @@ pub struct Emitter {
     // Detect doesn't support certain queries yet, similar to
     // SELECT timestamp FROM events WHERE event == 'InstallationError'
     // To get around this, we keep a buffer of specifically InstallationError events.
-    // TODO(fxbug.dev/67649): remove this field once Detect can support this query.
+    // TODO(https://fxbug.dev/67649): remove this field once Detect can support this query.
     installation_error_events: BoundedNode<Node>,
 
     // Used to group events from the same update check. Independent from the Omaha session id.

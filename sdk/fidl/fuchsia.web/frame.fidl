@@ -12,7 +12,7 @@ using fuchsia.ui.gfx;
 using fuchsia.ui.views;
 using zx;
 
-// TODO(fxbug.dev/29927): Consider using [`fuchsia.logger/LogLevelFilter`] if possible.
+// TODO(https://fxbug.dev/29927): Consider using [`fuchsia.logger/LogLevelFilter`] if possible.
 type ConsoleLogLevel = strict enum : int32 {
     /// No logging.
     NONE = 100;
@@ -184,7 +184,7 @@ closed protocol Frame {
     /// Caller should pass the other end of the token to
     /// [`fuchsia.ui.composition/Flatland.CreateViewport`] to attach the new Flatland view to its
     /// graph.
-    // TODO(fxbug.dev/81959): use "resource table" syntax when it becomes available, thus getting
+    // TODO(https://fxbug.dev/81959): use "resource table" syntax when it becomes available, thus getting
     // rid of the need for CreateView2Args.  Hopefully this will be done by the time we want to
     // rename CreateView2() to CreateView(), once the latter is deleted.
     strict CreateView2(resource struct {

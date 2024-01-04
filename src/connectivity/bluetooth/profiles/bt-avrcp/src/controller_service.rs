@@ -149,7 +149,7 @@ impl ControllerService {
             }
             ControllerRequest::SetNotificationFilter {
                 notifications,
-                // TODO(fxbug.dev/44332): coalesce position change intervals and notify on schedule
+                // TODO(https://fxbug.dev/44332): coalesce position change intervals and notify on schedule
                 position_change_interval: _,
                 control_handle: _,
             } => {
@@ -231,7 +231,7 @@ impl ControllerService {
     ) -> Result<(), Error> {
         match event {
             PeerControllerEvent::AvailablePlayersChanged => {
-                // TODO(fxbug.dev/130791): get all the available players instead of just 10.
+                // TODO(https://fxbug.dev/130791): get all the available players instead of just 10.
                 if let Err(e) = self.controller.get_media_player_items(0, 9, true).await {
                     trace!(?e, "Failed to get updated media player items");
                 }

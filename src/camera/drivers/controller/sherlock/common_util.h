@@ -43,7 +43,7 @@ struct ConstraintsOverrides {
 // constraints to the collection (e.g. min_buffer_count), but they also represent aggregate views of
 // the controller constraints to the client (specifically, min_buffer_count_for_camping). Because it
 // is not possible for a collection client to voluntarily relinquish ownership of its camping
-// allocation (fxbug.dev/99578) it is necessary to set this field to zero when the constraints are
+// allocation (https://fxbug.dev/99578) it is necessary to set this field to zero when the constraints are
 // being used as a proxy to reserve space for a future client.
 fuchsia::sysmem::BufferCollectionConstraints CopyConstraintsWithOverrides(
     const fuchsia::sysmem::BufferCollectionConstraints& original,

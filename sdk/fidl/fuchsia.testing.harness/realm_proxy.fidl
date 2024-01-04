@@ -27,7 +27,7 @@ const MAX_PROTOCOL_LEN uint64 = fuchsia.io.MAX_NAME_LENGTH;
 /// different filesystems, we can use the same suite to validate each system.
 ///
 /// Prefer to connect to RealmFactory instead to obtain an instance of RealmProxy;
-/// in the future RealmProxy will no longer be discoverable TODO(fxb/126679).
+/// in the future RealmProxy will no longer be discoverable TODO(https://fxbug.dev/126679).
 @discoverable
 closed protocol RealmProxy {
     /// Connects [server_end] to the [protocol] from this proxy's namespace.

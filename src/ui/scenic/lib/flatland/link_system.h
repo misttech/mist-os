@@ -423,7 +423,7 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
 
   // |mutex_| guards access to |link_graph_| and |link_topologies_|.
   //
-  // TODO(fxbug.dev/44335): These maps are modified at Link creation and destruction time (within
+  // TODO(https://fxbug.dev/44335): These maps are modified at Link creation and destruction time (within
   // the ObjectLinker closures) as well as within UpdateLinks, which is called by the core render
   // loop. This produces a possible priority inversion between the Flatland instance threads and the
   // (possibly deadline scheduled) render thread.
@@ -451,7 +451,7 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
 
   // The starting DPR used by the link system. The actual DPR used on subsequent calls to
   // UpdateLinks() may be different from this value.
-  // TODO(fxbug.dev/108608): This will need to be updated once we have multidisplay setup.
+  // TODO(https://fxbug.dev/108608): This will need to be updated once we have multidisplay setup.
   std::atomic<fuchsia::math::VecF> device_pixel_ratio_;
 };
 

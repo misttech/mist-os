@@ -12,7 +12,7 @@ group("components") {
     "echo:echo-example",
     "lifecycle:lifecycle-example",
 
-    # TODO(fxbug.dev/299358404): Uncomment once it's possible to build fuchsia
+    # TODO(https://fxbug.dev/299358404): Uncomment once it's possible to build fuchsia
     # and pigweed together in CQ.
     #"pw_rpc",
     "routing:components-routing-example",

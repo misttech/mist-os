@@ -287,7 +287,7 @@ where
         let meta_contents = MetaContents::deserialize(meta_contents.as_slice())?.into_contents();
 
         // Download all the blobs.
-        // FIXME(http://fxbug.dev/97192): Consider replacing this with work_queue to allow the
+        // FIXME(https://fxbug.dev/97192): Consider replacing this with work_queue to allow the
         // caller to globally control the concurrency.
         let mut tasks = stream::iter(meta_contents.values().map(|hash| self.fetch_blob(hash)))
             .buffer_unordered(self.concurrency);

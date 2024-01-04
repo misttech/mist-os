@@ -649,7 +649,7 @@ bool AttachTokenSucceedsV2(
   // Modify constraints_2 to require double the width and height.
   constraints_2.image_format_constraints()->at(0).min_size() = {512, 512};
 
-  // TODO(fxb/115937): Fix this to work for sysmem2.
+  // TODO(https://fxbug.dev/115937): Fix this to work for sysmem2.
 #if SYSMEM_FUZZ_CORPUS
   FILE* ofp = fopen("/cache/sysmem_fuzz_corpus_multi_buffer_collecton_constraints.dat", "wb");
   if (ofp) {
@@ -1365,7 +1365,7 @@ TEST(Sysmem, TokenOneParticipantWithImageConstraintsV2) {
   image_constraints.start_offset_divisor() = 2;
   image_constraints.display_rect_alignment() = {1, 1};
 
-  // TODO(fxb/115937): Make this work for sysmem2.
+  // TODO(https://fxbug.dev/115937): Make this work for sysmem2.
 #if 0
 #if SYSMEM_FUZZ_CORPUS
   FILE* ofp = fopen("/cache/sysmem_fuzz_corpus_buffer_collecton_constraints.dat", "wb");
@@ -1779,7 +1779,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   // Modify constraints_2 to require double the width and height.
   constraints_2.image_format_constraints()->at(0).min_size() = {512, 512};
 
-  // TODO(fxb/115937): Make this work for sysmem2.
+  // TODO(https://fxbug.dev/115937): Make this work for sysmem2.
 #if 0
 #if SYSMEM_FUZZ_CORPUS
   FILE* ofp = fopen("/cache/sysmem_fuzz_corpus_multi_buffer_collecton_constraints.dat", "wb");
@@ -1818,7 +1818,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   // to re-alloc all the server's held FIDL tables 4 times before we continue.  These are
   // synchronous calls, so the 4 re-allocs are done by the time this loop completes.
   //
-  // TODO(fxbug.dev/33670): Switch to creating real churn instead, once we have new messages that
+  // TODO(https://fxbug.dev/33670): Switch to creating real churn instead, once we have new messages that
   // can create real churn.
   constexpr uint32_t kChurnCount = 256 * 2;  // 256 * 4;
   for (uint32_t i = 0; i < kChurnCount; ++i) {
@@ -2043,7 +2043,7 @@ TEST(Sysmem, ComplicatedFormatModifiersV2) {
     constraints_2.image_format_constraints()->at(i).required_max_size() = {512, 512};
   }
 
-  // TODO(fxb/115937): Make this work for sysmem2.
+  // TODO(https://fxbug.dev/115937): Make this work for sysmem2.
 #if SYSMEM_FUZZ_CORPUS
   FILE* ofp = fopen("/cache/sysmem_fuzz_corpus_multi_buffer_format_modifier_constraints.dat", "wb");
   if (ofp) {
@@ -2201,14 +2201,14 @@ TEST(Sysmem, MultipleParticipantsColorspaceRankingV2) {
   check_allocation_results(collection_2->WaitForAllBuffersAllocated());
 }
 
-// Regression-avoidance test for fxbug.dev/60895:
+// Regression-avoidance test for https://fxbug.dev/60895:
 //  * One client with two NV12 ImageFormatConstraints, one with rec601, one with rec709
 //  * One client with NV12 ImageFormatConstraints with rec709.
 //  * Scrambled ordering of which constraints get processed first, but deterministically check each
 //    client going first in the first couple iterations.
 TEST(Sysmem,
      MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_CompatibleColorspacesV2) {
-  // Multiple iterations to try to repro fxbug.dev/60895, in case it comes back.  This should be
+  // Multiple iterations to try to repro https://fxbug.dev/60895, in case it comes back.  This should be
   // at least 2 to check both orderings with two clients.
   std::atomic<uint32_t> clean_failure_seen_count = 0;
   const uint32_t kCleanFailureSeenGoal = 15;

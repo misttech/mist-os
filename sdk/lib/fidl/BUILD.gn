@@ -15,7 +15,7 @@ sdk_source_set("fidl") {
   api = "//sdk/lib/fidl/fidl.api"
   sdk_name = "fidl"
 
-  # TODO(fxbug.dev/90775): We should represent the library as a
+  # TODO(https://fxbug.dev/90775): We should represent the library as a
   # `sdk_static_library` when supported.
   build_as_static = true
 
@@ -30,7 +30,7 @@ sdk_source_set("fidl") {
     "//src/zircon/lib/zircon",
   ]
 
-  # TODO(fxbug.dev/101752): GN check fails without this condition.
+  # TODO(https://fxbug.dev/101752): GN check fails without this condition.
   if (zircon_toolchain != false) {
     public_deps += [ "//zircon/system/public" ]
   }

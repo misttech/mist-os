@@ -255,7 +255,7 @@ impl Supplicant for MockSupplicant {
         _update_sink: &mut UpdateSink,
         _result: fidl_mlme::EapolResultCode,
     ) -> Result<(), Error> {
-        // TODO(fxbug.dev/68454): Implement once this does something for a real supplicant.
+        // TODO(https://fxbug.dev/68454): Implement once this does something for a real supplicant.
         Ok(())
     }
 

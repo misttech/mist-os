@@ -267,7 +267,7 @@ where
             let contents = MetaContents::deserialize(contents.as_slice())?;
 
             // Concurrently fetch the package blob sizes.
-            // FIXME(http://fxbug.dev/97192): Use work queue so we can globally control the
+            // FIXME(https://fxbug.dev/97192): Use work queue so we can globally control the
             // concurrency here, rather than limiting fetches per call.
             let mut tasks = stream::iter(contents.contents().iter().map(|(_, hash)| async move {
                 self.tuf_client.remote_repo().blob_len(&hash.to_string()).await
@@ -536,7 +536,7 @@ where
     let metadata_repo = EphemeralRepository::<Pouf1>::new();
 
     let raw_signed_meta = {
-        // FIXME(http://fxbug.dev/92126) we really should be initializing trust, rather than just
+        // FIXME(https://fxbug.dev/92126) we really should be initializing trust, rather than just
         // trusting 1.root.json.
         let root = tuf_repo.fetch_metadata(&MetadataPath::root(), MetadataVersion::Number(1)).await;
 

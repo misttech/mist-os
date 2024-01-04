@@ -85,7 +85,7 @@ void ForSomeImpls(const Impls& impls, const AllowImplPair& allow, const TestBody
 }
 
 bool GetImplsUnderTest(Impls* out_impls) {
-  // TODO(fxbug.dev/126999): this should come from structured config.
+  // TODO(https://fxbug.dev/126999): this should come from structured config.
   zx::result client_end = component::Connect<fidl_test_compatibility::Config>();
   FX_CHECK(client_end.is_ok());
   fidl::SyncClient config(std::move(*client_end));

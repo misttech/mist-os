@@ -225,7 +225,7 @@ class Device : public DeviceType,
   BusType bus_type_ = BusType::kUnknown;
   uint32_t bus_id_ = UINT32_MAX;
 
-  // TODO(fxbug.dev/32978): remove once kernel PCI is no longer used.
+  // TODO(https://fxbug.dev/32978): remove once kernel PCI is no longer used.
   std::vector<pci_bdf_t> pci_bdfs_;
 
   // ACPI events.

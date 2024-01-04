@@ -201,7 +201,7 @@ func doTestOTAs(
 
 	// Attempt to check if the device is up-to-date, up to downgradeOTAAttempts times.
 	// We retry this since some downgrade builds contain bugs which make them spuriously reboot
-	// See fxbug.dev/109811 for more details
+	// See https://fxbug.dev/109811 for more details
 	var upToDate bool
 	var lastError error
 	for attempt := uint(1); attempt <= c.downgradeOTAAttempts; attempt++ {
@@ -243,7 +243,7 @@ func doTestOTAs(
 		// Attempt an N-1 -> N OTA, up to downgradeOTAAttempts times.
 		// We optionally retry this OTA because some downgrade builds contain bugs which make them
 		// spuriously reboot. Those builds are already cut, but we still need to test them.
-		// See fxbug.dev/109811 for more details.
+		// See https://fxbug.dev/109811 for more details.
 		for attempt := uint(1); attempt <= c.downgradeOTAAttempts; attempt++ {
 			logger.Infof(ctx, "starting OTA from N-1 -> N test, attempt %d of %d", attempt, c.downgradeOTAAttempts)
 			otaTime := time.Now()
@@ -598,7 +598,7 @@ func otaToPackage(
 
 	// Disconnect from sl4f since we rebooted the device.
 	//
-	// FIXME(47145) To avoid fxbug.dev/47145, we need to delay
+	// FIXME(47145) To avoid https://fxbug.dev/47145, we need to delay
 	// disconnecting from sl4f until after we reboot the device. Otherwise
 	// we risk leaving the ssh session in a bad state.
 	if *rpcClient != nil {

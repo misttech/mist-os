@@ -16,7 +16,7 @@ declare_args() {
   # in fuchsia_platform.supported_fuchsia_api_levels. This impacts the behavior
   # of the idk() template.
   #
-  # TODO(fxbug.dev/306723826): Deal with the fact that the mac builders are too
+  # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders are too
   # slow to enable this setting, and therefore the mac IDK won't have
   # per-api-level prebuilts.
   sdk_with_all_supported_api_levels = host_os != "mac"

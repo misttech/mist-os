@@ -9,7 +9,7 @@ import("//build/cpp/sdk_static_library.gni")
 import("//build/test.gni")
 
 sdk_source_set("cpp") {
-  # TODO(fxbug.dev/59937): Remove when Mac links OK against this.
+  # TODO(https://fxbug.dev/59937): Remove when Mac links OK against this.
   if ((current_toolchain == "//build/toolchain:host_x64" && host_os == "mac") ||
       (current_toolchain == "//build/toolchain:host_arm64" &&
        host_os == "mac")) {

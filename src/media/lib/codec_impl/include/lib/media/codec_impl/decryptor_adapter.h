@@ -116,7 +116,7 @@ class DecryptorAdapter : public CodecAdapter {
   // processing thread to give the implementation an opportunity to set a scheduler profile on the
   // thread.  Ownership of the thread remains with DecryptorAdapter and callers should duplicate the
   // handle if necessary (such as for passing to fuchsia.media.ProfileProvider).
-  // TODO(http://fxbug.dev/70234): Generalize this mechanism for all codec_impl threads
+  // TODO(https://fxbug.dev/70234): Generalize this mechanism for all codec_impl threads
   virtual void SetProcessingSchedulerProfile(zx::unowned_thread input_processing_thread) {}
 
   bool is_secure() const { return secure_mode_; }

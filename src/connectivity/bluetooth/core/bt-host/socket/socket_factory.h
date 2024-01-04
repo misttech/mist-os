@@ -63,7 +63,7 @@ class SocketFactory final {
   using RelayT = SocketChannelRelay<ChannelT>;
   using ChannelIdT = typename ChannelT::UniqueId;
 
-  // TODO(fxbug.dev/671): Figure out what we need to do handle the possibility that a
+  // TODO(https://fxbug.dev/671): Figure out what we need to do handle the possibility that a
   // channel id is recycled. (See comment in LogicalLink::HandleRxPacket.)
   std::unordered_map<ChannelIdT, std::unique_ptr<RelayT>> channel_to_relay_;
 

@@ -376,7 +376,7 @@ void SymbolizerImpl::OutputBatchedBacktrace() {
   std::vector<debug_ipc::StackFrame> input_frames;
   input_frames.reserve(frames_in_batch_mode_.size());
   for (auto& frame : frames_in_batch_mode_) {
-    // TODO(fxbug.dev/130879): type is not used.
+    // TODO(https://fxbug.dev/130879): type is not used.
     input_frames.emplace_back(frame.address, 0);
   }
   zxdb::Stack& stack = target_->GetProcess()->GetThreads()[0]->GetStack();

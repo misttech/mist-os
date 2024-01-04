@@ -80,7 +80,7 @@ steps would apply with the roles reversed.
 
     * Get the expected type and rights from the FIDL type: `MAP` and `READ`.
     * Ensure that `h2` has (at least) those rights.
-    <!-- TODO(fxbug.dev/89504): In the future, the following point will only
+    <!-- TODO(https://fxbug.dev/89504): In the future, the following point will only
     apply to debug mode. Explain that here once that is the case. -->
     * Since `h2` has the unexpected right `WRITE`, invoke the
       [`zx_handle_replace`] syscall to get a new handle `h3` that only has the

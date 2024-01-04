@@ -271,7 +271,7 @@ class PowerTigerLake : public Power {
     // Power well assignments from IHD-OS-TGL-Vol 12-12.21
     // "Functions Within Each Well", pages 219-220.
 
-    // TODO(fxbug.dev/95863): Add all pipes supported by gen12.
+    // TODO(https://fxbug.dev/95863): Add all pipes supported by gen12.
     switch (pipe_id) {
       case PipeId::PIPE_A:
         return PowerWellRef(this, PowerWellId::PG1);

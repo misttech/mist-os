@@ -1774,7 +1774,7 @@ inline void Thread::DumpTidDuringPanic(zx_koid_t tid, bool full) TA_NO_THREAD_SA
   DumpTidLocked(tid, full);
 }
 
-// TODO(johngro): Remove this when we have addressed fxbug.dev/33473.  Right now, this
+// TODO(johngro): Remove this when we have addressed https://fxbug.dev/33473.  Right now, this
 // is used in only one place (x86_bringup_aps in arch/x86/smp.cpp) outside of
 // thread.cpp.
 //

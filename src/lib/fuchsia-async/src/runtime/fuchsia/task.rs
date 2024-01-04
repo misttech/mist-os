@@ -161,7 +161,7 @@ impl<T: 'static> Future for Task<T> {
 ///   should be assumed to be held until the returned future completes.
 /// - This function assumes panic=abort semantics, so if the input function panics,
 ///   the process aborts. Behavior for panic=unwind is not defined.
-// TODO(fxbug.dev/78332): Consider using a backing thread pool to alleviate the cost of
+// TODO(https://fxbug.dev/78332): Consider using a backing thread pool to alleviate the cost of
 // spawning new threads if this proves to be a bottleneck.
 pub fn unblock<T: 'static + Send>(
     f: impl 'static + Send + FnOnce() -> T,

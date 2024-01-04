@@ -148,7 +148,7 @@ impl ResolvedAncestorComponent {
             {
                 let resolved_parent = parent_component.lock_resolved_state().await?;
                 let address = resolved_parent.address();
-                // TODO(fxbug.dev/102211): change this test to something more
+                // TODO(https://fxbug.dev/102211): change this test to something more
                 // explicit, that is, return the parent's address and context if
                 // the component address is a packaged component (determined in
                 // some way).

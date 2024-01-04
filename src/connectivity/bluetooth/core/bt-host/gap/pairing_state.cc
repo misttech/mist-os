@@ -61,7 +61,7 @@ PairingState::~PairingState() {
 
 void PairingState::InitiatePairing(BrEdrSecurityRequirements security_requirements,
                                    StatusCallback status_cb) {
-  // TODO(fxbug.dev/132667): Reject pairing if peer/local device don't support Secure Connections
+  // TODO(https://fxbug.dev/132667): Reject pairing if peer/local device don't support Secure Connections
   // and SC is required
   if (state() == State::kIdle) {
     BT_ASSERT(!is_pairing());
@@ -74,11 +74,11 @@ void PairingState::InitiatePairing(BrEdrSecurityRequirements security_requiremen
       status_cb(handle(), fit::ok());
       return;
     }
-    // TODO(fxbug.dev/42403): If there is no pairing delegate set AND the current peer does not have
+    // TODO(https://fxbug.dev/42403): If there is no pairing delegate set AND the current peer does not have
     // a bonded link key, there is no way to upgrade the link security, so we don't need to bother
     // calling `send_auth_request`.
     //
-    // TODO(fxbug.dev/55770): If current IO capabilities would make meeting security requirements
+    // TODO(https://fxbug.dev/55770): If current IO capabilities would make meeting security requirements
     // impossible, skip pairing and report failure immediately.
 
     current_pairing_ = Pairing::MakeInitiator(security_requirements, outgoing_connection_);
@@ -196,7 +196,7 @@ void PairingState::OnUserConfirmationRequest(uint32_t numeric_value, UserConfirm
   }
   BT_ASSERT(is_pairing());
 
-  // TODO(fxbug.dev/37447): Reject pairing if pairing delegate went away.
+  // TODO(https://fxbug.dev/37447): Reject pairing if pairing delegate went away.
   BT_ASSERT(pairing_delegate().is_alive());
   state_ = State::kWaitPairingComplete;
 
@@ -245,7 +245,7 @@ void PairingState::OnUserPasskeyRequest(UserPasskeyCallback cb) {
   }
   BT_ASSERT(is_pairing());
 
-  // TODO(fxbug.dev/37447): Reject pairing if pairing delegate went away.
+  // TODO(https://fxbug.dev/37447): Reject pairing if pairing delegate went away.
   BT_ASSERT(pairing_delegate().is_alive());
   state_ = State::kWaitPairingComplete;
 
@@ -275,7 +275,7 @@ void PairingState::OnUserPasskeyNotification(uint32_t numeric_value) {
   }
   BT_ASSERT(is_pairing());
 
-  // TODO(fxbug.dev/37447): Reject pairing if pairing delegate went away.
+  // TODO(https://fxbug.dev/37447): Reject pairing if pairing delegate went away.
   BT_ASSERT(pairing_delegate().is_alive());
   state_ = State::kWaitPairingComplete;
 
@@ -298,7 +298,7 @@ void PairingState::OnSimplePairingComplete(pw::bluetooth::emboss::StatusCode sta
       is_pairing() &&
       bt_is_error(result, INFO, "gap-bredr", "Pairing failed on link %#.4x (id: %s)", handle(),
                   bt_str(peer_id()))) {
-    // TODO(fxbug.dev/37447): Checking pairing_delegate() for reset like this isn't thread safe.
+    // TODO(https://fxbug.dev/37447): Checking pairing_delegate() for reset like this isn't thread safe.
     if (pairing_delegate().is_alive()) {
       pairing_delegate()->CompletePairing(peer_id(), ToResult(HostError::kFailed));
     }
@@ -372,7 +372,7 @@ std::optional<hci_spec::LinkKey> PairingState::OnLinkKeyRequest() {
 
 void PairingState::OnLinkKeyNotification(const UInt128& link_key, hci_spec::LinkKeyType key_type,
                                          bool local_secure_connections_supported) {
-  // TODO(fxbug.dev/36360): We assume the controller is never in pairing debug mode because it's a
+  // TODO(https://fxbug.dev/36360): We assume the controller is never in pairing debug mode because it's a
   // security hazard to pair and bond using Debug Combination link keys.
   BT_ASSERT_MSG(key_type != hci_spec::LinkKeyType::kDebugCombination,
                 "Pairing on link %#.4x (id: %s) resulted in insecure Debug Combination link key",
@@ -433,7 +433,7 @@ void PairingState::OnLinkKeyNotification(const UInt128& link_key, hci_spec::Link
   // Set Security Properties for this BR/EDR connection
   set_security_properties(sec_props);
 
-  // TODO(fxbug.dev/132673): When in SC Only mode, all services require security mode 4, level 4
+  // TODO(https://fxbug.dev/132673): When in SC Only mode, all services require security mode 4, level 4
   if (security_mode() == BrEdrSecurityMode::SecureConnectionsOnly &&
       security_properties().level() != sm::SecurityLevel::kSecureAuthenticated) {
     bt_log(WARN, "gap-bredr",
@@ -681,7 +681,7 @@ std::vector<fit::closure> PairingState::CompletePairingRequests(hci::Result<> st
   // If a new link key was received, notify all callbacks because we always negotiate the best
   // security possible. Even though pairing succeeded, send an error status if the individual
   // request security requirements are not satisfied.
-  // TODO(fxbug.dev/1249): Only notify failure to callbacks of requests that have the same (or
+  // TODO(https://fxbug.dev/1249): Only notify failure to callbacks of requests that have the same (or
   // none) MITM requirements as the current pairing.
   bool link_key_received = current_pairing_->security_properties.has_value();
   if (link_key_received) {

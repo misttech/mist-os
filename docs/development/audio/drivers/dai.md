@@ -155,8 +155,8 @@ For a description of the ring buffer functionality, see the [Audio Streaming
 Interface](streaming.md).
 
 {% comment %}
-> TODO(fxbug.dev/63522): Add support for power control.
-> TODO(fxbug.dev/63523): Add support for content protection.
+> TODO(https://fxbug.dev/63522): Add support for power control.
+> TODO(https://fxbug.dev/63523): Add support for content protection.
 {% endcomment %}
 
 ## Signal processing {#signal-processing}

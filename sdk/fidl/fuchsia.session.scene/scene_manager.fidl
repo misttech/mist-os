@@ -33,7 +33,7 @@ closed protocol Manager {
     /// (1) Its root view will be focused once it's connected to the scene.
     /// (2) The logical size and position of its root view match the display.
     ///
-    /// TODO(fxbug.dev/104411): Fix this situation.
+    /// TODO(https://fxbug.dev/104411): Fix this situation.
     /// NOTE: the ViewRef is only returned after the child view is connected to the scene graph.
     /// Therefore, the caller must guarantee that the child view will eventually be connected before
     /// waiting for the ViewRef; if the child view doesn't connect, it is possible to deadlock.
@@ -56,7 +56,7 @@ closed protocol Manager {
     /// (1) Its root view will be focused once it's connected to the scene.
     /// (2) The logical size and position of its root view match the display.
     ///
-    /// TODO(fxbug.dev/104411): Fix this situation.
+    /// TODO(https://fxbug.dev/104411): Fix this situation.
     /// NOTE: this method returns only after the child view is connected to the scene graph.
     /// Therefore, the caller must guarantee that the child view will eventually be connected before
     /// waiting for the return; if the child view doesn't connect, it is possible to deadlock.
@@ -76,7 +76,7 @@ closed protocol Manager {
     /// (1) Its root view will be focused once it's connected to the scene.
     /// (2) The logical size and position of its root view match the display.
     ///
-    /// TODO(fxbug.dev/104411): Fix this situation.
+    /// TODO(https://fxbug.dev/104411): Fix this situation.
     /// NOTE: this method returns only after the child view is connected to the scene graph.
     /// Therefore, the caller must guarantee that the child view will eventually be connected before
     /// waiting for the return; if the child view doesn't connect, it is possible to deadlock.

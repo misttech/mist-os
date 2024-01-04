@@ -41,7 +41,7 @@ if (is_phys_toolchain) {
   }
 
   zbi_test("uart-input-test-zbi") {
-    # TODO(fxbug.dev/115209): This ZBI is not actually a ZBI test, but relies
+    # TODO(https://fxbug.dev/115209): This ZBI is not actually a ZBI test, but relies
     # on the specification just for the `images` metadata implicitly set by
     # `zbi_test()` and not `zbi()`. Investigate whether we can have `zbi()`
     # targets set this metadata and update this target accordingly - and

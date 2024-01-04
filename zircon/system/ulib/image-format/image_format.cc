@@ -8,7 +8,7 @@
 // used for API levels other than HEAD where images2 and sysmem2 are supported.
 
 #if __Fuchsia_API_level__ < FUCHSIA_HEAD
-// Enable a subset of functionality. See fxbug.dev/42085119.
+// Enable a subset of functionality. See https://fxbug.dev/42085119.
 // It cannot be undefined because other Fuchsia headers may indirectly include image_format.h.
 #define __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__
 #endif

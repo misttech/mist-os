@@ -68,7 +68,7 @@ const MAX_COMPLETED_CALLS: usize = 10;
 /// inspect per protocol.
 const MAX_PENDING_CALLS: usize = 10;
 
-// TODO(fxb/108679): Explore reducing size of keys in inspect.
+// TODO(https://fxbug.dev/108679): Explore reducing size of keys in inspect.
 #[derive(Debug, Default, Inspect)]
 struct ExternalApiCallInfo {
     /// Node of this info.

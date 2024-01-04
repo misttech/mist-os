@@ -87,7 +87,7 @@ void PinExecutableMemory::Pin() {
     // page ALWAYS_NEED -- this will disable kernel optimizations for the entire address space.
     // Since we always have at least one executable page, we don't need additional work to satisfy
     // this requirement.
-    // See fxbug.dev/85056.
+    // See https://fxbug.dev/85056.
     if ((vmap.type != ZX_INFO_MAPS_TYPE_MAPPING) ||
         (vmap.u.mapping.mmu_flags & ZX_VM_PERM_READ) == 0 ||
         (vmap.u.mapping.mmu_flags & ZX_VM_PERM_WRITE) != 0) {

@@ -17,7 +17,7 @@ sampler_files = [
   "setui.json",
   "system-update-committer.json",
 
-  # TODO(fxbug.dev/): remove driver_manager_all.json and bring back these
+  # TODO(https://fxbug.dev/): remove driver_manager_all.json and bring back these
   #"audio-drivers.json",
   #"bthost.json",
   #"connectivity-wlan.json",

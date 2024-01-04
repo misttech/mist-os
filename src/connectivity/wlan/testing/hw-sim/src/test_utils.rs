@@ -489,7 +489,7 @@ impl RetryWithBackoff {
     }
 }
 
-/// TODO(fxbug.dev/83882): This function strips the `timestamp_nanos` field
+/// TODO(https://fxbug.dev/83882): This function strips the `timestamp_nanos` field
 /// from each `fidl_fuchsia_wlan_policy::ScanResult` entry since the `timestamp_nanos`
 /// field is undefined.
 pub fn strip_timestamp_nanos_from_scan_results(
@@ -502,7 +502,7 @@ pub fn strip_timestamp_nanos_from_scan_results(
             .unwrap()
             .sort_by(|a, b| a.bssid.as_ref().unwrap().cmp(&b.bssid.as_ref().unwrap()));
         for entry in scan_result.entries.as_mut().unwrap() {
-            // TODO(fxbug.dev/83882): Strip timestamp_nanos since it's not implemented.
+            // TODO(https://fxbug.dev/83882): Strip timestamp_nanos since it's not implemented.
             entry.timestamp_nanos.take();
         }
     }

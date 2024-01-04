@@ -115,7 +115,7 @@ executable("app") {
   ]
 }
 
-# TODO(fxbug.dev/122864) Remove transitional labels
+# TODO(https://fxbug.dev/122864) Remove transitional labels
 group("config") {
 }
 group("user_config") {

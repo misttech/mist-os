@@ -90,7 +90,7 @@ impl ChannelHandler {
             self.warn_rate_limiter.rate_limit(|| {
                 warn!("error getting current channel: {:#}", anyhow!(err));
             });
-            // TODO: Remove this once we have channel in vbmeta (fxbug.dev/39970).
+            // TODO: Remove this once we have channel in vbmeta (https://fxbug.dev/39970).
             self.target_channel_manager.get_target_channel().unwrap_or_default()
         })
     }

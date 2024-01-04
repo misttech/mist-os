@@ -127,7 +127,7 @@ closed protocol GuestManager {
     });
 };
 
-// TODO(fxbug.dev/100515): Reconsider the use of composition here
+// TODO(https://fxbug.dev/100515): Reconsider the use of composition here
 @discoverable
 closed protocol ZirconGuestManager {
     compose GuestManager;

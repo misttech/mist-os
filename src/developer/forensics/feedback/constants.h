@@ -44,7 +44,7 @@ constexpr char kEnableLimitInspectDataKey[] = "enable_limit_inspect_data";
 constexpr char kPreviousGracefulRebootReasonFile[] = "/tmp/graceful_reboot_reason.txt";
 constexpr char kCurrentGracefulRebootReasonFile[] = "/data/graceful_reboot_reason.txt";
 
-// TODO(fxbug.dev/85184): Stop attempting to read from the /cache file once it no longer exists.
+// TODO(https://fxbug.dev/85184): Stop attempting to read from the /cache file once it no longer exists.
 constexpr char kLegacyGracefulRebootReasonFile[] = "/cache/graceful_reboot_reason.txt";
 
 constexpr char kNotAFdrFile[] = "/data/not_a_fdr.txt";
@@ -53,7 +53,7 @@ constexpr char kNotAFdrFile[] = "/data/not_a_fdr.txt";
 // all and specifically the data from memory_monitor) is included in the snapshot.zip generated
 // by the Feedback service. The memory_monitor Inspect data is critical to debug OOM crash
 // reports.
-// TODO(fxbug.dev/46216, fxbug.dev/48485): remove delay.
+// TODO(https://fxbug.dev/46216, https://fxbug.dev/48485): remove delay.
 constexpr zx::duration kOOMCrashReportingDelay = zx::sec(90);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

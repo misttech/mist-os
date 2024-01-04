@@ -53,7 +53,7 @@ use {
 /// ```
 #[derive(Debug)]
 pub struct BoundedNode<V> {
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     node: Node,
     children_node: Node,

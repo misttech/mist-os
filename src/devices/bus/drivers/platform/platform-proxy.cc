@@ -139,7 +139,7 @@ zx_status_t PlatformProxy::Rpc(const platform_proxy_req_t* req, size_t req_lengt
     // This is a fairly serious error; subsequent requests are very likely
     // to also fail.
     //
-    // TODO(fxbug.dev/33622): Make this less likely and/or handle differently.
+    // TODO(https://fxbug.dev/33622): Make this less likely and/or handle differently.
     zxlogf(ERROR, "PlatformProxy::Rpc rpc_channel_.call failed - status: %d", status);
     return status;
   }

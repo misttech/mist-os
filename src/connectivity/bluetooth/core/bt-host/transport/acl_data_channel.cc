@@ -415,7 +415,7 @@ CommandChannel::EventCallbackResult AclDataChannelImpl::NumberOfCompletedPackets
     uint16_t comp_packets = le16toh(data->hc_num_of_completed_packets);
 
     if (iter->second.count < comp_packets) {
-      // TODO(fxbug.dev/2795): This can be caused by the controller reusing the connection handle
+      // TODO(https://fxbug.dev/2795): This can be caused by the controller reusing the connection handle
       // of a connection that just disconnected. We should somehow avoid sending the controller
       // packets for a connection that has disconnected. AclDataChannel already dequeues such
       // packets, but this is insufficient: packets can be queued in the channel to the transport
@@ -477,7 +477,7 @@ void AclDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   BT_ASSERT(rx_callback_);
 
   if (buffer.size() < sizeof(hci_spec::ACLDataHeader)) {
-    // TODO(fxbug.dev/97362): Handle these types of errors by signaling Transport.
+    // TODO(https://fxbug.dev/97362): Handle these types of errors by signaling Transport.
     bt_log(ERROR, "hci", "malformed packet - expected at least %zu bytes, got %zu",
            sizeof(hci_spec::ACLDataHeader), buffer.size());
     return;
@@ -491,7 +491,7 @@ void AclDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   packet->InitializeFromBuffer();
 
   if (packet->view().header().data_total_length != payload_size) {
-    // TODO(fxbug.dev/97362): Handle these types of errors by signaling Transport.
+    // TODO(https://fxbug.dev/97362): Handle these types of errors by signaling Transport.
     bt_log(ERROR, "hci",
            "malformed packet - payload size from header (%hu) does not match"
            " received payload size: %zu",

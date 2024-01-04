@@ -47,7 +47,7 @@
                 // Requires MTE support
                 "malloc.disable_mte",
 
-                // TODO(fxbug.dev/103867): Implement membarrier
+                // TODO(https://fxbug.dev/103867): Implement membarrier
                 "membarrier.global_barrier",
                 "membarrier.global_expedited",
                 "membarrier.private_expedited",
@@ -177,7 +177,7 @@
         {
             type: "skip",
             matchers: [
-                // fxbug.dev/136325
+                // https://fxbug.dev/136325
                 "time.timer_disarm_terminates",
 
                 // This test is passing in some configurations.

@@ -461,7 +461,7 @@ impl Parser {
 
         // If there are zero pages at the end of the file, they won't appear in the extents list.
         // Pad the data with zeroes to the full file length.
-        // TODO(fxbug.dev/122237): Add a test for this behavior, once better test infra exists.
+        // TODO(https://fxbug.dev/122237): Add a test for this behavior, once better test infra exists.
         data.resize(inode.size().try_into().unwrap(), 0);
         Ok(data)
     }
@@ -676,7 +676,7 @@ impl Parser {
                         .map_err(|_| ParsingError::BadDirectory(path.join("/")))?;
                 }
                 _ => {
-                    // TODO(fxbug.dev/122152): Handle other types.
+                    // TODO(https://fxbug.dev/122152): Handle other types.
                 }
             }
             Ok(true)

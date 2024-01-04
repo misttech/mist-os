@@ -91,7 +91,7 @@ void DisplayDebugTypesSectionWarning() {
   FX_FIRST_N(1, LOGS(Warn))
       << "Separated .debug_types section is not supported yet. Please consider to remove "
          "`-fdebug-types-section` from the compiler flags or add `-fno-debug-types-section` if "
-         "it's enabled by default. (fxbug.dev/97388)";
+         "it's enabled by default. (https://fxbug.dev/97388)";
 }
 
 // Returns true if the form uses any of the addr "x" encodings (relocatable references to the
@@ -517,7 +517,7 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeCollection(const llvm::DWARFDie& d
   llvm::DWARFDie parent;
   decoder.AddAbstractParent(&parent);
 
-  // TODO(fxbug.dev/97388): Support DW_AT_signature.
+  // TODO(https://fxbug.dev/97388): Support DW_AT_signature.
   bool has_signature = false;
   decoder.AddCustom(llvm::dwarf::DW_AT_signature,
                     [&has_signature](auto, auto) { has_signature = true; });
@@ -701,7 +701,7 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeEnum(const llvm::DWARFDie& die) co
   llvm::DWARFDie parent;
   main_decoder.AddAbstractParent(&parent);
 
-  // TODO(fxbug.dev/97388): Support DW_AT_signature.
+  // TODO(https://fxbug.dev/97388): Support DW_AT_signature.
   bool has_signature = false;
   main_decoder.AddCustom(llvm::dwarf::DW_AT_signature,
                          [&has_signature](auto, auto) { has_signature = true; });

@@ -145,13 +145,13 @@ class ProcessDispatcher final
   // Returns an identifier that can be used to associate hardware trace
   // data with this process.
   uintptr_t hw_trace_context_id() const {
-    // TODO(fxbug.dev/104750): Figure out how to make HW tracing work in restricted mode.
+    // TODO(https://fxbug.dev/104750): Figure out how to make HW tracing work in restricted mode.
     return shareable_state_->aspace()->arch_aspace().pt_phys();
   }
 #endif
 
   uintptr_t arch_table_phys() const {
-    // TODO(fxbug.dev/104750): Figure out how to make tracing works in restricted mode.
+    // TODO(https://fxbug.dev/104750): Figure out how to make tracing works in restricted mode.
     return shareable_state_->aspace()->arch_aspace().arch_table_phys();
   }
 
@@ -310,7 +310,7 @@ class ProcessDispatcher final
   // For non-shared processes (regular ones), the normal aspace is the one and only aspace
   // belonging to the process (`ShareableProcessState::aspace()`).
   //
-  // TODO(fxbug.dev/132980): Update this comment once all architectures support unified aspaces.
+  // TODO(https://fxbug.dev/132980): Update this comment once all architectures support unified aspaces.
   VmAspace* normal_aspace() {
     if (unified_aspace_) {
       return unified_aspace_.get();

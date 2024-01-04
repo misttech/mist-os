@@ -124,7 +124,7 @@ fn run_cargo_outdated_raw(
     .unwrap();
     let mut cmd = std::process::Command::new(cargo);
     cmd.arg("outdated")
-        // TODO(fxbug.dev/80080) remove this flag when we start updating transitive deps
+        // TODO(https://fxbug.dev/80080) remove this flag when we start updating transitive deps
         .arg("--root-deps-only") // only return things in Cargo.toml explicitly
         .arg("--verbose")
         .arg("--manifest-path")

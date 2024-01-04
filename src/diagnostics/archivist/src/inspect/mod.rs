@@ -308,7 +308,7 @@ impl ReaderServer {
     /// such that the only diagnostics properties they contain are those
     /// configured by the static and client-provided selectors.
     ///
-    // TODO(fxbug.dev/4601): Error entries should still be included, but with a custom hierarchy
+    // TODO(https://fxbug.dev/4601): Error entries should still be included, but with a custom hierarchy
     //             that makes it clear to clients that snapshotting failed.
     fn filter_snapshot(
         &self,
@@ -490,7 +490,7 @@ mod tests {
         ns.unbind(path).unwrap();
     }
 
-    // TODO(fxbug.dev/299973540): remove this test when the out/diagnostics dir is removed
+    // TODO(https://fxbug.dev/299973540): remove this test when the out/diagnostics dir is removed
     #[fuchsia::test]
     async fn inspect_data_collector_tree() {
         let path = "/test-bindings2/out";

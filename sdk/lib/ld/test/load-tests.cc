@@ -34,7 +34,7 @@ using LdLoadFailureTests = Fixture;
 // This lists all the types that are compatible with both LdLoadTests and LdLoadFailureTests.
 template <class... Tests>
 using TestTypes = ::testing::Types<
-// TODO(fxbug.dev/130483): The separate-process tests require symbolic
+// TODO(https://fxbug.dev/130483): The separate-process tests require symbolic
 // relocation so they can make the syscall to exit. The spawn-process
 // tests also need a loader service to get ld.so.1 itself.
 #ifdef __Fuchsia__
@@ -46,7 +46,7 @@ using TestTypes = ::testing::Types<
 
 // This types are meaningul for the successful tests, LdLoadTests.
 using LoadTypes = TestTypes<
-// TODO(fxbug.dev/134320): LdRemoteProcessTests::Run doesn't actually run the
+// TODO(https://fxbug.dev/134320): LdRemoteProcessTests::Run doesn't actually run the
 // test, instead it always returns 17. This isn't suitable for failure tests
 // which don't return 17. When remote loading is implemented and these tests
 // are actually run this can be moved into the default types in TestTypes.

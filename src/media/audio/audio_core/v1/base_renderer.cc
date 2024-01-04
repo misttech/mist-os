@@ -221,7 +221,7 @@ void BaseRenderer::AddPayloadBufferInternal(uint32_t id, zx::vmo payload_buffer)
 
   FX_LOGS(DEBUG) << " (id: " << id << ")";
 
-  // TODO(fxbug.dev/13655): Lift this restriction.
+  // TODO(https://fxbug.dev/13655): Lift this restriction.
   if (IsOperating()) {
     FX_LOGS(ERROR) << "Attempted to set payload buffer while in operational mode.";
     return;
@@ -300,7 +300,7 @@ void BaseRenderer::RemovePayloadBufferInternal(uint32_t id) {
 
   FX_LOGS(DEBUG) << " (id: " << id << ")";
 
-  // TODO(fxbug.dev/13655): Lift this restriction.
+  // TODO(https://fxbug.dev/13655): Lift this restriction.
   if (IsOperating()) {
     FX_LOGS(ERROR) << "Attempted to remove payload buffer while in the operational mode.";
     return;
@@ -645,7 +645,7 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
 
   // Snap the starting pts to an input frame boundary.
   //
-  // TODO(fxbug.dev/13374): Don't do this. If a user wants to write an explicit timestamp on a
+  // TODO(https://fxbug.dev/13374): Don't do this. If a user wants to write an explicit timestamp on a
   // source packet which schedules the packet to start at a fractional position on the source time
   // line, we should probably permit this. We need to make sure that the mixer cores are ready to
   // handle this case before proceeding, however.

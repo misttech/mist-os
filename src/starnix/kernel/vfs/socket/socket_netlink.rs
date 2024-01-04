@@ -242,7 +242,7 @@ impl NetlinkSocketInner {
         }
 
         if self.passcred {
-            not_implemented!("TODO(http://fxbug.dev/128863): SCM_CREDENTIALS/SO_PASSCRED not fully implemented, returning unknown credentials for now");
+            not_implemented!("TODO(https://fxbug.dev/128863): SCM_CREDENTIALS/SO_PASSCRED not fully implemented, returning unknown credentials for now");
             info.ancillary_data.push(AncillaryData::Unix(UnixControlData::unknown_creds()));
         }
 
@@ -695,7 +695,7 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
     fn on_device_event(&self, action: UEventAction, device: Device, context: UEventContext) {
         let kobject = device.kobject();
         let subsystem = kobject.parent().unwrap().name();
-        // TODO(fxb/127713): Pass the synthetic UUID when available.
+        // TODO(https://fxbug.dev/127713): Pass the synthetic UUID when available.
         // Otherwise, default as "0".
         let message = format!(
             "{action}@/{path}\0\

@@ -173,8 +173,8 @@ class LowEnergyConnection final : public sm::Delegate {
   //   3. HCI LE Remote Connection Parameter Request Event
   //   4. L2CAP Connection Parameter Update request
   //
-  // TODO(fxbug.dev/68803): Support #1 above.
-  // TODO(fxbug.dev/68804): Support #3 above.
+  // TODO(https://fxbug.dev/68803): Support #1 above.
+  // TODO(https://fxbug.dev/68804): Support #3 above.
   //
   // This method caches |params| for later connection attempts and sends the
   // parameters to the controller if the initializing procedures are complete
@@ -236,7 +236,7 @@ class LowEnergyConnection final : public sm::Delegate {
 
   // Updates or requests an update of the connection parameters, for central and peripheral roles
   // respectively, if interrogation has completed.
-  // TODO(fxbug.dev/79491): Wait to update connection parameters until all initialization
+  // TODO(https://fxbug.dev/79491): Wait to update connection parameters until all initialization
   // procedures have completed.
   void MaybeUpdateConnectionParameters();
 

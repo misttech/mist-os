@@ -87,7 +87,7 @@ executable("codec_detect_hw_decode_test_bin") {
     "//src/lib/testing/loop_fixture",
   ]
 
-  # TODO(fxbug.dev/126566): Temporarily disable lsan for this target. Reenable once all leaks are fixed.
+  # TODO(https://fxbug.dev/126566): Temporarily disable lsan for this target. Reenable once all leaks are fixed.
   deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
 }
 

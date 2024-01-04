@@ -321,7 +321,7 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // TODO(fxbug.dev/135377): Do not use cea_timing; use display::DisplayTiming
+  // TODO(https://fxbug.dev/135377): Do not use cea_timing; use display::DisplayTiming
   // directly instead.
   cea_timing encoder_timing = CalculateDisplayTimings(timing);
   pll_param clock_params = CalculateClockParameters(timing);
@@ -452,11 +452,11 @@ bool IsPixelClockSupported(int pixel_clock_khz) {
   // Video tree divisor /N0 `vid_clk_div` == 2,
   // Video tree ENCP clock selector `encp_div` == 1.
   //
-  // TODO(fxbug.dev/133175): Factor this out for pixel clock checking and
+  // TODO(https://fxbug.dev/133175): Factor this out for pixel clock checking and
   // calculation logics.
   constexpr int kFixedPllDivisionFactor = 5 * 2 * 1;
 
-  // TODO(fxbug.dev/133175): Factor out ranges for each output frequency
+  // TODO(https://fxbug.dev/133175): Factor out ranges for each output frequency
   // divider so that they can be used for both clock checking and calculation.
   // OD1 = OD2 = OD3 = 1.
   constexpr int kMinimumPllDivisionFactor = 1 * 1 * 1;
@@ -492,7 +492,7 @@ bool IsPixelClockSupported(int pixel_clock_khz) {
 }  // namespace
 
 bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) const {
-  // TODO(fxbug.dev/124984): High-resolution display modes (4K or more) are not
+  // TODO(https://fxbug.dev/124984): High-resolution display modes (4K or more) are not
   // supported.
   const int kMaximumAllowedWidthPixels = 2560;
   const int kMaximumAllowedHeightPixels = 1600;
@@ -502,18 +502,18 @@ bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) co
     return false;
   }
 
-  // TODO(fxbug.dev/133248): Interlaced modes are not supported.
+  // TODO(https://fxbug.dev/133248): Interlaced modes are not supported.
   if (timing.fields_per_frame == display::FieldsPerFrame::kInterlaced) {
     return false;
   }
 
-  // TODO(fxbug.dev/133248): Interlaced modes with alternating vblanks are not
+  // TODO(https://fxbug.dev/133248): Interlaced modes with alternating vblanks are not
   // supported.
   if (timing.vblank_alternates) {
     return false;
   }
 
-  // TODO(fxbug.dev/134708): Modes with pixel repetition are not supported.
+  // TODO(https://fxbug.dev/134708): Modes with pixel repetition are not supported.
   if (timing.pixel_repetition != 0) {
     return false;
   }
@@ -697,7 +697,7 @@ void HdmiHost::ConfigPhy() {
   // 3840 x 2160. The configuration currently works for all display modes
   // supported by this driver.
   //
-  // TODO(fxbug.dev/124984): Set the PHY control registers properly if the
+  // TODO(https://fxbug.dev/124984): Set the PHY control registers properly if the
   // display uses a 4k resolution (3840 x 2160 or higher).
   HhiHdmiPhyCntl0Reg::Get().FromValue(0).set_hdmi_ctl1(0x33eb).set_hdmi_ctl2(0x4242).WriteTo(
       &hhi_mmio_);

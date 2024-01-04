@@ -8,7 +8,7 @@
 //
 // CML files that include it must declare a `display-coordinator-connector`
 // child component with the URL set to the appropriate package and manifest.
-// TODO(fxbug.dev/129205): Define the child component using subpackaged URLs.
+// TODO(https://fxbug.dev/129205): Define the child component using subpackaged URLs.
 //
 // For example:
 //   include: [

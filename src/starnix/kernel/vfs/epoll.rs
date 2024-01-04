@@ -44,7 +44,7 @@ struct WaitObject {
 }
 
 impl WaitObject {
-    // TODO(fxbug.dev/64296) we should not report an error if the file was closed while it was
+    // TODO(https://fxbug.dev/64296) we should not report an error if the file was closed while it was
     // registered for epoll(). Either the file needs to be removed from our lists when it is closed,
     // we need to ignore/remove WaitObjects when the file is gone, or (more likely) both because of
     // race conditions removing the file object.

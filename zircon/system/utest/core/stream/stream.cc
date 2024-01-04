@@ -1073,7 +1073,7 @@ TEST(StreamTestCase, ReadWriteShrinkRace) {
   }
 }
 
-// Regression test for fxbug.dev/94454. Writing to an offset that requires expansion should not
+// Regression test for https://fxbug.dev/94454. Writing to an offset that requires expansion should not
 // result in an overflow when computing the new required VMO size.
 TEST(StreamTestCase, ExpandOverflow) {
   zx::vmo vmo;

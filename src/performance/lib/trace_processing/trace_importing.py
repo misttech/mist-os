@@ -388,7 +388,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
 
     dropped_flow_event_counter: int = 0
     dropped_async_event_counter: int = 0
-    # TODO(fxbug.dev/41309): Support nested async events.  In the meantime, just
+    # TODO(https://fxbug.dev/41309): Support nested async events.  In the meantime, just
     # drop them.
     dropped_nested_async_event_counter: int = 0
 
@@ -527,7 +527,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
             )
             result_events.append(counter_event)
         elif phase == "n":
-            # TODO(fxbug.dev/41309): Support nested async events.  In the
+            # TODO(https://fxbug.dev/41309): Support nested async events.  In the
             # meantime, just drop them.
             dropped_nested_async_event_counter += 1
         elif phase == "M":

@@ -20,7 +20,7 @@ namespace hwreg {
 // We define an alias for clarity in contexts in which enabling "print"ing
 // would not seem relevant to these ends.
 //
-// TODO(fxbug.dev/68404): Use at your own risk.
+// TODO(https://fxbug.dev/68404): Use at your own risk.
 using EnableAsmGeneration = EnablePrinter;
 
 // This can be used in fluid style to define macros directly for constants,

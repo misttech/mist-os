@@ -233,7 +233,7 @@ if (current_cpu != "riscv64") {
     "netstack_migration_packages",
     "netstack_migration_packages_gub",
 
-    # TODO(fxbug.dev/128551): Move to the list above once build errors are resolved.
+    # TODO(https://fxbug.dev/128551): Move to the list above once build errors are resolved.
     "virtualization_support",
   ]
 }

@@ -73,7 +73,7 @@ fn read_characteristics(
     let Some(chrc) = characteristics.iter().find(|c| is_battery_level(c) && is_readable(c)) else {
         return Err(format_err!("No battery level characteristic"));
     };
-    // TODO(fxbug.dev/123852): `handle` check can be removed when converted to a local type.
+    // TODO(https://fxbug.dev/123852): `handle` check can be removed when converted to a local type.
     let handle = chrc.handle.ok_or(format_err!("characteristic missing handle"))?;
     Ok((handle, is_notifiable(chrc)))
 }
@@ -83,7 +83,7 @@ fn read_services(services: Vec<gatt::ServiceInfo>) -> Result<gatt::ServiceHandle
     let Some(service) = services.into_iter().find(is_battery_service) else {
         return Err(format_err!("No compatible Battery service"));
     };
-    // TODO(fxbug.dev/123852): `handle` check can be removed when converted to a local type.
+    // TODO(https://fxbug.dev/123852): `handle` check can be removed when converted to a local type.
     service.handle.ok_or(format_err!("service missing handle"))
 }
 
@@ -97,7 +97,7 @@ async fn watch_battery_level(id: PeerId, mut stream: gatt::CharacteristicNotifie
             Ok(battery_percent) => info!(%id, "Battery level: {battery_percent}"),
             Err(e) => warn!(%id, "Couldn't read battery level: {e:?}"),
         }
-        // TODO(fxbug.dev/123880): Integrate this with the Fuchsia power reporting services using
+        // TODO(https://fxbug.dev/123880): Integrate this with the Fuchsia power reporting services using
         // the `fuchsia.bluetooth.power.Reporter` API.
     }
     info!(%id, "Battery notifications terminated");

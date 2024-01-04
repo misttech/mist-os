@@ -110,7 +110,7 @@ struct InternedString {
   // resulting in every InternedString instance from instantiations of the _intern literal operator
   // being placed in the "__fxt_interned_string_table" section. However, GCC ignores section
   // attributes on COMDAT symbols as of this writing, resulting in an empty section when compiled
-  // with GCC.  TODO(fxbug.dev/27083): Cleanup this comment when GCC supports section attributes on
+  // with GCC.  TODO(https://fxbug.dev/27083): Cleanup this comment when GCC supports section attributes on
   // COMDAT.
 
   static void PreRegister() {
@@ -125,7 +125,7 @@ struct InternedString {
   static void SetMapStringCallback(MapStringCallback callback) { map_string_callback_ = callback; }
 
  private:
-  // TODO(fxbug.dev/33293): Replace runtime lock-free linked list with comdat linker sections once
+  // TODO(https://fxbug.dev/33293): Replace runtime lock-free linked list with comdat linker sections once
   // the toolchain supports it with all compilers.
   [[gnu::noinline]] static uint16_t Register(const InternedString& interned_string) {
     // Return the id if the string ref is already registered.
@@ -191,7 +191,7 @@ struct InternedStringStorage {
 // This implementation uses the N3599 extension supported by Clang and GCC.  C++20 ratified a
 // slightly different syntax that is simple to switch to, once available, without affecting call
 // sites.
-// TODO(fxbug.dev/33284): Update to C++20 syntax when available.
+// TODO(https://fxbug.dev/33284): Update to C++20 syntax when available.
 //
 // References:
 //     http://open-std.org/JTC1/SC22/WG21/docs/papers/2013/n3599.html

@@ -76,7 +76,7 @@ config("incremental") {
 config("one_codegen_unit") {
   # Disable codegen parallelism.
   # Trades incremental rebuild speed for smaller code size.
-  # See: fxbug.dev/74435, fxbug.dev/80514
+  # See: https://fxbug.dev/74435, https://fxbug.dev/80514
   if (rust_incremental == "") {
     rustflags = [ "-Ccodegen-units=1" ]
   }
@@ -125,20 +125,20 @@ config("lto_thin") {
 # Best practices for Rust binaries that go into size-constrained bootfs.
 config("bootfs") {
   # Optimize for size.
-  # TODO(fxbug.dev/84386): use "z" when resolved.
+  # TODO(https://fxbug.dev/84386): use "z" when resolved.
   rustflags = [ "-Copt-level=s" ]
 
   if (target_cpu == "arm64" && is_debug) {
     # Debug builds produce large Rust binaries.
     # So large they might not fit in the ZBI.
     # Force ThinLTO to squeeze Rust binaries further.
-    # See: fxbug.dev/80514
-    # See: fxbug.dev/91325
+    # See: https://fxbug.dev/80514
+    # See: https://fxbug.dev/91325
     configs = [ "//build/config/lto:thinlto" ]
   }
 
   # Can't dynamically link libstd and libtest for ZBI binaries.
-  # TODO(fxbug.dev/83081): reconsider this.
+  # TODO(https://fxbug.dev/83081): reconsider this.
   rustflags += [ "-Cprefer-dynamic=no" ]
 }
 
@@ -179,7 +179,7 @@ config("allow_unknown_lints") {
   rustflags = [ "-Aunknown-lints" ]
 }
 
-# TODO(fxbug.dev/69442) remove this allowance
+# TODO(https://fxbug.dev/69442) remove this allowance
 config("allow_legacy_derive_helpers") {
   rustflags = [ "-Alegacy-derive-helpers" ]
 }
@@ -188,7 +188,7 @@ config("coverage") {
   rustflags = [ "-Cinstrument-coverage" ]
 }
 
-# TODO(fxbug.dev/94355): Eliminate or identify all sources of output dir leaks.
+# TODO(https://fxbug.dev/94355): Eliminate or identify all sources of output dir leaks.
 # This option makes it explicit that a particular build action is sensitive
 # to the output dir path, and informs remote execution to refrain from
 # normalizing the output dir, which improves caching.
@@ -247,7 +247,7 @@ config("no_download") {
 # When adding a new config, make sure to add a TODO with a link to the tracking
 # issue.
 
-# TODO(fxbug.dev/94237)
+# TODO(https://fxbug.dev/94237)
 config("allow_simd") {
   rustflags = [ "-Zallow-features=stdsimd,aarch64_target_feature" ]
 }

@@ -215,11 +215,11 @@ impl BlockServer {
             Some(remote_block_device::BlockOpcode::Read) => {
                 into_raw_status(self.handle_blockio_read(&request).await)
             }
-            // TODO(fxbug.dev/89873): simply returning ZX_OK since we're
+            // TODO(https://fxbug.dev/89873): simply returning ZX_OK since we're
             // writing to device and no need to flush cache, but need to
             // check that flush goes down the stack
             Some(remote_block_device::BlockOpcode::Flush) => zx::sys::ZX_OK,
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             Some(remote_block_device::BlockOpcode::Trim) => zx::sys::ZX_OK,
             None => panic!("Unexpected message, request {:?}", request.command.opcode),
         }
@@ -301,7 +301,7 @@ impl BlockServer {
                     flags: block::Flag::empty(),
                 }))?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::GetStats { clear: _, responder } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
@@ -328,14 +328,14 @@ impl BlockServer {
                                     }
                                 }
                             }
-                            // TODO(fxbug.dev/89873): close fifo
+                            // TODO(https://fxbug.dev/89873): close fifo
                             block::SessionRequest::Close { responder } => responder.send(Ok(()))?,
                         };
                         Ok(())
                     })
                     .await?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::ReadBlocks {
                 responder,
                 vmo: _,
@@ -345,7 +345,7 @@ impl BlockServer {
             } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::WriteBlocks {
                 responder,
                 vmo: _,
@@ -355,15 +355,15 @@ impl BlockServer {
             } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::GetTypeGuid { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::GetInstanceGuid { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::GetName { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
@@ -389,7 +389,7 @@ impl BlockServer {
                 }
                 responder.send(status, &slices, response_count)?;
             }
-            // TODO(fxbug.dev/89873): need to check if this returns the right information.
+            // TODO(https://fxbug.dev/89873): need to check if this returns the right information.
             VolumeAndNodeRequest::GetVolumeInfo { responder } => {
                 match self.file.get_attrs().await {
                     Ok(attr) => {
@@ -419,7 +419,7 @@ impl BlockServer {
                 }
             }
             VolumeAndNodeRequest::Extend { start_slice, slice_count, responder } => {
-                // TODO(fxbug.dev/89873): this is a hack. When extend is called, the extent is
+                // TODO(https://fxbug.dev/89873): this is a hack. When extend is called, the extent is
                 // expected to be set as allocated. The easiest way to do this is to just
                 // write an extent of zeroed data. Another issue here is the size. The memory
                 // allocated here should be bounded to what's available.
@@ -433,11 +433,11 @@ impl BlockServer {
                     Err(status) => responder.send(status.into_raw())?,
                 };
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::Shrink { start_slice: _, slice_count: _, responder } => {
                 responder.send(zx::sys::ZX_OK)?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::Destroy { responder } => {
                 responder.send(zx::sys::ZX_OK)?;
             }
@@ -446,23 +446,23 @@ impl BlockServer {
                 // complaint about recursive async functions
                 self.handle_clone_request(object.into_channel());
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::Reopen {
                 rights_request: _,
                 object_request: _,
                 control_handle: _,
             } => {}
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::Close { responder } => {
                 responder.send(Ok(()))?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::GetConnectionInfo { responder } => {
                 // TODO(https://fxbug.dev/77623): Fill in rights and available operations.
                 let info = fio::ConnectionInfo::default();
                 responder.send(info)?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::Sync { responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
@@ -486,12 +486,12 @@ impl BlockServer {
                     }
                 };
             }
-            // TODO(fxbug.dev/89873) VolumeAndNodeRequest::GetAttributes { query, responder }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873) VolumeAndNodeRequest::GetAttributes { query, responder }
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::GetAttributes { query: _, responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
@@ -510,15 +510,15 @@ impl BlockServer {
             VolumeAndNodeRequest::RemoveExtendedAttribute { responder, .. } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::GetFlags { responder } => {
                 responder.send(zx::sys::ZX_OK, fio::OpenFlags::NODE_REFERENCE)?;
             }
-            // TODO(fxbug.dev/89873)
+            // TODO(https://fxbug.dev/89873)
             VolumeAndNodeRequest::SetFlags { flags: _, responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
             }
-            // TODO(fxbug.dev/105608)
+            // TODO(https://fxbug.dev/105608)
             VolumeAndNodeRequest::Query { responder } => {
                 responder.send(fio::NODE_PROTOCOL_NAME.as_bytes())?;
             }
@@ -787,7 +787,7 @@ mod tests {
                 for _ in 1..5 {
                     match remote_block_device.attach_vmo(&vmo).await {
                         Ok(vmo_id) => {
-                            // TODO(fxbug.dev/89873): need to detach vmoid. into_id() is a
+                            // TODO(https://fxbug.dev/89873): need to detach vmoid. into_id() is a
                             // temporary solution. Remove this after detaching vmo has been
                             // implemented
                             // Make sure that vmo_id is unique

@@ -170,7 +170,7 @@ VK_TEST_F(YuvIntegrationTest, Rec709Texture) {
   auto color_at_601_wide =
       ColorAt(bytes.data(), kFramebufferWidth, kFramebufferWidth / 4, kFramebufferHeight * 3 / 4);
 
-  // TODO(fxbug.dev/65765): We should check the exact color values once we have
+  // TODO(https://fxbug.dev/65765): We should check the exact color values once we have
   // a good explanation for the converted RGB values.
   EXPECT_FALSE(ColorMatch(color_at_709, color_at_601));
   EXPECT_FALSE(ColorMatch(color_at_709, color_at_601_wide));

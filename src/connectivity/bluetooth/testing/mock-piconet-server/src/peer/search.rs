@@ -16,7 +16,7 @@ use crate::types::{RegisteredServiceId, ServiceRecord};
 struct SearchInfo {
     service_uuid: ServiceClassProfileIdentifier,
 
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     attr_ids: Vec<u16>,
 

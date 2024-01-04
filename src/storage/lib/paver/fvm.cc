@@ -386,8 +386,8 @@ namespace {
 // On success, returns the VolumeManager for the zxcrypt instance, and writes the inner block
 // device's into |part|.
 zx::result<zxcrypt::VolumeManager> ZxcryptCreate(PartitionInfo* part) {
-  // TODO(security): fxbug.dev/31073. We need to bind with channel in order to pass a key here.
-  // TODO(security): fxbug.dev/31733. The created volume must marked as needing key rotation.
+  // TODO(security): https://fxbug.dev/31073. We need to bind with channel in order to pass a key here.
+  // TODO(security): https://fxbug.dev/31733. The created volume must marked as needing key rotation.
 
   fbl::unique_fd devfs_root;
   if (zx_status_t status = fdio_open_fd("/dev", 0, devfs_root.reset_and_get_address());

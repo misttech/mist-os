@@ -61,7 +61,7 @@
             from: "#intl",
             to: "#feedback",
 
-            // TODO(fxbug.dev/107206): feedback is available in configurations
+            // TODO(https://fxbug.dev/107206): feedback is available in configurations
             // where intl is not present. Fix this irrationality somehow.
             source_availability: "unknown",
         },
@@ -83,10 +83,10 @@
             from: "#setui_service",
             to: "#feedback",
 
-            // TODO(fxbug.dev/107215): break the cycle
+            // TODO(https://fxbug.dev/107215): break the cycle
             dependency: "weak",
 
-            // TODO(fxbug.dev/107215): feedback is available in configurations
+            // TODO(https://fxbug.dev/107215): feedback is available in configurations
             // where setui_service is not present. Fix this irrationality somehow.
             source_availability: "unknown",
         },

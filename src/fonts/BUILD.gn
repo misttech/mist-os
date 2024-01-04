@@ -96,7 +96,7 @@ rustc_binary("font_provider") {
     "//third_party/rust_crates:unicase",
   ]
 
-  # TODO(fxbug.dev/99760): Fix the leaks and remove this.
+  # TODO(https://fxbug.dev/99760): Fix the leaks and remove this.
   deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
 
   test_deps = [
@@ -256,7 +256,7 @@ fuchsia_package("fonts_configurable_for_test") {
 }
 
 # Deprecated.
-# TODO(fxbug.dev/98663): Clean up after all out-of-tree dependents are fixed.
+# TODO(https://fxbug.dev/98663): Clean up after all out-of-tree dependents are fixed.
 group("open-fonts") {
   deps = []
 }

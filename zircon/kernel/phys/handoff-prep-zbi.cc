@@ -39,14 +39,14 @@
 #include <ktl/enforce.h>
 
 void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
-  // TODO(fxbug.dev/84107): The data ZBI is still inspected by the kernel
+  // TODO(https://fxbug.dev/84107): The data ZBI is still inspected by the kernel
   // proper until migrations are complete, so this communicates the physical
   // address during handoff.  This member should be removed as soon as the
   // kernel no longer examines the ZBI itself.
   handoff_->zbi = reinterpret_cast<uintptr_t>(zbi.data());
 
   // Allocate some pages to fill up with the ZBI items to save for mexec.
-  // TODO(fxbug.dev/84107): Currently this is in scratch space and gets
+  // TODO(https://fxbug.dev/84107): Currently this is in scratch space and gets
   // copied into the handoff allocator when its final size is known.
   // Later, it will allocated with its own type and be handed off to
   // the kernel as a whole range of pages that can be turned into a VMO.
@@ -99,7 +99,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         // Pass the original incoming data on for mexec verbatim.
         SaveForMexec(*header, payload);
 
-        // TODO(fxbug.dev/84107): Hand off the incoming ZBI item data directly
+        // TODO(https://fxbug.dev/84107): Hand off the incoming ZBI item data directly
         // rather than using normalized data from memalloc::Pool so that the
         // kernel's ingestion of RAM vs RESERVED regions is unperturbed.
         // Later this will be replaced by proper memory handoff.
@@ -120,14 +120,14 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
           extra_mem_config_ranges++;
         }
 
-        // TODO(fxbug.dev/136068): Clean up when zircon initializes in virtual address mode.
+        // TODO(https://fxbug.dev/136068): Clean up when zircon initializes in virtual address mode.
         //
         // Peripheral ranges are only meaningful in ARM64 where accesses cannot be performed
         // through the physmap at the time of writing.
         ktl::optional<zbi_mem_range_t> uart_periph_range;
-        // TODO(fxbug.dev/136068): Clean this up.
+        // TODO(https://fxbug.dev/136068): Clean this up.
         if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
-          // TODO(fxbug.dev/129541): Use length provided by the driver, not
+          // TODO(https://fxbug.dev/129541): Use length provided by the driver, not
           // assume it is just one page. This works in practice but is not
           // entirely correct.
           uart::internal::Visit(
@@ -251,7 +251,7 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
   ZX_ASSERT(view.take_error().is_ok());
 
   // Copy mexec data into handoff temporary space.
-  // TODO(fxbug.dev/84107): Later this won't be required since we'll pass
+  // TODO(https://fxbug.dev/84107): Later this won't be required since we'll pass
   // the contents of mexec_image_ to the kernel in the handoff by address.
   ktl::span handoff_mexec = New(handoff_->mexec_data, ac, mexec_image_.size_bytes());
   ZX_ASSERT(ac.check());

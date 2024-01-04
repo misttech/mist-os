@@ -172,7 +172,7 @@ if (is_host) {
   group("host_tests") {
     testonly = true
 
-    # TODO(fxbug.dev/126146): Support Fxblob in scrutiny
+    # TODO(https://fxbug.dev/126146): Support Fxblob in scrutiny
     if (fxfs_blob) {
       deps = []
     } else {

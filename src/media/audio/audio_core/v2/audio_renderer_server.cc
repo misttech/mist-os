@@ -164,7 +164,7 @@ void AudioRendererServer::SetPtsUnits(SetPtsUnitsRequestView request,
     return;
   }
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->SetPtsUnits(tick_per_second_numerator, tick_per_second_denominator);
 
   media_ticks_per_second_ = std::move(pts_ticks_per_sec);
@@ -195,7 +195,7 @@ void AudioRendererServer::SetPtsContinuityThreshold(
     return;
   }
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->SetPtsContinuityThreshold(threshold_seconds);
 
   media_ticks_continuity_threshold_seconds_ = threshold_seconds;
@@ -278,7 +278,7 @@ void AudioRendererServer::SetPcmStreamType(SetPcmStreamTypeRequestView request,
 
   format_ = std::move(format_result.value());
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->SetFormat(*format_);
 
   MaybeConfigure();
@@ -351,7 +351,7 @@ void AudioRendererServer::AddPayloadBuffer(AddPayloadBufferRequestView request,
     return;
   }
 
-  // TODO(fxbug.dev/98652): support IDs other than 0.
+  // TODO(https://fxbug.dev/98652): support IDs other than 0.
   // This is a current limitation of the mixer service APIs.
   if (request->id != 0) {
     FX_LOGS(WARNING) << "AddPayloadBuffer id must be 0, is " << request->id;
@@ -370,7 +370,7 @@ void AudioRendererServer::AddPayloadBuffer(AddPayloadBufferRequestView request,
     return;
   }
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->AddPayloadBuffer(id, vmo_size);
 
   payload_buffers_[request->id] = std::move(request->payload_buffer);
@@ -394,11 +394,11 @@ void AudioRendererServer::RemovePayloadBuffer(RemovePayloadBufferRequestView req
     return;
   }
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->RemovePayloadBuffer(id);
 }
 
-// TODO(fxbug.dev/98652): implement: need to create a fuchsia.media.audio.GainControl server that
+// TODO(https://fxbug.dev/98652): implement: need to create a fuchsia.media.audio.GainControl server that
 // forwards to stream_gain_control_client_
 void AudioRendererServer::BindGainControl(BindGainControlRequestView request,
                                           BindGainControlCompleter::Sync& completer) {
@@ -430,7 +430,7 @@ void AudioRendererServer::SendPacketInternal(fuchsia_media::StreamPacket packet,
   FX_CHECK(state_ == State::kFullyCreated);
   FX_CHECK(stream_sink_client_);
 
-  // TODO(fxbug.dev/98652): support IDs other than 0.
+  // TODO(https://fxbug.dev/98652): support IDs other than 0.
   if (packet.payload_buffer_id() != 0) {
     FX_LOGS(WARNING) << "SendPacket packet.payload_buffer_id must be 0, is "
                      << packet.payload_buffer_id();
@@ -438,7 +438,7 @@ void AudioRendererServer::SendPacketInternal(fuchsia_media::StreamPacket packet,
     return;
   }
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->SendPacket(packet);
 
   fidl::Arena<> arena;
@@ -502,7 +502,7 @@ void AudioRendererServer::EndOfStreamInternal() {
   }
 }
 
-// TODO(fxbug.dev/98652): implement: need another mixer service API
+// TODO(https://fxbug.dev/98652): implement: need another mixer service API
 void AudioRendererServer::DiscardAllPacketsInternal(
     std::optional<DiscardAllPacketsCompleter::Async> completer) {
   TRACE_DURATION("audio", "AudioRendererServer::DiscardAllPacketsInternal");
@@ -557,7 +557,7 @@ void AudioRendererServer::PlayInternal(zx::time reference_time, int64_t media_ti
           completer->Reply(result->value()->reference_time(), result->value()->packet_timestamp());
         }
 
-        // TODO(fxbug.dev/98652): call reporter
+        // TODO(https://fxbug.dev/98652): call reporter
         // reporter_->ReportStartIfStopped();
       });
 
@@ -681,7 +681,7 @@ void AudioRendererServer::PauseInternal(std::optional<PauseCompleter::Async> com
           completer->Reply(result->value()->reference_time(), result->value()->packet_timestamp());
         }
 
-        // TODO(fxbug.dev/98652): call reporter
+        // TODO(https://fxbug.dev/98652): call reporter
         // reporter_->ReportStopIfStarted();
       });
 }
@@ -760,7 +760,7 @@ void AudioRendererServer::MaybeConfigure() {
     media_ticks_per_second_ = TimelineRate(1'000'000'000, 1);
   }
 
-  // TODO(fxbug.dev/98652): add media_ticks_continuity_threshold_seconds_ to mixer service
+  // TODO(https://fxbug.dev/98652): add media_ticks_continuity_threshold_seconds_ to mixer service
 
   state_ = State::kConfigured;
 
@@ -903,7 +903,7 @@ void AudioRendererServer::MaybeSetFullyCreated() {
     on_fully_created_(shared_from_this());
   }
 
-  // TODO(fxbug.dev/98652): after implementing RouteGraph, this is where we should add this renderer
+  // TODO(https://fxbug.dev/98652): after implementing RouteGraph, this is where we should add this renderer
   // to the RouteGroup.
 
   // Flush all queued tasks.

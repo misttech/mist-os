@@ -82,7 +82,7 @@ class DisplayCoordinatorListener {
       wait_coordinator_closed_{this};
 
   // Used for dispatching events that we receive over the coordinator channel.
-  // TODO(fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
+  // TODO(https://fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
   fidl::InterfacePtr<fuchsia::hardware::display::Coordinator> event_dispatcher_;
 };
 

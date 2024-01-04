@@ -108,7 +108,7 @@ class Control : public ControlType,
   // server-side channel is bound to |heap|.
   zx_status_t RegisterAndBindHeap(fuchsia_sysmem2::wire::HeapType heap_type, Heap* heap);
 
-  // TODO(fxbug.dev/81211): Remove these pipe IO functions and use
+  // TODO(https://fxbug.dev/81211): Remove these pipe IO functions and use
   // //src/devices/lib/goldfish/pipe_io instead.
   int32_t WriteLocked(uint32_t cmd_size, int32_t* consumed_size) TA_REQ(lock_);
   void WriteLocked(uint32_t cmd_size) TA_REQ(lock_);
@@ -153,7 +153,7 @@ class Control : public ControlType,
   fidl::WireSyncClient<fuchsia_hardware_goldfish::AddressSpaceChildDriver> address_space_child_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish::SyncTimeline> sync_timeline_;
 
-  // TODO(fxbug.dev/3213): This should be std::unordered_map.
+  // TODO(https://fxbug.dev/3213): This should be std::unordered_map.
   //
   // buffer_collection_id, buffer_index
   std::map<BufferKey, uint32_t> buffer_handles_ TA_GUARDED(lock_);

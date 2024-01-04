@@ -290,7 +290,7 @@ class LocalServiceManager::ServiceData final {
 
   void AddCharacteristic(att::AttributeGrouping* grouping, CharacteristicPtr chrc) {
     // Set up the characteristic callbacks.
-    // TODO(armansito): Consider tracking a transaction timeout here (fxbug.dev/636).
+    // TODO(armansito): Consider tracking a transaction timeout here (https://fxbug.dev/636).
     IdType id = chrc->id();
     uint8_t props = chrc->properties();
     uint16_t ext_props = chrc->extended_properties();

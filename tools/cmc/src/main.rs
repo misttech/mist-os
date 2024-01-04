@@ -41,7 +41,7 @@ fn optional_path_exists(optional_path: Option<&PathBuf>) -> Result<(), Error> {
 fn run_cmc() -> Result<(), Error> {
     let opt = opts::Opt::from_args();
     match opt.cmd {
-        // TODO(fxbug.dev/69367): Remove `cmc validate`.
+        // TODO(https://fxbug.dev/69367): Remove `cmc validate`.
         opts::Commands::Validate { files, must_offer_protocol, must_use_protocol } => {
             if files.is_empty() {
                 return Err(error::Error::invalid_args("No files provided").into());
@@ -98,7 +98,7 @@ fn run_cmc() -> Result<(), Error> {
             )?
         }
         opts::Commands::Format { file, pretty, cml, inplace, mut output } => {
-            // TODO(fxbug.dev/109014): stop accepting these flags.
+            // TODO(https://fxbug.dev/109014): stop accepting these flags.
             let _pretty = pretty;
             let _cml = cml;
 

@@ -61,7 +61,7 @@ func NewDeviceConfig(fs *flag.FlagSet, testDataPath string) *DeviceConfig {
 	fs.StringVar(&c.SerialSocketPath, "device-serial", "", "device serial path")
 	fs.DurationVar(&c.connectTimeout, "device-connect-timeout", 5*time.Second, "device connection timeout (default 5 seconds)")
 	fs.BoolVar(&c.WorkaroundBrokenTimeSkip, "workaround-broken-time-skip", false,
-		"whether to sleep for 15 seconds after pave and then reconnect, to work around a known networking bug, fxbug.dev/74861")
+		"whether to sleep for 15 seconds after pave and then reconnect, to work around a known networking bug, https://fxbug.dev/74861")
 	fs.IntVar(&c.repoPort, "repo-port", 0, "default port to serve the repository")
 
 	environmentSerialPath := os.Getenv(constants.SerialSocketEnvKey)

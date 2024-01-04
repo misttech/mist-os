@@ -51,7 +51,7 @@ pub async fn interface_discovery(
     e: events::Queue<DaemonEvent>,
     discovery_interval: Duration,
 ) {
-    // See fxbug.dev/62617#c10 for details. A macOS system can end up in
+    // See https://fxbug.dev/62617#c10 for details. A macOS system can end up in
     // a situation where the default routes for protocols are on
     // non-functional interfaces, and under such conditions the wildcard
     // listen socket binds will fail. We will repeat attempting to bind
@@ -71,7 +71,7 @@ pub async fn interface_discovery(
     };
 
     loop {
-        // fxb/90219 - disabled by default
+        // https://fxbug.dev/90219 - disabled by default
         let is_enabled: bool = ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).await.unwrap_or(false);
         if is_enabled {
             if v6_listen_socket.upgrade().is_none() {
@@ -118,7 +118,7 @@ pub async fn interface_discovery(
 // silently discarded.
 async fn recv_loop(sock: Arc<UdpSocket>, e: events::Queue<DaemonEvent>) {
     loop {
-        // fxb/90219 - disabled by default
+        // https://fxbug.dev/90219 - disabled by default
         let is_enabled: bool = ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).await.unwrap_or(false);
         if !is_enabled {
             return;

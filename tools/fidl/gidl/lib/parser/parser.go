@@ -630,7 +630,7 @@ func (p *Parser) parseSingleBodyElement(result *body, all map[bodyElement]struct
 		}
 		record, ok := val.(ir.RecordLike)
 		if !ok {
-			// TODO(fxbug.dev/118230): Change message when tables and unions are allowed.
+			// TODO(https://fxbug.dev/118230): Change message when tables and unions are allowed.
 			return p.newParseError(tok, "top-level value must be a struct; got %T", val)
 		}
 		result.Value = record

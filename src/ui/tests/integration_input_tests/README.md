@@ -11,7 +11,7 @@ To build and run the tests for core-based products (e.g. core, astro, or
 sherlock), include the `integration_input_tests` test package in your build
 args either directly:
 
-<!-- TODO(fxbug.dev/119212): Remove the web_engine lines when resolved. -->
+<!-- TODO(https://fxbug.dev/119212): Remove the web_engine lines when resolved. -->
 
 ```
 fx set ... \

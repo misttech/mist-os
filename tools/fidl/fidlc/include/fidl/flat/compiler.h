@@ -95,7 +95,7 @@ class Libraries {
 
   // Returns the filtered compilation for the last-inserted library.
   //
-  // TODO(fxbug.dev/67858): Add a method that doesn't take a version selection
+  // TODO(https://fxbug.dev/67858): Add a method that doesn't take a version selection
   // and preserves everything, for the full-history IR needed by zither.
   std::unique_ptr<Compilation> Filter(const VersionSelection* version_selection);
 
@@ -107,7 +107,7 @@ class Libraries {
 
   // Removes a library that was inserted before.
   //
-  // TODO(fxbug.dev/90838): This is only needed to filter out the zx library,
+  // TODO(https://fxbug.dev/90838): This is only needed to filter out the zx library,
   // and should be deleted once that is no longer necessary.
   void Remove(const Library* library);
 
@@ -148,7 +148,7 @@ class Libraries {
   Typespace typespace_;
   AttributeSchemaMap attribute_schemas_;
 
-  // TODO(fxbug.dev/8027): Remove this field.
+  // TODO(https://fxbug.dev/8027): Remove this field.
   VirtualSourceFile* generated_source_file_;
 };
 

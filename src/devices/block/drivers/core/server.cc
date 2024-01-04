@@ -202,7 +202,7 @@ zx::result<std::unique_ptr<Server>> Server::Create(ddk::BlockProtocolClient* bp)
 
   bp->Query(&bs->info_, &bs->block_op_size_);
 
-  // TODO(fxbug.dev/31467): Allocate BlockMsg arena based on block_op_size_.
+  // TODO(https://fxbug.dev/31467): Allocate BlockMsg arena based on block_op_size_.
 
   return zx::ok(std::move(bs));
 }

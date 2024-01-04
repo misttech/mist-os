@@ -300,7 +300,7 @@ def process_content(content):
           # It has been observed that measurements in this calculation
           # can be negative, which causes the sqrt to fail. Catch
           # this case while we investigate more closely.
-          # TODO(fxbug.dev/115483): Investigate negative values.
+          # TODO(https://fxbug.dev/115483): Investigate negative values.
           weight = 0
         correlations.append({
             'name1': key1,

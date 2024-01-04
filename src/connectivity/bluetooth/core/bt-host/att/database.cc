@@ -292,7 +292,7 @@ void Database::ExecuteWriteQueue(PeerId peer_id, PrepareWriteQueue write_queue,
       break;
     }
 
-    // TODO(fxbug.dev/97458): Consider removing the boolean return value in favor of always
+    // TODO(https://fxbug.dev/97458): Consider removing the boolean return value in favor of always
     // reporting errors using the callback. That would simplify the pattern here.
     if (!attr->WriteAsync(peer_id, next.offset(), next.value(), std::move(attr_write_cb))) {
       write_complete_fn(fit::error(std::tuple(next.handle(), ErrorCode::kWriteNotPermitted)));

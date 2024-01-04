@@ -16,7 +16,7 @@
 
 namespace {
 
-// TODO(fxbug.dev/7680): We may want to fail instead of saturating.
+// TODO(https://fxbug.dev/7680): We may want to fail instead of saturating.
 using DataSize = safemath::ClampedNumeric<uint32_t>;
 
 // Given |offset| in bytes, returns how many padding bytes need to be added to |offset| to be
@@ -153,7 +153,7 @@ class UnalignedSizeVisitor final : public TypeShapeVisitor<DataSize> {
           case flat::Decl::Kind::kProtocol:
           case flat::Decl::Kind::kService:
             return DataSize(kHandleSize);
-          // TODO(fxbug.dev/70186): this should be handled as a box and nullable structs should
+          // TODO(https://fxbug.dev/70186): this should be handled as a box and nullable structs should
           // never be visited
           case flat::Decl::Kind::kStruct:
             return DataSize(8);
@@ -299,7 +299,7 @@ class AlignmentVisitor final : public TypeShapeVisitor<DataSize> {
           case flat::Decl::Kind::kProtocol:
           case flat::Decl::Kind::kService:
             return DataSize(kHandleSize);
-          // TODO(fxbug.dev/70186): this should be handled as a box and nullable structs should
+          // TODO(https://fxbug.dev/70186): this should be handled as a box and nullable structs should
           // never be visited
           case flat::Decl::Kind::kStruct:
           case flat::Decl::Kind::kUnion:
@@ -602,7 +602,7 @@ class MaxHandlesVisitor final : public flat::Object::Visitor<DataSize> {
   std::any Visit(const flat::IdentifierType& object) override {
     thread_local RecursionDetector recursion_detector;
 
-    // TODO(fxbug.dev/36327): This code is technically incorrect; see the visit(Struct&) overload
+    // TODO(https://fxbug.dev/36327): This code is technically incorrect; see the visit(Struct&) overload
     // for more details.
     auto guard = recursion_detector.Enter(&object);
     if (!guard) {
@@ -627,7 +627,7 @@ class MaxHandlesVisitor final : public flat::Object::Visitor<DataSize> {
   std::any Visit(const flat::Service& object) override { return DataSize(1); }
 
   std::any Visit(const flat::Struct& object) override {
-    // TODO(fxbug.dev/36327): This is technically incorrect: if a struct is recursive, it may not
+    // TODO(https://fxbug.dev/36327): This is technically incorrect: if a struct is recursive, it may not
     // directly contain a handle, but could contain e.g. a struct that contains a handle. In that
     // case, this code will return 0 instead of std::numeric_limits<DataSize>::max(). This does pass
     // all current tests and Fuchsia compilation, so fixing it isn't super-urgent.
@@ -971,7 +971,7 @@ class HasPaddingVisitor final : public TypeShapeVisitor<bool> {
           case flat::Decl::Kind::kProtocol:
           case flat::Decl::Kind::kService:
             return false;
-          // TODO(fxbug.dev/70186): this should be handled as a box and nullable structs should
+          // TODO(https://fxbug.dev/70186): this should be handled as a box and nullable structs should
           // never be visited
           case flat::Decl::Kind::kStruct:
           case flat::Decl::Kind::kUnion:
@@ -1063,7 +1063,7 @@ class HasPaddingVisitor final : public TypeShapeVisitor<bool> {
   }
 
   std::any Visit(const flat::Union& object) override {
-    // TODO(fxbug.dev/36332): Unions currently return true for has_padding in all cases, which
+    // TODO(https://fxbug.dev/36332): Unions currently return true for has_padding in all cases, which
     // should be fixed.
     return true;
   }
@@ -1073,7 +1073,7 @@ class HasPaddingVisitor final : public TypeShapeVisitor<bool> {
   }
 
   std::any Visit(const flat::Union::Member::Used& object) override {
-    // TODO(fxbug.dev/36331): This code only accounts for inline padding for the union member. We
+    // TODO(https://fxbug.dev/36331): This code only accounts for inline padding for the union member. We
     // also need to account for out-of-line padding.
     return object.fieldshape(wire_format()).padding > 0;
   }

@@ -46,7 +46,7 @@ KCOUNTER(thread_legacy_yield, "thread.legacy_yield")
 constexpr size_t kMaxDebugReadBlock = 64 * 1024u * 1024u;
 constexpr size_t kMaxDebugWriteBlock = 64 * 1024u * 1024u;
 
-// TODO(fxbug.dev/30969): copy_user_string may truncate the incoming string,
+// TODO(https://fxbug.dev/30969): copy_user_string may truncate the incoming string,
 // and may copy extra data past the NUL.
 // TODO(dbort): If anyone else needs this, move it into user_ptr.
 zx_status_t copy_user_string(const user_in_ptr<const char>& src, size_t src_len, char* buf,
@@ -148,7 +148,7 @@ zx_status_t sys_thread_read_state(zx_handle_t handle, uint32_t kind, user_out_pt
 
   auto up = ProcessDispatcher::GetCurrent();
 
-  // TODO(fxbug.dev/30915): debug rights
+  // TODO(https://fxbug.dev/30915): debug rights
   fbl::RefPtr<ThreadDispatcher> thread;
   zx_status_t status =
       up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_READ, &thread);
@@ -169,7 +169,7 @@ zx_status_t sys_thread_write_state(zx_handle_t handle, uint32_t kind,
 
   auto up = ProcessDispatcher::GetCurrent();
 
-  // TODO(fxbug.dev/30915): debug rights
+  // TODO(https://fxbug.dev/30915): debug rights
   fbl::RefPtr<ThreadDispatcher> thread;
   zx_status_t status =
       up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &thread);
@@ -195,7 +195,7 @@ zx_status_t sys_task_suspend(zx_handle_t handle, zx_handle_t* token) {
 
   auto up = ProcessDispatcher::GetCurrent();
 
-  // TODO(fxbug.dev/30807): Add support for jobs
+  // TODO(https://fxbug.dev/30807): Add support for jobs
   fbl::RefPtr<Dispatcher> task;
   zx_status_t status =
       up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &task);
@@ -286,7 +286,7 @@ zx_status_t sys_process_create_shared(zx_handle_t shared_proc_handle, uint32_t o
 
   // We check the policy against the process calling zx_process_create, which
   // is the operative policy.
-  // TODO(fxbug.dev/98922): Figure out which policy check makes sense here.
+  // TODO(https://fxbug.dev/98922): Figure out which policy check makes sense here.
   zx_status_t result = up->EnforceBasicPolicy(ZX_POL_NEW_PROCESS);
   if (result != ZX_OK) {
     return result;
@@ -440,7 +440,7 @@ zx_status_t sys_process_read_memory(zx_handle_t handle, zx_vaddr_t vaddr, user_o
   {
     Guard<CriticalMutex> guard{vm_mapping->lock()};
     offset = vaddr - vm_mapping->base_locked() + vm_mapping->object_offset_locked();
-    // TODO(fxbug.dev/31512): While this limits reading to the mapped address space of
+    // TODO(https://fxbug.dev/31512): While this limits reading to the mapped address space of
     // this VMO, it should be reading from multiple VMOs, not a single one.
     // Additionally, it is racy with the mapping going away.
     buffer_size =
@@ -509,7 +509,7 @@ zx_status_t sys_process_write_memory(zx_handle_t handle, zx_vaddr_t vaddr,
   {
     Guard<CriticalMutex> guard{vm_mapping->lock()};
     offset = vaddr - vm_mapping->base_locked() + vm_mapping->object_offset_locked();
-    // TODO(fxbug.dev/31512): While this limits writing to the mapped address space of
+    // TODO(https://fxbug.dev/31512): While this limits writing to the mapped address space of
     // this VMO, it should be writing to multiple VMOs, not a single one.
     // Additionally, it is racy with the mapping going away.
     buffer_size =

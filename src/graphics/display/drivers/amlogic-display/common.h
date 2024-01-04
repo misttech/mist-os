@@ -21,7 +21,7 @@
 // - `field_value` must be a valid `field_size_bits`-bit number, i.e. it must be
 //   >= 0 and <= 2 ^ `field_size_bits` - 1.
 //
-// TODO(fxbug.dev/131232): Replace direct register reads / writes using the
+// TODO(https://fxbug.dev/131232): Replace direct register reads / writes using the
 // register helper functions with register classes (such as
 // `hwreg::RegisterBase`).
 constexpr uint32_t SetFieldValue32(uint32_t reg_value, int field_begin_bit, int field_size_bits,
@@ -49,7 +49,7 @@ constexpr uint32_t SetFieldValue32(uint32_t reg_value, int field_begin_bit, int 
 // The returned value is guaranteed to be a valid `field_size_bits`-bit number,
 // i.e. it is >= 0 and <= 2 ^ `field_size_bits` - 1.
 //
-// TODO(fxbug.dev/131232): Replace direct register reads / writes using the
+// TODO(https://fxbug.dev/131232): Replace direct register reads / writes using the
 // register helper functions with register classes (such as
 // `hwreg::RegisterBase`).
 constexpr uint32_t GetFieldValue32(uint32_t reg_value, int field_begin_bit, int field_size_bits) {

@@ -45,7 +45,7 @@ TEST(Types, InternedString) {
   fxt::InternedString::PreRegister();
 
   // Manually register the interned strings on unsupported compilers.
-  // TODO(fxbug.dev/33293): Remove when GCC supports COMDAT section attributes.
+  // TODO(https://fxbug.dev/33293): Remove when GCC supports COMDAT section attributes.
 #ifndef __clang__
   EXPECT_NE(foo.GetId(), fxt::InternedString::kInvalidId);
   EXPECT_NE(bar.GetId(), fxt::InternedString::kInvalidId);

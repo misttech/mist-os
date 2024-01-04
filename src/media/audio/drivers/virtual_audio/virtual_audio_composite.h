@@ -44,7 +44,7 @@ class VirtualAudioComposite
   void DdkRelease() {}
 
   // VirtualAudioDriver overrides.
-  // TODO(fxbug.dev/124865): Add support for GetPositionForVA, SetNotificationFrequencyFromVA,
+  // TODO(https://fxbug.dev/124865): Add support for GetPositionForVA, SetNotificationFrequencyFromVA,
   // and AdjustClockRateFromVA.
   using ErrorT = fuchsia_virtualaudio::Error;
   fit::result<ErrorT, CurrentFormat> GetFormatForVA() override;

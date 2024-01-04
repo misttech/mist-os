@@ -172,7 +172,7 @@ class AmlogicDisplay
   void OnHotPlugStateChange(HotPlugDetectionState current_state);
   void OnCaptureComplete();
 
-  // TODO(fxbug.dev/132267): Currently, AmlogicDisplay has a multi-step
+  // TODO(https://fxbug.dev/132267): Currently, AmlogicDisplay has a multi-step
   // initialization procedure when the device manager binds the driver to the
   // device node. This makes the initialization stateful and hard to maintain
   // (submodules may have dependencies on initialization). Instead, it's

@@ -146,7 +146,7 @@
         {{/if}}
         "-parallel",
         "none",
-        {{! TODO(fxbug.dev/90005): These last few items were hard-coded into
+        {{! TODO(https://fxbug.dev/90005): These last few items were hard-coded into
             device_launcher, but need to be reevaluated as part of the template
             here. }}
         "-vga",

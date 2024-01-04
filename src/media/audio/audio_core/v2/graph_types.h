@@ -12,7 +12,7 @@
 
 namespace media_audio {
 
-// TODO(fxbug.dev/98652): deduplicate with ../services/mixer/common/basic_types.h
+// TODO(https://fxbug.dev/98652): deduplicate with ../services/mixer/common/basic_types.h
 
 // FIDL IDs.
 using NodeId = uint64_t;

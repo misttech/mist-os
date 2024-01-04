@@ -333,7 +333,7 @@ CodecAdapterVp9::CoreCodecGetBufferCollectionConstraints(
     image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::NV12;
     image_constraints.pixel_format.has_format_modifier = true;
     image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
-    // TODO(fxbug.dev/13532): confirm that REC709 is always what we want here, or plumb
+    // TODO(https://fxbug.dev/13532): confirm that REC709 is always what we want here, or plumb
     // actual YUV color space if it can ever be REC601_*.  Since 2020 and 2100
     // are minimum 10 bits per Y sample and we're outputting NV12, 601 is the
     // only other potential possibility here.
@@ -1072,7 +1072,7 @@ void CodecAdapterVp9::SubmitDataToStreamBuffer(zx_paddr_t paddr_base, uint32_t p
     if (size + sizeof(kFlushThroughZeroes) > video_->GetStreamBufferEmptySpace()) {
       // We don't want the parser to hang waiting for output buffer space, since new space will
       // never be released to it since we need to manually update the read pointer.
-      // TODO(fxbug.dev/41825): Handle copying only as much as can fit and waiting for
+      // TODO(https://fxbug.dev/41825): Handle copying only as much as can fit and waiting for
       // kVp9InputBufferEmpty to continue copying the remainder.
       DECODE_ERROR("Empty space in stream buffer %d too small for video data (%lu)",
                    video_->GetStreamBufferEmptySpace(), size + sizeof(kFlushThroughZeroes));

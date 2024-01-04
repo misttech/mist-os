@@ -150,7 +150,7 @@ fuchsia_test_package("cpp_elf_hlcpp") {
     ":component",
     ":values",
 
-    # fxbug.dev/101490: Dep included for affected tests presubmit
+    # https://fxbug.dev/101490: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
 }

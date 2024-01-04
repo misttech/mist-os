@@ -89,7 +89,7 @@ impl MediaState {
     /// If `command` is unsupported, send a `COMMAND_NOT_IMPLEMENTED`.
     /// Otherwise, handle the command on the key release event because it will only
     /// be triggered once (whereas a long press sends pressed multiple times).
-    // TODO(fxbug.dev/1216): Add support for VolumeUp/Down.
+    // TODO(https://fxbug.dev/1216): Add support for VolumeUp/Down.
     pub async fn handle_avc_passthrough_command(
         &self,
         command: fidl_avrcp::AvcPanelCommand,
@@ -240,7 +240,7 @@ impl SessionInfo {
     /// Returns a `Notification` containing the currently set notification value specified
     /// by `event_id`.
     /// Returns `RejectedInvalidParameter` for unsupported `NotificationEvent` IDs.
-    // TODO(fxbug.dev/1216): Add VolumeChanged to supported events when scoped.
+    // TODO(https://fxbug.dev/1216): Add VolumeChanged to supported events when scoped.
     pub fn get_notification_value(
         &self,
         event_id: &fidl_avrcp::NotificationEvent,

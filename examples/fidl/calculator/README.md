@@ -170,7 +170,7 @@ emu start`) and are serving packages (ex: `fx serve`) then run the following:
 fx test calculator-client-cpp-parser-unittests
 ```
 
-TODO(fxbug.dev/108591): Create client side FIDL unit tests once the TestBase exists for Natural bindings.
+TODO(https://fxbug.dev/108591): Create client side FIDL unit tests once the TestBase exists for Natural bindings.
 
 **Server**
 

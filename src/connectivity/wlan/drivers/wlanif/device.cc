@@ -748,7 +748,7 @@ void Device::OnLinkStateChanged(bool online) {
     return;
   }
 
-  // TODO(fxbug.dev/51009): Let SME handle these changes.
+  // TODO(https://fxbug.dev/51009): Let SME handle these changes.
   if (online != device_online_) {
     device_online_ = online;
     auto result = client_.sync().buffer(*arena)->OnLinkStateChanged(online);

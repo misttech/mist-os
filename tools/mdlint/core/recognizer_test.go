@@ -174,9 +174,9 @@ func TestRecognizeLinks(t *testing.T) {
 			},
 		},
 		{
-			ignore: "fxbug.dev/76515",
+			ignore: "https://fxbug.dev/76515",
 			input: `
-For instance, [fidlgen_rust] [would like to know](http://fxbug.dev/61760)
+For instance, [fidlgen_rust] [would like to know](https://fxbug.dev/61760)
 whether a type may ever contain a floating point number to determine which...
 
 [fidlgen_rust]: /some/url/here`,
@@ -184,7 +184,7 @@ whether a type may ever contain a floating point number to determine which...
 				"[fidlgen_rust]",
 			},
 			hrefUses: []string{
-				"(http://fxbug.dev/61760)",
+				"(https://fxbug.dev/61760)",
 			},
 			xrefDefs: []xrefDef{
 				{"[fidlgen_rust]", "/some/url/here"},
@@ -214,7 +214,7 @@ whether a type may ever contain a floating point number to determine which...
 			},
 		},
 		{
-			ignore: "fxbug.dev/76515",
+			ignore: "https://fxbug.dev/76515",
 			input: `
 > In blockquotes, we can wrap [inline links]
 > (http://example.com) between the "]" and "(".
@@ -224,7 +224,7 @@ whether a type may ever contain a floating point number to determine which...
 			},
 		},
 		{
-			ignore: "fxbug.dev/76515",
+			ignore: "https://fxbug.dev/76515",
 			input: `
 > In blockquotes, we can wrap [reference links]
 > [link label] between the "]" and "[".

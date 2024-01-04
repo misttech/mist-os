@@ -95,7 +95,7 @@ typedef bool FidlEmpty;
 static const FidlEmpty kFidlEmpty_IsNotEmpty = false;
 static const FidlEmpty kFidlEmpty_IsEmpty = true;
 
-// TODO(fxbug.dev/42792): Remove either this FidlAlign function or the FIDL_ALIGN macro in
+// TODO(https://fxbug.dev/42792): Remove either this FidlAlign function or the FIDL_ALIGN macro in
 // zircon/fidl.h.
 // clang-format off
 #ifdef __cplusplus
@@ -282,7 +282,7 @@ struct FidlUnionField {
   const fidl_type_t* type;
 };
 
-// TODO(fxbug.dev/42793): Consider starting enum values for FidlTypeTag from 1, not 0.
+// TODO(https://fxbug.dev/42793): Consider starting enum values for FidlTypeTag from 1, not 0.
 typedef uint8_t FidlTypeTag;
 static const uint8_t kFidlTypePrimitive = 0;
 static const uint8_t kFidlTypeEnum = 1;
@@ -297,7 +297,7 @@ static const uint8_t kFidlTypeTable = 9;
 static const uint8_t kFidlTypeXUnion = 10;
 static const uint8_t kFidlTypeUnion = 10;
 
-// TODO(fxbug.dev/42793): Consider starting enum values for FidlCodedPrimitive from 1, not 0.
+// TODO(https://fxbug.dev/42793): Consider starting enum values for FidlCodedPrimitive from 1, not 0.
 typedef uint8_t FidlCodedPrimitiveSubtype;
 static const uint8_t kFidlCodedPrimitiveSubtype_Bool = 0;
 static const uint8_t kFidlCodedPrimitiveSubtype_Int8 = 1;

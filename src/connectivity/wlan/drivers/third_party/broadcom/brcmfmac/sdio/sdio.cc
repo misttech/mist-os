@@ -1052,7 +1052,7 @@ static void brcmf_sdio_txfail(struct brcmf_sdio* bus) {
       break;
     }
   }
-  // TODO(fxbug.dev/49955) There is a firmware issue that will eventually cause TX CRC errors when
+  // TODO(https://fxbug.dev/49955) There is a firmware issue that will eventually cause TX CRC errors when
   // using TX glomming. After this happens any attempt at TX glomming will fail. However, sending a
   // single frame per transaction still works. So fall back to that when get a TX error. In most
   // normal cases we still get the benefit of TX glomming and in some high throughput cases we will
@@ -3072,7 +3072,7 @@ static void brcmf_sdio_bus_watchdog(struct brcmf_sdio* bus) {
 #ifdef BRCMF_CONSOLE_LOG
   /* Poll for console output periodically */
   // This was the original check. But for some reason sdiodev->state never gets set to
-  // BRCMF_SDIOD_DATA. Need to investiage TODO(fxbug.dev/36618)
+  // BRCMF_SDIOD_DATA. Need to investiage TODO(https://fxbug.dev/36618)
   // (bus->sdiodev->state == BRCMF_SDIOD_DATA && BRCMF_IS_ON(FWCON) && bus->console_interval != 0)
   if (BRCMF_IS_ON(FWCON) && bus->console_interval != 0) {
     bus->console.count += BRCMF_WD_POLL_MSEC;
@@ -3831,7 +3831,7 @@ zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
 
   /* Start the watchdog timer */
   bus->sdcnt.tickcnt = 0;
-  // TODO(fxbug.dev/29365): This call apparently has no effect because the state isn't
+  // TODO(https://fxbug.dev/29365): This call apparently has no effect because the state isn't
   // BRCMF_SDIOD_DATA. This was in the original driver. Once interrupts are working, figure out
   // what's going on.
   brcmf_sdio_wd_timer(bus, true);
@@ -3908,7 +3908,7 @@ zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
   if (err == ZX_OK) {
     /* Allow full data communication using DPC from now on. */
     brcmf_sdiod_change_state(sdiod, BRCMF_SDIOD_DATA);
-    // TODO(fxbug.dev/29365): The next line was added to enable watchdog to take effect immediately,
+    // TODO(https://fxbug.dev/29365): The next line was added to enable watchdog to take effect immediately,
     // since it currently handles all interrupt conditions. This may or may not make the
     // previous call to brcmf_sdio_wd_timer() unnecessary; that call apparently had no effect
     // because the state wasn't BRCMF_SDIOD_DATA yet. Once interrupts are working, revisit
@@ -3944,8 +3944,8 @@ release:
 
 fail:
   BRCMF_DBG(TRACE, "failed: err=%d", err);
-  BRCMF_ERR("Need to implement driver release logic (fxbug.dev/29508)");
-  // TODO(fxbug.dev/29508)
+  BRCMF_ERR("Need to implement driver release logic (https://fxbug.dev/29508)");
+  // TODO(https://fxbug.dev/29508)
   // device_release_driver(&sdiodev->func2->dev);
   // device_release_driver(dev);
 

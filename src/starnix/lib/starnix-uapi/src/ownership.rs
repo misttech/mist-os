@@ -27,7 +27,7 @@
 // Not all instance of OwnedRef and Releasable are used in non test code yet.
 #![allow(dead_code)]
 
-// TODO(fxbug.dev/131097): Create a linter to ensure TempRef is not held while calling any blocking
+// TODO(https://fxbug.dev/131097): Create a linter to ensure TempRef is not held while calling any blocking
 // operation.
 
 use core::hash::Hasher;

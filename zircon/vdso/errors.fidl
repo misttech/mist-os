@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library zx;
 
-// TODO(fxbug.dev/113897): `status` should be defined here and this should all
+// TODO(https://fxbug.dev/113897): `status` should be defined here and this should all
 // be a single enum definition.
 
 /// Indicates an operation was successful.

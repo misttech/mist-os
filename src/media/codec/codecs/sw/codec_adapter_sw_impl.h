@@ -199,7 +199,7 @@ class CodecAdapterSWImpl : public CodecAdapterSW<fit::deferred_action<fit::closu
           // Output current buffer if it cannot encode another input block or if
           // current input block indicates end of stream and the output contains
           // some data.
-          // TODO(fxb/116824): consider outputting current packet if the input
+          // TODO(https://fxbug.dev/116824): consider outputting current packet if the input
           // queue is empty and the the chunk input stream does not have at least
           // one more chunk after the current chunk.
           if ((output_item_->buffer->size() - output_item_->data_length) < MinOutputBufferSize() ||

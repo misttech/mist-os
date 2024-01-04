@@ -5,7 +5,7 @@ library zx;
 
 @transport("Syscall")
 closed protocol Pmt {
-    // TODO(fxbug.dev/32803): handle ZX_OBJ_TYPE_PMT; No rights required?
+    // TODO(https://fxbug.dev/32803): handle ZX_OBJ_TYPE_PMT; No rights required?
     /// ## Summary
     ///
     /// Unpin pages and revoke device access to them.
@@ -28,7 +28,7 @@ closed protocol Pmt {
     ///
     /// ## Rights
     ///
-    /// TODO(fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/32253)
     ///
     /// ## Return value
     ///

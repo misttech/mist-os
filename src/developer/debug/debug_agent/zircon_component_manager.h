@@ -108,7 +108,7 @@ class ZirconComponentManager : public ComponentManager {
   // NOTE: It's not possible to inspect the handle table of the process and find the socket pair,
   // because the socket we get from test framework is not the opposite side sent to the process.
   //
-  // TODO(fxbug.dev/107174): Use a better method to associate processes and test cases.
+  // TODO(https://fxbug.dev/107174): Use a better method to associate processes and test cases.
   struct TestInfo {
     size_t ignored_process = 2;           // number of processes not corresponding to test cases.
     std::vector<zx_koid_t> pids;          // koids of processes launched in the test.

@@ -7,7 +7,7 @@ import("//build/rust/rustc_test.gni")
 
 # Defines a Rust dynamic library.
 #
-# NOTE: Support for Rust dylibs is very limited. See http://fxbug.dev/59286#c17.
+# NOTE: Support for Rust dylibs is very limited. See https://fxbug.dev/59286#c17.
 #
 # Parameters
 #

@@ -37,7 +37,7 @@ void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
 
     ShutdownHelper& shutdown_helper = node->GetShutdownHelper();
     if (!removal_tracker && shutdown_helper.removal_tracker_) {
-      // TODO(fxbug.dev/115171): Change this to an error when we track shutdown steps better.
+      // TODO(https://fxbug.dev/115171): Change this to an error when we track shutdown steps better.
       LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
            node->MakeTopologicalPath().c_str());
     }

@@ -680,7 +680,7 @@ impl RecoveryViewAssistant {
                                     let out_dir =
                                         fuchsia_zircon::Channel::from(out_dir_handle).into();
 
-                                    // TODO(fxbug.dev/112997): make this call the OTA component
+                                    // TODO(https://fxbug.dev/112997): make this call the OTA component
                                     // instead of calling isolated-ota here.
                                     let result = ota::run_devhost_ota(cfg, out_dir).await;
                                     local_app_sender.queue_message(
@@ -1341,7 +1341,7 @@ mod tests {
     use carnelian::{drawing::DisplayRotation, App, AppAssistant, AppSender};
     use std::sync::Arc;
 
-    #[ignore] //TODO(fxbug.dev/102239) Move to integration test
+    #[ignore] //TODO(https://fxbug.dev/102239) Move to integration test
     #[test]
     fn test_ui() -> std::result::Result<(), anyhow::Error> {
         let assistant = make_app_assistant();

@@ -63,7 +63,7 @@ source_set("user_pci") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
 
-    # TODO(fxbug.dev/33846): This shouldn't be here if the mmio code is actually
+    # TODO(https://fxbug.dev/33846): This shouldn't be here if the mmio code is actually
     # used in the test too.  Anything using that needs to be separately
     # compiled for the test using the mock version.
     "//src/devices/lib/mmio",

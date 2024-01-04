@@ -529,7 +529,7 @@ void VPartition::DdkMadeVisible() {
   if (on_visible_) {
     sync_completion_signal(on_visible_);
     // **NOTE**: The DdkMadeVisible hook gets called multiple times in DFv1, so we have to guard
-    // against signaling twice. See http://fxbug.dev/126961 for more information.
+    // against signaling twice. See https://fxbug.dev/126961 for more information.
     on_visible_ = nullptr;
   }
 }

@@ -21,7 +21,7 @@ fn get_event_setting_types() -> HashSet<SettingType> {
     vec![SettingType::Input].into_iter().collect()
 }
 
-// TODO(fxbug.dev/70195): Extract common template from agents.
+// TODO(https://fxbug.dev/70195): Extract common template from agents.
 pub(crate) struct CameraWatcherAgent {
     publisher: Publisher,
     messenger: service::message::Messenger,

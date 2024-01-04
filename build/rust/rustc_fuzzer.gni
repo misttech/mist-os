@@ -87,7 +87,7 @@ template("rustc_fuzzer") {
       "--cfg=fuzz_target=\"$rustfunction\"",
     ]
 
-    # fxbug.dev/94239: rustc multiple codegen units seems incompatible
+    # https://fxbug.dev/94239: rustc multiple codegen units seems incompatible
     # with fuzzing.
     configs = [ "//build/config/rust:one_codegen_unit" ]
   }
@@ -103,7 +103,7 @@ template("rustc_fuzzer") {
   }
   staticlib_vars += [ "configs" ]
 
-  # fxbug.dev/94239: rustc multiple codegen units are incompatible with fuzzing.
+  # https://fxbug.dev/94239: rustc multiple codegen units are incompatible with fuzzing.
   ignored_parameters = []
   if (is_fuchsia) {
     ignored_parameters += [ "test_inputs" ]
@@ -113,7 +113,7 @@ template("rustc_fuzzer") {
       configs += [ "//build/config/rust:one_codegen_unit" ]
     }
   } else {
-    # TODO(fxbug.dev/105707): Remove once all fuzzers are using explicit manifests.
+    # TODO(https://fxbug.dev/105707): Remove once all fuzzers are using explicit manifests.
     host_library_fuzzer(target_name) {
       forward_variables_from(invoker, "*", staticlib_vars + ignored_parameters)
       deps = [ ":$fuzzer_lib" ]

@@ -158,7 +158,7 @@ func testFuzzWithoutCorpus(t *testing.T, handle string) {
 	glog.Info(out)
 
 	// Only the CFF wrapper echos arguments back
-	// TODO(fxbug.dev/106110): Remove this condition after deprecating v1 fuzzers
+	// TODO(https://fxbug.dev/106110): Remove this condition after deprecating v1 fuzzers
 	if strings.Contains(out, "/pkg/test/crash_fuzzer") {
 		if !strings.Contains(out, "-rss_limit_mb=1000") {
 			t.Fatalf("rss limit not passed: %s", out)
@@ -257,7 +257,7 @@ func testFuzzWithCorpus(t *testing.T, handle string) {
 
 	outputElements := readCorpus(t, outputCorpus)
 
-	// TODO(fxbug.dev/38760): This is included in the ClusterFuzz tests but may
+	// TODO(https://fxbug.dev/38760): This is included in the ClusterFuzz tests but may
 	// not be a correct assertion. To avoid flake here, a fixed seed is passed above.
 	if len(outputElements) <= len(inputElements) {
 		t.Fatalf("output corpus smaller than expected: %d", len(outputElements))

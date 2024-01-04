@@ -358,7 +358,7 @@ TEST(Union, EchoUnionPayloadNoRetval) {
   });
 }
 
-// TODO(fxbug.dev/94910): This is an N+M case, where we only want to test each bindings
+// TODO(https://fxbug.dev/94910): This is an N+M case, where we only want to test each bindings
 // client/server once, rather than in combination with ever other binding. Move this test case to a
 // more appropriate file with other such N+M cases, once it exists.
 TEST(Union, EchoUnionResponseWithErrorComposedSuccessCase) {
@@ -399,7 +399,7 @@ TEST(Union, EchoUnionResponseWithErrorComposedSuccessCase) {
       });
 }
 
-// TODO(fxbug.dev/94910): This is an N+M case, where we only want to test each bindings
+// TODO(https://fxbug.dev/94910): This is an N+M case, where we only want to test each bindings
 // client/server once, rather than in combination with ever other binding. Move this test case to a
 // more appropriate file with other such N+M cases, once it exists.
 TEST(Union, EchoUnionResponseWithErrorComposedErrorCase) {

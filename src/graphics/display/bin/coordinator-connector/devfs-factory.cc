@@ -49,7 +49,7 @@ zx_status_t DevFsCoordinatorFactory::OpenCoordinatorForPrimaryOnDevice(
     return ZX_ERR_INTERNAL;
   }
 
-  // TODO(fxbug.dev/57269): Pass an async completer asynchronously into
+  // TODO(https://fxbug.dev/57269): Pass an async completer asynchronously into
   // OpenCoordinator(), rather than blocking on a synchronous call.
   fidl::WireResult result =
       fidl::WireCall(client.value())->OpenCoordinatorForPrimary(std::move(coordinator_server));

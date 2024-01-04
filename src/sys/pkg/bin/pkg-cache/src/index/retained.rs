@@ -19,7 +19,7 @@ pub struct RetainedIndex {
     /// Value will be None if no hashes have been added yet, i.e. if the package's meta.far was not
     /// available when the package was added to the index.
     /// Value will be Some if at least some of the required blobs are known.
-    /// TODO(fxbug.dev/112568) Explicitly model the intermediate state in which the meta.far is
+    /// TODO(https://fxbug.dev/112568) Explicitly model the intermediate state in which the meta.far is
     /// cached but not all subpackage meta.fars are cached. The blobs cached in the intermediate
     /// state are protected from GC (serve_needed_blobs gives MissingBlobs a callback that adds
     /// blobs to the retained index as they are encountered in the caching process), but this could

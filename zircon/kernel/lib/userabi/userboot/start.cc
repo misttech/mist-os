@@ -50,7 +50,7 @@
 
 namespace {
 
-// TODO(fxbug.dev/121753): Replace copy & pasted FIDL C bindings with new C++ bindings when that's
+// TODO(https://fxbug.dev/121753): Replace copy & pasted FIDL C bindings with new C++ bindings when that's
 // allowed.
 
 struct fuchsia_boot_SvcStashStoreRequestMessage {

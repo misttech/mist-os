@@ -156,7 +156,7 @@ impl<D> ClientMlme<D> {
         &self,
         responder: wlan_sme::responder::Responder<fidl_mlme::GetIfaceCounterStatsResponse>,
     ) -> Result<(), Error> {
-        // TODO(fxbug.dev/43456): Implement stats
+        // TODO(https://fxbug.dev/43456): Implement stats
         let resp =
             fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED);
         responder.respond(resp);
@@ -167,7 +167,7 @@ impl<D> ClientMlme<D> {
         &self,
         responder: wlan_sme::responder::Responder<fidl_mlme::GetIfaceHistogramStatsResponse>,
     ) -> Result<(), Error> {
-        // TODO(fxbug.dev/43456): Implement stats
+        // TODO(https://fxbug.dev/43456): Implement stats
         let resp =
             fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED);
         responder.respond(resp);
@@ -178,7 +178,7 @@ impl<D> ClientMlme<D> {
         &self,
         responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelListResponse>,
     ) -> Result<(), Error> {
-        // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
+        // TODO(https://fxbug.dev/79543): Implement once Minstrel is in Rust.
         error!("ListMinstrelPeers is not supported.");
         let peers = fidl_minstrel::Peers { addrs: vec![] };
         let resp = fidl_mlme::MinstrelListResponse { peers };
@@ -191,7 +191,7 @@ impl<D> ClientMlme<D> {
         responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelStatsResponse>,
         _addr: &MacAddr,
     ) -> Result<(), Error> {
-        // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
+        // TODO(https://fxbug.dev/79543): Implement once Minstrel is in Rust.
         error!("GetMinstrelStats is not supported.");
         let resp = fidl_mlme::MinstrelStatsResponse { peer: None };
         responder.respond(resp);
@@ -231,7 +231,7 @@ impl<D: DeviceOps> ClientMlme<D> {
     }
 
     pub fn on_mac_frame_rx(&mut self, frame: &[u8], rx_info: banjo_wlan_softmac::WlanRxInfo) {
-        // TODO(fxbug.dev/44487): Send the entire frame to scanner.
+        // TODO(https://fxbug.dev/44487): Send the entire frame to scanner.
         match mac::MacFrame::parse(frame, false) {
             Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) => {
                 let bssid = Bssid::from(mgmt_hdr.addr3);
@@ -270,7 +270,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                     .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
                     .on_mac_frame(frame, rx_info),
                 Some(_) => (),
-                // TODO(fxbug.dev/124243): This is only reachable because the Client state machine
+                // TODO(https://fxbug.dev/124243): This is only reachable because the Client state machine
                 // returns to the Joined state and clears the main channel upon deauthentication.
                 None => {
                     error!(
@@ -395,7 +395,7 @@ impl<D: DeviceOps> ClientMlme<D> {
             }
             Err(e) => {
                 error!("Error setting up device for join: {}", e);
-                // TODO(fxbug.dev/44317): Only one failure code defined in IEEE 802.11-2016 6.3.4.3
+                // TODO(https://fxbug.dev/44317): Only one failure code defined in IEEE 802.11-2016 6.3.4.3
                 // Can we do better?
                 self.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::ConnectConf {
                     resp: fidl_mlme::ConnectConfirm {
@@ -549,7 +549,7 @@ impl Client {
 
     pub fn eapol_required(&self) -> bool {
         self.connect_req.selected_bss.rsne().is_some()
-        // TODO(fxb/61020): Add detection of WPA1 in softmac for testing
+        // TODO(https://fxbug.dev/61020): Add detection of WPA1 in softmac for testing
         // purposes only. In particular, connect-to-wpa1-network relies
         // on this half of the OR statement.
             || self.connect_req.selected_bss.find_wpa_ie().is_some()
@@ -633,7 +633,7 @@ impl Client {
 
 pub struct BoundClient<'a, D> {
     sta: &'a mut Client,
-    // TODO(fxbug.dev/44079): pull everything out of Context and plop them here.
+    // TODO(https://fxbug.dev/44079): pull everything out of Context and plop them here.
     ctx: &'a mut Context<D>,
     scanner: &'a mut Scanner,
     channel_state: &'a mut ChannelState,
@@ -730,7 +730,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     /// Sends an association request frame based on device capability.
-    // TODO(fxbug.dev/39148): Use an IE set instead of individual IEs.
+    // TODO(https://fxbug.dev/39148): Use an IE set instead of individual IEs.
     pub fn send_assoc_req_frame(&mut self) -> Result<(), Error> {
         let ssid = self.sta.ssid().clone();
         let cap = &self.sta.client_capabilities.0;
@@ -848,10 +848,10 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
 
         // IEEE Std 802.11-2016, Table 9-26 specifies address field contents and their relation
         // to the addr fields.
-        // TODO(fxbug.dev/51295): Support A-MSDU address field contents.
+        // TODO(https://fxbug.dev/51295): Support A-MSDU address field contents.
 
         // We do not currently support RA other than the BSS.
-        // TODO(fxbug.dev/45833): Support to_ds = false and alternative RA for TDLS.
+        // TODO(https://fxbug.dev/45833): Support to_ds = false and alternative RA for TDLS.
         let to_ds = true;
         let from_ds = src != self.sta.iface_mac;
         // Detect when SA != TA, in which case we use addr4.
@@ -930,7 +930,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         is_protected: bool,
         eapol_frame: &[u8],
     ) {
-        // TODO(fxbug.dev/34910): EAPoL frames can be send in QoS data frames. However, Fuchsia's old C++
+        // TODO(https://fxbug.dev/34910): EAPoL frames can be send in QoS data frames. However, Fuchsia's old C++
         // MLME never sent EAPoL frames in QoS data frames. For feature parity do the same.
         let result = self.send_data_frame(
             src,
@@ -1190,7 +1190,7 @@ impl ParsedAssociateResp {
                         parsed_assoc_resp.vht_cap = Some(*vht_cap);
                     }
                 },
-                // TODO(fxbug.dev/43938): parse vendor ID and include WMM param if exists
+                // TODO(https://fxbug.dev/43938): parse vendor ID and include WMM param if exists
                 _ => {}
             }
         }

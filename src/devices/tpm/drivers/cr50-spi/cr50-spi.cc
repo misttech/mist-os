@@ -331,7 +331,7 @@ zx::result<> Cr50SpiDevice::DoXfer(uint16_t address, fidl::VectorView<uint8_t> &
     zxlogf(ERROR, "asserting spi bus failed");
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   auto deasserter = fit::defer([this]() { (void)spi_->DeassertCs(); });
 
   auto status = SendHeader(address, buf.count(), do_write);

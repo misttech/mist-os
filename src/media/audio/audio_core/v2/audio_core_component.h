@@ -31,7 +31,7 @@ class AudioCoreComponent {
                      std::shared_ptr<const FidlThread> fidl_thread, bool enable_cobalt);
 
  private:
-  // TODO(fxbug.dev/98652): delete when we have a real implementation
+  // TODO(https://fxbug.dev/98652): delete when we have a real implementation
   class EmptyDeviceLister : public media::audio::DeviceLister {
     std::vector<fuchsia::media::AudioDeviceInfo> GetDeviceInfos() { return {}; }
   };
@@ -48,7 +48,7 @@ class AudioCoreComponent {
   std::shared_ptr<media::audio::UsageGainReporterImpl> usage_gain_reporter_;
   std::shared_ptr<media::audio::UsageReporterImpl> usage_reporter_;
 
-  // TODO(fxbug.dev/98652):
+  // TODO(https://fxbug.dev/98652):
   // fuchsia.media.AudioDeviceEnumerator
   // fuchsia.media.tuning.AudioTuner
 

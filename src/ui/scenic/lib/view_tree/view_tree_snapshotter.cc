@@ -115,7 +115,7 @@ ViewTreeSnapshotter::ViewTreeSnapshotter(std::vector<SubtreeSnapshotGenerator> s
     : subtree_generators_(std::move(subtree_generators)) {
   for (auto& [subscriber_callback, dispatcher] : subscribers) {
     FX_DCHECK(dispatcher);
-    // TODO(fxbug.dev/75864): We save the callback directly and ignore the dispatcher as a
+    // TODO(https://fxbug.dev/75864): We save the callback directly and ignore the dispatcher as a
     // workaround to avoid flakes. Rework this after deciding on a new synchronization mechanism.
     subscriber_callbacks_.emplace_back(std::move(subscriber_callback));
   }

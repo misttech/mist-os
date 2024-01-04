@@ -387,7 +387,7 @@ async fn run(
 }
 
 /// Parse program arguments, call the main loop, and log any unrecoverable errors.
-/// TODO(fxbug.dev/125788): migrate runtime config to structured config.
+/// TODO(https://fxbug.dev/125788): migrate runtime config to structured config.
 #[fuchsia::main(logging_tags=["bt-snoop"])]
 async fn main() {
     let args: Args = argh::from_env();

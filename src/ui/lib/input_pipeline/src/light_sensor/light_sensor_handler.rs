@@ -438,7 +438,7 @@ const MAX_SATURATION_GREEN: u16 = 20_395;
 const MAX_SATURATION_BLUE: u16 = 20_939;
 const MAX_SATURATION_CLEAR: u16 = 65_085;
 
-// TODO(http://fxbug.dev/65167) Update when sensor reports include saturation
+// TODO(https://fxbug.dev/65167) Update when sensor reports include saturation
 // information.
 fn saturated(reading: Rgbc<u16>) -> bool {
     reading.red == MAX_SATURATION_RED

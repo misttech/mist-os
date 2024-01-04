@@ -38,7 +38,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
 
                     // Mix in additional capabilities to the dict.
                     //
-                    // TODO(fxbug.dev/298100106): Could RealmInstance expose a higher-level
+                    // TODO(https://fxbug.dev/298100106): Could RealmInstance expose a higher-level
                     // API for getting the realm's exposed dict, along with APIs that make it
                     // easy to add in more capabilities served by this component? For example:
                     //

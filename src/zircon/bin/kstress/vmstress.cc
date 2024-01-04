@@ -1549,7 +1549,7 @@ class MultiVmoTestInstance : public TestInstance {
           Printf("P");
           static const uint32_t policies[] = {ZX_CACHE_POLICY_CACHED,
 
-          // TODO(fxbug.dev/131108): On arm64, unaligned access to Device memory generates an
+          // TODO(https://fxbug.dev/131108): On arm64, unaligned access to Device memory generates an
           // alignment exception.  Our current memcpy/memset implementations are designed to
           // work on Normal memory and will result in unaligned access if the pointer arguments
           // are not aligned.  We should fix vmstress to never issue unaligned memcpy/memset to

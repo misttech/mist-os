@@ -192,7 +192,7 @@ TEST_F(AcpiBatteryTest, CheckDataUpdated) {
 
   // Percentage point drop!
   battery_capacity_ = 990;
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)notify_client_->Handle(0x80);
 
   // Expect an event.

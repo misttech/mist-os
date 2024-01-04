@@ -38,7 +38,7 @@ group("for_transition") {
 # don't care between Netstack 2 and 3. These tests currently use NS2,
 # which is unavailable on RISC-V. Instead, use NS3 there. Once NS3 is
 # widely deployed, this group can be deleted.
-# TODO(fxbug.dev/133188): Define a package here instead of a group, then
+# TODO(https://fxbug.dev/133188): Define a package here instead of a group, then
 # use it as a subpackage within the tests that need it.
 group("netstack-for-tests") {
   deps = [ "netstack:component" ]
@@ -94,7 +94,7 @@ network_unified_binary_regular_and_gub_packages("netstack-migration") {
   ]
 }
 
-# TODO(fxbug.dev/122864) Remove transitional labels
+# TODO(https://fxbug.dev/122864) Remove transitional labels
 group("virtualization-core-shard") {
 }
 

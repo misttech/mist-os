@@ -53,7 +53,7 @@ zx::result<> UicCommand::SendUicCommand() {
 
   UicCommandReg::Get().FromValue(static_cast<uint8_t>(GetOpcode())).WriteTo(&mmio);
 
-  // TODO(fxbug.dev/124835): Currently, the UIC commands are only used during the initialisation
+  // TODO(https://fxbug.dev/124835): Currently, the UIC commands are only used during the initialisation
   // process, so we implemented them as polling. However, if DME_HIBERNATE and DME_POWERMODE are
   // added in the future, it should be changed to an interrupt method.
 

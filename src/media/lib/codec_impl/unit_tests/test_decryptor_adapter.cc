@@ -703,7 +703,7 @@ TEST_F(SecureDecryptorAdapterTest, FailsToAcquireSecureBuffers) {
 
   PumpInput();
 
-  // TODO(fxbug.dev/13678): Once there is a Sysmem fake that allows us to control behavior, we could
+  // TODO(https://fxbug.dev/13678): Once there is a Sysmem fake that allows us to control behavior, we could
   // force it to give us back "secure" buffers that aren't really secure and go through more of the
   // flow.
   RunLoopUntil(

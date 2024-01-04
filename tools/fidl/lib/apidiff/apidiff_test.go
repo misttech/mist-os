@@ -2568,7 +2568,7 @@ closed protocol T {
 }
 `,
 		},
-		// TODO(fxbug.dev/7807): Add aliases and newtypes to summaries and diffs
+		// TODO(https://fxbug.dev/7807): Add aliases and newtypes to summaries and diffs
 		// once they are fully implemented.
 	}
 	for _, test := range tests {

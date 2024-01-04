@@ -69,7 +69,7 @@ impl FromStr for RemoteDirectoryPath {
             return Err(ParsePathError::InvalidFormat);
         }
 
-        // TODO(fxb/126681): Use common Moniker parsing logic instead of String.
+        // TODO(https://fxbug.dev/126681): Use common Moniker parsing logic instead of String.
         let moniker = parts.first().unwrap().to_string();
         let (dir_type, path_str) = if parts.len() == 3 {
             let parsed = parse_dir_type_from_str(parts[1])?;

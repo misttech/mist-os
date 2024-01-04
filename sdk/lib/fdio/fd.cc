@@ -41,7 +41,7 @@ zx_status_t fdio_fd_clone(int fd, zx_handle_t* out_handle) {
   if (io == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
-  // TODO(fxbug.dev/30920): implement/honor close-on-exec flag
+  // TODO(https://fxbug.dev/30920): implement/honor close-on-exec flag
   return io->clone(out_handle);
 }
 

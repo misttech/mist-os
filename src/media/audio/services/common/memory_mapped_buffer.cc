@@ -25,7 +25,7 @@ fbl::RefPtr<fzl::VmarManager>* CreateVmarManager() {
   //
   // We somewhat-arbitrarily choose 16GB.
   //
-  // For historical context, see fxbug.dev/13355 and fxrev.dev/286608.
+  // For historical context, see https://fxbug.dev/13355 and fxrev.dev/286608.
   constexpr size_t kSize = 16ull * 1024 * 1024 * 1024;
   constexpr zx_vm_option_t kFlags =
       ZX_VM_COMPACT | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_ALIGN_1GB;

@@ -34,7 +34,7 @@ zx_status_t ChromiumosEcLpc::Bind() {
   // Enable access to the ranges of IO ports required for communication with the EC.
   //
   // This list is not available via ACPI, so we need to hard-code it.
-  // TODO(fxbug.dev/89226): patch in required resources to the ACPI table, instead of using
+  // TODO(https://fxbug.dev/89226): patch in required resources to the ACPI table, instead of using
   // get_root_resource().
   struct PortRange {
     uint16_t base;

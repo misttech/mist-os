@@ -14,7 +14,7 @@
 
 namespace i2cutil {
 
-// TODO(fxbug.dev/104064): Currently there's a mismatch between the maximum
+// TODO(https://fxbug.dev/104064): Currently there's a mismatch between the maximum
 //                         number of transactions the i2c.fidl and i2c-impl.fidl
 //                         permit.
 //                         This implementation just picks the smaller (safer) of

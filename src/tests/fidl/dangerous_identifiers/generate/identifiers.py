@@ -19,7 +19,7 @@ from common import Identifier, Deny
 # @bindings_denylist attribute will be used, if not then the identifier will
 # be entirely omitted from the affected contexts.
 
-# Deny rule to apply to Rust keywords, see fxbug.dev/60219
+# Deny rule to apply to Rust keywords, see https://fxbug.dev/60219
 RUST_KEYWORD = [
     Deny(
         bindings=["rust"],
@@ -64,7 +64,7 @@ IDENTIFIERS = [
     Identifier("bitand"),
     Identifier("bitor"),
     Identifier("bool", FIDL_PRIMITIVE),
-    # TODO(fxbug.dev/77561): this can be re-enabled once builtin shadowing works.
+    # TODO(https://fxbug.dev/77561): this can be re-enabled once builtin shadowing works.
     # Identifier('box', RUST_KEYWORD),
     Identifier("break", RUST_KEYWORD),
     Identifier("byte", FIDL_PRIMITIVE),
@@ -87,7 +87,7 @@ IDENTIFIERS = [
     Identifier("const_cast"),
     Identifier("constexpr"),
     Identifier("continue", RUST_KEYWORD),
-    # TODO(fxbug.dev/66767): Fix in Rust.
+    # TODO(https://fxbug.dev/66767): Fix in Rust.
     Identifier("control_handle", [Deny(bindings=["rust"])]),
     Identifier("controller"),
     Identifier("covariant"),
@@ -96,7 +96,7 @@ IDENTIFIERS = [
     Identifier("decodable"),
     Identifier(
         "decoder"
-    ),  # TODO(fxbug.dev/8081) [Deny(uses=['union.names'], styles=['lower'])]),
+    ),  # TODO(https://fxbug.dev/8081) [Deny(uses=['union.names'], styles=['lower'])]),
     Identifier("default"),
     Identifier("defer"),
     Identifier("deferred"),
@@ -119,7 +119,7 @@ IDENTIFIERS = [
     Identifier("external"),
     Identifier("factory"),
     Identifier("fallthrough"),
-    # TODO(fxbug.dev/77561)
+    # TODO(https://fxbug.dev/77561)
     # Identifier('false', RUST_KEYWORD),
     Identifier("fidl"),
     Identifier("fidl_type"),
@@ -207,7 +207,7 @@ IDENTIFIERS = [
     Identifier("reinterpret_cast"),
     Identifier("requires"),
     Identifier("result"),
-    # TODO(fxbug.dev/66767): Fix in Rust.
+    # TODO(https://fxbug.dev/66767): Fix in Rust.
     Identifier("responder", [Deny(bindings=["rust"])]),
     Identifier("rethrow"),
     Identifier("return", RUST_KEYWORD),
@@ -241,7 +241,7 @@ IDENTIFIERS = [
         "string",
         FIDL_PRIMITIVE
         + [
-            # TODO(fxbug.dev/66767): Need to escape "String" in Rust.
+            # TODO(https://fxbug.dev/66767): Need to escape "String" in Rust.
             Deny(
                 bindings=["rust"],
                 styles=["upper", "camel"],
@@ -263,7 +263,7 @@ IDENTIFIERS = [
     Identifier("throw"),
     Identifier("to_string"),
     Identifier("trait", RUST_KEYWORD),
-    # TODO(fxbug.dev/77561)
+    # TODO(https://fxbug.dev/77561)
     # Identifier('true', RUST_KEYWORD),
     Identifier("try", RUST_KEYWORD),
     Identifier("type", RUST_KEYWORD),
@@ -273,7 +273,7 @@ IDENTIFIERS = [
     Identifier("typeof", RUST_KEYWORD),
     Identifier("uint16", FIDL_PRIMITIVE),
     # We use uint32 as a type in some tests which makes it conflict.
-    # See also: fxbug.dev/38124 fxbug.dev/8042)
+    # See also: https://fxbug.dev/38124 https://fxbug.dev/8042)
     Identifier(
         "uint32",
         [
@@ -283,7 +283,7 @@ IDENTIFIERS = [
                     "constants",
                     "service.member.types",  # FIDL compiler disallows primitives here.
                     "struct.types",
-                    "table.names",  # TODO(fxbug.dev/8081) 'union.names'
+                    "table.names",  # TODO(https://fxbug.dev/8081) 'union.names'
                 ],
             )
         ],
@@ -293,7 +293,7 @@ IDENTIFIERS = [
     Identifier("union"),
     Identifier("unknown"),
     Identifier("unknown_bytes"),
-    # TODO(fxb/60495):  Remedy identifier clashes.
+    # TODO(https://fxbug.dev/60495):  Remedy identifier clashes.
     Identifier("unknown_data", [Deny(bindings=["dart", "rust"])]),
     Identifier("unsafe", RUST_KEYWORD),
     Identifier("unsigned"),

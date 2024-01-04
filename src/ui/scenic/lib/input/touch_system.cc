@@ -55,7 +55,7 @@ AccessibilityPointerEvent BuildAccessibilityPointerEvent(const InternalTouchEven
 
 // Takes an InternalTouchEvent and returns a point in (Vulkan) Normalized Device Coordinates,
 // in relation to the viewport. Intended for magnification
-// TODO(fxbug.dev/50549): Only here to allow the legacy a11y flow. Remove along with the legacy a11y
+// TODO(https://fxbug.dev/50549): Only here to allow the legacy a11y flow. Remove along with the legacy a11y
 // code.
 glm::vec2 GetViewportNDCPoint(const InternalTouchEvent& internal_event) {
   const float width = internal_event.viewport.extents.max.x - internal_event.viewport.extents.min.x;
@@ -140,7 +140,7 @@ zx_koid_t TouchSystem::FindViewRefKoidOfRelatedChannel(
 
 void TouchSystem::Upgrade(fidl::InterfaceHandle<fuchsia::ui::pointer::TouchSource> original,
                           fuchsia::ui::pointer::augment::LocalHit::UpgradeCallback callback) {
-  // TODO(fxbug.dev/84270): This currently requires the client to wait until the TouchSource has
+  // TODO(https://fxbug.dev/84270): This currently requires the client to wait until the TouchSource has
   // been hooked up before making the Upgrade() call. This is not a great user experience. Change
   // this so we cache the channel if it arrives too early.
   const zx_koid_t view_ref_koid = FindViewRefKoidOfRelatedChannel(original);
@@ -173,7 +173,7 @@ void TouchSystem::Upgrade(fidl::InterfaceHandle<fuchsia::ui::pointer::TouchSourc
             /*get_local_hit*/
             [this](const InternalTouchEvent& event) {
               // Perform a semantic hit test to find the top view a11y cares about.
-              // TODO(fxbug.dev/106611): If we have more than one TouchSourceWithLocalHit client,
+              // TODO(https://fxbug.dev/106611): If we have more than one TouchSourceWithLocalHit client,
               // this hit test will be done multiple times per injectiom redundantly. We might need
               // to improve this in the future, but as long as we're only expecting the one client
               // this is fine.
@@ -375,7 +375,7 @@ std::vector<ContenderId> TouchSystem::CollectContenders(StreamId stream_id,
   std::vector<ContenderId> contenders;
 
   // Add an A11yLegacyContender if the injection context is the root of the ViewTree.
-  // TODO(fxbug.dev/50549): Remove when a11y is a native GD client.
+  // TODO(https://fxbug.dev/50549): Remove when a11y is a native GD client.
   if (contenders_.count(a11y_contender_id_) &&
       IsRootOrDirectChildOfRoot(event.context, *view_tree_snapshot_)) {
     contenders.push_back(a11y_contender_id_);
@@ -420,7 +420,7 @@ void TouchSystem::UpdateGestureContest(const InternalTouchEvent& event, StreamId
   for (const auto contender_id : contenders) {
     // Don't use the arena obtained above the loop, because it may have been removed from
     // gesture_arenas_ in a previous loop iteration.
-    // TODO(fxbug.dev/90004): it would be nice to restructure the code so that the arena can be
+    // TODO(https://fxbug.dev/90004): it would be nice to restructure the code so that the arena can be
     // obtained once at the top of this method, and guaranteed to be safe to reuse thereafter.
     const auto arena_it = gesture_arenas_.find(stream_id);
     if (arena_it == gesture_arenas_.end()) {
@@ -435,7 +435,7 @@ void TouchSystem::UpdateGestureContest(const InternalTouchEvent& event, StreamId
     const auto it = contenders_.find(contender_id);
     if (it == contenders_.end()) {
       // This contender is no longer present, probably because the client has disconnected.
-      // TODO(fxbug.dev/90004): the contender is still in the arena, though.  Can this cause
+      // TODO(https://fxbug.dev/90004): the contender is still in the arena, though.  Can this cause
       // problems (such as the arena contest never completing), or will the arena soon finish and be
       // deleted anyway?
       continue;
@@ -451,7 +451,7 @@ void TouchSystem::UpdateGestureContest(const InternalTouchEvent& event, StreamId
                              is_end_of_stream,
                              view_tree_snapshot_->view_tree.at(view_ref_koid).bounding_box);
     } else if (contender_id == a11y_contender_id_) {
-      // TODO(fxbug.dev/50549): A11yLegacyContender doesn't need correct transforms or view bounds.
+      // TODO(https://fxbug.dev/50549): A11yLegacyContender doesn't need correct transforms or view bounds.
       // Remove this branch when legacy a11y api goes away.
       contender.UpdateStream(stream_id, event, is_end_of_stream, /*bounding_box=*/{});
     } else {
@@ -517,7 +517,7 @@ void TouchSystem::DestroyArenaIfComplete(StreamId stream_id) {
   const auto& arena = arena_it->second;
 
   // This branch will eventually be taken for every arena.
-  // TODO(fxbug.dev/90004): can we elaborate on why this is true?
+  // TODO(https://fxbug.dev/90004): can we elaborate on why this is true?
   if (arena.contenders().empty() || (arena.contest_has_ended() && arena.stream_has_ended())) {
     gesture_arenas_.erase(stream_id);
   }
@@ -528,7 +528,7 @@ void TouchSystem::EraseContender(ContenderId contender_id, zx_koid_t view_ref_ko
     const size_t success = contenders_.erase(contender_id);
     FX_DCHECK(success) << "Contender " << contender_id << " did not exist";
   }
-  // TODO(fxbug.dev/64376): ZX_KOID_INVALID is only passed in by legacy contenders. Remove this
+  // TODO(https://fxbug.dev/64376): ZX_KOID_INVALID is only passed in by legacy contenders. Remove this
   // check when they go away.
   if (view_ref_koid != ZX_KOID_INVALID) {
     const size_t success = viewrefs_to_contender_ids_.erase(view_ref_koid);

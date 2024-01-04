@@ -38,7 +38,7 @@ closed protocol DeviceReportsReader {
     }) error zx.Status;
 };
 
-// TODO(fxbug.dev/49329): This API doesn't follow best practices and needs to be
+// TODO(https://fxbug.dev/49329): This API doesn't follow best practices and needs to be
 // cleaned up.
 closed protocol Device {
     /// Get the HID boot interface protocol this device supports

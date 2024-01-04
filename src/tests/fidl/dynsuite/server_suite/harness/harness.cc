@@ -49,7 +49,7 @@ void ServerTest::SetUp() {
     runner_version_ = result->version();
   }
 
-  // TODO(fxbug.dev/132094): Remove after updating Dart.
+  // TODO(https://fxbug.dev/132094): Remove after updating Dart.
   SKIP_IF_VERSION_OLDER_THAN(1);
 
   // Start the Target server.

@@ -32,7 +32,7 @@ Alternatively, look for build targets with suppressions:
 ```gn
 source_set("foo") {
   ...
-  # TODO(fxbug.dev/xxxxx): UBSan has found an instance of undefined behavior in this target.
+  # TODO(https://fxbug.dev/xxxxx): UBSan has found an instance of undefined behavior in this target.
   # Disable UBSan for this target temporarily until it is migrated into CI/CQ.
   configs += [ "//build/config:temporarily_disable_ubsan_do_not_use" ]
 }

@@ -480,7 +480,7 @@ pub fn create_repo_host(
     // communicate by way of the ssh host's address. This is helpful when the
     // device can access the repository only through a specific interface.
 
-    // FIXME(fxbug.dev/87439): Once the tunnel bug is fixed, we may
+    // FIXME(https://fxbug.dev/87439): Once the tunnel bug is fixed, we may
     // want to default all traffic going through the tunnel. Consider
     // creating an ffx config variable to decide if we want to always
     // tunnel, or only tunnel if the server is on a loopback address.

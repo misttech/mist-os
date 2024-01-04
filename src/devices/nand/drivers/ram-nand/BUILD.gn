@@ -40,7 +40,7 @@ fuchsia_driver("ram-nand-driver") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -64,7 +64,7 @@ source_set("common") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
 
-    # TODO(fxb/38132): Migrate to the new bind rules and delete the below
+    # TODO(https://fxbug.dev/38132): Migrate to the new bind rules and delete the below
     "//src/lib/ddk:ddk-deprecated-binding-headers",
   ]
   public_deps = [ "//zircon/system/ulib/fbl" ]
@@ -103,12 +103,12 @@ test("test") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
 
-    # TODO(fxb/38132): Migrate to the new bind rules and delete the below
+    # TODO(https://fxbug.dev/38132): Migrate to the new bind rules and delete the below
     "//src/lib/ddk:ddk-deprecated-binding-headers",
   ]
   data_deps = [ ":ram-nand" ]
 
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

@@ -229,7 +229,7 @@ specifically must at least one non-reserved member.
 
 ### NOTE 6
 
-<!-- TODO(fxbug.dev/77958): remove when complete -->
+<!-- TODO(https://fxbug.dev/77958): remove when complete -->
 Attributes cannot be placed on a reserved member.
 
 Also, though ordinals can be any numeric literal, the compiler enforces that

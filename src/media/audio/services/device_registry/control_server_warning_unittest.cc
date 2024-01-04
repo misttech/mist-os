@@ -440,7 +440,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferWhilePending) {
   EXPECT_TRUE(control_client.is_valid());
 }
 
-// TODO(fxbug.dev/117826): Enable this unittest that tests the upper limit of VMO size (4Gb).
+// TODO(https://fxbug.dev/117826): Enable this unittest that tests the upper limit of VMO size (4Gb).
 // This is not high-priority since even at the service's highest supported frame rate (192 kHz),
 // channel_count (8) and sample_type (float64), a 4Gb ring-buffer would be 5.8 minutes long!
 TEST_F(ControlServerWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes) {

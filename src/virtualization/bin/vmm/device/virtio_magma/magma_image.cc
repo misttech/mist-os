@@ -213,7 +213,7 @@ zx_status_t VulkanImageCreator::InitSysmem() {
     sysmem_allocator_ = fidl::WireSyncClient<fuchsia_sysmem::Allocator>(std::move(*client_end));
   }
 
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)sysmem_allocator_->SetDebugClientInfo(
       fidl::StringView::FromExternal(fsl::GetCurrentProcessName()), fsl::GetCurrentProcessKoid());
 

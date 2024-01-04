@@ -131,7 +131,7 @@ bool ImagePipeSurfaceDisplay::Init() {
               provider.error_value(), provider.status_string());
     }
 
-    // TODO(fxbug.dev/113114): Use Component::Connect here when it's possible to use this without
+    // TODO(https://fxbug.dev/113114): Use Component::Connect here when it's possible to use this without
     // depending on libsvc.so
     status = fdio_service_connect(filename.c_str(), provider->server.TakeChannel().release());
     if (status != ZX_OK) {

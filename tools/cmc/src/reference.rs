@@ -14,7 +14,7 @@ enum ComponentManifest {
 
 // These runners respect `program.binary`. We only validate the `program` section for components
 // using them.
-// TODO(fxbug.dev/67151)
+// TODO(https://fxbug.dev/67151)
 const RUNNER_VALIDATE_LIST: [&'static str; 6] = [
     "driver",
     "elf",
@@ -22,7 +22,7 @@ const RUNNER_VALIDATE_LIST: [&'static str; 6] = [
     "go_test_runner",
     "gtest_runner",
     "rust_test_runner",
-    // TODO(fxbug.dev/68608): Add support for Dart components.
+    // TODO(https://fxbug.dev/68608): Add support for Dart components.
 ];
 
 const CHECK_REFERENCES_URL: &str = "https://fuchsia.dev/go/components/build-errors";

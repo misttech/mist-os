@@ -277,7 +277,7 @@ TYPED_TEST(ElfldltlRelocationTests, VisitSymbolicEmpty) {
   EXPECT_EQ(0u, count);
 }
 
-// TODO(fxbug.dev/72221): real VisitSymbolic tests
+// TODO(https://fxbug.dev/72221): real VisitSymbolic tests
 
 template <elfldltl::ElfMachine Machine>
 constexpr void CheckMachine() {

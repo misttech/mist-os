@@ -13,7 +13,7 @@
 char16_t kBootbyteVariableName[] = ZIRCON_BOOTBYTE_EFIVAR;
 efi_guid kZirconVendorGuid = ZIRCON_VENDOR_GUID;
 
-// FIXME(fxbug.dev/128274): UBSan is detecting a function type mismatch between
+// FIXME(https://fxbug.dev/128274): UBSan is detecting a function type mismatch between
 // this and EfiBootbyOwner::GetVariable in fastboot_test.cc. I'm not exactly
 // sure where the mismatch occurs since both functions have the same attribute,
 // return type, and argument types. But for now, let's suppress the warning to
@@ -29,7 +29,7 @@ __attribute__((no_sanitize("function"))) efi_status get_bootbyte(efi_runtime_ser
   return status;
 }
 
-// FIXME(fxbug.dev/128274): UBSan is detecting a function type mismatch between
+// FIXME(https://fxbug.dev/128274): UBSan is detecting a function type mismatch between
 // this and EfiBootbyOwner::SetVariable in fastboot_test.cc. I'm not exactly
 // sure where the mismatch occurs since both functions have the same attribute,
 // return type, and argument types. But for now, let's suppress the warning to

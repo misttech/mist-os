@@ -69,7 +69,7 @@ func getFfxFuzzOutput(t *testing.T, args []string) (string, string) {
 		if fuzzerUrl == "fuchsia-pkg://fuchsia.com/cff#meta/broken.cm" {
 			// Simulate fuzzer error by having the subprocess test exit with
 			// error.
-			// TODO(fxbug.dev/112048): We are running inside a `go test`
+			// TODO(https://fxbug.dev/112048): We are running inside a `go test`
 			// environment which, unintuitively, outputs everything over stdout
 			// even if we write to stderr.
 			t.Fatalf("internal error")

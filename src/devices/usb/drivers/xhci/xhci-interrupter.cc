@@ -73,7 +73,7 @@ fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
 }
 
 zx_status_t Interrupter::IrqThread() {
-  // TODO(fxbug.dev/30888): See fxbug.dev/30888.  Get rid of this.  For now we need thread
+  // TODO(https://fxbug.dev/30888): See https://fxbug.dev/30888.  Get rid of this.  For now we need thread
   // priorities so that realtime transactions use the completer which ends
   // up getting realtime latency guarantees.
   async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;

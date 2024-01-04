@@ -233,7 +233,7 @@ if (is_host) {
       "//src/testing/catapult_converter:converter_bin",
     ]
 
-    # TODO(fxbug.dev/48350): Enable host build for non-linux hosts as well.
+    # TODO(https://fxbug.dev/48350): Enable host build for non-linux hosts as well.
     if (host_os == "linux") {
       sources += [ "$root_out_dir/iperf3" ]
       deps += [ "//third_party/iperf:bin" ]

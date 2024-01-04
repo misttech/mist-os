@@ -386,7 +386,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display
     }
   }
 
-  // TODO(fxbug.dev/72588): This is a stopgap solution to support existing
+  // TODO(https://fxbug.dev/72588): This is a stopgap solution to support existing
   // OnVsync() DisplayController FIDL events. In the future we'll remove this
   // logic and only return config seqnos in OnVsync() events instead.
 
@@ -458,7 +458,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
     kernel_framebuffer_released_ = true;
   }
 
-  // TODO(fxbug.dev/130367): Replace VLA with fixed-size array once we have a
+  // TODO(https://fxbug.dev/130367): Replace VLA with fixed-size array once we have a
   // limit on the number of connected displays.
   const int32_t display_configs_size = std::max(1, count);
   const display_config_t* display_configs[display_configs_size];

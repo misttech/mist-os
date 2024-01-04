@@ -23,7 +23,7 @@ const char kAuthHelp[] =
 
     rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login
 
-  For more information, please see fxbug.dev/119250.
+  For more information, please see https://fxbug.dev/119250.
 )";
 
 void RunVerbAuth(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
@@ -31,7 +31,7 @@ void RunVerbAuth(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
       "This command and the OOB auth workflow are deprecated (go/oauth-oob-deprecation). "
       "To authenticate, please run the following command and restart zxdb\n\n"
       "  rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login\n\n"
-      "For more information, please see fxbug.dev/119250.");
+      "For more information, please see https://fxbug.dev/119250.");
 }
 
 }  // namespace

@@ -141,7 +141,7 @@ the FIDL language. It only includes current features, not obsolete ones.
 | `Method(table { ... })`  | [RFC-0087] | Tables and unions as top-level request/response types
 | `open`, `closed`, `ajar` | [RFC-0138] | Open and closed interactions
 
-<!-- TODO(fxbug.dev/93457): Uncomment when accepted. -->
+<!-- TODO(https://fxbug.dev/93457): Uncomment when accepted. -->
 <!-- | `terminal`        | [RFC-NNNN] | Terminal events -->
 
 ## Current status
@@ -169,7 +169,7 @@ _Legend:_
 | [RFC-0022] | Default values for struct members | Superseded by [RFC-0160]
 | [RFC-0051] | Safer structs for C++ | Rejected
 | [RFC-0062] | Method impossible | Rejected
-| [RFC-0053] | Epitaphs | Implemented <!-- TODO(fxbug.dev/93457): Change to "Superseded" when we have terminal events. -->
+| [RFC-0053] | Epitaphs | Implemented <!-- TODO(https://fxbug.dev/93457): Change to "Superseded" when we have terminal events. -->
 | [RFC-0066] | Programmer advisory explicit defaults | Implemented
 | [RFC-0047] | Tables | Amended by [RFC-0116], [RFC-0132]
 | [RFC-0055] | Documentation comments | Amended by [RFC-0043]

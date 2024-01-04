@@ -61,13 +61,13 @@ class InputDevice : public InputDeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // TODO(fxbug.dev/78205): Support feature reports (polling frequency,
+  // TODO(https://fxbug.dev/78205): Support feature reports (polling frequency,
   // sensor value thresholds).
   void GetFeatureReport(GetFeatureReportCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // TODO(fxbug.dev/78205): Support feature reports (polling frequency,
+  // TODO(https://fxbug.dev/78205): Support feature reports (polling frequency,
   // sensor value thresholds).
   void SetFeatureReport(SetFeatureReportRequestView request,
                         SetFeatureReportCompleter::Sync& completer) override {

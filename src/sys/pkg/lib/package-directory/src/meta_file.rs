@@ -45,7 +45,7 @@ impl<S: crate::NonMetaStorage> MetaFile<S> {
             // least 4 KiB.
             // [1] https://fuchsia.dev/fuchsia-src/concepts/source_code/archive_format#content_chunk
             // [2] https://fuchsia.dev/fuchsia-src/reference/syscalls/system_get_page_size
-            // TODO(fxbug.dev/82006) Need to manually zero the end of the VMO if
+            // TODO(https://fxbug.dev/82006) Need to manually zero the end of the VMO if
             // zx_system_get_page_size() > 4K.
             assert_eq!(zx::system_get_page_size(), 4096);
             let vmo = far_vmo

@@ -46,7 +46,7 @@ TEST(UsbTests, RootHubsTest) {
   // xhci/ehci, we should check the root hubs.
   if (zx_status_t status = check_xhci_root_hubs(); status != ZX_OK) {
     // TODO(https://fxbug.dev/121596): At the moment we cannot restrict a test
-    // to only run on hardware(fxbug.dev/9362) and not the qemu instances.
+    // to only run on hardware(https://fxbug.dev/9362) and not the qemu instances.
     // We should fail here when running on hardware.
     printf("[SKIPPING] Root hub creation failed.\n");
     return;

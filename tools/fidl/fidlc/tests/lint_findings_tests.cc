@@ -1591,7 +1591,7 @@ ${TEST1} TODO: Finish the TestStruct declaration
 type TestStruct = struct {
 
   ${TEST2}TODO: Replace the placeholder
-  placeholder string:64;${DOC_NOT_ALLOWED_HERE1} TODO(fxbug.dev/FIDL-0000): Add some more fields
+  placeholder string:64;${DOC_NOT_ALLOWED_HERE1} TODO(https://fxbug.dev/FIDL-0000): Add some more fields
 };
 )FIDL";
 

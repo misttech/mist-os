@@ -148,7 +148,7 @@ more efficient code, but requires a little more effort to maintain. You can use
 this approach when the enumeration has stabilized.
 
 Note: Switching to `stringer` as the default recommended approached is tracked
-as [fxbug.dev/73539](https://fxbug.dev/73539).
+as [https://fxbug.dev/73539](https://fxbug.dev/73539).
 
 ### Sets
 
@@ -427,7 +427,7 @@ shape to be reused at will. We plan to update the various GN templates to
 reflect these subtleties, and offer a `go_private_library` template allowed to
 be used solely by a single `go_binary` rule, and `go_third_party_library` which
 would be the only allowing the use `...`. This is tracked as
-[fxbug.dev/73815](https://fxbug.dev/73815).
+[https://fxbug.dev/73815](https://fxbug.dev/73815).
 
 ## Testing
 

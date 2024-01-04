@@ -169,7 +169,7 @@ void AudioCapturerServer::SetPcmStreamType(SetPcmStreamTypeRequestView request,
 
   format_ = std::move(format_result.value());
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->SetFormat(*format_);
 
   MaybeConfigure();
@@ -252,7 +252,7 @@ void AudioCapturerServer::AddPayloadBuffer(AddPayloadBufferRequestView request,
     return;
   }
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->AddPayloadBuffer(request->id, vmo_size);
 
   payload_buffer_ = std::move(request->payload_buffer);
@@ -268,7 +268,7 @@ void AudioCapturerServer::RemovePayloadBuffer(RemovePayloadBufferRequestView req
   Shutdown(ZX_ERR_NOT_SUPPORTED);
 }
 
-// TODO(fxbug.dev/98652): implement: need to create a fuchsia.media.audio.GainControl server that
+// TODO(https://fxbug.dev/98652): implement: need to create a fuchsia.media.audio.GainControl server that
 // forwards to stream_gain_control_client_
 void AudioCapturerServer::BindGainControl(BindGainControlRequestView request,
                                           BindGainControlCompleter::Sync& completer) {
@@ -463,14 +463,14 @@ void AudioCapturerServer::DiscardAllPacketsInternal(
   stream_sink_server_->DiscardPackets();
 }
 
-// TODO(fxbug.dev/98652): at most one start or stop command can be pending; if one is already
+// TODO(https://fxbug.dev/98652): at most one start or stop command can be pending; if one is already
 // pending, cancel it before sending the new start command
 void AudioCapturerServer::Start() {
   // Start the ConsumerNode at "now". To ensure that packets are timestamped with the reference time
   // at which they were captured, pick an explicit start time `T=now` and call Graph.Start with the
   // correspondence pair `(ReferenceTime=T, PacketTimestamp=T)`.
   //
-  // TODO(fxbug.dev/98652): once the mixer service populates `Packet.capture_timestamp`, this will
+  // TODO(https://fxbug.dev/98652): once the mixer service populates `Packet.capture_timestamp`, this will
   // be unnecessary. Instead, we can start at `(RealTime=ASAP, PacketTimestamp=<anything>)`. Our
   // `stream_sink_server_` will use `Packet.capture_timestamp` and will ignore `Packet.timestamp`.
   zx_time_t now;
@@ -493,12 +493,12 @@ void AudioCapturerServer::Start() {
           return;
         }
 
-        // TODO(fxbug.dev/98652): call reporter
+        // TODO(https://fxbug.dev/98652): call reporter
         // reporter_->StartSession(result->value()->reference_time());
       });
 }
 
-// TODO(fxbug.dev/98652): at most one start or stop command can be pending; if one is already
+// TODO(https://fxbug.dev/98652): at most one start or stop command can be pending; if one is already
 // pending, cancel it before sending the new stop command
 void AudioCapturerServer::Stop() {
   fidl::Arena<> arena;
@@ -513,7 +513,7 @@ void AudioCapturerServer::Stop() {
           return;
         }
 
-        // TODO(fxbug.dev/98652): call reporter
+        // TODO(https://fxbug.dev/98652): call reporter
         // reporter_->StopSession(result->value()->reference_time());
       });
 }
@@ -525,7 +525,7 @@ void AudioCapturerServer::SendPacket(
     return;
   }
 
-  // TODO(fxbug.dev/98652): call reporter
+  // TODO(https://fxbug.dev/98652): call reporter
   // reporter_->SendPacket(packet);
   // if (overflow) {
   //   reporter_->Overflow(overflow);
@@ -570,7 +570,7 @@ void AudioCapturerServer::OnShutdown(fidl::UnbindInfo info) {
   graph_client_ = nullptr;
   stream_gain_control_client_ = std::nullopt;
 
-  // TODO(fxbug.dev/98652): send OnWillClose event from the StreamSinkServer before shutting down
+  // TODO(https://fxbug.dev/98652): send OnWillClose event from the StreamSinkServer before shutting down
   if (stream_sink_server_) {
     stream_sink_server_->Shutdown();
     stream_sink_server_ = nullptr;
@@ -723,7 +723,7 @@ void AudioCapturerServer::MaybeSetFullyCreated() {
     on_fully_created_(shared_from_this());
   }
 
-  // TODO(fxbug.dev/98652): after implementing RouteGraph, this is where we should add this capturer
+  // TODO(https://fxbug.dev/98652): after implementing RouteGraph, this is where we should add this capturer
   // to the RouteGroup.
 
   // Flush all queued tasks.

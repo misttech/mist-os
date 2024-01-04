@@ -28,7 +28,7 @@
 
 namespace fidl {
 
-// TODO(fxbug.dev/85474): A formatter bug causes this enum to be formatted with
+// TODO(https://fxbug.dev/85474): A formatter bug causes this enum to be formatted with
 // 4 byte indent otherwise.
 // clang-format off
 
@@ -128,7 +128,7 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
     // this is inherently racy i.e. shutting down dispatchers while trying
     // to also bind new channels to the same dispatcher, so we may want to
     // reevaluate whether shutting down the dispatcher is an error whenever
-    // there is any active binding (fxbug.dev/117969).
+    // there is any active binding (https://fxbug.dev/117969).
     kDispatcherError,
   };
 

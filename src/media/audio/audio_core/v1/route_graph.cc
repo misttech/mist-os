@@ -15,7 +15,7 @@
 namespace media::audio {
 namespace {
 
-// TODO(fxbug.dev/55132): Remove this workaround. Just 64000 would still support the range needed.
+// TODO(https://fxbug.dev/55132): Remove this workaround. Just 64000 would still support the range needed.
 constexpr int32_t kMinUltrasoundRate = 96000;
 
 bool DeviceConfigurationSupportsUsage(AudioDevice* device, StreamUsage usage) {

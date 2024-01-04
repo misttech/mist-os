@@ -148,7 +148,7 @@ alias SnakeCase = uint32;
   ASSERT_WARNINGS(0, library, "");
 }
 
-// TODO(fxbug.dev/7807): Delete this test once new-types are supported.
+// TODO(https://fxbug.dev/7807): Delete this test once new-types are supported.
 // This is a case where compilation would fail, but since the linter only operates on the parsed
 // raw AST, we would not yet know it. Thus, we expect compilation to fail, but linting to pass.
 TEST(LintTests, GoodIgnoreNewTypes) {

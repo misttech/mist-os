@@ -5,7 +5,7 @@
 # found in the LICENSE file.
 
 # Run this script whenever the $source_file has changed.
-# TODO(fxbug.dev/73858): replace this script with a GN bindgen target when there
+# TODO(https://fxbug.dev/73858): replace this script with a GN bindgen target when there
 # is in-tree support.
 
 set -euo pipefail

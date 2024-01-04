@@ -23,7 +23,7 @@ fuchsia_unittest_package("security-policy-create-raw-processes-test") {
   deps = [
     ":bin",
 
-    # fxbug.dev/101490: Dep included for affected tests presubmit
+    # https://fxbug.dev/101490: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
   test_type = "system"

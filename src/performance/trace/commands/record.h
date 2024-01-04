@@ -74,7 +74,7 @@ class RecordCommand : public CommandWithController {
   async::WaitMethod<RecordCommand, &RecordCommand::OnSpawnedAppExit> wait_spawned_app_;
 
   std::unique_ptr<std::ostream> binary_out_;
-  // TODO(fxbug.dev/22974): Remove |exporter_|.
+  // TODO(https://fxbug.dev/22974): Remove |exporter_|.
   std::unique_ptr<ChromiumExporter> exporter_;
 
   std::unique_ptr<Tracer> tracer_;

@@ -150,7 +150,7 @@ template("gidl_llcpp_conformance") {
     bindings_suffix = "_cpp"
     forward_variables_from(invoker, "*")
 
-    # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+    # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
     # rather than builders.
     configs = [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
   }
@@ -181,7 +181,7 @@ template("gidl_llcpp_benchmarks") {
     bindings_suffix = "_cpp"
     forward_variables_from(invoker, "*")
 
-    # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+    # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
     # rather than builders.
     configs = [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
   }
@@ -194,7 +194,7 @@ template("gidl_reference_benchmarks") {
     bindings_suffix = "_cpp"
     forward_variables_from(invoker, "*")
 
-    # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+    # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
     # rather than builders.
     configs = [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
   }
@@ -216,7 +216,7 @@ template("gidl_driver_llcpp_benchmarks") {
     bindings_suffix = "_cpp"
     forward_variables_from(invoker, "*")
 
-    # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+    # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
     # rather than builders.
     configs = [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
   }

@@ -54,7 +54,7 @@ constexpr char kTerminaGuestUrl[] = "#meta/termina_guest_manager.cm";
 constexpr auto kDevGpuDirectory = "dev-gpu";
 constexpr auto kGuestManagerName = "guest_manager";
 
-// TODO(fxbug.dev/12589): Use consistent naming for the test utils here.
+// TODO(https://fxbug.dev/12589): Use consistent naming for the test utils here.
 constexpr char kDebianTestUtilDir[] = "/test_utils";
 constexpr zx::duration kRetryStep = zx::msec(200);
 

@@ -14,7 +14,7 @@ use {
 /// A summary of a specific capability route and the outcome of verification.
 #[derive(Clone, Debug, PartialEq)]
 pub struct VerifyRouteResult {
-    /// TODO(fxbug.dev/102801): Rename to `moniker`.
+    /// TODO(https://fxbug.dev/102801): Rename to `moniker`.
     pub using_node: Moniker,
     pub capability: Option<Name>,
     pub error: Option<AnalyzerModelError>,

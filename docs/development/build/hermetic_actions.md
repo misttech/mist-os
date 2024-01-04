@@ -144,7 +144,7 @@ Actions that are currently not hermetic have the following parameter set:
 ```gn
 action("foo") {
   ...
-  # TODO(fxbug.dev/xxxxx): delete the line below and fix this
+  # TODO(https://fxbug.dev/xxxxx): delete the line below and fix this
   hermetic_deps = false
 }
 ```

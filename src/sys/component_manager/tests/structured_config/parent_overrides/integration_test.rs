@@ -188,5 +188,5 @@ async fn static_child_without_overrides_returns_default() {
     assert_eq!(value, expected_value);
 }
 
-// TODO(fxbug.dev/126578): Add a test similar to the one above with a
+// TODO(https://fxbug.dev/126578): Add a test similar to the one above with a
 // static-child-specific config value when adding support for this.

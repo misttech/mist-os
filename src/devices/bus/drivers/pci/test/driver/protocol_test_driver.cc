@@ -261,7 +261,7 @@ TEST_F(PciProtocolTests, GetBar0) { ASSERT_NO_FAILURES(GetBarTestHelper(0)); }
 TEST_F(PciProtocolTests, GetBar1) { ASSERT_NO_FAILURES(GetBarTestHelper(1)); }
 TEST_F(PciProtocolTests, GetBar3) { ASSERT_NO_FAILURES(GetBarTestHelper(3)); }
 // An IO bar which behaves differently according to platform
-// TODO(http://fxbug.dev/122448): Fix this test by sending a real resource.
+// TODO(https://fxbug.dev/122448): Fix this test by sending a real resource.
 TEST_F(PciProtocolTests, DISABLED_GetBar5) { ASSERT_NO_FAILURES(GetBarTestHelper(5)); }
 
 TEST_F(PciProtocolTests, GetBar2) {
@@ -507,7 +507,7 @@ TEST_F(PciProtocolTests, GetInterruptModes) {
   EXPECT_EQ(modes.msix_count, kFakeQuadroMsiXIrqCnt);
 }
 
-// TODO(fxbug.dev/61631): Without USERSPACE_PCI defined in proxy it presently
+// TODO(https://fxbug.dev/61631): Without USERSPACE_PCI defined in proxy it presently
 // will always return the kernel implementation which avoids the channel call
 // and returns ZX_OK. This needs to be re-enabled after the migration.
 TEST_F(PciProtocolTests, DISABLED_AckingIrqModes) {

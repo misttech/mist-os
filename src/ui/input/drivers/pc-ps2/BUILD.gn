@@ -49,7 +49,7 @@ fuchsia_driver("pc-ps2-driver") {
   ]
   deps = common_deps
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -81,7 +81,7 @@ test("pc-ps2-tests-bin") {
            "//zircon/system/ulib/zxtest",
          ]
 
-  # TODO(fxbug.dev/99745): remove this
+  # TODO(https://fxbug.dev/99745): remove this
   defines = [ "PS2_TEST" ]
 }
 

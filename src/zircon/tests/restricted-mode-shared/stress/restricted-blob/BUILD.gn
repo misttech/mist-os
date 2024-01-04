@@ -36,7 +36,7 @@ hermetic_code_blob("reader.blob") {
   entrypoint = "Reader"
   sources = [ "reader.cc" ]
 
-  # TODO(fxbug.dev/129545): LLD lets --no-pie trump the code generation
+  # TODO(https://fxbug.dev/129545): LLD lets --no-pie trump the code generation
   # switches, but this needs to be compiled as PIC though linked differently.
   if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
       toolchain_variant.tags) {

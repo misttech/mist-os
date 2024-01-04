@@ -263,7 +263,7 @@ For simplicity, this is an example of a single Fuchsia device testbed.
 
 NOTE: Multi-device testbeds follows a similar configuration but is out-of-scope
 of this guide - stay tuned for the "Multi-device testing" guide.
-TODO(fxbug.dev/124459)
+TODO(https://fxbug.dev/124459)
 
 ```yaml
 TestBeds:

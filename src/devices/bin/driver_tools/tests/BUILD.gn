@@ -86,7 +86,7 @@ if (is_host && current_cpu == "x64") {
 group("tests") {
   testonly = true
   deps = [
-    # TODO(fxbug.dev/119914): Enable this test when CQ issue is fixed.
+    # TODO(https://fxbug.dev/119914): Enable this test when CQ issue is fixed.
     # ":host_tests($host_toolchain)",
     #
     # # Included because the host test needs this component to be available on the Fuchsia device.

@@ -77,7 +77,7 @@ bootstrap.
 
 Since 2020, Fuchsia has managed a complex system of duplication and isolation to
 work around the security problem noted above (see
-[fxbug.dev/47602][bug_stash_isolation]).
+[https://fxbug.dev/47602][bug_stash_isolation]).
 
 - Three different FIDL stash protocols have been defined: `fuchsia.stash.Store`,
 `fuchsia.stash.Store2`, and `fuchsia.stash.SecureStore`.
@@ -131,7 +131,7 @@ the same library to deserialize and populate the component's persistent data
 structures.
 
 Scenic is not using stash for the intended purpose (ref
-[fxbug.dev/91585][bug_scenic]) and we will migrate their use case to [structured
+[https://fxbug.dev/91585][bug_scenic]) and we will migrate their use case to [structured
 config developer overrides][rfc_developer_overrides].
 
 It is always desirable to minimize the attack surface of components that start
@@ -175,7 +175,7 @@ all stash protocols as deprecated.
 We will then work with each of the seven impacted client components to agree a
 plan and approximate timeline for migration. In some cases the team is already
 planning to migrate away from stash
-(e.g. [fxbug.dev/91403][bug_setui_migration]), in other cases the trusted
+(e.g. [https://fxbug.dev/91403][bug_setui_migration]), in other cases the trusted
 platform services team could help with the migration. This RFC does not specify
 a deadline for completing the migration.
 

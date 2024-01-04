@@ -133,7 +133,7 @@ if (is_host) {
     visibility = [
       "//src/security/lib/scrutiny/*",
 
-      # TODO(fxbug.dev/93569): Shared types should be exposed on a public
+      # TODO(https://fxbug.dev/93569): Shared types should be exposed on a public
       # interface instead of making this visibility exception.
       "//src/developer/ffx/plugins/scrutiny/extract/*",
       "//src/developer/ffx/plugins/scrutiny/verify/*",

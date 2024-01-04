@@ -1448,7 +1448,7 @@ TEST(ChannelTest, ChannelFullException) {
   ASSERT_EQ(proc_info.return_code, ZX_TASK_RETCODE_EXCEPTION_KILL);
 }
 
-// This is a regression test for fxbug.dev/75568.
+// This is a regression test for https://fxbug.dev/75568.
 //
 // Ensure that the kernel does not leak handle objects when copy out faults.
 TEST(ChannelTest, ReadFaultDoesNotLeakHandles) {

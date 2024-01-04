@@ -60,7 +60,7 @@ fidl("manual.conformance.large") {
   sources = [ "large.test.fidl" ]
 }
 
-# TODO(fxbug.dev/71459): This test is Fuchsia only because the FIDL library
+# TODO(https://fxbug.dev/71459): This test is Fuchsia only because the FIDL library
 # cannot compile on host.
 test("fidl_llcpp_manual_conformance_tests_bin") {
   output_name = "fidl_llcpp_manual_conformance_tests"
@@ -77,7 +77,7 @@ test("fidl_llcpp_manual_conformance_tests_bin") {
     "//third_party/googletest:gtest",
   ]
 
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

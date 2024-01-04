@@ -44,7 +44,7 @@ const BLOCK_DEV_PATH: &str = "/dev/class/block/";
 
 /// Waits for a partition to appear on BLOCK_DEV_PATH that matches the fields in the
 /// PartitionMatcher. Returns the path of the partition if found. Errors after timeout duration.
-// TODO(fxbug.dev/122007): Most users end up wanting the things we open for checking the partition,
+// TODO(https://fxbug.dev/122007): Most users end up wanting the things we open for checking the partition,
 // like the partition proxy and the topological path. We should consider returning all those
 // resources instead of forcing them to retrieve them again.
 pub async fn find_partition(

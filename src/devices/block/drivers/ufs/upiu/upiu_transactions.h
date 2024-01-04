@@ -88,7 +88,7 @@ static_assert(sizeof(UpiuHeader) == 12, "UpiuHeader struct must be 12 bytes");
 
 class AbstractUpiu {
  public:
-  // TODO(fxbug.dev/124835): Make |AbstractUpiu| to template class for removing the |Data| struct
+  // TODO(https://fxbug.dev/124835): Make |AbstractUpiu| to template class for removing the |Data| struct
   // within |AbstractUpiu|. Currently each derived class must have a |UpiuHeader| as the first
   // member in its |Data| struct.
   struct Data {

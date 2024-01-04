@@ -133,7 +133,7 @@ TEST_F(MbrDeviceTest, DdkLifecycle) {
   ASSERT_NOT_NULL(device1);
   EXPECT_OK(MbrDevice::Bind(std::move(devices[1])));
 
-  // TODO(fxbug.dev/79639): Removed the fake_ddk.Ok() check, which did
+  // TODO(https://fxbug.dev/79639): Removed the fake_ddk.Ok() check, which did
   // not actually test lifecycle. Implement any checks necessary to test
   // that this driver implements Unbind and Release properly, if needed.
 }

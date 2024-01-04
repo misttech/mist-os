@@ -180,7 +180,7 @@ void ExtractAnnotationsAndAttachments(fuchsia::feedback::CrashReport report,
       annotations->Set(kThreadKoidKey, native_report.thread_koid());
     }
 
-    // TODO(fxbug.dev/6564): add module annotations from minidump.
+    // TODO(https://fxbug.dev/6564): add module annotations from minidump.
   }
 
   // Default attachments common to all crash reports.
@@ -221,7 +221,7 @@ void AddCrashServerAnnotations(const std::string& program_name,
                                const std::optional<timekeeper::time_utc>& current_time,
                                AnnotationMap* annotations) {
   // Program.
-  // TODO(fxbug.dev/57502): for historical reasons, we used ptype to benefit from Chrome's
+  // TODO(https://fxbug.dev/57502): for historical reasons, we used ptype to benefit from Chrome's
   // "Process type" handling in the crash server UI. Remove once the UI can fallback on "Program".
   annotations->Set("ptype", program_name);
   annotations->Set("program", program_name);

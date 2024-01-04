@@ -103,7 +103,7 @@ zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* ou
     return status;
   }
 
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
+  // Please do not use get_root_resource() in new code. See https://fxbug.dev/31358.
   ZX_ASSERT(zx_handle_duplicate(get_root_resource(parent), ZX_RIGHT_SAME_RIGHTS,
                                 &root_resource_handle) == ZX_OK);
 

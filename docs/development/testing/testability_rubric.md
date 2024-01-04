@@ -198,7 +198,7 @@ change that.
 *   **Gigaboot** is a UEFI bootloader in `//src/firmware/gigaboot` that predates
     testability policy. At present there is not an infrastructure available
     to write integration tests for the UEFI code. Introducing that
-    infrastructure is tracked in fxbug.dev/34478. A testability exception is granted
-    until fxbug.dev/34478 is addressed.
+    infrastructure is tracked in https://fxbug.dev/34478. A testability exception is granted
+    until https://fxbug.dev/34478 is addressed.
 
 [determinism]: /docs/contribute/testing/best-practices.md#write_reproducible_deterministic_tests

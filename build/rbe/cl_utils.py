@@ -573,7 +573,7 @@ def exec_relaunch(command: Sequence[str]) -> None:
 
     Returns: (it does not return)
     """
-    # TODO(http://fxbug.dev/125841): use os.execv(), but figure out
+    # TODO(https://fxbug.dev/125841): use os.execv(), but figure out
     # how to get in-python print() of the new process to appear.
     # os.execv(command[0], command[1:])
 

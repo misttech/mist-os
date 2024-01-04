@@ -181,7 +181,7 @@ void DriverHost::ShutdownDriver(Driver* driver, fidl::ServerEnd<fdh::Driver> ser
       // If this is the last driver, shutdown the driver host.
       if (drivers_.is_empty()) {
         // We only exit if we're not shutting down in order to match DFv1 behavior.
-        // TODO(http://fxbug.dev/124305): We should always exit driver hosts when we get down to 0
+        // TODO(https://fxbug.dev/124305): We should always exit driver hosts when we get down to 0
         // drivers.
         zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
         ZX_ASSERT_MSG(!client.is_error(), "Failed to connect to SystemStateTransition: %s",

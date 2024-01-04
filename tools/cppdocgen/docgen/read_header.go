@@ -165,7 +165,7 @@ func parsePreprocContents(contents string, comments []string, loc clangdoc.Locat
 		Description: commentsToDescription(comments),
 	})
 
-	// TODO(fxbug.dev/119110) look for end-of-line comments here and use that if the |comments|
+	// TODO(https://fxbug.dev/119110) look for end-of-line comments here and use that if the |comments|
 	// are empty.
 }
 

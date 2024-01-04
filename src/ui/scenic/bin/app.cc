@@ -120,7 +120,7 @@ scenic_structured_config::Config GetConfig() {
 }
 
 #ifdef NDEBUG
-// TODO(fxbug.dev/48596): Scenic sometimes gets stuck for consecutive 60 seconds.
+// TODO(https://fxbug.dev/48596): Scenic sometimes gets stuck for consecutive 60 seconds.
 // Here we set up a Watchdog polling Scenic status every 15 seconds.
 constexpr uint32_t kWatchdogWarningIntervalMs = 15000u;
 // On some devices, the time to start up Scenic may exceed 15 seconds.
@@ -194,7 +194,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
     : executor_(async_get_default_dispatcher()),
       app_context_(std::move(app_context)),
       config_values_(GetConfig()),
-      // TODO(fxbug.dev/40997): subsystems requiring graceful shutdown *on a loop* should register
+      // TODO(https://fxbug.dev/40997): subsystems requiring graceful shutdown *on a loop* should register
       // themselves. It is preferable to cleanly shutdown using destructors only, if possible.
       shutdown_manager_(
           ShutdownManager::New(async_get_default_dispatcher(), std::move(quit_callback))),
@@ -372,7 +372,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     pipeline_builder->set_log_pipeline_creation_callback(
         [metrics_logger = &metrics_logger_](const vk::GraphicsPipelineCreateInfo* graphics_info,
                                             const vk::ComputePipelineCreateInfo* compute_info) {
-          // TODO(fxbug.dev/49972): pre-warm compute pipelines in addition to graphics pipelines.
+          // TODO(https://fxbug.dev/49972): pre-warm compute pipelines in addition to graphics pipelines.
           if (compute_info) {
             FX_LOGS(WARNING) << "Unexpected lazy creation of Vulkan compute pipeline.";
             return;
@@ -409,7 +409,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
       flatland_renderer = std::make_shared<flatland::VkRenderer>(escher_->GetWeakPtr());
       break;
   }
-  // TODO(fxbug.dev/78186): flatland::VkRenderer hardcodes the framebuffer pixel format.
+  // TODO(https://fxbug.dev/78186): flatland::VkRenderer hardcodes the framebuffer pixel format.
   // Eventually we won't, instead choosing one from the list of acceptable formats advertised by
   // each plugged-in display.  This will raise the issue of where to do pipeline cache warming: it
   // will be too early to do it here, since we're not yet aware of any displays nor the formats they
@@ -418,7 +418,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
 
   flatland_renderer->WarmPipelineCache();
 
-  // TODO(fxb/122155) Support camera image in shader pre-warmup.
+  // TODO(https://fxbug.dev/122155) Support camera image in shader pre-warmup.
   // Disabling this line allows any shaders that weren't warmed up to be lazily created later.
   // flatland_renderer->set_disable_lazy_pipeline_creation(true);
 
@@ -463,7 +463,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
           input_->RegisterMouseSource(std::move(mouse_source), view_ref_koid);
         });
 
-    // TODO(fxbug.dev/67206): these should be moved into FlatlandManager.
+    // TODO(https://fxbug.dev/67206): these should be moved into FlatlandManager.
     {
       // Note: can't use `fit::bind_member()` here, because `CreateFlatland()` returns non-void.
       fit::function<void(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland>)> handler =

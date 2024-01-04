@@ -65,7 +65,7 @@ class TouchSourceBase : public GestureContender {
                           fuchsia::ui::pointer::TouchResponse response,
                           fit::function<void()> callback);
 
-  // TODO(fxbug.dev/78951): Implement ANR.
+  // TODO(https://fxbug.dev/78951): Implement ANR.
 
   // Closes the FIDL channel. This triggers the destruction of the TouchSourceBase object through
   // the error handler set in InputSystem. NOTE: No further method calls or member accesses should

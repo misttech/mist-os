@@ -73,7 +73,7 @@ struct MdnsNames {
   // Returns the alternate host name for |host_name|. For example, if |host_name| is
   // "fuchsia-1234-5678-9abc", this method returns "123456789ABC". If |host_name| isn't
   // the expected size (22 characters), this method returns the |host_name| argument.
-  // TODO(fxb/113901): Remove this when alt_services is no longer needed.
+  // TODO(https://fxbug.dev/113901): Remove this when alt_services is no longer needed.
   static std::string AltHostName(const std::string& host_name);
 };
 

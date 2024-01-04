@@ -844,7 +844,7 @@ VmObject::AttributionCounts VmObjectPaged::AttributedPagesInRangeLocked(uint64_t
   // A reference never has pages attributed to it. It points to the parent's VmCowPages, and we need
   // to hold the invariant that every page is attributed to a single VMO.
   //
-  // TODO(fxb/117886): Consider attributing pages to the current VmCowPages backlink for the case
+  // TODO(https://fxbug.dev/117886): Consider attributing pages to the current VmCowPages backlink for the case
   // where the parent has gone away.
   if (is_reference()) {
     return AttributionCounts{};

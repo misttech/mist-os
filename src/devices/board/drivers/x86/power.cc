@@ -9,7 +9,7 @@
 
 #include <acpica/acpi.h>
 
-// TODO(fxb/317387259): change name to acpi_power_resource to be more
+// TODO(https://fxbug.dev/317387259): change name to acpi_power_resource to be more
 // accurate.
 zx_handle_t acpi_root_resource;
 

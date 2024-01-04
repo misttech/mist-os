@@ -274,7 +274,7 @@ class Parser {
   std::unique_ptr<raw::ProtocolDeclaration> ParseProtocolDeclaration(
       std::unique_ptr<raw::AttributeList>, ASTScope&);
   std::unique_ptr<raw::ResourceProperty> ParseResourcePropertyDeclaration();
-  // TODO(fxbug.dev/64629): When we properly generalize handles, we will most
+  // TODO(https://fxbug.dev/64629): When we properly generalize handles, we will most
   // likely alter the name of a resource declaration, and how it looks
   // syntactically. While we rely on this feature in `library zx;`, it should
   // be considered experimental for all other intents and purposes.

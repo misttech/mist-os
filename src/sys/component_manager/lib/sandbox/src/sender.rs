@@ -15,7 +15,7 @@ use tracing::warn;
 #[derive(Debug)]
 pub struct Message<T: Default + Debug + Send + Sync + 'static> {
     pub payload: fsandbox::ProtocolPayload,
-    // TODO(fxbug.dev/315508244): Divorce target from Sender
+    // TODO(https://fxbug.dev/315508244): Divorce target from Sender
     pub target: T,
 }
 

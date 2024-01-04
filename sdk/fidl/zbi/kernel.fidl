@@ -4,7 +4,7 @@
 
 library zbi;
 
-// TODO(fxbug.dev/111453): Figure out documentation convention.
+// TODO(https://fxbug.dev/111453): Figure out documentation convention.
 
 /// The kernel image.  In a bootable ZBI this item must always be first,
 /// immediately after the ZBI_TYPE_CONTAINER header.  The contiguous memory
@@ -35,7 +35,7 @@ library zbi;
 ///     The kernel assumes it was loaded at a fixed physical address of
 ///     0x100000 (1MB).  zbi_kernel_t.entry is the absolute physical address
 ///     of the PC location where the kernel will start.
-///     TODO(fxbug.dev/24762): Perhaps this will change??
+///     TODO(https://fxbug.dev/24762): Perhaps this will change??
 ///     The processor is in 64-bit mode with direct virtual to physical
 ///     mapping covering the physical memory where the kernel and
 ///     bootloader-constructed ZBI were loaded.

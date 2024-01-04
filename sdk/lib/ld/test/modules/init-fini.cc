@@ -18,7 +18,7 @@ void test(int n, int o) {
   }
 }
 
-// TODO(fxbug.dev/134095): clang doesn't support template arguments being used
+// TODO(https://fxbug.dev/134095): clang doesn't support template arguments being used
 // as part of attribute arguments.
 
 #ifdef __clang__

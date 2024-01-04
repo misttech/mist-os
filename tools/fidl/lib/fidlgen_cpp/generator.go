@@ -41,7 +41,7 @@ func NewGenerator(flags *CmdlineFlags, templates fs.FS, extraFuncs template.Func
 }
 
 func NewFormatter(clangFormatPath string) fidlgen.Formatter {
-	// TODO(fxbug.dev/107586): Investigate clang-format memory usage on large files.
+	// TODO(https://fxbug.dev/107586): Investigate clang-format memory usage on large files.
 	return fidlgen.NewFormatterWithSizeLimit(128*1024, clangFormatPath, clangFormatArgs...)
 }
 

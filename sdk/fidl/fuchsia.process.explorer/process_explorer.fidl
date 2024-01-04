@@ -27,7 +27,7 @@ closed protocol Query {
     //         ...
     //     ]
     // }
-    // TODO(fxbug.dev/107973): define the schema of data in FIDL and return the data via a response struct
+    // TODO(https://fxbug.dev/107973): define the schema of data in FIDL and return the data via a response struct
     strict WriteJsonProcessesData(resource struct {
         socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });

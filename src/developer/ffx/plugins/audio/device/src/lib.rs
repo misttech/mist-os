@@ -220,7 +220,7 @@ async fn device_info(device_control_proxy: DeviceControlProxy, cmd: DeviceComman
         _ => panic!("Unreachable."),
     };
 
-    // TODO(fxbug.dev/126775): Generalize to DAI & Codec types.
+    // TODO(https://fxbug.dev/126775): Generalize to DAI & Codec types.
     let (device_selector, is_default_device) = match cmd.id {
         Some(id) => (
             DeviceSelector {
@@ -574,8 +574,8 @@ async fn device_play(
         )),
 
         gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
-            mute: None, // TODO(fxbug.dev/121211)
-            gain: None, // TODO(fxbug.dev/121211)
+            mute: None, // TODO(https://fxbug.dev/121211)
+            gain: None, // TODO(https://fxbug.dev/121211)
             ..Default::default()
         }),
         ..Default::default()

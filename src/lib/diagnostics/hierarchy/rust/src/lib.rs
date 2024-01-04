@@ -157,7 +157,7 @@ where
     {
         // We have to use indices to iterate here because the borrow checker cannot
         // deduce that there are no borrowed values in the else-branch.
-        // TODO(fxbug.dev/4601): We could make this cleaner by changing the DiagnosticsHierarchy
+        // TODO(https://fxbug.dev/4601): We could make this cleaner by changing the DiagnosticsHierarchy
         // children to hashmaps.
         match (0..self.children.len()).find(|&i| self.children[i].name == name.as_ref()) {
             Some(matching_index) => &mut self.children[matching_index],
@@ -768,7 +768,7 @@ impl<T: Borrow<Selector>> TryFrom<&[T]> for HierarchyMatcher {
     type Error = Error;
 
     fn try_from(selectors: &[T]) -> Result<Self, Self::Error> {
-        // TODO(fxbug.dev/117929: remove cloning, the archivist can probably hold
+        // TODO(https://fxbug.dev/117929: remove cloning, the archivist can probably hold
         // HierarchyMatcher<'static>
         let mut matcher = HierarchyMatcher::default();
         for selector in selectors {
@@ -776,7 +776,7 @@ impl<T: Borrow<Selector>> TryFrom<&[T]> for HierarchyMatcher {
             selector.validate().map_err(|e| Error::Selectors(e.into()))?;
 
             // Safe to unwrap since we already validated the selector.
-            // TODO(fxbug.dev/117929): instead of doing this over Borrow<Selector> do it over
+            // TODO(https://fxbug.dev/117929): instead of doing this over Borrow<Selector> do it over
             // Selector.
             match selector.tree_selector.clone().unwrap() {
                 TreeSelector::SubtreeSelector(subtree_selector) => {
@@ -1601,7 +1601,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    // TODO(fxbug.dev/88496): delete the below
+    // TODO(https://fxbug.dev/88496): delete the below
     #[cfg_attr(feature = "variant_asan", ignore)]
     #[cfg_attr(feature = "variant_hwasan", ignore)]
     #[should_panic]

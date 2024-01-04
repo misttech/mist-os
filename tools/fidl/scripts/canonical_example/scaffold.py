@@ -436,7 +436,7 @@ def create_new(series, protocol, bug):
         lines, start, end = edit_ranges[DOCS_ROOT_README_FILE]
         lines.insert(
             end,
-            """## %s\n\n<!-- TODO(fxbug.dev/%s): DOCUMENT[%s/%s] (brief description) -->\n\n"""
+            """## %s\n\n<!-- TODO(https://fxbug.dev/%s): DOCUMENT[%s/%s] (brief description) -->\n\n"""
             % (
                 subs["series_sentence_case"],
                 subs["bug"],

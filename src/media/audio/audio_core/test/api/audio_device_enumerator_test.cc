@@ -152,7 +152,7 @@ TEST_F(AudioDeviceEnumeratorTest, OnDeviceGainChangedIgnoresInvalidTokensInSets)
   ExpectCallbacks();
 }
 
-// TODO(fxbug.dev/124889): Reenable after fixing this test flaky behavior.
+// TODO(https://fxbug.dev/124889): Reenable after fixing this test flaky behavior.
 TEST_F(AudioDeviceEnumeratorTest, DISABLED_SetDeviceGain_Input) {
   TestSetDeviceGain(CreateInput({0xff, 0x00}, kFormat, kFrameRate));
 }
@@ -199,7 +199,7 @@ TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnplugged_Output) {
   RunLoopUntilIdle();
 }
 
-// TODO(fxbug.dev/73947): disabled due to flakes when run in AEMU on CQ
+// TODO(https://fxbug.dev/73947): disabled due to flakes when run in AEMU on CQ
 // These are disabled by #if instead of DISABLED because they mention types that
 // do no exist when the tests are DISABLED.
 #if 0

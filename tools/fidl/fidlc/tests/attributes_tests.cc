@@ -835,7 +835,7 @@ library example;
 type MyStruct = struct {};
 
 )FIDL");
-  // TODO(fxbug.dev/112219): If an unnamed string argument follows a named
+  // TODO(https://fxbug.dev/112219): If an unnamed string argument follows a named
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind instead of
   // ErrAttributeArgsMustAllBeNamed.
   library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
@@ -864,7 +864,7 @@ library example;
 type MyStruct = struct {};
 
 )FIDL");
-  // TODO(fxbug.dev/112219): If an unnamed identifier argument follows a named
+  // TODO(https://fxbug.dev/112219): If an unnamed identifier argument follows a named
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind and
   // ErrUnexpectedToken instead of ErrAttributeArgsMustAllBeNamed.
   library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,

@@ -69,7 +69,7 @@ void StreamSinkServer::PutPacket(PutPacketRequestView request,
       packet_start = next_continuous_frame_;
       break;
     case Timestamp::Tag::kUnspecifiedBestEffort:
-      // TODO(fxbug.dev/114712): support unspecified_best_effort
+      // TODO(https://fxbug.dev/114712): support unspecified_best_effort
       FX_LOGS(WARNING) << "Skipping packet: unspecified_best_effort timestamps not supported";
       return;
     default:

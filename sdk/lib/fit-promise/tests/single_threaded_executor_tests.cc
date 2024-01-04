@@ -117,7 +117,7 @@ TEST(SingleThreadedExecutorTests, suspending_and_resuming_tasks) {
   EXPECT_EQ(100, run_count[4]);
 }
 
-// Test disabled due to flakiness.  See fxbug.dev/8378.
+// Test disabled due to flakiness.  See https://fxbug.dev/8378.
 TEST(SingleThreadedExecutorTests, DISABLED_abandoning_tasks) {
   fpromise::single_threaded_executor executor;
   uint64_t run_count[4] = {};

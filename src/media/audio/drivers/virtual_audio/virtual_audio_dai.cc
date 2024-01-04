@@ -313,7 +313,7 @@ void VirtualAudioDai::Stop(StopCompleter::Sync& completer) {
   auto parent = parent_.lock();
   ZX_ASSERT(parent);
   zx_time_t now = zx::clock::get_monotonic().get();
-  // TODO(fxbug.dev/124865): Add support for position, now we always report 0.
+  // TODO(https://fxbug.dev/124865): Add support for position, now we always report 0.
   parent->NotifyStop(now, 0);
   completer.Reply();
   ring_buffer_started_ = false;
@@ -324,7 +324,7 @@ void VirtualAudioDai::WatchClockRecoveryPositionInfo(
   if (!watch_position_replied_) {
     fuchsia_hardware_audio::RingBufferPositionInfo position_info;
     position_info.timestamp(zx::clock::get_monotonic().get());
-    // TODO(fxbug.dev/124865): Add support for position, now we always report 0.
+    // TODO(https://fxbug.dev/124865): Add support for position, now we always report 0.
     position_info.position(0);
     completer.Reply(std::move(position_info));
     watch_position_replied_ = true;
@@ -364,7 +364,7 @@ void VirtualAudioDai::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
 void VirtualAudioDai::SetActiveChannels(
     fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
     SetActiveChannelsCompleter::Sync& completer) {
-  // TODO(fxbug.dev/81649): Add support.
+  // TODO(https://fxbug.dev/81649): Add support.
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 

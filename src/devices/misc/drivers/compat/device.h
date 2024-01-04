@@ -205,7 +205,7 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   DeviceServer device_server_;
 
   // This is the device's topological path without the leading '/dev/'.
-  // TODO(fxbug.dev/117180): Simplify this and the GetTopologicalPath API.
+  // TODO(https://fxbug.dev/117180): Simplify this and the GetTopologicalPath API.
   std::string topological_path_;
   const std::string name_;
   // A unique id for the device.

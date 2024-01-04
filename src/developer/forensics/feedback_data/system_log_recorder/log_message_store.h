@@ -48,7 +48,7 @@ class LogMessageStore : public LogSink {
   // The system log recorder takes no action on the log stream being interrupted and ceases to
   // continue out of safety for the already persisted messages.
   //
-  // TODO(fxbug.dev/59289): Handle reconnection in the system log recorder.
+  // TODO(https://fxbug.dev/59289): Handle reconnection in the system log recorder.
   void NotifyInterruption() override {}
   bool SafeAfterInterruption() const override { return false; }
 

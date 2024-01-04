@@ -52,7 +52,7 @@ class LoopbackTest : public ::gtest::TestLoopFixture {
     ASSERT_EQ(1u, root_dev()->child_count());
     ASSERT_TRUE(dut());
 
-    // TODO(fxb/91487): Due to Mock DDK limitations, we need to add the BT_HCI protocol to the
+    // TODO(https://fxbug.dev/91487): Due to Mock DDK limitations, we need to add the BT_HCI protocol to the
     // BtTransportUart MockDevice so that BtHciProtocolClient (and device_get_protocol) work.
     bt_hci_protocol_t proto;
     dut()->GetDeviceContext<bt_hci_virtual::LoopbackDevice>()->DdkGetProtocol(ZX_PROTOCOL_BT_HCI,

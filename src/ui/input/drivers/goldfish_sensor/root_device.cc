@@ -134,7 +134,7 @@ void RootDevice::OnReadSensor(PipeIo::ReadResult<char> result) {
 
   auto report = ParseSensorReport(data, result.value().size());
 
-  // TODO(fxbug.dev/78205): Handle non-device report headers, e.g. "sync"
+  // TODO(https://fxbug.dev/78205): Handle non-device report headers, e.g. "sync"
   // and "device-sync".
   input_devices_.DispatchReportToDevice(report.name, report);
 }

@@ -80,7 +80,7 @@ impl Id {
     /// `Id::new` is likely to hit the UI bug because it (per process) generates trace ids
     /// consecutively starting from 1.
     /// https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/trace-engine/nonce.cc;l=15-17;drc=b1c2f508a59e6c87c617852ed3e424693a392646
-    /// TODO(fxbug.dev/103604) Delete this and migrate clients to `Id::new` once UIs stop grouping
+    /// TODO(https://fxbug.dev/103604) Delete this and migrate clients to `Id::new` once UIs stop grouping
     /// async durations with the same trace id but different process ids.
     pub fn random() -> Self {
         let ts = zx::Time::get_monotonic().into_nanos() as u64;

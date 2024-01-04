@@ -25,7 +25,7 @@
             to: [ "#scene_manager" ],
         },
 
-        // TODO(fxbug.dev/110642): Remove once gfx is deprecated.
+        // TODO(https://fxbug.dev/110642): Remove once gfx is deprecated.
         {
             protocol: [ "fuchsia.ui.accessibility.view.Registry" ],
             from: "#scene_manager",

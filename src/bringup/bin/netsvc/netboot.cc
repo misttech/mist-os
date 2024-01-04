@@ -305,7 +305,7 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
     return;
 
   // Must be copied to stack structure rather than interpreted in place for
-  // UBSan, see fxbug.dev/45621.
+  // UBSan, see https://fxbug.dev/45621.
   memcpy(&msg_header, data, sizeof(msg_header));
   char* msg_data = reinterpret_cast<char*>(data) + sizeof(msg_header);
 
@@ -450,7 +450,7 @@ void netboot_recv(void* data, size_t len, bool is_mcast, const ip6_addr_t* daddr
     return;
   }
   // Must be copied to stack structure rather than interpreted in place for
-  // UBSan, see fxbug.dev/45621.
+  // UBSan, see https://fxbug.dev/45621.
   memcpy(&msg_header, data, sizeof(msg_header));
   char* msg_data = reinterpret_cast<char*>(data) + sizeof(msg_header);
 

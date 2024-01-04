@@ -442,7 +442,7 @@ impl SeccompState {
                 None
             }
             SeccompAction::Trace => {
-                // TODO(fxbug.dev/76810): Because there is no ptrace support, this returns ENOSYS
+                // TODO(https://fxbug.dev/76810): Because there is no ptrace support, this returns ENOSYS
                 Some(Err(errno!(ENOSYS)))
             }
             SeccompAction::Trap(errno) => {

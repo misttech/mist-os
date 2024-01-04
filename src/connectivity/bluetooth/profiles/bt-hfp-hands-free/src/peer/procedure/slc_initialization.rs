@@ -67,7 +67,7 @@ impl SlcInitProcedure {
     ) -> Option<ProcedureOutput> {
         self.state = State::SentAvailableCodecs;
         state.supported_codecs.push(MSBC);
-        // TODO(fxb/130963) Make this configurable.
+        // TODO(https://fxbug.dev/130963) Make this configurable.
         // By default, we support the CVSD and MSBC codecs.
         Some(at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] }))
     }
@@ -78,7 +78,7 @@ impl SlcInitProcedure {
     }
 
     fn receive_supported_ag_indicators(&mut self, _bytes: Vec<u8>) -> Option<ProcedureOutput> {
-        // TODO(fxbug.dev/108331): Read additional indicators by parsing raw bytes instead
+        // TODO(https://fxbug.dev/108331): Read additional indicators by parsing raw bytes instead
         // ofjust checking for existence of raw bytes.
         self.state = State::ReceivedSupportedAgIndicators;
         None
@@ -295,7 +295,7 @@ mod tests {
     use crate::{config::HandsFreeFeatureSupport, features::CallHoldAction, features::HfFeatures};
     use assert_matches::assert_matches;
 
-    // TODO(fxb/71668) Stop using raw bytes.
+    // TODO(https://fxbug.dev/71668) Stop using raw bytes.
     const CIND_TEST_RESPONSE_BYTES: &[u8] = b"+CIND: \
     (\"service\",(0,1)),\
     (\"call\",(0,1)),\

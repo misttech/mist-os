@@ -212,7 +212,7 @@ INSTANTIATE_TEST_SUITE_P(YuvPixelFormats, ParameterizedYUVPixelTest,
                                            fuchsia::sysmem::PixelFormatType::I420));
 
 TEST_P(ParameterizedYUVPixelTest, YUVTest) {
-  // TODO(fxb/59804): Skip this test for AEMU as YUV sysmem images are not supported yet.
+  // TODO(https://fxbug.dev/59804): Skip this test for AEMU as YUV sysmem images are not supported yet.
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
 
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
@@ -285,7 +285,7 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
   root_flatland_->SetContent(kRootTransform, kImageContentId);
   BlockingPresent(this, root_flatland_);
 
-  // TODO(fxbug.dev/65765): provide reasoning for why this is the correct expected color.
+  // TODO(https://fxbug.dev/65765): provide reasoning for why this is the correct expected color.
   const utils::Pixel expected_pixel(255, 85, 249, 255);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
@@ -647,7 +647,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
   // Verify that the number of pixels is the same (i.e. the image hasn't changed).
   auto histogram = screenshot.Histogram();
   const uint32_t pixel_color_count = num_pixels / 4;
-  // TODO(fxb/116631): Switch to exact comparisons after Astro precision issues are resolved.
+  // TODO(https://fxbug.dev/116631): Switch to exact comparisons after Astro precision issues are resolved.
   EXPECT_NEAR(histogram[utils::kBlue], pixel_color_count, display_width_);
   EXPECT_NEAR(histogram[utils::kGreen], pixel_color_count, display_width_);
   EXPECT_NEAR(histogram[utils::kBlack], pixel_color_count, display_width_);

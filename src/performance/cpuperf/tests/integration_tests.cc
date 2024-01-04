@@ -31,14 +31,14 @@ static void RunAndVerify(const char* spec_path) {
 
 TEST(Cpuperf, FixedCounters) { RunAndVerify("/pkg/data/fixed_counters.cpspec"); }
 
-// TODO(fxbug.dev/8501): Re-enable.
+// TODO(https://fxbug.dev/8501): Re-enable.
 TEST(Cpuperf, DISABLED_OsFlag) { RunAndVerify("/pkg/data/os_flag.cpspec"); }
 
 TEST(Cpuperf, ProgrammableCounters) { RunAndVerify("/pkg/data/programmable_counters.cpspec"); }
 
 TEST(Cpuperf, UserFlag) { RunAndVerify("/pkg/data/user_flag.cpspec"); }
 
-// TODO(fxbug.dev/38183): Re-enable.
+// TODO(https://fxbug.dev/38183): Re-enable.
 TEST(Cpuperf, DISABLED_ValueRecords) { RunAndVerify("/pkg/data/value_records.cpspec"); }
 
 TEST(Cpuperf, LastBranchRecord) {

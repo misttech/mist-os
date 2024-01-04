@@ -7,7 +7,7 @@ library zx;
 closed protocol Framebuffer {
     /// ## Summary
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Declaration
     ///
@@ -23,7 +23,7 @@ closed protocol Framebuffer {
     ///
     /// ## Description
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Rights
     ///
@@ -31,15 +31,15 @@ closed protocol Framebuffer {
     ///
     /// ## Return value
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Errors
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## See also
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     strict GetInfo(resource struct {
         resource Handle:RESOURCE;
     }) -> (struct {
@@ -49,10 +49,10 @@ closed protocol Framebuffer {
         stride uint32;
     }) error Status;
 
-    // TODO(fxbug.dev/32803): vmo ZX_OBJ_TYPE_VMO; No rights required?
+    // TODO(https://fxbug.dev/32803): vmo ZX_OBJ_TYPE_VMO; No rights required?
     /// ## Summary
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Declaration
     ///
@@ -70,7 +70,7 @@ closed protocol Framebuffer {
     ///
     /// ## Description
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Rights
     ///
@@ -78,15 +78,15 @@ closed protocol Framebuffer {
     ///
     /// ## Return value
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Errors
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## See also
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     strict SetRange(resource struct {
         resource Handle:RESOURCE;
         vmo Handle:VMO;

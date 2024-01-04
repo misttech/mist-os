@@ -170,7 +170,7 @@ fn group_by_feature<'a>(
     index
 }
 
-#[allow(clippy::unused_io_amount)] // TODO(fxbug.dev/95078)
+#[allow(clippy::unused_io_amount)] // TODO(https://fxbug.dev/95078)
 fn output_result<T: Write>(
     list: &Vec<ComponentManifest>,
     index: &mut HashMap<Option<String>, Vec<&ComponentManifest>>,
@@ -363,7 +363,7 @@ mod test {
     }
 
     #[test]
-    #[allow(clippy::unit_cmp)] // TODO(fxbug.dev/95078)
+    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/95078)
     fn test_target_set() {
         let mut expected =
             vec![BuildTarget { arch: String::from("x64"), board: String::from("workstation") }];

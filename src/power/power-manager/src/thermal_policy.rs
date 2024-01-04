@@ -575,7 +575,7 @@ impl ThermalPolicy {
         // utilized amount is subtracted from the total available power, then the remaining power is
         // allocated to the remaining CPU control nodes in the same way.
 
-        // TODO(fxbug.dev/48205): We may want to revisit this distribution algorithm to avoid potentially
+        // TODO(https://fxbug.dev/48205): We may want to revisit this distribution algorithm to avoid potentially
         // starving some CPU control nodes. We'll want to have some discussions and learn more about
         // intended big.LITTLE scheduling and operation to better inform our decisions here. We may
         // find that we'll need to first query the nodes to learn how much power they intend to use
@@ -1041,7 +1041,7 @@ pub mod tests {
         stepper.iterate_policy();
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(fxbug.dev/95036)
+    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/95036)
     /// Tests that the ThermalPolicy node populates the correct temperature sensor driver path in
     /// its UpdateThermalLoad messages.
     #[fasync::run_singlethreaded(test)]
@@ -1081,7 +1081,7 @@ pub mod tests {
         assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(fxbug.dev/95036)
+    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/95036)
     /// Tests that each of the configured `thermal_load_notify_nodes` nodes receive an
     /// UpdateThermalLoad message as expected.
     #[fasync::run_singlethreaded(test)]

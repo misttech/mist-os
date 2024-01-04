@@ -478,7 +478,7 @@ TEST(BindServerTestCase, CallbackErrorServerTriggered) {
 
   // Client1 launches a thread so we can hold its transaction in progress.
   auto client1 = std::thread([local = local.borrow()] {
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)fidl::WireCall(local)->Echo(kExpectedReply);
   });
 
@@ -613,7 +613,7 @@ TEST(BindServerTestCase, ExplicitUnbindWithPendingTransaction) {
   // Client launches a thread so we can hold the transaction in progress.
   auto client = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
   async::PostTask(client->dispatcher(), [local = local.borrow(), client = client.get()]() {
-    // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)fidl::WireCall(local)->Echo(kExpectedReply);
   });
   ASSERT_OK(client->StartThread());
@@ -999,9 +999,9 @@ TEST(BindServerTestCase, EnableNextDispatchInLongRunningHandler) {
 
   // Issue two requests. The second request should initiate binding teardown.
   std::vector<std::thread> threads;
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   threads.emplace_back([local = local.borrow()] { (void)fidl::WireCall(local)->Close(); });
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   threads.emplace_back([local = local.borrow()] { (void)fidl::WireCall(local)->Close(); });
 
   // Teardown should not complete unless |long_operation| completes.

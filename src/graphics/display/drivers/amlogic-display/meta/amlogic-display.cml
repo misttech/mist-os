@@ -11,7 +11,7 @@
         runner: "driver",
         bind: "meta/bind/amlogic-display.bindbc",
 
-        // TODO(fxbug.dev/125227): `colocate` must be true.
+        // TODO(https://fxbug.dev/125227): `colocate` must be true.
         // amlogic-display driver needs to create a DsiImpl banjo client, but
         // there's no fragment proxy support for the DsiImpl protocol.
         //

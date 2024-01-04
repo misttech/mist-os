@@ -8,7 +8,7 @@
 
 #include "setjmp_impl.h"
 
-// TODO(fxbug.dev/125629): The size has been expanded to accommodate a checksum
+// TODO(https://fxbug.dev/125629): The size has been expanded to accommodate a checksum
 // word, but this is not yet used until callers can be expected to use the new
 // larger size.
 #define JB_COUNT_UNUSED 1

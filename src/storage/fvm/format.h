@@ -100,7 +100,7 @@ static constexpr uint64_t kBlockSize = 8192;
 
 // One past the maximum number of virtual partitions that can be created.
 // Valid partitions indices range from 1 to 1023.
-// TODO(fxb/59980) make this consistent so we can use the whole table. Either use 0-1023 as the
+// TODO(https://fxbug.dev/59980) make this consistent so we can use the whole table. Either use 0-1023 as the
 // valid partition range, or 1-1024.
 static constexpr uint64_t kMaxVPartitions = 1024;
 static constexpr uint64_t kMaxUsablePartitions = kMaxVPartitions - 1;
@@ -164,11 +164,11 @@ struct Header {
   // The partition and slice tables will end up both being one larger than the number of usable
   // entries passed in to this function. So don't pass even numbers to make the tables
   // nicely aligned, pass one less.
-  // TODO(fxb/59980) make table_size == usable_count.
+  // TODO(https://fxbug.dev/59980) make table_size == usable_count.
   //
   // Currently the partition table size is fixed, so usable_partitions must be kMaxUsablePartitions
   // or it will assert.
-  // TODO(fxb/40192): Allow usable partitions to vary.
+  // TODO(https://fxbug.dev/40192): Allow usable partitions to vary.
   static Header FromDiskSize(size_t usable_partitions, size_t disk_size, size_t slice_size);
   static Header FromGrowableDiskSize(size_t usable_partitions, size_t initial_disk_size,
                                      size_t max_disk_size, size_t slice_size);
@@ -284,7 +284,7 @@ struct Header {
   // Physical slices are 1-indexed (0 means "none"). Therefore:
   //   1 <= |maximum valid pslice| <= pslice_count
   //
-  // IMPORTANT NOTE: Due to fxbug.dev/59980, this value is one less than the number of entries worth
+  // IMPORTANT NOTE: Due to https://fxbug.dev/59980, this value is one less than the number of entries worth
   // of space in the allocation table because there is an unused 0 entry.
   uint64_t pslice_count = 0;
 
@@ -301,7 +301,7 @@ struct Header {
   //
   // Currently this is fixed to be the size required to hold exactly kMaxVPartitions and various
   // code assumes this constant.
-  // TODO(fxbug.dev/40192): Use this value so the partition table can have different sizes.
+  // TODO(https://fxbug.dev/40192): Use this value so the partition table can have different sizes.
   uint64_t vpartition_table_size = 0;
 
   // Size in bytes reserved for the allocation table. Must be a multiple of kBlockSize. This
@@ -471,7 +471,7 @@ static_assert(!internal::block_alignment<SliceEntry>::may_cross_boundary,
 // smaller than the number table entries because the 0th entry is not used. This function may
 // generate a larger-than-needed partition table to ensure it's block-aligned.
 //
-// TODO(fxb/59980) Remove the unused 0th entry so we can actually use the full number passed in.
+// TODO(https://fxbug.dev/59980) Remove the unused 0th entry so we can actually use the full number passed in.
 constexpr size_t PartitionTableByteSizeForUsablePartitionCount(size_t usable_partitions) {
   // This multiply shouldn't overflow because usable_partitions should always be <=
   // kMaxUsablePartitions.
@@ -524,7 +524,7 @@ inline size_t Header::GetPartitionTableOffset() const {
 inline size_t Header::GetPartitionTableEntryCount() const {
   // The partition table has an unused 0th entry, so the number of usable entries in the table
   // is one less than that.
-  // TODO(fxb/59980) the partition table is 0-indexed (with the 0th entry not used) while the
+  // TODO(https://fxbug.dev/59980) the partition table is 0-indexed (with the 0th entry not used) while the
   // valid indices start from 1 (0 means invalid). This should be more consistent to remove the
   // unused entry.
   // Currently we expect the partition table count and size to be constant.
@@ -556,7 +556,7 @@ inline size_t Header::GetAllocationTableUsedByteSize() const {
 
 inline size_t Header::GetAllocationTableAllocatedEntryCount() const {
   // The "-1" here allows for the unused 0 indexed slice.
-  // TODO(fxbug.dev/59980) the allocation table is 0-indexed (with the 0th entry not used) while the
+  // TODO(https://fxbug.dev/59980) the allocation table is 0-indexed (with the 0th entry not used) while the
   // allocation data itself is 1-indexed. This inconsistency should be fixed.
   if (size_t byte_size = GetAllocationTableAllocatedByteSize(); byte_size > 0)
     return byte_size / sizeof(SliceEntry) - 1;
@@ -578,7 +578,7 @@ inline size_t Header::GetMaxAllocationTableEntriesForDiskSize(size_t disk_size) 
 }
 
 inline size_t Header::GetSliceEntryOffset(size_t pslice) const {
-  // TODO(fxbug.dev/59980) the allocation table is 0-indexed (with the 0th entry not used) while the
+  // TODO(https://fxbug.dev/59980) the allocation table is 0-indexed (with the 0th entry not used) while the
   // allocation data itself is 1-indexed. This inconsistency should be fixed,
   return GetAllocationTableOffset() + pslice * sizeof(SliceEntry);
 }

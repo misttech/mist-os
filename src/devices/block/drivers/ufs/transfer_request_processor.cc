@@ -60,7 +60,7 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
 
   FillPrdt(prdt, buffer_phys, prdt_entry_count, data_transfer_length);
 
-  // TODO(fxbug.dev/124835): Enable unmmap and write buffer command. Umap and writebuffer must set
+  // TODO(https://fxbug.dev/124835): Enable unmmap and write buffer command. Umap and writebuffer must set
   // the xfer->count value differently.
 
   return {prdt_offset, prdt_entry_count};
@@ -320,7 +320,7 @@ zx::result<> TransferRequestProcessor::RingRequestDoorbell(uint8_t slot_num) {
   ZX_DEBUG_ASSERT(request_slot.state == SlotState::kReserved);
   request_slot.state = SlotState::kScheduled;
 
-  // TODO(fxbug.dev/124835): Set the UtrInterruptAggregationControlReg.
+  // TODO(https://fxbug.dev/124835): Set the UtrInterruptAggregationControlReg.
 
   UtrListDoorBellReg::Get().FromValue(1 << slot_num).WriteTo(&register_);
 
@@ -334,7 +334,7 @@ zx::result<> TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestS
   ResponseUpiu response(
       request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, sizeof(CommandUpiuData)));
 
-  // TODO(fxbug.dev/124835): Need to check if response.header.trans_code() is a kCommnad.
+  // TODO(https://fxbug.dev/124835): Need to check if response.header.trans_code() is a kCommnad.
   return GetResponseStatus(descriptor, response, UpiuTransactionCodes::kCommand);
 }
 
@@ -438,7 +438,7 @@ zx::result<> TransferRequestProcessor::GetResponseStatus(TransferRequestDescript
   uint8_t status = response.GetHeader().status;
   uint8_t header_response = response.GetHeader().response;
 
-  // TODO(fxbug.dev/124835): Needs refactoring.
+  // TODO(https://fxbug.dev/124835): Needs refactoring.
   if (transaction_type == UpiuTransactionCodes::kCommand &&
       (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
        status != static_cast<uint8_t>(scsi::StatusCode::GOOD) ||

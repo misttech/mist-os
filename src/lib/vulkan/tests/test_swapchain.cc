@@ -641,7 +641,7 @@ class SwapchainTest : public ::testing::TestWithParam<ParamType> {
   void SetUp() override {
     std::vector<const char*> instance_layers;
     // The copy swapchain doesn't pass validation, so skip this test.
-    // TODO(fxbug.dev/83314): Re-enable when swapchain is fixed.
+    // TODO(https://fxbug.dev/83314): Re-enable when swapchain is fixed.
     if (with_copy() && validation_before_layer()) {
       GTEST_SKIP();
     }
@@ -653,7 +653,7 @@ class SwapchainTest : public ::testing::TestWithParam<ParamType> {
     }
     instance_layers.push_back("VK_LAYER_FUCHSIA_imagepipe_swapchain");
     // The copy swapchain doesn't pass validation, so don't enable validation when using it.
-    // TODO(fxbug.dev/83314): Re-enable when swapchain is fixed.
+    // TODO(https://fxbug.dev/83314): Re-enable when swapchain is fixed.
     if (!validation_before_layer() && !with_copy()) {
       instance_layers.push_back("VK_LAYER_KHRONOS_validation");
     }
@@ -711,7 +711,7 @@ TEST_P(SwapchainTest, CreateForStorage) {
   }
 
   if (GetVkPhysicalDeviceVendorID(test_->vk_physical_device_) == kVendorIDIntel) {
-    // TODO(fxbug.dev/83325): STORAGE usage isn't supported by Intel.
+    // TODO(https://fxbug.dev/83325): STORAGE usage isn't supported by Intel.
     GTEST_SKIP();
   }
 

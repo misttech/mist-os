@@ -41,7 +41,7 @@ func init() {
 	flag.StringVar(&successString, "success-str", "", "string that - if read - indicates success")
 }
 
-// TODO(fxbug.dev/116559): Revisit as this is a workaround for a possibly lower-level bug.
+// TODO(https://fxbug.dev/116559): Revisit as this is a workaround for a possibly lower-level bug.
 type socketReader struct {
 	ctx     context.Context
 	r       net.Conn
@@ -120,14 +120,14 @@ func main() {
 	ctx = logger.WithLogger(ctx, log)
 
 	// Emulator serial is already wired up to stdout
-	// TODO(fxbug.dev/116559): Temporarily write serial output
+	// TODO(https://fxbug.dev/116559): Temporarily write serial output
 	// to a file for debugging purposes.
 	stdout := io.Discard
 	if outDir := os.Getenv(testrunnerconstants.TestOutDirEnvKey); outDir != "" {
 		if serialOutput, err := osmisc.CreateFile(filepath.Join(outDir, "serial_output")); err != nil {
 			logger.Errorf(ctx, "%s", err)
 		} else {
-			// TODO(fxbug.dev/135386): Temporarily write to stdout while
+			// TODO(https://fxbug.dev/135386): Temporarily write to stdout while
 			// emulator serial output has been temporarily disabled from
 			// being written to stdout.
 			stdout = io.MultiWriter(os.Stdout, serialOutput)

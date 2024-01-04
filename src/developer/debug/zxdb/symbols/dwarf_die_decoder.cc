@@ -327,7 +327,7 @@ llvm::DWARFDie DwarfDieDecoder::DecodeReference(llvm::DWARFUnit* unit,
       // that our Clang toolchain doesn't seem to generate. The "sup4/8" ones
       // require a shared separate symbol file we don't use.
       //
-      // TODO(fxbug.dev/97388): Support DW_AT_signature and DW_FORM_ref_sig8.
+      // TODO(https://fxbug.dev/97388): Support DW_AT_signature and DW_FORM_ref_sig8.
       break;
   }
   return llvm::DWARFDie();

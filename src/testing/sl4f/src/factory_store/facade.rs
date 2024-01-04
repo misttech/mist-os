@@ -185,7 +185,7 @@ mod tests {
                 factory_store_facade.list_files(json!({ "provider": provider })).await?;
 
             let mut file_list: Vec<String> = from_value(file_list_json_value)?;
-            #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95034)
+            #[allow(suspicious_double_ref_op)] // TODO(https://fxbug.dev/95034)
             let mut expected_file_list: Vec<&str> =
                 file_map.keys().map(|entry| entry.clone()).collect();
 

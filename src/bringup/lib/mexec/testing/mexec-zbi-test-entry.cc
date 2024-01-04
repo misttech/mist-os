@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
 
   printf("%s: Booting test ZBI via mexec...\n", argv[0]);
 
-  // TODO(fxbug.dev/107535): This is a short-term band-aid to address the
+  // TODO(https://fxbug.dev/107535): This is a short-term band-aid to address the
   // likely issue of this program mexec'ing before the secondary CPUs have
   // been brought up.
   zx::nanosleep(zx::deadline_after(zx::sec(3)));

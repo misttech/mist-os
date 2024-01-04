@@ -59,8 +59,8 @@ class RegisterMmioProcessor {
   // UTP Task Management
   // RegisterMap::kUTMRLBA does not require a handler.
   // RegisterMap::kUTMRLBAU does not require a handler.
-  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTMRLDBR handler
-  // TODO(fxbug.dev/124835): Implement RegisterMap::kUTMRLRSR handler
+  // TODO(https://fxbug.dev/124835): Implement RegisterMap::kUTMRLDBR handler
+  // TODO(https://fxbug.dev/124835): Implement RegisterMap::kUTMRLRSR handler
   // UIC Command
   DEF_DEFAULT_HANDLER(RegisterMap::kUICCMD, DefaultUICCMDHandler)
   // RegisterMap::kUICCMDARG1 does not require a handler.

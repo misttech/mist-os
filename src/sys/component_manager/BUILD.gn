@@ -278,7 +278,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:regex",
 
     # component_manager should not depend on json
-    # TODO(fxbug.dev/302204241): Uncomment when component_manager no longer
+    # TODO(https://fxbug.dev/302204241): Uncomment when component_manager no longer
     # depends on serde_json (it does through version-history, at least)
     # "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",

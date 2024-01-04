@@ -329,7 +329,7 @@ pub fn build_random_bss_description_creator__(
         bssid: (0..6).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>().try_into().unwrap(),
         bss_type,
         beacon_period: rng.gen::<u16>(),
-        // TODO(fxbug.dev/81978): Purely random valid channel values is not implemented.
+        // TODO(https://fxbug.dev/81978): Purely random valid channel values is not implemented.
         channel: Channel::new(rng.gen_range(1..255), Cbw::Cbw20),
         rssi_dbm: rng.gen::<i8>(),
         snr_db: rng.gen::<i8>(),
@@ -701,7 +701,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Personal is not supported")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn unsupported_bss_type() {
         fake_fidl_bss_description!(Open, bss_type: fidl_common::BssType::Personal);

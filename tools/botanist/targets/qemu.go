@@ -232,7 +232,7 @@ func (t *QEMU) UseProductBundles() bool {
 }
 
 // Start starts the QEMU target.
-// TODO(fxbug.dev/95938): Add logic to use PB with ffx emu
+// TODO(https://fxbug.dev/95938): Add logic to use PB with ffx emu
 func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) (err error) {
 	if t.process != nil {
 		return fmt.Errorf("a process has already been started with PID %d", t.process.Pid)
@@ -557,7 +557,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-period-ms=0")
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-age-threshold-ms=0")
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0")
-	// TODO(fxbug.dev/133949): Remove when set by default.
+	// TODO(https://fxbug.dev/133949): Remove when set by default.
 	if !strings.Contains(strings.Join(args, " "), "kernel.experimental.serial_migration") {
 		qemuCmd.AddKernelArg("kernel.experimental.serial_migration=true")
 	}
@@ -620,7 +620,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		cmd.Stdout = io.MultiWriter(t.ptm, stdout)
 		cmd.Stderr = io.MultiWriter(t.ptm, stderr)
 		if isBootTest {
-			// TODO(fxbug.dev/135386): Don't write to stdout for
+			// TODO(https://fxbug.dev/135386): Don't write to stdout for
 			// boot tests to rule out whether the issue in the bug
 			// is due to a race between writing to stdout from the
 			// emulator and the boot test. Instead the boot test

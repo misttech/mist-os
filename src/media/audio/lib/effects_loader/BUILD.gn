@@ -56,7 +56,7 @@ executable("test") {
     "//zircon/system/ulib/fzl",
   ]
 
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

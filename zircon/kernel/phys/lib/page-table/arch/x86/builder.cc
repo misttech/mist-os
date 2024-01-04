@@ -63,7 +63,7 @@ zx_status_t AddressSpaceBuilder::MapRegion(Vaddr virt_start, Paddr phys_start, u
 
   // We currently only support normal mappings.
   //
-  // TODO(fxbug.dev/67632): Add support for other attributes.
+  // TODO(https://fxbug.dev/67632): Add support for other attributes.
   if (cache_attrs != CacheAttributes::kNormal) {
     return ZX_ERR_NOT_SUPPORTED;
   }

@@ -233,7 +233,7 @@ Result Walker<VisitorImpl, WireFormatVersion>::WalkIterableInternal(
     const fidl_type_t* elem_type, Walker<VisitorImpl, WireFormatVersion>::Position position,
     uint32_t stride, uint32_t end_offset, OutOfLineDepth depth) {
   if (unlikely(!elem_type)) {
-    // TODO(fxbug.dev/55226) Remove this case - it is only for tests.
+    // TODO(https://fxbug.dev/55226) Remove this case - it is only for tests.
     return Result::kContinue;
   }
   if (elem_type->type_tag() == kFidlTypePrimitive &&

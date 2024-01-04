@@ -370,7 +370,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolUsesLocalComponentFactory) {
 
 // Demonstrates a LocalComponentImpl can restart after exit.
 //
-// Note that a test flake was reported in fxbug.dev/111225 in this test.
+// Note that a test flake was reported in https://fxbug.dev/111225 in this test.
 // This test can occasionally time out, which probably means that at least
 // one of the expected events is not always occurring.
 //
@@ -433,7 +433,7 @@ TEST_F(RealmBuilderTest, ComponentCanStopAndBeRestarted) {
   // To work around this failure, re-try until it succeeds.
   //
   // This approach is expected to fix an automatically-reported flake bug
-  // (fxbug.dev/111225).
+  // (https://fxbug.dev/111225).
 
   got_response = false;
   got_peer_closed = false;

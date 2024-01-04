@@ -911,12 +911,12 @@ impl vfs::directory::entry_container::Directory for FxDirectory {
                     Ok(iter) => iter,
                     Err(e) => {
                         error!(error = ?e, "Failed to iterate directory for watch",);
-                        // TODO(fxbug.dev/96086): This really should close the watcher connection
+                        // TODO(https://fxbug.dev/96086): This really should close the watcher connection
                         // with an epitaph so that the watcher knows.
                         return;
                     }
                 };
-                // TODO(fxbug.dev/96087): It is possible that we'll duplicate entries that are added
+                // TODO(https://fxbug.dev/96087): It is possible that we'll duplicate entries that are added
                 // as we iterate over directories.  I suspect fixing this might be non-trivial.
                 controller.send_event(&mut SingleNameEventProducer::existing("."));
                 while let Some((name, _, _)) = iter.get() {
@@ -1591,7 +1591,7 @@ mod tests {
             close_file_checked(file).await;
         }
 
-        // TODO(fxbug.dev/95356): Magic number; can we get this from fuchsia.io?
+        // TODO(https://fxbug.dev/95356): Magic number; can we get this from fuchsia.io?
         const DIRENT_SIZE: u64 = 10; // inode: u64, size: u8, kind: u8
         const BUFFER_SIZE: u64 = DIRENT_SIZE + 2; // Enough space for a 2-byte name.
 

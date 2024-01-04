@@ -3,12 +3,12 @@
 
 # Bluetooth Retrieve Supported Features command
 # HFP 1.8 4.35.1
-# TODO(fxb/71403) Guarantee this int is 32 bits.
+# TODO(https://fxbug.dev/71403) Guarantee this int is 32 bits.
 command { AT+BRSF=features: Integer }
 
 # Bluetooth Retrieve Supported Features response
 # HFP 1.8 4.35.1
-# TODO(fxb/71403) Guarantee this int is 32 bits.
+# TODO(https://fxbug.dev/71403) Guarantee this int is 32 bits.
 response { +BRSF: features: Integer}
 
 # Standard Indicator Update read command

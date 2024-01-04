@@ -18,7 +18,7 @@ class FIDLImportFinder(importlib.abc.MetaPathFinder):
 
     def find_module(self, fullname: str, path=None):
         """Override from abc.MetaPathFinder."""
-        # TODO(fxbug.dev/109789): Remove "TransportError".
+        # TODO(https://fxbug.dev/109789): Remove "TransportError".
         if (
             fullname.startswith("fidl._")
             or fullname == "fidl.FrameworkError"

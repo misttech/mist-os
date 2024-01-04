@@ -379,7 +379,7 @@ TEST(VkLoop, InfiniteLoop) {
 TEST(VkLoop, EventHang) {
   VkLoopTest test(true);
   ASSERT_TRUE(test.Initialize());
-  // TODO(fxbug.dev/82005): Re-enable when the Mali MSD returns an error.
+  // TODO(https://fxbug.dev/82005): Re-enable when the Mali MSD returns an error.
   ASSERT_TRUE(test.Exec(false, VkLoopTest::AllowSuccess::kAllow));
 }
 
@@ -387,7 +387,7 @@ TEST(VkLoop, DriverDeath) {
   VkLoopTest test(true);
   ASSERT_TRUE(test.Initialize());
 
-  // TODO(fxbug.dev/100070) - enable for ARM/Mali
+  // TODO(https://fxbug.dev/100070) - enable for ARM/Mali
   if (test.get_vendor_id() == 0x13B5)
     GTEST_SKIP();
 

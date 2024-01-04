@@ -1,7 +1,7 @@
 [
     {
         "override_condition_to": "allowed-condition",
-        "bug": "fxb/123",
+        "bug": "https://fxbug.dev/123",
         "comment": [
             "Test override rule"
         ],
@@ -26,7 +26,7 @@
     },
     {
         "override_condition_to": "allowed-condition",
-        "bug": "fxb/123",
+        "bug": "https://fxbug.dev/123",
         "comment": [
             "Test override rule"
         ],
@@ -52,7 +52,7 @@
     },
     {
         "override_condition_to": "allowed-condition",
-        "bug": "fxb/123",
+        "bug": "https://fxbug.dev/123",
         "comment": [
             "Test override rule"
         ],
@@ -76,7 +76,7 @@
     },
     {
         "override_condition_to": "allowed-condition",
-        "bug": "fxb/123",
+        "bug": "https://fxbug.dev/123",
         "comment": [
             "Test override rule"
         ],

@@ -186,7 +186,7 @@ template("access_ota_blob_as_executable") {
       deps += [ "//src/sys/pkg/bin/pkg-cache:production-component-and-config-cpp-blobfs" ]
     }
 
-    # TODO(fxbug.dev/88453): Complete test dependency composition to eliminate
+    # TODO(https://fxbug.dev/88453): Complete test dependency composition to eliminate
     # error logs:
     # - system-updater: "Failed to read vbmeta hash: while opening the file:
     #   open failed with status: NOT_FOUND: NOT_FOUND".

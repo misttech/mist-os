@@ -71,7 +71,7 @@ pub struct FsNode {
     ops: Box<dyn FsNodeOps>,
 
     /// The current kernel.
-    // TODO(fxbug.dev/130251): This is a temporary measure to access a task on drop.
+    // TODO(https://fxbug.dev/130251): This is a temporary measure to access a task on drop.
     kernel: Weak<Kernel>,
 
     /// The FileSystem that owns this FsNode's tree.
@@ -1687,7 +1687,7 @@ impl FsNode {
             return error!(EINVAL);
         }
 
-        let mut stx_attributes = 0; // TODO(fxbug.dev/302594110)
+        let mut stx_attributes = 0; // TODO(https://fxbug.dev/302594110)
         let stx_attributes_mask = STATX_ATTR_VERITY as u64;
 
         if matches!(*self.fsverity.lock(), FsVerityState::FsVerity) {
@@ -1724,7 +1724,7 @@ impl FsNode {
 
             stx_dev_major: self.fs().dev_id.major(),
             stx_dev_minor: self.fs().dev_id.minor(),
-            stx_mnt_id: 0, // TODO(fxbug.dev/302594110)
+            stx_mnt_id: 0, // TODO(https://fxbug.dev/302594110)
             ..Default::default()
         })
     }

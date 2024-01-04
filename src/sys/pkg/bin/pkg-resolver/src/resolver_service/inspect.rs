@@ -16,7 +16,7 @@ fn now_monotonic_nanos() -> i64 {
 pub struct ResolverService {
     /// How many times the resolver service has fallen back to the
     /// cache package set due to a remote repository returning NOT_FOUND.
-    /// TODO(fxbug.dev/50764): remove this stat when we remove this cache fallback behavior.
+    /// TODO(https://fxbug.dev/50764): remove this stat when we remove this cache fallback behavior.
     cache_fallbacks_due_to_not_found: inspect_util::Counter,
     active_package_resolves: Node,
     _node: Node,
@@ -37,7 +37,7 @@ impl ResolverService {
 
     /// Increment the count of package resolves that have fallen back to cache packages due to a
     /// remote repository returning NOT_FOUND. This fallback behavior will be removed
-    /// TODO(fxbug.dev/50764).
+    /// TODO(https://fxbug.dev/50764).
     pub fn cache_fallback_due_to_not_found(&self) {
         self.cache_fallbacks_due_to_not_found.increment();
     }

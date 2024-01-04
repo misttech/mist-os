@@ -130,7 +130,7 @@ void MdnsDeprecatedServiceImpl::PublishServiceInstance(
     return;
   }
 
-  // TODO(fxbug.dev/56579): Review this approach to conflicts.
+  // TODO(https://fxbug.dev/56579): Review this approach to conflicts.
   std::string instance_full_name = MdnsNames::InstanceFullName(instance, service);
 
   // If there's an existing publisher for this full name, destroy it so the new publication
@@ -287,7 +287,7 @@ MdnsDeprecatedServiceImpl::ResponderPublisher::ResponderPublisher(
       if (!MdnsNames::IsValidSubtypeName(subtype)) {
         FX_LOGS(ERROR) << "Invalid subtype " << subtype
                        << " passed in SetSubtypes event, closing connection.";
-        // TODO(fxb/71542): Should also call deleter here and at other Unpublish call sites.
+        // TODO(https://fxbug.dev/71542): Should also call deleter here and at other Unpublish call sites.
         responder_ = nullptr;
         Unpublish();
         return;

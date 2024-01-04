@@ -49,7 +49,7 @@
                     "prebuilt/third_party/sysroot/ubuntu20.04"
                 ],
                 "notes": [
-                    "Skip Linux sysroot directory, see fxbug.dev/59222."
+                    "Skip Linux sysroot directory, see https://fxbug.dev/59222."
                 ]
             },
             {
@@ -110,7 +110,7 @@
                     "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/firmware"
                 ],
                 "notes": [
-                    "Bug: fxbug.dev/126193",
+                    "Bug: https://fxbug.dev/126193",
                     "There are no distributable license files in this directory.",
                     "Handle it in a better way than simply skipping it."
                 ]
@@ -133,7 +133,7 @@
                     "third_party/jinja2"
                 ],
                 "notes": [
-                    "Bug: fxbug.dev/126193",
+                    "Bug: https://fxbug.dev/126193",
                     "These projects don't have a LICENSE file currently.",
                     "Address this issue, and remove these projects from this list."
                 ]
@@ -175,7 +175,7 @@
                     "src/testing/end_to_end/mobly_driver/tests/unit_tests/drivers/__init__.py"
                 ],
                 "notes": [
-                    "Bug: fxbug.dev/126193",
+                    "Bug: https://fxbug.dev/126193",
                     "'__init__.py' files can hold licensing information, but the ones listed here are empty.",
                     "Add copyright headers to these files."
                 ]
@@ -186,7 +186,7 @@
                     "zircon/LICENSE"
                 ],
                 "notes": [
-                    "Bug: fxbug.dev/126193",
+                    "Bug: https://fxbug.dev/126193",
                     "Temporarily skip these files while proper license detection can be enabled."
                 ]
             },

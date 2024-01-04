@@ -72,7 +72,7 @@ def workflow_entity_rule(*, implementation, attrs = {}, **kwargs):
             arguments = prepend_task_args + ctx.attr.arguments
             task_runfiles = collect_runfiles(ctx, ctx.attr.inputs, runfiles, arguments, ignore_types = ["string"])
 
-            # TODO(fxbug.dev/114470): Interpolate input file locations.
+            # TODO(https://fxbug.dev/114470): Interpolate input file locations.
             return [
                 arg.short_path if type(arg) == "File" else arg
                 for arg in arguments

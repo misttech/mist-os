@@ -313,11 +313,11 @@ void UsbAudioDevice::Probe() {
 
     // Log a warning if we are about to build an audio path which operates
     // in separate clock domain.  We still need to add support for this
-    // case, see fxbug.dev/31906 for details.
+    // case, see https://fxbug.dev/31906 for details.
     if (stream_ifc->ep_sync_type() == EndpointSyncType::Async) {
       LOG(WARNING,
           "Warning: Creating USB audio %s with operating in Asynchronous Isochronous mode. "
-          "See fxbug.dev/31906",
+          "See https://fxbug.dev/31906",
           stream_ifc->direction() == Direction::Input ? "input" : "output");
     }
 

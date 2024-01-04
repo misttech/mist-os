@@ -47,7 +47,7 @@ echo "127.0.1.1    machina-guest" >> /etc/hosts
 # https://fuchsia.dev/fuchsia-src/contribute/respectful_code note:
 # "blacklist" is a keyword required by modprobe.
 cat > /etc/modprobe.d/machina.conf << EOF
-# Causes a panic on certain x86-64 CPUs: <http://fxbug.dev/86351>.
+# Causes a panic on certain x86-64 CPUs: <https://fxbug.dev/86351>.
 blacklist intel_pmc_core
 EOF
 

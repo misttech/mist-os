@@ -109,7 +109,7 @@ const DISPLAY_USAGE_LAYER uint32 = 1;
 const DISPLAY_USAGE_CURSOR uint32 = 2;
 
 // Flags for "video" usage.
-// TODO(fxbug.dev/32118): Add more specific HwDecoder flags if needed.
+// TODO(https://fxbug.dev/32118): Add more specific HwDecoder flags if needed.
 @available(added=HEAD)
 const VIDEO_USAGE_HW_DECODER uint32 = 1;
 @available(added=HEAD)

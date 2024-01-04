@@ -31,9 +31,9 @@ struct BlobPageInFrequencies {
 
 // Encapsulates Blobfs-specific metrics available via Inspect.
 //
-// TODO(fxbug.dev/80285): Make this properly thread-safe.  IncrementPageIn(), paged_read_metrics(),
+// TODO(https://fxbug.dev/80285): Make this properly thread-safe.  IncrementPageIn(), paged_read_metrics(),
 // unpaged_read_metrics(), and verification_metrics() are not thread safe.
-// TODO(fxbug.dev/80285): Make this class encapsulate all Blobfs-specific metrics, and have
+// TODO(https://fxbug.dev/80285): Make this class encapsulate all Blobfs-specific metrics, and have
 // BlobfsInspectTree take ownership of it.
 class BlobfsMetrics final {
  public:

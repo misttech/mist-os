@@ -26,7 +26,7 @@ use {
     wlan_frame_writer::write_frame_with_dynamic_buf,
 };
 
-// TODO(fxbug.dev/89992): Currently hardcoded until parameters supported.
+// TODO(https://fxbug.dev/89992): Currently hardcoded until parameters supported.
 const MIN_HOME_TIME: zx::Duration = zx::Duration::from_millis(0);
 const MIN_PROBES_PER_CHANNEL: u8 = 0;
 const MAX_PROBES_PER_CHANNEL: u8 = 0;
@@ -213,7 +213,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
                 .device
                 .start_passive_scan(&fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest {
                     channels: Some(req.channel_list),
-                    // TODO(fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here
+                    // TODO(https://fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here
                     // is required since fuchsia.wlan.mlme/ScanRequest.min_channel_time has a width of
                     // four octets.
                     min_channel_time: Some(
@@ -245,7 +245,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         })?;
 
         let mut remaining_active_scan_requests = active_scan_request_series(
-            // TODO(fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here
+            // TODO(https://fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here
             // is required since fuchsia.wlan.mlme/ScanRequest.min_channel_time has a width of
             // four octets.
             query_response,
@@ -330,7 +330,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         }
 
         match self.scanner.ongoing_scan.take() {
-            // TODO(fxbug.dev/91045): A spurious ScanComplete should not silently cancel an
+            // TODO(https://fxbug.dev/91045): A spurious ScanComplete should not silently cancel an
             // MlmeScan by permanently taking the contents of ongoing_scan.
             None => {
                 warn!("Unexpected ScanComplete when no scan in progress.");
@@ -425,7 +425,7 @@ fn band_cap_for_band(
         .next()
 }
 
-// TODO(fxbug.dev/91036): Zero should not mark a null rate.
+// TODO(https://fxbug.dev/91036): Zero should not mark a null rate.
 fn supported_rates_for_band(
     query_response: &fidl_softmac::WlanSoftmacQueryResponse,
     band: fidl_common::WlanBand,
@@ -438,7 +438,7 @@ fn supported_rates_for_band(
     Ok(rates)
 }
 
-// TODO(fxbug.dev/91038): This is not correct. Channel numbers do not imply band.
+// TODO(https://fxbug.dev/91038): This is not correct. Channel numbers do not imply band.
 fn band_from_channel_number(channel_number: u8) -> fidl_common::WlanBand {
     if channel_number > 14 {
         fidl_common::WlanBand::FiveGhz
@@ -458,7 +458,7 @@ fn active_scan_request_series(
     min_probes_per_channel: u8,
     max_probes_per_channel: u8,
 ) -> Result<Vec<fidl_softmac::WlanSoftmacStartActiveScanRequest>, Error> {
-    // TODO(fxbug.dev/91038): The fuchsia.wlan.mlme/MLME API assumes channels numbers imply bands
+    // TODO(https://fxbug.dev/91038): The fuchsia.wlan.mlme/MLME API assumes channels numbers imply bands
     //                        and so partitioning channels must be done internally.
     struct BandChannels {
         band: fidl_common::WlanBand,

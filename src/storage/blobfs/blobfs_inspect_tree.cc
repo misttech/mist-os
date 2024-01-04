@@ -14,7 +14,7 @@ inspect::Inspector CreateInspector() {
 #ifdef BLOBFS_ENABLE_LARGE_INSPECT_VMO
   // When recording page-in frequencies, a much larger Inspect VMO is required (>512KB).
   //
-  // TODO(fxbug.dev/59043): Inspect should print warnings about overflowing the maximum size of a
+  // TODO(https://fxbug.dev/59043): Inspect should print warnings about overflowing the maximum size of a
   // VMO.
   const size_t kMaxInspectVmoSize = 2UL * 1024UL * 1024UL;
   return inspect::Inspector(inspect::InspectSettings{.maximum_size = kMaxInspectVmoSize});

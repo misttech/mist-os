@@ -88,7 +88,7 @@ pub async fn watch_scan_results(
 
             if state.read().connect && peer.connectable {
                 // connect_peripheral will log errors, so the result can be ignored.
-                // TODO(fxbug.dev/108816): Use Central.Connect instead of deprecated Central.ConnectPeripheral.
+                // TODO(https://fxbug.dev/108816): Use Central.Connect instead of deprecated Central.ConnectPeripheral.
                 let _ = connect(&state, peer.id, None).await;
             }
 

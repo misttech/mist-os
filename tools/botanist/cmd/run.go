@@ -234,7 +234,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 			cmdWait <- err
 		}()
 		cleanup = func() {
-			// TODO(fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
+			// TODO(https://fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
 			// process once that is supported.
 			if err := ffx.Stop(); err != nil {
 				logger.Errorf(ctx, "failed to stop ffx daemon: %s", err)
@@ -287,7 +287,7 @@ func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuc
 
 			// Create a new file to capture the serial log for this nodename.
 			serialLogName := fmt.Sprintf("%s_serial_log.txt", t.Nodename())
-			// TODO(fxbug.dev/71529): Remove once there are no dependencies on this filename.
+			// TODO(https://fxbug.dev/71529): Remove once there are no dependencies on this filename.
 			if len(fuchsiaTargets) == 1 {
 				serialLogName = "serial_log.txt"
 			}
@@ -410,7 +410,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 					}
 					go func() {
 						syslogName := fmt.Sprintf("%s_syslog.txt", t.Nodename())
-						// TODO(fxbug.dev/71529): Remove when there are no dependencies on this filename.
+						// TODO(https://fxbug.dev/71529): Remove when there are no dependencies on this filename.
 						if len(fuchsiaTargets) == 1 {
 							syslogName = "syslog.txt"
 						}
@@ -706,7 +706,7 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		defer func() {
 			if skippedFiles, err := osmisc.CopyDir(tmpOutDir, testOutDir, osmisc.SkipUnknownFiles); err != nil {
 				logger.Errorf(ctx, "failed to copy outputs to %s: %s", testOutDir, err)
-				// TODO(fxbug.dev/128608): If we fail to copy outputs, at least copy
+				// TODO(https://fxbug.dev/128608): If we fail to copy outputs, at least copy
 				// the ffx logs over so we can debug. Remove when attached bug is
 				// fixed.
 				if r.ffxPath != "" {

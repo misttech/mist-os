@@ -694,7 +694,7 @@ foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
   #
   template("_${_target_type}_internal_wrapper") {
     target(_target_type, target_name) {
-      # Capture the target name prior to forwarding variables. See fxb/133723.
+      # Capture the target name prior to forwarding variables. See https://fxbug.dev/133723.
       _target_label = get_label_info(":${target_name}", "label_with_toolchain")
 
       forward_variables_from(invoker,
@@ -1550,7 +1550,7 @@ _hwasan_variant = {
     "replaces-allocator",
     "uses-shadow",
 
-    # TODO(fxbug.dev/104397): This is here because starnix binaries using
+    # TODO(https://fxbug.dev/104397): This is here because starnix binaries using
     # this variant attempt to use libclang_rt.hwasan.so for linux-arm64, but
     # we don't ship that yet in the toolchain. Once we do, we should be able
     # to remove this.
@@ -2403,7 +2403,7 @@ template("_fuchsia_binary") {
       }
 
       if (target_type == "shared_library") {
-        # Add zircon dependency for the profile variant. TODO(fxbug.dev/61522): Remove this.
+        # Add zircon dependency for the profile variant. TODO(https://fxbug.dev/61522): Remove this.
         if (toolchain_variant.tags + [
               "profile",
               "coverage",
@@ -2437,7 +2437,7 @@ template("_fuchsia_binary") {
         data_deps += [ "//build/toolchain/runtime:static-libc++-deps" ]
       }
       if (defined(crate_root)) {
-        # TODO(fxbug.dev/57585): Handle this for (non-rlib) static libraries.
+        # TODO(https://fxbug.dev/57585): Handle this for (non-rlib) static libraries.
         should_add_shared_rust_runtime = false
         dynamic_rust_config =
             [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
@@ -2449,7 +2449,7 @@ template("_fuchsia_binary") {
         if (defined(configs) &&
             configs + bootfs_rust_config - bootfs_rust_config != configs) {
           # Never add dynamic stdlib for bootfs binaries.
-          # TODO(fxbug.dev/83081): reconsider this.
+          # TODO(https://fxbug.dev/83081): reconsider this.
           should_add_shared_rust_runtime = false
         }
         if (should_add_shared_rust_runtime) {
@@ -2867,7 +2867,7 @@ template("variant_target") {
     # executable's location.  Usually that does not matter, because we
     # avoid dynamic linking (for host tools) for reasons like that.  An
     # exception is ASan on Mac, but that is currently disabled due to
-    # problems caused by its use of dynamic linking (TODO(fxbug.dev/3166)).
+    # problems caused by its use of dynamic linking (TODO(https://fxbug.dev/3166)).
     copy(target_name) {
       forward_variables_from(target_invoker,
                              [
@@ -3138,7 +3138,7 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
           install_name = invoker.install_name
         }
 
-        # TODO(fxbug.dev/54322): Zircon toolchains must use a .debug suffix for non-stripped
+        # TODO(https://fxbug.dev/54322): Zircon toolchains must use a .debug suffix for non-stripped
         # shared libraries, instead of putting them into exe.unstripped. This can be
         # changed after build unification completes.
         if (zircon_toolchain != false) {
@@ -3308,7 +3308,7 @@ template("executable") {
     target_name = _executable_name
 
     # NOTE: Zircon-specific toolchains don't need a syslog backend.
-    # TODO(fxbug.dev/60072): Clean up logging backends for executables.
+    # TODO(https://fxbug.dev/60072): Clean up logging backends for executables.
     disable_syslog_backend = defined(invoker.disable_syslog_backend) &&
                              invoker.disable_syslog_backend
 
@@ -3355,7 +3355,7 @@ template("executable") {
       output_file += ".$output_extension"
     }
 
-    # TODO(fxbug.dev/54322): Zircon toolchains must use a .debug suffix for non-stripped
+    # TODO(https://fxbug.dev/54322): Zircon toolchains must use a .debug suffix for non-stripped
     # executables, instead of putting them into exe.unstripped. This can be
     # changed after build unification completes.
     if (zircon_toolchain != false) {
@@ -3373,7 +3373,7 @@ template("executable") {
 
     # This ensures that non-Zircon host executables get __zx_panic.
     #
-    # TODO(fxbug.dev/34571): This will likely no longer be needed at some point.  See
+    # TODO(https://fxbug.dev/34571): This will likely no longer be needed at some point.  See
     # the bug for more info/discussion.
     if (is_host) {
       deps += [ "//zircon/system/ulib/zx-panic-libc" ]

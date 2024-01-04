@@ -168,7 +168,7 @@ impl Drop for SendExecutor {
     }
 }
 
-// TODO(fxbug.dev/76583) test SendExecutor with unit tests
+// TODO(https://fxbug.dev/76583) test SendExecutor with unit tests
 
 #[cfg(test)]
 mod tests {

@@ -12,7 +12,7 @@ use starnix_logging::log_warn;
 use starnix_sync::Mutex;
 
 // Many Linux APIs need a running UTC clock to function. Since there can be a delay until the
-// UTC clock in Zircon starts up (fxb/131200), Starnix provides a synthetic utc clock initially,
+// UTC clock in Zircon starts up (https://fxbug.dev/131200), Starnix provides a synthetic utc clock initially,
 // and polls for the signal ZX_CLOCK_STARTED. Once this signal is asserted, the synthetic utc
 // clock is replaced by a real utc clock.
 

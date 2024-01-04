@@ -78,7 +78,7 @@ driver_bind_rules("spec-composite-1-bind") {
   header_output = "spec-composite-1-bind.h"
   bind_output = "spec-composite-1.bindbc"
 
-  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # TODO(https://fxbug.dev/115757): Remove this once we no longer need to generate
   # fragments for composite bind rules.
   disable_fragment_gen = true
 
@@ -108,7 +108,7 @@ driver_bind_rules("spec-composite-2-bind") {
   header_output = "spec-composite-2-bind.h"
   bind_output = "spec-composite-2.bindbc"
 
-  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # TODO(https://fxbug.dev/115757): Remove this once we no longer need to generate
   # fragments for composite bind rules.
   disable_fragment_gen = true
 

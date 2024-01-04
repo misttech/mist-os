@@ -49,7 +49,7 @@ closed protocol Cache {
     ///
     /// ## Rights
     ///
-    /// TODO(fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/32253)
     ///
     /// ## Return value
     ///

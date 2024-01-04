@@ -15,7 +15,7 @@ type Capability = strict enum : uint32 {
     SHORT_SLOT_TIME = 0x0400;
     RADIO_MSMT = 0x01000;
 
-    // TODO(fxbug.dev/54923): Move SIMULTANEOUS_CLIENT_AP to a different Fuchsia specific capability enum.
+    // TODO(https://fxbug.dev/54923): Move SIMULTANEOUS_CLIENT_AP to a different Fuchsia specific capability enum.
     // This enum should only be used for IEEE 802.11 fields. This type should also be reduced
     // to uint16_t once this is done.
     SIMULTANEOUS_CLIENT_AP = 0x10000;
@@ -37,7 +37,7 @@ type BandInfo = struct {
 
 type CreateIfaceRequest = resource struct {
     role fuchsia.wlan.common.WlanMacRole;
-    // TODO(fxbug.dev/29547): Make `mlme_channel` mandatory once all drivers support the channel.
+    // TODO(https://fxbug.dev/29547): Make `mlme_channel` mandatory once all drivers support the channel.
     mlme_channel zx.Handle:<CHANNEL, optional>;
     init_sta_addr ieee80211.MacAddr;
 };

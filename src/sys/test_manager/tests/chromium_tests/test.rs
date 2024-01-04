@@ -4,5 +4,5 @@
 
 // These tests verify that dependencies needed by tests in the chromium realm are correctly
 // routed.
-// TODO(fxbug.dev/91934): once we can define the chromium realm out of tree, we should move
+// TODO(https://fxbug.dev/91934): once we can define the chromium realm out of tree, we should move
 // the definition and remove these tests.

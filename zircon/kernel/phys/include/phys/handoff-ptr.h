@@ -35,7 +35,7 @@
 //    roughly until the kernel becomes multi-threaded(*).  This data resides on
 //    pages that the PMM may be told to reuse after handoff.
 //
-// (*) TODO(fxbug.dev/84107): Currently permanent handoff data is not possible
+// (*) TODO(https://fxbug.dev/84107): Currently permanent handoff data is not possible
 // at all, since the kernel proper will consume all physical memory.  Temporary
 // data is in fact available until userboot, which is the last thing in kernel
 // startup.  In future, the cutoff when temporary handoff pointers become
@@ -44,7 +44,7 @@ enum class PhysHandoffPtrLifetime { Permanent, Temporary };
 
 // The handoff pointers can be encoded in two ways.
 //
-// TODO(fxbug.dev/84107): Currently pointers are physical addresses residing
+// TODO(https://fxbug.dev/84107): Currently pointers are physical addresses residing
 // inside the data ZBI.  The kernel will access them via the physmap.
 // Eventually they will be kernel virtual pointers into some kernel mapping
 // (possibly the physmap or possibly dedicated mappings).  The distinction here
@@ -188,7 +188,7 @@ using PhysHandoffTemporarySpan =
 using PhysHandoffTemporaryString =
     PhysHandoffString<PhysHandoffPtrEncoding::PhysAddr, PhysHandoffPtrLifetime::Temporary>;
 
-// TODO(fxbug.dev/84107): permanent handoff pointers are not yet available
+// TODO(https://fxbug.dev/84107): permanent handoff pointers are not yet available
 // template <typename T>
 // using PhysHandoffPermanentPtr =
 //     PhysHandoffPtr<T, PhysHandoffPtrEncoding::KernelVirtualPtr,

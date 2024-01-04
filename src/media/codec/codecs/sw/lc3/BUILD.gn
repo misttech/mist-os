@@ -14,7 +14,7 @@ executable("codec_runner_sw_lc3") {
     "//src/media/codec:codec_runner_sw_lc3",
     "//src/media/codec:codec_runner_sw_lc3.manifest",
 
-    # TODO(fxbug.dev/4129): now that this bug is no longer a problem, the deps covered
+    # TODO(https://fxbug.dev/4129): now that this bug is no longer a problem, the deps covered
     # by this * no longer need to exist as direct dependencies and requires cleanup.
     "//src/media/codec/*",
     "//src/media/codec/factory",

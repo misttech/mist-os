@@ -167,7 +167,7 @@ async fn test_connect_unknown_peer(profile: ProfileHarness) {
     }
 }
 
-// TODO(fxbug.dev/70927): Fix this and reenable
+// TODO(https://fxbug.dev/70927): Fix this and reenable
 #[ignore]
 #[test_harness::run_singlethreaded_test]
 async fn test_add_search((access, profile): (AccessHarness, ProfileHarness)) {
@@ -215,4 +215,4 @@ async fn test_add_search((access, profile): (AccessHarness, ProfileHarness)) {
         .unwrap();
 }
 
-// TODO(fxbug.dev/1252): the rest of connect_l2cap tests (that actually succeed)
+// TODO(https://fxbug.dev/1252): the rest of connect_l2cap tests (that actually succeed)

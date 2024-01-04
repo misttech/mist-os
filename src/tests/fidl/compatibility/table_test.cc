@@ -178,7 +178,7 @@ TEST(Table, EchoTableWithErrorSuccessCase) {
 
 TEST(Table, EchoTableWithErrorErrorCase) {
   ForAllImpls(impls,
-              // See: fxbug.dev/7966
+              // See: https://fxbug.dev/7966
               [](async::Loop& loop, fidl::test::compatibility::EchoPtr& proxy,
                  const std::string& server_url, const std::string& proxy_url) {
                 summary[ExtractShortName(proxy_url) + " <-> " + ExtractShortName(server_url) +
@@ -340,7 +340,7 @@ TEST(Table, EchoTablePayloadNoRetval) {
   });
 }
 
-// TODO(fxbug.dev/94910): This is an N+M case, where we only want to test each bindings
+// TODO(https://fxbug.dev/94910): This is an N+M case, where we only want to test each bindings
 // client/server once, rather than in combination with ever other binding. Move this test case to a
 // more appropriate file with other such N+M cases, once it exists.
 TEST(Table, EchoTableRequestComposed) {

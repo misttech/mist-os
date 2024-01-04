@@ -17,7 +17,7 @@ bool IsYuvFormat(VkFormat format) {
   }
 }
 
-// TODO(fxbug.dev/91193): Support more usage cases and feature flags.
+// TODO(https://fxbug.dev/91193): Support more usage cases and feature flags.
 VkFormatFeatureFlags GetFormatFeatureFlagsFromUsage(VkImageUsageFlags usage) {
   VkFormatFeatureFlags result = {};
   if (usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) {

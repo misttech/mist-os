@@ -21,7 +21,7 @@ use starnix_uapi::{
 use zerocopy::{AsBytes, FromBytes};
 
 /// The size of the red zone.
-// TODO(fxbug.dev/121659): Determine whether or not this is the correct red zone size for aarch64.
+// TODO(https://fxbug.dev/121659): Determine whether or not this is the correct red zone size for aarch64.
 pub const RED_ZONE_SIZE: u64 = 128;
 
 /// The size of the syscall instruction in bytes.
@@ -67,7 +67,7 @@ impl SignalStackFrame {
                 sp: registers.sp,
                 pc: registers.pc,
                 pstate: registers.cpsr,
-                // TODO(fxbug.dev/121659): Should actually contain the fault address for SIGBUS and
+                // TODO(https://fxbug.dev/121659): Should actually contain the fault address for SIGBUS and
                 // SIGSEGV.
                 fault_address: 0,
                 __reserved: get_sigcontext_data(extended_pstate),

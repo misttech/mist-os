@@ -99,7 +99,7 @@ impl Into<u8> for CodecId {
 }
 
 // Convenience conversions for interacting with AT library.
-// TODO(fxbug.dev/71403): Remove this once AT library supports specifying correct widths.
+// TODO(https://fxbug.dev/71403): Remove this once AT library supports specifying correct widths.
 impl Into<i64> for CodecId {
     fn into(self) -> i64 {
         self.0 as i64

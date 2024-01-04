@@ -204,8 +204,8 @@ void Gatt2ServerServer::OnClientCharacteristicConfiguration(bt::gatt::IdType ser
 }
 
 void Gatt2ServerServer::OnSuppressDiscovery(InternalServiceId service_id) {
-  // TODO(fxbug.dev/98598): This event is not yet supported
-  bt_log(ERROR, "fidl", "%s not supported - see fxbug.dev/98598", __FUNCTION__);
+  // TODO(https://fxbug.dev/98598): This event is not yet supported
+  bt_log(ERROR, "fidl", "%s not supported - see https://fxbug.dev/98598", __FUNCTION__);
 }
 
 bool Gatt2ServerServer::ValidateValueChangedEvent(

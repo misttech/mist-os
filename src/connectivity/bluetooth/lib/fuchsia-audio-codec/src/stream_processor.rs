@@ -1118,7 +1118,7 @@ mod tests {
 
         // Write an initial frame to the encoder.
         // This is to get past allocating the input/output buffers stage.
-        // TODO(fxbug.dev/131164): Both futures need to be polled here even though it's only the
+        // TODO(https://fxbug.dev/131164): Both futures need to be polled here even though it's only the
         // writer we really care about because currently decoded_fut is needed to drive the
         // allocation process.
         let (written_res, mut decoded_fut) =

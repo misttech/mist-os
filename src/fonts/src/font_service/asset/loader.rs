@@ -49,7 +49,7 @@ impl AssetLoaderImpl {
 }
 
 /// This implementation is currently covered by integration tests only.
-/// TODO(fxbug.dev/48649): Unit tests.
+/// TODO(https://fxbug.dev/48649): Unit tests.
 #[async_trait]
 impl AssetLoader for AssetLoaderImpl {
     async fn fetch_package_directory(

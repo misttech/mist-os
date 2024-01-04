@@ -4,7 +4,7 @@
 
 library zbi;
 
-// TODO(fxbug.dev/111453): Figure out documentation convention.
+// TODO(https://fxbug.dev/111453): Figure out documentation convention.
 
 const PARTITION_NAME_LEN uint64 = 32;
 const PARTITION_GUID_LEN uint64 = 16;

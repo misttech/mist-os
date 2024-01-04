@@ -92,7 +92,7 @@ impl From<&TargetAddrInfo> for TargetAddr {
                 IpAddress::Ipv6(Ipv6Address { addr }) => (addr.into(), ip.scope_id, ip.port),
                 IpAddress::Ipv4(Ipv4Address { addr }) => (addr.into(), ip.scope_id, ip.port),
             },
-            // TODO(fxbug.dev/52733): Add serial numbers.,
+            // TODO(https://fxbug.dev/52733): Add serial numbers.,
         };
 
         TargetAddr::new(addr, scope, port)

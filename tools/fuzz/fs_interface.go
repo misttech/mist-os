@@ -20,7 +20,7 @@ import (
 //
 // This allows for re-using the bulk of the code implementing Put/Get for both
 // v1 and v2 fuzzers.
-// TODO(fxbug.dev/106110): Simplify this once we don't need to support SFTP.
+// TODO(https://fxbug.dev/106110): Simplify this once we don't need to support SFTP.
 type fsInterface interface {
 	iofs.FS
 	iofs.GlobFS

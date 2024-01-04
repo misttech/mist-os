@@ -103,7 +103,7 @@ enum InnerVmoWriter {
 }
 
 impl VmoWriter {
-    // TODO(fxbug.dev/48669): take the name of the VMO as well.
+    // TODO(https://fxbug.dev/48669): take the name of the VMO as well.
     fn new(start_size: u64) -> Self {
         let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, start_size)
             .expect("can always create resizable vmo's");

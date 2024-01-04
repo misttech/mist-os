@@ -183,7 +183,7 @@ async fn run_usb_link(
 
     let tx = async move {
         loop {
-            // TODO(sadmac): Change to MTU when fxb/124327 is fixed
+            // TODO(sadmac): Change to MTU when https://fxbug.dev/124327 is fixed
             let mut out = [0u8; 496];
 
             // TODO: We could save a copy here by having a version of `read` with an async body.

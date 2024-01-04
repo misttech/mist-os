@@ -7,7 +7,7 @@
 
 #include <ldmsg/ldmsg.h>
 
-// TODO(fxbug.dev/121817): These handwritten encoding/decoding functions should
+// TODO(https://fxbug.dev/121817): These handwritten encoding/decoding functions should
 // be replaced with generated FIDL bindings after the linked bug about libc
 // improvements.
 

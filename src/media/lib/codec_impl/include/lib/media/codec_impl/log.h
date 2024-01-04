@@ -27,7 +27,7 @@
   } while (0)
 
 // Temporary solution for logging in driver and non-driver contexts by logging to stderr
-// TODO(fxbug.dev/41539): Replace with logging interface that accommodates both driver and
+// TODO(https://fxbug.dev/41539): Replace with logging interface that accommodates both driver and
 // non-driver contexts
 #define LOG(severity, format, ...)                          \
   do {                                                      \

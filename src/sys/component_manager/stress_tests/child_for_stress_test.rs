@@ -65,7 +65,7 @@ async fn main() -> Result<(), Error> {
                     }
                     fstresstests::ChildRealmRequest::StopChildren { responder } => {
                         // TODO: this variable triggered the `must_not_suspend` lint and may be held across an await
-                        // If this is the case, it is an error. See fxbug.dev/87757 for more details
+                        // If this is the case, it is an error. See https://fxbug.dev/87757 for more details
                         let mut children_vec = children_vec.lock().unwrap();
                         let mut children = vec![];
                         children.append(&mut children_vec);

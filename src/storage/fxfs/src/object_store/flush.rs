@@ -63,7 +63,7 @@ impl ObjectStore {
                 // in a file.  We don't worry if they're in memory because a flush should get
                 // triggered when the journal gets full.
                 if self.store_info().encrypted_mutations_object_id == INVALID_OBJECT_ID {
-                    // TODO(fxbug.dev/97078): Add earliest_version support for encrypted mutations.
+                    // TODO(https://fxbug.dev/97078): Add earliest_version support for encrypted mutations.
                     // Early exit, but still return the earliest version used by a struct in the
                     // tree.
                     return Ok(self.tree.get_earliest_version());

@@ -173,7 +173,7 @@ impl FileOps for SyncFile {
                     return error!(EINVAL);
                 }
 
-                // TODO(fxbug.dev/128389): remove sync points that are already signaled?
+                // TODO(https://fxbug.dev/128389): remove sync points that are already signaled?
                 let name = merge_data.name.map(|x| x as u8);
                 let file = Anon::new_file(
                     current_task,

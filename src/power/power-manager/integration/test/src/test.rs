@@ -72,7 +72,7 @@ async fn shutdown_test() {
     // Verify the system controller service gets the shutdown request from Power Manager
     env.mocks.system_controller_service.wait_for_shutdown_request().await;
 
-    // TODO(http://fxbug.dev/119962): Update integration tests to ensure interaction between driver
+    // TODO(https://fxbug.dev/119962): Update integration tests to ensure interaction between driver
     // manager and shutdown shim works as intended. This likely requires using shutdown shim in
     // this integration test.
 

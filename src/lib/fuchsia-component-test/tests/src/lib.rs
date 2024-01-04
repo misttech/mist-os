@@ -960,7 +960,7 @@ async fn config_mix_packaged_and_set_values() {
     assert!(receive_echo_server_called.next().await.is_some());
 }
 
-/// This is a regression test for fxb/113503, where we discovered that fshost couldn't launch
+/// This is a regression test for https://fxbug.dev/113503, where we discovered that fshost couldn't launch
 /// blobfs in a collection when fshost's structured config was being overridden by RealmBuilder.
 ///
 /// The structure is:

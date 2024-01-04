@@ -168,7 +168,7 @@ void CtapHidDriver::SendMessage(SendMessageRequestView request,
 
   // Set the pending response. The pending response will be reset once the device has sent a
   // response and it has been retrieved via GetMessage().
-  // TODO(fxbug.dev/103893): have this clear after some time or when the list gets too large.
+  // TODO(https://fxbug.dev/103893): have this clear after some time or when the list gets too large.
   pending_response_ = pending_response{
       .channel = channel_id,
       .next_packet_seq_expected = INIT_PACKET_SEQ,

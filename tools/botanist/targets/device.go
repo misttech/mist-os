@@ -54,7 +54,7 @@ const (
 	fastbootIdleWaitTimeoutSecs = 10
 
 	// Whether we should place the device in Zedboot if idling in fastboot.
-	// TODO(fxbug.dev/124946): Remove once release branches no longer need this.
+	// TODO(https://fxbug.dev/124946): Remove once release branches no longer need this.
 	mustLoadThroughZedboot = false
 )
 
@@ -563,7 +563,7 @@ func (t *Device) flash(ctx context.Context, images []bootserver.Image, productBu
 		}
 	}()
 
-	// TODO(fxbug.dev/87634): Need support for ffx target flash for cuckoo tests.
+	// TODO(https://fxbug.dev/87634): Need support for ffx target flash for cuckoo tests.
 	if pubkey != "" && t.UseFFX() {
 		var flashManifestPath string
 		if productBundle == "" {

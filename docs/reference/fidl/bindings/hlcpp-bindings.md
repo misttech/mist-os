@@ -145,7 +145,7 @@ class`, with the following additional methods:
   to its underlying primitive value.
 * `explicit constexpr operator bool() const`: Returns whether any bits are set.
 
-<!-- TODO(fxbug.dev/64760): mask value should be consistent -->
+<!-- TODO(https://fxbug.dev/64760): mask value should be consistent -->
 The generated class contains a static number for each bits member as well as
 for the bits mask. These correspond exactly with the members of the `enum class`
 value, with the addition a `kMask` member that replaces `FileModeMask`.

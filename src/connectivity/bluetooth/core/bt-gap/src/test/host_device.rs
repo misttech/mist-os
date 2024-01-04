@@ -129,7 +129,7 @@ async fn host_device_restore_bonds() -> Result<(), Error> {
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
     let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-host/test".to_string(), client);
 
-    // TODO(fxbug.dev/80564): Assume that 256 bonds is enough to cause HostDevice to use multiple
+    // TODO(https://fxbug.dev/80564): Assume that 256 bonds is enough to cause HostDevice to use multiple
     // FIDL calls to transmit all of the bonds (at this time, the maximum message size is 64 KiB
     // and a fully-populated BondingData without peer service records is close to 700 B).
     let bonds = (0..=255).map(|i| {
@@ -157,7 +157,7 @@ async fn host_device_restore_bonds() -> Result<(), Error> {
     Ok(())
 }
 
-// TODO(fxbug.dev/39373): Add host.fidl emulation to bt-fidl-mocks and use that instead.
+// TODO(https://fxbug.dev/39373): Add host.fidl emulation to bt-fidl-mocks and use that instead.
 async fn expect_call<F>(stream: Arc<RwLock<HostRequestStream>>, f: F) -> Result<(), Error>
 where
     F: FnOnce(Arc<HostControlHandle>, HostRequest) -> Result<(), Error>,

@@ -87,7 +87,7 @@ type RegisterBufferCollectionArgs = resource table {
     ///
     /// If both the `usages` and `usage` fields are set, `usages` takes precedence and `usage` is
     /// ignored.
-    @available(deprecated=9, note="use usages. Deletion tracking bug: fxbug.dev/105226")
+    @available(deprecated=9, note="use usages. Deletion tracking bug: https://fxbug.dev/105226")
     3: usage RegisterBufferCollectionUsage;
 
     /// The client can register a buffer collection for various uses and has the ability to

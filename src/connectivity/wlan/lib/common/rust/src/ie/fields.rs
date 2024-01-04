@@ -136,7 +136,7 @@ pub struct WmmAcParams {
 }
 
 // WFA WMM v1.2.0, 2.2.2 Figure 10
-// TODO(fxbug.dev/82563): ACI is dependent on the AC parameters its encoding, so
+// TODO(https://fxbug.dev/82563): ACI is dependent on the AC parameters its encoding, so
 // it shouldn't be allowed to be set arbitrarily.
 #[bitfield(
     0..=3   aifsn,
@@ -1195,7 +1195,7 @@ impl VhtMcsSet {
 #[derive(
     PartialEq, Eq, Hash, AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Clone, Copy, Debug,
 )]
-// TODO(fxbug.dev/29669): Derive phy parameters based on Table 9-250 and 9-253.
+// TODO(https://fxbug.dev/29669): Derive phy parameters based on Table 9-250 and 9-253.
 pub struct VhtOperation {
     pub vht_cbw: VhtChannelBandwidth, // u8
     pub center_freq_seg0: u8,         // Channel index

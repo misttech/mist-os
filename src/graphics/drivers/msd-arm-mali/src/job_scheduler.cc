@@ -500,7 +500,7 @@ void JobScheduler::HandleTimedOutAtoms() {
       }
       owner_->OutputHangMessage(/*hardware_hang*/ false);
       removed_waiting_atoms = true;
-      // TODO(fxbug.dev/82005): Revert https://fuchsia-review.googlesource.com/c/fuchsia/+/564008
+      // TODO(https://fxbug.dev/82005): Revert https://fuchsia-review.googlesource.com/c/fuchsia/+/564008
       // and make semaphore problems fail the atoms.
       owner_->AtomCompleted(atom.get(), kArmMaliResultSuccess);
       // The semaphore wait on the port will be canceled by the closing of the event handle.

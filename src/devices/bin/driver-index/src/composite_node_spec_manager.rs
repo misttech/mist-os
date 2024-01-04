@@ -82,7 +82,7 @@ impl CompositeNodeSpecManager {
         // Collect parent refs in a separate vector before adding them to the
         // CompositeNodeSpecManager. This is to ensure that we add the parent refs after
         // they're all verified to be valid.
-        // TODO(fxb/105562): Update tests so that we can verify that properties exists in
+        // TODO(https://fxbug.dev/105562): Update tests so that we can verify that properties exists in
         // each parent ref.
         let mut parent_refs: Vec<(BindRules, CompositeParentRef)> = vec![];
         for (idx, parent) in parents.iter().enumerate() {
@@ -145,7 +145,7 @@ impl CompositeNodeSpecManager {
             let composite_info = self.spec_list.get(&matching_ref.name);
             match composite_info {
                 Some(info) => {
-                    // TODO(fxb/107371): Only return specs that have a matched composite using
+                    // TODO(https://fxbug.dev/107371): Only return specs that have a matched composite using
                     // info.matched_driver.is_some()
                     composite_parents_result.push(fdf::CompositeParent {
                         composite: Some(fdf::CompositeInfo {
@@ -455,7 +455,7 @@ fn match_composite_properties<'a>(
     //
     // If we were smarter here we could match up properties[1] with additional_nodes[1]
     // and properties[2] with additional_nodes[0] to return a positive match.
-    // TODO(fxb/107176): Disallow ambiguity with spec matching. We should log
+    // TODO(https://fxbug.dev/107176): Disallow ambiguity with spec matching. We should log
     // a warning and return false if a spec node matches with multiple composite
     // driver nodes, and vice versa.
     let mut unmatched_additional_indices =
@@ -609,7 +609,7 @@ mod tests {
         fdf::NodeProperty { key: key, value: value }
     }
 
-    // TODO(fxb/120270): Update tests so that they use the test data functions more often.
+    // TODO(https://fxbug.dev/120270): Update tests so that they use the test data functions more often.
     fn create_test_parent_spec_1() -> fdf::ParentSpec {
         let bind_rules = vec![
             make_accept(fdf::NodePropertyKey::IntValue(1), fdf::NodePropertyValue::IntValue(200)),

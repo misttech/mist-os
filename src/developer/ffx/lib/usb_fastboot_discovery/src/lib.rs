@@ -19,7 +19,7 @@ const FASTBOOT_USB_INTERFACE_CLASS: u8 = 0xff;
 const FASTBOOT_USB_INTERFACE_SUBCLASS: u8 = 0x42;
 const FASTBOOT_USB_INTERFACE_PROTOCOL: u8 = 0x03;
 
-//TODO(fxbug.dev/52733) - serial info will probably get rolled into the target struct
+//TODO(https://fxbug.dev/52733) - serial info will probably get rolled into the target struct
 
 fn is_fastboot_match(info: &InterfaceInfo) -> bool {
     (info.dev_vendor == 0x18d1)

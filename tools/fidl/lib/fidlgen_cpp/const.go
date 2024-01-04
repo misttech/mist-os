@@ -112,7 +112,7 @@ func (c *compiler) compileLiteral(val fidlgen.Literal, typ fidlgen.Type) string 
 			// value cannot be represented as a nonnegative number in 64-bits.
 			return "(-9223372036854775807ll-1)"
 		}
-		// TODO(fxbug.dev/7810): Once we expose resolved constants for defaults, e.g.
+		// TODO(https://fxbug.dev/7810): Once we expose resolved constants for defaults, e.g.
 		// in structs, we will not need ignore hex and binary values.
 		if strings.HasPrefix(val.Value, "0x") || strings.HasPrefix(val.Value, "0b") {
 			return val.Value

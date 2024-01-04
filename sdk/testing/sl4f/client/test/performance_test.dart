@@ -54,7 +54,7 @@ void main(List<String> args) {
     return tempDir;
   }
 
-  // TODO(fxbug.dev/59861): Update this test to the new fuchsia perf json
+  // TODO(https://fxbug.dev/59861): Update this test to the new fuchsia perf json
   // format when the migration is done.
   test('process trace', () async {
     final metricsSpecs = [

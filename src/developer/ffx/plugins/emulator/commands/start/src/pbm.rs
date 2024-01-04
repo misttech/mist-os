@@ -77,7 +77,7 @@ async fn apply_command_line_options(
         // expect the log file to exist ahead of time.
         emu_config.host.log = PathBuf::from(env::current_dir()?).join(log);
     } else {
-        // TODO(http://fxbug.dev/116262): Move logs to ffx log dir so `ffx doctor` collects them.
+        // TODO(https://fxbug.dev/116262): Move logs to ffx log dir so `ffx doctor` collects them.
         let instance = get_instance_dir(&cmd.name().await?, false).await?;
         emu_config.host.log = instance.join("emulator.log");
     }

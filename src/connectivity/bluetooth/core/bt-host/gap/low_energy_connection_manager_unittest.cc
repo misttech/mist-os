@@ -355,7 +355,7 @@ TEST_F(LowEnergyConnectionManagerTest, ConnectSinglePeerRequestTimeout) {
 TEST_F(LowEnergyConnectionManagerTest, PeerDoesNotExpireDuringTimeout) {
   // Set a connection timeout that is longer than the PeerCache expiry
   // timeout.
-  // TODO(fxbug.dev/1418): Consider configuring the cache timeout explicitly rather than
+  // TODO(https://fxbug.dev/1418): Consider configuring the cache timeout explicitly rather than
   // relying on the kCacheTimeout constant.
   constexpr pw::chrono::SystemClock::duration kTestRequestTimeout =
       kCacheTimeout + std::chrono::seconds(1);
@@ -1333,7 +1333,7 @@ TEST_F(LowEnergyConnectionManagerTest,
   // exists.
   RunFor(kLECreateConnectionTimeout);
   // An error should be returned if the connection complete was incorrectly not matched to the
-  // pending connection request (see fxbug.dev/68969).
+  // pending connection request (see https://fxbug.dev/68969).
   // In the future it may make sense to return success because a link to the peer already exists.
   ASSERT_TRUE(result.is_error());
   EXPECT_TRUE(peer->le()->connected());
@@ -1405,7 +1405,7 @@ TEST_F(LowEnergyConnectionManagerTest, IncomingConnectionUpgradesKnownBrEdrPeerT
 }
 
 // Successful connection to a peer whose address type is kBREDR.
-// TODO(fxbug.dev/2761): This test will likely become obsolete when LE connections are based on the
+// TODO(https://fxbug.dev/2761): This test will likely become obsolete when LE connections are based on the
 // presence of LowEnergyData in a Peer and no address type enum exists.
 TEST_F(LowEnergyConnectionManagerTest, ConnectAndDisconnectDualModeDeviceWithBrEdrAddress) {
   Peer* peer = peer_cache()->NewPeer(kAddrAlias0, /*connectable=*/true);
@@ -1972,7 +1972,7 @@ TEST_F(LowEnergyConnectionManagerTest,
                                      kPeripheralPreferredConnectionParametersCharacteristic);
   service_client->set_characteristics({char_data});
 
-  // TODO(fxbug.dev/123377): These parameters are invalid, but this test passes because we fail to
+  // TODO(https://fxbug.dev/123377): These parameters are invalid, but this test passes because we fail to
   // validate them before sending them to the controller.
   StaticByteBuffer char_value(0x01, 0x00,   // min interval
                               0x02, 0x00,   // max interval

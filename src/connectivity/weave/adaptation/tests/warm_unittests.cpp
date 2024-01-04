@@ -151,7 +151,7 @@ class FakeAddressStateProvider
       // Send the OnAddressAdded event prior the `OnAddressRemoved`, so that the
       // `AddressStateProviderEventHandler` has to handle two events before
       // knowing the removal reason. This is a regression test for
-      // fxbug.dev/136245.
+      // https://fxbug.dev/136245.
       SendOnAddressAdded();
       SendOnAddressRemoved(
           fuchsia::net::interfaces::admin::AddressRemovalReason::INTERFACE_REMOVED);

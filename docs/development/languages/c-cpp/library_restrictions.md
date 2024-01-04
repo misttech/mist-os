@@ -5,7 +5,7 @@
 Decision: **do not use** `absl` in new code. Generally, `absl` is a
 poor fit for use cases in Fuchsia. We will remove `absl` from the tree
 once existing clients of it are migrated away. This removal work is tracked in
-[fxbug.dev/59428](https://fxbug.dev/59428).
+[https://fxbug.dev/59428](https://fxbug.dev/59428).
 
 ## third_party/googletest
 

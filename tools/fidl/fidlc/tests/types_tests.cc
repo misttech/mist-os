@@ -619,7 +619,7 @@ type Foo = struct {
 )FIDL");
   library.UseLibraryZx();
 
-  // TODO(fxbug.dev/74193): We plan to disallow constraints on aliases, so this
+  // TODO(https://fxbug.dev/74193): We plan to disallow constraints on aliases, so this
   // error message should change to that. For now, to test this we have to use
   // `zx.ObjType` above because contextual lookup is not done through aliases.
   library.ExpectFail(fidl::ErrCannotConstrainTwice, "MyVmo");

@@ -272,7 +272,7 @@ closed protocol Interrupt {
         out_timestamp Time;
     }) error Status;
 
-    // TODO(fxbug.dev/32803): No DESTROY rights here.
+    // TODO(https://fxbug.dev/32803): No DESTROY rights here.
     /// ## Summary
     ///
     /// Destroys an interrupt object.
@@ -304,7 +304,7 @@ closed protocol Interrupt {
     ///
     /// ## Rights
     ///
-    /// TODO(fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/32253)
     ///
     /// ## Return value
     ///

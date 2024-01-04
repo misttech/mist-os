@@ -454,7 +454,7 @@ void arm64_feature_init() {
       arm64_isa_features |= ZX_ARM64_FEATURE_ISA_ASIMD;
     }
     if (pfr0.sve() != arch::ArmIdAa64Pfr0El1::Sve::kNone) {
-      // TODO(fxbug.dev/131698): We do not currently report
+      // TODO(https://fxbug.dev/131698): We do not currently report
       // ZX_ARM64_FEATURE_ISA_SVE even if the processor supports the feature
       // because Zircon does not have all the supporting code yet.
     }

@@ -113,7 +113,7 @@
         },
         {
             // Virtualization is not present in all configurations.
-            // See: fxbug.dev/103301
+            // See: https://fxbug.dev/103301
             protocol: [
                 "fuchsia.virtualization.DebianGuestManager",
                 "fuchsia.virtualization.LinuxManager",

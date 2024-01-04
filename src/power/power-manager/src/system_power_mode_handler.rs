@@ -395,7 +395,7 @@ impl SystemPowerModeHandlerInspect {
 struct ClientStateInspect {
     power_level: inspect::UintProperty,
 
-    // TODO(fxbug.dev/93970): track # of active connections instead of just connect count
+    // TODO(https://fxbug.dev/93970): track # of active connections instead of just connect count
     connect_count: inspect::UintProperty,
     config: inspect::StringProperty,
     _client_node: inspect::Node,

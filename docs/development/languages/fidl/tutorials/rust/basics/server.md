@@ -8,7 +8,7 @@ Rust code, which is covered in the [Rust FIDL crates][fidl-crates] tutorial.
 
 ## Overview
 
-<!-- TODO(fxbug.dev/58758) <<../../common/server/overview.md>> -->
+<!-- TODO(https://fxbug.dev/58758) <<../../common/server/overview.md>> -->
 
 This tutorial shows you how to implement a FIDL protocol
 (`fuchsia.examples.Echo`) and run it on Fuchsia. This protocol has one method
@@ -68,7 +68,7 @@ To create a component:
    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/server/BUILD.gn" region_tag="rest" %}
    ```
 
-   <!-- TODO(fxbug.dev/58758) <<../../common/server/packages.md>> -->
+   <!-- TODO(https://fxbug.dev/58758) <<../../common/server/packages.md>> -->
 
    To get the server component up and running, there are three targets that are
    defined:
@@ -92,7 +92,7 @@ To create a component:
    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/server/meta/server.cml" region_tag="example_snippet" %}
    ```
 
-   <!-- TODO(fxbug.dev/58758) <<../../common/server/qemu.md>> -->
+   <!-- TODO(https://fxbug.dev/58758) <<../../common/server/qemu.md>> -->
 
 1. Add the server to your build configuration:
 

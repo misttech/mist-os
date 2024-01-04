@@ -864,7 +864,7 @@ impl CurrentTask {
     // Notify all futexes in robust list.  The robust list is in user space, so we
     // are very careful about walking it, and there are a lot of quiet returns if
     // we fail to walk it.
-    // TODO(fxbug.dev/128610): This only sets the FUTEX_OWNER_DIED bit; it does
+    // TODO(https://fxbug.dev/128610): This only sets the FUTEX_OWNER_DIED bit; it does
     // not wake up a waiter.
     pub fn notify_robust_list(&self) {
         let task_state = self.write();
@@ -1238,7 +1238,7 @@ impl CurrentTask {
         }
 
         if clone_vm && !clone_thread {
-            // TODO(fxbug.dev/114813) Implement CLONE_VM for child processes (not just child
+            // TODO(https://fxbug.dev/114813) Implement CLONE_VM for child processes (not just child
             // threads). Currently this executes CLONE_VM (explicitly passed to clone() or as
             // used by vfork()) as a fork (the VM in the child is copy-on-write) which is almost
             // always OK.

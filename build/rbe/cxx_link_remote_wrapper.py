@@ -135,7 +135,7 @@ class CxxLinkRemoteAction(object):
 
         if self._main_args.fsatrace_path:
             msg(
-                "Warning: Due to http://fxbug.dev/128947, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path."
+                "Warning: Due to https://fxbug.dev/128947, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path."
             )
             self._main_args.fsatrace_path = None
 

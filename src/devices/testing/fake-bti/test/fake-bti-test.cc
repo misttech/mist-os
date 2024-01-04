@@ -351,7 +351,7 @@ TEST(FakeBti, PmoCount) {
   EXPECT_EQ(0, bti_info.pmo_count);
 }
 
-// TODO(fxbug.dev/32963): when functionality is available, check that pinning a
+// TODO(https://fxbug.dev/32963): when functionality is available, check that pinning a
 // vmo with the ZX_BTI_CONTIGUOUS flag fails if the vmo was not created with
 // zx_vmo_create_contiguous.
 

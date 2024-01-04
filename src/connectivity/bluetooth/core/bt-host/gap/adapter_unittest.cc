@@ -305,7 +305,7 @@ TEST_F(AdapterTest, TransportClosedCallback) {
   EXPECT_EQ(1, init_cb_count);
 }
 
-// TODO(fxbug.dev/1512): Add a unit test for Adapter::ShutDown() and update
+// TODO(https://fxbug.dev/1512): Add a unit test for Adapter::ShutDown() and update
 // ShutDownDuringInitialize() with the same expectations.
 
 TEST_F(AdapterTest, ShutDownDuringInitialize) {
@@ -783,7 +783,7 @@ TEST_F(AdapterTest, LocalAddressForConnections) {
   ASSERT_TRUE(conn_ref);
   ASSERT_TRUE(test_device()->le_connect_params());
 
-  // TODO(fxbug.dev/63123): The current policy is to use a public address when initiating
+  // TODO(https://fxbug.dev/63123): The current policy is to use a public address when initiating
   // connections. Change this test to expect a random address once RPAs for central connections are
   // re-enabled.
   EXPECT_EQ(pw::bluetooth::emboss::LEOwnAddressType::PUBLIC,
@@ -819,7 +819,7 @@ TEST_F(AdapterTest, LocalAddressDuringHangingConnect) {
   // Some of the behavior below stems from the fact that kTestTimeout is longer
   // than kCacheTimeout. This assertion is here to catch regressions in this
   // test if the values ever change.
-  // TODO(fxbug.dev/1418): Configuring the cache expiration timeout explicitly would
+  // TODO(https://fxbug.dev/1418): Configuring the cache expiration timeout explicitly would
   // remove some of the unnecessary invariants from this test case.
   static_assert(kTestTimeout > kCacheTimeout, "expected a shorter device cache timeout");
 
@@ -856,7 +856,7 @@ TEST_F(AdapterTest, LocalAddressDuringHangingConnect) {
   adapter()->le()->Connect(peer->identifier(), connect_cb, LowEnergyConnectionOptions());
   RunUntilIdle();
   ASSERT_TRUE(test_device()->legacy_advertising_state().random_address);
-  // TODO(fxbug.dev/63123): The current policy is to use a public address when initiating
+  // TODO(https://fxbug.dev/63123): The current policy is to use a public address when initiating
   // connections. Change this test to expect a random address once RPAs for central connections are
   // re-enabled.
   EXPECT_EQ(pw::bluetooth::emboss::LEOwnAddressType::PUBLIC,
@@ -881,7 +881,7 @@ TEST_F(AdapterTest, LocalAddressDuringHangingConnect) {
                            LowEnergyConnectionOptions());
   RunUntilIdle();
   EXPECT_NE(last_random_addr, *test_device()->legacy_advertising_state().random_address);
-  // TODO(fxbug.dev/63123): The current policy is to use a public address when initiating
+  // TODO(https://fxbug.dev/63123): The current policy is to use a public address when initiating
   // connections. Change this test to expect a random address once RPAs for central connections are
   // re-enabled.
   EXPECT_EQ(pw::bluetooth::emboss::LEOwnAddressType::PUBLIC,
@@ -909,7 +909,7 @@ TEST_F(AdapterTest, ExistingConnectionDoesNotPreventLocalAddressChange) {
   test_device()->AddPeer(std::move(fake_peer));
   adapter()->le()->Connect(peer->identifier(), connect_cb, LowEnergyConnectionOptions());
   RunUntilIdle();
-  // TODO(fxbug.dev/63123): The current policy is to use a public address when initiating
+  // TODO(https://fxbug.dev/63123): The current policy is to use a public address when initiating
   // connections. Change this test to expect a random address once RPAs for central connections are
   // re-enabled.
   EXPECT_EQ(pw::bluetooth::emboss::LEOwnAddressType::PUBLIC,

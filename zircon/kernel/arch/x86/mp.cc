@@ -212,7 +212,7 @@ void x86_init_percpu(cpu_num_t cpu_num) {
   gdt_load(gdt_get());
 
   // Disable the LDT so userspace cannot make segment selectors that point to it.  See
-  // fxbug.dev/79060
+  // https://fxbug.dev/79060
   arch::DisableLdt();
 
   x86_initialize_percpu_tss();

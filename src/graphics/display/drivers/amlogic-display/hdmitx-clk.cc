@@ -26,7 +26,7 @@
 
 namespace amlogic_display {
 
-// TODO(fxb/69072): Reconcile with amlogic-clock
+// TODO(https://fxbug.dev/69072): Reconcile with amlogic-clock
 
 namespace {
 
@@ -213,7 +213,7 @@ void HdmiHost::ConfigureOd3Div(uint32_t div_sel) {
   /* When div 6.25, need to reset vid_pll_div */
   if (div_sel == VID_PLL_DIV_6p25) {
     usleep(1);
-    /* TODO(fxb/69679): Add in Resets
+    /* TODO(https://fxbug.dev/69679): Add in Resets
     auto result = display->reset_register_.WriteRegister32(PRESET0_REGISTER, 1 << 7, 1 << 7);
     if ((result.status() != ZX_OK) || result->is_error()) {
       zxlogf(ERROR, "Reset0 Set failed");

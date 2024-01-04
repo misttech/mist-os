@@ -58,7 +58,7 @@ malloc
 posix_memalign
 realloc
 
-# IO - no implementation needed (pending fxbug.dev/13095)
+# IO - no implementation needed (pending https://fxbug.dev/13095)
 fchmod
 chdir
 chmod
@@ -471,7 +471,7 @@ zx_object_wait_async
 zx_object_wait_many
 zx_object_wait_one
 zx_pager_create
-# workaround for fxbug.dev/40168
+# workaround for https://fxbug.dev/40168
 zx_pager_create_vmo
 zx_pager_detach_vmo
 zx_port_cancel

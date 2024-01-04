@@ -96,7 +96,7 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   loop.RunUntilIdle();
 }
 
-// TODO(fxb/120485): Add a test to cover calls to Controller::GetKnownCategories once
+// TODO(https://fxbug.dev/120485): Add a test to cover calls to Controller::GetKnownCategories once
 // perfetto_producer.cc has a working backend. This would test the plumbing all the
 // way from perfetto to ffx trace.
 // TEST(PerfettoBridgeIntegrationTest, GetKnownCategories)

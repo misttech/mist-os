@@ -57,13 +57,13 @@ namespace amlogic_display {
 // handles to images, while handles to images are defined as a fixed-size
 // uint64_t in the banjo protocol. This works on platforms where uint64_t and
 // uintptr_t are equivalent but this may cause portability issues in the future.
-// TODO(fxbug.dev/128653): Do not use pointers as handles.
+// TODO(https://fxbug.dev/128653): Do not use pointers as handles.
 static_assert(std::is_same_v<uint64_t, uintptr_t>);
 
 namespace {
 
 // List of supported pixel formats.
-// TODO(fxbug.dev/69236): Add more supported formats.
+// TODO(https://fxbug.dev/69236): Add more supported formats.
 constexpr std::array<fuchsia_images2::wire::PixelFormat, 2> kSupportedPixelFormats = {
     fuchsia_images2::wire::PixelFormat::kBgra32,
     fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -129,7 +129,7 @@ bool GetFullHardwareResetFromKernelCommandLine(zx_device_t* device) {
       // "0", "false" and "off" will disable the option and any other form will
       // enable it.
       //
-      // TODO(fxbug.dev/132908): Use a common library to check boolean values
+      // TODO(https://fxbug.dev/132908): Use a common library to check boolean values
       // of a kernel command argument.
       return option_str != "0" && option_str != "false" && option_str != "off";
     }
@@ -183,7 +183,7 @@ zx::result<> AmlogicDisplay::ResetDisplayEngine() {
   vpu_->PowerOff();
   vpu_->PowerOn();
 
-  // TODO(fxbug.dev/132904): Instead of enabling it ad-hoc here, make
+  // TODO(https://fxbug.dev/132904): Instead of enabling it ad-hoc here, make
   // `Vpu::PowerOn()` idempotent and always enable the AFBC in `Vpu::PowerOn()`.
   vpu_->AfbcPower(/*power_on=*/true);
 
@@ -286,7 +286,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection =
       buffer_collections_.at(driver_buffer_collection_id);
   fidl::WireResult check_result = collection->CheckBuffersAllocated();
-  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
@@ -301,7 +301,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
   }
 
   fidl::WireResult wait_result = collection->WaitForBuffersAllocated();
-  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
@@ -401,7 +401,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
       ZX_DEBUG_ASSERT_MSG(false, "Invalid pixel format modifier: %lu", format_modifier);
       return ZX_ERR_INVALID_ARGS;
   }
-  // TODO(fxbug.dev/128653): Using pointers as handles impedes portability of
+  // TODO(https://fxbug.dev/128653): Using pointers as handles impedes portability of
   // the driver. Do not use pointers as handles.
   *out_image_handle = reinterpret_cast<uint64_t>(import_info.get());
   fbl::AutoLock lock(&image_mutex_);
@@ -459,7 +459,7 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     success = false;
   }
 
-  // TODO(fxbug.dev/130593): Move color conversion validation code to a common
+  // TODO(https://fxbug.dev/130593): Move color conversion validation code to a common
   // library.
   if (success && display_configs[0]->cc_flags) {
     // Make sure cc values are correct
@@ -482,7 +482,7 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     const uint32_t height = display_timing.vertical_active_lines;
     // Make sure ther layer configuration is supported
     const primary_layer_t& layer = display_configs[0]->layer_list[0]->cfg.primary;
-    // TODO(fxbug.dev/130594) Instead of using memcmp() to compare the frame
+    // TODO(https://fxbug.dev/130594) Instead of using memcmp() to compare the frame
     // with expected frames, we should use the common type in "api-types-cpp"
     // which supports comparison opeartors.
     frame_t frame = {
@@ -620,7 +620,7 @@ void AmlogicDisplay::DdkRelease() {
     }
   }
 
-  // TODO(fxbug.dev/132066): Power off should occur after all threads are
+  // TODO(https://fxbug.dev/132066): Power off should occur after all threads are
   // destroyed. Otherwise other threads may still write to the VPU MMIO which
   // can cause the system to hang.
   if (fully_initialized()) {
@@ -714,7 +714,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
         vout_->display_width() * vout_->display_height();
     buffer_name = "Display capture";
   } else {
-    // TODO(fxbug.dev/94535): Currently the buffer collection constraints are
+    // TODO(https://fxbug.dev/94535): Currently the buffer collection constraints are
     // applied to all displays. If the |vout_| device type changes, then the
     // existing image formats might not work for the new device type. To resolve
     // this, the driver should set per-display buffer collection constraints
@@ -809,7 +809,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
   }
   fbl::AutoLock lock(&capture_mutex_);
   fidl::WireResult check_result = collection->CheckBuffersAllocated();
-  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
@@ -824,7 +824,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
   }
 
   fidl::WireResult wait_result = collection->WaitForBuffersAllocated();
-  // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
@@ -904,7 +904,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
   // At this point, we have setup a canvas with the BufferCollection-based VMO. Store the
   // capture information
   //
-  // TODO(fxbug.dev/132064): Currently there's no guarantee in the canvas API
+  // TODO(https://fxbug.dev/132064): Currently there's no guarantee in the canvas API
   // for the uniqueness of `canvas_idx`, and this driver doesn't check if there
   // is any image with the same canvas index either. We should either make this
   // a formal guarantee in Canvas.Config() API, or perform a check against all
@@ -914,7 +914,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImageForCapture(
   import_capture->canvas = canvas_.client_end();
   import_capture->image_height = collection_info.settings.image_format_constraints.min_coded_height;
   import_capture->image_width = collection_info.settings.image_format_constraints.min_coded_width;
-  // TODO(fxbug.dev/128653): Using pointers as handles impedes portability of
+  // TODO(https://fxbug.dev/128653): Using pointers as handles impedes portability of
   // the driver. Do not use pointers as handles.
   *out_capture_handle = reinterpret_cast<uint64_t>(import_capture.get());
   imported_captures_.push_back(std::move(import_capture));
@@ -935,7 +935,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_h
   }
 
   // Confirm that the handle was previously imported (hence valid)
-  // TODO(fxbug.dev/128653): This requires an enumeration over all the imported
+  // TODO(https://fxbug.dev/128653): This requires an enumeration over all the imported
   // capture images for each StartCapture(). We should use hash maps to map
   // handles (which shouldn't be pointers) to ImageInfo instead.
   ImageInfo* info = reinterpret_cast<ImageInfo*>(capture_handle);
@@ -948,7 +948,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplStartCapture(uint64_t capture_h
     return ZX_ERR_NOT_FOUND;
   }
 
-  // TODO(fxbug.dev/132064): A valid canvas index can be zero.
+  // TODO(https://fxbug.dev/132064): A valid canvas index can be zero.
   ZX_DEBUG_ASSERT(info->canvas_idx > 0);
   ZX_DEBUG_ASSERT(info->image_height > 0);
   ZX_DEBUG_ASSERT(info->image_width > 0);
@@ -975,7 +975,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplReleaseCapture(uint64_t capture
   }
 
   // Find and erase previously imported capture
-  // TODO(fxbug.dev/128653): This requires an enumeration over all the imported
+  // TODO(https://fxbug.dev/128653): This requires an enumeration over all the imported
   // capture images for each StartCapture(). We should use hash maps to map
   // handles (which shouldn't be pointers) to ImageInfo instead.
   uint8_t canvas_index = reinterpret_cast<ImageInfo*>(capture_handle)->canvas_idx;
@@ -1135,7 +1135,7 @@ zx_status_t AmlogicDisplay::InitializeVout() {
   display_panel_t panel_info;
   size_t actual_bytes;
 
-  // TODO(fxbug.dev/132065): `DEVICE_METADATA_DISPLAY_CONFIG` is defined to
+  // TODO(https://fxbug.dev/132065): `DEVICE_METADATA_DISPLAY_CONFIG` is defined to
   // store metadata of `display_config_t` type rather than `display_panel_t`
   // type, though currently all the board drivers use display_panel_t instead,
   // which is defined on a side channel apart from the //src/lib/ddk library.
@@ -1307,7 +1307,7 @@ zx_status_t AmlogicDisplay::Bind() {
     // previous driver when the driver takes it over so we should ensure it's
     // enabled.
     //
-    // TODO(fxbug.dev/132904): Instead of enabling it ad-hoc here, make
+    // TODO(https://fxbug.dev/132904): Instead of enabling it ad-hoc here, make
     // `Vpu::PowerOn()` idempotent and always call it when initializing the
     // driver.
     vpu_->AfbcPower(true);

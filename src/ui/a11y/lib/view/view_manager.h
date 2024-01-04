@@ -39,7 +39,7 @@ class ViewManager : public fuchsia::accessibility::semantics::SemanticsManager,
                     public fuchsia::accessibility::virtualkeyboard::Registry,
                     public fuchsia::accessibility::virtualkeyboard::Listener,
                     public InjectorManagerInterface,
-                    // TODO(fxbug.dev/109954): Remove.
+                    // TODO(https://fxbug.dev/109954): Remove.
                     public SemanticsSource,
                     public ViewSource,
                     public VirtualKeyboardManager {

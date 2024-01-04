@@ -155,7 +155,7 @@ zx_status_t SdmmcRootDevice::Init(
   if (metadata->removable()) {
     // This controller is connected to a removable card slot, and no card was inserted. Indicate
     // success so that our device remains available.
-    // TODO(fxbug.dev/130283): Enable detection of card insert/removal after initialization.
+    // TODO(https://fxbug.dev/130283): Enable detection of card insert/removal after initialization.
     FDF_LOGL(INFO, logger(), "failed to probe removable device");
     return ZX_OK;
   }

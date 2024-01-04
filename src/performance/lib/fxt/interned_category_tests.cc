@@ -60,7 +60,7 @@ TEST(Types, InternedCategory) {
   fxt::InternedCategory::PreRegister();
 
   // Manually register the interned categories on unsupported compilers.
-  // TODO(fxbug.dev/33293): Remove when GCC supports COMDAT section attributes.
+  // TODO(https://fxbug.dev/33293): Remove when GCC supports COMDAT section attributes.
 #ifndef __clang__
   EXPECT_NE(foo.GetBit(), fxt::InternedCategory::kInvalidBitNumber);
   EXPECT_NE(bar.GetBit(), fxt::InternedCategory::kInvalidBitNumber);

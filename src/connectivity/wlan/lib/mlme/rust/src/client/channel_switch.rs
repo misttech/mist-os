@@ -51,7 +51,7 @@ impl<'a, D: DeviceOps> ChannelActions for ChannelActionHandle<'a, D> {
         bound_scanner.enable_scanning()
     }
     fn disable_tx(&mut self) -> Result<(), zx::Status> {
-        // TODO(fxbug.dev/109628): Support transmission pause.
+        // TODO(https://fxbug.dev/109628): Support transmission pause.
         Err(zx::Status::NOT_SUPPORTED)
     }
     fn enable_tx(&mut self) {}
@@ -253,12 +253,12 @@ pub struct ChannelSwitch {
     pub new_channel: fidl_common::WlanChannel,
     pub pause_transmission: bool,
     pub new_operating_class: Option<u8>,
-    // TODO(fxbug.dev/97850): Support transmit power envelope.
+    // TODO(https://fxbug.dev/97850): Support transmit power envelope.
     pub new_transmit_power_envelope_specified: bool,
 }
 
 impl ChannelSwitch {
-    // TODO(fxbug.dev/97850): Support channel switch related feature queries.
+    // TODO(https://fxbug.dev/97850): Support channel switch related feature queries.
     /// Determines whether this ChannelSwitch can be performed by the driver.
     fn compatible(&self) -> bool {
         self.new_operating_class.is_none()
@@ -292,7 +292,7 @@ pub enum ChannelSwitchError {
     InvalidChannelSwitchMode(u8),
 }
 
-// TODO(fxbug.dev/88026): Remove unused annotation.
+// TODO(https://fxbug.dev/88026): Remove unused annotation.
 #[allow(unused)]
 impl<B: ByteSlice> ChannelSwitchBuilder<B> {
     // Convert a set of received channel-switch-related IEs into the parameters

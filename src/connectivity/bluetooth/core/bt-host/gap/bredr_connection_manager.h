@@ -119,7 +119,7 @@ class BrEdrConnectionManager final {
   // SearchId which can be used to remove the search later. Identical searches will perform the same
   // search for each search added. Results of added service searches will be added to each Peer's
   // BrEdrData.
-  // TODO(fxbug.dev/1378): Make identical searches just search once
+  // TODO(https://fxbug.dev/1378): Make identical searches just search once
   using SearchCallback = sdp::ServiceDiscoverer::ResultCallback;
   using SearchId = sdp::ServiceDiscoverer::SearchId;
   SearchId AddServiceSearch(const UUID& uuid, std::unordered_set<sdp::AttributeId> attributes,
@@ -136,7 +136,7 @@ class BrEdrConnectionManager final {
   // the peer identified by |peer_id|. Returns false if the connection
   // request was invalid, otherwise returns true and |callback| will be called
   // with the result of the procedure, whether successful or not
-  // TODO(fxbug.dev/1413) - implement a timeout
+  // TODO(https://fxbug.dev/1413) - implement a timeout
   [[nodiscard]] bool Connect(PeerId peer_id, ConnectResultCallback callback);
 
   // Initiate pairing to the peer with |peer_id| using the bondable preference. Pairing will only be

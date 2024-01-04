@@ -100,7 +100,7 @@ template("plasa_fragment_cc") {
     outputs = [ _plasa_api_output_file ]
     sources = [ _clang_doc_api_d ]
     args = [
-      # TODO(fxbug.dev/85753): Remove leniency when bug is fixed.
+      # TODO(https://fxbug.dev/85753): Remove leniency when bug is fixed.
       "--lenient",
       "--input-dir",
       rebase_path(_clang_doc_api_d, root_build_dir),

@@ -305,7 +305,7 @@ TEST_F(PortTest, ShutdownWaitsForTransactionsInFlight) {
     shutdown_complete = true;
   });
 
-  // TODO(fxbug.dev/109707): This should be handled by a watchdog in the driver.
+  // TODO(https://fxbug.dev/109707): This should be handled by a watchdog in the driver.
   std::thread watchdog_thread([&]() {
     while (!shutdown_complete) {
       con->SignalWorker();

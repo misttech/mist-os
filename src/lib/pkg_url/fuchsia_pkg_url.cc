@@ -42,7 +42,7 @@ bool FuchsiaPkgUrl::Parse(const std::string& url) {
   url_ = url;
 
   if (variant_.empty()) {
-    // TODO(fxbug.dev/4002): Currently this defaults to "0" if not present, but variant
+    // TODO(https://fxbug.dev/4002): Currently this defaults to "0" if not present, but variant
     // will eventually be required in fuchsia-pkg URLs.
     variant_ = "0";
   }

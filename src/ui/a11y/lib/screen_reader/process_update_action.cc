@@ -41,7 +41,7 @@ void ProcessUpdateAction::Run(a11y::gesture_util_v2::GestureContext gesture_cont
   const zx::duration interaction_interval = now - screen_reader_context_->last_interaction();
   if (speak_interval <= zx::msec(1000) || interaction_interval > zx::min(5)) {
     // Some nodes update too frequently. Avoid repeating them too often.
-    // TODO(fxbug.dev/95647): Use activity service to detect when user is using a fuchsia device.
+    // TODO(https://fxbug.dev/95647): Use activity service to detect when user is using a fuchsia device.
     // If it has been more than 5 minutes since the user interacted with the
     // device, do not produce speech output.
     return;

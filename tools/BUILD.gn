@@ -76,7 +76,7 @@ group("e2e_tests") {
 
   deps = []
 
-  # TODO(fxbug.dev/63992): Temporarily disable bootserver_old tests on coverage builders.
+  # TODO(https://fxbug.dev/63992): Temporarily disable bootserver_old tests on coverage builders.
   if (!is_coverage) {
     deps += [ "//tools/bootserver_old/tests($host_toolchain)" ]
   }

@@ -26,7 +26,7 @@ TEST(SomeStruct, CodingTable) {
 
 namespace {
 
-// TODO(fxbug.dev/7704): When the wire bindings support "unflattened" request
+// TODO(https://fxbug.dev/7704): When the wire bindings support "unflattened" request
 // payloads, remove this line. For now we manually generate an extern
 // declaration for the request payload struct.
 __LOCAL extern "C" const fidl_type_t fidl_test_example_codingtables_CodingSomeStructRequestTable;
@@ -278,7 +278,7 @@ TEST(MyEnum, CodingTable) {
   ASSERT_EQ(kFidlCodedPrimitiveSubtype_Uint32, my_enum_table.underlying_type);
 }
 
-// This ensures that the number collision tests compile. (See fxbug.dev/7772).
+// This ensures that the number collision tests compile. (See https://fxbug.dev/7772).
 // These tests ensure that the name mangling rules used in the generator avoid certain types
 // of collisions that appeared in earlier versions (e.g. number of elements would merge with
 // other content).

@@ -11,7 +11,7 @@ closed protocol Ktrace {
     //   (handle, data, data_size, offset).
     /// ## Summary
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Declaration
     ///
@@ -31,7 +31,7 @@ closed protocol Ktrace {
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
     /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Rights
     ///
@@ -40,15 +40,15 @@ closed protocol Ktrace {
     ///
     /// ## Return value
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Errors
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## See also
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     strict Read(resource struct {
         handle Handle:RESOURCE;
         @out
@@ -63,7 +63,7 @@ closed protocol Ktrace {
     // TODO(scottmg): syscalls.banjo had the length of |ptr| being |action|?
     /// ## Summary
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Declaration
     ///
@@ -82,7 +82,7 @@ closed protocol Ktrace {
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
     /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Rights
     ///
@@ -91,15 +91,15 @@ closed protocol Ktrace {
     ///
     /// ## Return value
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Errors
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## See also
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     strict Control(resource struct {
         handle Handle:RESOURCE;
         action uint32;
@@ -112,7 +112,7 @@ closed protocol Ktrace {
 
     /// ## Summary
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Declaration
     ///
@@ -131,7 +131,7 @@ closed protocol Ktrace {
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
     /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Rights
     ///
@@ -140,15 +140,15 @@ closed protocol Ktrace {
     ///
     /// ## Return value
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Errors
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## See also
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     strict Write(resource struct {
         handle Handle:RESOURCE;
         id uint32;

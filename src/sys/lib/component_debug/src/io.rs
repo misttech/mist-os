@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxb/66157): Migrate to the new library that substitutes io_utils and fuchsia_fs::directory.
+// TODO(https://fxbug.dev/66157): Migrate to the new library that substitutes io_utils and fuchsia_fs::directory.
 // Ask for host-side support on the new library (fxr/467217).
 
 use {

@@ -24,7 +24,7 @@ zx_library("ldmsg") {
   configs += [
     # This library is linked into libc, which is used by libfuzzer.
     # Don't instrument it to avoid getting noise in code coverage.
-    # TODO(fxbug.dev/25073): Once a cleaner solution is found, remove this.
+    # TODO(https://fxbug.dev/25073): Once a cleaner solution is found, remove this.
     "//build/config/zircon:no_fuzzer",
   ]
 

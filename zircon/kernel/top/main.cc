@@ -86,7 +86,7 @@ void lk_main(paddr_t handoff_paddr) {
   // which holds (a per-line buffer), and global ctors finished (some of the
   // printf machinery depends on ctors right now).
   // NOTE: botanist depends on this string being printed to serial. If this changes,
-  // that code must be changed as well. See fxbug.dev/59963#c20.
+  // that code must be changed as well. See https://fxbug.dev/59963#c20.
   dprintf(ALWAYS, "printing enabled\n");
 
   // At this point the physmap (set up in start.S) is available and all static

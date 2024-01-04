@@ -131,7 +131,7 @@ impl Authenticating {
             Ok(akm::AkmState::InProgress) => AuthProgress::InProgress,
             Ok(akm::AkmState::Failed) => {
                 error!("authentication with BSS failed");
-                // TODO(fxbug.dev/83828): pass the status code from the original auth frame
+                // TODO(https://fxbug.dev/83828): pass the status code from the original auth frame
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
                 let _ = sta
                     .clear_association()
@@ -140,7 +140,7 @@ impl Authenticating {
             }
             Err(e) => {
                 error!("Internal error while authenticating: {}", e);
-                // TODO(fxbug.dev/83828): pass the status code from the original auth frame
+                // TODO(https://fxbug.dev/83828): pass the status code from the original auth frame
                 sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
                 let _ = sta
                     .clear_association()
@@ -283,7 +283,7 @@ impl Associating {
         assoc_resp_hdr: &mac::AssocRespHdr,
         elements: B,
     ) -> Result<Association, ()> {
-        // TODO(fxbug.dev/91353): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
+        // TODO(https://fxbug.dev/91353): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
         match Option::<fidl_ieee80211::StatusCode>::from(assoc_resp_hdr.status_code)
             .unwrap_or(fidl_ieee80211::StatusCode::RefusedReasonUnspecified)
         {
@@ -332,7 +332,7 @@ impl Associating {
             }
         };
 
-        // TODO(fxbug.dev/29325): Determine for each outbound data frame,
+        // TODO(https://fxbug.dev/29325): Determine for each outbound data frame,
         // given the result of the dynamic capability negotiation, data frame
         // classification, and QoS policy.
         //
@@ -369,7 +369,7 @@ impl Associating {
         let controlled_port_open = !sta.sta.eapol_required();
         if controlled_port_open {
             if let Err(e) = sta.ctx.device.set_ethernet_up() {
-                // TODO(fxbug.dev/94009) - Consider returning an Err here.
+                // TODO(https://fxbug.dev/94009) - Consider returning an Err here.
                 error!("Cannot set ethernet to UP. Status: {}", e);
             }
         }
@@ -719,8 +719,8 @@ impl Associated {
         _action: mac::BlockAckAction,
         _body: B,
     ) {
-        // TODO(fxbug.dev/29887): Handle BlockAck frames. The following code has been disabled as a
-        //                        fix for fxbug.dev/98298. Without this code, the BlockAck state
+        // TODO(https://fxbug.dev/29887): Handle BlockAck frames. The following code has been disabled as a
+        //                        fix for https://fxbug.dev/98298. Without this code, the BlockAck state
         //                        machine is dormant and, importantly, never transmits BlockAck
         //                        frames.
         //self.0.block_ack_state.replace_state(|state| state.on_block_ack_frame(sta, action, body));
@@ -965,7 +965,7 @@ impl States {
     /// - frames' frame class is not yet permitted
     /// - frames are from a foreign BSS
     /// - frames are unicast but destined for a MAC address that is different from this STA.
-    // TODO(fxbug.dev/43456): Implement a packet counter and add tests to verify frames are dropped correctly.
+    // TODO(https://fxbug.dev/43456): Implement a packet counter and add tests to verify frames are dropped correctly.
     pub fn on_mac_frame<B: ByteSlice, D: DeviceOps>(
         mut self,
         sta: &mut BoundClient<'_, D>,
@@ -2009,8 +2009,8 @@ mod tests {
         match state.on_mac_frame(&mut client, &frame[..], rx_info) {
             States::Associated(state) => {
                 let (_, associated) = state.release_data();
-                // TODO(fxbug.dev/29887): Handle BlockAck frames. The following code has been
-                //                        altered as part of a fix for fxbug.dev/98298. This check
+                // TODO(https://fxbug.dev/29887): Handle BlockAck frames. The following code has been
+                //                        altered as part of a fix for https://fxbug.dev/98298. This check
                 //                        should ensure that the state has transitioned to
                 //                        `Established`, but since the state machine has been
                 //                        disabled it instead checks that the state has remained

@@ -25,10 +25,10 @@ use tracing::info;
 const DISABLED_TESTS: &[Test] = &[
     // This is for testing the test disabling functionality itself.
     Test::IgnoreDisabled,
-    // TODO(fxbug.dev/81036): Bindings *do* hide PEER_CLOSED from event sending.
+    // TODO(https://fxbug.dev/81036): Bindings *do* hide PEER_CLOSED from event sending.
     // But because we send events through an Option<TargetControlHandle>, and we
     // have to set it to None at the end (see the other comment about
-    // fxbug.dev/81036 below), we effectively re-introduce the race condition.
+    // https://fxbug.dev/81036 below), we effectively re-introduce the race condition.
     Test::EventSendingDoNotReportPeerClosed,
 ];
 
@@ -96,7 +96,7 @@ fn get_teardown_reason(error: Option<fidl::Error>) -> TeardownReason {
 }
 
 /// Returns the FIDL method name for a request/event enum value.
-// TODO(fxbug.dev/127952): Provide this in FIDL bindings.
+// TODO(https://fxbug.dev/127952): Provide this in FIDL bindings.
 fn method_name(request_or_event: &impl std::fmt::Debug) -> String {
     let mut string = format!("{:?}", request_or_event);
     let len = string.find('{').unwrap_or(string.len());
@@ -326,7 +326,7 @@ impl RunnerServer {
                     self.handle_request(request.unwrap()).await;
                 }
                 result = &mut self.target_serve_fut => {
-                    // TODO(fxbug.dev/81036): The control handle keeps the Target channel alive.
+                    // TODO(https://fxbug.dev/81036): The control handle keeps the Target channel alive.
                     // We must drop it otherwise the harness will hang waiting for PEER_CLOSED.
                     // This shouldn't be necessary: control handles should hold weak references.
                     self.target_ctrl = None;

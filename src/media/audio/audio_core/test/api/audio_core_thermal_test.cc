@@ -136,7 +136,7 @@ class AudioCoreThermalTest : public HermeticPipelineTest {
 
     if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
       // In case of underflows, exit NOW (don't assess this buffer).
-      // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+      // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
       if (DeviceHasUnderflows(DeviceUniqueIdToString(AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS))) {
         GTEST_SKIP() << "Skipping step magnitude checks due to underflows";
       }

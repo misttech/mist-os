@@ -166,7 +166,7 @@ type EventStream = table {
 };
 
 /// Declares a dictionary capability.
-// TODO(fxbug.dev/300503731): Add doc link
+// TODO(https://fxbug.dev/300503731): Add doc link
 @available(added=HEAD)
 type Dictionary = table {
     /// (Required) The name of this dictionary.

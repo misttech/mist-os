@@ -235,7 +235,7 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
   // So, it is possible to keep spinning when we probably shouldn't, and also
   // possible to drop out of a spin when we might want to stay in it.
   //
-  // TODO(fxbug.dev/34646): Optimize cache pressure of spinners and default spin max.
+  // TODO(https://fxbug.dev/34646): Optimize cache pressure of spinners and default spin max.
 
   const uintptr_t new_mutex_state = reinterpret_cast<uintptr_t>(current_thread);
 

@@ -23,7 +23,7 @@ pub(crate) struct LogDisplayConfiguration {
     pub text_options: LogTextDisplayOptions,
 }
 
-// TODO(fxbug.dev/54198, fxbug.dev/70581): deprecate this when implementing metadata selectors for
+// TODO(https://fxbug.dev/54198, https://fxbug.dev/70581): deprecate this when implementing metadata selectors for
 // logs or when we support automatically sending interest updates to all test components on startup.
 // We currently don't have a way of setting the interest of a test realm before creating that realm.
 #[derive(Clone, Default)]

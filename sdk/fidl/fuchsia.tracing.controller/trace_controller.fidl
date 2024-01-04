@@ -131,14 +131,14 @@ type TraceConfig = table {
             vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
 
     /// Suggested size of trace buffer which each provider should receive.
-    // TODO(fxbug.dev/7932): Default to 4.
+    // TODO(https://fxbug.dev/7932): Default to 4.
     2: buffer_size_megabytes_hint uint32;
 
     /// Acknowledge start request after at most `start_timeout_milliseconds`.
-    // TODO(fxbug.dev/7932): Default to 5000.
+    // TODO(https://fxbug.dev/7932): Default to 5000.
     3: start_timeout_milliseconds uint64;
 
-    // TODO(fxbug.dev/7932), TODO(fxbug.dev/7810): Default to BufferingMode.ONESHOT.
+    // TODO(https://fxbug.dev/7932), TODO(https://fxbug.dev/7810): Default to BufferingMode.ONESHOT.
     4: buffering_mode fuchsia.tracing.BufferingMode;
 
     /// Overrides for particular providers.

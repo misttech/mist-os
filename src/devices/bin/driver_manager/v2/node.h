@@ -237,14 +237,14 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   fidl::ArenaBase& arena() { return arena_; }
 
-  // TODO(fxbug.dev/66150): Once FIDL wire types support a Clone() method,
+  // TODO(https://fxbug.dev/66150): Once FIDL wire types support a Clone() method,
   // remove the const_cast.
   fidl::VectorView<fuchsia_component_decl::wire::Offer> offers() const {
     return fidl::VectorView<fuchsia_component_decl::wire::Offer>::FromExternal(
         const_cast<decltype(offers_)&>(offers_));
   }
 
-  // TODO(fxbug.dev/7999): Remove const_cast once VectorView supports const.
+  // TODO(https://fxbug.dev/7999): Remove const_cast once VectorView supports const.
   fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols() const {
     return fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol>::FromExternal(
         const_cast<decltype(symbols_)&>(symbols_));
@@ -397,7 +397,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   fit::nullable<NodeManager*> node_manager_;
   async_dispatcher_t* const dispatcher_;
 
-  // TODO(fxb/122531): Set this flag from NodeAddArgs.
+  // TODO(https://fxbug.dev/122531): Set this flag from NodeAddArgs.
   bool can_multibind_composites_ = true;
 
   bool host_restart_on_crash_ = false;

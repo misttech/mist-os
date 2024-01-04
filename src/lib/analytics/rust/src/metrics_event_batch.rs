@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 const MAX_ENTRIES_EXCEEDED: &str = "There is a maximum of 20 events allowed in a batch.";
 
-// TODO(fxb/126764) Remove this file when UA is turned down (July 1, 2023)
+// TODO(https://fxbug.dev/126764) Remove this file when UA is turned down (July 1, 2023)
 
 /// MetricsEventBatch will go away when UA analytics gets turned down
 /// (July 1, 2023 at the latest) and GA4 Post will handle batching.

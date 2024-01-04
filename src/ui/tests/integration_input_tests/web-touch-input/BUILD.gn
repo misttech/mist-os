@@ -73,7 +73,7 @@ fuchsia_test_package("web-touch-input-test") {
   ]
   test_specs = {
     log_settings = {
-      # TODO(fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
+      # TODO(https://fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = [
@@ -93,9 +93,9 @@ group("tests") {
     ":web-touch-input-test",
 
     # The deps below are necessary on minimal product configs.
-    # TODO(fxbug.dev/119212): These should be provided by the Product
+    # TODO(https://fxbug.dev/119212): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
-    # TODO(fxbug.dev/119212): Should these be deps of the individual test
+    # TODO(https://fxbug.dev/119212): Should these be deps of the individual test
     # targets above?
     "//src/chromium:web_context_provider_for_test",
     "//src/cobalt/bin/testing/mock_cobalt",

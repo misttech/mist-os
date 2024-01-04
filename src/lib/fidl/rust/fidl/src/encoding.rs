@@ -4,7 +4,7 @@
 
 //! FIDL encoding and decoding.
 
-// TODO(fxbug.dev/118834): This file is too big. Split it into smaller files.
+// TODO(https://fxbug.dev/118834): This file is too big. Split it into smaller files.
 
 pub use static_assertions::const_assert_eq;
 
@@ -139,7 +139,7 @@ pub unsafe trait Encode<T: TypeMarker>: Sized {
 pub trait Decode<T: TypeMarker>: 'static + Sized {
     /// Creates a valid instance of `Self`. The specific value does not matter,
     /// since it will be overwritten by `decode`.
-    // TODO(fxbug.dev/118783): Take context parameter to discourage using this.
+    // TODO(https://fxbug.dev/118783): Take context parameter to discourage using this.
     fn new_empty() -> Self;
 
     /// Decodes an object of type `T` from the decoder's buffers into `self`.
@@ -171,7 +171,7 @@ pub const MAX_RECURSION: usize = 32;
 
 /// The maximum number of handles allowed in a FIDL message. Note that this
 /// number is one less for large messages for the time being. See
-/// (fxbug.dev/117162) for progress, or to report problems caused by this
+/// (https://fxbug.dev/117162) for progress, or to report problems caused by this
 /// specific limitation.
 pub const MAX_HANDLES: usize = 64;
 
@@ -222,7 +222,7 @@ pub fn round_up_to_align(x: usize, align: usize) -> usize {
 ///
 /// FIDL conformance tests are used to validate that there are no uninitialized
 /// bytes in the output across a range of types and values.
-// TODO(fxbug.dev/124338): Fix safety issues, use MaybeUninit.
+// TODO(https://fxbug.dev/124338): Fix safety issues, use MaybeUninit.
 #[inline]
 unsafe fn resize_vec_no_zeroing<T>(buf: &mut Vec<T>, new_len: usize) {
     if new_len > buf.capacity() {
@@ -837,7 +837,7 @@ macro_rules! impl_ambiguous {
             }
         }
 
-        // TODO(fxbug.dev/118783): impl for `T: 'static` this once user code has
+        // TODO(https://fxbug.dev/118783): impl for `T: 'static` this once user code has
         // migrated off new_empty(), which is meant to be internal.
         impl Decode<$ambiguous> for AmbiguousNever {
             fn new_empty() -> Self {
@@ -1650,7 +1650,7 @@ unsafe impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
             ObjectType::from_raw(OBJECT_TYPE),
             // Safety: bitflags does not require valid bits for safety. This
             // function is just marked unsafe for aesthetic reasons.
-            // TODO(fxbug.dev/124335): Use `from_bits_retain` instead.
+            // TODO(https://fxbug.dev/124335): Use `from_bits_retain` instead.
             unsafe { Rights::from_bits_unchecked(RIGHTS) },
             encoder,
             offset,
@@ -1678,7 +1678,7 @@ impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
             ObjectType::from_raw(OBJECT_TYPE),
             // Safety: bitflags does not require valid bits for safety. This
             // function is just marked unsafe for aesthetic reasons.
-            // TODO(fxbug.dev/124335): Use `from_bits_retain` instead.
+            // TODO(https://fxbug.dev/124335): Use `from_bits_retain` instead.
             unsafe { Rights::from_bits_unchecked(RIGHTS) },
             decoder,
             offset,

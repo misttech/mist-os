@@ -33,7 +33,7 @@ use {
     thiserror::Error,
 };
 
-// TODO(fxbug.dev/61174): Document these.
+// TODO(https://fxbug.dev/61174): Document these.
 #[allow(missing_docs)]
 extern "C" {
     pub fn dl_clone_loader_service(out: *mut zx_handle_t) -> zx_status_t;

@@ -28,7 +28,7 @@ type mat4 = struct {
 };
 
 /// sRGB color space and nonlinear transfer function.
-// TODO(fxbug.dev/23484): use float32s instead of uint8.
+// TODO(https://fxbug.dev/23484): use float32s instead of uint8.
 @available(deprecated=13, removed=17, legacy=true)
 type ColorRgba = struct {
     red uint8;
@@ -240,7 +240,7 @@ type ViewProperties = struct {
     ///    { bounding_box.min, bounding_box.max }
     /// Content contained within the View is clipped to this bounding box.
     ///
-    // TODO(fxbug.dev/24037): should we just have a vec3 extent instead of a bounding box
+    // TODO(https://fxbug.dev/24037): should we just have a vec3 extent instead of a bounding box
     // with a potentially non-zero min?
     bounding_box BoundingBox;
 

@@ -233,7 +233,7 @@ void asan_register_globals_late() {
   }
 }
 
-// TODO(fxbug.dev/30033): Figure out what dynamic_init is doing.
+// TODO(https://fxbug.dev/30033): Figure out what dynamic_init is doing.
 void __asan_before_dynamic_init(const char* module) {}
 void __asan_after_dynamic_init() {}
 

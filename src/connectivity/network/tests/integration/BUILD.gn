@@ -145,7 +145,7 @@ foreach(test, tests_with_err_logs + long_tests_with_err_logs) {
         package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
     if (defined(test.long_test) && test.long_test) {
       test_specs = {
-        # Longer timeout to reduce flake (fxbug.dev/104137)
+        # Longer timeout to reduce flake (https://fxbug.dev/104137)
         timeout_secs = 720
       }
     }
@@ -162,7 +162,7 @@ foreach(test, tests_with_err_logs + long_tests_with_err_logs) {
         max_severity = "ERROR"
       }
       if (defined(test.long_test) && test.long_test) {
-        # Longer timeout to reduce flake (fxbug.dev/104137)
+        # Longer timeout to reduce flake (https://fxbug.dev/104137)
         timeout_secs = 720
       }
     }
@@ -237,7 +237,7 @@ group("tests") {
          ] + err_log_package_deps
 
   if (!is_coverage) {
-    # TODO(fxbug.dev/104137): Re-enable this test when it passes with
+    # TODO(https://fxbug.dev/104137): Re-enable this test when it passes with
     # the coverage variant.
     deps += long_test_err_log_package_deps
   }

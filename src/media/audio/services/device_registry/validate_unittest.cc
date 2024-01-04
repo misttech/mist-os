@@ -30,7 +30,7 @@ const std::vector<std::pair<uint8_t, fuchsia_hardware_audio::SampleFormat>> kFor
 };
 const std::vector<uint32_t> kFrameRates = {1000, 44100, 48000, 19200};
 
-// TODO(fxbug.dev/117826): Unittest TranslateFormatSets
+// TODO(https://fxbug.dev/117826): Unittest TranslateFormatSets
 // TEST(ValidateTest, TranslateFormatSets) {}
 
 // Unittest ValidateStreamProperties
@@ -343,8 +343,8 @@ TEST(ValidateTest, ValidatePlugState) {
             ZX_OK);
 }
 
-// TODO(fxbug.dev/117826): Unittest ValidateDeviceInfo
-// TODO(fxbug.dev/117826): manufacturer and product strings that are 256 chars long
+// TODO(https://fxbug.dev/117826): Unittest ValidateDeviceInfo
+// TODO(https://fxbug.dev/117826): manufacturer and product strings that are 256 chars long
 // TEST(ValidateTest, ValidateDeviceInfo) {}
 
 // Unittest ValidateRingBufferProperties

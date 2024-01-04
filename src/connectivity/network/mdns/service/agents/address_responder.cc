@@ -23,7 +23,7 @@ AddressResponder::AddressResponder(MdnsAgent::Owner* owner, std::string host_ful
       media_(media),
       ip_versions_(ip_versions) {
   FX_DCHECK(!host_full_name_.empty());
-  // TODO(fxb/113901): Restore this check when alt_services is no longer needed.
+  // TODO(https://fxbug.dev/113901): Restore this check when alt_services is no longer needed.
   // FX_DCHECK(!addresses_.empty());
 }
 

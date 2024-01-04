@@ -80,7 +80,7 @@ fpromise::result<Command, zx_status_t> StrToCommand(const std::string& str) {
   return fpromise::error(ZX_ERR_INVALID_ARGS);
 }
 
-// TODO(fxbug.dev/58025): The varius std::stoi() calls can fail here and cause a crash, be sure to
+// TODO(https://fxbug.dev/58025): The varius std::stoi() calls can fail here and cause a crash, be sure to
 // sanitize input.
 zx_status_t RunCommand(fuchsia::factory::camera::ControllerPtr& controller,
                        fuchsia::factory::camera::IspPtr& isp, const Command command,

@@ -267,7 +267,7 @@ build_api_module("package-repositories") {
 # This describes all the archives the build can produce, in:
 # "$root_build_dir/archives.json"
 #
-# TODO(fxbug.dev/43568): Delete me ASAP. Archives are targets that necessarily
+# TODO(https://fxbug.dev/43568): Delete me ASAP. Archives are targets that necessarily
 # depend on 'everything'; targets like this should be migrated away from.
 #
 # Type: list(scope)
@@ -507,7 +507,7 @@ group("checkout_artifacts.metadata") {
   metadata = {
     checkout_artifacts = [
       {
-        # TODO(fxbug.dev/43568): Remove `archive` field. This is a signal to
+        # TODO(https://fxbug.dev/43568): Remove `archive` field. This is a signal to
         # include the this file in the archive.
         archive = true
         name = "jiri_snapshot"
@@ -738,7 +738,7 @@ build_api_module("sdk_archives") {
   testonly = true
   data_keys = [ "sdk_archives" ]
   deps = [
-           # WARNING (fxbug.dev/116642): the driver SDK will soon be removed.
+           # WARNING (https://fxbug.dev/116642): the driver SDK will soon be removed.
            "//sdk:driver_archive",
            "//sdk:final_fuchsia_idk",
          ] + sdk_archive_labels
@@ -747,7 +747,7 @@ build_api_module("sdk_archives") {
 # Describes the platforms available for testing, in the file:
 #  "$root_build_dir/platforms.json"
 #
-# TODO(fxbug.dev/10429): the fuchsia platform should not know about such things.
+# TODO(https://fxbug.dev/10429): the fuchsia platform should not know about such things.
 #
 # Type: list(scope)
 #
@@ -1541,7 +1541,7 @@ group("default") {
     "//:test-list",
     "//build/assembly:validate_product_defs",
 
-    # TODO(fxbug.dev/116566) has_board check not working
+    # TODO(https://fxbug.dev/116566) has_board check not working
     "//build/images:default-images",
     "//build/images/updates:packages",
     "//build/input:build_only",
@@ -1764,7 +1764,7 @@ group("discoverable_packages") {
 #
 
 group("host") {
-  # TODO(fxbug.dev/80548) investigate removing testonly here
+  # TODO(https://fxbug.dev/80548) investigate removing testonly here
   testonly = true
   public_deps = [
     "//build/input/board:host($host_toolchain)",

@@ -173,7 +173,7 @@ impl<'a> GnBuildGraph<'a> {
                             self.targets.insert(gn_target);
                         }
 
-                        // FIXME(http://fxbug.dev/91791): support staticlib, dylib, and
+                        // FIXME(https://fxbug.dev/91791): support staticlib, dylib, and
                         // cdylib crate types.
                         GnRustType::Staticlib | GnRustType::Dylib | GnRustType::Cdylib => (),
 

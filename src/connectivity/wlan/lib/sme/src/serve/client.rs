@@ -363,7 +363,7 @@ mod tests {
         );
     }
 
-    // TODO(fxbug.dev/83885): There is no test coverage for consistency between MLME scan results
+    // TODO(https://fxbug.dev/83885): There is no test coverage for consistency between MLME scan results
     // and SME scan results produced by wlanstack. In particular, the timestamp_nanos field
     // of fidl_mlme::ScanResult is dropped in SME, and no tests reveal this problem.
 
@@ -509,7 +509,7 @@ mod tests {
     fn random_scan_result(rng: &mut ThreadRng) -> wlan_common::scan::ScanResult {
         use wlan_common::security::SecurityDescriptor;
 
-        // TODO(fxbug.dev/83740): Merge this with a similar function in wlancfg.
+        // TODO(https://fxbug.dev/83740): Merge this with a similar function in wlancfg.
         wlan_common::scan::ScanResult {
             compatibility: match rng.gen_range(0..4) {
                 0 => wlan_common::scan::Compatibility::expect_some([SecurityDescriptor::OPEN]),

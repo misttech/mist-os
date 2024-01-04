@@ -157,7 +157,7 @@ async fn launch_and_run_sample_test_include_disabled() {
         &RunEvent::case_started("my_tests::failing_test")
     );
 
-    // TODO(fxbug.dev/132477): Re-enable this
+    // TODO(https://fxbug.dev/132477): Re-enable this
     // assert_eq!(
     //     &events_failing_test.stderr_events[1],
     //     &RunEvent::case_stderr("my_tests::failing_test", "I'm supposed to panic!()")

@@ -70,7 +70,7 @@ class RegisteredTestDriver {
     }
   }
 
-  // TODO(fxbug.dev/124976): Unify rebind and production drivers.
+  // TODO(https://fxbug.dev/124976): Unify rebind and production drivers.
   const char* GetRebindDriverSuffix() {
     return is_dfv2_ ? "msd_arm_rebind_dfv2.cm" : "msd_arm_rebind.cm";
   }
@@ -79,7 +79,7 @@ class RegisteredTestDriver {
   }
 
   const char* GetParentTopologicalPath() {
-    // TODO(fxbug.dev/127515): Avoid hardcoding this path.
+    // TODO(https://fxbug.dev/127515): Avoid hardcoding this path.
     return "/dev/sys/platform/05:06:17/aml-gpu-composite/aml-gpu/mali-composite";
   }
 

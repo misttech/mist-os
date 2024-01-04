@@ -162,7 +162,7 @@ closed protocol Central {
         peripherals vector<RemoteDevice>:MAX;
     });
 
-    /// **This method is not implemented by the Fuchsia core stack- TODO(fxbug.dev/1424)**
+    /// **This method is not implemented by the Fuchsia core stack- TODO(https://fxbug.dev/1424)**
     ///
     /// Returns information about a single peripheral that is known to the system from previous scan,
     /// connection, and/or bonding procedures based on its unique identifier. Returns null if

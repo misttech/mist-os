@@ -68,7 +68,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
         config.delay_fallback_until_base_drivers_indexed,
     ));
 
-    // TODO(fxb/126225): Pass in a seed from the input, if available.
+    // TODO(https://fxbug.dev/126225): Pass in a seed from the input, if available.
     let (sender, receiver) = futures::channel::mpsc::unbounded::<Vec<ResolvedDriver>>();
     indexer.clone().start_driver_load(
         receiver,
@@ -391,7 +391,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .context("Failed to load boot drivers")
             .map_err(log_error)?;
 
-    // TODO(fxbug.dev/97517): Resolve unpackaged boot drivers until they have been fully migrated.
+    // TODO(https://fxbug.dev/97517): Resolve unpackaged boot drivers until they have been fully migrated.
     let unpackaged_boot_drivers =
         load_unpackaged_boot_drivers(&boot, &eager_drivers, &disabled_drivers)
             .await

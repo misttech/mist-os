@@ -626,7 +626,7 @@ impl<K> PropertyAssertion<K> for AnyUintProperty {
 
 /// A PropertyAssertion that passes for non-zero, unsigned integers.
 ///
-/// TODO(fxbug.dev/62447): generalize this to use the >= operator.
+/// TODO(https://fxbug.dev/62447): generalize this to use the >= operator.
 pub struct NonZeroUintProperty;
 
 impl<K> PropertyAssertion<K> for NonZeroUintProperty {

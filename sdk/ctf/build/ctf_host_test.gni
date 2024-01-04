@@ -11,7 +11,7 @@ import("//build/testing/host_test.gni")
 template("ctf_host_test") {
   main_target_name = target_name + "_host"
 
-  # TODO(fxbug.dev/303077069): This template should not generate
+  # TODO(https://fxbug.dev/303077069): This template should not generate
   # the host_test target.
   host_test(main_target_name) {
     forward_variables_from(invoker, "*")

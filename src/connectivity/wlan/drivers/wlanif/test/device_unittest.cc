@@ -376,5 +376,5 @@ TEST_F(WlanifDeviceTest, CheckDeauthConf) {
   EXPECT_OK(client_.buffer(arena)->DeauthConf(req));
   EXPECT_TRUE(called);
 }
-// TODO(fxb/121450) Add unit tests for other functions in wlanif::Device
+// TODO(https://fxbug.dev/121450) Add unit tests for other functions in wlanif::Device
 }  // namespace

@@ -42,7 +42,7 @@ void MagmaDependencyInjectionDevice::SetMemoryPressureProvider(
       fidl::BindServer(server_loop_.dispatcher(), std::move(endpoints->server), this);
 
   fidl::WireSyncClient provider{std::move(request->provider)};
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)provider->RegisterWatcher(std::move(endpoints->client));
 }
 

@@ -84,7 +84,7 @@ void main() {
       verifyNever(ssh.start(any));
     });
 
-    // fxbug.dev/4745
+    // https://fxbug.dev/4745
     test('do not hang even if the tools do', () {
       const eventually = Duration(hours: 1);
 

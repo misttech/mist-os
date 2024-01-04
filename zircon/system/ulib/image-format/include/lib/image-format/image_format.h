@@ -13,7 +13,7 @@
 
 // Most of the functions in this file are only available at HEAD because they
 // depend on fuchsia.images2 and fuchsia.sysmem2 which are currently
-// `added=HEAD`. See fxbug.dev/42085119.
+// `added=HEAD`. See https://fxbug.dev/42085119.
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
@@ -140,7 +140,7 @@ bool ImageFormatCompatibleWithProtectedMemory(
 #else  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 // A small subset of the functions are exposed for use by zircon_platform_sysmem_connection.cc when
-// __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__ is defined. See fxbug.dev/42085119.
+// __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__ is defined. See https://fxbug.dev/42085119.
 #if defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <lib/fpromise/result.h>

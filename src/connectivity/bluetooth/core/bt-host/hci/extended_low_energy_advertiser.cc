@@ -29,7 +29,7 @@ ExtendedLowEnergyAdvertiser::~ExtendedLowEnergyAdvertiser() {
     return;
   }
   hci()->command_channel()->RemoveEventHandler(set_terminated_event_handler_id_);
-  // TODO(fxbug.dev/112157): This will only cancel one advertisement, after which the
+  // TODO(https://fxbug.dev/112157): This will only cancel one advertisement, after which the
   // SequentialCommandRunner will have been destroyed and no further commands will be sent.
   StopAdvertising();
 }
@@ -109,7 +109,7 @@ CommandChannel::CommandPacketVariant ExtendedLowEnergyAdvertiser::BuildSetAdvert
   packet_view.scan_request_notification_enable().Write(
       pw::bluetooth::emboss::GenericEnableParam::DISABLE);
 
-  // TODO(fxbug.dev/81470): using legacy PDUs requires advertisements on the LE 1M PHY.
+  // TODO(https://fxbug.dev/81470): using legacy PDUs requires advertisements on the LE 1M PHY.
   packet_view.primary_advertising_phy().Write(
       pw::bluetooth::emboss::LEPrimaryAdvertisingPHY::LE_1M);
   packet_view.secondary_advertising_phy().Write(
@@ -148,7 +148,7 @@ CommandChannel::CommandPacketVariant ExtendedLowEnergyAdvertiser::BuildSetAdvert
   BT_ASSERT(handle);
   params.advertising_handle().Write(handle.value());
 
-  // TODO(fxbug.dev/81470): We support only legacy PDUs and do not support fragmented extended
+  // TODO(https://fxbug.dev/81470): We support only legacy PDUs and do not support fragmented extended
   // advertising data at this time.
   params.operation().Write(pw::bluetooth::emboss::LESetExtendedAdvDataOp::COMPLETE);
   params.fragment_preference().Write(
@@ -177,7 +177,7 @@ CommandChannel::CommandPacketVariant ExtendedLowEnergyAdvertiser::BuildUnsetAdve
   BT_ASSERT(handle);
   payload.advertising_handle().Write(handle.value());
 
-  // TODO(fxbug.dev/81470): We support only legacy PDUs and do not support fragmented extended
+  // TODO(https://fxbug.dev/81470): We support only legacy PDUs and do not support fragmented extended
   // advertising data at this time.
   payload.operation().Write(pw::bluetooth::emboss::LESetExtendedAdvDataOp::COMPLETE);
   payload.fragment_preference().Write(
@@ -209,7 +209,7 @@ CommandChannel::CommandPacketVariant ExtendedLowEnergyAdvertiser::BuildSetScanRe
   BT_ASSERT(handle);
   params.advertising_handle().Write(handle.value());
 
-  // TODO(fxbug.dev/81470): We support only legacy PDUs and do not support fragmented extended
+  // TODO(https://fxbug.dev/81470): We support only legacy PDUs and do not support fragmented extended
   // advertising data at this time.
   params.operation().Write(pw::bluetooth::emboss::LESetExtendedAdvDataOp::COMPLETE);
   params.fragment_preference().Write(
@@ -238,7 +238,7 @@ CommandChannel::CommandPacketVariant ExtendedLowEnergyAdvertiser::BuildUnsetScan
   BT_ASSERT(handle);
   payload.advertising_handle().Write(handle.value());
 
-  // TODO(fxbug.dev/81470): We support only legacy PDUs and do not support fragmented extended
+  // TODO(https://fxbug.dev/81470): We support only legacy PDUs and do not support fragmented extended
   // advertising data at this time.
   payload.operation().Write(pw::bluetooth::emboss::LESetExtendedAdvDataOp::COMPLETE);
   payload.fragment_preference().Write(

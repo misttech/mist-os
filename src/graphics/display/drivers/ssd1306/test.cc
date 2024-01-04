@@ -44,7 +44,7 @@ TEST(Ssd1306Test, LifetimeTest) {
   device_async_remove(device->zxdev());
   mock_ddk::ReleaseFlaggedDevices(fake_parent.get());
 
-  // TODO(fxbug.dev/79639): Removed the obsolete fake_ddk.Ok() check.
+  // TODO(https://fxbug.dev/79639): Removed the obsolete fake_ddk.Ok() check.
   // To test Unbind and Release behavior, call UnbindOp and ReleaseOp directly.
 }
 

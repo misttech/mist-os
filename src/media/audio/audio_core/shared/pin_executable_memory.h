@@ -16,7 +16,7 @@
 namespace media::audio {
 
 // Spins up a background thread to periodically ensure that all executable memory
-// is pinned. See fxbug.dev/62830 for the original motivation.
+// is pinned. See https://fxbug.dev/62830 for the original motivation.
 class PinExecutableMemory {
  public:
   // Return the singleton object. Executable memory is pinned the first time this

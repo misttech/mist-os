@@ -400,9 +400,9 @@ static bool trylock_or_cancel_canceled() {
   BEGIN_TEST;
 
 #if defined(__x86_64__)
-  // TODO(fxbug.dev/85324): Test is disabled because it can deadlock with TLB
+  // TODO(https://fxbug.dev/85324): Test is disabled because it can deadlock with TLB
   // invalidation, which uses synchronous IPIs.
-  printf("test is disabled on x86, see fxbug.dev/85324\n");
+  printf("test is disabled on x86, see https://fxbug.dev/85324\n");
   END_TEST;
 #endif
 
@@ -453,9 +453,9 @@ static bool trylock_or_cancel_get_lock() {
   BEGIN_TEST;
 
 #if defined(__x86_64__)
-  // TODO(fxbug.dev/85324): Test is disabled because it can deadlock with TLB
+  // TODO(https://fxbug.dev/85324): Test is disabled because it can deadlock with TLB
   // invalidation, which uses synchronous IPIs.
-  printf("test is disabled on x86, see fxbug.dev/85324\n");
+  printf("test is disabled on x86, see https://fxbug.dev/85324\n");
   END_TEST;
 #endif
 

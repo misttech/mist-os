@@ -38,7 +38,7 @@ using BoardInfoItem = boot_shim::SingleOptionalItem<zbi_board_info_t, ZBI_TYPE_D
 // Specialized PoolMemConfigItem that allows attaching additional ranges. This is needed to
 // provide the single range for peripherial [0, 1G].
 //
-// TODO(fxbug.dev/131475): Remove hack for hardcoded 1G peripherial range.
+// TODO(https://fxbug.dev/131475): Remove hack for hardcoded 1G peripherial range.
 class QemuArm64PoolMemConfigItem : public boot_shim::PoolMemConfigItem {
  public:
   // Include the extra range.
@@ -68,7 +68,7 @@ class QemuArm64PoolMemConfigItem : public boot_shim::PoolMemConfigItem {
 
 constexpr const char* kShimName = "linux-arm64-boot-shim";
 
-// TODO(fxbug.dev/295031359): Once assembly generates this items, remove the hardcoded pair.
+// TODO(https://fxbug.dev/295031359): Once assembly generates this items, remove the hardcoded pair.
 constexpr zbi_platform_id_t kQemuPlatformId = {
     .vid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_VID.QEMU
     .pid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_PID.QEMU

@@ -38,7 +38,7 @@ InstanceResponder::InstanceResponder(MdnsAgent::Owner* owner, std::string host_n
       media_(media),
       ip_versions_(ip_versions),
       publisher_(publisher) {
-  // TODO(fxb/113901): Restore this check when alt_services is no longer needed.
+  // TODO(https://fxbug.dev/113901): Restore this check when alt_services is no longer needed.
   // FX_DCHECK(host_name.empty() == addresses_.empty());
   instance_.service_name_ = service_name;
   instance_.instance_name_ = instance_name;

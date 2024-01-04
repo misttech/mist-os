@@ -1627,7 +1627,7 @@ TEST(Sysmem, MultipleParticipantsV1) {
   // to re-alloc all the server's held FIDL tables 4 times before we continue.  These are
   // synchronous calls, so the 4 re-allocs are done by the time this loop completes.
   //
-  // TODO(fxbug.dev/33670): Switch to creating real churn instead, once we have new messages that
+  // TODO(https://fxbug.dev/33670): Switch to creating real churn instead, once we have new messages that
   // can create real churn.
   constexpr uint32_t kChurnCount = 256 * 2;  // 256 * 4;
   for (uint32_t i = 0; i < kChurnCount; ++i) {
@@ -1990,14 +1990,14 @@ TEST(Sysmem, MultipleParticipantsColorspaceRankingV1) {
   check_allocation_results(collection_2->WaitForBuffersAllocated());
 }
 
-// Regression-avoidance test for fxbug.dev/60895:
+// Regression-avoidance test for https://fxbug.dev/60895:
 //  * One client with two NV12 ImageFormatConstraints, one with rec601, one with rec709
 //  * One client with NV12 ImageFormatConstraints with rec709.
 //  * Scrambled ordering of which constraints get processed first, but deterministically check each
 //    client going first in the first couple iterations.
 TEST(Sysmem,
      MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_CompatibleColorspacesV1) {
-  // Multiple iterations to try to repro fxbug.dev/60895, in case it comes back.  This should be
+  // Multiple iterations to try to repro https://fxbug.dev/60895, in case it comes back.  This should be
   // at least 2 to check both orderings with two clients.
   std::atomic<uint32_t> clean_failure_seen_count = 0;
   const uint32_t kCleanFailureSeenGoal = 15;

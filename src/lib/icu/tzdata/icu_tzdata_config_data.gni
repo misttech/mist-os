@@ -24,7 +24,7 @@ import("//src/lib/icu/tzdata/icu_tzres_source.gni")
 #
 # Please see `README.md` for detailed documentation.
 #
-# TODO(fxbug.dev/104685): Remove in favor of tzdata directory capability
+# TODO(https://fxbug.dev/104685): Remove in favor of tzdata directory capability
 template("icu_tzdata_config_data") {
   _resources_label = "_${target_name}_resources"
   config_data(_resources_label) {

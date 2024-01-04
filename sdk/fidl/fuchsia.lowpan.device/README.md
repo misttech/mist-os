@@ -4,7 +4,7 @@ fuchsia.lowpan.device
 `fuchsia.lowpan.device` provides the FIDL protocols for discovering
 and managing low-power wireless network interfaces (LoWPAN interfaces).
 
-TODO(fxbug.dev/46266): Write overview of fuchsia.lowpan.device architecture and usage.
+TODO(https://fxbug.dev/46266): Write overview of fuchsia.lowpan.device architecture and usage.
 
 See also:
 

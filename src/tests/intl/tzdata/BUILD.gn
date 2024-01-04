@@ -54,7 +54,7 @@ fuchsia_test_package("pkg") {
   ]
 }
 
-# TODO(fxbug.dev/109378): Migrate to directory capabilities
+# TODO(https://fxbug.dev/109378): Migrate to directory capabilities
 zoneinfo_config_data("zoneinfo-for-tzdata-test") {
   for_pkg = "tzdata-test"
   include_revision_file = true

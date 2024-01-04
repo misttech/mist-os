@@ -98,7 +98,7 @@ success("ReverseOrdinalUnion") {
 // ======================== UNKNOWN VARIANT TESTS ==========================
 
 success("FlexibleUnionUnknownValueStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of FlexibleUnionUnknownValue
+    // TODO(https://fxbug.dev/85383): Remove in favor of FlexibleUnionUnknownValue
     // decode_success and encode_failure tests.
     bindings_allowlist = [dart, go],
     value = TestFlexibleXUnionInStruct{
@@ -119,7 +119,7 @@ success("FlexibleUnionUnknownValueStored") {
 }
 
 decode_success("FlexibleUnionUnknownValue") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = TestFlexibleXUnionInStruct{
         xu: SampleXUnion{
@@ -136,7 +136,7 @@ decode_success("FlexibleUnionUnknownValue") {
 }
 
 encode_failure("FlexibleUnionUnknownValue") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = TestFlexibleXUnionInStruct{
         xu: decode({
@@ -154,7 +154,7 @@ encode_failure("FlexibleUnionUnknownValue") {
 }
 
 success("FlexibleResourceUnionUnknownValueStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // FlexibleResourceUnionUnknownValue decode_success and encode_failure tests.
     bindings_allowlist = [dart, go],
     value = TestFlexibleResourceXUnionInStruct{
@@ -175,7 +175,7 @@ success("FlexibleResourceUnionUnknownValueStored") {
 }
 
 decode_success("FlexibleResourceUnionUnknownValue") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = TestFlexibleResourceXUnionInStruct{
         xu: SampleResourceXUnion{
@@ -192,7 +192,7 @@ decode_success("FlexibleResourceUnionUnknownValue") {
 }
 
 encode_failure("FlexibleResourceUnionUnknownValue") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = TestFlexibleResourceXUnionInStruct{
         xu: decode({
@@ -210,7 +210,7 @@ encode_failure("FlexibleResourceUnionUnknownValue") {
 }
 
 success("FlexibleResourceUnionUnknownValueWithHandlesStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // FlexibleResourceUnionUnknownValueWithHandles decode_success and
     // encode_failure tests.
     bindings_allowlist = [dart, go],
@@ -244,7 +244,7 @@ success("FlexibleResourceUnionUnknownValueWithHandlesStored") {
 }
 
 decode_success("FlexibleResourceUnionUnknownValueWithHandles") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -272,7 +272,7 @@ decode_success("FlexibleResourceUnionUnknownValueWithHandles") {
 }
 
 encode_failure("FlexibleResourceUnionUnknownValueWithHandles") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -336,7 +336,7 @@ decode_failure("StrictUnionUnknownValueWithHandles") {
 }
 
 decode_failure("FlexibleUnionUnknownValueWithHandles") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // FlexibleUnionUnknownValueWithHandlesCloseHandles decode_success test.
     bindings_allowlist = [dart, go],
     handle_defs = {
@@ -362,7 +362,7 @@ decode_failure("FlexibleUnionUnknownValueWithHandles") {
 }
 
 decode_success("FlexibleUnionUnknownValueWithHandlesCloseHandles") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -523,7 +523,7 @@ success("UnionEnvelopeInlining_HandleValue_Inlined") {
 }
 
 success("UnionEnvelopeInlining_UnknownSmallValue_Inlined_Stored") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // UnionEnvelopeInlining_UnknownSmallValue_Inlined decode_success test.
     bindings_allowlist = [go],
     value = EnvelopeInliningTestUnionStruct{
@@ -543,7 +543,7 @@ success("UnionEnvelopeInlining_UnknownSmallValue_Inlined_Stored") {
 }
 
 decode_success("UnionEnvelopeInlining_UnknownSmallValue_Inlined") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = EnvelopeInliningTestUnionStruct{
         u: EnvelopeInliningTestUnion{
@@ -560,7 +560,7 @@ decode_success("UnionEnvelopeInlining_UnknownSmallValue_Inlined") {
 }
 
 success("UnionEnvelopeInlining_UnknownLargeValue_Outlined_Stored") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // UnionEnvelopeInlining_UnknownLargeValue_Outlined decode_success test.
     bindings_allowlist = [go],
     value = EnvelopeInliningTestUnionStruct{
@@ -583,7 +583,7 @@ success("UnionEnvelopeInlining_UnknownLargeValue_Outlined_Stored") {
 }
 
 decode_success("UnionEnvelopeInlining_UnknownLargeValue_Outlined") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = EnvelopeInliningTestUnionStruct{
         u: EnvelopeInliningTestUnion{
@@ -603,7 +603,7 @@ decode_success("UnionEnvelopeInlining_UnknownLargeValue_Outlined") {
 }
 
 success("UnionEnvelopeInlining_UnknownHandleValue_Inlined_Stored") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // UnionEnvelopeInlining_UnknownHandleValue_Inlined decode_success test.
     bindings_allowlist = [go],
     handle_defs = {
@@ -630,7 +630,7 @@ success("UnionEnvelopeInlining_UnknownHandleValue_Inlined_Stored") {
 }
 
 decode_success("UnionEnvelopeInlining_UnknownHandleValue_Inlined") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -684,7 +684,7 @@ decode_failure("UnionInlineEnvelopeWhenOutOfLineRequired") {
 }
 
 encode_failure("RequiredFlexibleValueUnionZeroOrdinalNoPayloadOld") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // RequiredFlexibleValueUnionZeroOrdinalNoPayload.
     bindings_allowlist = [dart, go],
     value = TestFlexibleXUnionInStruct{
@@ -698,7 +698,7 @@ encode_failure("RequiredFlexibleValueUnionZeroOrdinalNoPayloadOld") {
 }
 
 encode_failure("RequiredFlexibleValueUnionZeroOrdinalNoPayload") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = TestFlexibleXUnionInStruct{
         xu: SampleXUnion{
@@ -709,7 +709,7 @@ encode_failure("RequiredFlexibleValueUnionZeroOrdinalNoPayload") {
 }
 
 encode_failure("RequiredFlexibleValueUnionZeroOrdinalWithPayload") {
-    // TODO(fxbug.dev/85383): Remove this test once no binding stores unknown
+    // TODO(https://fxbug.dev/85383): Remove this test once no binding stores unknown
     // data (it's only expressible when you can store unknown data).
     bindings_allowlist = [dart, go],
     value = TestFlexibleXUnionInStruct{
@@ -723,7 +723,7 @@ encode_failure("RequiredFlexibleValueUnionZeroOrdinalWithPayload") {
 }
 
 encode_failure("RequiredFlexibleResourceUnionZeroOrdinalNoPayloadOld") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // RequiredFlexibleResourceUnionZeroOrdinalNoPayload.
     bindings_allowlist = [dart, go],
     value = TestFlexibleResourceXUnionInStruct{
@@ -737,7 +737,7 @@ encode_failure("RequiredFlexibleResourceUnionZeroOrdinalNoPayloadOld") {
 }
 
 encode_failure("RequiredFlexibleResourceUnionZeroOrdinalNoPayload") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = TestFlexibleResourceXUnionInStruct{
         xu: SampleResourceXUnion{
@@ -748,7 +748,7 @@ encode_failure("RequiredFlexibleResourceUnionZeroOrdinalNoPayload") {
 }
 
 encode_failure("RequiredFlexibleResourceUnionZeroOrdinalWithPayload") {
-    // TODO(fxbug.dev/85383): Remove this test once no binding stores unknown
+    // TODO(https://fxbug.dev/85383): Remove this test once no binding stores unknown
     // data (it's only expressible when you can store unknown data).
     bindings_allowlist = [dart, go],
     value = TestFlexibleResourceXUnionInStruct{
@@ -762,7 +762,7 @@ encode_failure("RequiredFlexibleResourceUnionZeroOrdinalWithPayload") {
 }
 
 encode_failure("OptionalFlexibleValueUnionZeroOrdinalWithPayload") {
-    // TODO(fxbug.dev/85383): Remove this test once no binding stores unknown
+    // TODO(https://fxbug.dev/85383): Remove this test once no binding stores unknown
     // data (it's only expressible when you can store unknown data).
     bindings_allowlist = [dart, go],
     value = TestOptionalFlexibleXUnionInStruct{
@@ -776,7 +776,7 @@ encode_failure("OptionalFlexibleValueUnionZeroOrdinalWithPayload") {
 }
 
 encode_failure("OptionalFlexibleResourceUnionZeroOrdinalWithPayload") {
-    // TODO(fxbug.dev/85383): Remove this test once no binding stores unknown
+    // TODO(https://fxbug.dev/85383): Remove this test once no binding stores unknown
     // data (it's only expressible when you can store unknown data).
     bindings_allowlist = [dart, go],
     value = TestOptionalFlexibleResourceXUnionInStruct{
@@ -1010,7 +1010,7 @@ encode_failure("RequiredFlexibleResourceUnionDefaultInitialized") {
 }
 
 encode_failure("OptionalStrictValueUnionDefaultInitialized") {
-    // TODO(fxbug.dev/7805): Enable in HLCPP and LLCPP.
+    // TODO(https://fxbug.dev/7805): Enable in HLCPP and LLCPP.
     bindings_allowlist = [go],
     value = TestOptionalStrictXUnionInStruct{
         xu: SampleStrictXUnion{},
@@ -1019,7 +1019,7 @@ encode_failure("OptionalStrictValueUnionDefaultInitialized") {
 }
 
 encode_failure("OptionalStrictResourceUnionDefaultInitialized") {
-    // TODO(fxbug.dev/7805): Enable in HLCPP and LLCPP.
+    // TODO(https://fxbug.dev/7805): Enable in HLCPP and LLCPP.
     bindings_allowlist = [go],
     value = TestOptionalStrictResourceXUnionInStruct{
         xu: SampleStrictResourceXUnion{},
@@ -1028,7 +1028,7 @@ encode_failure("OptionalStrictResourceUnionDefaultInitialized") {
 }
 
 encode_failure("OptionalFlexibleValueUnionDefaultInitialized") {
-    // TODO(fxbug.dev/7805): Enable in HLCPP, LLCPP.
+    // TODO(https://fxbug.dev/7805): Enable in HLCPP, LLCPP.
     bindings_allowlist = [go],
     value = TestOptionalFlexibleXUnionInStruct{
         xu: SampleXUnion{},
@@ -1037,7 +1037,7 @@ encode_failure("OptionalFlexibleValueUnionDefaultInitialized") {
 }
 
 encode_failure("OptionalFlexibleResourceUnionDefaultInitialized") {
-    // TODO(fxbug.dev/7805): Enable in HLCPP, LLCPP.
+    // TODO(https://fxbug.dev/7805): Enable in HLCPP, LLCPP.
     bindings_allowlist = [go],
     value = TestOptionalFlexibleResourceXUnionInStruct{
         xu: SampleResourceXUnion{},
@@ -1046,8 +1046,8 @@ encode_failure("OptionalFlexibleResourceUnionDefaultInitialized") {
 }
 
 decode_failure("EnvelopeByteCountExceedsMessageByteCount") {
-    // TODO(fxbug.dev/88704) Fix in Rust.
-    // TODO(fxbug.dev/88705) Fix in Dart.
+    // TODO(https://fxbug.dev/88704) Fix in Rust.
+    // TODO(https://fxbug.dev/88705) Fix in Dart.
     bindings_denylist = [rust, dart],
     type = EnvelopeInliningTestUnionStruct,
     bytes = {
@@ -1060,8 +1060,8 @@ decode_failure("EnvelopeByteCountExceedsMessageByteCount") {
 }
 
 decode_failure("EnvelopeHandleCountExceedsMessageHandleCount") {
-    // TODO(fxbug.dev/88705) Fix in Dart.
-    // TODO(fxbug.dev/100924) Fix in Go.
+    // TODO(https://fxbug.dev/88705) Fix in Dart.
+    // TODO(https://fxbug.dev/100924) Fix in Go.
     bindings_denylist = [dart, go],
     type = EnvelopeInliningTestUnionStruct,
     bytes = {
@@ -1074,8 +1074,8 @@ decode_failure("EnvelopeHandleCountExceedsMessageHandleCount") {
 }
 
 decode_failure("EnvelopeHandleCountExceedsMessageHandleCountUnknown") {
-    // TODO(fxbug.dev/88704) Fix in Rust.
-    // TODO(fxbug.dev/88705) Fix in Dart.
+    // TODO(https://fxbug.dev/88704) Fix in Rust.
+    // TODO(https://fxbug.dev/88705) Fix in Dart.
     bindings_denylist = [rust, dart],
     type = EnvelopeInliningTestUnionStruct,
     bytes = {
@@ -1088,7 +1088,7 @@ decode_failure("EnvelopeHandleCountExceedsMessageHandleCountUnknown") {
 }
 
 decode_success("EmptyFlexibleUnionDecodesUnknownSmallValueStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // EmptyFlexibleUnionDecodesUnknownSmallValue.
     bindings_allowlist = [dart, go],
     value = StructOfEmptyFlexibleUnion{
@@ -1109,7 +1109,7 @@ decode_success("EmptyFlexibleUnionDecodesUnknownSmallValueStored") {
 }
 
 decode_success("EmptyFlexibleUnionDecodesUnknownSmallValue") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = StructOfEmptyFlexibleUnion{
         empty: EmptyFlexibleUnion{
@@ -1126,7 +1126,7 @@ decode_success("EmptyFlexibleUnionDecodesUnknownSmallValue") {
 }
 
 decode_success("EmptyFlexibleUnionDecodesUnknownLargeValueStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of
+    // TODO(https://fxbug.dev/85383): Remove in favor of
     // EmptyFlexibleUnionDecodesUnknownLargeValue.
     bindings_allowlist = [dart, go],
     value = StructOfEmptyFlexibleUnion{
@@ -1150,7 +1150,7 @@ decode_success("EmptyFlexibleUnionDecodesUnknownLargeValueStored") {
 }
 
 decode_success("EmptyFlexibleUnionDecodesUnknownLargeValue") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_allowlist = [rust],
     value = StructOfEmptyFlexibleUnion{
         empty: EmptyFlexibleUnion{

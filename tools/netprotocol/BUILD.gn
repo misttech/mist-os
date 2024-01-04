@@ -8,7 +8,7 @@ source_set("common") {
   sources = [ "netprotocol.c" ]
   public_deps = [ "//src/bringup/lib/netboot" ]
   configs += [
-    # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
     "//build/config:Wno-conversion",
   ]
 }
@@ -25,7 +25,7 @@ executable("netcp") {
     "//zircon/system/ulib/tftp",
   ]
   configs += [
-    # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
     "//build/config:Wno-conversion",
   ]
 }

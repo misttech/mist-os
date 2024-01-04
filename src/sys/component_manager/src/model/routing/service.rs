@@ -530,7 +530,7 @@ pub struct ServiceInstanceDirectoryEntry<T: Send + Sync + 'static + fmt::Display
     /// This is a generic type because it varies between aggregated directory types. For example,
     /// for aggregated offers this an instance in the source instance filter,
     /// while for aggregated collections it is the moniker of the source child.
-    // TODO(fxbug.dev/294909269): AnonymizedAggregateServiceDir needs this, but
+    // TODO(https://fxbug.dev/294909269): AnonymizedAggregateServiceDir needs this, but
     // FilteredAggregateServiceDir only uses this for debug info. We could probably have
     // AnonymizedAggregateServiceDir use ServiceInstanceDirectoryKey.source_id instead, and either
     // delete this or make it debug-only.
@@ -826,7 +826,7 @@ mod tests {
         original_entries: Vec<fuchsia_fs::directory::DirEntry>,
     ) -> Vec<fuchsia_fs::directory::DirEntry> {
         loop {
-            // TODO(fxbug.dev/294909269): Now that component manager supports watching for
+            // TODO(https://fxbug.dev/294909269): Now that component manager supports watching for
             // service instances, this loop should be replaced by a watcher.
             let updated_entries = fuchsia_fs::directory::readdir(dir_proxy)
                 .await

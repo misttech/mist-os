@@ -71,7 +71,7 @@ pub mod id {
     use std::fmt::Display;
     use std::sync::atomic::{AtomicU64, Ordering};
 
-    /// TODO(fxbug.dev/316036032): store a moniker token instead, to eliminate
+    /// TODO(https://fxbug.dev/316036032): store a moniker token instead, to eliminate
     /// ELF runner's visibility into component monikers.
     #[derive(Eq, Hash, PartialEq, Clone, Debug)]
     pub struct Id(Moniker, u64);

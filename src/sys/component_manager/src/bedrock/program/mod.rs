@@ -56,14 +56,14 @@ impl Program {
     /// program. If [Program] is dropped or [Program::kill] is called, the namespace will no
     /// longer be served.
     ///
-    /// TODO(fxbug.dev/122024): Change `start_info` to a `Dict` and `DeliveryMap` as runners
+    /// TODO(https://fxbug.dev/122024): Change `start_info` to a `Dict` and `DeliveryMap` as runners
     /// migrate to use sandboxes.
     ///
-    /// TODO(fxbug.dev/122024): This API allows users to create orphaned programs that's not
+    /// TODO(https://fxbug.dev/122024): This API allows users to create orphaned programs that's not
     /// associated with anything else. Once we have a bedrock component concept, we might
     /// want to require a containing component to start a program.
     ///
-    /// TODO(fxbug.dev/122024): Since diagnostic information is only available once,
+    /// TODO(https://fxbug.dev/122024): Since diagnostic information is only available once,
     /// the framework should be the one that get it. That's another reason to limit this API.
     pub fn start(
         moniker: Moniker,

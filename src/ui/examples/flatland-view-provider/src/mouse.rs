@@ -23,13 +23,13 @@ pub fn spawn_mouse_source_watcher(
                 Ok(events) => {
                     for e in events.iter() {
                         let timestamp = e.timestamp.unwrap();
-                        // TODO(fxbug.dev/82533): currently the API does not guarantee that the
+                        // TODO(https://fxbug.dev/82533): currently the API does not guarantee that the
                         // trace ID will be present.  However, the current implementation behaves
                         // this way, and in the future it will also be guaranteed by the API.
                         let trace_flow_id = e.trace_flow_id.unwrap();
 
                         // Handle `device_info` field, if it exists.
-                        // TODO(fxbug.dev/90972): We don't use this info; currently all of the
+                        // TODO(https://fxbug.dev/90972): We don't use this info; currently all of the
                         // fields except for `id` are absent.  Furthermore, the documentation is
                         // insufficient to understand how to handle these fields, if present.
                         if let Some(new_device_info) = e.device_info.clone() {
@@ -65,17 +65,17 @@ pub fn spawn_mouse_source_watcher(
                             ..
                         }) = e.pointer_sample.clone()
                         {
-                            // TODO(fxbug.dev/90972): Relative motion is currently ignored.
+                            // TODO(https://fxbug.dev/90972): Relative motion is currently ignored.
                             if let Some(relative_motion) = &relative_motion {
                                 info!(
-                                    "fxbug.dev/90972: Relative motion ignored: {:?}",
+                                    "https://fxbug.dev/90972: Relative motion ignored: {:?}",
                                     relative_motion
                                 );
                             }
 
                             // We expect `view_parameters` to have already been received before any
                             // pointer samples are received.
-                            // TODO(fxbug.dev/90972): We currently ignore these parameters, but real
+                            // TODO(https://fxbug.dev/90972): We currently ignore these parameters, but real
                             // apps/frameworks will want to apply the `viewport_to_view_transform`
                             // instead of passing `position_in_viewport` through unchanged.
                             if let Some(_view_parameters) = &view_parameters {

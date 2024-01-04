@@ -102,7 +102,7 @@ fuchsia_unittest_package("virtio-gpu-test-package") {
   package_name = "virtio-gpu-test"
   deps = [ ":virtio-gpu-test" ]
 
-  # TODO(fxbug.dev/134883): Remove this block when below error is resolved.
+  # TODO(https://fxbug.dev/134883): Remove this block when below error is resolved.
   # There's expected error logs that happen in the integration test where
   # GetBtiAndBackend fails in GpuDevice::Create due to testing
   # without a fake GPU backend in place.

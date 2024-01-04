@@ -419,7 +419,7 @@ TEST_P(DirectoryTest, RmdirOnlyAllowsDirectories) {
 }
 
 TEST_P(DirectoryTest, Deep) {
-  // TODO(fxbug.dev/125828): Fix stack overflow in f2fs fsck
+  // TODO(https://fxbug.dev/125828): Fix stack overflow in f2fs fsck
   if (fs().GetTraits().name == "f2fs") {
     std::cout << "Skipped test" << std::endl;
     return;

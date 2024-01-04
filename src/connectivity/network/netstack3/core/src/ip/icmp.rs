@@ -3419,7 +3419,7 @@ fn receive_icmp_echo_reply<
                 return;
             }
         }
-        // TODO(fxbug.dev/47952): Neither the ICMPv4 or ICMPv6 RFCs
+        // TODO(https://fxbug.dev/47952): Neither the ICMPv4 or ICMPv6 RFCs
         // explicitly state what to do in case we receive an "unsolicited"
         // echo reply. We only expose the replies if we have a registered
         // connection for the IcmpAddr of the incoming reply for now. Given
@@ -4450,7 +4450,7 @@ mod tests {
         }
 
         for counter in assert_counters {
-            // TODO(http://fxbug.dev/134635): Redesign iterating through
+            // TODO(https://fxbug.dev/134635): Redesign iterating through
             // assert_counters once CounterContext is removed.
             let count = match *counter {
                 "send_ipv4_packet" => core_ctx.state.ipv4.inner.counters().send_ip_packet.get(),
@@ -4599,7 +4599,7 @@ mod tests {
                 | Ipv4Proto::Proto(IpProto::Tcp) => {}
             }
 
-            // TODO(fxbug.dev/47953): We seem to fail to parse an IPv6 packet if
+            // TODO(https://fxbug.dev/47953): We seem to fail to parse an IPv6 packet if
             // its Next Header value is unrecognized (rather than treating this
             // as a valid parsing but then replying with a parameter problem
             // error message). We should a) fix this and, b) expand this test to

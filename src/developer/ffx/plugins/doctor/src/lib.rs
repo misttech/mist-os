@@ -177,7 +177,7 @@ async fn get_config_permission<W: Write>(mut writer: W) -> Result<bool> {
     loop {
         let mut input = String::new();
         writeln!(&mut writer, "Do you want to include your config data `ffx config get`? [y/n]")?;
-        // TODO(fxbug.dev/81228) Use a generic read type instead of stdin
+        // TODO(https://fxbug.dev/81228) Use a generic read type instead of stdin
         std::io::stdin().read_line(&mut input)?;
         permission = match input.to_lowercase().trim() {
             "yes" | "y" => true,
@@ -218,7 +218,7 @@ fho::embedded_plugin!(DoctorTool);
 impl FfxMain for DoctorTool {
     type Writer = SimpleWriter;
 
-    // TODO(fxbug.dev/127955): use the writer instead of directly using std::io::stdout.
+    // TODO(https://fxbug.dev/127955): use the writer instead of directly using std::io::stdout.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         doctor_cmd_impl(self.version_info, self.cmd, stdout()).await?;
         Ok(())
@@ -653,7 +653,7 @@ async fn daemon_restart<W: Write>(
         // HACK: Wait a few seconds before spawning a new daemon. Attempting
         // to spawn one too quickly after killing one will lead to timeouts
         // when attempting to communicate with the spawned daemon.
-        // Temporary fix for fxbug.dev/66958. Remove when that bug is resolved.
+        // Temporary fix for https://fxbug.dev/66958. Remove when that bug is resolved.
         fuchsia_async::Timer::new(Duration::from_millis(5000)).await;
     };
 
@@ -1163,7 +1163,7 @@ async fn doctor_summary<W: Write>(
         ledger.set_outcome(state_node, outcome)?;
         ledger.set_outcome(message_node, outcome)?;
 
-        //TODO(fxbug.dev/86523): Offer a fix when we cannot connect to a device via RCS.
+        //TODO(https://fxbug.dev/86523): Offer a fix when we cannot connect to a device via RCS.
         let (target_proxy, target_server) = fidl::endpoints::create_proxy::<TargetMarker>()?;
         match timeout(
             retry_delay,

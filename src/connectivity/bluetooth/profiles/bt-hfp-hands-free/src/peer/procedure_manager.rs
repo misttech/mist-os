@@ -227,7 +227,7 @@ impl<I: ProcedureInputT<O>, O: ProcedureOutputT> ProcedureManager<I, O> {
 ///   - A response is received which causes the procedure to update ProcedureManipulatedState, and
 ///   - The second ProcedureOutput is processed, which assumes the ProcedureManiplated state is
 ///     in its previous state.
-// TODO(fxb/129730) This can return individual ProcedureOutputs if all state management is moved to
+// TODO(https://fxbug.dev/129730) This can return individual ProcedureOutputs if all state management is moved to
 // the PeerTask and thus synchronized there..
 impl<I: ProcedureInputT<O>, O: ProcedureOutputT> Stream for ProcedureManager<I, O> {
     type Item = Result<Vec<O>>;

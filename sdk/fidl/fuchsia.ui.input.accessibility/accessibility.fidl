@@ -63,7 +63,7 @@ closed protocol PointerEventRegistry {
 
 /// A PointerEventListener receives pointer events and decides to consume them
 /// or not.
-/// TODO(fxbug.dev/36429): Investigate flow control mechanisms for a11y input events.
+/// TODO(https://fxbug.dev/36429): Investigate flow control mechanisms for a11y input events.
 closed protocol PointerEventListener {
     /// Sends a PointerEvent to an accessibility service. An event is returned
     /// at any time to indicate whether the pointer event stream was consumed /

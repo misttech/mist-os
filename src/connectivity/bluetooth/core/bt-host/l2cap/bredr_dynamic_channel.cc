@@ -136,7 +136,7 @@ void BrEdrDynamicChannelRegistry::OnRxInfoReq(
   bt_log(TRACE, "l2cap-bredr", "Got Information Request for type %#.4hx",
          static_cast<unsigned short>(type));
 
-  // TODO(fxbug.dev/933): The responses here will likely remain hardcoded magics, but
+  // TODO(https://fxbug.dev/933): The responses here will likely remain hardcoded magics, but
   // maybe they should live elsewhere.
   switch (type) {
     case InformationType::kConnectionlessMTU: {
@@ -157,7 +157,7 @@ void BrEdrDynamicChannelRegistry::OnRxInfoReq(
       const FixedChannelsSupported channels_supported = kFixedChannelsSupportedBitSignaling;
 
       // Express support for the ACL-U Signaling Channel (as required)
-      // TODO(fxbug.dev/933): Set the bit for SM's fixed channel
+      // TODO(https://fxbug.dev/933): Set the bit for SM's fixed channel
       responder->SendFixedChannelsSupported(channels_supported);
       break;
     }
@@ -406,7 +406,7 @@ void BrEdrDynamicChannel::OnRxConfigReq(uint16_t flags, ChannelConfiguration con
   if (remote_config_accum_.has_value()) {
     remote_config_accum_->Merge(std::move(config));
   } else {
-    // TODO(fxbug.dev/40053): if channel is being re-configured, merge with existing configuration
+    // TODO(https://fxbug.dev/40053): if channel is being re-configured, merge with existing configuration
     remote_config_accum_ = std::move(config);
   }
 
@@ -487,14 +487,14 @@ void BrEdrDynamicChannel::OnRxConfigReq(uint16_t flags, ChannelConfiguration con
     return;
   }
 
-  // TODO(fxbug.dev/1059): Defer accepting config req using a Pending response
+  // TODO(https://fxbug.dev/1059): Defer accepting config req using a Pending response
   state_ |= kRemoteConfigAccepted;
 
   ChannelConfiguration response_config;
 
   // Successful response should include actual MTU local device will use. This must be min(received
   // MTU, local outgoing MTU capability). Currently, we accept any MTU.
-  // TODO(fxbug.dev/41376): determine the upper bound of what we are actually capable of sending
+  // TODO(https://fxbug.dev/41376): determine the upper bound of what we are actually capable of sending
   uint16_t actual_mtu = req_config.mtu_option()->mtu();
   response_config.set_mtu_option(ChannelConfiguration::MtuOption(actual_mtu));
   req_config.set_mtu_option(response_config.mtu_option());
@@ -740,7 +740,7 @@ bool BrEdrDynamicChannel::AcceptedChannelModesAreConsistent() const {
 
 ChannelConfiguration BrEdrDynamicChannel::CheckForUnacceptableConfigReqOptions(
     const ChannelConfiguration& config) const {
-  // TODO(fxbug.dev/40053): reject reconfiguring MTU if mode is Enhanced Retransmission or Streaming
+  // TODO(https://fxbug.dev/40053): reject reconfiguring MTU if mode is Enhanced Retransmission or Streaming
   // mode.
   ChannelConfiguration unacceptable;
 
@@ -832,7 +832,7 @@ BrEdrDynamicChannel::CheckForUnacceptableErtmOptions(const ChannelConfiguration&
     unacceptable_rfc_option->set_tx_window_size(kErtmMaxUnackedInboundFrames);
   }
 
-  // NOTE(fxbug.dev/1033): MPS must be large enough to fit the largest SDU in the minimum MTU case,
+  // NOTE(https://fxbug.dev/1033): MPS must be large enough to fit the largest SDU in the minimum MTU case,
   // because ERTM does not segment in the outbound direction.
   if (peer_rfc_option.mps() < kMinACLMTU) {
     bt_log(DEBUG, "l2cap-bredr", "Channel %#.4x: rejecting too-small ERTM MPS of %hu", local_cid(),

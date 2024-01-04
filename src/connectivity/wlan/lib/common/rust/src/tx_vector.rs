@@ -41,7 +41,7 @@ pub const MAX_VALID_IDX: u16 = DSSS_CCK_START_IDX + DSSS_CCK_NUM_TX_VECTOR as u1
 //  5       137 - 138             DSSS  -    -   -   0-1
 //  6       139 - 140             CCK   -    -   -   2-3
 //
-// TODO(fxbug.dev/20947) VHT will be inserted between HT and ERP.
+// TODO(https://fxbug.dev/20947) VHT will be inserted between HT and ERP.
 
 #[derive(PartialEq, Debug)]
 /// Encapsulates parameters for transmitting a packet over a PHY.
@@ -105,7 +105,7 @@ impl TxVector {
         if supported_mcs {
             let nss = match phy {
                 banjo_common::WlanPhyType::HT => 1 + mcs_idx / HT_NUM_UNIQUE_MCS,
-                // TODO(fxbug.dev/20947): Support VHT NSS
+                // TODO(https://fxbug.dev/20947): Support VHT NSS
                 _ => 1,
             };
             Ok(Self { phy, gi, cbw, nss, mcs_idx })
@@ -238,7 +238,7 @@ impl TxVecIdx {
         }
     }
 
-    // TODO(fxbug.dev/82520): Add a const fn new when it's a stable feature.
+    // TODO(https://fxbug.dev/82520): Add a const fn new when it's a stable feature.
 
     pub fn to_erp_rate(&self) -> Option<SupportedRate> {
         const ERP_RATE_LIST: [u8; ERP_NUM_TX_VECTOR as usize] = [12, 18, 24, 36, 48, 72, 96, 108];

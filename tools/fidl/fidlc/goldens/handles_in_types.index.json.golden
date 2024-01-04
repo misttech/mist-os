@@ -62,8 +62,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/handles_in_types.test.fidl",
         "data": "EmptyResourceUnion",
-        "start_offset": 993,
-        "end_offset": 1011
+        "start_offset": 1001,
+        "end_offset": 1019
       },
       "members": []
     },

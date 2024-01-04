@@ -283,7 +283,7 @@ impl Pager {
     /// page request. See `ZX_PAGER_OP_DIRTY` for more information.
     pub fn dirty_pages(&self, vmo: &zx::Vmo, range: Range<u64>) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::Dirty, vmo, range) {
-            // TODO(fxbug.dev/136457): The kernel can spuriously return ZX_ERR_NOT_FOUND.
+            // TODO(https://fxbug.dev/136457): The kernel can spuriously return ZX_ERR_NOT_FOUND.
             if e != zx::Status::NOT_FOUND {
                 error!(error = ?e, "dirty_pages failed");
             }
@@ -324,7 +324,7 @@ impl Pager {
         let mut actual = 0;
         let mut avail = 0;
         let status = unsafe {
-            // TODO(fxbug.dev/63989) Move to src/lib/zircon/rust/src/pager.rs once
+            // TODO(https://fxbug.dev/63989) Move to src/lib/zircon/rust/src/pager.rs once
             // query_dirty_ranges is part of the stable vDSO.
             zx::sys::zx_pager_query_dirty_ranges(
                 self.pager.raw_handle(),
@@ -356,7 +356,7 @@ impl Pager {
         const ZX_PAGER_VMO_STATS_MODIFIED: u32 = 1;
         let mut vmo_stats = MaybeUninit::<zx_pager_vmo_stats>::uninit();
         let status = unsafe {
-            // TODO(fxbug.dev/63989) Move to src/lib/zircon/rust/src/pager.rs once
+            // TODO(https://fxbug.dev/63989) Move to src/lib/zircon/rust/src/pager.rs once
             // query_vmo_stats is part of the stable vDSO.
             zx::sys::zx_pager_query_vmo_stats(
                 self.pager.raw_handle(),

@@ -553,7 +553,7 @@ class Scheduler {
   // complain about obtaining a lock while holding a leaf-lock, which will cause
   // more printing, which causes more complaints, etc...
   //
-  // See fxb/119371 for more details.
+  // See https://fxbug.dev/119371 for more details.
   mutable DECLARE_SPINLOCK_WITH_TYPE(Scheduler, MonitoredSpinLock) queue_lock_;
 
   // Alias of the queue lock wrapper type.

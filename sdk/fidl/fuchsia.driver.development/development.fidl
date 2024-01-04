@@ -255,7 +255,7 @@ open protocol DriverDevelopment {
         binding_result vector<NodeBindingInfo>:BINDING_RESULT_MAX;
     }) error zx.Status;
 
-    // TODO(fxbug.dev/107895): Remove this method once it is no longer being
+    // TODO(https://fxbug.dev/107895): Remove this method once it is no longer being
     // used.
     // Returns a boolean value of whether or not driver framework version 2 is
     // enabled.

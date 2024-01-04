@@ -496,7 +496,7 @@ class TestPlatformBuffer {
     EXPECT_TRUE(buffer->HasChildren());
 
     child2.reset();
-    // fxbug.dev/70430: transition from true to false may be delayed.
+    // https://fxbug.dev/70430: transition from true to false may be delayed.
     while (buffer->HasChildren()) {
       usleep(10000);
     }

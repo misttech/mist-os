@@ -169,7 +169,7 @@ fn run(opt: Opt) -> Result<(), Error> {
 }
 /// If an attribute only has one argument, returns that argument's value.  If the number of
 /// arguments is not equal to 1, or the argument's value could not be resolved, error instead.
-// TODO(fxbug.dev/81390): Attribute values may only be string literals for now. Make sure to fix
+// TODO(https://fxbug.dev/81390): Attribute values may only be string literals for now. Make sure to fix
 //  this API once that changes to resolve the constant value for all constant types.
 fn get_attribute_standalone_arg_value(attribute: &Value) -> Result<String, Error> {
     let args = attribute["arguments"].as_array().expect("Arguments invalid");

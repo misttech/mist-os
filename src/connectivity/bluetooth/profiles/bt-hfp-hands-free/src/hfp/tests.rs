@@ -152,7 +152,7 @@ fn expect_channel_still_open(exec: &mut fasync::TestExecutor, channel: &Channel)
 
 // Tests //////////////////////////////////////////////////////////////////
 
-// TODO(fxb/136469)  Remove this ignore when the Peer Task does not exit immediately.
+// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
 #[ignore]
 #[fuchsia::test]
 fn hfp_connected_starts_task() {
@@ -182,7 +182,7 @@ fn hfp_connected_starts_task() {
     expect_channel_still_open(&mut exec, &near);
 }
 
-// TODO(fxb/136469)  Remove this ignore when the Peer Task does not exit immediately.
+// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
 #[ignore]
 #[fuchsia::test]
 fn search_result_connects_channel_and_starts_task_after_delay() {
@@ -222,7 +222,7 @@ fn search_result_connects_channel_and_starts_task_after_delay() {
     expect_channel_still_open(&mut exec, &near);
 }
 
-// TODO(fxb/136469)  Remove this ignore when the Peer Task does not exit immediately.
+// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
 #[ignore]
 #[fuchsia::test]
 fn peer_connected_then_search_result_starts_task_and_does_not_connect() {
@@ -263,7 +263,7 @@ fn peer_connected_then_search_result_starts_task_and_does_not_connect() {
     expect_channel_still_open(&mut exec, &near);
 }
 
-// TODO(fxb/136469)  Remove this ignore when the Peer Task does not exit immediately.
+// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
 #[ignore]
 #[fuchsia::test]
 fn search_result_then_peer_connected_before_delay_starts_task_and_does_not_connect() {
@@ -314,7 +314,7 @@ fn search_result_then_peer_connected_before_delay_starts_task_and_does_not_conne
     expect_channel_still_open(&mut exec, &near);
 }
 
-// TODO(fxb/136469)  Remove this ignore when the Peer Task does not exit immediately.
+// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
 #[ignore]
 #[fuchsia::test]
 fn search_result_then_peer_connected_after_delay_starts_task_and_connects() {

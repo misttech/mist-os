@@ -130,7 +130,7 @@ closed protocol Debug {
 
     /// ## Summary
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Declaration
     ///
@@ -148,7 +148,7 @@ closed protocol Debug {
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
     /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Rights
     ///
@@ -157,15 +157,15 @@ closed protocol Debug {
     ///
     /// ## Return value
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Errors
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## See also
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     strict SendCommand(resource struct {
         resource Handle:RESOURCE;
         buffer vector<uchar>:MAX;

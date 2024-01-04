@@ -69,7 +69,7 @@ async fn record_filesystem_info(
     stats_node.record_uint("allocated_inodes", info.total_nodes);
     stats_node.record_uint("used_inodes", info.used_nodes);
     // Total bytes is the size of the partition plus the size it could conceivably grow into.
-    // TODO(fxbug.dev/84626): Remove this misleading metric.
+    // TODO(https://fxbug.dev/84626): Remove this misleading metric.
     stats_node.record_uint("total_bytes", info.total_bytes + info.free_shared_pool_bytes);
     stats_node.record_uint("allocated_bytes", info.total_bytes);
     stats_node.record_uint("used_bytes", info.used_bytes);

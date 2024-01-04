@@ -434,7 +434,7 @@ void AudioRenderer::RealizeVolume(VolumeCommand volume_command) {
         });
 
         if constexpr (kLogRenderUsageVolumeGainActions) {
-          // TODO(fxbug.dev/51049) Swap this logging for inspect or other real-time gain observation
+          // TODO(https://fxbug.dev/51049) Swap this logging for inspect or other real-time gain observation
           FX_LOGS(INFO) << static_cast<const void*>(this) << " (gain " << &(link.mixer->gain)
                         << ", mixer " << static_cast<const void*>(link.mixer.get()) << ") "
                         << StreamUsage::WithRenderUsage(usage_).ToString() << " dest_gain("
@@ -465,7 +465,7 @@ void AudioRenderer::PostStreamGainMute(StreamGainCommand gain_command) {
     FX_CHECK(link.mix_domain) << "Renderer dest link should have a defined mix_domain";
 
     if constexpr (kLogRendererSetGainMuteRampActions) {
-      // TODO(fxbug.dev/51049) Swap this logging for inspect or other real-time gain observation
+      // TODO(https://fxbug.dev/51049) Swap this logging for inspect or other real-time gain observation
       std::stringstream stream;
       stream << static_cast<const void*>(this) << " (gain " << &(link.mixer->gain) << ", mixer "
              << static_cast<const void*>(link.mixer.get()) << ") stream ("

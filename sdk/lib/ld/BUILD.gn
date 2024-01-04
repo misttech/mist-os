@@ -9,7 +9,7 @@ import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 
-# TODO(fxbug.dev/121817): This will be used for the static library of support
+# TODO(https://fxbug.dev/121817): This will be used for the static library of support
 # code.  It provides access to additional <lib/ld/...> headers for support code
 # that isn't itself part of of the passive ABI.
 library_headers("headers") {
@@ -152,7 +152,7 @@ source_set("bootstrap") {
     ":headers",
     "//src/lib/elfldltl",
 
-    # TODO(fxbug.dev/130542): This gets users of bootstrap.h the config that
+    # TODO(https://fxbug.dev/130542): This gets users of bootstrap.h the config that
     # plumbs the HAVE_LLVM_PROFDATA predefine used there.
     "//src/lib/llvm-profdata",
   ]
@@ -198,7 +198,7 @@ config("standalone.config") {
     # The standard profiling runtime can't be used in the minimal standalone
     # context of ld.so.
     #
-    # TODO(fxbug.dev/130542): The instrumentation works fine to collect data,
+    # TODO(https://fxbug.dev/130542): The instrumentation works fine to collect data,
     # but the data needs to be plumbed out somewhere using a custom
     # runtime. For now, the data is just ignored.
     ldflags += [ "-noprofilelib" ]

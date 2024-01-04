@@ -183,7 +183,7 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
     last_successful_update_start_time_ = update_start_time;
   }
 
-  // TODO(fxbug.dev/24669) Revisit how we do this.
+  // TODO(https://fxbug.dev/24669) Revisit how we do this.
   const zx::time update_end_time = zx::time(async_now(dispatcher_));
   const zx::time render_start_time = update_end_time;
   frame_predictor_->ReportUpdateDuration(zx::duration(update_end_time - update_start_time));
@@ -196,7 +196,7 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
     return;
   }
 
-  // TODO(fxbug.dev/24531) Remove the presentation check, and pipeline frames within a VSYNC
+  // TODO(https://fxbug.dev/24531) Remove the presentation check, and pipeline frames within a VSYNC
   // interval.
   FX_DCHECK(last_presented_frame_number_ <= frame_number);
   // Only one frame is allowed "in flight" at any given. Don't start rendering another frame until

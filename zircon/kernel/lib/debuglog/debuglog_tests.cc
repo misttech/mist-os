@@ -404,7 +404,7 @@ struct DebuglogTests {
     END_TEST;
   }
 
-  // This is a regression test introduced after discovering fxb/120254.  It
+  // This is a regression test introduced after discovering https://fxbug.dev/120254.  It
   // attempt to make sure that the internal methods ReadRecord and
   // ReassembleFromOffset return proper results, even when headers and payload
   // span the break in the ring buffer.

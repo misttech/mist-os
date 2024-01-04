@@ -16,7 +16,7 @@ zx_library("heap") {
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/virtual_alloc",
 
-    # TODO(fxbug.dev/51163): Remove headers when possible.
+    # TODO(https://fxbug.dev/51163): Remove headers when possible.
     "//zircon/kernel/lib/instrumentation:headers",
   ]
 }

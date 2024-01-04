@@ -16,7 +16,7 @@ import (
 // See "RFC-0040: Identifier Uniqueness" for details on how name-part boundaries
 // are calculated.
 //
-// TODO(fxbug.dev/95218): Fix any discrepancies with RFC-0040. In particular,
+// TODO(https://fxbug.dev/95218): Fix any discrepancies with RFC-0040. In particular,
 // ensure that all these functions are idempotent.
 
 // nameParts breaks an identifier into parts recognized according to RFC-0040

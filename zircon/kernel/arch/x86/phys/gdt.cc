@@ -104,7 +104,7 @@ arch::SystemSegmentDesc64 MakeIdtEntry() {
           .cfi_offset %%rip, %c[rip_cfa_offset]
           .cfi_offset %%rflags, %c[rflags_cfa_offset]
           .cfi_offset %%rsp, %c[rsp_cfa_offset]
-.if 0 // TODO(fxbug.dev/122567): clang encodes wrong
+.if 0 // TODO(https://fxbug.dev/122567): clang encodes wrong
           .cfi_offset %%cs, %c[cs_cfa_offset]
           .cfi_offset %%ss, %c[ss_cfa_offset]
 .endif
@@ -291,8 +291,8 @@ void DefineInterruptCommonAsm() {
           .macro spill_idt_reg idt_offset, spill, reg
             mov (%c[frame_size_difference] + \idt_offset)(%%rsp), \spill
             .ifnb \reg
-              .ifnc %%cs,\reg // TODO(fxbug.dev/122567): clang encodes wrong
-              .ifnc %%ss,\reg // TODO(fxbug.dev/122567): clang encodes wrong
+              .ifnc %%cs,\reg // TODO(https://fxbug.dev/122567): clang encodes wrong
+              .ifnc %%ss,\reg // TODO(https://fxbug.dev/122567): clang encodes wrong
               .cfi_register \reg, \spill
               .endif
               .endif

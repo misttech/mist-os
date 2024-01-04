@@ -251,7 +251,7 @@ impl StreamEndpoint {
         self.transport = Some(Arc::new(RwLock::new(c)));
         self.try_flush_timeout(Self::SRC_FLUSH_TIMEOUT);
         self.stream_held = Arc::new(Mutex::new(false));
-        // TODO(jamuraa, fxbug.dev/1009, fxbug.dev/1010): Reporting and Recovery channels
+        // TODO(jamuraa, https://fxbug.dev/1009, https://fxbug.dev/1010): Reporting and Recovery channels
         self.set_state(StreamState::Open);
         Ok(false)
     }
@@ -273,7 +273,7 @@ impl StreamEndpoint {
             return Ok(());
         }
         // TODO: this variable triggered the `must_not_suspend` lint and may be held across an await
-        // If this is the case, it is an error. See fxbug.dev/87757 for more details
+        // If this is the case, it is an error. See https://fxbug.dev/87757 for more details
         let channel =
             self.transport.as_ref().unwrap().try_read().map_err(|_e| Status::BAD_STATE)?;
         let closed_fut = channel.closed();

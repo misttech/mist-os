@@ -466,7 +466,7 @@ async fn repo_spec_to_backend(
             )))
         }
         RepositorySpec::Gcs { .. } => {
-            // FIXME(fxbug.dev/98994): Implement support for daemon-side GCS repositories.
+            // FIXME(https://fxbug.dev/98994): Implement support for daemon-side GCS repositories.
             tracing::error!("Trying to register a GCS repository, but that's not supported yet");
             Err(ffx::RepositoryError::UnknownRepositorySpec)
         }
@@ -2043,7 +2043,7 @@ mod tests {
         static ref TEST_LOCK: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
     }
 
-    // FIXME(fxbug.dev/80740): Rust tests on host use panic=unwind, which causes all the tests to
+    // FIXME(https://fxbug.dev/80740): Rust tests on host use panic=unwind, which causes all the tests to
     // run in the same process. Unfortunately ffx_config is global, and so each of these tests
     // could step on each others ffx_config entries if run in parallel. To avoid this, we will:
     //

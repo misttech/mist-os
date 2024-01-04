@@ -96,7 +96,7 @@ TEST(Counters, Basic) {
           case counters::Type::kSum:
             value += cpu_value;
             break;
-          case counters::Type::kMax:  // Not used, see fxbug.dev/33140.
+          case counters::Type::kMax:  // Not used, see https://fxbug.dev/33140.
             value = std::max(value, cpu_value);
             break;
         }

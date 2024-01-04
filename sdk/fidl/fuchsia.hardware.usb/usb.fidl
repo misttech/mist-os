@@ -17,7 +17,7 @@ closed protocol Usb {
         ep server_end:fuchsia.hardware.usb.endpoint.Endpoint;
     }) -> () error zx.Status;
 
-    // TODO(fxbug.dev/96732): More functions to come. Equivalents to
+    // TODO(https://fxbug.dev/96732): More functions to come. Equivalents to
     // //sdk/banjo/fuchsia.hardware.usb/usb.fidl
 };
 

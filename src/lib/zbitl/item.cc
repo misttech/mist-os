@@ -10,7 +10,7 @@ using namespace std::literals;
 
 namespace zbitl {
 
-// TODO(fxbug.dev/127846): Consider some way of generating this.
+// TODO(https://fxbug.dev/127846): Consider some way of generating this.
 std::string_view TypeName(uint32_t type) {
   using namespace std::string_view_literals;
 

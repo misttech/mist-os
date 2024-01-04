@@ -869,7 +869,7 @@ impl MemoryManagerState {
             return error!(ENOMEM);
         }
 
-        // TODO(fxbug.dev/88262): Implement support for MREMAP_DONTUNMAP.
+        // TODO(https://fxbug.dev/88262): Implement support for MREMAP_DONTUNMAP.
         if flags.contains(MremapFlags::DONTUNMAP) {
             not_implemented!("mremap flag MREMAP_DONTUNMAP not implemented");
             return error!(EOPNOTSUPP);
@@ -2686,7 +2686,7 @@ impl MemoryManager {
     where
         L: LockBefore<MmDumpable>,
     {
-        // TODO(fxbug.dev/123742): When SNAPSHOT (or equivalent) is supported on pager-backed VMOs
+        // TODO(https://fxbug.dev/123742): When SNAPSHOT (or equivalent) is supported on pager-backed VMOs
         // we can remove the hack below (which also won't be performant). For now, as a workaround,
         // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
 
@@ -3608,7 +3608,7 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
     set_zx_name(&vmo, b"starnix-anon");
 
     profile.pivot("ReplaceAnonVmoAsExecutable");
-    // TODO(fxbug.dev/105639): Audit replace_as_executable usage
+    // TODO(https://fxbug.dev/105639): Audit replace_as_executable usage
     vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
     Ok(Arc::new(vmo))
 }

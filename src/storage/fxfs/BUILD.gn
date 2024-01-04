@@ -220,7 +220,7 @@ fs_test_config("fxfs") {
   max_file_size = 9223372036854771712
   supports_fsck_after_every_transaction = true
 
-  # TODO(fxbug.dev/112024) Add support for block sizes greater than the page size.
+  # TODO(https://fxbug.dev/112024) Add support for block sizes greater than the page size.
   max_block_size = 4096
   supports_hard_links = true
   supports_inspect = true

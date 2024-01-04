@@ -78,7 +78,7 @@ pub trait Task: AsHandleRef {
     /// Wraps the
     /// [zx_task_kill](https://fuchsia.dev/fuchsia-src/reference/syscalls/task_kill.md)
     /// syscall.
-    // TODO(fxbug.dev/72722): guaranteed to return an error when called on a Thread.
+    // TODO(https://fxbug.dev/72722): guaranteed to return an error when called on a Thread.
     fn kill(&self) -> Result<(), Status> {
         ok(unsafe { sys::zx_task_kill(self.raw_handle()) })
     }

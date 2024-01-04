@@ -86,7 +86,7 @@ class WireServer;
 // This is a temporary forward declaration to allow the //sdk/lib/sys/component
 // service library to conditionally support natural servers when it is available.
 // Intentional empty line to avoid language servers picking up this doc comment.
-// TODO(fxbug.dev/92356): Remove this after the unified bindings are in the SDK.
+// TODO(https://fxbug.dev/92356): Remove this after the unified bindings are in the SDK.
 
 template <typename FidlProtocol>
 class Server;
@@ -206,7 +206,7 @@ class WireWeakAsyncBufferClientImpl;
 // |WireSyncClientImpl| implements synchronous FIDL calls with managed buffers.
 // It contains an unowned transport handle.
 //
-// TODO(fxbug.dev/78906): Consider merging this implementation with
+// TODO(https://fxbug.dev/78906): Consider merging this implementation with
 // |WireWeakSyncClientImpl| to support thread-safe teardown of
 // |fidl::WireSyncClient|s.
 template <typename FidlProtocol>
@@ -220,7 +220,7 @@ class WireWeakSyncClientImpl;
 // |WireSyncBufferClientImpl| implements synchronous FIDL calls with
 // caller-provided buffers. It contains an unowned transport handle.
 //
-// TODO(fxbug.dev/78906): Consider merging this implementation with
+// TODO(https://fxbug.dev/78906): Consider merging this implementation with
 // |WireWeakSyncBufferClientImpl| to support thread-safe teardown of
 // |fidl::WireSyncClient|s.
 template <typename FidlProtocol>
@@ -230,7 +230,7 @@ class WireSyncBufferClientImpl;
 // caller-provided buffers. It borrows the transport through a weak reference
 // when making calls.
 //
-// TODO(fxbug.dev/85688): Generate this class.
+// TODO(https://fxbug.dev/85688): Generate this class.
 template <typename FidlProtocol>
 class WireWeakSyncBufferClientImpl;
 

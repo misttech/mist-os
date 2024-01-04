@@ -47,7 +47,7 @@ success("TableFieldInlinedHandle") {
 // A field that would normally be inlined is empty.
 // This tests logic checking that values are inlined in the correct situations.
 success("TableFieldInlinedReservedStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of TableFieldInlinedReservedDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of TableFieldInlinedReservedDropped.
     bindings_allowlist = [dart, go],
     value = TableFieldInlinedStruct{
         t: TableFieldInlined{
@@ -69,7 +69,7 @@ success("TableFieldInlinedReservedStored") {
 }
 
 decode_success("TableFieldInlinedReservedDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     value = TableFieldInlinedStruct{
         t: TableFieldInlined{},
@@ -87,8 +87,8 @@ decode_success("TableFieldInlinedReservedDropped") {
 }
 
 encode_success("TableFieldInlinedReservedDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     value = TableFieldInlinedStruct{
         t: decode({
@@ -118,7 +118,7 @@ encode_success("TableFieldInlinedReservedDropped") {
 // Because this kind of field is not zeroed by default, binding backends (especially wire-based
 // ones) need to take extra care during encoding when checking whether the field is unset.
 //
-// See fxbug.dev/114125 for a detailed description of this error case.
+// See https://fxbug.dev/114125 for a detailed description of this error case.
 success("TableFieldUnsetFlexibleEnumInlinedSigned") {
     value = TableFieldUnsetFlexibleEnumInlinedStruct{
         t: TableFieldUnsetFlexibleEnumInlined{
@@ -223,7 +223,7 @@ decode_failure("TableFieldOutOfLineBadOutlinedMarker") {
 
 // Tests a table in which a value is inlined into an unknown field.
 success("TableFieldUnknownInlinedStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of TableFieldUnknownInlinedDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of TableFieldUnknownInlinedDropped.
     bindings_allowlist = [dart, go],
     value = TableFieldUnknownStruct{
         t: TableFieldUnknown{
@@ -244,7 +244,7 @@ success("TableFieldUnknownInlinedStored") {
 
 // Tests a table in which a value is inlined into an unknown field.
 decode_success("TableFieldUnknownInlinedDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     value = TableFieldUnknownStruct{
         t: TableFieldUnknown{},
@@ -261,8 +261,8 @@ decode_success("TableFieldUnknownInlinedDropped") {
 
 // Tests a table in which a value is inlined into an unknown field.
 encode_success("TableFieldUnknownInlinedDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     value = TableFieldUnknownStruct{
         t: decode({
@@ -286,7 +286,7 @@ encode_success("TableFieldUnknownInlinedDropped") {
 
 // Tests a table in which a handle value is inlined into an unknown field.
 success("TableFieldUnknownInlinedHandleStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of TableFieldUnknownInlinedHandleDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of TableFieldUnknownInlinedHandleDropped.
     bindings_allowlist = [dart, go],
     handle_defs = {
         #0 = channel(),
@@ -314,7 +314,7 @@ success("TableFieldUnknownInlinedHandleStored") {
 
 // Tests a table in which a handle value is inlined into an unknown field.
 decode_success("TableFieldUnknownInlinedHandleDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     handle_defs = {
         #0 = channel(),
@@ -337,8 +337,8 @@ decode_success("TableFieldUnknownInlinedHandleDropped") {
 
 // Tests a table in which a handle value is inlined into an unknown field.
 encode_success("TableFieldUnknownInlinedHandleDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = channel(),
@@ -368,7 +368,7 @@ encode_success("TableFieldUnknownInlinedHandleDropped") {
 
 // Tests a table in which a value is stored out of line in an unknown field.
 success("TableFieldUnknownOutOfLineStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of TableFieldUnknownOutOfLineDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of TableFieldUnknownOutOfLineDropped.
     bindings_allowlist = [dart, go],
     value = TableFieldUnknownStruct{
         t: TableFieldUnknown{
@@ -391,7 +391,7 @@ success("TableFieldUnknownOutOfLineStored") {
 
 // Tests a table in which a value is stored out of line in an unknown field.
 decode_success("TableFieldUnknownOutOfLineDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     value = TableFieldUnknownStruct{
         t: TableFieldUnknown{},
@@ -409,8 +409,8 @@ decode_success("TableFieldUnknownOutOfLineDropped") {
 }
 
 encode_success("TableFieldUnknownOutOfLineDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     value = TableFieldUnknownStruct{
         t: decode({
@@ -642,7 +642,7 @@ success("TableWithStringAndVectorNoVectorContent") {
     },
 }
 
-// TODO(fxbug.dev/7948): Create test with TableWithStringAndVectorHasVectorContent.
+// TODO(https://fxbug.dev/7948): Create test with TableWithStringAndVectorHasVectorContent.
 
 success("SimpleTableThenUint64") {
     value = SimpleTableThenUint64{
@@ -716,7 +716,7 @@ success("TableWithGaps") {
 }
 
 decode_success("ValueTableUnknownReservedDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     bytes = {
         v2 = [
@@ -741,8 +741,8 @@ decode_success("ValueTableUnknownReservedDropped") {
 }
 
 encode_success("ValueTableUnknownReservedDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     value = StructOfSimpleTable{
         table: decode({
@@ -779,7 +779,7 @@ encode_success("ValueTableUnknownReservedDropped") {
 }
 
 decode_success("ResourceTableUnknownReservedDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     bytes = {
         v2 = [
@@ -804,8 +804,8 @@ decode_success("ResourceTableUnknownReservedDropped") {
 }
 
 encode_success("ResourceTableUnknownReservedDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     value = StructOfSimpleResourceTable{
         table: decode({
@@ -842,7 +842,7 @@ encode_success("ResourceTableUnknownReservedDropped") {
 }
 
 success("ValueTableUnknownReservedStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of ValueTableUnknownReservedDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of ValueTableUnknownReservedDropped.
     bindings_allowlist = [dart, go],
     bytes = {
         v2 = [
@@ -870,7 +870,7 @@ success("ValueTableUnknownReservedStored") {
 }
 
 success("ResourceTableUnknownReservedStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of ResourceTableUnknownReservedDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of ResourceTableUnknownReservedDropped.
     bindings_allowlist = [dart, go],
     bytes = {
         v2 = [
@@ -898,7 +898,7 @@ success("ResourceTableUnknownReservedStored") {
 }
 
 decode_success("ValueTableUnknownTrailingDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     bytes = {
         v2 = [
@@ -924,8 +924,8 @@ decode_success("ValueTableUnknownTrailingDropped") {
 }
 
 encode_success("ValueTableUnknownTrailingDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     value = StructOfSimpleTable{
         table: decode({
@@ -963,7 +963,7 @@ encode_success("ValueTableUnknownTrailingDropped") {
 }
 
 decode_success("ResourceTableUnknownTrailingDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     bytes = {
         v2 = [
@@ -989,8 +989,8 @@ decode_success("ResourceTableUnknownTrailingDropped") {
 }
 
 encode_success("ResourceTableUnknownTrailingDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     value = StructOfSimpleResourceTable{
         table: decode({
@@ -1028,7 +1028,7 @@ encode_success("ResourceTableUnknownTrailingDropped") {
 }
 
 success("ValueTableUnknownTrailingStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of ValueTableUnknownTrailingDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of ValueTableUnknownTrailingDropped.
     bindings_allowlist = [dart, go],
     bytes = {
         v2 = [
@@ -1057,7 +1057,7 @@ success("ValueTableUnknownTrailingStored") {
 }
 
 success("ResourceTableUnknownTrailingStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of ResourceTableUnknownTrailingDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of ResourceTableUnknownTrailingDropped.
     bindings_allowlist = [dart, go],
     bytes = {
         v2 = [
@@ -1086,7 +1086,7 @@ success("ResourceTableUnknownTrailingStored") {
 }
 
 decode_success("ValueTableUnknownTrailingHandlesDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     handle_defs = {
         #0 = event(),
@@ -1120,8 +1120,8 @@ decode_success("ValueTableUnknownTrailingHandlesDropped") {
 }
 
 encode_success("ValueTableUnknownTrailingHandlesDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -1167,7 +1167,7 @@ encode_success("ValueTableUnknownTrailingHandlesDropped") {
 }
 
 decode_success("ResourceTableUnknownTrailingHandlesDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     handle_defs = {
         #0 = event(),
@@ -1201,8 +1201,8 @@ decode_success("ResourceTableUnknownTrailingHandlesDropped") {
 }
 
 encode_success("ResourceTableUnknownTrailingHandlesDropped") {
-    // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
-    // TODO(fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     handle_defs = {
         #0 = event(),
@@ -1248,7 +1248,7 @@ encode_success("ResourceTableUnknownTrailingHandlesDropped") {
 }
 
 decode_failure("ValueTableUnknownTrailingHandlesRejected") {
-    // TODO(fxbug.dev/85383): Remove in favor of ValueTableUnknownTrailingHandlesDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of ValueTableUnknownTrailingHandlesDropped.
     bindings_allowlist = [dart, go],
     handle_defs = {
         #0 = event(),
@@ -1279,7 +1279,7 @@ decode_failure("ValueTableUnknownTrailingHandlesRejected") {
 }
 
 success("ResourceTableUnknownTrailingHandlesStored") {
-    // TODO(fxbug.dev/85383): Remove in favor of ResourceTableUnknownTrailingHandlesDropped.
+    // TODO(https://fxbug.dev/85383): Remove in favor of ResourceTableUnknownTrailingHandlesDropped.
     bindings_allowlist = [dart, go],
     handle_defs = {
         #0 = event(),

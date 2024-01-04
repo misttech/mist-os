@@ -39,7 +39,7 @@ class InputSystem {
   }
 
   // For tests.
-  // TODO(fxbug.dev/72919): Remove when integration tests are properly separated out.
+  // TODO(https://fxbug.dev/72919): Remove when integration tests are properly separated out.
   void RegisterPointerinjector(
       fuchsia::ui::pointerinjector::Config config,
       fidl::InterfaceRequest<fuchsia::ui::pointerinjector::Device> injector,
@@ -48,7 +48,7 @@ class InputSystem {
   }
 
   // Accessor for tests.
-  // TODO(fxbug.dev/72919): Remove when integration tests are properly separated out.
+  // TODO(https://fxbug.dev/72919): Remove when integration tests are properly separated out.
   scenic_impl::input::TouchSystem& touch_system() { return touch_system_; }
 
  private:

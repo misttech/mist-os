@@ -485,7 +485,7 @@ TEST(FidlTypes, StdVector) {
   std::vector<std::string> empty_vector;
   std::vector<std::string> utensil_vector = {"knife", "spork"};
 
-  // The fostr::NewLine was added to repro fxb/80062 and test for regressions.
+  // The fostr::NewLine was added to repro https://fxbug.dev/80062 and test for regressions.
   os << fostr::Indent << fostr::NewLine << "empty:" << Formatted(empty_vector)
      << ", utensil:" << Formatted(utensil_vector);
 
@@ -503,7 +503,7 @@ TEST(FidlTypes, StdVectorOfVectors) {
   std::vector<std::vector<std::string>> utensil_vector = {
       {"knife", "spork"}, {}, {"runcible spoon"}};
 
-  // The fostr::NewLine was added to repro fxb/80062 and test for regressions.
+  // The fostr::NewLine was added to repro https://fxbug.dev/80062 and test for regressions.
   os << fostr::Indent << fostr::NewLine << "empty:" << Formatted(empty_vector)
      << ", utensil:" << Formatted(utensil_vector);
 

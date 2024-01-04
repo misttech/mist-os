@@ -149,7 +149,7 @@ if (current_toolchain == default_toolchain) {
       "//build/config:symbol_no_undefined",
     ]
 
-    # TODO(fxbug.dev/104480): Ensure all of libc uses libcalls into the hwasan
+    # TODO(https://fxbug.dev/104480): Ensure all of libc uses libcalls into the hwasan
     # runtime for storing frame record info.
     if (!is_gcc && toolchain_variant.tags + [ "hwasan" ] - [ "hwasan" ] !=
                    toolchain_variant.tags) {
@@ -277,7 +277,7 @@ if (zircon_toolchain == false) {
     if (!is_gcc && current_cpu == "riscv64" &&
         toolchain_variant.tags + [ "instrumented" ] - [ "instrumented" ] !=
         toolchain_variant.tags) {
-      # TODO(fxbug.dev/121817): There is no R_RISCV_GLOB_DAT and instead
+      # TODO(https://fxbug.dev/121817): There is no R_RISCV_GLOB_DAT and instead
       # R_RISCV_64 is used for all GOT relocs; this means that they all must be
       # presumed to have potentially nonzero addends that matter.  The ld.so
       # bootstrap hack of saving the in-place DT_REL addends on the stack

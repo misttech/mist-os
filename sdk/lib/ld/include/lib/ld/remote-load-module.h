@@ -242,7 +242,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
       return false;
     }
     auto tlsdesc_resolver = [&diag](auto&&... args) {
-      diag.FormatError("TODO(fxbug.dev/128502): remote TLSDESC not implemented yet");
+      diag.FormatError("TODO(https://fxbug.dev/128502): remote TLSDESC not implemented yet");
       return TlsDescGot{};
     };
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, tlsdesc_resolver);

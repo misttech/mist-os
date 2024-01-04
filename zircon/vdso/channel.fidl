@@ -14,7 +14,7 @@ type HandleInfo = resource struct {
     unused uint32;
 };
 
-// TODO(fxbug.dev/110021): We cannot yet conveniently express this.
+// TODO(https://fxbug.dev/110021): We cannot yet conveniently express this.
 type ChannelCallArgs = resource struct {};
 
 type HandleDisposition = resource struct {
@@ -25,7 +25,7 @@ type HandleDisposition = resource struct {
     result Status;
 };
 
-// TODO(fxbug.dev/110021): We cannot yet conveniently express this.
+// TODO(https://fxbug.dev/110021): We cannot yet conveniently express this.
 type ChannelCallEtcArgs = resource struct {};
 
 @transport("Syscall")

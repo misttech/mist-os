@@ -43,7 +43,7 @@ void SetDeadlineMemoryPriority(zx::unowned_resource& root_resource, zx::vmar& vm
     // If we are running as a component test, and not a zbi test, we do not have the root job and
     // cannot create a profile. This is not an issue as when running tests as a component
     // compression is not enabled so the profile is not needed anyway.
-    // TODO(fxb/60238): Once compression is enabled for builds with component tests support setting
+    // TODO(https://fxbug.dev/60238): Once compression is enabled for builds with component tests support setting
     // a profile via the profile provider.
     return;
   }
@@ -224,7 +224,7 @@ TEST(ProcessShared, InfoProcessVmos) {
 
 // Verify mappings in shared processes are properly accounted for in zx_info_task_stats_t.
 //
-// See also fxbug.dev/123525.
+// See also https://fxbug.dev/123525.
 TEST(ProcessShared, InfoTaskStats) {
   // First, verify we have access to the root resource to run this test.
   zx::unowned_resource root_resource = maybe_standalone::GetRootResource();

@@ -44,7 +44,7 @@ using allocation::BufferCollectionUsage;
 // DisplayCompositor, providing it with the necessary data to render without exposing to Flatland
 // the DisplayCoordinator or other dependencies.
 //
-// TODO(fxbug.dev/77414): we use a weak ptr to safely post a task that might outlive this
+// TODO(https://fxbug.dev/77414): we use a weak ptr to safely post a task that might outlive this
 // DisplayCompositor, see RenderFrame().  This task simulates a vsync callback that we aren't yet
 // receiving because the display coordinator doesn't yet implement the ApplyConfig2() method. It's
 // likely that shared_from_this will become unnecessary at that time.
@@ -66,7 +66,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
     static RenderFrameTestArgs Default() { return {}; }
   };
 
-  // TODO(fxbug.dev/66807): The DisplayCompositor has multiple parts of its code where usage of the
+  // TODO(https://fxbug.dev/66807): The DisplayCompositor has multiple parts of its code where usage of the
   // display coordinator is protected by locks, because of the multithreaded environment of
   // flatland. Ideally, we'd want the DisplayCompositor to have sole ownership of the display
   // coordinator - meaning that it would require a unique_ptr instead of a shared_ptr. But since
@@ -127,7 +127,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // |out_collection_info|. This out parameter is only allowed to be nullptr when
   // |num_render_targets| is 0. Otherwise, a valid handle to return the buffer collection data is
   // required.
-  // TODO(fxbug.dev/59646): We need to figure out exactly how we want the display to anchor
+  // TODO(https://fxbug.dev/59646): We need to figure out exactly how we want the display to anchor
   // to the Flatland hierarchy.
   // Only called from the main thread.
   void AddDisplay(scenic_impl::display::Display* display, DisplayInfo info,
@@ -274,7 +274,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // ImportBufferImage() and ReleaseBufferImage(), where the shared data structures are guarded by
   // this.
   //
-  // TODO(fxbug.dev/44335): Convert this to a lock-free structure. This is a unique
+  // TODO(https://fxbug.dev/44335): Convert this to a lock-free structure. This is a unique
   // case since we are talking to a FIDL interface (display_coordinator_) through a lock.
   // We either need lock-free threadsafe FIDL bindings, multiple channels to the display
   // coordinator, or something else.
@@ -304,7 +304,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   std::unordered_set<allocation::GlobalImageId> display_imported_images_ FXL_GUARDED_BY(lock_);
 
   // Maps a buffer collection ID to a collection pixel format struct.
-  // TODO(fxbug.dev/71344): Delete after we don't need the pixel format anymore.
+  // TODO(https://fxbug.dev/71344): Delete after we don't need the pixel format anymore.
   std::unordered_map<allocation::GlobalBufferCollectionId,
                      fuchsia::sysmem::PixelFormat> buffer_collection_pixel_format_
       FXL_GUARDED_BY(lock_);
@@ -353,7 +353,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Constant except for in tests.
   bool enable_display_composition_ = true;
 
-  // TODO(fxbug.dev/127675): Display controller currently doesn't allow flipping one image on one
+  // TODO(https://fxbug.dev/127675): Display controller currently doesn't allow flipping one image on one
   // layer, but keeping the image on another layer the same in consecutive configs. As a result,
   // using multiple layers is broken. This field is used to limit it.
   uint32_t max_display_layers_ = 1;

@@ -52,7 +52,7 @@ closed protocol Control {
 
     /// Returns the number of active input and output devices and devices with unspecified
     /// direction.
-    // TODO(fxbug.dev/124865): Consider adding per-driver type info here.
+    // TODO(https://fxbug.dev/124865): Consider adding per-driver type info here.
     strict GetNumDevices() -> (struct {
         num_input_devices uint32;
         num_output_devices uint32;

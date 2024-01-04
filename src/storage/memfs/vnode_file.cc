@@ -126,7 +126,7 @@ zx_status_t VnodeFile::Truncate(size_t length) {
 }
 
 zx_status_t VnodeFile::CreateBackingStoreIfNeeded() {
-  // TODO(fxbug.dev/116484): Use a fixed sized VMO.
+  // TODO(https://fxbug.dev/116484): Use a fixed sized VMO.
   return EnsureCreatePagedVmo(0, ZX_VMO_RESIZABLE).status_value();
 }
 

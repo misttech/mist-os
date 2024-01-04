@@ -20,7 +20,7 @@ namespace amlogic_display {
 // The function will error on values that doesn't fit in a U28.4 fixed-point
 // number.
 //
-// TODO(fxbug.dev/113689): In C++20 this can be consteval.
+// TODO(https://fxbug.dev/113689): In C++20 this can be consteval.
 inline constexpr uint32_t ToU28_4(double value) {
   ZX_ASSERT(value >= 0);
   uint32_t fixed_value = static_cast<uint32_t>(value * 16);
@@ -34,7 +34,7 @@ inline constexpr uint32_t ToU28_4(double value) {
 // The Um.n notation is defined in:
 // https://source.android.com/docs/core/audio/data_formats#q.
 //
-// TODO(fxbug.dev/113689): In C++20 this can be consteval.
+// TODO(https://fxbug.dev/113689): In C++20 this can be consteval.
 inline constexpr double U28_4ToDouble(uint32_t u28_4) {
   // This is guaranteed to be valid for all U28.4 values, since "double" has
   // 52 precision bits.

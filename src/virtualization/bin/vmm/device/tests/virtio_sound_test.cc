@@ -1466,7 +1466,7 @@ TEST_F(VirtioSoundTest, PcmOutputXferMultiple) {
   }
 }
 
-// TODO(fxbug.dev/99083): Re-enable this test once the flake is fixed.
+// TODO(https://fxbug.dev/99083): Re-enable this test once the flake is fixed.
 TEST_F(VirtioSoundTest, DISABLED_PcmOutputXferThenRelease) {
   constexpr uint32_t kBufferBytes = 64;
   constexpr uint32_t kPeriodBytes = 8;
@@ -2091,7 +2091,7 @@ TEST_F(VirtioSoundTest, PcmInputXferMultiple) {
   }
 }
 
-// TODO(fxbug.dev/99083): Re-enable this test once the flake is fixed.
+// TODO(https://fxbug.dev/99083): Re-enable this test once the flake is fixed.
 TEST_F(VirtioSoundTest, DISABLED_PcmInputXferThenRelease) {
   constexpr uint32_t kBufferBytes = 64;
   constexpr uint32_t kPeriodBytes = 8;

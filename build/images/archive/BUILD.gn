@@ -106,7 +106,7 @@ foreach(target, archive_targets + fastboot_targets + paver_targets) {
     }
     testonly = true
 
-    # TODO(fxb/110475): Remove this once the assembly inputs stop leaking
+    # TODO(https://fxbug.dev/110475): Remove this once the assembly inputs stop leaking
     # output_dir.
     no_output_dir_leaks = false
     outputs = target.outputs

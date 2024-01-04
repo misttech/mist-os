@@ -125,7 +125,7 @@ constexpr auto kMockResponseListener = "response_listener";
 
 std::vector<float> ConfigsToTest() {
   std::vector<float> configs;
-  // TODO: fxbug.dev/132413 - Test for DPR=2.0, too.
+  // TODO: https://fxbug.dev/132413 - Test for DPR=2.0, too.
   configs.push_back(2.f);
   return configs;
 }
@@ -340,9 +340,9 @@ class WebEngineTest : public ui_testing::PortableUITest,
   // that node `is_rendering` as soon as it is `Present()`-ed. Walking transitively up the
   // scene graph, that causes our `Session` to receive the `is_rendering` signal.
   //
-  // For more details, see fxbug.dev/57268.
+  // For more details, see https://fxbug.dev/57268.
   //
-  // TODO(fxbug.dev/58322): Improve synchronization when we move to Flatland.
+  // TODO(https://fxbug.dev/58322): Improve synchronization when we move to Flatland.
   void TryInject() {
     InjectInput(TapLocation::kTopLeft);
     async::PostDelayedTask(
@@ -440,7 +440,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
   uint32_t display_height() { return display_size().height; }
   uint32_t display_rotation() override { return 90; }
 
-  // TODO: fxbug.dev/132413 - Test for DPR=2.0, too.
+  // TODO: https://fxbug.dev/132413 - Test for DPR=2.0, too.
   float device_pixel_ratio() override { return 1.f; }
 
   std::shared_ptr<ResponseState> response_state() const { return response_state_; }

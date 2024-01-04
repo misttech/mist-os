@@ -110,7 +110,7 @@ impl<'a> OnSignals<'a> {
     ///
     /// Note that `OnSignals` will not fire if the handle that was used to create it is dropped or
     /// transferred to another process.
-    // TODO(fxbug.dev/99577): Try to remove this footgun.
+    // TODO(https://fxbug.dev/99577): Try to remove this footgun.
     pub fn extend_lifetime(mut self) -> OnSignals<'static> {
         OnSignals { state: std::mem::replace(&mut self.state, Err(zx::Status::OK)), handle: None }
     }

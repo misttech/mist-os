@@ -7,7 +7,7 @@ import("../libc.gni")
 llvm_libc_source_set("math") {
   noncpu_dir = "generic"
 
-  # TODO(fxbug.dev/62780): for now only using functions that are trivial
+  # TODO(https://fxbug.dev/62780): for now only using functions that are trivial
   # machine instructions in the aarch64 and x86_64 implementations.
   functions = [
     "fabs",

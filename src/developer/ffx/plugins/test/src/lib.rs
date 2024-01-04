@@ -59,7 +59,7 @@ fho::embedded_plugin!(TestTool);
 impl FfxMain for TestTool {
     type Writer = SimpleWriter;
 
-    // TODO(fxbug.dev/127955): use Writer when it becomes possible.
+    // TODO(https://fxbug.dev/127955): use Writer when it becomes possible.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         let writer = Box::new(stdout());
         let remote_control =

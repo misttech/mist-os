@@ -247,7 +247,7 @@ async fn serve_fidl(hd: HostDispatcher, inspect: fuchsia_inspect::Inspector) -> 
             ProfileMarker::PROTOCOL_NAME,
             host_service_handler(&hd, ProfileMarker::PROTOCOL_NAME, Profile),
         )
-        // TODO(fxbug.dev/1496) - according fuchsia.bluetooth.sys/bootstrap.fidl, the bootstrap service should
+        // TODO(https://fxbug.dev/1496) - according fuchsia.bluetooth.sys/bootstrap.fidl, the bootstrap service should
         // only be available before initialization, and only allow a single commit before becoming
         // unservicable. This behavior interacts with parts of Bluetooth lifecycle and component
         // framework design that are not yet complete. For now, we provide the service to whomever

@@ -288,7 +288,7 @@ ParseCreateEdgeOptions(
   Node::CreateEdgeOptions options;
   if (request->has_mixer_sampler()) {
     if (dest.type() == Node::Type::kMixer && request->mixer_sampler().is_sinc_sampler()) {
-      // TODO(fxbug.dev/114373): Make use of `fuchsia_audio_mixer::wire::SincSampler` parameters.
+      // TODO(https://fxbug.dev/114373): Make use of `fuchsia_audio_mixer::wire::SincSampler` parameters.
       options.sampler_type = Sampler::Type::kSincSampler;
     } else {
       return fpromise::error(fuchsia_audio_mixer::CreateEdgeError::kUnsupportedOption);
@@ -534,7 +534,7 @@ void GraphServer::CreateProducer(CreateProducerRequestView request,
       return;
     }
 
-    // TODO(fxbug.dev/114907): each time the producer's downstream delay changes, validate that
+    // TODO(https://fxbug.dev/114907): each time the producer's downstream delay changes, validate that
     // consumer_frames >= downstream delay.
 
     source = std::move(result.value().ring_buffer);
@@ -783,7 +783,7 @@ void GraphServer::CreateMixer(CreateMixerRequestView request,
     completer.ReplyError(fuchsia_audio_mixer::CreateNodeError::kInvalidParameter);
     return;
   }
-  // TODO(fxbug.dev/114381): This check blelow is not a strict FIDL API requirement, but an
+  // TODO(https://fxbug.dev/114381): This check blelow is not a strict FIDL API requirement, but an
   // enforcement by the underlying `MixerStage`. Revisit if we want to support non-float types.
   if (format.value().sample_type() != fuchsia_audio::wire::SampleType::kFloat32) {
     FX_LOGS(WARNING) << "CreateMixer: destination format must use float";
@@ -1241,7 +1241,7 @@ void GraphServer::CreateGraphControlledReferenceClock(
                                          fence = std::move(local_fence), wait_it](
                                             async_dispatcher_t* dispatcher, async::WaitOnce* wait,
                                             zx_status_t status, const zx_packet_signal_t* signal) {
-    // TODO(fxbug.dev/114909): Need to tell `clock_registry_` to stop adjusting `clock`.
+    // TODO(https://fxbug.dev/114909): Need to tell `clock_registry_` to stop adjusting `clock`.
     pending_one_shot_waiters_.erase(wait_it);
   });
 

@@ -61,7 +61,7 @@ zx::result<> Driver::Start() {
   }
   pdev_.Bind(std::move(pdev.value()));
   // We get one MMIO per engine.
-  // TODO(fxbug.dev/132252): If we change the engines underlying AmlTdmDevice objects such that
+  // TODO(https://fxbug.dev/132252): If we change the engines underlying AmlTdmDevice objects such that
   // they take an MmioView, then we can get only one MmioBuffer here, own it in this driver and
   // pass MmioViews to the underlying AmlTdmDevice objects.
   std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios;

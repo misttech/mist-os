@@ -39,7 +39,7 @@ group("fdr") {
     ":fdr_lib_unittests",
     ":system_recovery_fdr",
 
-    # TODO(fxbug.dev/103089): Handle FDR via integration tests.
+    # TODO(https://fxbug.dev/103089): Handle FDR via integration tests.
     # ":system_recovery_fdr_test",
   ]
 }
@@ -48,7 +48,7 @@ group("installer") {
   testonly = true
   deps = [
     ":system_recovery_installer",
-    # TODO(fxbug.dev/102239): This directive does not pick up any tests.
+    # TODO(https://fxbug.dev/102239): This directive does not pick up any tests.
     #":system_recovery_installer_tests",
   ]
 }
@@ -344,7 +344,7 @@ rustc_binary("bin_fdr") {
   sources = [ "src/main.rs" ]
 }
 
-# Start system_recovery_fdr component TODO(fxbug.dev/105564)
+# Start system_recovery_fdr component TODO(https://fxbug.dev/105564)
 fuchsia_component_manifest("manifest_fdr") {
   component_name = "system_recovery_fdr"
   manifest = "meta/system_recovery_fdr.cml"

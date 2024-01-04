@@ -11,9 +11,9 @@ group("tests") {
     ":mouse-input-test",
     "//src/cobalt/bin/testing/mock_cobalt",
 
-    # TODO(fxbug.dev/119212): These should be provided by the Product
+    # TODO(https://fxbug.dev/119212): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
-    # TODO(fxbug.dev/119212): Should these be deps of the individual test
+    # TODO(https://fxbug.dev/119212): Should these be deps of the individual test
     # targets above?
     "//src/chromium:web_context_provider_for_test",
     "//src/graphics/bin/vulkan_loader",
@@ -71,7 +71,7 @@ fuchsia_test_package("mouse-input-test") {
     # The test realms.
     "mouse-input-chromium:mouse-input-chromium-component",
 
-    # TODO(fxbug.dev/119212): This should be provided by the Product
+    # TODO(https://fxbug.dev/119212): This should be provided by the Product
     # configurations on which these tests run rather than as deps.
     "//src/chromium:web_context_provider_for_test",
 

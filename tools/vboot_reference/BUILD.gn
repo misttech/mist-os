@@ -137,7 +137,7 @@ executable("cgpt") {
   ]
   configs += [ ":internal_config" ]
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -194,7 +194,7 @@ executable("futility") {
   deps += [ "//third_party/boringssl:crypto" ]
   configs += [ ":internal_config" ]
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

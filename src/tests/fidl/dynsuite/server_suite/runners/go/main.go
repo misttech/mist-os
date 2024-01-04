@@ -26,13 +26,13 @@ import (
 var disabledTests = map[serversuite.Test]struct{}{
 	// This is for testing the test disabling functionality itself.
 	serversuite.TestIgnoreDisabled: {},
-	// TODO(fxbug.dev/113160): Peer-closed errors should be hidden from one-way calls.
+	// TODO(https://fxbug.dev/113160): Peer-closed errors should be hidden from one-way calls.
 	serversuite.TestEventSendingDoNotReportPeerClosed: {},
 	serversuite.TestReplySendingDoNotReportPeerClosed: {},
-	// TODO(fxbug.dev/133250): Should validate txid.
+	// TODO(https://fxbug.dev/133250): Should validate txid.
 	serversuite.TestOneWayWithNonZeroTxid:       {},
 	serversuite.TestTwoWayNoPayloadWithZeroTxid: {},
-	// TODO(fxbug.dev/133249): After calling CloseWithEpitaph, component.Serve
+	// TODO(https://fxbug.dev/133249): After calling CloseWithEpitaph, component.Serve
 	// still tries to close the channel at the end, and returns ErrBadHandle.
 	serversuite.TestServerSendsEpitaph: {},
 }

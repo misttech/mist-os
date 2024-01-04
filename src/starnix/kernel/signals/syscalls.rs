@@ -777,7 +777,7 @@ pub fn sys_waitid(
                 ..Default::default()
             };
 
-            // TODO(fxb/76976): Return proper usage information.
+            // TODO(https://fxbug.dev/76976): Return proper usage information.
             current_task.write_object(user_rusage, &usage)?;
         }
 
@@ -833,7 +833,7 @@ pub fn sys_wait4(
                 ..Default::default()
             };
 
-            // TODO(fxb/76976): Return proper usage information.
+            // TODO(https://fxbug.dev/76976): Return proper usage information.
             current_task.write_object(user_rusage, &usage)?;
         }
 

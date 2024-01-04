@@ -20,7 +20,7 @@ namespace escher {
 
 // Base class for items that can be cached in a HashCache.
 //
-// TODO(fxbug.dev/23918): A fancier implementation would make these fields private.
+// TODO(https://fxbug.dev/23918): A fancier implementation would make these fields private.
 // Until then, we trust Escher clients to not frob them.
 template <typename T>
 struct HashCacheItem : public IntrusiveListItem<T> {

@@ -280,7 +280,7 @@ pub async fn create_component_from_stream(
                 let kernel = &container.kernel;
                 let vvar = kernel.vdso.vvar_writeable.clone();
                 kernel.kthreads.spawner().spawn(move |_, _| loop {
-                    // TODO(fxb/129367): Replace polling for the clock transformation with having
+                    // TODO(https://fxbug.dev/129367): Replace polling for the clock transformation with having
                     // some sort of a wait for a clock transform update notification.
                     std::thread::sleep(std::time::Duration::from_millis(500));
                     update_utc_clock(&vvar);
@@ -516,7 +516,7 @@ async fn wait_for_init_file(
     startup_file_path: &str,
     current_task: &CurrentTask,
 ) -> Result<(), Error> {
-    // TODO(fxb/96299): Use inotify machinery to wait for the file.
+    // TODO(https://fxbug.dev/96299): Use inotify machinery to wait for the file.
     loop {
         fasync::Timer::new(fasync::Duration::from_millis(100).after_now()).await;
         let root = current_task.fs().root();

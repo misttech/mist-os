@@ -12,7 +12,7 @@ driver_bind_rules("aml_spi_bind") {
   bind_output = "aml-spi.bindbc"
   tests = "bind_tests.json"
 
-  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # TODO(https://fxbug.dev/115757): Remove this once we no longer need to generate
   # fragments for composite bind rules.
   disable_fragment_gen = true
 

@@ -83,13 +83,13 @@ closed protocol InputMethodEditor {
         state TextInputState;
     });
 
-    // TODO(fxbug.dev/72752)
+    // TODO(https://fxbug.dev/72752)
     @available(deprecated=8, note="Instead, use `fuchsia.ui.input3.KeyEventInjector`")
     strict InjectInput(struct {
         event InputEvent;
     });
 
-    // TODO(fxbug.dev/72752)
+    // TODO(https://fxbug.dev/72752)
     @available(deprecated=8, note="Instead, use `fuchsia.ui.input3.KeyEventInjector`")
     @transitional
     strict DispatchKey3(struct {
@@ -98,7 +98,7 @@ closed protocol InputMethodEditor {
         handled bool;
     });
 
-    // TODO(fxbug.dev/26729): remove these in a later change, after PlatformView has been
+    // TODO(https://fxbug.dev/26729): remove these in a later change, after PlatformView has been
     // switched over to open/close on the input_connection_ instead.
     @available(deprecated=13)
     strict Show();

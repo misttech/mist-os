@@ -9,7 +9,7 @@
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/eventpair.h>
 
-// TODO(fxbug.dev/76640): delete when we delete hack_seen_display_id_values_.
+// TODO(https://fxbug.dev/76640): delete when we delete hack_seen_display_id_values_.
 #include <lib/fit/function.h>
 
 #include <optional>
@@ -85,7 +85,7 @@ class Engine {
   bool first_frame_with_image_is_rendered_ = false;
   uint64_t last_rendered_frame_ = 0;
 
-  // TODO(fxbug.dev/76640): hack so that we can call DisplayCompositor::AddDisplay() when we first
+  // TODO(https://fxbug.dev/76640): hack so that we can call DisplayCompositor::AddDisplay() when we first
   // encounter a new display.  Need a more straightforward way to call AddDisplay().
   std::set</*fuchsia::hardware::display::types::DisplayId::value*/ uint64_t>
       hack_seen_display_id_values_;

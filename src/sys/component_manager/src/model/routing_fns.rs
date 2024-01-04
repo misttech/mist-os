@@ -14,7 +14,7 @@ use {
     vfs::{execution_scope::ExecutionScope, path::Path, remote::RoutingFn},
 };
 
-// TODO(fxbug.dev/126770): `cap` is used only for debug output. This would be simpler if we
+// TODO(https://fxbug.dev/126770): `cap` is used only for debug output. This would be simpler if we
 // removed the `cap` argument and used `request` for the debug output instead.
 pub fn route_fn(
     component: WeakComponentInstance,

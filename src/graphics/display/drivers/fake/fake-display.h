@@ -53,7 +53,7 @@ struct FakeDisplayDeviceConfig {
   // image buffers for capturing.
   // Display capture is supported iff this field is false.
   //
-  // TODO(fxbug.dev/128891): This is a temporary workaround to support fake
+  // TODO(https://fxbug.dev/128891): This is a temporary workaround to support fake
   // display device for GPU devices that cannot render into CPU-accessible
   // formats directly. Remove this option when we have a fake Vulkan
   // implementation.

@@ -137,7 +137,7 @@ class UmsTest : public zxtest::Test {
   }
 
   // Waits for the block device to be removed
-  // TODO(fxbug.dev/33183, fxbug.dev/33378) -- Use something better
+  // TODO(https://fxbug.dev/33183, https://fxbug.dev/33378) -- Use something better
   // than a busy loop.
   void WaitForRemove() {
     struct stat dirinfo;

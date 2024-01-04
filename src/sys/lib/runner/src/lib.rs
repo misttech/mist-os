@@ -128,7 +128,7 @@ pub fn get_program_strvec<'a>(
 }
 
 /// Retrieves program.binary from ComponentStartInfo and makes sure that path is relative.
-// TODO(fxbug.dev/129604): This method should accept a program dict instead of start_info
+// TODO(https://fxbug.dev/129604): This method should accept a program dict instead of start_info
 pub fn get_program_binary(
     start_info: &fcrunner::ComponentStartInfo,
 ) -> Result<String, StartInfoProgramError> {
@@ -159,7 +159,7 @@ pub fn get_program_binary_from_dict(
 }
 
 /// Retrieves program.args from ComponentStartInfo and validates them.
-// TODO(fxbug.dev/129604): This method should accept a program dict instead of start_info
+// TODO(https://fxbug.dev/129604): This method should accept a program dict instead of start_info
 pub fn get_program_args(
     start_info: &fcrunner::ComponentStartInfo,
 ) -> Result<Vec<String>, StartInfoProgramError> {

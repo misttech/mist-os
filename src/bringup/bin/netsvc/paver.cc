@@ -278,7 +278,7 @@ zx_status_t Paver::WriteABImage(fidl::WireSyncClient<fuchsia_paver::DataSink> da
     }
   }
 
-  // TODO(fxbug.dev/47505): The following two syncs are called everytime WriteAsset is called, which
+  // TODO(https://fxbug.dev/47505): The following two syncs are called everytime WriteAsset is called, which
   // is not optimal for reducing NAND PE cycles. Ideally, we want to sync when all assets, A/B
   // configuration have been written to buffer. Find a safe time and place for sync.
   {

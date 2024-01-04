@@ -177,7 +177,7 @@ struct AptxCodecInformation {
 static_assert(sizeof(AptxCodecInformation) == 32,
               "AptxCodecInformation must take up exactly 32 bytes");
 
-// TODO(fxbug.dev/128280): Migrate A2dpOffloadCodecInformation to Emboss
+// TODO(https://fxbug.dev/128280): Migrate A2dpOffloadCodecInformation to Emboss
 union A2dpOffloadCodecInformation {
   SbcCodecInformation sbc;
   AacCodecInformation aac;

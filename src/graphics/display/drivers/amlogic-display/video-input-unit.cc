@@ -304,7 +304,7 @@ void VideoInputUnit::FlipOnVsync(uint8_t idx, const display_config_t* config,
   PixelGridSize2D display_contents_size = {.width = display_timing.horizontal_active_px,
                                            .height = display_timing.vertical_active_lines};
 
-  // TODO(fxbug.dev/317922128): Use the (unscaled) layer source frame size.
+  // TODO(https://fxbug.dev/317922128): Use the (unscaled) layer source frame size.
   PixelGridSize2D layer_image_size = {.width = display_timing.horizontal_active_px,
                                       .height = display_timing.vertical_active_lines};
 
@@ -502,7 +502,7 @@ void VideoInputUnit::ConfigOsdLayers(PixelGridSize2D layer_image_size,
 
 void VideoInputUnit::ConfigSingleLayerBlending(PixelGridSize2D layer_size,
                                                PixelGridSize2D display_contents_size) {
-  // TODO(fxbug.dev/317961333): The documentation below needs to be
+  // TODO(https://fxbug.dev/317961333): The documentation below needs to be
   // re-organized. Move the descriptions of the blenders and the blender muxes
   // to the blender register definitions; at this function we should only keep
   // how the muxes are wired to each other.
@@ -537,7 +537,7 @@ void VideoInputUnit::ConfigSingleLayerBlending(PixelGridSize2D layer_size,
   // blenders, and the input / output sizes of the VPP blenders are the same
   // as the `display_contents_size`.
 
-  // TODO(fxbug.dev/42062952): Support multi-layer blender configurations.
+  // TODO(https://fxbug.dev/42062952): Support multi-layer blender configurations.
 
   // osd blend ctrl
   vpu_mmio_.Write32(4 << 29 | 0 << 27 |  // blend2_premult_en
@@ -574,7 +574,7 @@ void VideoInputUnit::ConfigSingleLayerBlending(PixelGridSize2D layer_size,
                     VIU_OSD_BLEND_BLEND0_SIZE);
 
   // Size of the VIU OSD blender BLEND1 output.
-  // TODO(fxbug.dev/42062952): This is not used when there's only one layer.
+  // TODO(https://fxbug.dev/42062952): This is not used when there's only one layer.
   vpu_mmio_.Write32(display_contents_size.height << 16 | display_contents_size.width,
                     VIU_OSD_BLEND_BLEND1_SIZE);
 
@@ -715,7 +715,7 @@ void VideoInputUnit::ConfigForSingleNonscaledLayer(PixelGridSize2D layer_image_s
   ZX_DEBUG_ASSERT_MSG(layer_image_size.IsValid(), "Invalid framebuffer size (%d x %d)",
                       layer_image_size.width, layer_image_size.height);
 
-  // TODO(fxbug.dev/317922128): Remove this assertion once we support
+  // TODO(https://fxbug.dev/317922128): Remove this assertion once we support
   // framebuffer scaling.
   ZX_DEBUG_ASSERT(layer_image_size.width == display_contents_size.width);
   ZX_DEBUG_ASSERT(layer_image_size.height == display_contents_size.height);

@@ -184,7 +184,7 @@ fpromise::result<std::vector<PartitionParams>, std::string> PartitionParams::Fro
   }
 
   // One-off empty partition with a label of "data". This will later be reformatted.
-  // TODO(fxbug.dev/85165): Have assembly pass in an empty file and remove this flag.
+  // TODO(https://fxbug.dev/85165): Have assembly pass in an empty file and remove this flag.
   if (auto index = FindArgumentByName(arguments, "--with-empty-data"); index.has_value()) {
     PartitionParams empty_data_partition;
     empty_data_partition.format = PartitionImageFormat::kEmptyPartition;
@@ -199,7 +199,7 @@ fpromise::result<std::vector<PartitionParams>, std::string> PartitionParams::Fro
   }
 
   // One-off empty partition with a label of "account". This will later be reformatted.
-  // TODO(fxbug.dev/85165): Have assembly pass in an empty file and remove this flag.
+  // TODO(https://fxbug.dev/85165): Have assembly pass in an empty file and remove this flag.
   if (auto index = FindArgumentByName(arguments, "--with-empty-account-partition");
       index.has_value()) {
     PartitionParams empty_account_partition;

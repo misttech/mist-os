@@ -234,7 +234,7 @@ class Sl4f {
   ///
   /// Throws a [Sl4fException] if the host IP address cannot be determined.
   Future<String> hostIpAddress() async {
-    // TODO(fxbug.dev/52924): Replace the body of this function with just the host ip
+    // TODO(https://fxbug.dev/52924): Replace the body of this function with just the host ip
     // env variable (which could be set in Sl4f.fromEnvironment(), above). Or,
     // try that env var and use the following as a fallback.
 
@@ -347,7 +347,7 @@ class Sl4f {
   Future<Duration> reboot() async {
     _log.info('Initiating reboot sequence.');
     // Issue a reboot command and wait.
-    // TODO(fxbug.dev/7003): trap errors
+    // TODO(https://fxbug.dev/7003): trap errors
     final Stopwatch rebootStopwatch = Stopwatch()..start();
     await ssh.run('dm reboot');
     await Future.delayed(Duration(seconds: 20));

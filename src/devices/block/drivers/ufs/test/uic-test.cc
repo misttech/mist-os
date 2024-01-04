@@ -43,7 +43,7 @@ TEST_F(UicTest, DmeSet) {
   DmeSetUicCommand dme_set_command(*ufs_, 0, 0, 0);
   ASSERT_OK(dme_set_command.SendCommand());
 
-  // TODO(fxbug.dev/124835): Add more tests.
+  // TODO(https://fxbug.dev/124835): Add more tests.
 }
 
 TEST_F(UicTest, DmeLinkStartUp) {
@@ -70,7 +70,7 @@ TEST_F(UicTest, DmeHibernate) {
   DmeHibernateExitCommand dme_hibernate_exit_command(*ufs_);
   EXPECT_OK(dme_hibernate_exit_command.SendCommand().status_value());
 
-  // TODO(fxbug.dev/124835): Add more tests.
+  // TODO(https://fxbug.dev/124835): Add more tests.
 }
 
 TEST_F(UicTest, SendUicCommandException) {

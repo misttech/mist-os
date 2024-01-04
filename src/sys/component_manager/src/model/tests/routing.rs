@@ -530,7 +530,7 @@ async fn dynamic_offer_from_parent() {
     .await;
 }
 
-// TODO(fxbug.dev/298698003): If we fix the bug we don't need this test.
+// TODO(https://fxbug.dev/298698003): If we fix the bug we don't need this test.
 #[fuchsia::test]
 async fn dynamic_offer_from_parent_with_collision() {
     let components = vec![

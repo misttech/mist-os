@@ -101,7 +101,7 @@ void RegistryServer::ReplyWithAddedDevices() {
   }}));
 }
 
-// TODO(fxbug.dev/117166): consider WatchDevicesRemoved (plural: return vector) - more ergonomic?
+// TODO(https://fxbug.dev/117166): consider WatchDevicesRemoved (plural: return vector) - more ergonomic?
 void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& completer) {
   ADR_LOG_OBJECT(kLogRegistryServerMethods);
   if (watch_device_removed_completer_) {
@@ -197,7 +197,7 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
       break;
   }
 
-  // TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
+  // TODO(https://fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
 
   auto observer =
       parent_->CreateObserverServer(std::move(*request.observer_server()), matching_device);

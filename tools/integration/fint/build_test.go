@@ -477,7 +477,7 @@ func TestBuild(t *testing.T) {
 				generatedSources: []string{
 					"foo.h",
 					"bar.cc",
-					// Non-C++ files should be ignored, see fxbug.dev/115554.
+					// Non-C++ files should be ignored, see https://fxbug.dev/115554.
 					"baz.go",
 					"quux.rs",
 				},

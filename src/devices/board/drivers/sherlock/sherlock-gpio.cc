@@ -262,7 +262,7 @@ zx_status_t Sherlock::GpioInit() {
     }
   }
 
-  // TODO(fxbug.dev/130993): Add the GPIO C device after all init steps have been executed to ensure
+  // TODO(https://fxbug.dev/130993): Add the GPIO C device after all init steps have been executed to ensure
   // that there are no simultaneous accesses to these banks.
   {
     fidl::Arena<> fidl_arena;

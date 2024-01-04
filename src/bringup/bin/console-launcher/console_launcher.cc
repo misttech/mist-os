@@ -23,7 +23,7 @@ namespace console_launcher {
 zx::result<ConsoleLauncher> ConsoleLauncher::Create() {
   ConsoleLauncher launcher;
 
-  // TODO(fxbug.dev/33957): Remove all uses of the root job.
+  // TODO(https://fxbug.dev/33957): Remove all uses of the root job.
   zx::result client_end = component::Connect<fuchsia_kernel::RootJob>();
   if (client_end.is_error()) {
     FX_PLOGS(ERROR, client_end.status_value())

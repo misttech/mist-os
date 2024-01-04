@@ -18,7 +18,7 @@
 
 // Methods of this class can be called on any thread.
 //
-// TODO(fxb/86491): This wrapper is temporary to minimize files with diffs in a CL for fxb/86491.
+// TODO(https://fxbug.dev/86491): This wrapper is temporary to minimize files with diffs in a CL for https://fxbug.dev/86491.
 // We can switch to using MetricsBuffer/MetricBuffer directly in a later CL.
 class CodecMetrics final {
  public:

@@ -117,7 +117,7 @@ impl StreamsBuilder {
         metrics_logger: bt_metrics::MetricsLogger,
         config: &A2dpConfiguration,
     ) -> Result<Self, Error> {
-        // TODO(fxbug.dev/1126): detect codecs, add streams for each codec
+        // TODO(https://fxbug.dev/1126): detect codecs, add streams for each codec
         // Sink codecs
         let sbc_endpoint = Self::build_sbc_sink_endpoint()?;
         let sbc_cap = find_codec_cap(&sbc_endpoint).expect("just built");

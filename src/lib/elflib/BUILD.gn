@@ -20,7 +20,7 @@ sdk_static_library("elflib") {
 
   public_deps = [ "//zircon/system/ulib/fbl" ]
 
-  # TODO(fxb/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 
   public_configs = [ "//src/lib/llvm:LLVMHeader_config" ]
@@ -36,7 +36,7 @@ test("elflib_unittest") {
     "//third_party/googletest:gtest",
   ]
 
-  # TODO(fxb/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -106,7 +106,7 @@ fuchsia_library_fuzzer("elflib_fuzzer") {
   sources = [ "elflib_fuzztest.cc" ]
   deps = [ ":elflib" ]
 
-  # TODO(fxb/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

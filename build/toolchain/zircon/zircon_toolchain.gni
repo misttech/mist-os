@@ -230,7 +230,7 @@ template("zircon_toolchain") {
       # Compare local vs. remote build.
       # Allow caching.
       # Use local concurrency.
-      # TODO(http://fxbug.dev/128947): enable file trace comparison
+      # TODO(https://fxbug.dev/128947): enable file trace comparison
       compiler_prefix_list += [
         "--compare",
 
@@ -422,7 +422,7 @@ template("zircon_toolchain") {
       tool_prefix = "llvm-"
       version_string = clang_version_string
 
-      # TODO(fxbug.dev/27328): The MSVC target in the clang driver never uses the
+      # TODO(https://fxbug.dev/27328): The MSVC target in the clang driver never uses the
       # -stdlib=libc++ switch or the toolchain's own libc++ include path.
       if (invoker.os == "win") {
         include_dirs_cc = rebase_path(
@@ -493,7 +493,7 @@ template("zircon_toolchain") {
     }
   }
 
-  # TODO(fxbug.dev/58294): enable for other targets and binary formats.
+  # TODO(https://fxbug.dev/58294): enable for other targets and binary formats.
   use_gsym = output_gsym && is_elf && invoker.os == "fuchsia"
   if (use_gsym) {
     gsymutil = rebase_path("$clang_tool_dir/llvm-gsymutil", root_build_dir)
@@ -539,7 +539,7 @@ template("zircon_toolchain") {
 
         _remote_strip_list = []
         if (_link_rbe_enable) {
-          # TODO(http://fxbug.dev/133103): disable remote stripping when config includes //build/config:no_remote_link.
+          # TODO(https://fxbug.dev/133103): disable remote stripping when config includes //build/config:no_remote_link.
           _remote_strip_list += [
             rebase_path(python_exe_src, root_build_dir),
             "-S",

@@ -326,7 +326,7 @@ async fn write<S: HandleOwner>(
     handle: DataObjectHandle<S>,
 ) -> Result<(), Error> {
     let object_manager = handle.store().filesystem().object_manager().clone();
-    // TODO(fxbug.dev/95404): Don't use the same code here for Journal and SuperBlock. They
+    // TODO(https://fxbug.dev/95404): Don't use the same code here for Journal and SuperBlock. They
     // aren't the same things and it is already getting convoluted. e.g of diff stream content:
     //   Superblock:  (Magic, Ver, Header(Ver), SuperBlockRecord(Ver)*, ...)
     //   Journal:     (Ver, JournalRecord(Ver)*, RESET, Ver2, JournalRecord(Ver2)*, ...)

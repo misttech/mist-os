@@ -43,7 +43,7 @@ class MdnsTransceiver : public Mdns::Transceiver {
 
   // Returns the interface transceiver with address |address| if it exists,
   // nullptr if not.
-  // TODO(fxbug.dev/49875): move this back to private after multi-network test
+  // TODO(https://fxbug.dev/49875): move this back to private after multi-network test
   // is rewritten in Rust.
   MdnsInterfaceTransceiver* GetInterfaceTransceiver(const inet::IpAddress& address);
 

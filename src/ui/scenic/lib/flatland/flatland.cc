@@ -181,7 +181,7 @@ Flatland::Flatland(
 }
 
 Flatland::~Flatland() {
-  // TODO(fxbug.dev/55374): consider if Link tokens should be returned or not.
+  // TODO(https://fxbug.dev/55374): consider if Link tokens should be returned or not.
 
   // Clear the scene graph, then collect the images to release.
   Clear();
@@ -267,11 +267,11 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
 
   auto root_handle = GetRoot();
 
-  // TODO(fxbug.dev/40818): Decide on a proper limit on compute time for topological sorting.
+  // TODO(https://fxbug.dev/40818): Decide on a proper limit on compute time for topological sorting.
   auto data = transform_graph_.ComputeAndCleanup(root_handle, std::numeric_limits<uint64_t>::max());
   FX_DCHECK(data.iterations != std::numeric_limits<uint64_t>::max());
 
-  // TODO(fxbug.dev/36166): Once the 2D scene graph is externalized, don't commit changes if a cycle
+  // TODO(https://fxbug.dev/36166): Once the 2D scene graph is externalized, don't commit changes if a cycle
   // is detected. Instead, kill the channel and remove the sub-graph from the global graph.
   failure_since_previous_present_ |= !data.cyclical_edges.empty();
 
@@ -391,7 +391,7 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
 
   // Safe to capture |this| because the Flatland is guaranteed to outlive |fence_queue_|,
   // Flatland is non-movable and FenceQueue does not fire closures after destruction.
-  // TODO(fxbug.dev/76640): make the fences be the first arg, and the closure be the second.
+  // TODO(https://fxbug.dev/76640): make the fences be the first arg, and the closure be the second.
   fence_queue_->QueueTask(
       [this, present_id, requested_presentation_time = args.requested_presentation_time(),
        unsquashable = args.unsquashable(), uber_struct = std::move(uber_struct),
@@ -1043,7 +1043,7 @@ void Flatland::CreateImage(ContentId image_id,
   for (uint32_t i = 0; i < buffer_collection_importers_.size(); i++) {
     auto& importer = buffer_collection_importers_[i];
 
-    // TODO(fxbug.dev/62240): Give more detailed errors.
+    // TODO(https://fxbug.dev/62240): Give more detailed errors.
     auto result =
         importer->ImportBufferImage(metadata, allocation::BufferCollectionUsage::kClientImage);
     if (!result) {
@@ -1111,7 +1111,7 @@ void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
     // image_height) limits, so we only clamp the positive differences. The root cause is the
     // precision errors in floating point arithmetic when a client tries to calculate floats within
     // pixel space.
-    // TODO(fxbug.dev/132486): Remove floating point precision error checks and use uints instead.
+    // TODO(https://fxbug.dev/132486): Remove floating point precision error checks and use uints instead.
     ClampIfNear(&rect.width, rect.x + rect.width - image_width);
     ClampIfNear(&rect.height, rect.y + rect.height - image_height);
     if (rect.x < 0.f || rect.width < 0.f || (rect.x + rect.width) > image_width || rect.y < 0.f ||
@@ -1647,7 +1647,7 @@ void Flatland::OnNextFrameBegin(uint32_t additional_present_credits,
 void Flatland::OnFramePresented(const std::map<scheduling::PresentId, zx::time>& latched_times,
                                 scheduling::PresentTimestamps present_times) {
   TRACE_DURATION("gfx", "Flatland::OnFramePresented");
-  // TODO(fxbug.dev/63305): remove `num_presents_allowed` from this event.  Clients should obtain
+  // TODO(https://fxbug.dev/63305): remove `num_presents_allowed` from this event.  Clients should obtain
   // this information from OnPresentProcessedValues().
   present2_helper_.OnPresented(latched_times, present_times, /*num_presents_allowed=*/0);
 }

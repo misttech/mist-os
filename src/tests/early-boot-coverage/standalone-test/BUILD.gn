@@ -17,7 +17,7 @@ if (is_fuchsia) {
 
     if (toolchain_variant.tags + [ "hwasan" ] - [ "hwasan" ] !=
         toolchain_variant.tags) {
-      # TODO(fxbug.dev/107896): We run into a linker error where a tagged
+      # TODO(https://fxbug.dev/107896): We run into a linker error where a tagged
       # definition of __llvm_profile_counter_bias is provided in this executable,
       # but the statically-linked profile runtime is not hwasan instrumented, so
       # any reference to the tagged __llvm_profile_counter_bias fails during an

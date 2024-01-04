@@ -31,7 +31,7 @@ cstr = "0.2"
 libc = "0.2"
 bincode = "1"
 serde = { version = "1", features = ["derive"] }
-# TODO(fxbug.dev/106164) This is a Google change in our fuse3 fork
+# TODO(https://fxbug.dev/106164) This is a Google change in our fuse3 fork
 # This specific version of nix is set to make cargo-gnaw
 # pull in the correct version of nix.
 # See: https://github.com/Sherlock-Holo/fuse3/pull/64.
@@ -48,11 +48,11 @@ features = ["unstable"]
 optional = true
 
 [dependencies.tokio]
-# TODO(fxbug.dev/106164) This is a Google change in our fuse3 fork
+# TODO(https://fxbug.dev/106164) This is a Google change in our fuse3 fork
 # This specific version of tokio is defined because of
 # its usages in other places in Fuchsia.
 version = "1"
-# TODO(fxbug.dev/106164) This is a Google change in our fuse3 fork
+# TODO(https://fxbug.dev/106164) This is a Google change in our fuse3 fork
 # Gnaw does not support target-specific features for now.
 # The features are manually configured in //third_party/rust_crates/Cargo.toml.
 # features = ["fs", "rt", "sync", "net"]

@@ -70,7 +70,7 @@ impl<Resp> Responder<Resp> {
 }
 
 /// The responding end of a channel.
-// TODO(http://fxbug.dev/82145): Consider replacing this with this alias:
+// TODO(https://fxbug.dev/82145): Consider replacing this with this alias:
 //
 //   pub type Receiver<Req, Resp> = mpsc::Receiver<(Req, Responder<Resp>)>;
 pub struct Receiver<Req, Resp> {

@@ -348,7 +348,7 @@ impl PairingManagerInspect {
 /// Fast Pair owns the Pairing Delegate will incorrectly use Fast Pair I/O capabilities. Ideally,
 /// we'd like the granularity of I/O capabilities to be at the peer level. To avoid confusion at
 /// the upstream level, the `PairingManager` will reject such pairing requests while Fast Pair is
-/// active. See fxbug.dev/101721 for more details.
+/// active. See https://fxbug.dev/101721 for more details.
 ///
 /// PairingManager implements `Stream`. Clients should poll this stream to receive updates about
 /// Fast Pair pairing.
@@ -541,7 +541,7 @@ impl PairingManager {
     /// exist or wasn't in the expected state).
     /// Returns the passkey on success (e.g the comparison took place, not that `gatt_passkey`
     /// necessarily matched the expected passkey).
-    // TODO(fxbug.dev/102963): There is an implicit assumption that the peer has already made the
+    // TODO(https://fxbug.dev/102963): There is an implicit assumption that the peer has already made the
     // pairing request before `compare_passkey` is called with the GATT passkey. While the GFPS
     // does specify this ordering, this may not always be the case in practice.
     pub fn compare_passkey(&mut self, le_id: PeerId, gatt_passkey: u32) -> Result<u32, Error> {
@@ -565,7 +565,7 @@ impl PairingManager {
 
     /// Progresses the procedure after an Account Key has been written.
     /// Returns Error if there is no active procedure in the correct state.
-    // TODO(fxbug.dev/102963): There is an implicit assumption that the peer has already
+    // TODO(https://fxbug.dev/102963): There is an implicit assumption that the peer has already
     // successfully completed the Classic/LE pairing request (e.g OnPairingComplete
     // { success = true }) before `account_key_write` is called. While the GFPS does specify this
     // ordering, this may not always be the case in practice.
@@ -654,7 +654,7 @@ impl PairingManager {
             // have assigned two unique PeerIds for the same peer. This will get coalesced once
             // the peer successfully bonds. For now, we try to find the first valid pairing
             // procedure that is in the correct state.
-            // TODO(fxbug.dev/107780): Consider limiting the PairingManager to one active procedure
+            // TODO(https://fxbug.dev/107780): Consider limiting the PairingManager to one active procedure
             // at a time. Then we won't have to worry about this case.
             None => {
                 let procedure =
@@ -664,7 +664,7 @@ impl PairingManager {
                         %le_or_bredr_id,
                         "Couldn't match pairing request with inflight Fast Pair procedure"
                     );
-                    // TODO(fxbug.dev/101721): Consider relaying upstream if I/O capabilities are
+                    // TODO(https://fxbug.dev/101721): Consider relaying upstream if I/O capabilities are
                     // defined per peer.
                     let _ = responder.send(false, 0u32);
                     return Ok(());
@@ -708,7 +708,7 @@ impl PairingManager {
             .find(|(id, p)| **id == le_or_bredr_id || p.bredr_id == Some(le_or_bredr_id));
         if procedure.is_none() {
             debug!(%le_or_bredr_id, "Pairing complete for non-Fast Pair peer. Ignoring..");
-            // TODO(fxbug.dev/101721): Consider relaying upstream if I/O capabilities are defined
+            // TODO(https://fxbug.dev/101721): Consider relaying upstream if I/O capabilities are defined
             // per peer.
             return Ok(None);
         }
@@ -723,7 +723,7 @@ impl PairingManager {
 
         if success {
             warn!(%le_id, ?procedure.state, "Unexpected pairing success for Fast Pair procedure");
-            // TODO(fxbug.dev/103204): This indicates Fast Pair pairing was completed in an
+            // TODO(https://fxbug.dev/103204): This indicates Fast Pair pairing was completed in an
             // non spec-compliant manner. We should remove the bond via sys.Access/Forget.
         } else {
             info!(%le_id, "Pairing failure");
@@ -1314,7 +1314,7 @@ pub(crate) mod tests {
         assert_matches!(manager.complete_pairing_procedure(id), Ok(_));
     }
 
-    // TODO(fxbug.dev/102963): This test will be obsolete if the PairingManager is resilient to
+    // TODO(https://fxbug.dev/102963): This test will be obsolete if the PairingManager is resilient to
     // ordering of events.
     #[fuchsia::test]
     async fn complete_pairing_before_on_pairing_complete_is_error() {

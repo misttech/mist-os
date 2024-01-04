@@ -672,7 +672,7 @@ impl ClientInner {
                 let mut message_interests = self.message_interests.lock();
                 let raw_recvd_interest_id = recvd_interest_id.as_raw_id();
                 let Some(interest) = message_interests.get_mut(raw_recvd_interest_id) else {
-                    // TODO(fxbug.dev/114743): Should close the channel.
+                    // TODO(https://fxbug.dev/114743): Should close the channel.
                     return Err(Error::InvalidResponseTxid);
                 };
                 let remove = interest.receive(buf);
@@ -695,7 +695,7 @@ impl ClientInner {
     /// Gets a waker that will wake up all the tasks that are waiting on this channel.
     /// `wake_all` is preferred if you are certain you are waking everyone immediately, as it is
     /// idempotent (it will only wake each task once)
-    // TODO(fxbug.dev/74427): if Arc::new_cyclic becomes stable, we can wake tasks only when their
+    // TODO(https://fxbug.dev/74427): if Arc::new_cyclic becomes stable, we can wake tasks only when their
     // message has arrived.
     fn get_combined_waker(&self) -> Waker {
         let mut wakers = Vec::new();
@@ -1103,7 +1103,7 @@ mod tests {
         Ok(())
     }
 
-    // TODO(fxbug.dev/73477): When the sync client supports epitaphs, rename
+    // TODO(https://fxbug.dev/73477): When the sync client supports epitaphs, rename
     // this and change the assert to expect zx_status::Status::UNAVAILABLE.
     #[test]
     fn sync_client_does_not_receive_epitaphs() -> Result<(), Error> {

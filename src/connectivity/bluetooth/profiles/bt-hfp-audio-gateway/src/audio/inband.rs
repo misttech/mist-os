@@ -196,7 +196,7 @@ impl AudioSession {
             if let Err(e) = decoder.write_all(packet).await {
                 return AudioError::audio_core(format_err!("Failed to write to decoder: {e:?}"));
             }
-            // TODO(fxbug.dev/122271): buffer some packets before flushing instead of flushing on
+            // TODO(https://fxbug.dev/122271): buffer some packets before flushing instead of flushing on
             // every one.
             if let Err(e) = decoder.flush().await {
                 return AudioError::audio_core(format_err!("Failed to flush decoder: {e:?}"));

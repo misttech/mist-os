@@ -14,7 +14,7 @@
 
 // This file contains a fake Vulkan ICD that implements everything up to and including
 // vkCreateInstance.  It is (mostly) a copy of //src/graphics/tests/libvulkan/libvulkan_fake.cc,
-// and will exist only temporarily, see fxbug.dev/124972
+// and will exist only temporarily, see https://fxbug.dev/124972
 
 VKAPI_ATTR __attribute__((visibility("default"))) VkResult VKAPI_CALL
 vk_icdNegotiateLoaderICDInterfaceVersion(uint32_t* pVersion) {

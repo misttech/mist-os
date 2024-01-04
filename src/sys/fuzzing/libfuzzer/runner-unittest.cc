@@ -181,7 +181,7 @@ class LibFuzzerRunnerTest : public RunnerTest {
 #undef RUNNER_TYPE
 #undef RUNNER_TEST
 
-// TODO(fxbug.dev/127339): Re-enable (and return to runner-unittest.inc) once flake is fixed.
+// TODO(https://fxbug.dev/127339): Re-enable (and return to runner-unittest.inc) once flake is fixed.
 TEST_F(LibFuzzerRunnerTest, DISABLED_Stop) { Stop(); }
 TEST_F(LibFuzzerRunnerTest, Merge) { Merge(/* keep_errors= */ false); }
 

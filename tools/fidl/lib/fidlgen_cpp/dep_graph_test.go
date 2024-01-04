@@ -394,7 +394,7 @@ func TestUnionDeps(t *testing.T) {
 	})
 }
 
-// TODO(fxbug.dev/105758): Test aliases of aliases too.
+// TODO(https://fxbug.dev/105758): Test aliases of aliases too.
 func TestAliasDeps(t *testing.T) {
 	ir := fidlgentest.EndToEndTest{T: t}.Single(`
 	library example;
@@ -414,7 +414,7 @@ func TestAliasDeps(t *testing.T) {
 }
 
 func TestNewTypeDeps(t *testing.T) {
-	t.Skip("TODO(fxbug.dev/7807): Support new types")
+	t.Skip("TODO(https://fxbug.dev/7807): Support new types")
 
 	ir := fidlgentest.EndToEndTest{T: t}.Single(`
 	library example;

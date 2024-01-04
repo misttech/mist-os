@@ -204,7 +204,7 @@ where
     }
 
     fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, Result<u64>> {
-        // FIXME(http://fxbug.dev/98376): It may be more efficient to try to make a HEAD request and
+        // FIXME(https://fxbug.dev/98376): It may be more efficient to try to make a HEAD request and
         // see if that includes the content length before falling back to us requesting the blob and
         // dropping the stream.
         let fut = self.fetch_blob_range(path, Range::Full);

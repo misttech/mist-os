@@ -101,7 +101,7 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                            uint32_t block_size_bytes, scsi::DiskOp *disk_op, iovec data) override;
 
-  // TODO(fxbug.dev/124835): Implement inspector.
+  // TODO(https://fxbug.dev/124835): Implement inspector.
 
   fdf::MmioBuffer &GetMmio() { return mmio_; }
 

@@ -98,7 +98,7 @@ group("tools") {
   deps = [ "wlancfg/tool:donut" ]
 }
 
-# (fxbug.dev/127513) Remove after transition that includes WLAN in assembly for most builds.
+# (https://fxbug.dev/127513) Remove after transition that includes WLAN in assembly for most builds.
 group("wlan-bundle-for-transition") {
   deps = []
 }

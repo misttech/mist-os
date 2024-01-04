@@ -155,7 +155,7 @@ impl FsContext {
 
     pub fn unshare_namespace(&self) {
         let mut state = self.state.write();
-        // TODO(https:://fxbug.dev/130030): Implement better locking to make these failures
+        // TODO(https:://https://fxbug.dev/130030): Implement better locking to make these failures
         // impossible. These expects can only fail if another thread changes mounts between the
         // clone_namespace and the translate_node calls, making the cwd or root disappear or move.
         let cloned = state.namespace.clone_namespace();

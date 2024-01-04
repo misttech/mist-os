@@ -22,7 +22,7 @@ namespace symbolizer {
 namespace {
 
 // TODO(dangyi): This is a poor implementation of the authentication process. Revisit this after
-// fxb/61746 is resolved.
+// https://fxbug.dev/61746 is resolved.
 int AuthMode() {
   debug::MessageLoopPoll loop;
   loop.Init(nullptr);
@@ -48,7 +48,7 @@ int AuthMode() {
       << "OOB auth workflow is deprecated (go/oauth-oob-deprecation). "
       << "To authenticate, please run the following command\n\n"
       << "  rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login\n\n"
-      << "For more information, please see fxbug.dev/119250.\n";
+      << "For more information, please see https://fxbug.dev/119250.\n";
   return EXIT_FAILURE;
 }
 

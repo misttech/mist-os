@@ -136,7 +136,7 @@ async fn unformatted_netboot() {
 }
 
 #[fuchsia::test]
-// TODO(http://fxbug.dev/42182707): this test is flaking, disabling it temporarily to help with
+// TODO(https://fxbug.dev/42182707): this test is flaking, disabling it temporarily to help with
 // tree health.
 #[cfg_attr(feature = "minfs", ignore)]
 async fn unformatted_small_disk() {

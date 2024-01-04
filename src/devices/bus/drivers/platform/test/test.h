@@ -42,7 +42,7 @@ class TestBoard : public TestBoardType {
   zx_status_t TestInit();
   int Thread();
 
-  // TODO(fxbug.dev/108070): Use `fdf::SyncClient` when it is available.
+  // TODO(https://fxbug.dev/108070): Use `fdf::SyncClient` when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   thrd_t thread_;
 };

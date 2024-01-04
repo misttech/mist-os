@@ -95,7 +95,7 @@ impl FsInspect for InspectedFxFilesystem {
             version_minor: LATEST_VERSION.minor.into(),
             block_size: self.0.block_size() as u64,
             max_filename_length: fio::MAX_FILENAME,
-            // TODO(fxbug.dev/93770): Determine how to report oldest on-disk version if required.
+            // TODO(https://fxbug.dev/93770): Determine how to report oldest on-disk version if required.
             oldest_version: None,
         }
     }
@@ -105,7 +105,7 @@ impl FsInspect for InspectedFxFilesystem {
         UsageData {
             total_bytes: info.total_bytes,
             used_bytes: info.used_bytes,
-            // TODO(fxbug.dev/94075): Should these be moved to per-volume nodes?
+            // TODO(https://fxbug.dev/94075): Should these be moved to per-volume nodes?
             total_nodes: 0,
             used_nodes: 0,
         }
@@ -262,13 +262,13 @@ impl Component {
     ) -> Result<(), Error> {
         info!(?options, "Received start request");
         let mut state = self.state.lock().await;
-        // TODO(fxbug.dev/93066): This is not very graceful.  It would be better for the client to
+        // TODO(https://fxbug.dev/93066): This is not very graceful.  It would be better for the client to
         // explicitly shut down all volumes first, and make this fail if there are remaining active
         // connections.  Fix the bug in fs_test which requires this.
         state.stop(&self.outgoing_dir).await;
         let client = new_block_client(device).await?;
 
-        // TODO(fxbug.dev/112024) Add support for block sizes greater than the page size.
+        // TODO(https://fxbug.dev/112024) Add support for block sizes greater than the page size.
         assert!(client.block_size() <= zx::system_get_page_size());
         assert!((zx::system_get_page_size() as u64) == MIN_BLOCK_SIZE);
 

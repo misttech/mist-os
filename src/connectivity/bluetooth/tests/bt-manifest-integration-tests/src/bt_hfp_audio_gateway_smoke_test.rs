@@ -92,7 +92,7 @@ async fn mock_hfp_client(
     let hfp_test_svc = handles.connect_to_protocol::<HfpTestMarker>()?;
     sender.send(Event::HfpTest(Some(hfp_test_svc))).await.expect("failed sending ack to test");
 
-    // TODO(fxbug.dev/303919602): pending! is a workaround to never exit this component so
+    // TODO(https://fxbug.dev/303919602): pending! is a workaround to never exit this component so
     // we don't trigger this bug, which can cause a flake.
     pending!();
     Ok(())

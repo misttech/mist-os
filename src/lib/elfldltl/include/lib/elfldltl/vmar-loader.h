@@ -249,7 +249,7 @@ class VmarLoader {
       //    * Mapping zero-fill pages, including the intersecting page, to the
       //    * end of the segment.
       //
-      // TODO(fxbug.dev/91206): Support mapping objects into VMAR from out of
+      // TODO(https://fxbug.dev/91206): Support mapping objects into VMAR from out of
       // process.
       //
       // After the second mapping, the VmarLoader then reads in the partial

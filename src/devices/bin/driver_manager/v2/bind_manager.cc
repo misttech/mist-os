@@ -229,7 +229,7 @@ void BindManager::OnMatchDriverCallback(
 
   std::shared_ptr node = request.node.lock();
 
-  // TODO(fxb/125100): Add an additional guard to ensure that the node is still available for
+  // TODO(https://fxbug.dev/125100): Add an additional guard to ensure that the node is still available for
   // binding when the match callback is fired. Currently, there are no issues from it, but it
   // is something we should address.
   if (!node) {
@@ -456,7 +456,7 @@ void BindManager::RecordInspect(inspect::Inspector& inspector) const {
 
 std::vector<fdd::wire::CompositeNodeInfo> BindManager::GetCompositeListInfo(
     fidl::AnyArena& arena) const {
-  // TODO(fxb/119947): Add composite node specs to the list.
+  // TODO(https://fxbug.dev/119947): Add composite node specs to the list.
   return legacy_composite_manager_.GetCompositeListInfo(arena);
 }
 

@@ -93,12 +93,12 @@ pub fn sys_sysinfo(
     let result = uapi::sysinfo {
         uptime: (zx::Time::get_monotonic() - zx::Time::ZERO).into_seconds(),
 
-        // TODO(fxbug.dev/125626): Report system load.
+        // TODO(https://fxbug.dev/125626): Report system load.
         loads: [0; 3],
 
         totalram: total_ram_pages,
 
-        // TODO(fxbug.dev/125625): Return actual memory usage.
+        // TODO(https://fxbug.dev/125625): Return actual memory usage.
         freeram: total_ram_pages / 8,
 
         procs: num_procs.try_into().map_err(|_| errno!(EINVAL))?,

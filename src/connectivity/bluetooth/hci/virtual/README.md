@@ -16,8 +16,8 @@ It accomplishes this by publishing three distinct devices:
   [fuchsia.bluetooth.test.Loopback](//sdk/fidl/fuchsia.bluetooth.test/loopback.fidl).
 
 ## Usage
-TODO(fxbug.dev/822): Document the driver's device publishing behavior once implement,
+TODO(https://fxbug.dev/822): Document the driver's device publishing behavior once implement,
 with a usage example.
 
 ## Library Utilities
-TODO(fxbug.dev/822): Document Rust library utilities.
+TODO(https://fxbug.dev/822): Document Rust library utilities.

@@ -104,7 +104,7 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
 
   fs_inspect::NodeOperations& node_operations() { return inspect_tree_.node_operations(); }
 
-  // TODO(fxbug.dev/80285): Move ownership of metrics_ to inspect_tree_, and remove use of shared
+  // TODO(https://fxbug.dev/80285): Move ownership of metrics_ to inspect_tree_, and remove use of shared
   // ownership (all uses of this function take mutable pointers to this object already, or bypass
   // the use of shared ownership entirely by calling |get()| on the shared_ptr.
   const std::shared_ptr<BlobfsMetrics>& GetMetrics() const { return metrics_; }

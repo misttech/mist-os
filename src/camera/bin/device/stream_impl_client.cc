@@ -71,7 +71,7 @@ void StreamImpl::Client::ReceiveResolution(fuchsia::math::Size coded_size) {
 
 void StreamImpl::Client::ReceiveCropRegion(std::unique_ptr<fuchsia::math::RectF> region) {
   TRACE_DURATION("camera", "StreamImpl::Client::ReceiveCropRegion");
-  // TODO(fxbug.dev/51176): Because unique_ptr is non-copyable, the hanging get helper assumes all
+  // TODO(https://fxbug.dev/51176): Because unique_ptr is non-copyable, the hanging get helper assumes all
   // values are never the same as previous values. In this case, however, back-to-back null regions
   // or identical regions should not be sent twice.
   crop_region_.Set(std::move(region));

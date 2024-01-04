@@ -184,7 +184,7 @@ func doTestRecovery(
 
 	// // Disconnect from sl4f since we recovered the device.
 	// //
-	// // FIXME(47145) To avoid fxbug.dev/47145, we need to delay
+	// // FIXME(47145) To avoid https://fxbug.dev/47145, we need to delay
 	// // disconnecting from sl4f until after we reboot the device. Otherwise
 	// // we risk leaving the ssh session in a bad state.
 	(*rpcClient).Close()

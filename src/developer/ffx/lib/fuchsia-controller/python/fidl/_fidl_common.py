@@ -54,7 +54,7 @@ class StopEventHandler(Exception):
 
 
 def internal_kind_to_type(internal_kind: str):
-    # TODO(fxbug.dev/109789): Remove "transport_error".
+    # TODO(https://fxbug.dev/109789): Remove "transport_error".
     if internal_kind == "framework_error" or internal_kind == "transport_error":
         return FrameworkError
     raise RuntimeError(f"Unrecognized internal type: {internal_kind}")

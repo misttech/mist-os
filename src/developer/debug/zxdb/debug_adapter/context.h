@@ -109,7 +109,7 @@ class DebugAdapterContext : public ThreadObserver, ProcessObserver, SessionObser
   void StoreBreakpointForSource(const std::string& source, Breakpoint* bp);
   std::vector<fxl::WeakPtr<Breakpoint>>* GetBreakpointsForSource(const std::string& source);
 
-  // TODO(fxbug.dev/69392): These 2 method deletes all breakpoints added by the debug adapter.
+  // TODO(https://fxbug.dev/69392): These 2 method deletes all breakpoints added by the debug adapter.
   // Breakpoints added from console are not deleted.
   void DeleteBreakpointsForSource(const std::string& source);
   void DeleteAllBreakpoints();
@@ -142,7 +142,7 @@ class DebugAdapterContext : public ThreadObserver, ProcessObserver, SessionObser
   fit::callback<void(dap::ResponseOrError<dap::InitializeResponse>)> send_initialize_response_;
 
   // This mapping is temporarily added to store all breakpoints added by debug adapter client. Once
-  // http://fxbug.dev/69392 is fixed, this can removed in favor of using System::GetBreakpoints API
+  // https://fxbug.dev/69392 is fixed, this can removed in favor of using System::GetBreakpoints API
   // i.e. with breakpoint event, debug adapter client can be made aware of additional breakpoints
   // (from say zxdb console) and hence breakpoint list maintained by system will be identical to
   // this map in terms of the entries. One could traverse the entire system breakpoint list to get

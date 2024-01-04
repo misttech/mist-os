@@ -707,7 +707,7 @@ pub async fn handle_input_device_registry_request_streams(
         // continue to operate on this inspect tree in future iterations of the loop.
         let node_clone = injected_devices_node.clone_weak();
 
-        // TODO(fxbug.dev/109772): Push this task down to InputPipeline.
+        // TODO(https://fxbug.dev/109772): Push this task down to InputPipeline.
         // I didn't do that here, to keep the scope of this change small.
         fasync::Task::local(async move {
             match InputPipeline::handle_input_device_registry_request_stream(
@@ -742,6 +742,6 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_placeholder() {
-        // TODO(fxb/73643): Add tests that verify the construction of the input pipeline.
+        // TODO(https://fxbug.dev/73643): Add tests that verify the construction of the input pipeline.
     }
 }

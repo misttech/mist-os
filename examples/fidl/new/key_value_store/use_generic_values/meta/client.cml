@@ -15,7 +15,7 @@
         // A vector of values for every easily representible type in our key-value store. For
         // brevity's sake, the 8, 16, and 32 bit integer types and booleans are omitted.
         //
-        // TODO(fxbug.dev/96264): It would absolve individual language implementations of a great
+        // TODO(https://fxbug.dev/96264): It would absolve individual language implementations of a great
         //   deal of string parsing if we were able to use all FIDL constructs directly here. In
         //   particular, floats and nested types are very difficult to represent, and have been
         //   excluded from this example for the time being.

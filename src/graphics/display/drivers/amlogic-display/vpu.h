@@ -28,7 +28,7 @@ enum class ColorSpaceConversionMode {
   kRgbInternalYuvOut,
 };
 
-// TODO(fxbug.dev/126195): `Vpu` currently contains multiple relatively
+// TODO(https://fxbug.dev/126195): `Vpu` currently contains multiple relatively
 // independent units of the greater Video Processing Unit (VPU) including power
 // control, AFBC engine control, Video Post-processing matrices and capture
 // engine. These functional units should be split into different classes.

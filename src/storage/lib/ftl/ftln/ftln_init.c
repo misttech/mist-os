@@ -489,7 +489,7 @@ static int build_map(FTLN ftl) {
         ftl->logger.error(
             __FILE__, __LINE__,
             "Map Page %u at %u contains maping offset %u mapped to physical %u. But physical block "
-            "%u looks free. This could be a result of premature block recycle. fxbug.dev/87653",
+            "%u looks free. This could be a result of premature block recycle. https://fxbug.dev/87653",
             mpn, map_block, mpn * ftl->mappings_per_mpg + n, pn, b);
         return -1;
       }
@@ -499,7 +499,7 @@ static int build_map(FTLN ftl) {
             __FILE__, __LINE__,
             "Map Page %u at %u contains maping offset %u mapped to physical %u. But physical block "
             "%u looks like a map block. This could be a result of premature block recycle. "
-            "fxbug.dev/87653",
+            "https://fxbug.dev/87653",
             mpn, map_block, mpn * ftl->mappings_per_mpg + n, pn, b);
         return -1;
       }

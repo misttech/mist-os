@@ -4300,7 +4300,7 @@ mod tests {
 
     /// This test is to verify that after a `TelemetryEvent::UpdateExperiment`,
     /// the `1d_counters` and `7d_counters` in Inspect LazyNode are still valid,
-    /// ensuring that the regression from fxbug.dev/120678 is not introduced
+    /// ensuring that the regression from https://fxbug.dev/120678 is not introduced
     #[fuchsia::test]
     fn test_counters_after_update_experiment() {
         let (mut test_helper, mut test_fut) = setup_test();

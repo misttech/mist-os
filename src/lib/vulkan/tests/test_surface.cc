@@ -140,7 +140,7 @@ TEST(Surface, DISABLED_CreateFramebufferSurface) { TestSurface(true).CreateSurfa
 TEST(Surface, CreateFramebufferSurfaceDynamicSymbol) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   loop.StartThread();
-  // Perform a backtrace if the test takes too long to try to diagnose fxbug.dev/109002
+  // Perform a backtrace if the test takes too long to try to diagnose https://fxbug.dev/109002
   async::PostDelayedTask(
       loop.dispatcher(), []() { backtrace_request_all_threads(); }, zx::sec(20));
 

@@ -174,7 +174,7 @@ TEST(TranscoderDdiControlTest, InputPipeId) {
   EXPECT_EQ(0b00000000'00000000'0'110'0000'00000000u, transcoder_ddi_control_a.reg_value());
   EXPECT_EQ(PipeId::PIPE_C, transcoder_ddi_control_a.input_pipe_id());
 
-  // TODO(fxbug.dev/109278): Add a test for Tiger Lake's pipe D, when we support
+  // TODO(https://fxbug.dev/109278): Add a test for Tiger Lake's pipe D, when we support
   // it. The golden value is 0b00000000'00000000'0'111'0000'00000000u
 
   transcoder_ddi_control_a.set_reg_value(0b00000000'00000000'0'001'0000'00000000u);
@@ -266,7 +266,7 @@ TEST(TranscoderDdiControlTest, GetForTigerLakeTranscoder) {
           .FromValue(0);
   EXPECT_EQ(0x62400u, transcoder_ddi_control_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x63400.
 }
 
@@ -320,7 +320,7 @@ TEST(TranscoderConfigTest, GetForTigerLakeTranscoder) {
           .FromValue(0);
   EXPECT_EQ(0x72008u, transcoder_config_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x73008.
 
   // TODO(fxbug.com/109672): Add a test for the WD transcoders, when we support
@@ -455,7 +455,7 @@ TEST(TranscoderClockSelectTest, GetForTranscoder) {
       registers::TranscoderClockSelect::GetForTranscoder(TranscoderId::TRANSCODER_C).FromValue(0);
   EXPECT_EQ(0x46148u, transcoder_clock_select_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x4614c.
 }
 
@@ -522,7 +522,7 @@ TEST(TranscoderDataMTest, GetForTigerLakeTranscoder) {
                       .FromValue(0);
   EXPECT_EQ(0x62030u, data_m_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x63030.
 }
 
@@ -567,7 +567,7 @@ TEST(TranscoderDataNTest, GetForTigerLakeTranscoder) {
                       .FromValue(0);
   EXPECT_EQ(0x62034u, data_n_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x63034.
 }
 
@@ -612,7 +612,7 @@ TEST(TranscoderLinkMTest, GetForTigerLakeTranscoder) {
                       .FromValue(0);
   EXPECT_EQ(0x62040u, link_m_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x63040.
 }
 
@@ -657,7 +657,7 @@ TEST(TranscoderLinkNTest, GetForTigerLakeTranscoder) {
                       .FromValue(0);
   EXPECT_EQ(0x62044u, link_n_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x63044.
 }
 
@@ -715,7 +715,7 @@ TEST(TranscoderMainStreamAttributeMiscTest, GetForTigerLakeTranscoder) {
           .FromValue(0);
   EXPECT_EQ(0x62410u, transcoder_main_stream_attribute_misc_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x63410.
 }
 
@@ -742,7 +742,7 @@ TEST(TranscoderVariableRateRefreshControlTest, GetForTigerLakeTranscoder) {
           .FromValue(0);
   EXPECT_EQ(0x62420u, transcoder_variable_rate_refresh_control_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x63420.
 }
 
@@ -811,7 +811,7 @@ TEST(TranscoderChickenTest, GetForTigerLakeTranscoder) {
           .FromValue(0);
   EXPECT_EQ(0x420c8u, transcoder_chicken_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x420d8.
 }
 

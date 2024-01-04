@@ -226,7 +226,7 @@ func recordFullName(r *clangdoc.RecordInfo) string {
 func recordHtmlId(index *Index, r *clangdoc.RecordInfo) string {
 	// Use the fully-qualified type name as the ID.
 	//
-	// TODO(fxbug.dev/119085) Allow links to template specializations (the same name). If this
+	// TODO(https://fxbug.dev/119085) Allow links to template specializations (the same name). If this
 	// function took an Index parameter, it could check for this case and use the USR id for all
 	// but the first instance.
 	fullRecord := index.RecordUsrs[r.USR]

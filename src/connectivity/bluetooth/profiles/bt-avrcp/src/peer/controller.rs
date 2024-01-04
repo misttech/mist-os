@@ -155,7 +155,7 @@ impl Controller {
         let response = ListPlayerApplicationSettingAttributesResponse::decode(&buf[..])?;
 
         // Get the text information of supported attributes.
-        // TODO(fxbug.dev/41253): Get attribute text information for only custom attributes.
+        // TODO(https://fxbug.dev/41253): Get attribute text information for only custom attributes.
         let cmd = GetPlayerApplicationSettingAttributeTextCommand::new(
             response.player_application_setting_attribute_ids().clone(),
         );
@@ -170,7 +170,7 @@ impl Controller {
             let buf = self.peer.send_vendor_dependent_command(&cmd).await?;
             let list_response = ListPlayerApplicationSettingValuesResponse::decode(&buf[..])?;
 
-            // TODO(fxbug.dev/41253): Get value text information for only custom attributes.
+            // TODO(https://fxbug.dev/41253): Get value text information for only custom attributes.
             let cmd = GetPlayerApplicationSettingValueTextCommand::new(
                 attribute,
                 list_response.player_application_setting_value_ids(),
@@ -185,7 +185,7 @@ impl Controller {
             );
         }
 
-        // TODO(fxbug.dev/41253): Use return value of ListPlayerApplicationSettingValuesResponse::decode()
+        // TODO(https://fxbug.dev/41253): Use return value of ListPlayerApplicationSettingValuesResponse::decode()
         // to get current custom settings. For now, get current settings for default settings.
         self.get_current_player_application_settings(
             response.player_application_setting_attribute_ids().into(),
@@ -461,7 +461,7 @@ impl Controller {
     /// Creates new stream for events and returns the receiveing end for
     /// getting notification events from the peer.
     pub fn add_event_listener(&self) -> ControllerEventStream {
-        // TODO(fxbug.dev/44330) handle back pressure correctly and reduce mpsc::channel buffer sizes.
+        // TODO(https://fxbug.dev/44330) handle back pressure correctly and reduce mpsc::channel buffer sizes.
         let (sender, receiver) = mpsc::channel(512);
         self.peer.add_control_listener(sender);
         receiver

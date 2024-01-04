@@ -147,7 +147,7 @@ TYPED_TEST(BalloonGuestTest, VirtioBalloonFreePageReporting) {
 
   // Require 10% of allocated memory to be reclaimed to detect free page reporting
   // Requiring 50% was causing occasional flakes, especially when memory was low to begin with.
-  // TODO(fxb/112540) Remove added logging during the reclaim wait once flake is resolved
+  // TODO(https://fxbug.dev/112540) Remove added logging during the reclaim wait once flake is resolved
   const uint64_t reclaim_success_threshold =
       starting_free_memory_mib - alloc_amount_mib + alloc_amount_mib / 10;
   FX_LOGS(INFO) << "Waiting for the virtio balloon to reclaim memory. reclaim_success_threshold="

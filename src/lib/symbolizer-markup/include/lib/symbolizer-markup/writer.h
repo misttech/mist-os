@@ -125,7 +125,7 @@ class Writer {
     return BeginElement(kBt).DecimalField(frame).HexField(pc).Field(kPc).EndElement();
   }
 
-  // TODO(fxbug.dev/91214): Support the "hexdict" field.
+  // TODO(https://fxbug.dev/91214): Support the "hexdict" field.
 
   //
   // Trigger elements.

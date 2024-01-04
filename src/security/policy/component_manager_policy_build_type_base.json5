@@ -31,7 +31,7 @@
                 source_name: "data",
                 capability: "directory",
                 target_monikers: [
-                    // TODO(fxbug.dev/126266): Remove once session_manager gets autolaunch override
+                    // TODO(https://fxbug.dev/126266): Remove once session_manager gets autolaunch override
                     // from structured configuration
                     "/core/session-manager",
                 ],
@@ -94,7 +94,7 @@
                 target_monikers: [
                     "/core/system-updater",
 
-                    // TODO(fxbug.dev/123124) Use optional routing to remove these three routes on
+                    // TODO(https://fxbug.dev/123124) Use optional routing to remove these three routes on
                     // non-eng builds.
                     // Use of this capability is controlled by driver_index's structured config
                     // flag enable_ephemeral_drivers, which is disabled on non-eng builds.
@@ -102,7 +102,7 @@
                     "/bootstrap/driver_index",
                     "/bootstrap/driver_manager",
 
-                    // TODO(fxbug.dev/294908859) Use optional routing to remove this route on
+                    // TODO(https://fxbug.dev/294908859) Use optional routing to remove this route on
                     // non-eng builds.
                     // Use of this capability is controlled by kernel command line options
                     // https://cs.opensource.google/fuchsia/fuchsia/+/main:src/bringup/bin/console-launcher/console_launcher.cc;l=53;drc=2abb92a67d8528b484e1c8ee49bdc8badeaec184

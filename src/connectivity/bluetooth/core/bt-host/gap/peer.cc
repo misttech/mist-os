@@ -120,7 +120,7 @@ void Peer::LowEnergyData::SetAdvertisingData(int8_t rssi, const ByteBuffer& data
     parsed_adv_data_ = std::move(res);
 
     // Do not update the name of bonded peers because advertisements are unauthenticated.
-    // TODO(fxbug.dev/85365): Populate more Peer fields with relevant fields from parsed_adv_data_.
+    // TODO(https://fxbug.dev/85365): Populate more Peer fields with relevant fields from parsed_adv_data_.
     if (!peer_->bonded() && parsed_adv_data_->local_name().has_value()) {
       peer_->RegisterNameInternal(parsed_adv_data_->local_name()->name,
                                   parsed_adv_data_->local_name()->is_complete
@@ -408,7 +408,7 @@ bool Peer::BrEdrData::SetEirData(const ByteBuffer& eir) {
       }
     } else if (type == DataType::kIncomplete16BitServiceUuids ||
                type == DataType::kComplete16BitServiceUuids) {
-      // TODO(fxbug.dev/131973): Consider adding 32-bit and 128-bit UUIDs to the list
+      // TODO(https://fxbug.dev/131973): Consider adding 32-bit and 128-bit UUIDs to the list
       ParseUuids(data, UUIDElemSize::k16Bit, [this, &changed](const UUID& uuid) {
         auto [_, inserted] = services_.Mutable()->insert(uuid);
         if (inserted) {
@@ -558,7 +558,7 @@ std::string Peer::ToString() const {
 bool Peer::RegisterName(const std::string& name, Peer::NameSource source) {
   if (RegisterNameInternal(name, source)) {
     UpdateExpiry();
-    // TODO(fxbug.dev/61739): Update the bond when this happens
+    // TODO(https://fxbug.dev/61739): Update the bond when this happens
     UpdatePeerAndNotifyListeners(NotifyListenersChange::kBondNotUpdated);
     return true;
   }

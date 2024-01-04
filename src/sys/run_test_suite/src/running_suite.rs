@@ -115,7 +115,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                             )?;
                             match &entry.lifecycle {
                                 Lifecycle::Found => {
-                                    // TODO(fxbug.dev/79712): Record per-case runtime once we have an
+                                    // TODO(https://fxbug.dev/79712): Record per-case runtime once we have an
                                     // accurate way to measure it.
                                     entry.reporter.started(Timestamp::Unknown)?;
                                     entry.lifecycle = Lifecycle::Started;
@@ -164,7 +164,7 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                             )?;
                             match &entry.lifecycle {
                                 Lifecycle::Started => {
-                                    // TODO(fxbug.dev/79712): Record per-case runtime once we have an
+                                    // TODO(https://fxbug.dev/79712): Record per-case runtime once we have an
                                     // accurate way to measure it.
                                     entry.reporter.stopped(&status.into(), Timestamp::Unknown)?;
                                     entry.lifecycle = Lifecycle::Stopped;

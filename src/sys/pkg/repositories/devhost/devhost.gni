@@ -51,7 +51,7 @@ template("devhost_root_metadata") {
       "output_metadata_dir must be defined")
   _output_metadata_dir = invoker.output_metadata_dir
 
-  # TODO(fxbug.dev/38262) In order to be TUF-1.0 conformant, we need to have
+  # TODO(https://fxbug.dev/38262) In order to be TUF-1.0 conformant, we need to have
   # versioned-prefixed root metadata files. Fow now this just hard-codes
   # copying the current metadata to the correct place, but long term this
   # should be computed so we don't forget to copy the file when we rotate the
@@ -68,7 +68,7 @@ template("devhost_root_metadata") {
                            ])
   }
 
-  # TODO(fxbug.dev/38262) See the comment on `unversioned_root_metadata`.
+  # TODO(https://fxbug.dev/38262) See the comment on `unversioned_root_metadata`.
   copy(target_name) {
     sources = [
       "${_devhost_metadata_dir}/1.root.json",

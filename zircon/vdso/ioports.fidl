@@ -7,7 +7,7 @@ library zx;
 closed protocol Ioports {
     /// ## Summary
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Declaration
     ///
@@ -21,7 +21,7 @@ closed protocol Ioports {
     ///
     /// ## Description
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Rights
     ///
@@ -29,15 +29,15 @@ closed protocol Ioports {
     ///
     /// ## Return value
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Errors
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## See also
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     strict Request(resource struct {
         resource Handle:RESOURCE;
         io_addr uint16;
@@ -46,7 +46,7 @@ closed protocol Ioports {
 
     /// ## Summary
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Declaration
     ///
@@ -60,7 +60,7 @@ closed protocol Ioports {
     ///
     /// ## Description
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Rights
     ///
@@ -68,15 +68,15 @@ closed protocol Ioports {
     ///
     /// ## Return value
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## Errors
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     ///
     /// ## See also
     ///
-    /// TODO(fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/32938)
     strict Release(resource struct {
         resource Handle:RESOURCE;
         io_addr uint16;

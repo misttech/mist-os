@@ -21,13 +21,13 @@ def print_fences():
     All fences are emitted from here.
     """
     print(
-        "ninja complains about a cyclic dependency in //examples/components/config/integration_test (http://fxbug.dev/97837)"
+        "ninja complains about a cyclic dependency in //examples/components/config/integration_test (https://fxbug.dev/97837)"
     )
     print(
-        "ninja complains about a cyclic dependency in //src/virtualization/bin/vmm/device/virtio_net/virtio_net (http://fxbug.dev/114895)"
+        "ninja complains about a cyclic dependency in //src/virtualization/bin/vmm/device/virtio_net/virtio_net (https://fxbug.dev/114895)"
     )
     print(
-        "After fxr/829176, assembly complains that host_tools.modular manifest cannot be found (http://fxbug.dev/124905)."
+        "After fxr/829176, assembly complains that host_tools.modular manifest cannot be found (https://fxbug.dev/124905)."
     )
     print(
         "After fxr/898958, assembly complains about fshost equivalence in zedboot even though zedboot should not be built in user/userdebug."

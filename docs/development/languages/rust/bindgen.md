@@ -4,7 +4,7 @@ If you need to call some C or C++ APIs from Rust, you can use [`bindgen`] which 
 
 ## Requirements
 
-> Note: This requirement will be lifted when [fxb/78852][static-link-bug] is resolved.
+> Note: This requirement will be lifted when [https://fxbug.dev/78852][static-link-bug] is resolved.
 
 Our `bindgen` prebuilt currently links dynamically to clang, which means you need `libclang.so` available in your library search path.
 
@@ -12,7 +12,7 @@ On Debian-based systems this can usually be achieved with `sudo apt install llvm
 
 ## Generating Rust code
 
-> Note: This section and the next will be simplified when [fxb/73858][gn-template-bug] is resolved.
+> Note: This section and the next will be simplified when [https://fxbug.dev/73858][gn-template-bug] is resolved.
 
 While the generated code will be checked in to git, it is important that it is easy for any contributor to update the generated code. The first step here is to make an executable file in your target's directory called `bindgen.sh`. See [`//src/lib/usb_bulk/bindgen.sh`](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/lib/usb_bulk/bindgen.sh) for an example which uses our prebuilt `bindgen` binary and further customizes the output.
 

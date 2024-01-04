@@ -318,7 +318,7 @@ async fn wait_for_test_peer(
     Ok((peer_id, proxy))
 }
 
-// TODO(fxbug.dev/1525) - Add a test for disconnect failure when a connection attempt is outgoing, provided
+// TODO(https://fxbug.dev/1525) - Add a test for disconnect failure when a connection attempt is outgoing, provided
 // that we can provide a manner of doing so that will not flake.
 
 /// Disconnecting from an unknown device should succeed
@@ -385,5 +385,5 @@ async fn test_forget(harness: HostDriverHarness) {
     assert_eq!(Ok(()), status);
     host_expectation::no_peer(&harness, id.into()).await.unwrap();
 
-    // TODO(fxbug.dev/1472): Test that the link closes by querying fake HCI.
+    // TODO(https://fxbug.dev/1472): Test that the link closes by querying fake HCI.
 }

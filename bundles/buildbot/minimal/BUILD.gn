@@ -62,13 +62,13 @@ group("minimal") {
     # Additional non-test things to build:
     ":additional_build_targets",
 
-    # TODO(fxbug.dev/131001): Migrate from this list to ":hermetic_tests", which
+    # TODO(https://fxbug.dev/131001): Migrate from this list to ":hermetic_tests", which
     # will include all hermetic tests, including those from the targets below.
     "//examples:tests",
     "//sdk:tests",
     "//src/connectivity/network:tests",
 
-    # TODO(fxbug.dev/132473): Uncomment once all tests pass on minimal.x64.
+    # TODO(https://fxbug.dev/132473): Uncomment once all tests pass on minimal.x64.
     # "//src/developer:tests",
     "//src/bringup:tests",
     "//src/devices:tests",
@@ -88,15 +88,15 @@ group("minimal") {
 
   if (current_cpu == "riscv64") {
     deps -= [
-      # TODO(fxbug.dev/122609): Remove after removing Go dependencies on RISC-V.
+      # TODO(https://fxbug.dev/122609): Remove after removing Go dependencies on RISC-V.
       "//src/connectivity/network:tests",
-      # TODO(fxbug.dev/292292675): Enable once all dependencies succeed on RISC-V.
-      # TODO(fxbug.dev/132473): Uncomment when adding to the default targets.
+      # TODO(https://fxbug.dev/292292675): Enable once all dependencies succeed on RISC-V.
+      # TODO(https://fxbug.dev/132473): Uncomment when adding to the default targets.
       # "//src/developer:tests",
     ]
 
     deps += [
-      # Run a subset of the network tests until fxbug.dev/122609 is addressed
+      # Run a subset of the network tests until https://fxbug.dev/122609 is addressed
       # and all tests (removed above) can be built and run.
       "//src/connectivity/network/tests:tests",
     ]
@@ -105,7 +105,7 @@ group("minimal") {
       # The integration tests that require WebEngine fail when run. See
       # https://fxbug.dev/133254. Since they are only run on x64 (the test spec
       # requires AEMU), disable them only for that architecture
-      # TODO(fxbug.dev/131001): Remove once the corresponding entry above is
+      # TODO(https://fxbug.dev/131001): Remove once the corresponding entry above is
       # replaced with a `hermetic_tests`.target.
       "//src/ui:tests",
     ]

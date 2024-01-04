@@ -46,7 +46,7 @@ void physmap_protect_gap(vaddr_t base, size_t size) {
   // Ideally, we'd drop the range completely, but early boot code currently relies
   // on peripherals being mapped in.
   //
-  // TODO(fxbug.dev/47856): Remove these regions completely.
+  // TODO(https://fxbug.dev/47856): Remove these regions completely.
   physmap_protect_region(base, size, kGapMmuFlags);
 }
 

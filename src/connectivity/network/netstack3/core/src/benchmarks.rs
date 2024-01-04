@@ -141,7 +141,7 @@ bench!(bench_forward_minimum_1024, |b| bench_forward_minimum(b, 1024));
 #[cfg(benchmark)]
 /// Returns a benchmark group for all Netstack3 Core microbenchmarks.
 pub fn get_benchmark() -> criterion::Benchmark {
-    // TODO(http://fxbug.dev/100863) Find an automatic way to add benchmark
+    // TODO(https://fxbug.dev/100863) Find an automatic way to add benchmark
     // functions to the `Criterion::Benchmark`, ideally as part of `bench!`.
     let mut b = criterion::Benchmark::new("ForwardIpv4/64", bench_forward_minimum_64);
     b = b.with_function("ForwardIpv4/128", bench_forward_minimum_128);

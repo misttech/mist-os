@@ -343,7 +343,7 @@ the drivers that still need it:
 
 ### Picking a task
 
-Bugs have been filed for all remaining uses of Fake DDK (e.g., fxb/115045). The label is [`df-mock-ddk-migration`](https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=label%3Adf-mock-ddk-migration&can=2).
+Bugs have been filed for all remaining uses of Fake DDK (e.g., https://fxbug.dev/115045). The label is [`df-mock-ddk-migration`](https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=label%3Adf-mock-ddk-migration&can=2).
 
 You can also check the allowlist in `src/devices/testing/fake_ddk/BUILD.gn`.
 

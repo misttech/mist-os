@@ -447,7 +447,7 @@ TEST_F(BrEdrDiscoveryManagerTest, RequestDiscoveryAndDrop) {
 
   EXPECT_EQ(2u, peers_found);
 
-  // TODO(jamuraa, fxbug.dev/668): test InquiryCancel when it is implemented
+  // TODO(jamuraa, https://fxbug.dev/668): test InquiryCancel when it is implemented
 
   session = nullptr;
   test_device()->SendCommandChannelPacket(kInquiryResult);
@@ -521,7 +521,7 @@ TEST_F(BrEdrDiscoveryManagerTest, MultipleRequests) {
   EXPECT_EQ(2u, peers_found1);
   EXPECT_EQ(2u, peers_found2);
 
-  // TODO(jamuraa, fxbug.dev/668): test InquiryCancel when it is implemented
+  // TODO(jamuraa, https://fxbug.dev/668): test InquiryCancel when it is implemented
 
   session2 = nullptr;
 
@@ -590,7 +590,7 @@ TEST_F(BrEdrDiscoveryManagerTest, RequestDiscoveryWhileStop) {
 
   // Inquiry should be restarted when the Complete comes in because an active
   // session2 still exists.
-  // TODO(jamuraa, fxbug.dev/668): test InquiryCancel when it is implemented
+  // TODO(jamuraa, https://fxbug.dev/668): test InquiryCancel when it is implemented
   EXPECT_CMD_PACKET_OUT(test_device(), kInquiry, &kInquiryRsp, &kInquiryResult);
   test_device()->SendCommandChannelPacket(kInquiryComplete);
 
@@ -607,7 +607,7 @@ TEST_F(BrEdrDiscoveryManagerTest, RequestDiscoveryWhileStop) {
   EXPECT_EQ(1u, peers_found1);
   EXPECT_EQ(3u, peers_found2);
 
-  // TODO(jamuraa, fxbug.dev/668): test InquiryCancel when it is implemented
+  // TODO(jamuraa, https://fxbug.dev/668): test InquiryCancel when it is implemented
   session2 = nullptr;
 
   // After the session is dropped, even if another result comes in, no results

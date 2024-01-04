@@ -25,7 +25,7 @@ std::variant<std::monostate, const SimpleInformationFrameHeader, const SimpleSta
 GetFrameHeaderFromPdu(const PDU& pdu) {
   const auto control_field_opt = TryCopyFromPdu<EnhancedControlField>(pdu);
   if (!control_field_opt) {
-    // TODO(fxbug.dev/1306): Add metric counting runt frames.
+    // TODO(https://fxbug.dev/1306): Add metric counting runt frames.
     return std::monostate();
   }
 
@@ -33,7 +33,7 @@ GetFrameHeaderFromPdu(const PDU& pdu) {
   if (control_field.designates_supervisory_frame()) {
     const auto frame_opt = TryCopyFromPdu<SimpleSupervisoryFrame>(pdu);
     if (!frame_opt) {
-      // TODO(fxbug.dev/1306): Add metric counting runt S-frames.
+      // TODO(https://fxbug.dev/1306): Add metric counting runt S-frames.
       return std::monostate();
     }
     return frame_opt.value();
@@ -42,7 +42,7 @@ GetFrameHeaderFromPdu(const PDU& pdu) {
   if (control_field.designates_start_of_segmented_sdu()) {
     const auto frame_opt = TryCopyFromPdu<SimpleStartOfSduFrameHeader>(pdu);
     if (!frame_opt) {
-      // TODO(fxbug.dev/1306): Add metric counting runt Start-of-SDU frames.
+      // TODO(https://fxbug.dev/1306): Add metric counting runt Start-of-SDU frames.
       return std::monostate();
     }
     return frame_opt.value();
@@ -50,7 +50,7 @@ GetFrameHeaderFromPdu(const PDU& pdu) {
 
   const auto frame_opt = TryCopyFromPdu<SimpleInformationFrameHeader>(pdu);
   if (!frame_opt) {
-    // TODO(fxbug.dev/1306): Add metric counting runt I-frames.
+    // TODO(https://fxbug.dev/1306): Add metric counting runt I-frames.
     return std::monostate();
   }
   return frame_opt.value();
@@ -93,7 +93,7 @@ ByteBufferPtr Engine::ProcessPdu(PDU pdu) {
 
   if (!IsMpsValid(pdu)) {
     // TODO(quiche): Close connection.
-    // TODO(fxbug.dev/1306): Add metric counting oversized frames.
+    // TODO(https://fxbug.dev/1306): Add metric counting oversized frames.
     return nullptr;
   }
 
@@ -194,7 +194,7 @@ ByteBufferPtr Engine::ProcessFrame(const SimpleSupervisoryFrame sframe, PDU pdu)
       // REJ_SENT state. See Core Spec, v5, Vol 3, Part A, Section 8.6.5.10, Table 8.7, "Recv
       // RR(P=1)".
       //
-      // TODO(fxbug.dev/1039): Respond with RNR when LocalBusy.
+      // TODO(https://fxbug.dev/1039): Respond with RNR when LocalBusy.
       SimpleReceiverReadyFrame poll_response;
       poll_response.set_is_poll_response();
       poll_response.set_receive_seq_num(next_seqnum_);

@@ -24,7 +24,7 @@ class AudioTunerTest : public HermeticAudioTest {
 };
 
 // Test that the user is connected to the audio tuner.
-// TODO(fxbug.dev/52962): Flesh out
+// TODO(https://fxbug.dev/52962): Flesh out
 TEST_F(AudioTunerTest, ConnectToAudioTuner) {
   fuchsia::media::tuning::AudioTunerPtr audio_tuner;
   realm().Connect(audio_tuner.NewRequest());

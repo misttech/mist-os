@@ -1185,7 +1185,7 @@ On type aliasing and named types
 ##### Footnote1
 
 Or at least, not without a good understanding of the wire format and care, e.g.
-[fxb/360015](https://fuchsia-review.googlesource.com/c/fuchsia/+/360015)
+[https://fxbug.dev/360015](https://fuchsia-review.googlesource.com/c/fuchsia/+/360015)
 
 ##### Footnote2
 

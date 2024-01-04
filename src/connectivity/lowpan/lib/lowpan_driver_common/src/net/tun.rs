@@ -35,7 +35,7 @@ const TUN_PORT_ID: u8 = 0;
 pub struct TunNetworkInterface {
     tun_dev: ftun::DeviceProxy,
     tun_port: ftun::PortProxy,
-    #[allow(unused)] // TODO(fxb/64704): use `control` after converting methods to async.
+    #[allow(unused)] // TODO(https://fxbug.dev/64704): use `control` after converting methods to async.
     control: fnetifext::admin::Control,
     control_sync: Mutex<fnetifadmin::ControlSynchronousProxy>,
     stack_sync: Mutex<fnetstack::StackSynchronousProxy>,

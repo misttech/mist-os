@@ -25,7 +25,7 @@
                     // exact hardware configuration of the board.
                     // Grant all drivers the ability to access the root
                     // resource because of this.
-                    // TODO(fxbug.dev/93188): remove this once the root
+                    // TODO(https://fxbug.dev/93188): remove this once the root
                     // resource is not widely used.
                     "/bootstrap/boot-drivers:**",
                     "/bootstrap/pkg-drivers:**",
@@ -265,7 +265,7 @@
                 source_name: "fuchsia.pkg.PackageResolver-ota",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/303275551): Update target "/core/pkg-resolver" when use-from-expose
+                    // TODO(https://fxbug.dev/303275551): Update target "/core/pkg-resolver" when use-from-expose
                     // policy check is fixed.
                     "/core/pkg-resolver",
                     "/core/system-update/system-updater",

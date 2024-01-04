@@ -159,7 +159,7 @@ def fuchsia_package_tasks(
         disable_repository_name = None,
         test_realm = None,
         **kwargs):
-    # TODO(fxbug.dev/98996): Use ffx isolation. ffx test run currently needs
+    # TODO(https://fxbug.dev/98996): Use ffx isolation. ffx test run currently needs
     # to access ~/.local/share/Fuchsia/ffx/ or else it crashes.
     top_level_tags = tags + (["no-sandbox", "no-cache"] if is_test else [])
 

@@ -29,7 +29,7 @@ mod opts;
 // files.
 //
 
-// TODO(fxbug.dev/132598): Refactor test_list_tool and reuse these structures and their parser
+// TODO(https://fxbug.dev/132598): Refactor test_list_tool and reuse these structures and their parser
 // functions.
 
 /// Deserialization wrapper for 'tests.json'
@@ -70,7 +70,7 @@ struct TestEntry {
     test_label: String,
 
     // Only fuchsia_test_package() tests have these fields.
-    // TODO(fxbug.dev/132598): Split this struct into an enum type.
+    // TODO(https://fxbug.dev/132598): Split this struct into an enum type.
     package_url: Option<String>,
     component_label: Option<String>,
     package_label: Option<String>,

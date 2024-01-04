@@ -13,7 +13,7 @@ fidl("fuchsia.memory.report") {
     "//zircon/vdso/zx",
   ]
 
-  # TODO(fxbug.dev/307580082): This protocol is under construction.
+  # TODO(https://fxbug.dev/307580082): This protocol is under construction.
   visibility = [
     "//examples/components/runner/colocated/*",
     "//src/developer/memory/*",

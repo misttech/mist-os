@@ -19,7 +19,7 @@ void UicCmdProcessor::HandleUicCmd(UicCommandOpcode value) {
   if (auto it = handlers_.find(value); it != handlers_.end()) {
     (it->second)(mock_device_, ucmdarg1, ucmdarg2, ucmdarg3);
   } else {
-    // TODO(fxbug.dev/124835): Revisit it when UICCMD error handling logic is implemented in the
+    // TODO(https://fxbug.dev/124835): Revisit it when UICCMD error handling logic is implemented in the
     // driver.
     zxlogf(ERROR, "UFS MOCK: uiccmd value: 0x%x is not supported",
            static_cast<unsigned int>(value));

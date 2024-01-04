@@ -142,13 +142,13 @@ config("carnelian-performance") {
   ]
 
   if (target_cpu == "x64") {
-    # TODO(fxbug.dev/87582): not all x64 targets are haswell.
+    # TODO(https://fxbug.dev/87582): not all x64 targets are haswell.
     # Consider moving this to a board config.
     configs += [ "//build/config/x64:haswell" ]
   }
 
   if (target_cpu == "arm64") {
-    # TODO(fxbug.dev/87243): the flag below is not added by default.
+    # TODO(https://fxbug.dev/87243): the flag below is not added by default.
     # It's safe to remove the line below when //build/config/arm64:cortex-a53
     # picks up this flag.
     # Also note that not all arm64 targets are cortex-a53.

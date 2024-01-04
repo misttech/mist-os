@@ -254,7 +254,7 @@ int Interrupts::IrqLoop() {
       }
     }
 
-    // TODO(fxbug.dev/109278): Check for Pipe D interrupts here when we support
+    // TODO(https://fxbug.dev/109278): Check for Pipe D interrupts here when we support
     //                         pipe and transcoder D.
 
     if (display_interrupts.pipe_c_pending()) {
@@ -342,7 +342,7 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
   ZX_DEBUG_ASSERT(dev);
   ZX_DEBUG_ASSERT(mmio_space);
 
-  // TODO(fxbug.dev/86038): Looks like calling Init multiple times is allowed for unit tests but it
+  // TODO(https://fxbug.dev/86038): Looks like calling Init multiple times is allowed for unit tests but it
   // would make the state of instances of this class more predictable to disallow this.
   if (irq_) {
     Destroy();

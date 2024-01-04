@@ -88,7 +88,7 @@ zx_status_t Sherlock::BluetoothInit() {
   fdf::Arena arena('BLUE');
 
   fuchsia_driver_framework::wire::BindRule kPwmBindRules[] = {
-      // TODO(fxbug.dev/129042): Replace this with wire type function.
+      // TODO(https://fxbug.dev/129042): Replace this with wire type function.
       fidl::ToWire(arena, fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
                                                   bind_fuchsia_pwm::BIND_INIT_STEP_PWM)),
   };

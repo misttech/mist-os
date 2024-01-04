@@ -102,7 +102,7 @@ pub fn simple_device_ops<T: Default + FileOps + 'static>(
     Ok(Box::new(T::default()))
 }
 
-// TODO(fxb/128798): It's ideal to support all registered device nodes.
+// TODO(https://fxbug.dev/128798): It's ideal to support all registered device nodes.
 pub fn create_unknown_device(
     _current_task: &CurrentTask,
     _id: DeviceType,

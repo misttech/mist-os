@@ -38,7 +38,7 @@ class ProcUptimeTest : public ProcTestBase {
     EXPECT_EQ(s, 2);
 
     // On Linux `idle` value may decrease, i.e. we cannot expect it to
-    // increase with `uptime` (see fxbug.dev/130494). Ignore it.
+    // increase with `uptime` (see https://fxbug.dev/130494). Ignore it.
 
     return uptime;
   }

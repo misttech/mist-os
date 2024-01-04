@@ -383,7 +383,7 @@ class CalcDependencies {
   void VisitTypeConstructor(const TypeConstructor* type_ctor) {
     VisitReference(type_ctor->layout);
 
-    // TODO(fxbug.dev/64629): Add dependencies introduced through handle constraints.
+    // TODO(https://fxbug.dev/64629): Add dependencies introduced through handle constraints.
     // This code currently assumes the handle constraints are always defined in the same
     // library as the resource_definition and so does not check for them separately.
     const auto& invocation = type_ctor->resolved_params;

@@ -9,7 +9,7 @@
 
 namespace fidl::types {
 
-// TODO(fxbug.dev/51002): zircon/types.h's zx_rights_t needs to be kept in sync with
+// TODO(https://fxbug.dev/51002): zircon/types.h's zx_rights_t needs to be kept in sync with
 // this. Eventually, zx_rights_t will be generated from a fidl
 // declaration. This is currently tested by fidl-compiler's
 // TypesTests' rights test.
@@ -36,11 +36,11 @@ enum struct Openness {
   kOpen,
 };
 
-// TODO(fxbug.dev/51002): zircon/types.h's zx_obj_type_t and related values must be
+// TODO(https://fxbug.dev/51002): zircon/types.h's zx_obj_type_t and related values must be
 // kept in sync with this. Eventually, they will be generated from
 // fidl declarations. This is currently tested by fidl-compiler's
 // TypesTests's handle_subtype test.
-// TODO(fxbug.dev/64629): Remove this enumeration once handle generalization is
+// TODO(https://fxbug.dev/64629): Remove this enumeration once handle generalization is
 // fully implemented. The enum `obj_type` defined in the FIDL library zx will
 // become the only source of truth.
 enum struct HandleSubtype : uint32_t {

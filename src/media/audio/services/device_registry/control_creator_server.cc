@@ -67,7 +67,7 @@ void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync&
   }
 
   FX_CHECK(device);
-  // TODO(fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
+  // TODO(https://fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
 
   auto control = parent_->CreateControlServer(std::move(*request.control_server()), device);
 

@@ -686,7 +686,7 @@ fn find_offer_sources(instance: &impl Component, source: &OfferSource) -> Vec<Co
         }
         OfferSource::Self_ => vec![ComponentRef::Self_],
         OfferSource::Collection(_) => {
-            // TODO(fxbug.dev/84766): Consider services routed from collections
+            // TODO(https://fxbug.dev/84766): Consider services routed from collections
             // in shutdown order.
             vec![]
         }
@@ -774,7 +774,7 @@ fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<Co
             .map(|child| child.moniker.into())
             .collect(),
         OfferTarget::Capability(_capability) => {
-            // TODO(fxbug.dev/301674053): Support dictionary routing.
+            // TODO(https://fxbug.dev/301674053): Support dictionary routing.
             vec![]
         }
     }

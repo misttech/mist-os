@@ -204,7 +204,7 @@ struct DisplayTiming {
   // - CTA-861 standard, Section 6.4 "Format of Version 2, 3 and 4 AVI
   //   InfoFrames", pages 76-77.
   //
-  // TODO(fxbug.dev/135218): Support other `pixel_repetition` values allowed by
+  // TODO(https://fxbug.dev/135218): Support other `pixel_repetition` values allowed by
   // the AVI InfoFrame.
   //
   // Must be 0 or 1.
@@ -244,7 +244,7 @@ struct DisplayTiming {
   // If `IsValid()` is true, the value is guaranteed to be >= 0 and
   // <= kMaxTimingValue.
   //
-  // TODO(fxbug.dev/136948): The current display limits may not support some
+  // TODO(https://fxbug.dev/136948): The current display limits may not support some
   // timings allowed by the VESA DisplayID standard.
   constexpr int horizontal_total_px() const { return horizontal_active_px + horizontal_blank_px(); }
 
@@ -255,7 +255,7 @@ struct DisplayTiming {
   // If `IsValid()` is true, the value is guaranteed to be >= 0 and
   // <= kMaxTimingValue.
   //
-  // TODO(fxbug.dev/136948): The current display limits may not support some
+  // TODO(https://fxbug.dev/136948): The current display limits may not support some
   // timings allowed by the VESA DisplayID standard.
   constexpr int vertical_total_lines() const {
     // Interlaced display mode has 2 blanks.

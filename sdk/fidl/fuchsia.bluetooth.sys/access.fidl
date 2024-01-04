@@ -56,7 +56,7 @@ closed protocol Access {
     /// + request `output` Bluetooth output capability
     /// + request `delegate` The client end of a PairingDelegate channel.
     /// # Deprecation - This method is folded into the fuchsia.bluetooth.sys/Pairing protocol. See
-    ///   fxbug.dev/98413 for more details on the migration.
+    ///   https://fxbug.dev/98413 for more details on the migration.
     @available(added=7, deprecated=HEAD, note="Use `sys.Pairing/SetPairingDelegate` instead")
     strict SetPairingDelegate(resource struct {
         input InputCapability;
@@ -110,7 +110,7 @@ closed protocol Access {
     ///
     /// - response `updated` Peers that were added or updated since the last call to WatchPeers().
     /// - response `removed` Ids of peers that were removed since the last call to WatchPeers().
-    // TODO(fxbug.dev/65461): Implement a pagination scheme for this method and apply suitable
+    // TODO(https://fxbug.dev/65461): Implement a pagination scheme for this method and apply suitable
     // vectors bounds. MAX will likely not prevent this method from overfilling a FIDL message if
     // the client falls behind. This can happen during device discovery as it can involve high
     // volume of peer updates.

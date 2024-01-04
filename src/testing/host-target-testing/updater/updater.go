@@ -219,7 +219,7 @@ func updateCheckNow(
 
 		err = c.Run(ctx, cmd, os.Stdout, os.Stderr)
 		if err == nil && checkForUnkownFirmware {
-			// FIXME(fxbug.dev/126805): We wouldn't have to ignore disconnects
+			// FIXME(https://fxbug.dev/126805): We wouldn't have to ignore disconnects
 			// if we could trigger an update without it automatically rebooting.
 			err = checkSyslogForUnknownFirmware(ctx, c)
 		}

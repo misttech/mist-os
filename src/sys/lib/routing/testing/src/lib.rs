@@ -371,7 +371,7 @@ macro_rules! instantiate_common_routing_tests {
         instantiate_common_routing_tests! { $builder_impl, $($remaining),+ }
     };
     ($builder_impl:path, $test:ident) => {
-        // TODO(fxbug.dev/77647): #[fuchsia::test] did not work inside a declarative macro, so this
+        // TODO(https://fxbug.dev/77647): #[fuchsia::test] did not work inside a declarative macro, so this
         // falls back on fuchsia_async and manual logging initialization for now.
         #[fuchsia_async::run_singlethreaded(test)]
         async fn $test() {

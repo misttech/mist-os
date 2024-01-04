@@ -449,7 +449,7 @@ class GNBuilder(Frontend):
             )
             # Special case: VkLayer_image_pipe_swapchain has an undocumented
             # data_dep on trace-engine. Currently atom metadata does not
-            # contain this information (fxbug.dev/46250).
+            # contain this information (https://fxbug.dev/46250).
             if layer_name == "VkLayer_image_pipe_swapchain":
                 layer.data_deps.append("../trace-engine")
 

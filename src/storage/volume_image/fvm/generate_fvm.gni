@@ -50,7 +50,7 @@ template("generate_fvm") {
       deps = []
     }
     if (defined(invoker.with_empty_data) && invoker.with_empty_data) {
-      # TODO(fxbug.dev/85165): Remove this flag and pass in an empty file instead.
+      # TODO(https://fxbug.dev/85165): Remove this flag and pass in an empty file instead.
       args += [ "--with-empty-data" ]
     }
     if (defined(invoker.partitions)) {

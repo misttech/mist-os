@@ -955,7 +955,7 @@ impl DynamicFileSource for StatusFile {
             let task_group = task.thread_group.read();
             (task_group.get_ppid(), task_group.tasks_count())
         } else {
-            // TODO(fxbug.dev/129993): The data is incorrect, and requires keeping information for zombie processes.
+            // TODO(https://fxbug.dev/129993): The data is incorrect, and requires keeping information for zombie processes.
             (1, 1)
         };
         writeln!(sink, "PPid:\t{}", ppid)?;

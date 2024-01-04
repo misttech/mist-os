@@ -780,7 +780,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let (mut buffer, size) = match iter.get() {
             Some(item) if item.key == &key => match item.value {
                 ObjectValue::Attribute { size } => {
-                    // TODO(fxbug.dev/122125): size > max buffer size
+                    // TODO(https://fxbug.dev/122125): size > max buffer size
                     (
                         store
                             .device

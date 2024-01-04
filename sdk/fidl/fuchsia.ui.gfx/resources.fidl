@@ -57,7 +57,7 @@ type ResourceArgs = strict resource union {
     // A value that can be used in place of a constant value.
    27: variable VariableArgs;
 
-    // TODO(fxbug.dev/24428): Move these where they belong.  They're added to the end
+    // TODO(https://fxbug.dev/24428): Move these where they belong.  They're added to the end
     // of the struct temporarily until we transition to xunions.
    28: point_light PointLightArgs;
    29: reserved;
@@ -203,7 +203,7 @@ type ViewHolderArgs = resource struct {
 
 /// A Compositor draws its `LayerStack` into a framebuffer provided by its
 /// attached `Display`, if any.  If no display is attached, nothing is rendered.
-// TODO(fxbug.dev/23686): there is currently no way to create/attach a display.
+// TODO(https://fxbug.dev/23686): there is currently no way to create/attach a display.
 @available(deprecated=13, removed=17, legacy=true)
 type CompositorArgs = struct {
     @allow_deprecated_struct_defaults

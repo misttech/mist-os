@@ -337,7 +337,7 @@ impl Into<u8> for &HeaderIdentifier {
 }
 
 /// Represents a user-defined Header type.
-// TODO(fxbug.dev/121500): This representation may change depending on what kind of user
+// TODO(https://fxbug.dev/121500): This representation may change depending on what kind of user
 // headers we expect.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UserDefinedHeader {
@@ -409,7 +409,7 @@ impl Header {
     /// The ISO 8601 time format used in the Time Header Packet.
     /// The format is YYYYMMDDTHHMMSSZ, where the "Z" denotes UTC time. The format is sent as a UTF-
     /// 16 null terminated string. There are 32 bytes for the time and 2 bytes for the terminator.
-    // TODO(fxbug.dev/135006): This encoding assumes the timezone is always UTC. Update this
+    // TODO(https://fxbug.dev/135006): This encoding assumes the timezone is always UTC. Update this
     // when `Header` supports timezones.
     const ISO_8601_LENGTH_BYTES: usize = 34;
 
@@ -562,7 +562,7 @@ impl Encodable for Header {
             TimeIso8601(time) => {
                 let mut formatted = time.format(Self::ISO_8601_TIME_FORMAT).to_string();
                 // Always assume it's UTC.
-                // TODO(fxbug.dev/135006): Conditionally do this when we store timezones.
+                // TODO(https://fxbug.dev/135006): Conditionally do this when we store timezones.
                 formatted.push('Z');
                 let s = ObexString::from(formatted).to_be_bytes();
                 buf[start_index..start_index + s.len()].copy_from_slice(&s);
@@ -636,7 +636,7 @@ impl Decodable for Header {
             }
             HeaderIdentifier::TimeIso8601 => {
                 let mut time_str = ObexString::try_from(data).map(|s| s.to_string())?;
-                // TODO(fxbug.dev/135006): In some cases, the peer can send a local time instead of
+                // TODO(https://fxbug.dev/135006): In some cases, the peer can send a local time instead of
                 // UTC. The timezone is not specified. Figure out how to represent this using
                 // DateTime/NaiveDateTime.
                 if time_str.ends_with("Z") {

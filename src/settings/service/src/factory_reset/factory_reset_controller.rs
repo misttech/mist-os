@@ -100,7 +100,7 @@ impl FactoryResetManager {
         Ok(())
     }
 
-    #[allow(clippy::result_large_err)] // TODO(fxbug.dev/117896)
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/117896)
     fn get(&self) -> SettingHandlerResult {
         Ok(Some(FactoryResetInfo::new(self.is_local_reset_allowed).into()))
     }

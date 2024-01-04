@@ -54,7 +54,7 @@ func writeFunctionIndex(index *Index, f io.Writer) {
 
 	// Collect function info by group.
 	//
-	// TODO(fxbug.dev/119085) this can generate duplicate link texts for functions with
+	// TODO(https://fxbug.dev/119085) this can generate duplicate link texts for functions with
 	// overrides or template specializations. It would be nice to check for this case and
 	// disambiguate the link text with template parameters and/or function parameters.
 	//

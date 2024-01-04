@@ -376,7 +376,7 @@ using gizmotronics.gizmo;
 pci.device_id == gizmotronics.gizmo.device_id.GIZMO_VER_1
 ```
 
-WARNING: Extending new keys (fxb/95933) and aliasing namespaces (fxb/95939) are currently unsupported.
+WARNING: Extending new keys (https://fxbug.dev/95933) and aliasing namespaces (https://fxbug.dev/95939) are currently unsupported.
 
 ### Keys and values
 

@@ -105,7 +105,7 @@ zx_status_t Device::HandleArpReq(const ArpFrame& arp_frame) {
 }
 
 void Device::GenEthArpResp(const ArpFrame& req, EthArpFrame* resp) {
-  // TODO(fxbug.dev/40051): Generate fake mac address to support multiple
+  // TODO(https://fxbug.dev/40051): Generate fake mac address to support multiple
   // cellular devices.
   // Eth header
   // eth_dst_mac_addr_ is ensured to be not null when calling this method.
@@ -495,7 +495,7 @@ void Device::SnoopQmiMsgSend(uint8_t* msg_arr, uint32_t msg_arr_len,
   memcpy(qmi_msg.opaque_bytes.data_, msg_arr, current_length);
   telephony_snoop::wire::Message snoop_msg = telephony_snoop::wire::Message::WithQmiMessage(
       fidl::ObjectView<telephony_snoop::wire::QmiMessage>::FromExternal(&qmi_msg));
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)fidl::WireCall(snoop_client_end_)->SendMessage(std::move(snoop_msg));
 }
 

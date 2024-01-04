@@ -92,7 +92,7 @@ class SurfaceBufferManager {
   // into account the pixel format.
   virtual gfx::Size GetRequiredSurfaceSize(const gfx::Size& picture_size) = 0;
 
-  // TODO(fxbug.dev/109108): This is a temporary workaround until the new media APIs are adopted
+  // TODO(https://fxbug.dev/109108): This is a temporary workaround until the new media APIs are adopted
   // Returns true if the surface manager can not have outstanding reference frames when new buffers
   // are required to hold the new coded picture size.
   virtual bool NeedsKeyframeForBufferAllocation() const = 0;
@@ -416,7 +416,7 @@ class CodecAdapterVaApiDecoder : public CodecAdapter {
       constraints.min_buffer_count_for_camping =
           static_cast<uint32_t>(media_decoder_->GetRequiredNumOfPictures());
       constraints.has_buffer_memory_constraints = true;
-      // TODO(fxbug.dev/94140): Add RAM domain support.
+      // TODO(https://fxbug.dev/94140): Add RAM domain support.
       constraints.buffer_memory_constraints.cpu_domain_supported = true;
 
       // Lamdba that will set the common constraint values regardless of what format modifier value

@@ -302,7 +302,7 @@ pub struct InspectMetadata {
 /// `DataSource::Logs`.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct LogsMetadata {
-    // TODO(fxbug.dev/58369) figure out exact spelling of pid/tid context and severity
+    // TODO(https://fxbug.dev/58369) figure out exact spelling of pid/tid context and severity
     /// Optional vector of errors encountered by platform.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub errors: Option<Vec<LogError>>,
@@ -473,7 +473,7 @@ impl PartialOrd<FidlSeverity> for Severity {
 pub struct Data<D: DiagnosticsData> {
     /// The source of the data.
     #[serde(default)]
-    // TODO(fxbug.dev/58033) remove this once the Metadata enum is gone everywhere
+    // TODO(https://fxbug.dev/58033) remove this once the Metadata enum is gone everywhere
     pub data_source: DataSource,
 
     /// The metadata for the diagnostics payload.
@@ -524,7 +524,7 @@ where
             }
         };
 
-        // TODO(fxbug.dev/300319116): Cache the `HierarchyMatcher`s
+        // TODO(https://fxbug.dev/300319116): Cache the `HierarchyMatcher`s
         let matcher: HierarchyMatcher = match matching_selectors.try_into() {
             Ok(hierarchy_matcher) => hierarchy_matcher,
             Err(e) => {
@@ -1342,7 +1342,7 @@ impl fmt::Display for LogsField {
     }
 }
 
-// TODO(fxbug.dev/50519) - ensure that strings reported here align with naming
+// TODO(https://fxbug.dev/50519) - ensure that strings reported here align with naming
 // decisions made for the structured log format sent by other components.
 /// The label for the process koid in the log metadata.
 pub const PID_LABEL: &str = "pid";
@@ -1760,7 +1760,7 @@ mod tests {
         .add_tag("You're")
         .add_tag("IT!")
         .add_key(LogsProperty::String(LogsField::Other("key".to_string()), "value".to_string()));
-        // TODO(http://fxbug.dev/77054): Convert to our custom DSL when possible.
+        // TODO(https://fxbug.dev/77054): Convert to our custom DSL when possible.
         let expected_json = json!({
           "moniker": "moniker",
           "version": 1,

@@ -118,7 +118,7 @@ TEST_F(AudioRendererPipelineTestInt16, RenderSameFrameRate) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -156,7 +156,7 @@ TEST_F(AudioRendererPipelineTestInt16, RenderFasterFrameRate) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -209,7 +209,7 @@ TEST_F(AudioRendererPipelineTestInt16, RenderSlowerFrameRate) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -271,7 +271,7 @@ TEST_F(AudioRendererPipelineTestInt16, PlayRampUp) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -346,7 +346,7 @@ TEST_F(AudioRendererPipelineTestInt16, PauseRampDown) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -514,7 +514,7 @@ TEST_F(AudioRendererPipelineTestInt16, DiscardDuringPlayback) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -552,7 +552,7 @@ TEST_F(AudioRendererPipelineTestInt16, DiscardDuringPlayback) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -579,7 +579,7 @@ TEST_F(AudioRendererPipelineTestInt16, DiscardDuringPlayback) {
       AudioBufferSlice<ASF::SIGNED_16>(), opts);
 }
 
-// TODO(fxbug.dev/74985): Parameterize gainramp tests (volume-change, Play, Pause) for shared code.
+// TODO(https://fxbug.dev/74985): Parameterize gainramp tests (volume-change, Play, Pause) for shared code.
 TEST_F(AudioRendererPipelineTestInt16, RampOnGainChanges) {
   fuchsia::media::audio::VolumeControlPtr volume;
   audio_core_->BindUsageVolumeControl(
@@ -610,7 +610,7 @@ TEST_F(AudioRendererPipelineTestInt16, RampOnGainChanges) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -681,7 +681,7 @@ TEST_F(AudioRendererPipelineTestInt16, SetGainBeforeSetFormat) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -731,7 +731,7 @@ TEST_F(AudioRendererPipelineTestFloat, NoDistortionOnGainChanges) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -860,7 +860,7 @@ class AudioRendererGainLimitsTest : public AudioRendererPipelineTestFloat {
 
     if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
       // In case of underflows, exit NOW (don't assess this buffer).
-      // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+      // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
       if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
         GTEST_SKIP() << "Skipping data checks due to underflows";
         __builtin_unreachable();
@@ -1113,7 +1113,7 @@ TEST_F(AudioRendererEffectsV1Test, RenderWithEffects) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -1179,7 +1179,7 @@ TEST_F(AudioRendererEffectsV1Test, EffectsControllerUpdateEffect) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -1272,7 +1272,7 @@ TEST_F(AudioRendererEffectsV2Test, RenderWithEffects) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -1378,7 +1378,7 @@ TEST_F(AudioRendererPipelineTuningTest, CorrectStreamOutputUponUpdatedPipeline) 
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -1444,7 +1444,7 @@ TEST_F(AudioRendererPipelineTuningTest, CorrectStreamOutputUponUpdatedPipeline) 
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(device_id)) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
@@ -1495,7 +1495,7 @@ TEST_F(AudioRendererPipelineTuningTest, AudioTunerUpdateEffect) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(device_id)) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();

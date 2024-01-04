@@ -289,7 +289,7 @@ impl Puppet {
 
         let mut runner = TestRunner::new_with_rng(
             ProptestConfig { cases: 2048, failure_persistence: None, ..Default::default() },
-            // TODO(fxbug.dev/66783) use TestRng::from_seed
+            // TODO(https://fxbug.dev/66783) use TestRng::from_seed
             TestRng::deterministic_rng(RngAlgorithm::ChaCha),
         );
 
@@ -560,7 +560,7 @@ impl TestVector {
 fn vector_filter(vector: &TestVector) -> bool {
     // check to make sure the generated message is small enough
     let record = vector.record();
-    // TODO(fxbug.dev/66785) avoid this overallocation by supporting growth of the vec
+    // TODO(https://fxbug.dev/66785) avoid this overallocation by supporting growth of the vec
     let mut buf = Cursor::new(vec![0; 1_000_000]);
     {
         diagnostics_log_encoding::encode::Encoder::new(&mut buf).write_record(&record).unwrap();

@@ -244,7 +244,7 @@ mod tests {
          $(golden_structured_outfile: $golden_structured_outfile: literal)?
          should_contain: $should_contain: expr
          ) => {
-            // TODO(fxbug.dev/77647): use fuchsia::test
+            // TODO(https://fxbug.dev/77647): use fuchsia::test
             #[fuchsia_async::run_singlethreaded(test)]
             async fn $name() -> Result<()> {
                 let config = vec![$($($config),+)?];

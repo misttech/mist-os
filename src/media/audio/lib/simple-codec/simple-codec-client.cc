@@ -130,7 +130,7 @@ zx_status_t SimpleCodecClient::SetCodec(
         }
         break;
       default:
-        // TODO(fxbug.dev/110245): Handle default case.
+        // TODO(https://fxbug.dev/110245): Handle default case.
         break;
     }
   }

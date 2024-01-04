@@ -307,7 +307,7 @@ zx_status_t Guest::Init(uint64_t guest_memory, uint64_t pluggable_region_size,
     // So, leave the pluggable memory region part of vmar_regions and remove it
     // from memory_regions_ which will be later used to set up e820 map
     //
-    // TODO(fxbug.dev/100514): Get virtio-mem to take the guest and host vmars,
+    // TODO(https://fxbug.dev/100514): Get virtio-mem to take the guest and host vmars,
     // keep all pluggable memory unmapped and only map plugged regions. This
     // would require adding EXECUTE and perhaps other flags to the vmo which is
     // passed to the virtio-mem. Mapping only plugged regions can make existing

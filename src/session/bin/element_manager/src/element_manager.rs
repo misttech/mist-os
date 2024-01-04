@@ -354,7 +354,7 @@ impl ElementManager {
             )
             .await
             .map_err(|err| {
-                // TODO(fxbug.dev/82894): ProposeElement should propagate GraphicalPresenter errors back to caller
+                // TODO(https://fxbug.dev/82894): ProposeElement should propagate GraphicalPresenter errors back to caller
                 error!(?err, "ProposeElement() failed to present element");
                 felement::ProposeElementError::InvalidArgs
             })?;
@@ -449,7 +449,7 @@ async fn handle_element_controller_stream(
     annotation_holder: Arc<Mutex<AnnotationHolder>>,
     stream: Option<felement::ControllerRequestStream>,
 ) {
-    // TODO(fxbug.dev/83326): Unify this with handle_annotation_controller_stream(), once FIDL
+    // TODO(https://fxbug.dev/83326): Unify this with handle_annotation_controller_stream(), once FIDL
     // provides a mechanism to do so.
     if let Some(mut stream) = stream {
         let mut watch_subscriber = annotation_holder.lock().await.new_watch_subscriber();
@@ -484,7 +484,7 @@ async fn handle_element_controller_stream(
                     if let Err(e) = watch_subscriber
                         .watch_annotations(WatchResponder::ElementController(responder))
                     {
-                        // There is already a `WatchAnnotations` request pending for the client. Since the responder gets dropped (TODO(fxbug.dev/94602)), the connection will be closed to indicate unexpected client behavior.
+                        // There is already a `WatchAnnotations` request pending for the client. Since the responder gets dropped (TODO(https://fxbug.dev/94602)), the connection will be closed to indicate unexpected client behavior.
                         error!("ControllerRequest error: {}. Dropping connection", e);
                         stream.control_handle().shutdown_with_epitaph(zx::Status::BAD_STATE);
                         return;

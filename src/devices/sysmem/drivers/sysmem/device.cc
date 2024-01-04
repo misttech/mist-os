@@ -829,7 +829,7 @@ zx_status_t Device::CommonSysmemRegisterSecureMem(
             // listens for suspend(mexec) so that soft reboot can succeed.  If that driver has
             // failed, intentionally force a hard reboot here to get back to a known-good state.
             //
-            // TODO(fxbug.dev/98039): When there's any more direct/immediate way to
+            // TODO(https://fxbug.dev/98039): When there's any more direct/immediate way to
             // intentionally trigger a hard reboot, switch to that (or just remove this TODO
             // when sysmem terminating directly leads to a hard reboot).
             ZX_PANIC(

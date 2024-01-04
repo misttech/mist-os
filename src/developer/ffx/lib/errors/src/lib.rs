@@ -23,7 +23,7 @@ pub mod macro_deps {
 /// other error types are printed with full context and a BUG prefix, guiding the user to file bugs
 /// to improve the error condition that they have experienced, with a goal to maximize actionable
 /// errors over time.
-// TODO(fxbug.dev/57592): consider extending this to allow custom types from plugins.
+// TODO(https://fxbug.dev/57592): consider extending this to allow custom types from plugins.
 #[derive(thiserror::Error, Debug)]
 pub enum FfxError {
     #[error("{}", .0)]
@@ -112,7 +112,7 @@ pub fn map_daemon_error(svc_name: &str, err: DaemonError) -> anyhow::Error {
             "The daemon protocol '{svc_name}' did not match any protocols on the daemon
 If you are not developing this plugin or the protocol it connects to, then this is a bug
 
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
+Please report it at https://fxbug.dev/new/ffx+User+Bug."
         ),
         DaemonError::ProtocolOpenError => anyhow!(
             "The daemon protocol '{svc_name}' failed to open on the daemon.
@@ -122,7 +122,7 @@ function. See the ffx.daemon.log for details at `ffx config get log.dir -p sub`.
 
 If you are NOT developing this plugin or the protocol it connects to, then this is a bug.
 
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
+Please report it at https://fxbug.dev/new/ffx+User+Bug."
         ),
         unexpected => anyhow!(
 "While attempting to open the daemon protocol '{svc_name}', received an unexpected error:
@@ -130,7 +130,7 @@ Please report it at http://fxbug.dev/new/ffx+User+Bug."
 {unexpected:?}
 
 This is not intended behavior and is a bug.
-Please report it at http://fxbug.dev/new/ffx+User+Bug."
+Please report it at https://fxbug.dev/new/ffx+User+Bug."
 
         ),
     }

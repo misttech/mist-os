@@ -213,7 +213,7 @@ zx_status_t PtyClient::Write(const void* data, size_t count, size_t* out_actual)
     }
 
     // Send the translated line ending.
-    // TODO(fxbug.dev/35945): Prevent torn writes here by wiring through support
+    // TODO(https://fxbug.dev/35945): Prevent torn writes here by wiring through support
     // for Fifo::Write's "atomic" flag.
     status = WriteChunk("\r\n", 2, &chunk_actual);
     if (status != ZX_OK) {

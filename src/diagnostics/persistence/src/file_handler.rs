@@ -118,7 +118,7 @@ pub(crate) fn write(service_name: &ServiceName, tag: &Tag, data: &PersistSchema)
 }
 
 // All the names in the previous-boot directory.
-// TODO(fxbug.dev/71350): If this gets big, use Lazy Inspect.
+// TODO(https://fxbug.dev/71350): If this gets big, use Lazy Inspect.
 pub(crate) fn remembered_data() -> Result<Vec<(String, Vec<(String, String)>)>, Error> {
     // Counter for number of tags successfully retrieved. If no persisted tags were
     // retrieved, this method returns an error.

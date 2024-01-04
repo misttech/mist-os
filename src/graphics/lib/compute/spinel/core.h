@@ -641,7 +641,7 @@
 //
 // TTCK (64-BIT COMPARE) -- DEFAULT
 //
-// TODO(fxbug.dev/112827): The TTSB encoding should encode TTP values between
+// TODO(https://fxbug.dev/112827): The TTSB encoding should encode TTP values between
 // -1073741824 to 1073741823 (signed 31 bit integer). LAYER bits rise to 19.
 //
 //  0                                                  63

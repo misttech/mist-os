@@ -33,7 +33,7 @@ config("suppress-warning.config") {
   visibility = [
     ":*",
 
-    # TODO(fxbug.dev/44971): Referenced in environment configs.
+    # TODO(https://fxbug.dev/44971): Referenced in environment configs.
     "//build/config/*",
     "//sdk/fidl/zbi:*",
     "//sdk/lib/fit/*",

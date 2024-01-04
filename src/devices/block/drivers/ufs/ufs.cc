@@ -148,7 +148,7 @@ void Ufs::ProcessCompletions() { transfer_request_processor_->RequestCompletion(
 zx::result<> Ufs::Isr() {
   auto interrupt_status = InterruptStatusReg::Get().ReadFrom(&mmio_);
 
-  // TODO(fxbug.dev/124835): implement error handlers
+  // TODO(https://fxbug.dev/124835): implement error handlers
   if (interrupt_status.uic_error()) {
     zxlogf(ERROR, "UFS: UIC error on ISR");
     InterruptStatusReg::Get().FromValue(0).set_uic_error(true).WriteTo(&mmio_);
@@ -179,7 +179,7 @@ zx::result<> Ufs::Isr() {
     sync_completion_signal(&io_signal_);
   }
   if (interrupt_status.utp_task_management_request_completion_status()) {
-    // TODO(fxbug.dev/124835): Handle UTMR completion
+    // TODO(https://fxbug.dev/124835): Handle UTMR completion
     zxlogf(ERROR, "UFS: UTMR completion not yet implemented");
     InterruptStatusReg::Get()
         .FromValue(0)
@@ -187,7 +187,7 @@ zx::result<> Ufs::Isr() {
         .WriteTo(&mmio_);
   }
   if (interrupt_status.uic_command_completion_status()) {
-    // TODO(fxbug.dev/124835): Handle UIC completion
+    // TODO(https://fxbug.dev/124835): Handle UIC completion
     zxlogf(ERROR, "UFS: UIC completion not yet implemented");
     InterruptStatusReg::Get().FromValue(0).set_uic_command_completion_status(true).WriteTo(&mmio_);
   }
@@ -233,7 +233,7 @@ int Ufs::IoLoop() {
     }
     sync_completion_reset(&io_signal_);
 
-    // TODO(fxbug.dev/124835): Process async completions
+    // TODO(https://fxbug.dev/124835): Process async completions
 
     if (!disable_completion_) {
       ProcessCompletions();
@@ -306,7 +306,7 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
   fzl::VmoMapper mapper;
   if (data_direction != DataDirection::kNone) {
     // Allocate a response data buffer.
-    // TODO(fxbug.dev/124835): We need to pre-allocate a data buffer that will be used in the Sync
+    // TODO(https://fxbug.dev/124835): We need to pre-allocate a data buffer that will be used in the Sync
     // command.
     if (zx::result<> result = AllocatePages(data_vmo, mapper, data.iov_len); result.is_error()) {
       return result.error_value();
@@ -415,7 +415,7 @@ zx::result<> Ufs::InitController() {
       CapabilityReg::Get().ReadFrom(&mmio_).number_of_utp_task_management_request_slots() + 1);
   zxlogf(DEBUG, "number_of_task_management_request_slots=%d",
          number_of_task_management_request_slots);
-  // TODO(fxbug.dev/124835): Create TaskManagementRequestProcessor
+  // TODO(https://fxbug.dev/124835): Create TaskManagementRequestProcessor
 
   uint8_t number_of_transfer_request_slots = safemath::checked_cast<uint8_t>(
       CapabilityReg::Get().ReadFrom(&mmio_).number_of_utp_transfer_request_slots() + 1);
@@ -485,14 +485,14 @@ zx::result<> Ufs::InitDeviceInterface() {
   }
   zxlogf(INFO, "UFS device found");
 
-  // TODO(fxbug.dev/124835): Init task management request processor
+  // TODO(https://fxbug.dev/124835): Init task management request processor
 
   if (zx::result<> result = transfer_request_processor_->Init(); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize transfer request processor %s", result.status_string());
     return result.take_error();
   }
 
-  // TODO(fxbug.dev/124835): Configure interrupt aggregation. (default 0)
+  // TODO(https://fxbug.dev/124835): Configure interrupt aggregation. (default 0)
 
   NopOutUpiu nop_upiu;
   auto nop_response = transfer_request_processor_->SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_upiu);
@@ -525,7 +525,7 @@ zx::result<> Ufs::InitDeviceInterface() {
     return result.take_error();
   }
 
-  // TODO(fxbug.dev/124835): Set bMaxNumOfRTT (Read-to-transfer)
+  // TODO(https://fxbug.dev/124835): Set bMaxNumOfRTT (Read-to-transfer)
 
   return zx::ok();
 }
@@ -633,8 +633,8 @@ zx::result<uint8_t> Ufs::AddLogicalUnits() {
     ++lun_count;
   }
 
-  // TODO(fxbug.dev/124835): Send a request sense command to clear the UAC of a well-known LU.
-  // TODO(fxbug.dev/124835): We need to implement the processing of a well-known LU.
+  // TODO(https://fxbug.dev/124835): Send a request sense command to clear the UAC of a well-known LU.
+  // TODO(https://fxbug.dev/124835): We need to implement the processing of a well-known LU.
 
   return zx::ok(lun_count);
 }

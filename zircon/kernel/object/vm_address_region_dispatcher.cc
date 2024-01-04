@@ -188,7 +188,7 @@ zx::result<VmAddressRegionDispatcher::MapResult> VmAddressRegionDispatcher::Map(
   if (vmar_flags & VMAR_FLAG_ALLOW_FAULTS) {
     vmar_flags &= ~VMAR_FLAG_ALLOW_FAULTS;
   } else {
-    // TODO(fxbug.dev/34483): Add additional checks once all clients (resizable and pager-backed
+    // TODO(https://fxbug.dev/34483): Add additional checks once all clients (resizable and pager-backed
     // VMOs) start using the VMAR_FLAG_ALLOW_FAULTS flag.
     if (vmo->is_discardable()) {
       return zx::error{ZX_ERR_NOT_SUPPORTED};
@@ -231,7 +231,7 @@ zx_status_t VmAddressRegionDispatcher::RangeOp(uint32_t op, vaddr_t base, size_t
 
   const VmAddressRegionOpChildren op_children = op_children_from_rights(rights);
 
-  // TODO(fxbug.dev/39956): Restrict these operations based on the passed in |rights|.
+  // TODO(https://fxbug.dev/39956): Restrict these operations based on the passed in |rights|.
   if (op == ZX_VMAR_OP_COMMIT) {
     return vmar_->RangeOp(VmAddressRegion::RangeOpType::Commit, base, len, op_children, buffer,
                           buffer_size);

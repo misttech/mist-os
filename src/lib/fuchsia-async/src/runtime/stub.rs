@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 // This file contains a stub runtime that panics if it is ever used.
-// TODO(fxbug.dev/56078): Remove this once smol supports WASM.
+// TODO(https://fxbug.dev/56078): Remove this once smol supports WASM.
 
 pub mod task {
     use futures::prelude::Future;

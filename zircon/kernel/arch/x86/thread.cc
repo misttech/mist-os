@@ -112,7 +112,7 @@ static void x86_context_switch_spec_mitigations(Thread* oldthread, Thread* newth
   // 2) We are switching from the kernel address space to a user address space and the
   //    new user address space is not the same as the last user address space that ran
   //    on this core.
-  // TODO(fxbug.dev/39621): Handle aspace* reuse.
+  // TODO(https://fxbug.dev/39621): Handle aspace* reuse.
   if (x86_cpu_should_ibpb_on_ctxt_switch() &&
       (((oldthread->active_aspace() && newthread->active_aspace()) &&
         (oldthread->active_aspace() != newthread->active_aspace())) ||

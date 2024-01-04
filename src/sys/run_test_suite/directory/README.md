@@ -71,6 +71,6 @@ supported artifacts.
 
 ## Future work
 
-1. Publish schemas in the SDK (fxbug.dev/81195)
+1. Publish schemas in the SDK (https://fxbug.dev/81195)
 
 [schemas][./schemas]

@@ -213,7 +213,7 @@ distributed in the Go host toolchain prebuilts.
 prebuilt/third_party/go/$HOST_PLATFORM/bin/gofmt -s -w $FILES
 ```
 
-TODO(fxbug.dev/27310): Document go vet once implementation details are finalized.
+TODO(https://fxbug.dev/27310): Document go vet once implementation details are finalized.
 
 ## FIDL
 

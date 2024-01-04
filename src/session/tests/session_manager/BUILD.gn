@@ -49,7 +49,7 @@ fuchsia_test_package("package") {
   ]
 }
 
-# TODO(fxbug.dev/126272): Configuration gets specified using RealmBuilder, but
+# TODO(https://fxbug.dev/126272): Configuration gets specified using RealmBuilder, but
 # we need to provide values in the package for reasons (see bug). Include some
 # bogus defaults.
 fuchsia_structured_config_values("bogus_session_manager_test_config_values") {

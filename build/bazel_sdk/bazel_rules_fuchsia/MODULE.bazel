@@ -8,7 +8,7 @@
 module(
     name = "fuchsia_workspace",
     version = "0.0.1",
-    #TODO(fxbug.dev/108139) add bazel_compatibility when it is ready
+    #TODO(https://fxbug.dev/108139) add bazel_compatibility when it is ready
 )
 
 # Required Dependencies

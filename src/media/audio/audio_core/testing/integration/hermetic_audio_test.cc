@@ -171,7 +171,7 @@ void HermeticAudioTest::SetUp() {
 
 void HermeticAudioTest::TearDown() {
   TRACE_DURATION_END("audio", "HermeticAudioTest::RunTestBody");
-  // TODO(fxbug.dev/68206) Remove this and enable client-side FIDL errors.
+  // TODO(https://fxbug.dev/68206) Remove this and enable client-side FIDL errors.
   fidl::internal::TransitoryProxyControllerClientSideErrorDisabler client_side_error_disabler_;
 
   // Remove all components.

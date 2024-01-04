@@ -338,7 +338,7 @@ zx_status_t FvmInitPreallocated(fidl::UnownedClientEnd<fuchsia_hardware_block::B
   }
 
   // This buffer needs to hold both copies of the metadata.
-  // TODO(fxbug.dev/60709): Eliminate layout assumptions.
+  // TODO(https://fxbug.dev/60709): Eliminate layout assumptions.
   size_t metadata_allocated_bytes = header.GetMetadataAllocatedBytes();
   size_t dual_metadata_bytes = metadata_allocated_bytes * 2;
   std::unique_ptr<uint8_t[]> mvmo(new uint8_t[dual_metadata_bytes]);

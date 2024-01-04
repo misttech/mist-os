@@ -12,7 +12,7 @@ group("tests") {
     ":process_explorer_unit_tests",
   ]
 
-  # TODO(fxbug.dev/315843056): Remove this exception when tests run properly.
+  # TODO(https://fxbug.dev/315843056): Remove this exception when tests run properly.
   if (is_asan) {
     deps -= [ ":process_explorer_integration_tests" ]
   }

@@ -32,8 +32,8 @@
 // PageCache provides a front end to the PMM that reserves a given number of
 // pages in per-CPU caches to reduce contention on the PMM.
 //
-// TODO(fxbug.dev/68453): Add support for KASAN.
-// TODO(fxbug.dev/68455): Flush page caches when CPUs go offline.
+// TODO(https://fxbug.dev/68453): Add support for KASAN.
+// TODO(https://fxbug.dev/68455): Flush page caches when CPUs go offline.
 //
 
 namespace page_cache {

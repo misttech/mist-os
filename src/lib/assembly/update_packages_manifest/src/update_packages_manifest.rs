@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 
 /// A list of all packages included in an update, which can be written as a JSON
 /// packages manifest.
-/// TODO(fxbug.dev/76488): Share this enum with the rest of the SWD code.
+/// TODO(https://fxbug.dev/76488): Share this enum with the rest of the SWD code.
 ///
 /// ```json
 /// {

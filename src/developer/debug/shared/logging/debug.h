@@ -27,7 +27,7 @@ bool IsDebugLoggingActive();
 // Although you usually want more options such as
 //   fx log --select core/debug_agent#DEBUG --tag debug_agent --since_now --hide_metadata --pretty
 //
-// `ffx log` doesn't work yet because of fxbug.dev/99937.
+// `ffx log` doesn't work yet because of https://fxbug.dev/99937.
 
 // Log Categories ----------------------------------------------------------------------------------
 

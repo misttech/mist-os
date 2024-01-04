@@ -71,12 +71,12 @@ TEST(HardwareCommonTest, TigerLake) {
   EXPECT_THAT(ddis, testing::Contains(DdiId::DDI_C).Times(1));
   EXPECT_THAT(ddis, testing::Contains(DdiId::DDI_TC_6).Times(1));
 
-  // TODO(fxbug.dev/109278): Update the test once Pipe D is supported.
+  // TODO(https://fxbug.dev/109278): Update the test once Pipe D is supported.
   auto pipes = PipeIds<registers::Platform::kTigerLake>();
   EXPECT_EQ(pipes.size(), 3u);
   EXPECT_THAT(pipes, testing::UnorderedElementsAre(PipeId::PIPE_A, PipeId::PIPE_B, PipeId::PIPE_C));
 
-  // TODO(fxbug.dev/109278): Update the test once Transcoder D is supported.
+  // TODO(https://fxbug.dev/109278): Update the test once Transcoder D is supported.
   auto transcoders = TranscoderIds<registers::Platform::kTigerLake>();
   EXPECT_EQ(transcoders.size(), 3u);
   // There is no eDP Transcoder.

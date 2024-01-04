@@ -37,4 +37,4 @@ aspects of the component framework is layered on top of bedrock.
 - APIs and their implementation reference concepts in this document and reflect
   their invariants in a verifiable fashion.
 
-TODO(fxbug.dev/129662): start filling out the model.
+TODO(https://fxbug.dev/129662): start filling out the model.

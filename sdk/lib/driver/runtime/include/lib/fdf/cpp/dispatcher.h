@@ -42,7 +42,7 @@ namespace fdf {
 //   }
 //
 //   void Driver::Start() {
-//     // TODO(fxb/85946): update this once scheduler_role is supported.
+//     // TODO(https://fxbug.dev/85946): update this once scheduler_role is supported.
 //     const std::string_view scheduler_role = "";
 //     const std::string_view name = "MyDriver";
 //

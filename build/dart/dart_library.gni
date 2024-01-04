@@ -50,14 +50,14 @@ import("//build/toolchain/concurrent_jobs.gni")
 #   deps (optional)
 #     List of labels this library depends on.
 #
-#   TODO(fxb/63133): non_dart_deps is deprecated. Use deps instead.
+#   TODO(https://fxbug.dev/63133): non_dart_deps is deprecated. Use deps instead.
 #   non_dart_deps (optional, deprecated)
 #     List of labels this library depends on that are not Dart libraries. This
 #     includes things like actions that generate Dart code. It typically doesn't
 #     need to be set.
 #     Note that these labels *must* have an explicit toolchain attached.
 #
-#   TODO(fxbug.dev/71902): set up allowlist for disable_source_verification when
+#   TODO(https://fxbug.dev/71902): set up allowlist for disable_source_verification when
 #   dart_test no longer depends on dart_library.
 #   NOTE: Do NOT disable source verification unless you are 100% sure it is
 #   absolutely necessary.
@@ -223,7 +223,7 @@ if (current_toolchain == dart_toolchain) {
     dart_package_config(_dart_package_config_target_name) {
       # Do not publish the metadata to the dart_package_config json file if the
       # disable_metadata_entry flag is enabled in the dart_tool. The reason this is here
-      # is to avoid entries that may have identical rootUris as fxb/58781 has highlighted.
+      # is to avoid entries that may have identical rootUris as https://fxbug.dev/58781 has highlighted.
       deps = _dart_deps
       if (!defined(invoker.disable_metadata_entry) ||
           !invoker.disable_metadata_entry) {

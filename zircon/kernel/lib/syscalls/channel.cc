@@ -141,7 +141,7 @@ static __WARN_UNUSED_RESULT zx_status_t msg_get_handles(ProcessDispatcher* up, M
       }
     }
     HandleOwner handle(handle_list[i]);
-    // TODO(fxbug.dev/30916): This takes a lock per call. Consider doing these in a batch.
+    // TODO(https://fxbug.dev/30916): This takes a lock per call. Consider doing these in a batch.
     up->handle_table().AddHandle(ktl::move(handle));
   }
   msg->set_owns_handles(false);

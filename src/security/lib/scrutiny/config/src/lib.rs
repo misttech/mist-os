@@ -146,7 +146,7 @@ impl From<String> for LoggingVerbosity {
 /// should be tracked here so it is easy to modify all collectors if these
 /// paths or urls change in future releases.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
-// TODO(fxbug.dev/83871): Borrow instead of clone() and allow clients to clone
+// TODO(https://fxbug.dev/83871): Borrow instead of clone() and allow clients to clone
 // only when necessary.
 pub struct ModelConfig {
     /// Path to the model data.

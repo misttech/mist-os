@@ -44,17 +44,17 @@ configuration values, but these have not yet been built pending near-term use
 cases. If your use case requires any of these features, please comment on the
 tracking bug linked below for the feature:
 
-- **Development overrides ([fxbug.dev/96260][bug.96260]**). This would let
+- **Development overrides ([https://fxbug.dev/96260][bug.96260]**). This would let
   developers change configuration at runtime on engineering builds, for example
   to use pre-release features.
-- **Vbmeta ([fxbug.dev/96261][bug.96261]**). This would let signed configuration
+- **Vbmeta ([https://fxbug.dev/96261][bug.96261]**). This would let signed configuration
   be modified for a release without building a new image.
-- **Parent component ([fxbug.dev/96254][bug.96254]**). This would let a
+- **Parent component ([https://fxbug.dev/96254][bug.96254]**). This would let a
   component specify configuration for children in a dynamic collection as it
   creates those children. This requires a consistent definition of the
   configuration between the two components so may only be supported between
   components in the same image or package.
-- **Fleet and enterprise management ([fxbug.dev/104596][bug.104596])**. This
+- **Fleet and enterprise management ([https://fxbug.dev/104596][bug.104596])**. This
   would let structured configuration be used for incremental rollouts, running
   A/B experiments and enterprise policy enforcement, similar to the experiment
   systems in other large platforms.

@@ -247,7 +247,7 @@ constexpr ErrorDef<118, std::string_view, std::string_view, const flat::Decl *>
         "client_end / server_end of transport type {0} may not be sent over "
         "transport {1} used by {2}");
 constexpr ErrorDef<119, std::string_view> ErrEventErrorSyntaxDeprecated(
-    "Event '{0}' uses the error syntax. This is deprecated (see fxbug.dev/99924)");
+    "Event '{0}' uses the error syntax. This is deprecated (see https://fxbug.dev/99924)");
 constexpr ErrorDef<120, const flat::Attribute *> ErrInvalidAttributePlacement(
     "placement of attribute '{0}' disallowed here");
 constexpr ErrorDef<121, const flat::Attribute *> ErrDeprecatedAttribute(

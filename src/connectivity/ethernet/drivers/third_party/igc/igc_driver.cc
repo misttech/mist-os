@@ -474,7 +474,7 @@ void IgcDriver::ReapTxBuffers() {
     // We don't have a way to get the tx status of this packet from the tx descriptor since there
     // is no other STAT macros defined in FreeBSD driver,
     // so always return ZX_OK here.
-    // TODO(fxbug.dev/111725): Optimize it when we get the handbook.
+    // TODO(https://fxbug.dev/111725): Optimize it when we get the handbook.
     results[reap_count].status = ZX_OK;
 
     reap_count++;

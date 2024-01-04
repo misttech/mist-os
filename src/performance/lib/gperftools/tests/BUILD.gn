@@ -27,7 +27,7 @@ source_set("testutil") {
   sources = [ rebase_path("testutil.cc", ".", gperftools_src_root) ]
   deps = [ "//src/performance/lib/gperftools:profiler_static" ]
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 
   cflags = [ "-Wno-extra-semi" ]
@@ -58,7 +58,7 @@ executable("profiledata_unittest") {
     "//src/performance/lib/gperftools:profiler_static",
   ]
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

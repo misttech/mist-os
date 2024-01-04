@@ -341,7 +341,7 @@ fuchsia_test_package("foo_test") {
   test_components = [ ":test" ]
   deps = [ ":foo" ]
 
-  # TODO(fxbug.dev/12345): This test is intentionally disabled on coverage.
+  # TODO(https://fxbug.dev/12345): This test is intentionally disabled on coverage.
   if (is_coverage) {
     test_specs = {
       environments = [

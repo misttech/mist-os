@@ -38,7 +38,7 @@ at least one optional type in the cycle created by the self-reference. For
 instance, here we define the `items` `struct` member to be a `box<Item>`,
 thereby breaking the includes cycle.
 
-<!-- TODO(fxbug.dev/35218): remove box<Item> once this lands -->
+<!-- TODO(https://fxbug.dev/35218): remove box<Item> once this lands -->
 
 These changes also make heavy use of *anonymous types*, or types whose
 declarations are inlined at their sole point of use, rather than being named,

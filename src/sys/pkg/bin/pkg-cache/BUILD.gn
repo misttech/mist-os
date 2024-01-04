@@ -138,7 +138,7 @@ fuchsia_structured_config_values("config_values_from_gn") {
 fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
   cm_label = ":manifest"
   values = {
-    # TODO(fxbug.dev/130959) Recovery should use fxblob if available.
+    # TODO(https://fxbug.dev/130959) Recovery should use fxblob if available.
     use_fxblob = false
     use_system_image = false
   }

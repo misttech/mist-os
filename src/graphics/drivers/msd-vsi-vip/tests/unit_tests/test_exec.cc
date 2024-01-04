@@ -26,7 +26,7 @@ TEST_F(TestExec, SubmitBatchWithOffset) {
 
 // Verifies reset while GPU is busy.
 TEST_F(TestExec, ResetAfterSubmit) {
-  GTEST_SKIP();  // (fxb/105355) Disable test to collect data on other test
+  GTEST_SKIP();  // (https://fxbug.dev/105355) Disable test to collect data on other test
                  // that could also be flaking.
   for (uint32_t i = 0; i < 100; i++) {
     device_->StartDeviceThread();

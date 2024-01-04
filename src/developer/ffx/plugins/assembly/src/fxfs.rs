@@ -90,7 +90,7 @@ mod tests {
     // Generates a package manifest to be used for testing. The file is written
     // into `dir`, and the location is returned. The `name` is used in the blob
     // file names to make each manifest somewhat unique.
-    // TODO(fxbug.dev/76993): See if we can share this with BasePackage.
+    // TODO(https://fxbug.dev/76993): See if we can share this with BasePackage.
     pub fn generate_test_manifest_file(
         dir: impl AsRef<Utf8Path>,
         name: impl AsRef<str>,

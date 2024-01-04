@@ -4,7 +4,7 @@
 
 #![recursion_limit = "256"]
 #![allow(clippy::too_many_arguments)]
-// TODO(fxbug.dev/122028): Remove this allow once the lint is fixed.
+// TODO(https://fxbug.dev/122028): Remove this allow once the lint is fixed.
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
 
 // Avoid unused crate warnings on non-test/non-debug builds because this needs to be an

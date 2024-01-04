@@ -36,7 +36,7 @@ pub fn node_to_device_property(
             }
         };
 
-        // TODO(fxb/93937): Platform bus devices may contain two different BIND_PROTOCOL values.
+        // TODO(https://fxbug.dev/93937): Platform bus devices may contain two different BIND_PROTOCOL values.
         // The duplicate key needs to be fixed since this is incorrect and is working by luck.
         if key != BIND_PROTOCOL_KEY {
             if device_properties.contains_key(&key) && device_properties.get(&key) != Some(&value) {
@@ -55,7 +55,7 @@ pub fn node_to_device_property(
 
     // Due to a bug, if device properties already contain a "fuchsia.BIND_PROTOCOL" string key
     // and BIND_PROTOCOL = 28, we should remove the latter.
-    // TODO(fxb/93937): Fix the duplicate BIND_PROTOCOL values and remove this hack.
+    // TODO(https://fxbug.dev/93937): Fix the duplicate BIND_PROTOCOL values and remove this hack.
     if device_properties.contains_key(&PropertyKey::StringKey("fuchsia.BIND_PROTOCOL".to_string()))
         && device_properties.get(&BIND_PROTOCOL_KEY) == Some(&Symbol::NumberValue(28))
     {
@@ -129,7 +129,7 @@ mod tests {
         assert_eq!(Err(Status::INVALID_ARGS.into_raw()), node_to_device_property(&node_properties));
     }
 
-    // TODO(fxb/93937): Remove this case once the issue with multiple BIND_PROTOCOL properties
+    // TODO(https://fxbug.dev/93937): Remove this case once the issue with multiple BIND_PROTOCOL properties
     // is resolved.
     #[fasync::run_singlethreaded(test)]
     async fn test_multiple_bind_protocol() {
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(Ok(expected_properties), node_to_device_property(&node_properties));
     }
 
-    // TODO(fxb/93937): Remove this case once the issue with multiple BIND_PROTOCOL properties
+    // TODO(https://fxbug.dev/93937): Remove this case once the issue with multiple BIND_PROTOCOL properties
     // is resolved.
     #[fasync::run_singlethreaded(test)]
     async fn test_multiple_bind_protocol_w_deprecated_str_key() {

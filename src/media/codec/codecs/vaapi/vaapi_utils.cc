@@ -383,7 +383,7 @@ static VaProfileMapType GetVaProfileTranslation() {
   return *kVaProfileToMap;
 }
 
-// TODO(fxb/122628): Remove [[maybe_unused]] once used, or potentially remove the method if no
+// TODO(https://fxbug.dev/122628): Remove [[maybe_unused]] once used, or potentially remove the method if no
 // longer expect to need to convert the other direction.
 [[maybe_unused]] static VAProfile CodecProfileToVaProfile(fuchsia::media::CodecProfile profile) {
   const auto& profile_map = GetCodecProfileTranslation();

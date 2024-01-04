@@ -42,7 +42,7 @@ bool VaapiWrapper::UploadVideoFrameToSurface(VideoFrame& frame, VASurfaceID inpu
     vaDestroyImage(VADisplayWrapper::GetSingleton()->display(), image.image_id);
     return false;
   }
-  // TODO(fxbug.dev/100646): Optimize this code to reduce copies.
+  // TODO(https://fxbug.dev/100646): Optimize this code to reduce copies.
   uint8_t* in_ptr = frame.base;
   uint8_t* out_ptr = static_cast<uint8_t*>(surface_p);
   for (size_t y = 0; y < static_cast<size_t>(frame.display_size.height()); y++) {

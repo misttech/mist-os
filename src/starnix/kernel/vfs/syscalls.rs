@@ -401,7 +401,7 @@ fn do_writev(
     if flags != 0 {
         not_implemented!("pwritev2", flags);
     }
-    // TODO(fxbug.dev/117677) Allow partial writes.
+    // TODO(https://fxbug.dev/117677) Allow partial writes.
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersInputBuffer::new(current_task.mm(), iovec)?;
@@ -528,7 +528,7 @@ struct LookupFlags {
     symlink_mode: SymlinkMode,
 
     /// Automount directories on the path.
-    // TODO(fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
+    // TODO(https://fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
     #[allow(dead_code)]
     automount: bool,
 }
@@ -710,7 +710,7 @@ pub fn sys_newfstatat(
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) != 0 {
-        // TODO(fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
+        // TODO(https://fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
         not_implemented!("newfstatat", flags);
         return error!(ENOSYS);
     }
@@ -1684,7 +1684,7 @@ pub fn sys_timerfd_create(
             if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
                 return error!(EPERM);
             }
-            // TODO(fxbug.dev/121415): Add proper support for _ALARM clocks.
+            // TODO(https://fxbug.dev/121415): Add proper support for _ALARM clocks.
             not_implemented!("timerfd_create: CLOCK_BOOTTIME_ALARM is mapped to CLOCK_BOOTTIME");
             TimerFileClock::Monotonic
         }
@@ -1692,7 +1692,7 @@ pub fn sys_timerfd_create(
             if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
                 return error!(EPERM);
             }
-            // TODO(fxbug.dev/121415): Add proper support for _ALARM clocks.
+            // TODO(https://fxbug.dev/121415): Add proper support for _ALARM clocks.
             not_implemented!("timerfd_create: CLOCK_REALTIME_ALARM is mapped to CLOCK_REALTIME");
             TimerFileClock::Realtime
         }
@@ -1748,7 +1748,7 @@ pub fn sys_timerfd_settime(
     }
 
     if flags & TFD_TIMER_CANCEL_ON_SET != 0 {
-        // TODO(fxbug.dev/121607): Respect the cancel on set.
+        // TODO(https://fxbug.dev/121607): Respect the cancel on set.
         not_implemented!("timerfd_settime: TFD_TIMER_CANCEL_ON_SET");
     }
 
@@ -2329,7 +2329,7 @@ pub fn sys_fadvise64(
     len: off_t,
     advice: u32,
 ) -> Result<(), Errno> {
-    // TODO(fxbug.dev/125680): Implement fadvise.
+    // TODO(https://fxbug.dev/125680): Implement fadvise.
     match advice {
         POSIX_FADV_NORMAL
         | POSIX_FADV_RANDOM

@@ -53,10 +53,10 @@
 
 #define LOCAL_TRACE 0
 
-// TODO(fxbug.dev/91213): Remove this when zx_pc_firmware_tables() goes away.
+// TODO(https://fxbug.dev/91213): Remove this when zx_pc_firmware_tables() goes away.
 zx_paddr_t gAcpiRsdp = 0;
 
-// TODO(fxbug.dev/91213): Remove this when zx_pc_firmware_tables() goes away.
+// TODO(https://fxbug.dev/91213): Remove this when zx_pc_firmware_tables() goes away.
 zx_paddr_t gSmbiosPhys = 0;
 
 // zx_status_t zx_vmo_create_contiguous
@@ -368,7 +368,7 @@ zx_status_t sys_msi_create(zx_handle_t msi_alloc, uint32_t options, uint32_t msi
   return up->MakeAndAddHandle(ktl::move(msi_handle), rights, out);
 }
 
-// TODO(fxbug.dev/91213): Remove zx_pc_firmware_tables().
+// TODO(https://fxbug.dev/91213): Remove zx_pc_firmware_tables().
 // zx_status_t zx_pc_firmware_tables
 zx_status_t sys_pc_firmware_tables(zx_handle_t hrsrc, user_out_ptr<zx_paddr_t> acpi_rsdp,
                                    user_out_ptr<zx_paddr_t> smbios) {

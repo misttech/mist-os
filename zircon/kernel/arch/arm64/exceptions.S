@@ -493,7 +493,7 @@ LOCAL_FUNCTION_LABEL(arm64_syscall_dispatcher)
     // While this is not a mitigation for any single vulnerability, this does make
     //   constructing attacks more difficult - speculatively executed gadgets will
     //   execute with most register state clear.
-    // TODO(fxbug.dev/12540): Add to synchronous exception path as well.
+    // TODO(https://fxbug.dev/12540): Add to synchronous exception path as well.
     speculation_clear_gprs
     // Check if we're issuing a syscall from restricted mode.
     ldr w12, [percpu_ptr, #PERCPU_IN_RESTRICTED_MODE]

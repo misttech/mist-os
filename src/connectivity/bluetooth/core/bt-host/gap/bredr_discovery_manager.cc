@@ -188,7 +188,7 @@ void BrEdrDiscoveryManager::MaybeStartInquiry() {
 
         // Resolve the request if the controller sent back a Command Complete or
         // Status event.
-        // TODO(fxbug.dev/1109): Make it impossible for Command Complete to happen here
+        // TODO(https://fxbug.dev/1109): Make it impossible for Command Complete to happen here
         // and remove handling for it.
         if (event.event_code() == hci_spec::kCommandStatusEventCode ||
             event.event_code() == hci_spec::kCommandCompleteEventCode) {
@@ -611,7 +611,7 @@ void BrEdrDiscoveryManager::RemoveDiscoverySession(BrEdrDiscoverySession* sessio
   bt_log(TRACE, "gap-bredr", "removing discovery session");
 
   auto removed = discovering_.erase(session);
-  // TODO(fxbug.dev/668): Cancel the running inquiry with StopInquiry() instead.
+  // TODO(https://fxbug.dev/668): Cancel the running inquiry with StopInquiry() instead.
   if (removed) {
     zombie_discovering_.insert(session);
   }

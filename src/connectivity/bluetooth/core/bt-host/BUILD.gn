@@ -74,7 +74,7 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
-# TODO(fxbug.dev/135650): Rename to "bt-host" after removing driver code
+# TODO(https://fxbug.dev/135650): Rename to "bt-host" after removing driver code
 fuchsia_package("bt-host-component") {
   deps = [
     # component-url: fuchsia-pkg://fuchsia.com/bt-host-component#meta/bt-host.cm

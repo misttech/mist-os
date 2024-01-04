@@ -41,7 +41,7 @@
 
 // NOTE: At the time of this writing, the WLAN stack does not support WPA Enterprise. One
 //       consequence of this is that conversions between Rust and FIDL types may return errors or
-//       panic when they involve WPA Enterprise representations. See fxbug.dev/92693 and the TODOs
+//       panic when they involve WPA Enterprise representations. See https://fxbug.dev/92693 and the TODOs
 //       in this module.
 
 pub mod wep;
@@ -463,7 +463,7 @@ impl From<SecurityAuthenticator> for fidl_security::Authentication {
                 };
                 fidl_security::Authentication {
                     protocol,
-                    // TODO(fxbug.dev/92693): This panics when encountering WPA Enterprise.
+                    // TODO(https://fxbug.dev/92693): This panics when encountering WPA Enterprise.
                     credentials: Some(Box::new(fidl_security::Credentials::Wpa(
                         wpa.into_credentials().into(),
                     ))),
@@ -524,7 +524,7 @@ impl TryFrom<fidl_security::Authentication> for SecurityAuthenticator {
                 .map(|authentication| wpa::WpaAuthenticator::Wpa3 { cipher: None, authentication })
                 .map(From::from)
                 .ok_or_else(|| SecurityError::Incompatible), // Non-WPA credentials.
-            // TODO(fxbug.dev/92693): This returns an error when encountering WPA Enterprise
+            // TODO(https://fxbug.dev/92693): This returns an error when encountering WPA Enterprise
             //                        protocols. Some conversions of composing types panic, but
             //                        this top-level conversion insulates client code from this and
             //                        instead yields an error.

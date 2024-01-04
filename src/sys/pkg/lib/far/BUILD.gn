@@ -22,7 +22,7 @@ group("tests") {
 
   if (current_cpu == "riscv64") {
     deps -= [
-      # TODO(fxbug.dev/300170314): Remove after removing Go dependencies on RISC-V.
+      # TODO(https://fxbug.dev/300170314): Remove after removing Go dependencies on RISC-V.
       "go:tests",
     ]
   }

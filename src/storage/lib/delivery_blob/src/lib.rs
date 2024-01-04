@@ -161,7 +161,7 @@ impl Type1Blob {
     /// Generate a Type 1 delivery blob for `data` using the specified `mode`.
     ///
     /// **WARNING**: This function will panic on error.
-    // TODO(fxbug.dev/122054): Bubble up library/compression errors.
+    // TODO(https://fxbug.dev/122054): Bubble up library/compression errors.
     pub fn generate(data: &[u8], mode: CompressionMode) -> Vec<u8> {
         let mut delivery_blob: Vec<u8> = vec![];
         Self::generate_to(data, mode, &mut delivery_blob).unwrap();
@@ -172,7 +172,7 @@ impl Type1Blob {
     /// directly into `writer`.
     ///
     /// **WARNING**: This function will panic on compression errors.
-    // TODO(fxbug.dev/122054): Bubble up library/compression errors.
+    // TODO(https://fxbug.dev/122054): Bubble up library/compression errors.
     pub fn generate_to(
         data: &[u8],
         mode: CompressionMode,

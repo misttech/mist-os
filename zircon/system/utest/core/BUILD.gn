@@ -55,7 +55,7 @@ core_tests = [
 
 # Requires use_next_vdso in the manifest. Build as a package and unified bootfs test, but not a
 # standalone bootfs test.
-# TODO(fxbug.dev/89597): Remove this once standalone bootfs tests can access the next vDSO.
+# TODO(https://fxbug.dev/89597): Remove this once standalone bootfs tests can access the next vDSO.
 requires_next_vdso = [
   "pager-writeback",
   "restricted-mode",
@@ -95,7 +95,7 @@ bootfs_only = [
   # So they cannot run in an environment where test threads can block on pagers created outside of
   # the test, e.g. when the test is run as a component.
   #
-  # TODO(fxbug.dev/89597): pager-writeback should be moved here too once standalone bootfs tests
+  # TODO(https://fxbug.dev/89597): pager-writeback should be moved here too once standalone bootfs tests
   # can access the next vDSO.
   "pager",
 ]
@@ -275,7 +275,7 @@ if (current_cpu == "x64") {
   boot_tests += [ ":core-tests-hpet" ]
 }
 
-# TODO(fxbug.dev/89182): Remove once migration is complete.
+# TODO(https://fxbug.dev/89182): Remove once migration is complete.
 core_tests("core-tests-serial-migration") {
   args = [ "kernel.experimental.serial_migration=true" ]
   device_types = [ "QEMU" ]

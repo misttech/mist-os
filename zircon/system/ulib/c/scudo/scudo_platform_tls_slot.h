@@ -11,7 +11,7 @@
 // and call this function instead of using a `thread_local` variable of its
 // own.
 //
-// TODO(fxbug.dev/64175): Our current combined libc/dynamic linker
+// TODO(https://fxbug.dev/64175): Our current combined libc/dynamic linker
 // implementation does not allow libc itself to have any `thread_local`
 // variables of its own.  In future, a different dynamic linker implementation
 // will likely remove this restriction and having scudo use a (hidden

@@ -13,7 +13,7 @@ use {
     test_harness,
 };
 
-// TODO(fxbug.dev/121606): Add tests for BR/EDR and dual mode bond data.
+// TODO(https://fxbug.dev/121606): Add tests for BR/EDR and dual mode bond data.
 
 fn new_le_bond_data(id: &PeerId, address: &Address, name: &str, has_ltk: bool) -> BondingData {
     BondingData {

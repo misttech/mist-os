@@ -236,7 +236,7 @@ static void arm64_step_handler(iframe_t* iframe, uint exception_flags, uint32_t 
     exception_die(iframe, esr, __arm_rsr64("far_el1"),
                   "software step in kernel: PC at %#" PRIx64 "\n", iframe->elr);
   }
-  // TODO(fxbug.dev/32872): Is it worth separating this into two separate exceptions?
+  // TODO(https://fxbug.dev/32872): Is it worth separating this into two separate exceptions?
   try_dispatch_user_exception(ZX_EXCP_HW_BREAKPOINT, iframe, esr);
 }
 
@@ -358,7 +358,7 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
     // address) and fill it in.
     DEBUG_ASSERT(BIT_SET(dfr, ARM64_DFR_RUN_FAULT_HANDLER_BIT - 1));
     iframe->elr = dfr | (1ull << ARM64_DFR_RUN_FAULT_HANDLER_BIT);
-    // TODO(fxbug.dev/93593): x1 is relayed back to user_copy where it will be stored in page fault
+    // TODO(https://fxbug.dev/93593): x1 is relayed back to user_copy where it will be stored in page fault
     // info. Currently, the only users of this page fault info is VmAspace::SoftFault, but the
     // kernel page fault handler shouldn't accept/work with tags. To avoid architecture-specific
     // tags reaching the VM layer at all, we can strip it here so it never reaches user_copy page
@@ -614,7 +614,7 @@ zx_status_t arch_dispatch_user_policy_exception(uint32_t policy_exception_code,
 
 bool arch_install_exception_context(Thread* thread, const arch_exception_context_t* context) {
   if (!context->frame) {
-    // TODO(fxbug.dev/30521): Must be a synthetic exception as they don't (yet) provide the
+    // TODO(https://fxbug.dev/30521): Must be a synthetic exception as they don't (yet) provide the
     // registers.
     return false;
   }

@@ -87,7 +87,7 @@ zx::result<std::unique_ptr<PciAllocation>> PciRegionAllocator::Allocate(
   }
 
   zx::resource out_resource = {};
-  // TODO(fxbug.dev/32978): When the resource subset CL lands, make this a smaller resource.
+  // TODO(https://fxbug.dev/32978): When the resource subset CL lands, make this a smaller resource.
   status = parent_alloc_->resource().duplicate(ZX_DEFAULT_RESOURCE_RIGHTS, &out_resource);
   if (status != ZX_OK) {
     return zx::error(status);

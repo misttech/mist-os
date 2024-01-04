@@ -78,7 +78,7 @@ class ArchVmAspaceInterface {
 
   // This method puts the instance into read-only mode and asserts that it contains no mappings.
   //
-  // Note, this method may be a no-op on some architectures.  See fxbug.dev/79118.
+  // Note, this method may be a no-op on some architectures.  See https://fxbug.dev/79118.
   //
   // It is an error to call this method on an instance that contains mappings.  Once called,
   // subsequent operations that modify the page table will trigger a panic.

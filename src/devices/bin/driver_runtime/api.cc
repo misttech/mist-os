@@ -53,7 +53,7 @@ zx_status_t fdf_channel_write(fdf_handle_t channel_handle, uint32_t options, fdf
   fbl::RefPtr<driver_runtime::Channel> channel;
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_handle, &channel);
-  // TODO(fxbug.dev/87046): we may want to consider killing the process.
+  // TODO(https://fxbug.dev/87046): we may want to consider killing the process.
   ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->Write(options, arena, data, num_bytes, handles, num_handles);
 }
@@ -65,7 +65,7 @@ zx_status_t fdf_channel_read(fdf_handle_t channel_handle, uint32_t options, fdf_
   fbl::RefPtr<driver_runtime::Channel> channel;
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_handle, &channel);
-  // TODO(fxbug.dev/87046): we may want to consider killing the process.
+  // TODO(https://fxbug.dev/87046): we may want to consider killing the process.
   ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->Read(options, arena, data, num_bytes, handles, num_handles);
 }
@@ -79,7 +79,7 @@ zx_status_t fdf_channel_wait_async(struct fdf_dispatcher* dispatcher,
   fbl::RefPtr<driver_runtime::Channel> channel;
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_read->channel, &channel);
-  // TODO(fxbug.dev/87046): we may want to consider killing the process.
+  // TODO(https://fxbug.dev/87046): we may want to consider killing the process.
   ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->WaitAsync(dispatcher, channel_read, options);
 }
@@ -89,7 +89,7 @@ __EXPORT zx_status_t fdf_channel_call(fdf_handle_t channel_handle, uint32_t opti
   fbl::RefPtr<driver_runtime::Channel> channel;
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_handle, &channel);
-  // TODO(fxbug.dev/87046): we may want to consider killing the process.
+  // TODO(https://fxbug.dev/87046): we may want to consider killing the process.
   ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->Call(options, deadline, args);
 }
@@ -98,7 +98,7 @@ __EXPORT zx_status_t fdf_channel_cancel_wait(fdf_handle_t channel_handle) {
   fbl::RefPtr<driver_runtime::Channel> channel;
   zx_status_t status =
       driver_runtime::Handle::GetObject<driver_runtime::Channel>(channel_handle, &channel);
-  // TODO(fxbug.dev/87046): we may want to consider killing the process.
+  // TODO(https://fxbug.dev/87046): we may want to consider killing the process.
   ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
   return channel->CancelWait();
 }
@@ -112,7 +112,7 @@ __EXPORT void fdf_handle_close(fdf_handle_t channel_handle) {
     return;
   }
   driver_runtime::Handle* handle = driver_runtime::Handle::MapValueToHandle(channel_handle);
-  // TODO(fxbug.dev/87046): we may want to consider killing the process.
+  // TODO(https://fxbug.dev/87046): we may want to consider killing the process.
   ZX_ASSERT(handle);
 
   fbl::RefPtr<driver_runtime::Channel> channel;

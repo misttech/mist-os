@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/51770): move everything except installer and policy into a shared crate,
+// TODO(https://fxbug.dev/51770): move everything except installer and policy into a shared crate,
 // because these modules all come from //src/sys/pkg/bin/omaha-client.
 mod installer;
 mod policy;
@@ -110,7 +110,7 @@ where
 
     let stream: Vec<StateMachineEvent> = state_machine.oneshot_check().await.collect().await;
 
-    // TODO(fxbug.dev/117416): expose this data via the Monitor protocol, not just a single event.
+    // TODO(https://fxbug.dev/117416): expose this data via the Monitor protocol, not just a single event.
     // Filter the state machine events down to just update check results,
     // which contain the final state of the check.
     let filtered_events: Vec<Result<update_check::Response, UpdateCheckError>> = stream

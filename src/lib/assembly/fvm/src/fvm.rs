@@ -376,7 +376,7 @@ mod tests {
         );
         builder.filesystem(Filesystem::EmptyData);
         let args = builder.build_args().unwrap();
-        // TODO(fxbug.dev/85165): Have assembly pass in an empty file and remove --with-empty-data.
+        // TODO(https://fxbug.dev/85165): Have assembly pass in an empty file and remove --with-empty-data.
         assert_eq!(vec!["mypath", "sparse", "--slice", "1", "--with-empty-data",], args);
     }
 }

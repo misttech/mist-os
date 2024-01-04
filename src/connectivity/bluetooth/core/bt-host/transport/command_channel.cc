@@ -566,7 +566,7 @@ void CommandChannel::UpdateTransaction(std::unique_ptr<EventPacket> event) {
     return;
   }
 
-  // TODO(fxbug.dev/1109): Do not allow asynchronous commands to finish with Command Complete.
+  // TODO(https://fxbug.dev/1109): Do not allow asynchronous commands to finish with Command Complete.
   if (event_code == hci_spec::kCommandCompleteEventCode) {
     bt_log(WARN, "hci", "async command received CommandComplete");
     unregister_async_handler = true;
@@ -679,7 +679,7 @@ void CommandChannel::OnEvent(pw::span<const std::byte> buffer) {
   }
 
   if (buffer.size() < sizeof(hci_spec::EventHeader)) {
-    // TODO(fxbug.dev/97362): Handle these types of errors by signaling Transport.
+    // TODO(https://fxbug.dev/97362): Handle these types of errors by signaling Transport.
     bt_log(ERROR, "hci", "malformed packet - expected at least %zu bytes, got %zu",
            sizeof(hci_spec::EventHeader), buffer.size());
     return;
@@ -693,7 +693,7 @@ void CommandChannel::OnEvent(pw::span<const std::byte> buffer) {
   event->InitializeFromBuffer();
 
   if (event->view().header().parameter_total_size != payload_size) {
-    // TODO(fxbug.dev/97362): Handle these types of errors by signaling Transport.
+    // TODO(https://fxbug.dev/97362): Handle these types of errors by signaling Transport.
     bt_log(ERROR, "hci",
            "malformed packet - payload size from header (%hu) does not match"
            " received payload size: %zu",

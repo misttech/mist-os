@@ -124,7 +124,7 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
     zxlogf(ERROR, "Create(gpio) error: %s", gpio_base.status_string());
   }
 
-  // TODO(fxbug.dev/75530): Figure out if we need gpio protocol ops to modify these
+  // TODO(https://fxbug.dev/75530): Figure out if we need gpio protocol ops to modify these
   // gpio registers.
 
   // PREG_PAD_GPIO5_O[17] is an undocumented bit that selects between (0) GPIO and (1) SDMMC port B
@@ -196,7 +196,7 @@ zx_status_t Astro::SdioInit() {
 
   fit::result sdmmc_metadata =
       fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
-                        // TODO(fxbug.dev/134787): Use the FIDL SDMMC protocol.
+                        // TODO(https://fxbug.dev/134787): Use the FIDL SDMMC protocol.
                         .use_fidl(false)
                         .Build());
   if (!sdmmc_metadata.is_ok()) {

@@ -44,7 +44,7 @@ class ForwardMetadata {
   static ForwardMetadata Some(std::unordered_set<MetadataKey> filter);
 
   // Deprecated constructor. Use All(), Some(), None() instead.
-  // TODO(fxb/136476): Remove once all usages are migrated
+  // TODO(https://fxbug.dev/136476): Remove once all usages are migrated
   explicit ForwardMetadata(std::unordered_set<MetadataKey> filter) : filter_(filter) {}
 
   // Returns true when there's nothing to forward.
@@ -109,7 +109,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
 
   // Deprecated constructor. Use empty constructor with |Init| call after to manually initialize,
   // or use the sync/async-initialization constructors.
-  // TODO(fxb/136476): Remove once all usages are migrated
+  // TODO(https://fxbug.dev/136476): Remove once all usages are migrated
   DeviceServer(std::string name, uint32_t proto_id, std::string topological_path)
       : state_(std::in_place_type<Initialized>) {
     ZX_ASSERT(proto_id == 0);

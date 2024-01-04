@@ -451,7 +451,7 @@ def get_elf_info(filename, match_notes=False):
                 while pos < phdr.p_offset + phdr.p_filesz:
                     nhdr = elf.Nhdr.read(file, pos)
                     pos += elf.Nhdr.size
-                    # TODO(fxbug.dev/55190) PT_NOTE is expected to be valid
+                    # TODO(https://fxbug.dev/55190) PT_NOTE is expected to be valid
                     # 7-bit ASCII or UTF-8. Remove this when clients no longer
                     # depend on that behavior.
                     name = str(file[pos : pos + nhdr.n_namesz].decode())
@@ -497,7 +497,7 @@ def get_elf_info(filename, match_notes=False):
     def get_build_id():
         build_id = None
         for note in gen_notes():
-            # Note that the last build_id note needs to be used due to fxbug.dev/26967.
+            # Note that the last build_id note needs to be used due to https://fxbug.dev/26967.
             possible_build_id = note.build_id_hex()
             if possible_build_id:
                 build_id = possible_build_id
@@ -716,7 +716,7 @@ def get_elf_info(filename, match_notes=False):
                     value = 0
                     bits = 0
                     while start < limit:
-                        # TODO(fxbug.dev/48946): Remove this single-element slice hack
+                        # TODO(https://fxbug.dev/48946): Remove this single-element slice hack
                         # once Python2 is no longer used in-tree.
                         byte = ord(file[start : start + 1])
                         start += 1

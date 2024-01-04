@@ -84,10 +84,10 @@ enum ShapeType {
 #[derive(Debug)]
 struct TouchHandler {
     location: Point,
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     shape_type: ShapeType,
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     color: Color,
     facet_id: FacetId,

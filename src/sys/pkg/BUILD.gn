@@ -52,7 +52,7 @@ group("recovery") {
   ]
 }
 
-# TODO(fxbug.dev/122864) Remove transitional labels
+# TODO(https://fxbug.dev/122864) Remove transitional labels
 group("tools") {
 }
 

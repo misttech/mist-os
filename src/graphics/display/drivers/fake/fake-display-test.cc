@@ -96,7 +96,7 @@ TEST_F(FakeDisplayTest, Inspect) {
   ASSERT_NE(config, nullptr);
 
   // Must be the same as `kWidth` defined in fake-display.cc.
-  // TODO(fxbug.dev/114001): Use configurable values instead.
+  // TODO(https://fxbug.dev/114001): Use configurable values instead.
   constexpr int kWidth = 1280;
   const inspect::IntPropertyValue* width_px =
       config->node().get_property<inspect::IntPropertyValue>("width_px");
@@ -104,7 +104,7 @@ TEST_F(FakeDisplayTest, Inspect) {
   EXPECT_EQ(width_px->value(), kWidth);
 
   // Must be the same as `kHeight` defined in fake-display.cc.
-  // TODO(fxbug.dev/114001): Use configurable values instead.
+  // TODO(https://fxbug.dev/114001): Use configurable values instead.
   constexpr int kHeight = 800;
   const inspect::IntPropertyValue* height_px =
       config->node().get_property<inspect::IntPropertyValue>("height_px");
@@ -112,7 +112,7 @@ TEST_F(FakeDisplayTest, Inspect) {
   EXPECT_EQ(height_px->value(), kHeight);
 
   // Must be the same as `kRefreshRateFps` defined in fake-display.cc.
-  // TODO(fxbug.dev/114001): Use configurable values instead.
+  // TODO(https://fxbug.dev/114001): Use configurable values instead.
   constexpr double kRefreshRateHz = 60.0;
   const inspect::DoublePropertyValue* refresh_rate_hz =
       config->node().get_property<inspect::DoublePropertyValue>("refresh_rate_hz");
@@ -415,7 +415,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
   EXPECT_TRUE(collection_client->WaitForBuffersAllocated().ok());
 
   // Test ReleaseBufferCollection().
-  // TODO(fxbug.dev/128574): Consider adding RAII handles to release the
+  // TODO(https://fxbug.dev/128574): Consider adding RAII handles to release the
   // imported buffer collections.
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
@@ -469,7 +469,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   // The buffer should be allocated correctly in sysmem.
   EXPECT_TRUE(collection_client->WaitForBuffersAllocated().ok());
 
-  // TODO(fxbug.dev/128571): Split all valid / invalid imports into separate
+  // TODO(https://fxbug.dev/128571): Split all valid / invalid imports into separate
   // test cases.
   // Invalid import: Bad image type.
   image_t invalid_config = kDefaultConfig;
@@ -556,7 +556,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
 
   uint64_t out_capture_handle = INVALID_ID;
 
-  // TODO(fxbug.dev/128571): Split all valid / invalid imports into separate
+  // TODO(https://fxbug.dev/128571): Split all valid / invalid imports into separate
   // test cases.
   // Invalid import: Invalid collection ID.
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
@@ -578,7 +578,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   EXPECT_NE(out_capture_handle, INVALID_ID);
 
   // Release the image.
-  // TODO(fxbug.dev/128574): Consider adding RAII handles to release the
+  // TODO(https://fxbug.dev/128574): Consider adding RAII handles to release the
   // imported images and buffer collections.
   display()->DisplayControllerImplReleaseCapture(out_capture_handle);
 
@@ -624,7 +624,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   };
 
   // Must match kWidth and kHeight defined in fake-display.cc.
-  // TODO(fxbug.dev/128486): Do not hardcode the display width and height.
+  // TODO(https://fxbug.dev/128486): Do not hardcode the display width and height.
   constexpr int kDisplayWidth = 1280;
   constexpr int kDisplayHeight = 800;
 
@@ -697,7 +697,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   std::array<layer_t*, kNumLayers> layers = {&layer};
 
   // Must match kDisplayId in fake-display.cc.
-  // TODO(fxbug.dev/128486): Do not hardcode the display ID.
+  // TODO(https://fxbug.dev/128486): Do not hardcode the display ID.
   constexpr display::DisplayId kDisplayId(1);
   display_config_t display_config = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
@@ -762,7 +762,7 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   }
 
   // Release the image.
-  // TODO(fxbug.dev/128574): Consider adding RAII handles to release the
+  // TODO(https://fxbug.dev/128574): Consider adding RAII handles to release the
   // imported images and buffer collections.
   display()->DisplayControllerImplReleaseImage(framebuffer_image_handle);
   display()->DisplayControllerImplReleaseCapture(capture_handle);

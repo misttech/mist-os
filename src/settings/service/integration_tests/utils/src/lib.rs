@@ -154,7 +154,7 @@ async fn cobalt_impl(handles: LocalComponentHandles) -> Result<(), Error> {
     Ok(())
 }
 
-// TODO(fxb/105380): Replace with test-case macro.
+// TODO(https://fxbug.dev/105380): Replace with test-case macro.
 /// Macro for generating multiple tests from a common test function
 /// # Example
 /// ```

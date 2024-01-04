@@ -12,7 +12,7 @@ use {
 
 /// Valid characters for a Fuchsia package path.  These characters are any unicode character,
 /// except for '/', '\0', '.', and '\n'.
-// TODO(fxbug.dev/22531) allow newline once meta/contents supports it in blob paths
+// TODO(https://fxbug.dev/22531) allow newline once meta/contents supports it in blob paths
 pub(crate) const ANY_UNICODE_EXCEPT_SLASH_NULL_DOT_OR_NEWLINE: &str = "[^/\0\\.\n]";
 
 prop_compose! {

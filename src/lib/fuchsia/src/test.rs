@@ -146,7 +146,7 @@ mod test {
         assert!(false)
     }
 
-    // TODO(fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // TODO(https://fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
@@ -156,7 +156,7 @@ mod test {
         Ok(())
     }
 
-    // TODO(fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // TODO(https://fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
@@ -166,7 +166,7 @@ mod test {
         Ok(())
     }
 
-    // TODO(fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // TODO(https://fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
@@ -176,7 +176,7 @@ mod test {
         Ok(())
     }
 
-    // TODO(fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // TODO(https://fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
@@ -186,7 +186,7 @@ mod test {
         Ok(())
     }
 
-    // TODO(fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // TODO(https://fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
@@ -196,7 +196,7 @@ mod test {
         Ok(())
     }
 
-    // TODO(fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // TODO(https://fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
@@ -206,7 +206,7 @@ mod test {
         Ok(())
     }
 
-    // TODO(fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // TODO(https://fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
@@ -216,7 +216,7 @@ mod test {
         Ok(())
     }
 
-    // TODO(fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
+    // TODO(https://fxbug.dev/81029): We combine #[fuchsia::main] and #[test] here as a kludge to
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/96139): need validation after deserialization.
+// TODO(https://fxbug.dev/96139): need validation after deserialization.
 use {
     crate::{
         lsm_tree::types::{

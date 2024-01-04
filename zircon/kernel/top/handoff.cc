@@ -20,7 +20,7 @@ PhysHandoff* gPhysHandoff;
 
 namespace {
 
-// TODO(fxbug.dev/84107): Eventually physboot will hand off a permanent pointer
+// TODO(https://fxbug.dev/84107): Eventually physboot will hand off a permanent pointer
 // we can store in gBootOptions.  For now, handoff only provides temporary
 // pointers that we must copy out of.
 BootOptions gBootOptionsInstance;

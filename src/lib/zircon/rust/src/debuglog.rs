@@ -45,7 +45,7 @@ impl DebugLog {
     /// [zx_debuglog_write]((https://fuchsia.dev/fuchsia-src/reference/syscalls/debuglog_write.md)
     /// syscall.
     pub fn write(&self, message: &[u8]) -> Result<(), Status> {
-        // TODO(fxbug.dev/32998): Discussion ongoing over whether debuglog levels are supported, so no
+        // TODO(https://fxbug.dev/32998): Discussion ongoing over whether debuglog levels are supported, so no
         // options parameter for now.
         let status = unsafe {
             sys::zx_debuglog_write(self.raw_handle(), 0, message.as_ptr(), message.len())
@@ -61,7 +61,7 @@ impl DebugLog {
     /// Wraps the
     /// [zx_debuglog_read]((https://fuchsia.dev/fuchsia-src/reference/syscalls/debuglog_read.md)
     /// syscall.
-    // TODO(fxbug.dev/32998): Return a safe wrapper type for zx_log_record_t rather than raw bytes
+    // TODO(https://fxbug.dev/32998): Return a safe wrapper type for zx_log_record_t rather than raw bytes
     // depending on resolution.
     pub fn read(&self) -> Result<sys::zx_log_record_t, Status> {
         let mut record = sys::zx_log_record_t::default();

@@ -400,7 +400,7 @@ void WlanInterface::StartScan(StartScanRequestView request, fdf::Arena& arena,
     }
   };
 
-  // TODO(fxbug.dev/108408): Consider calculating a more accurate scan timeout based on the max
+  // TODO(https://fxbug.dev/108408): Consider calculating a more accurate scan timeout based on the max
   // scan time per channel in the scan request.
   constexpr zx_duration_t kScanTimeout = ZX_MSEC(12000);
   zx_status_t status =

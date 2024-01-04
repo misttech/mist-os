@@ -55,10 +55,10 @@ group("tests") {
     "virtio_input_test_util:tests($host_toolchain)",
   ]
 
-  # TODO(fxbug.dev/12616): These tests currently do not work on arm64.
+  # TODO(https://fxbug.dev/12616): These tests currently do not work on arm64.
   if (current_cpu == "x64") {
     deps += [
-      # TODO(fxbug.dev/64348): These tests needs to be reworked so that they
+      # TODO(https://fxbug.dev/64348): These tests needs to be reworked so that they
       # interact correctly with Scenic.
       ":virtualization_magma_tests_pkg",
       ":virtualization_sound_tests_pkg",
@@ -633,7 +633,7 @@ fuchsia_test_package("termina_container_tests_pkg") {
   subpackages = guest_packages
   test_specs = {
     if (is_debug) {
-      # See fxbug.dev/110903 for test timeouts when starting the container.
+      # See https://fxbug.dev/110903 for test timeouts when starting the container.
       timeout_secs = 420
     }
     environments = [ nuc_env ]

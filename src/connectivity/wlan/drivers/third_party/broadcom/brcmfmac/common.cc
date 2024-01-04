@@ -606,7 +606,7 @@ zx_status_t brcmf_c_preinit_dcmds(struct brcmf_if* ifp) {
               brcmf_fil_get_errstr(fw_err));
   }
 
-  // TODO(fxbug.dev/75818): Disabling mchan to work around issue of LINK DOWN and flowctl bit stuck.
+  // TODO(https://fxbug.dev/75818): Disabling mchan to work around issue of LINK DOWN and flowctl bit stuck.
   err = brcmf_fil_iovar_data_set(ifp, "mchan", &kMchanState, sizeof(kMchanState), &fw_err);
   if (err != ZX_OK) {
     BRCMF_ERR("Failed to set mchan: %s, fw err %s", zx_status_get_string(err),
@@ -636,7 +636,7 @@ void brcmf_get_module_param(enum brcmf_bus_type bus_type, uint32_t chip, uint32_
 #endif  // !defined(NDEBUG)
 
 #ifdef USE_PLATFORM_DATA
-  // TODO(fxbug.dev/29352): Do we need to do this?
+  // TODO(https://fxbug.dev/29352): Do we need to do this?
   struct brcmfmac_pd_device {
     uint32_t bus_type;
     uint32_t id;

@@ -1880,7 +1880,7 @@ void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bss
       conf.selected_bss.ies = ::fidl::VectorView<uint8_t>::FromExternal(cfg->conn_info.resp_ie,
                                                                         cfg->conn_info.resp_ie_len);
     }
-    // TODO(fxbug.dev/80230): The probably shouldn't be hardcoded (here and elsewhere).
+    // TODO(https://fxbug.dev/80230): The probably shouldn't be hardcoded (here and elsewhere).
     conf.selected_bss.bss_type = fuchsia_wlan_common::BssType::kInfrastructure;
 
     conf.selected_bss.capability_info = cfg->capability;
@@ -1978,7 +1978,7 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
     }
   }
 
-  // TODO(fxbug.dev/29354): We should be getting the IEs from SME. Passing a null entry seems
+  // TODO(https://fxbug.dev/29354): We should be getting the IEs from SME. Passing a null entry seems
   // to work for now, presumably because the firmware uses its defaults.
   err = brcmf_vif_set_mgmt_ie(ifp->vif, BRCMF_VNDR_IE_ASSOCREQ_FLAG, nullptr, 0);
   if (err != ZX_OK) {
@@ -2001,7 +2001,7 @@ zx_status_t brcmf_cfg80211_connect(struct net_device* ndev,
   // Override the channel bandwidth with 20Mhz because `channel_to_chanspec` doesn't support
   // encoding 80Mhz and the upper layer had always passed 20Mhz historically so also need to
   // test whether the 40Mhz encoding works properly.
-  // TODO(fxbug.dev/65770) - Remove this override.
+  // TODO(https://fxbug.dev/65770) - Remove this override.
   chan_override = ifp->connect_req.selected_bss()->channel();
   chan_override.cbw() = fuchsia_wlan_common_wire::ChannelBandwidth::kCbw20;
 
@@ -2676,7 +2676,7 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
       break;
     case fuchsia_wlan_ieee80211_wire::CipherSuiteType::kTkip:
       /* Note: Linux swaps the Tx and Rx MICs in client mode, but this doesn't work for us (see
-         fxbug.dev/28642). It's unclear why this would be necessary. */
+         https://fxbug.dev/28642). It's unclear why this would be necessary. */
       key->algo = CRYPTO_ALGO_TKIP;
       val = TKIP_ENABLED;
       BRCMF_DBG(CONN, "WPA_CIPHER_TKIP");
@@ -3930,7 +3930,7 @@ void brcmf_if_deauth_req(net_device* ndev,
     brcmf_notify_deauth(ndev, req->peer_sta_address().data());
   }  // else wait for disconnect to complete before sending response
 
-  // Workaround for fxbug.dev/28829: allow time for disconnect to complete
+  // Workaround for https://fxbug.dev/28829: allow time for disconnect to complete
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 }
 
@@ -3960,7 +3960,7 @@ void brcmf_if_assoc_resp(net_device* ndev,
     return;
   }
 
-  // TODO(fxb/62115): The translation here is poor because the set of result codes
+  // TODO(https://fxbug.dev/62115): The translation here is poor because the set of result codes
   // available for an association response is too small.
   fuchsia_wlan_ieee80211::ReasonCode reason = {};
   switch (req->result_code()) {
@@ -4327,7 +4327,7 @@ static void brcmf_update_ht_cap(struct brcmf_if* ifp,
   ht_caps->ht_cap_info.set_dsss_in_40(true);
 
   // SM Power Save
-  // At present SMPS appears to never be enabled in firmware (see fxbug.dev/29648)
+  // At present SMPS appears to never be enabled in firmware (see https://fxbug.dev/29648)
   ht_caps->ht_cap_info.set_sm_power_save(IEEE80211_HT_CAPS_SMPS_DISABLED);
 
   // Rx STBC
@@ -4377,7 +4377,7 @@ static void brcmf_update_vht_cap(struct brcmf_if* ifp,
       wlan::VhtCapabilities::ViewFromRawBytes(band_cap->vht_caps.bytes.data());
 
   // Set Max MPDU length to 11454
-  // TODO(fxbug.dev/29107): Value hardcoded from firmware behavior of the BCM4356 and BCM4359
+  // TODO(https://fxbug.dev/29107): Value hardcoded from firmware behavior of the BCM4356 and BCM4359
   // chips.
   vht_caps->vht_cap_info.set_max_mpdu_len(2);
 
@@ -4393,7 +4393,7 @@ static void brcmf_update_vht_cap(struct brcmf_if* ifp,
   }
 
   // Tx STBC
-  // TODO(fxbug.dev/29107): Value is hardcoded for now
+  // TODO(https://fxbug.dev/29107): Value is hardcoded for now
   if (brcmf_feat_is_quirk_enabled(ifp, BRCMF_FEAT_QUIRK_IS_4359)) {
     vht_caps->vht_cap_info.set_tx_stbc(true);
   }
@@ -4704,7 +4704,7 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
   // The "rxstreams_cap" iovar, when present, indicates the maximum number of Rx streams
   // possible, encoded as one bit per stream (i.e., a value of 0x3 indicates 2 streams/chains).
   if (brcmf_feat_is_quirk_enabled(ifp, BRCMF_FEAT_QUIRK_IS_4359)) {
-    // TODO(fxbug.dev/29107): The BCM4359 firmware supports rxstreams_cap, but it returns 0x2
+    // TODO(https://fxbug.dev/29107): The BCM4359 firmware supports rxstreams_cap, but it returns 0x2
     // instead of 0x3, which is incorrect.
     rxchain = 0x3;
   } else {
@@ -4712,7 +4712,7 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
     // the number of rx chains.
     status = brcmf_fil_iovar_int_get(ifp, "rxstreams_cap", &rxchain, nullptr);
     if (status != ZX_OK) {
-      // TODO(fxbug.dev/29107): The rxstreams_cap iovar isn't yet supported in the BCM4356
+      // TODO(https://fxbug.dev/29107): The rxstreams_cap iovar isn't yet supported in the BCM4356
       // firmware. For now we use a hard-coded value (another option would be to parse the
       // nvram contents ourselves (looking for the value associated with the key "rxchain").
       BRCMF_INFO("Failed to retrieve value for Rx chains. Assuming chip supports 2 Rx chains.");
@@ -5253,7 +5253,7 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   }
 
   status = brcmf_fil_iovar_data_get(ifp, "wme_ac_sta", &ac_params, sizeof(ac_params), &fw_err);
-  // TODO(fxbug.dev/67821): Check what happens when WMM is not enabled.
+  // TODO(https://fxbug.dev/67821): Check what happens when WMM is not enabled.
   if (status != ZX_OK) {
     BRCMF_ERR("could not get STA WMM status: %s, fw err %s", zx_status_get_string(status),
               brcmf_fil_get_errstr(fw_err));
@@ -5919,7 +5919,7 @@ static zx_status_t brcmf_handle_reassoc_event(struct brcmf_if* ifp, const struct
   }
   ZX_DEBUG_ASSERT(!brcmf_is_apmode(ifp->vif));
 
-  // TODO(fxbug.dev/117517) REASSOC fails if scan overlaps.
+  // TODO(https://fxbug.dev/117517) REASSOC fails if scan overlaps.
   // Note: canceling in-progress scan here does not prevent the REASSOC event
   // failure. The roam timer will timeout and cleanup if an overlapping scan
   // causes the roam to fail.
@@ -6122,7 +6122,7 @@ static zx_status_t brcmf_indicate_client_disconnect(struct brcmf_if* ifp,
   // Start of disconnect process. Reset disconnect_done.
   sync_completion_reset(&ifp->disconnect_done);
 
-  // TODO(fxb/61311): Remove once this verbose logging is no longer needed in
+  // TODO(https://fxbug.dev/61311): Remove once this verbose logging is no longer needed in
   // brcmf_indicate_client_disconnect(). This log should be moved to CONN
   // for production code.
   BRCMF_INFO("client disconnect indicated. state %s, rssi, %d snr, %d",
@@ -6700,7 +6700,7 @@ static zx_status_t brcmf_dongle_roam(struct brcmf_if* ifp) {
   zx_status_t err;
 
   if (brcmf_feat_is_quirk_enabled(ifp, BRCMF_FEAT_QUIRK_IS_4359)) {
-    return ZX_OK;  // TODO(fxbug.dev/29354) Find out why, and document.
+    return ZX_OK;  // TODO(https://fxbug.dev/29354) Find out why, and document.
   }
   err = brcmf_setup_roam_engine(ifp);
   if (err != ZX_OK) {

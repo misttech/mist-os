@@ -62,7 +62,7 @@ use notify::RecommendedWatcher;
 // file removal. Without PollWatcher the watcher would report a fresh file
 // as having been deleted even if it is a new file.
 //
-// See fxbug.dev/114564 for details on what happens when using the Default
+// See https://fxbug.dev/114564 for details on what happens when using the Default
 // RecommendedWatcher (FsEvents).
 //
 // It's possible that in future versions of this crate this bug will be fixed,

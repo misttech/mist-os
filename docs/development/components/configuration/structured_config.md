@@ -329,7 +329,7 @@ in the component's config schema which has `mutability: [ "parent" ]` and
 You can use [Realm Builder][rb-feature-matrix] to dynamically replace the configuration values of
 a component regardless of the configuration field's `mutability`.
 
-TODO(fxbug.dev/102211) Add a section covering use with subpackaged components.
+TODO(https://fxbug.dev/102211) Add a section covering use with subpackaged components.
 
 * {C++}
 
@@ -376,7 +376,7 @@ To set all of a component's values in code without using packaged values:
   {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/config/integration_test/rust/lib.rs" region_tag="config_empty" adjust_indentation="auto" %}
   ```
 
-<!-- TODO(fxbug.dev/104819): Link to fxbug.dev page when better documentation is available.  -->
+<!-- TODO(https://fxbug.dev/104819): Link to fxbug.dev page when better documentation is available.  -->
 [build-types]: /docs/contribute/governance/rfcs/0115_build_types.md
 [cml-ref-doc]: https://fuchsia.dev/reference/cml#config
 [sa-sc-docs]: assembling_structured_config.md

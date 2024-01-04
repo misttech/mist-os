@@ -19,7 +19,7 @@ namespace display {
 // this concept as "capture image handle". This name will be phased out when the
 // API is migrated from Banjo to FIDL.
 //
-// TODO(fxbug.dev/129092): Remove this type when unifying image ID namespaces.
+// TODO(https://fxbug.dev/129092): Remove this type when unifying image ID namespaces.
 DEFINE_STRONG_INT(DriverCaptureImageId, uint64_t);
 
 constexpr inline DriverCaptureImageId ToDriverCaptureImageId(

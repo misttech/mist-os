@@ -132,7 +132,7 @@ We do not rigidly adhere to a "one way to do it" philosophy. When we are
 concerned that users will waste time deciding between trivial alternatives, we
 introduce restrictions in `fidl-lint` or `fidl-format` rather than in `fidlc`.
 
-<!-- TODO(fxbug.dev/74753): Say "the linter enforces an ordering" when it is true. -->
+<!-- TODO(https://fxbug.dev/74753): Say "the linter enforces an ordering" when it is true. -->
 For example, FIDL accepts modifier keywords in any order, but we intend to
 enforce a consistent ordering in the linter.
 

@@ -375,7 +375,7 @@ fit::result<GuestError> Vmm::Initialize(GuestConfig cfg, ::sys::ComponentContext
   // Setup magma device.
   if (cfg.has_magma_device()) {
     magma_ = std::make_unique<VirtioMagma>(guest_->phys_mem());
-    // TODO(fxbug.dev/12619): simplify vmm launch configs
+    // TODO(https://fxbug.dev/12619): simplify vmm launch configs
     const size_t magma_dev_mem_size = cfg.magma_device().memory;
     const zx_gpaddr_t magma_dev_mem_offset = AllocDeviceAddr(magma_dev_mem_size);
     if (!dev_mem.AddRange(magma_dev_mem_offset, magma_dev_mem_size)) {

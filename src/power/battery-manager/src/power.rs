@@ -16,7 +16,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::battery_manager::BatteryManager;
 
-// TODO(fxbug.dev/33183): binding the FIDL service via file descriptor is still
+// TODO(https://fxbug.dev/33183): binding the FIDL service via file descriptor is still
 // required for hardware FIDLs (implemented by ACPI battery driver).
 // Once componentization of drivers is complete and they are capable of
 // publishing their FIDL services, should be abl to remove POWER_DEVICE
@@ -41,7 +41,7 @@ fn get_power_source_proxy(file: &PathBuf) -> Result<hpower::SourceProxy, Error> 
 // Note that this file (/dev/class/power) is a left over artifact of the
 // legacy power_manager implementation which was based on power IOCTLs.
 // The file is still required as it provides the descriptor with which
-// to bind the FIDL service, at least until fxbug.dev/33183 is complete, which
+// to bind the FIDL service, at least until https://fxbug.dev/33183 is complete, which
 // will componentize drivers and allow them to provide discoverable FIDL
 // services like everyone else.
 pub async fn get_power_info(file: &PathBuf) -> Result<hpower::SourceInfo, Error> {
@@ -59,7 +59,7 @@ pub async fn get_power_info(file: &PathBuf) -> Result<hpower::SourceInfo, Error>
 // Note that this file (/dev/class/power) is a left over artifact of the
 // legacy power_manager implementation which was based on power IOCTLs.
 // The file is still required as it provides the descriptor with which
-// to bind the FIDL service, at least until fxbug.dev/33183 is complete, which
+// to bind the FIDL service, at least until https://fxbug.dev/33183 is complete, which
 // will componentize drivers and allow them to provide discoverable FIDL
 // services like everyone else.
 pub async fn get_battery_info(file: &PathBuf) -> Result<hpower::BatteryInfo, Error> {

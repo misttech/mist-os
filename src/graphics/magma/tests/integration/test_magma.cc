@@ -659,7 +659,7 @@ class TestConnection {
     auto start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
               magma_poll(items.data(), to_uint32(items.size()), ms_to_ns(kTimeoutMs)));
-    // TODO(fxbug.dev/49103) - remove this adjustment for magma_poll timeout truncation in ns to ms
+    // TODO(https://fxbug.dev/49103) - remove this adjustment for magma_poll timeout truncation in ns to ms
     // conversion
     EXPECT_LE(kTimeoutMs - 1, std::chrono::duration_cast<std::chrono::milliseconds>(
                                   std::chrono::steady_clock::now() - start)
@@ -679,7 +679,7 @@ class TestConnection {
     start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
               magma_poll(items.data(), to_uint32(items.size()), ms_to_ns(kTimeoutMs)));
-    // TODO(fxbug.dev/49103) - remove this adjustment for magma_poll timeout truncation in ns to ms
+    // TODO(https://fxbug.dev/49103) - remove this adjustment for magma_poll timeout truncation in ns to ms
     // conversion
     EXPECT_LE(kTimeoutMs - 1, std::chrono::duration_cast<std::chrono::milliseconds>(
                                   std::chrono::steady_clock::now() - start)

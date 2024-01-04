@@ -197,7 +197,7 @@ fuchsia_test_package("fuchsia-zircon-tests") {
   ]
 
   if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/131011): Remove this once
+    # TODO(https://fxbug.dev/131011): Remove this once
     # version::tests::get_version_string passes on RISC-V.
     test_specs = {
       environments = []

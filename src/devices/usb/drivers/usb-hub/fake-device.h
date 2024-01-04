@@ -334,7 +334,7 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
         case OperationType::kUsbCancelAll:
           message->status = UsbCancelAllDispatch(message->ep_address);
           if (pending_requests_) {
-            // TODO(fxb/60981): Make CancelAll async
+            // TODO(https://fxbug.dev/60981): Make CancelAll async
             queue_.Insert(std::move(message));
           } else {
             Complete(std::move(message));

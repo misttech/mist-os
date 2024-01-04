@@ -246,14 +246,14 @@ void ProfileServer::L2capParametersExt::RequestParameters(
                    "L2capParametersExt::RequestParameters: setting flush timeout failed");
           }
           // Return the current parameters even if the request failed.
-          // TODO(fxb/73039): set current security requirements in returned channel parameters
+          // TODO(https://fxbug.dev/73039): set current security requirements in returned channel parameters
           cb(ChannelInfoToFidlChannelParameters(chan->info()));
         });
     return;
   }
 
   // No other channel parameters are  supported, so just return the current parameters.
-  // TODO(fxb/73039): set current security requirements in returned channel parameters
+  // TODO(https://fxbug.dev/73039): set current security requirements in returned channel parameters
   callback(ChannelInfoToFidlChannelParameters(channel_->info()));
 }
 
@@ -899,7 +899,7 @@ fidl::InterfaceHandle<fidlbredr::AudioOffloadExt> ProfileServer::BindAudioOffloa
   audio_offload_ext_server->set_error_handler(
       [this, server_ptr](zx_status_t status) { OnAudioOffloadExtError(server_ptr, status); });
 
-  // TODO(fxbug.dev/126635): Use unique channel id instead of server_ptr
+  // TODO(https://fxbug.dev/126635): Use unique channel id instead of server_ptr
   audio_offload_ext_servers_[server_ptr] = std::move(audio_offload_ext_server);
   return client;
 }
@@ -929,7 +929,7 @@ fuchsia::bluetooth::bredr::Channel ProfileServer::ChannelToFidl(
     l2cap_parameters_ext_servers_.erase(unique_id);
     audio_direction_ext_servers_.erase(unique_id);
     audio_offload_controller_server_ = nullptr;
-    // TODO(fxbug.dev/113355): Erase other channel extension servers.
+    // TODO(https://fxbug.dev/113355): Erase other channel extension servers.
   };
 
   auto sock = l2cap_socket_factory_.MakeSocketForChannel(std::move(channel), std::move(closed_cb));

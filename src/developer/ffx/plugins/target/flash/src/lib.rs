@@ -52,8 +52,8 @@ impl FfxMain for FlashTool {
 
 fn preflight_checks<W: Write>(cmd: &FlashCommand, mut writer: W) -> Result<()> {
     if cmd.manifest_path.is_some() {
-        // TODO(fxb/125854)
-        writeln!(writer, "{}WARNING:{} specifying the flash manifest via a positional argument is deprecated. Use the --manifest flag instead (fxb/125854)", color::Fg(color::Red), style::Reset)
+        // TODO(https://fxbug.dev/125854)
+        writeln!(writer, "{}WARNING:{} specifying the flash manifest via a positional argument is deprecated. Use the --manifest flag instead (https://fxbug.dev/125854)", color::Fg(color::Red), style::Reset)
 .with_context(||"writing warning to users")
 .map_err(fho::Error::from)?;
     }
@@ -243,7 +243,7 @@ mod test {
         assert_eq!(
             std::str::from_utf8(&w).expect("UTF8 String"),
             format!(
-                "{}WARNING:{} specifying the flash manifest via a positional argument is deprecated. Use the --manifest flag instead (fxb/125854)\n",
+                "{}WARNING:{} specifying the flash manifest via a positional argument is deprecated. Use the --manifest flag instead (https://fxbug.dev/125854)\n",
                 color::Fg(color::Red),
                 style::Reset
         ));

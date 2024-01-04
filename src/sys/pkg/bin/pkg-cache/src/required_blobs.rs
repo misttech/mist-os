@@ -38,7 +38,7 @@ pub(crate) enum FindRequiredBlobsError {
 ///     If some required blobs could be determined, return those blobs, otherwise return the error.
 ///   If `error_strategy` is `PropagateFailure`
 ///     returns Error
-/// TODO(fxbug.dev/112773) Replace with an iterative implementation to avoid stack overflows.
+/// TODO(https://fxbug.dev/112773) Replace with an iterative implementation to avoid stack overflows.
 pub(crate) fn find_required_blobs_recursive<'a>(
     blobfs: &'a blobfs::Client,
     meta_hash: &'a Hash,

@@ -183,7 +183,7 @@ impl AsyncWrite for UdpNetworkInterface {
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
         if self.write_task.is_none() {
-            // TODO(fxb/78975): unfortunately the Task requires the 'static lifetime so we have to
+            // TODO(https://fxbug.dev/78975): unfortunately the Task requires the 'static lifetime so we have to
             // copy the bytes and move them into the async block.
             let packets = self.create_fastboot_packets(buf).map_err(|e| {
                 std::io::Error::new(
@@ -253,7 +253,7 @@ impl AsyncWrite for UdpNetworkInterface {
 
 pub async fn open(addr: SocketAddr) -> Result<UdpNetworkInterface> {
     let mut to_sock: SocketAddr = addr.clone();
-    // TODO(fxb/78977): get the port from the mdns packet
+    // TODO(https://fxbug.dev/78977): get the port from the mdns packet
     to_sock.set_port(HOST_PORT);
     let socket = make_sender_socket(to_sock).await?;
     let (buf, sz) = send_to_device(&make_query_packet(), &socket)

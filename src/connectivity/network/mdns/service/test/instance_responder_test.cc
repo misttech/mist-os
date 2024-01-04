@@ -650,7 +650,7 @@ TEST_F(InstanceResponderTest, LocalServiceInstanceNotificationsProxy) {
   InstanceResponder under_test(this, kHostName, kAddresses, kServiceName, kInstanceName,
                                Media::kBoth, IpVersions::kBoth, this);
   SetAgent(under_test);
-  // Use alternate host addresses to test for regression of fxb/105871 fix.
+  // Use alternate host addresses to test for regression of https://fxbug.dev/105871 fix.
   SetLocalHostAddresses(kAlternateHostAddresses);
 
   // Normal startup.

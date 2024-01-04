@@ -164,7 +164,7 @@ std::ostream& operator<<(std::ostream& os, const {{ .Name.Parse.Name }}& value) 
   using fidl::operator<<;
   bool is_first = true;
         {{- range .Members }}
-  // TODO(fxbug.dev/7942): Simplify when bool conversion is supported.
+  // TODO(https://fxbug.dev/7942): Simplify when bool conversion is supported.
   if ((value & {{ $type_name }}::{{ .Name }}) != {{ $type_name }}(0)) {
     if (is_first) {
       is_first = false;

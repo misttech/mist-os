@@ -5,7 +5,7 @@
 declare_args() {
   # List of GN paths to source files to be instrumented by `profile` variants.
   profile_source_files = [
-    # fxbug.dev/109920: profile all checked-in sources.
+    # https://fxbug.dev/109920: profile all checked-in sources.
     # (don't profile generated sources under out/)
     "//*",
   ]
@@ -13,8 +13,8 @@ declare_args() {
   # List of GN paths to source files to NOT instrument by `profile` variants.
   # These take precedence over `profile_source_files`.
   dont_profile_source_files = [
-    # fxbug.dev/109920: don't profile //third_party.
-    # fxbug.dev/116075: uncomment the below when issue is fixed.
+    # https://fxbug.dev/109920: don't profile //third_party.
+    # https://fxbug.dev/116075: uncomment the below when issue is fixed.
     # Also, change the expression to not reject //third_party/cobalt/*
     #"//third_party/*",
   ]

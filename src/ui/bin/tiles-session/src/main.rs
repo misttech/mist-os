@@ -220,7 +220,7 @@ impl TilesSession {
     pub async fn new(
         internal_sender: UnboundedSender<MessageInternal>,
     ) -> Result<TilesSession, Error> {
-        // TODO(fxbug.dev/88656): do something like this to instantiate the library component that knows
+        // TODO(https://fxbug.dev/88656): do something like this to instantiate the library component that knows
         // how to generate a Flatland scene to lay views out on a tiled grid.  It will be used in the
         // event loop below.
         // let tiles_helper = tile_helper::TilesHelper::new();
@@ -231,7 +231,7 @@ impl TilesSession {
         let scene_manager = connect_to_protocol::<scene::ManagerMarker>()
             .expect("failed to connect to fuchsia.scene.Manager");
 
-        // TODO(fxbug.dev/104411): see scene_manager.fidl.  If we awaited the future immediately we
+        // TODO(https://fxbug.dev/104411): see scene_manager.fidl.  If we awaited the future immediately we
         // would deadlock.  Conversely, if we just dropped the future, then scene_manager would barf
         // because it would try to reply to present_root_view() on a closed channel.  So we kick off
         // the async FIDL request (which is not idiomatic for Rust, where typically the "future
@@ -315,7 +315,7 @@ impl TilesSession {
         _internal_sender: UnboundedSender<MessageInternal>,
     ) {
         // Listen for channel closure.
-        // TODO(fxbug.dev/88656): Actually watch for and respond to layout changes.
+        // TODO(https://fxbug.dev/88656): Actually watch for and respond to layout changes.
         fasync::Task::local(async move {
             let _ = proxy.on_closed().await;
         })
@@ -457,7 +457,7 @@ fn handle_graphical_presenter_request(
                         view_controller_request_stream,
                         responder,
                     },
-                    // TODO(fxbug.dev/88656): is this a safe expect()?  I think so, since
+                    // TODO(https://fxbug.dev/88656): is this a safe expect()?  I think so, since
                     // we're using Task::local() instead of Task::spawn(), so we're on the
                     // same thread as main(), which will keep the receiver end alive until
                     // it exits, at which time the executor will not tick this task again.

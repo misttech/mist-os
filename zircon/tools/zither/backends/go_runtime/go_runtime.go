@@ -116,7 +116,7 @@ func ffiType(desc zither.TypeDescriptor) string {
 	case zither.TypeKindHandle:
 		return "uint32"
 	case zither.TypeKindAlias:
-		// TODO(fxbug.dev/110021): These types are currently misdefined as
+		// TODO(https://fxbug.dev/110021): These types are currently misdefined as
 		// `uint64` aliases (instead of `uintptr` ones).
 		if desc.Type == "zx/Paddr" || desc.Type == "zx/Vaddr" {
 			return "uintptr"

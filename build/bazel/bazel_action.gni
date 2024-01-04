@@ -328,7 +328,7 @@ template("bazel_action") {
 
     # Rebuild on any change known to git and let Bazel
     # figure out if it actually needs to do work.
-    # See: fxbug.dev/117818#c2
+    # See: https://fxbug.dev/117818#c2
     inputs += [
       "//.git/HEAD",
       "//.git/index",

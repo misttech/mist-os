@@ -6,7 +6,7 @@ This component contains 3 examples that demonstrates how to render a simple imag
 * `--rect`: Renders a fuchsia rectangle on screen using Flatland's `CreateFilledRect` API.
 * `--block`: Generates 4 BGRA32 formatted colored blocks on screen.
 
-NOTE: Currently `ffx session add` does not support passing arguments for `.cm` components (fxb/96004). Until the support is added in ffx session plugin, to change the input arg, you will need to modify `simplest_sysmem.cml`.
+NOTE: Currently `ffx session add` does not support passing arguments for `.cm` components (https://fxbug.dev/96004). Until the support is added in ffx session plugin, to change the input arg, you will need to modify `simplest_sysmem.cml`.
 
 ## Usage
 

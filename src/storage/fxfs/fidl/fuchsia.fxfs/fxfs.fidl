@@ -91,7 +91,7 @@ closed protocol Volume {
     /// access for the given volume.  `outgoing_directory` will contain the root and other services
     /// exposed by the volume.  To lock the volume, call fuchsia.fs.Admin.Shutdown on the returned
     /// handle.
-    // TODO(fxbug.dev/99182): Try to share options with fuchsia.fs_startup StartOptions.
+    // TODO(https://fxbug.dev/99182): Try to share options with fuchsia.fs_startup StartOptions.
     strict Mount(resource struct {
         outgoing_directory server_end:fuchsia.io.Directory;
         options MountOptions;

@@ -47,7 +47,7 @@
 
 namespace amlogic_decoder {
 
-// TODO(fxbug.dev/35200):
+// TODO(https://fxbug.dev/35200):
 //
 // AllocateIoBuffer() - only used by VP9 - switch to InternalBuffer when we do zero copy on input
 // for VP9.
@@ -59,7 +59,7 @@ namespace amlogic_decoder {
 //  search_pattern_ - HW only reads this
 //  parser_input_ - not used when secure)
 
-// TODO(fxbug.dev/41972): bti::release_quarantine() or zx_bti_release_quarantine() somewhere during
+// TODO(https://fxbug.dev/41972): bti::release_quarantine() or zx_bti_release_quarantine() somewhere during
 // startup, after HW is known idle, before we allocate anything from sysmem.
 
 namespace {
@@ -786,7 +786,7 @@ zx_status_t AmlogicVideo::TeeVp9AddHeaders(zx_paddr_t page_phys_base, uint32_t b
   ZX_DEBUG_ASSERT(after_size);
   ZX_DEBUG_ASSERT(is_tee_available());
 
-  // TODO(fxbug.dev/44674): Remove this retry loop once this issue is resolved.
+  // TODO(https://fxbug.dev/44674): Remove this retry loop once this issue is resolved.
   constexpr uint32_t kRetryCount = 20;
   zx_status_t status = ZX_OK;
   for (uint32_t i = 0; i < kRetryCount; ++i) {
@@ -925,10 +925,10 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   if (is_tee_available_) {
     tee_proto_client_.Bind(std::move(endpoints->client));
-    // TODO(fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware TA
+    // TODO(https://fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware TA
     LOG(INFO, "Got ZX_PROTOCOL_TEE");
   } else {
-    // TODO(fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware TA
+    // TODO(https://fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware TA
     LOG(INFO, "Skipped ZX_PROTOCOL_TEE");
   }
 
@@ -1055,7 +1055,7 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   parser_ = std::make_unique<Parser>(this, std::move(parser_interrupt_handle_));
 
   if (is_tee_available()) {
-    // TODO(fxbug.dev/44674): Remove this retry loop once this issue is resolved.
+    // TODO(https://fxbug.dev/44674): Remove this retry loop once this issue is resolved.
     constexpr uint32_t kRetryCount = 10;
     for (uint32_t i = 0; i < kRetryCount; i++) {
       status = EnsureSecmemSessionIsConnected();
@@ -1082,7 +1082,7 @@ zx_status_t AmlogicVideo::PreloadFirmwareViaTee() {
   uint32_t firmware_size;
   firmware_->GetWholeBlob(&firmware_data, &firmware_size);
 
-  // TODO(fxbug.dev/44764): Remove retry when video_firmware crash is fixed.
+  // TODO(https://fxbug.dev/44764): Remove retry when video_firmware crash is fixed.
   zx_status_t status = ZX_OK;
   constexpr uint32_t kRetryCount = 10;
   for (uint32_t i = 0; i < kRetryCount; i++) {

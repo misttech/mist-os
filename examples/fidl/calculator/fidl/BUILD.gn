@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("calculator") {
-  # TODO(fxbug.dev/98622) - The structure and location of FIDL libraries along
+  # TODO(https://fxbug.dev/98622) - The structure and location of FIDL libraries along
   # with their names can be confusing. We should update this once we land on a
   # decision in the linked bug.
   name = "fuchsia.examples.calculator"

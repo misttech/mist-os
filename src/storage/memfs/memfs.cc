@@ -35,7 +35,7 @@ zx::result<fs::FilesystemInfo> Memfs::GetFilesystemInfo() {
   info.fs_type = fuchsia_fs::VfsType::kMemfs;
   info.SetFsId(fs_id_);
 
-  // TODO(fxbug.dev/86984) Define a better value for "unknown" or "undefined" for the total_bytes
+  // TODO(https://fxbug.dev/86984) Define a better value for "unknown" or "undefined" for the total_bytes
   // and used_bytes (memfs vends writable duplicates of its underlying VMOs to its clients which
   // makes accounting difficult).
   info.total_bytes = UINT64_MAX;

@@ -332,7 +332,7 @@ pub fn sys_membarrier(
     _flags: u32,
     _cpu_id: i32,
 ) -> Result<u32, Errno> {
-    // TODO(fxbug.dev/103867): This membarrier implementation does not do any real work.
+    // TODO(https://fxbug.dev/103867): This membarrier implementation does not do any real work.
     not_implemented!("membarrier", cmd);
     match cmd {
         uapi::membarrier_cmd_MEMBARRIER_CMD_QUERY => Ok(0),

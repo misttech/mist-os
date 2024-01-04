@@ -203,7 +203,7 @@ pub async fn list_devices(
         }
     }
 
-    // TODO(fxb/118660): Remove this warning once ffx driver supports unbound composites.
+    // TODO(https://fxbug.dev/118660): Remove this warning once ffx driver supports unbound composites.
     if !driver_development_proxy.is_dfv2().await? {
         println!(
             "\n\n\

@@ -1138,7 +1138,7 @@ void CloneThread(CloneThreadArgs* args) {
     // Explicitly close |fd| before unmapping.
     fd.reset();
     // Yielding before unmapping significantly improves the ability of this test to detect bugs
-    // (e.g. fxbug.dev/53882) by increasing the length of time that the file is closed but still has
+    // (e.g. https://fxbug.dev/53882) by increasing the length of time that the file is closed but still has
     // a VMO clone.
     zx_thread_legacy_yield(0);
     ASSERT_EQ(0, munmap(addr, args->info->size_data));
@@ -1148,7 +1148,7 @@ void CloneThread(CloneThreadArgs* args) {
 // This test ensures that blobfs' lifecycle management correctly deals with a highly volatile
 // number of VMO clones (which blobfs has special logic to handle, preventing the in-memory
 // blob from being discarded while there are active clones).
-// See fxbug.dev/53882 for background on this test case.
+// See https://fxbug.dev/53882 for background on this test case.
 TEST_P(BlobfsIntegrationTest, VmoCloneWatchingTest) {
   std::unique_ptr<BlobInfo> info = GenerateBlob(CharFill<'A'>, fs().mount_path(), 4096);
 

@@ -129,7 +129,7 @@ FUNCTION_LABEL(mexec_asm)
     /* Grab 64bit entrypoint from provided location */
     mov (%r10), %rax
 
-    // TODO(fxbug.dev/32255): In the legacy format, the entry address is
+    // TODO(https://fxbug.dev/32255): In the legacy format, the entry address is
     // absolute so we use the value as is.  In the modern format, the entry
     // address is relative to the (arbitrary) load address.  But this code
     // still always uses the fixed load address, so add that in.

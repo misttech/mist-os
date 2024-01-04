@@ -319,7 +319,7 @@ zx_status_t Alc5663Device::InitializeDevice() {
 
   // Power on everything.
   //
-  // TODO(fxbug.dev/31426): Only turn on subsystems as/if they are needed.
+  // TODO(https://fxbug.dev/31426): Only turn on subsystems as/if they are needed.
   status = MapRegister<PowerManagementControl1Reg>(&client_, [](auto reg) {
     return reg.set_en_i2s1(1)
         .set_pow_dac_l_1(1)
@@ -355,7 +355,7 @@ zx_status_t Alc5663Device::InitializeDevice() {
 
   // Setup internal clocks and PLL.
   //
-  // TODO(fxbug.dev/35648): Allow this to be configured at runtime.
+  // TODO(https://fxbug.dev/35648): Allow this to be configured at runtime.
   status = SetUpDeviceClocks(&client_, /*sample_rate=*/kSampleRate,
                              /*bclk_frequency=*/(kSampleRate * kBitsPerChannel * kNumChannels));
   if (status != ZX_OK) {

@@ -87,7 +87,7 @@ pub trait ErrorResultExt {
 impl ErrorResultExt for Result<(), anyhow::Error> {
     type Error = anyhow::Error;
     fn ignore_already_exists(self) -> Result<(), Self::Error> {
-        #[allow(clippy::if_same_then_else)] // TODO(fxbug.dev/95089)
+        #[allow(clippy::if_same_then_else)] // TODO(https://fxbug.dev/95089)
         self.or_else(|err| {
             if err.get_zx_status() == Some(ZxStatus::ALREADY_EXISTS) {
                 Ok(())
@@ -103,7 +103,7 @@ impl ErrorResultExt for Result<(), anyhow::Error> {
     }
 
     fn ignore_not_found(self) -> Result<(), Self::Error> {
-        #[allow(clippy::if_same_then_else)] // TODO(fxbug.dev/95089)
+        #[allow(clippy::if_same_then_else)] // TODO(https://fxbug.dev/95089)
         self.or_else(|err| {
             if err.get_zx_status() == Some(ZxStatus::NOT_FOUND) {
                 Ok(())

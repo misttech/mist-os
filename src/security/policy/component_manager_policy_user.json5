@@ -20,7 +20,7 @@
                     "/bootstrap",
                     "/bootstrap/pkg-cache",
 
-                    // TODO(fxbug.dev/294908859) Use optional routing to remove this route on user
+                    // TODO(https://fxbug.dev/294908859) Use optional routing to remove this route on user
                     // builds.
                     "/bootstrap/console-launcher",
                 ],

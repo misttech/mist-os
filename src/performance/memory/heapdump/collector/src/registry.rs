@@ -53,7 +53,7 @@ impl Registry {
         mut stream: fheapdump_client::StoredSnapshotIteratorRequestStream,
         snapshots: &[fheapdump_client::StoredSnapshot],
     ) -> Result<(), anyhow::Error> {
-        // TODO(fxbug.dev/128512): Batch multiple entries in the same message with measure-tape.
+        // TODO(https://fxbug.dev/128512): Batch multiple entries in the same message with measure-tape.
         let mut index = 0;
         while let Some(request) = stream.next().await.transpose()? {
             match request {

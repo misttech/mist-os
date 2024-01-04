@@ -61,7 +61,7 @@ def _fuchsia_virtual_device_impl(ctx):
                 "debug": 2345,
             },
 
-            # TODO(fxbug.dev/94125): remove once solution is available.
+            # TODO(https://fxbug.dev/94125): remove once solution is available.
             "start_up_args_template": template_file_name,
         },
     }

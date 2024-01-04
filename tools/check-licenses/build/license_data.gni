@@ -56,7 +56,7 @@ template("license_data") {
     always_run_gn_desc = invoker.always_run_gn_desc
   }
 
-  # TODO(fxb/116788): Remove once SPDX generation is not flaky.
+  # TODO(https://fxbug.dev/116788): Remove once SPDX generation is not flaky.
   produce_spdx = defined(invoker.produce_spdx) && invoker.produce_spdx
 
   out_dir = "$target_out_dir/check-licenses"
@@ -124,7 +124,7 @@ template("license_data") {
     ]
 
     # output JSON names the build output directory
-    # TODO(http://fxbug.dev/125423): fix tool to not leak the output directory
+    # TODO(https://fxbug.dev/125423): fix tool to not leak the output directory
     no_output_dir_leaks = false
   }
 
@@ -160,7 +160,7 @@ template("license_data") {
     }
 
     # output JSON names the build output directory
-    # TODO(http://fxbug.dev/125423): fix tool to not leak the output directory
+    # TODO(https://fxbug.dev/125423): fix tool to not leak the output directory
     no_output_dir_leaks = false
   }
 
@@ -174,7 +174,7 @@ template("license_data") {
     tool = "//tools/check-licenses"
 
     # The license tool scans the whole source tree, so it cannot be hermetic.
-    # TODO(fxbug.dev/84924): Improve the way notice files are generated.
+    # TODO(https://fxbug.dev/84924): Improve the way notice files are generated.
     hermetic_deps = false
 
     if (!defined(deps)) {

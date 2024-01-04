@@ -25,7 +25,7 @@ using Profiles::Security::PackedCertDateToTime;
 using Profiles::Security::WeaveDN;
 using Security::WeaveCertificateData;
 
-// TODO(fxbug.dev/51130): Allow build-time configuration of these values.
+// TODO(https://fxbug.dev/51130): Allow build-time configuration of these values.
 constexpr size_t kMaxCerts = 10;
 constexpr size_t kMaxServiceConfigSize = 10000;
 constexpr size_t kCertDecodeBufferSize = 5000;
@@ -38,13 +38,13 @@ WEAVE_ERROR GetEffectiveTime(uint32_t& effective_time) {
   uint64_t now_ms;
   WEAVE_ERROR err = System::Layer::GetClock_RealTimeMS(now_ms);
   if (err == WEAVE_NO_ERROR) {
-    // TODO(fxbug.dev/51890): The default implementation of GetClock_RealTimeMS only returns
+    // TODO(https://fxbug.dev/51890): The default implementation of GetClock_RealTimeMS only returns
     // not-synced if the value is before Jan 1, 2000. Use the UTC fidl instead
     // to confirm whether the clock source is from some external source.
     effective_time =
         Security::SecondsSinceEpochToPackedCertTime(static_cast<uint32_t>(now_ms / 1000));
   } else if (err == WEAVE_SYSTEM_ERROR_REAL_TIME_NOT_SYNCED) {
-    // TODO(fxbug.dev/51890): Acquire the firmware build time, for now we set it to May 26, 2023
+    // TODO(https://fxbug.dev/51890): Acquire the firmware build time, for now we set it to May 26, 2023
     // as reasonable default time.
     effective_time = Security::SecondsSinceEpochToPackedCertTime(1685059200U);
     FX_LOGS(WARNING) << "Real time clock not synchronized, using default time for cert validation.";

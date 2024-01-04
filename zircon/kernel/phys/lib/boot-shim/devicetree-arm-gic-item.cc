@@ -90,7 +90,7 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicChildNode(
       }
 
     } else if constexpr (std::is_same_v<dtype, zbi_dcfg_arm_gic_v3_driver_t>) {
-      // TODO(fxbug.dev/128235) : no support yet.
+      // TODO(https://fxbug.dev/128235) : no support yet.
     } else {
       // No Driver set, but we have seen the GIC, so this is an error.
       ZX_PANIC("GIC Item should have been initialized before looking into its child.");

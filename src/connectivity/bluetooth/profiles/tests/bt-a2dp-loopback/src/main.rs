@@ -92,7 +92,7 @@ async fn main() {
     }
 
     // The test will stream for 10 seconds.
-    // TODO(fxbug.dev/104010): Verify that audio packets are transferred from Source to Sink.
+    // TODO(https://fxbug.dev/104010): Verify that audio packets are transferred from Source to Sink.
     const STREAMING_DURATION: i64 = 10;
     info!("Streaming for duration {}", STREAMING_DURATION);
     fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(STREAMING_DURATION))).await;

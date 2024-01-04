@@ -210,7 +210,7 @@ impl InputControllerInner {
     }
 
     /// Sets the hardware mic/cam state from the muted states in `media_buttons`.
-    // TODO(fxbug.dev/66881): Send in name of device to set state for, instead
+    // TODO(https://fxbug.dev/66881): Send in name of device to set state for, instead
     // of using the device type's to_string.
     async fn set_hw_media_buttons_state(
         &mut self,
@@ -304,7 +304,7 @@ impl InputControllerInner {
         self.client.write_setting(input_info.into(), id).await.into_handler_result()
     }
 
-    #[allow(clippy::result_large_err)] // TODO(fxbug.dev/117896)
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/117896)
     /// Pulls the current software state of the camera from the device state.
     fn get_cam_sw_state(&self) -> Result<DeviceState, ControllerError> {
         self.input_device_state

@@ -31,7 +31,7 @@ namespace ddk_mock {
 // MockMmioRange results in more brittle mocks, and should only be used when
 // there is a single acceptable access ordering.
 //
-// TODO(fxbug.dev/105647): Instances are thread-safe. This hides unsafe
+// TODO(https://fxbug.dev/105647): Instances are thread-safe. This hides unsafe
 // concurrent MMIO accesses from TSAN. We should figure out a better thread
 // safety story.
 //

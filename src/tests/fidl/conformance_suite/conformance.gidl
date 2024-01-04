@@ -361,7 +361,7 @@ success("StrictXUnion") {
 }
 
 success("RecursiveVectorUnionStruct") {
-    // TODO(fxbug.dev/7644): Fix self-references and enable for Dart.
+    // TODO(https://fxbug.dev/7644): Fix self-references and enable for Dart.
     bindings_denylist = [dart],
     value = RecursiveVectorUnionStruct{
         u: RecursiveVectorUnion{
@@ -391,7 +391,7 @@ success("RecursiveVectorUnionStruct") {
 }
 
 success("MutualRecursionUnionStruct") {
-    // TODO(fxbug.dev/7644): Fix self-references and enable for Dart.
+    // TODO(https://fxbug.dev/7644): Fix self-references and enable for Dart.
     bindings_denylist = [dart],
     value = MutualRecursionUnionStruct{
         u: MutualRecursionUnion{
@@ -426,7 +426,7 @@ success("AddEthernetDeviceRequest") {
                 dhcp: true,
             },
         },
-        // TODO(fxbug.dev/7947): This should be a handle.
+        // TODO(https://fxbug.dev/7947): This should be a handle.
         this_should_be_a_handle: 0xffffffff,
     },
     bytes = {
@@ -460,7 +460,7 @@ success("PackageResolverResolveRequest") {
             fetch_if_absent: true,
             allow_old_versions: true,
         },
-        // TODO(fxbug.dev/7947): This should be a handle.
+        // TODO(https://fxbug.dev/7947): This should be a handle.
         this_should_be_a_handle: 0xffffffff,
     },
     bytes = {

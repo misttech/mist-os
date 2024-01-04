@@ -19,7 +19,7 @@ pub fn create_fidl_source(config_decl: &ConfigDecl, library_name: String) -> Str
     hbars.render("fidl_library", &fidl_library).unwrap()
 }
 
-// TODO(http://fxbug.dev/90690): The type identifier for the configuration fields struct
+// TODO(https://fxbug.dev/90690): The type identifier for the configuration fields struct
 // should be user-definable
 static FIDL_CLIENT_TEMPLATE: &str = "
 library {{library_name}};

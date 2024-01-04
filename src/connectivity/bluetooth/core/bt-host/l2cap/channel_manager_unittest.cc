@@ -66,7 +66,7 @@ struct PacketExpectation {
 
 // Helpers to set an outbound packet expectation with the link type and source location
 // boilerplate prefilled.
-// TODO(fxbug.dev/124457): Remove packet priorities from expectations
+// TODO(https://fxbug.dev/124457): Remove packet priorities from expectations
 #define EXPECT_LE_PACKET_OUT(packet_buffer, priority) \
   ExpectOutboundPacket(bt::LinkType::kLE, (priority), (packet_buffer), __FILE__, __LINE__)
 

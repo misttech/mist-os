@@ -44,7 +44,7 @@ class BlobVerifier {
 
   // Verifies the entire contents of a blob. |buffer_size| is the total size of the buffer and the
   // buffer must be zeroed from |data_size| to |buffer_size|.
-  // TODO(fxbug.dev/45457): Make const if MerkleTreeVerifier::Verify becomes const
+  // TODO(https://fxbug.dev/45457): Make const if MerkleTreeVerifier::Verify becomes const
   [[nodiscard]] zx_status_t Verify(const void* data, size_t data_size, size_t buffer_size);
 
   // Verifies a range of the contents of a blob from [data_offset, data_offset + length).
@@ -52,7 +52,7 @@ class BlobVerifier {
   // absolute start of the blob's data. (This facilitates partial verification when the blob is only
   // partially mapped in.) |buffer_size| is the total size of the buffer (relative to |data|) and
   // the buffer must be zerored from |data_size| to |buffer_size|.
-  // TODO(fxbug.dev/45457): Make const if MerkleTreeVerifier::Verify becomes const
+  // TODO(https://fxbug.dev/45457): Make const if MerkleTreeVerifier::Verify becomes const
   [[nodiscard]] zx_status_t VerifyPartial(const void* data, size_t length, size_t data_offset,
                                           size_t buffer_size);
 

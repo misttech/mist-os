@@ -55,7 +55,7 @@ class MixStage : public ReadableStream {
 
   struct MixJob {
     // Job state set up once by an output implementation, used by all renderers.
-    // TODO(fxbug.dev/13415): Integrate it into the Mixer class itself.
+    // TODO(https://fxbug.dev/13415): Integrate it into the Mixer class itself.
     ReadLockContext* read_lock_ctx;
     float* buf;
     int64_t buf_frames;

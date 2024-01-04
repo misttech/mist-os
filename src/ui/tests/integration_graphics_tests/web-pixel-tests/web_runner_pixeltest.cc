@@ -259,7 +259,7 @@ TEST_P(StaticHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
   const auto num_pixels = display_size().width * display_size().height;
 
-  // TODO(fxb/116631): Find a better replacement for screenshot loops to verify that content has
+  // TODO(https://fxbug.dev/116631): Find a better replacement for screenshot loops to verify that content has
   // been rendered on the display. Take screenshot until we see the web page's background color.
   ASSERT_TRUE(TakeScreenshotUntil(
       [num_pixels](const ui_testing::Screenshot& screenshot) {
@@ -360,7 +360,7 @@ TEST_P(VideoHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
 
   // The web page should render the scene as shown above.
-  // TODO(fxb/116631): Find a better replacement for screenshot loops to verify that content has
+  // TODO(https://fxbug.dev/116631): Find a better replacement for screenshot loops to verify that content has
   // been rendered on the display.
   ASSERT_TRUE(TakeScreenshotUntil(
       [&](const ui_testing::Screenshot& screenshot) {

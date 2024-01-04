@@ -17,7 +17,7 @@
         // builds a local vector sent via a single `AddLines(...)` call, while the latter sends a
         // `Ready() -> ()` call pauses execution until the next `->OnDrawn(...)` event is received.
         //
-        // TODO(fxbug.dev/96264): It would absolve individual language implementations of a great
+        // TODO(https://fxbug.dev/96264): It would absolve individual language implementations of a great
         //   deal of string parsing if we were able to use a vector of `union { Point; Ready}` here.
         script: {
             type: "vector",

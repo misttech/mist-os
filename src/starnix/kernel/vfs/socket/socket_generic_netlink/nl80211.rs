@@ -41,7 +41,7 @@ fn fidl_message_to_netlink(
     header: NetlinkHeader,
     message: fidl_wlanix::Nl80211Message,
 ) -> Result<NetlinkMessage<GenericMessage>, Error> {
-    // TODO(fxbug.dev/128857): Deduplicate these calls with similar calls used by rtnetlink.
+    // TODO(https://fxbug.dev/128857): Deduplicate these calls with similar calls used by rtnetlink.
     let payload = match message.message_type {
         Some(fidl_wlanix::Nl80211MessageType::Message) => {
             NetlinkPayload::InnerMessage(GenericMessage::Other {

@@ -30,7 +30,7 @@ template("generate_fuchsia_web_targets") {
   assert(defined(invoker.repository))
   not_needed([ "target_name" ])
 
-  # TODO(fxbug.dev/70573): Remove this once flavors are selected at a higher
+  # TODO(https://fxbug.dev/70573): Remove this once flavors are selected at a higher
   # level than the chromium BUILD.gn and thus before this file is imported.
   package_flavor_selections += invoker.package_flavor_selections
 
@@ -58,7 +58,7 @@ template("generate_fuchsia_web_targets") {
       "//:developer_cache_packages",
       "//:developer_universe_packages",
 
-      # TODO(fxbug.dev/119075): Remove when deps is removed from
+      # TODO(https://fxbug.dev/119075): Remove when deps is removed from
       # //products/terminal.gni.
       "//:legacy_cache_packages",
 
@@ -78,7 +78,7 @@ template("generate_fuchsia_web_targets") {
   # Used by integration tests to indicate they need WebEngine, specifically the
   # `context_provider.cm` Component, in the Products on which they run. It has
   # no effect.
-  # TODO(fxbug.dev/119212): Remove once a better solution is available.
+  # TODO(https://fxbug.dev/119212): Remove once a better solution is available.
   group("web_context_provider_for_test") {
     # No new tests relying on WebEngine should be added in tree.
     visibility += [
@@ -137,7 +137,7 @@ template("generate_fuchsia_web_test_targets") {
   assert(defined(invoker.repository))
   not_needed([ "target_name" ])
 
-  # TODO(fxbug.dev/70573): Remove this once flavors are selected at a higher
+  # TODO(https://fxbug.dev/70573): Remove this once flavors are selected at a higher
   # level than the chromium BUILD.gn and thus before this file is imported.
   package_flavor_selections += invoker.package_flavor_selections
 
@@ -198,7 +198,7 @@ if (is_host) {
   # because prebuilt_test_manifest() uses read_file() to parse a manifest
   # file that does not exist for riscv64 yet.
   #
-  # TODO(fxbug.dev/121729): Provide riscv64 Chromium prebuilts
+  # TODO(https://fxbug.dev/121729): Provide riscv64 Chromium prebuilts
   # Alternatively, move this check up in the dependency chain
   template("generate_test_targets") {
     visibility = [ ":*" ]

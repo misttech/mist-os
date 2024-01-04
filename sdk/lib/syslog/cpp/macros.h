@@ -248,7 +248,7 @@ template <typename Msg, typename... KeyValuePairs>
 struct LogValue final {
   constexpr LogValue(Msg msg, syslog_runtime::Tuplet<KeyValuePairs...> kvps)
       : msg(msg), kvps(kvps) {}
-  // FIXME(fxbug.dev/106574): With hwasan, or asan without stack-to-heap promotion for
+  // FIXME(https://fxbug.dev/106574): With hwasan, or asan without stack-to-heap promotion for
   // detecting use-after-returns, we can encounter a stack overflow in blobfs when bringing
   // up one of the drivers needed for networking. This largely has to do with the LogBuffer
   // which is 32kB and inlining can cause 4 of them to be allocated in a single frame. Without

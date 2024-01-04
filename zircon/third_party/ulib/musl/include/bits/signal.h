@@ -1,4 +1,4 @@
-// TODO(fxbug.dev/123876): Remove these types since no libc interfaces use them.
+// TODO(https://fxbug.dev/123876): Remove these types since no libc interfaces use them.
 #if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) || \
     defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
 

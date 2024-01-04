@@ -816,10 +816,10 @@ TEST(HelpersTest, PeerToFidlOptionalFields) {
   ASSERT_TRUE(fidl.has_device_class());
   EXPECT_EQ(fbt::MAJOR_DEVICE_CLASS_PERIPHERAL, fidl.device_class().value);
 
-  // Deprecated and never implemented (see fxbug.dev/57344).
+  // Deprecated and never implemented (see https://fxbug.dev/57344).
   EXPECT_FALSE(fidl.has_services());
 
-  // TODO(fxbug.dev/57344): Add a test when this field gets populated.
+  // TODO(https://fxbug.dev/57344): Add a test when this field gets populated.
   EXPECT_FALSE(fidl.has_le_services());
 
   ASSERT_TRUE(fidl.has_bredr_services());

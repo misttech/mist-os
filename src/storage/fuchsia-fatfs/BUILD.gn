@@ -174,7 +174,7 @@ fs_test_suite("fatfs") {
   ]
   extra_components = [ ":fatfs-fat-filename-tests" ]
 
-  # TODO(fxbug.dev/297201368): Remove when these tests pass on RISC-V.
+  # TODO(https://fxbug.dev/297201368): Remove when these tests pass on RISC-V.
   if (current_cpu == "riscv64") {
     omit_components += [
       ":fatfs-full-tests",

@@ -4,7 +4,7 @@
 
 // A wrapper around clang-format used by golden tests. It ensures golden file
 // reformatting is consistent with fidlgen_cpp, which skips formatting under
-// certain conditions (see fxbug.dev/78303).
+// certain conditions (see https://fxbug.dev/78303).
 package main
 
 import (

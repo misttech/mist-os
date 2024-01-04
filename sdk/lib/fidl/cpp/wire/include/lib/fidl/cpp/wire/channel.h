@@ -303,7 +303,7 @@ class ServerBindingRef : public internal::ServerBindingRefBase {
 //     fidl::BindServer(dispatcher, std::move(server_end), this,
 //                      [](Foo*, fidl::UnbindInfo, fidl::ServerEnd<Bar>) { ... });
 //
-// TODO(fxbug.dev/66343): Consider using a "DidUnbind" virtual function
+// TODO(https://fxbug.dev/66343): Consider using a "DidUnbind" virtual function
 // in the server interface to replace the |on_unbound| handler lambda.
 template <typename Protocol, typename ServerImpl, typename OnUnbound = std::nullptr_t>
 ServerBindingRef<Protocol> BindServer(async_dispatcher_t* dispatcher,

@@ -208,7 +208,7 @@ std::unique_ptr<ReleaseFenceManager::FrameRecord> ReleaseFenceManager::NewDirect
   record->frame_type = FrameType::kDirectScanout;
   record->frame_presented_callback = std::move(frame_presented_callback);
 
-  // TODO(fxbug.dev/74455): might want to add an offset to the time, so we don't screw up the
+  // TODO(https://fxbug.dev/74455): might want to add an offset to the time, so we don't screw up the
   // FrameScheduler. Another idea would be to use zero, and have the FrameScheduler ignore such
   // values.
   record->render_finished = true;

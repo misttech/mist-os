@@ -24,7 +24,7 @@ const impl::RenderPassPtr& RenderPassCache::ObtainRenderPass(const RenderPassInf
   TRACE_DURATION("gfx", "escher::impl::RenderPassCache::ObtainRenderPass");
   Hasher h;
 
-  // TODO(fxbug.dev/7166): take advantage of lazily-allocated memory for transient
+  // TODO(https://fxbug.dev/7166): take advantage of lazily-allocated memory for transient
   // subpass attachments in tile-based GPUs.  This involves setting a bit for
   // each transient attachment, both color and depth-stencil.
   uint32_t lazy = 0;
@@ -42,7 +42,7 @@ const impl::RenderPassPtr& RenderPassCache::ObtainRenderPass(const RenderPassInf
   if (rpi.depth_stencil_attachment_info.format != vk::Format::eUndefined) {
     h.u32(EnumCast(rpi.depth_stencil_attachment_info.format));
     h.u32(EnumCast(rpi.depth_stencil_attachment_info.swapchain_layout));
-    // TODO(fxbug.dev/7166): See above.  We don't check whether the depth-stencil attachment is
+    // TODO(https://fxbug.dev/7166): See above.  We don't check whether the depth-stencil attachment is
     // transient, but it seems like we probably should.
   }
 
@@ -68,8 +68,8 @@ const impl::RenderPassPtr& RenderPassCache::ObtainRenderPass(const RenderPassInf
   h.u32(rpi.store_attachments);
   h.u32(lazy);
 
-  // TODO(fxbug.dev/7167): track cache hit/miss rates.
-  // TODO(fxbug.dev/7166): pass |lazy| to RenderPass constructor; compare against
+  // TODO(https://fxbug.dev/7167): track cache hit/miss rates.
+  // TODO(https://fxbug.dev/7166): pass |lazy| to RenderPass constructor; compare against
   // retrieved RenderPass to make sure that they match.
   Hash hash = h.value();
   auto it = render_passes_.find(hash);

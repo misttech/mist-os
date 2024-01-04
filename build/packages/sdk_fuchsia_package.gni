@@ -95,7 +95,7 @@ template("sdk_fuchsia_package") {
 
   # Also build it in non-per-API-level contexts, for now.
   #
-  # TODO(fxbug.dev/310006516): Delete API-level-agnostic packages from the IDK.
+  # TODO(https://fxbug.dev/310006516): Delete API-level-agnostic packages from the IDK.
   if (override_target_api_level == -1) {
     package_in_target_api_level = true
   }
@@ -278,7 +278,7 @@ template("sdk_fuchsia_package") {
         # IDK" work. So for now, we'll continue building them with this strange
         # metadata quirk.
         #
-        # TODO(fxbug.dev/310006516): Delete this comment once API-level-agnostic
+        # TODO(https://fxbug.dev/310006516): Delete this comment once API-level-agnostic
         # packages are no longer in the IDK.
         "--api-level",
         "${override_target_api_level}",

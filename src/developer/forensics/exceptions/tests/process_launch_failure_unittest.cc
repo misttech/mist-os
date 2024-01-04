@@ -19,7 +19,7 @@ using ProcessLaunchFailureTest = UnitTestFixture;
 //
 // This is tested because we experienced an error where exceptions.cml could not successfully launch
 // subprocesses and ended up handling the same exception in an unterminated loop. For more
-// information, see fxbug.dev/59246.
+// information, see https://fxbug.dev/59246.
 TEST_F(ProcessLaunchFailureTest, HandleOnlyOnce) {
   HandlerManager handler_manager(dispatcher(), CrashCounter(&InspectRoot()), 1u,
                                  zx::duration::infinite());

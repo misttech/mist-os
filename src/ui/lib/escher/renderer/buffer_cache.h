@@ -50,7 +50,7 @@ class BufferCache : public ResourceRecycler {
   static constexpr size_t kMaxMemoryCached = 1024 * 1024;
 
   // Buffer usage info.
-  // TODO(fxbug.dev/24068) Grow this class to handle different buffer usage and memory
+  // TODO(https://fxbug.dev/24068) Grow this class to handle different buffer usage and memory
   // flags. It should work with the UniformBlockAllocator.
   const vk::BufferUsageFlags kUsageFlags =
       vk::BufferUsageFlagBits::eTransferSrc | vk::BufferUsageFlagBits::eTransferDst;

@@ -41,7 +41,7 @@ class Filter {
 
   // Eagerly precomputes needed data. If not called, needed data will be lazily computed on the
   // first `ComputeSample` call.
-  // TODO(fxbug.dev/45074): This is for tests only and can be removed once filter creation is eager.
+  // TODO(https://fxbug.dev/45074): This is for tests only and can be removed once filter creation is eager.
   virtual void EagerlyPrepare() = 0;
 
   int32_t source_rate() const { return source_rate_; }

@@ -15,10 +15,10 @@ the monotonic time at which `zx_process_start()` was called, when valid.
 
 ## Motivation
 
-First filed at [crbug.com/726484] and then [fxbug.dev/30751], Chromium requested
+First filed at [crbug.com/726484] and then [https://fxbug.dev/30751], Chromium requested
 the feature in order to give a base time for trace events, extending a
 platform-agnostic interface already supporting Linux, macOS, and Windows.
-Further, [fxbug.dev/43108] was filed to leverage this same feature in order to
+Further, [https://fxbug.dev/43108] was filed to leverage this same feature in order to
 include uptime in crash reports.
 
 ## Design
@@ -153,5 +153,5 @@ macOS: The `proc_pidinfo()` syscalls seems to expose this.
 
 <!-- xrefs -->
 [crbug.com/726484]: https://bugs.chromium.org/p/chromium/issues/detail?id=726484
-[fxbug.dev/30751]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=30751
-[fxbug.dev/43108]: https://b.corp.google.com/issues/42119376
+[https://fxbug.dev/30751]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=30751
+[https://fxbug.dev/43108]: https://b.corp.google.com/issues/42119376

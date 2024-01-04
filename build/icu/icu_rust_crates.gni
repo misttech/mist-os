@@ -71,7 +71,8 @@ template("icu_rust_library") {
                              [
                                "visibility",
                                "testonly",
-                               "target_name",  # Workaround for fxb/133723.
+                               "target_name",  # Workaround for
+                                               # https://fxbug.dev/133723.
                              ])
       forward_variables_from(invoker,
                              [

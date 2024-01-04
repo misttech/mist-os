@@ -330,7 +330,7 @@ const (
 	HandleSubtypeVmo          HandleSubtype = "vmo"
 )
 
-// TODO(fxb/64629): Remove, source of truth is library zx.
+// TODO(https://fxbug.dev/64629): Remove, source of truth is library zx.
 //
 // One complication is that GIDL parses nice handle subtypes in its grammar,
 // e.g. `#0 = event(rights: execute + write )`. And some GIDL backends care
@@ -807,7 +807,7 @@ type AttributeArg struct {
 }
 
 // ValueString returns the attribute arg's value in string form.
-// TODO(fxbug.dev/81390): Attribute values may only be string literals for now.
+// TODO(https://fxbug.dev/81390): Attribute values may only be string literals for now.
 // Make sure to fix this API once that changes to resolve the constant value
 // for all constant types.
 func (el AttributeArg) ValueString() string {
@@ -1160,7 +1160,7 @@ type Alias struct {
 	decl
 	Type       Type                    `json:"type"`
 	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
-	// TODO(fxbug.dev/7807): Remove PartialTypeConstructor.
+	// TODO(https://fxbug.dev/7807): Remove PartialTypeConstructor.
 	PartialTypeConstructor PartialTypeConstructor `json:"partial_type_ctor"`
 }
 
@@ -1325,7 +1325,7 @@ func (d *Protocol) GetProtocolName() string {
 	if arg, ok := attr.LookupArgStandalone(); ok {
 		name = arg.ValueString()
 	} else {
-		// TODO(fxbug.dev/102803): Construct this string in fidlc, not here.
+		// TODO(https://fxbug.dev/102803): Construct this string in fidlc, not here.
 		ci := d.Name.Parse()
 		var parts []string
 		for _, i := range ci.Library {
@@ -1382,7 +1382,7 @@ type Method struct {
 	// will be made required. For now, use IsStrict() to access the value
 	// correctly.
 	//
-	// TODO(fxbug.dev/88366): make "strict" required once fidlc always provides
+	// TODO(https://fxbug.dev/88366): make "strict" required once fidlc always provides
 	// it.  It's currently gated by unknown_interactions and should not default
 	// to false when not provided.
 	MaybeStrict *bool `json:"strict,omitempty"`
@@ -1435,7 +1435,7 @@ func (m *Method) GetResponsePayloadIdentifier() (EncodedCompoundIdentifier, bool
 // Helper for getting whether the method is strict. Strict is optional while
 // unknown interactions are experimental, and if strict is missing it should be
 // treated as true.
-// TODO(fxbug.dev/88366): replace this method with direct access to the Strict
+// TODO(https://fxbug.dev/88366): replace this method with direct access to the Strict
 // field, once it is required.
 func (m *Method) IsStrict() bool {
 	return m.MaybeStrict == nil || *m.MaybeStrict
@@ -1678,7 +1678,7 @@ func (dt DeclType) IsPrimitive() bool {
 }
 
 // LookupResourceness looks up whether a type is a value or resource.
-// TODO(fxbug.dev/7660): Store this on types directly.
+// TODO(https://fxbug.dev/7660): Store this on types directly.
 func (m DeclInfoMap) LookupResourceness(t Type) Resourceness {
 	switch t.Kind {
 	case PrimitiveType, StringType, InternalType:

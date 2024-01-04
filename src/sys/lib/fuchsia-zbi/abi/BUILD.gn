@@ -32,7 +32,7 @@ rustc_library("abi") {
 
   sources = [ "src/lib.rs" ]
 
-  # TODO(fxbug.dev/132599): //sdk/fidl/zbi:zbi_zither.rust is unused right now,
+  # TODO(https://fxbug.dev/132599): //sdk/fidl/zbi:zbi_zither.rust is unused right now,
   # but is depended upon for compilation exercise. Future changes will begin
   # to replace the abi crate with the generated one, at which point this can be
   # removed.

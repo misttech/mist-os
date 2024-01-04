@@ -541,7 +541,7 @@ void main(List<String> args) {
     expect(results[2].values, equals([0.0]));
   });
 
-// TODO(fxbug.dev/73367): Modify this test to only include VsyncProcessCallback
+// TODO(https://fxbug.dev/73367): Modify this test to only include VsyncProcessCallback
   group('DRM FPS metric for Vsync callback', () {
     final dataFiles = [
       'runtime_deps/flutter_app_vsync_process_callback.json',
@@ -560,7 +560,7 @@ void main(List<String> args) {
     }
   });
 
-// TODO(fxbug.dev/73367): Modify this test to only include VsyncProcessCallback
+// TODO(https://fxbug.dev/73367): Modify this test to only include VsyncProcessCallback
   group('System DRM FPS metric for vsync callback', () {
     final dataFiles = [
       'runtime_deps/flutter_app_vsync_process_callback.json',

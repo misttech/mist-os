@@ -21,7 +21,7 @@ pub struct Peers {
     peers: FutureMap<PeerId, PeerTask>,
 }
 
-// TODO(fxb/83269) Clean up when a peer task finishes.
+// TODO(https://fxbug.dev/83269) Clean up when a peer task finishes.
 impl Peers {
     pub fn new(profile_client: ProfileClient, profile_proxy: bredr::ProfileProxy) -> Self {
         Self { profile_client, profile_proxy, peers: FutureMap::new() }

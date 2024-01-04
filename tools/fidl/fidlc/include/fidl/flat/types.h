@@ -220,7 +220,7 @@ struct HandleType final : public Type, HandleConstraints {
   using Constraints = HandleConstraints;
 
   HandleType(const Name& name, Resource* resource_decl)
-      // TODO(fxbug.dev/64629): The default obj_type and rights should be
+      // TODO(https://fxbug.dev/64629): The default obj_type and rights should be
       // determined by the resource_definition, not hardcoded here.
       : HandleType(name, resource_decl, Constraints()) {}
 
@@ -359,7 +359,7 @@ struct TransportSideType final : public Type, public TransportSideConstraints {
   bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
 
   const TransportSide end;
-  // TODO(fxbug.dev/56727): Eventually, this will need to point to a transport declaration.
+  // TODO(https://fxbug.dev/56727): Eventually, this will need to point to a transport declaration.
   const std::string_view protocol_transport;
 
   std::any AcceptAny(VisitorAny* visitor) const override;

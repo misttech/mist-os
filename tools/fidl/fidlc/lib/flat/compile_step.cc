@@ -328,7 +328,7 @@ bool CompileStep::ResolveIdentifierConstant(IdentifierConstant* identifier_const
   const ConstantValue* const_val = nullptr;
   switch (target->kind) {
     case Element::Kind::kBuiltin: {
-      // TODO(fxbug.dev/99665): In some cases we want to return a more specific
+      // TODO(https://fxbug.dev/99665): In some cases we want to return a more specific
       // error message from here, but right now we can't due to the way
       // TypeResolver::ResolveConstraintAs tries multiple interpretations.
       return false;
@@ -712,7 +712,7 @@ bool CompileStep::TypeIsConvertibleTo(const Type* from_type, const Type* to_type
         case types::PrimitiveSubtype::kBool:
           return from_primitive_type->subtype == types::PrimitiveSubtype::kBool;
         default:
-          // TODO(fxbug.dev/118282): be more precise about convertibility, e.g. it should not be
+          // TODO(https://fxbug.dev/118282): be more precise about convertibility, e.g. it should not be
           // allowed to convert a float to an int.
           return from_primitive_type->subtype != types::PrimitiveSubtype::kBool;
       }
@@ -1030,7 +1030,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
           method.attributes->Get("selector")->GetArg(AttributeArg::kDefaultAnonymousName)->span);
       continue;
     }
-    // TODO(fxbug.dev/77623): Remove.
+    // TODO(https://fxbug.dev/77623): Remove.
     auto library_name = library()->name;
     if (library_name.size() == 2 && library_name[0] == "fuchsia" && library_name[1] == "io" &&
         selector.find('/') == std::string::npos) {
@@ -1156,7 +1156,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
   }
 
   // Ensure that events do not use the error syntax except those in an allowlist.
-  // TODO(fxbug.dev/98319): Error syntax in events should not parse.
+  // TODO(https://fxbug.dev/98319): Error syntax in events should not parse.
   auto CheckNoEventErrorSyntax = [this](const Protocol::Method& event) -> void {
     if (!event.maybe_response)
       return;
@@ -1164,12 +1164,12 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       return;
     const auto& protocol = *event.owning_protocol;
     const Library& library = *protocol.name.library();
-    // TODO(fxbug.dev/98319): Migrate test libraries.
+    // TODO(https://fxbug.dev/98319): Migrate test libraries.
     ZX_ASSERT(!library.name.empty());
     if (library.name[0] == "test" || library.name[0] == "fidl") {
       return;
     }
-    // TODO(fxbug.dev/99924): Migrate fuchsia.hardware.radar.
+    // TODO(https://fxbug.dev/99924): Migrate fuchsia.hardware.radar.
     if (library.name.size() == 3) {
       if (library.name[0] == "fuchsia" && library.name[1] == "hardware" &&
           library.name[2] == "radar") {
@@ -1343,7 +1343,7 @@ void CompileStep::CompileService(Service* service_decl) {
     }
 
     // Enforce that all client_end members are over the same transport.
-    // TODO(fxbug.dev/106184): We may need to revisit this restriction.
+    // TODO(https://fxbug.dev/106184): We may need to revisit this restriction.
     if (associated_transport.empty()) {
       associated_transport = transport_side_type->protocol_transport;
       first_member_with_that_transport = member.name.data();
@@ -1480,7 +1480,7 @@ void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
     CompileAttributeList(member.attributes.get());
     const auto ordinal_result = ordinal_scope.Insert(member.ordinal->value, member.ordinal->span());
     if (!ordinal_result.ok()) {
-      // TODO(fxbug.dev/123989): Consolidate errors for duplicate member ordinals.
+      // TODO(https://fxbug.dev/123989): Consolidate errors for duplicate member ordinals.
       reporter()->Fail(ErrDuplicateUnionMemberOrdinal, member.ordinal->span(),
                        ordinal_result.previous_occurrence());
     }

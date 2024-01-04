@@ -1007,7 +1007,7 @@ std::unique_ptr<Type> Type::ScalarTypeFromName(const std::string& type_name) {
 }
 
 std::unique_ptr<Type> InternalTypeFromName(const std::string& type_name) {
-  // TODO(fxbug.dev/109789): Remove "transport_error".
+  // TODO(https://fxbug.dev/109789): Remove "transport_error".
   if (type_name == "framework_error" || type_name == "transport_error") {
     return std::make_unique<EnumType>(Enum::FrameworkErrorEnum());
   }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/96139): need validation after deserialization.
+// TODO(https://fxbug.dev/96139): need validation after deserialization.
 
 use {
     crate::lsm_tree::types::{OrdLowerBound, OrdUpperBound},
@@ -19,7 +19,7 @@ use {
 pub const DEFAULT_DATA_ATTRIBUTE_ID: u64 = 0;
 
 /// For Blobs in Fxfs, we store the merkle tree at a well-known attribute.
-/// TODO(fxbug.dev/122125): Is this the best place to store the merkle tree?  What about inline with
+/// TODO(https://fxbug.dev/122125): Is this the best place to store the merkle tree?  What about inline with
 /// data?
 pub const BLOB_MERKLE_ATTRIBUTE_ID: u64 = 1;
 

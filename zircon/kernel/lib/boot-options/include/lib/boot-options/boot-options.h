@@ -7,7 +7,7 @@
 #ifndef ZIRCON_KERNEL_LIB_BOOT_OPTIONS_INCLUDE_LIB_BOOT_OPTIONS_BOOT_OPTIONS_H_
 #define ZIRCON_KERNEL_LIB_BOOT_OPTIONS_INCLUDE_LIB_BOOT_OPTIONS_BOOT_OPTIONS_H_
 
-// TODO(fxbug.dev/32926): Once possible, only define this for test code.
+// TODO(https://fxbug.dev/32926): Once possible, only define this for test code.
 // In any case, we do not want to include tests options when generating
 // boot option documentation.
 #define BOOT_OPTIONS_TESTONLY_OPTIONS !BOOT_OPTIONS_GENERATOR

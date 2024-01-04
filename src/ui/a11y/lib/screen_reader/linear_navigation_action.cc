@@ -48,8 +48,8 @@ void LinearNavigationAction::Run(a11y::gesture_util_v2::GestureContext gesture_c
              const fuchsia::accessibility::semantics::Node* parent) {
             FX_DCHECK(node);
             return NodeIsDescribable(node) &&
-                   // ************************ Workaround for fxb/64295  ************************
-                   // TODO(fxb/66128): Remove workaround once flutter semantics are fixed.
+                   // ************************ Workaround for https://fxbug.dev/64295  ************************
+                   // TODO(https://fxbug.dev/66128): Remove workaround once flutter semantics are fixed.
                    !SameInformationAsParent(node, parent);
           });
       break;
@@ -60,8 +60,8 @@ void LinearNavigationAction::Run(a11y::gesture_util_v2::GestureContext gesture_c
              const fuchsia::accessibility::semantics::Node* parent) {
             FX_DCHECK(node);
             return NodeIsDescribable(node) &&
-                   // ************************ Workaround for fxb/64295  ************************
-                   // TODO(fxb/66128): Remove workaround once flutter semantics are fixed.
+                   // ************************ Workaround for https://fxbug.dev/64295  ************************
+                   // TODO(https://fxbug.dev/66128): Remove workaround once flutter semantics are fixed.
                    !SameInformationAsParent(node, parent);
           });
       break;

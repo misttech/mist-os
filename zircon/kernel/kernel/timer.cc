@@ -299,7 +299,7 @@ bool Timer::Cancel() {
 
   // mark the timer as canceled
   cancel_.store(true, ktl::memory_order_relaxed);
-  // TODO(fxbug.dev/64092): Consider whether this DeviceMemoryBarrier is required
+  // TODO(https://fxbug.dev/64092): Consider whether this DeviceMemoryBarrier is required
   arch::DeviceMemoryBarrier();
 
   // see if we're trying to cancel the timer we're currently in the middle of handling
@@ -431,7 +431,7 @@ void TimerQueue::Tick(zx_time_t now, cpu_num_t cpu) {
 
     // Mark it not busy.
     timer.active_cpu_.store(INVALID_CPU, ktl::memory_order_relaxed);
-    // TODO(fxbug.dev/64092): Consider whether this DeviceMemoryBarrier is required
+    // TODO(https://fxbug.dev/64092): Consider whether this DeviceMemoryBarrier is required
     arch::DeviceMemoryBarrier();
   }
 

@@ -491,7 +491,7 @@ int CoreDisplayClockTigerLake::VoltageLevelForFrequency(uint32_t frequency_khz) 
   // DG1: IHD-OS-DG1-Vol 12-2.21 page 154
   //
 
-  // TODO(fxbug.dev/111046): Follow the PRM calculation, which requires knowing
+  // TODO(https://fxbug.dev/111046): Follow the PRM calculation, which requires knowing
   //                         all the DDI clock frequencies.
 
   if (frequency_khz > 556'800) {

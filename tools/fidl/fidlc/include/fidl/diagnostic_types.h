@@ -57,7 +57,7 @@ std::string Display(T val) {
   return std::to_string(val);
 }
 
-// TODO(fxbug.dev/113689): Use std::format when we're on C++20.
+// TODO(https://fxbug.dev/113689): Use std::format when we're on C++20.
 template <typename... Args>
 std::string FormatDiagnostic(std::string_view msg, const Args&... args) {
   std::string displayed_args[] = {Display(args)...};

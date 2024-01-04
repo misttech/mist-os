@@ -82,7 +82,7 @@ struct Args {
     /// when set, saves the output directory on the host.
     /// Note - this option is only intended to aid in migrating OOT tests to v2. It will be
     /// removed once existing users stop using it, and new users will not be supported.
-    // TODO(fxbug.dev/96298): remove this option once users are migrated to ffx test.
+    // TODO(https://fxbug.dev/96298): remove this option once users are migrated to ffx test.
     #[argh(option)]
     deprecated_output_directory: Option<String>,
 

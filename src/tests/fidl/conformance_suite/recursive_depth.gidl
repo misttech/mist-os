@@ -667,7 +667,7 @@ encode_failure("RecursiveOptionalAndTableExceedLimit") {
 }
 
 decode_failure("RecursiveOptionalAndTableExceedLimit") {
-    // TODO(fxbug.dev/134227): Fix in C++.
+    // TODO(https://fxbug.dev/134227): Fix in C++.
     bindings_denylist = [cpp],
     type = RecursiveOptionalAndTableStruct,
     bytes = {

@@ -415,7 +415,7 @@ func TestValidateName(t *testing.T) {
 		},
 		/*
 			Currently, validation of UTF-8 is not enforced, see
-			http://fxbug.dev/58420#c6
+			https://fxbug.dev/58420#c6
 			Should this change in the future, these are test cases
 			for invalid UTF-8 strings:
 				{

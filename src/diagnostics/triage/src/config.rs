@@ -10,7 +10,7 @@ use {
     std::{path::Path, str::FromStr},
 };
 
-// TODO(fxbug.dev/50451): Add support for CSV.
+// TODO(https://fxbug.dev/50451): Add support for CSV.
 #[derive(Debug, PartialEq, Clone)]
 pub enum OutputFormat {
     Structured,

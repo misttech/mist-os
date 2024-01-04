@@ -162,7 +162,7 @@ open protocol Receiver {
 /// Contains a protocol open request.
 type ProtocolPayload = resource struct {
     channel zx.Handle:CHANNEL;
-    // TODO(fxbug.dev/313998675): Decide whether to replace this with a more specific type
+    // TODO(https://fxbug.dev/313998675): Decide whether to replace this with a more specific type
     flags fuchsia.io.OpenFlags;
 };
 
@@ -177,7 +177,7 @@ open protocol Factory {
 
     /// Creates a [`Dict`] initialized with `items`.
     strict CreateDict(resource struct {
-        // TODO(fxbug.dev/306043410): Accept a DictIterator
+        // TODO(https://fxbug.dev/306043410): Accept a DictIterator
         items vector<DictItem>:MAX;
         server_end server_end:Dict;
     }) -> () error DictError;

@@ -83,7 +83,7 @@ fn builtin_jacks() -> Vec<wire::VirtioSndJackInfo> {
 fn builtin_streams(enable_input: bool) -> Vec<wire::VirtioSndPcmInfo> {
     let mut out = vec![wire::VirtioSndPcmInfo {
         hdr: wire::VirtioSndInfo { hda_fn_nid: LE32::new(0) },
-        // TODO(fxbug.dev/90029): support?
+        // TODO(https://fxbug.dev/90029): support?
         // VIRTIO_SND_PCM_F_MSG_POLLING
         // VIRTIO_SND_PCM_F_EVT_SHMEM_PERIODS
         // VIRTIO_SND_PCM_F_EVT_XRUNS
@@ -98,7 +98,7 @@ fn builtin_streams(enable_input: bool) -> Vec<wire::VirtioSndPcmInfo> {
     if enable_input {
         out.push(wire::VirtioSndPcmInfo {
             hdr: wire::VirtioSndInfo { hda_fn_nid: LE32::new(0) },
-            // TODO(fxbug.dev/90029): support?
+            // TODO(https://fxbug.dev/90029): support?
             // VIRTIO_SND_PCM_F_MSG_POLLING
             // VIRTIO_SND_PCM_F_EVT_SHMEM_PERIODS
             // VIRTIO_SND_PCM_F_EVT_XRUNS
@@ -262,7 +262,7 @@ async fn apply_deadline_profile() -> Result<(), Error> {
     .context("Failed to connect to fuchsia.scheduler.ProfileProvider")?;
 
     // Obtain a deadline profile for our (only) thread.
-    // TODO(fxbug.dev/90030): tune this profile
+    // TODO(https://fxbug.dev/90030): tune this profile
     let (status, profile) = profile_provider
         .get_deadline_profile(
             DEADLINE_PROFILE.capacity.into_nanos() as u64,

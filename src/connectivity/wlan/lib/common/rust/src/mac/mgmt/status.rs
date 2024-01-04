@@ -23,7 +23,7 @@ impl From<fidl_ieee80211::StatusCode> for StatusCode {
     }
 }
 
-// TODO(fxbug.dev/130163): Replace uses of this `From` implementation with `TryFrom` and then
+// TODO(https://fxbug.dev/130163): Replace uses of this `From` implementation with `TryFrom` and then
 //                         remove this.
 impl From<StatusCode> for Option<fidl_ieee80211::StatusCode> {
     fn from(status_code: StatusCode) -> Option<fidl_ieee80211::StatusCode> {

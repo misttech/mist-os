@@ -1912,7 +1912,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                         // Subsequent traffic to this neighbor will recreate the entry and restart
                         // address resolution.
                         //
-                        // TODO(http://fxbug.dev/132349): consider retaining this neighbor entry in
+                        // TODO(https://fxbug.dev/132349): consider retaining this neighbor entry in
                         // a sentinel `Failed` state, equivalent to its having been discarded except
                         // for debugging/observability purposes.
                         tracing::debug!(

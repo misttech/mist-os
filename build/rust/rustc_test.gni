@@ -157,7 +157,7 @@ template("rustc_test_internal") {
       if (_any_lto) {
         # LTO on tests can be memory-intensive, especially for Rust,
         # so reduce concurrency when running locally.
-        # See http://fxbug.dev/111904 for more context.
+        # See https://fxbug.dev/111904 for more context.
         _concurrency = concurrent_jobs.local
       }
     }

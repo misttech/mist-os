@@ -196,7 +196,7 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
     }
 
     async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status> {
-        // TODO(fxbug.dev/109832) Use mixed_integer_ops when available.
+        // TODO(https://fxbug.dev/109832) Use mixed_integer_ops when available.
         let new_seek = match origin {
             fio::SeekOrigin::Start => offset as i128,
             fio::SeekOrigin::Current => {
@@ -210,7 +210,7 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
             }
         };
 
-        // TODO(fxbug.dev/100754): There is an undocumented constraint that the seek offset can
+        // TODO(https://fxbug.dev/100754): There is an undocumented constraint that the seek offset can
         // never exceed 63 bits, but this is not currently enforced. For now we just ensure that
         // the values remain consistent internally with a 64-bit unsigned seek offset.
         if let Ok(new_seek) = u64::try_from(new_seek) {
@@ -917,7 +917,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::Representation, Status> {
-        // TODO(fxbug.dev/77623): Add support for connecting as Node.
+        // TODO(https://fxbug.dev/77623): Add support for connecting as Node.
         Ok(fio::Representation::File(fio::FileInfo {
             is_append: Some(self.options.is_append),
             observer: self.file.event()?,

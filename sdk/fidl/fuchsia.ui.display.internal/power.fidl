@@ -22,7 +22,7 @@ closed protocol DisplayPower {
     ///
     /// All display devices are turned on by default.
     ///
-    // TODO(fxbug.dev/95196): Currently this method controls all displays and
+    // TODO(https://fxbug.dev/95196): Currently this method controls all displays and
     // only succeeds when all displays support DDIC power control. We should
     // improve this function to better support multi-display use cases.
     strict SetDisplayPower(struct {

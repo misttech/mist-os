@@ -97,7 +97,7 @@ class TestHarness : public fio_test::Io1Harness {
     switch (entry.Which()) {
       case fio_test::DirectoryEntry::Tag::kDirectory: {
         fio_test::Directory directory = std::move(entry.directory());
-        // TODO(fxbug.dev/33880): Set the correct flags on this directory.
+        // TODO(https://fxbug.dev/33880): Set the correct flags on this directory.
         auto dir_entry = fbl::MakeRefCounted<fs::PseudoDir>();
         if (directory.has_entries()) {
           for (auto& child : *directory.mutable_entries()) {

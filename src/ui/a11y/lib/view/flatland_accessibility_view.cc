@@ -253,9 +253,9 @@ void FlatlandAccessibilityView::CreateView(
     fuchsia::ui::views::ViewCreationToken a11y_view_token,
     fuchsia::ui::views::ViewportCreationToken proxy_viewport_token) {
   // Crash a11y_manager if we've already received a CreateView request.
-  // See fxbug.dev/110402 for more discussion.
+  // See https://fxbug.dev/110402 for more discussion.
   FX_CHECK(!received_create_view_request_)
-      << "Receiving more than one `CreateView` request in a single run of a11y_manager is unsupported. See fxbug.dev/110402.";
+      << "Receiving more than one `CreateView` request in a single run of a11y_manager is unsupported. See https://fxbug.dev/110402.";
 
   FX_LOGS(INFO) << "A11y received `CreateView` request";
   received_create_view_request_ = true;
@@ -511,7 +511,7 @@ void FlatlandAccessibilityView::SetMagnificationTransform(
       fuchsia::math::VecF{.x = scale, .y = scale});
 
   // HACK HACK HACK
-  // TODO(fxbug.dev/131440): Remove this when we move to the new gesture disambiguation protocols.
+  // TODO(https://fxbug.dev/131440): Remove this when we move to the new gesture disambiguation protocols.
   // The input to this method is not properly adjusted for display rotation
   // (https://cs.opensource.google/fuchsia/fuchsia/+/main:src/ui/scenic/config/display_rotation)
   // We adjust it here for the default display rotation value of 270 degrees, but this won't be
@@ -519,7 +519,7 @@ void FlatlandAccessibilityView::SetMagnificationTransform(
   auto rotated_x = -y;
   auto rotated_y = x;
 
-  // TODO(fxbug.dev/111799): Remove these hacks to accommodate a translation
+  // TODO(https://fxbug.dev/111799): Remove these hacks to accommodate a translation
   // specified in scaled NDC space.
   //
   // Translation arguments to this method are in "scaled NDC" space, i.e. NDC

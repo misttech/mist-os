@@ -35,7 +35,7 @@ size_t FormatDisplayError(const T& value, char* destination, size_t capacity) {
 }
 
 // Built-in support for printing raw numerical errors.
-// TODO(fxbug.dev/95209): |zx_status_t| dispatches to this path today.
+// TODO(https://fxbug.dev/95209): |zx_status_t| dispatches to this path today.
 // Ideally we would like to print the human readable status name.
 template <>
 struct fidl::internal::DisplayError<int32_t> {

@@ -190,7 +190,7 @@ type InsertMultiple = struct {
 };
 
 // Action sent to instruct a Puppet to create a lazy node.
-// TODO(fxbug.dev/49114): This should be modified to allow for creating lazy nodes past 1-level deep.
+// TODO(https://fxbug.dev/49114): This should be modified to allow for creating lazy nodes past 1-level deep.
 type CreateLazyNode = struct {
     // Unique id for parent block.
     parent uint32;

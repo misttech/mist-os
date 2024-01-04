@@ -110,7 +110,7 @@ fuchsia_unittest_package("wlansoftmac-tests") {
   deps = [ ":wlansoftmac_tests" ]
 }
 
-# TODO(fxbug.dev/124830): This test target will be removed after wlansoftmac
+# TODO(https://fxbug.dev/124830): This test target will be removed after wlansoftmac
 #                         no longer uses Banjo types.
 test("wlansoftmac_convert_tests") {
   testonly = true

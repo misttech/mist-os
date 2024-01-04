@@ -104,13 +104,13 @@ class RunnerServer : public fidl::clientsuite::Runner {
 
   void IsTestEnabled(fidl::clientsuite::Test test, IsTestEnabledCallback callback) override {
     switch (test) {
-      // TODO(fxbug.dev/132059): HLCPP should validate header even when there's no payload.
+      // TODO(https://fxbug.dev/132059): HLCPP should validate header even when there's no payload.
       case fidl::clientsuite::Test::V1_TWO_WAY_NO_PAYLOAD:
-      // TODO(fxbug.dev/116294): HLCPP bindings should reject responses with the
+      // TODO(https://fxbug.dev/116294): HLCPP bindings should reject responses with the
       // wrong ordinal.
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_KNOWN:
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_WRONG_ORDINAL_UNKNOWN:
-      // TODO(fxbug.dev/129829): Should validate magic number.
+      // TODO(https://fxbug.dev/129829): Should validate magic number.
       case fidl::clientsuite::Test::RECEIVE_EVENT_BAD_MAGIC_NUMBER:
       case fidl::clientsuite::Test::RECEIVE_RESPONSE_BAD_MAGIC_NUMBER:
         callback(false);

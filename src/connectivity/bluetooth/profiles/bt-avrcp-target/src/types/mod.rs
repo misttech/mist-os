@@ -26,7 +26,7 @@ pub(crate) struct NotificationData {
     /// The current value of the notification when the client subscribed.
     current_value: Notification,
     /// The position change interval of the notification, for `TRACK_POS_CHANGED`.
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     pos_change_interval: u32,
     /// The time when we expect to reply automatically to the responder.
@@ -103,7 +103,7 @@ impl NotificationData {
                 Ok(self.current_value.application_settings != new_value.application_settings)
             }
             fidl_avrcp::NotificationEvent::TrackChanged => {
-                // TODO(fxbug.dev/104358): be able to use track_id alone
+                // TODO(https://fxbug.dev/104358): be able to use track_id alone
                 match (&new_value.media_info, &self.current_value.media_info) {
                     (None, None) => Ok(false),
                     (Some(_), None) | (None, Some(_)) => Ok(true),

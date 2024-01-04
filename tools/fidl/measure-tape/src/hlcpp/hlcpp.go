@@ -285,7 +285,7 @@ func (buf *codeBuffer) CaseSelectVariant(
 			}
 			buf.indent(func() {
 				if local := localWithBlock.Local; local != nil {
-					// TODO(fxbug.dev/51366): Improve local vars handling.
+					// TODO(https://fxbug.dev/51366): Improve local vars handling.
 					buf.writef("__attribute__((unused)) auto const& %s = %s.%s();\n",
 						formatExpr{local},
 						formatExpr{val}, fidlgen.ToSnakeCase(member))

@@ -29,9 +29,9 @@ namespace bt {
 //
 // Clients may subscribe to alerts for when various values exceed specified thresholds.
 //
-// TODO(fxbug.dev/71341): Produce pollable statistics about retired tokens
-// TODO(fxbug.dev/71342): Timestamp stages of each token
-// TODO(fxbug.dev/71342): Provide mechanism to split/merge tokens through chunking/de-chunking
+// TODO(https://fxbug.dev/71341): Produce pollable statistics about retired tokens
+// TODO(https://fxbug.dev/71342): Timestamp stages of each token
+// TODO(https://fxbug.dev/71342): Provide mechanism to split/merge tokens through chunking/de-chunking
 class PipelineMonitor final {
  private:
   using TokenId = uint64_t;

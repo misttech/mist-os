@@ -163,12 +163,12 @@ pub type Request<Marker> = <<Marker as ProtocolMarker>::RequestStream as futures
 pub trait ControlHandle {
     /// Set the server to shutdown. The underlying channel is only closed the
     /// next time the stream is polled.
-    // TODO(fxbug.dev/81036): Fix behavior or above docs.
+    // TODO(https://fxbug.dev/81036): Fix behavior or above docs.
     fn shutdown(&self);
 
     /// Sets the server to shutdown with an epitaph. The underlying channel is
     /// only closed the next time the stream is polled.
-    // TODO(fxbug.dev/81036): Fix behavior or above docs.
+    // TODO(https://fxbug.dev/81036): Fix behavior or above docs.
     fn shutdown_with_epitaph(&self, status: zx_status::Status);
 
     /// Returns true if the server has received the `PEER_CLOSED` signal.

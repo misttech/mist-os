@@ -32,7 +32,7 @@
 namespace media::audio {
 namespace {
 
-// TODO(fxbug.dev/39092): Log a cobalt metric for this.
+// TODO(https://fxbug.dev/39092): Log a cobalt metric for this.
 void LogMissedCommandDeadline(zx::duration delay, const std::string& cmd_tag) {
   FX_LOGS(WARNING) << "Driver command '" << cmd_tag << "' missed deadline by " << delay.to_nsecs()
                    << "ns";
@@ -52,7 +52,7 @@ AudioDriver::AudioDriver(AudioDevice* owner, DriverTimeoutHandler timeout_handle
 
 zx_status_t AudioDriver::Init(zx::channel stream_channel) {
   TRACE_DURATION("audio", "AudioDriver::Init");
-  // TODO(fxbug.dev/13665): Figure out a better way to assert this!
+  // TODO(https://fxbug.dev/13665): Figure out a better way to assert this!
   OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
   FX_DCHECK(state_ == State::Uninitialized);
 
@@ -97,7 +97,7 @@ zx_status_t AudioDriver::Init(zx::channel stream_channel) {
 
 void AudioDriver::Cleanup() {
   TRACE_DURATION("audio", "AudioDriver::Cleanup");
-  // TODO(fxbug.dev/13665): Figure out a better way to assert this!
+  // TODO(https://fxbug.dev/13665): Figure out a better way to assert this!
   OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
   std::shared_ptr<ReadableRingBuffer> readable_ring_buffer;
   std::shared_ptr<WritableRingBuffer> writable_ring_buffer;
@@ -123,7 +123,7 @@ std::optional<Format> AudioDriver::GetFormat() const {
 
 zx_status_t AudioDriver::GetDriverInfo() {
   TRACE_DURATION("audio", "AudioDriver::GetDriverInfo");
-  // TODO(fxbug.dev/13665): Figure out a better way to assert this!
+  // TODO(https://fxbug.dev/13665): Figure out a better way to assert this!
   OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
 
   // We have to be operational in order to fetch supported formats.
@@ -297,7 +297,7 @@ bool AudioDriver::ValidatePcmSupportedFormats(
 
 zx_status_t AudioDriver::Configure(const Format& format, zx::duration min_ring_buffer_duration) {
   TRACE_DURATION("audio", "AudioDriver::Configure");
-  // TODO(fxbug.dev/13665): Figure out a better way to assert this!
+  // TODO(https://fxbug.dev/13665): Figure out a better way to assert this!
   OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
 
   uint32_t channels = format.channels();
@@ -310,7 +310,7 @@ zx_status_t AudioDriver::Configure(const Format& format, zx::duration min_ring_b
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // TODO(fxbug.dev/13666): sanity check the min_ring_buffer_duration.
+  // TODO(https://fxbug.dev/13666): sanity check the min_ring_buffer_duration.
 
   // Check our known format list for compatibility.
   if (!IsFormatInSupported(format.stream_type(), formats_)) {
@@ -321,7 +321,7 @@ zx_status_t AudioDriver::Configure(const Format& format, zx::duration min_ring_b
   }
 
   // We must be in Unconfigured state to change formats.
-  // TODO(fxbug.dev/13667): Also permit this if we are in Configured state.
+  // TODO(https://fxbug.dev/13667): Also permit this if we are in Configured state.
   if (state_ != State::Unconfigured) {
     FX_LOGS(ERROR) << "Bad state while attempting to configure for " << frames_per_second << " Hz "
                    << channels << " Ch Fmt 0x" << std::hex << static_cast<uint32_t>(sample_format)
@@ -471,7 +471,7 @@ void AudioDriver::RequestRingBufferProperties() {
     OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
     turn_on_delay_ = zx::nsec(props.has_turn_on_delay() ? props.turn_on_delay() : 0);
 
-    // TODO(fxbug.dev/113705): obey the flag when it is false. We behave as if it is always true.
+    // TODO(https://fxbug.dev/113705): obey the flag when it is false. We behave as if it is always true.
     needs_cache_flush_or_invalidate_ = props.has_needs_cache_flush_or_invalidate()
                                            ? props.needs_cache_flush_or_invalidate()
                                            : true;
@@ -548,7 +548,7 @@ void AudioDriver::RequestDelayInfo() {
 
     RequestRingBufferVmo(min_frames_64);
 
-    // TODO(fxbug.dev/113710): Watch for subsequent delay updates.
+    // TODO(https://fxbug.dev/113710): Watch for subsequent delay updates.
   });
 }
 
@@ -694,7 +694,7 @@ void AudioDriver::RequestNextClockRecoveryUpdate() {
 
 zx_status_t AudioDriver::Start() {
   TRACE_DURATION("audio", "AudioDriver::Start");
-  // TODO(fxbug.dev/13665): Figure out a better way to assert this!
+  // TODO(https://fxbug.dev/13665): Figure out a better way to assert this!
   OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
 
   // In order to start, we must be in the Configured state.
@@ -857,11 +857,11 @@ zx_status_t AudioDriver::Start() {
 
 zx_status_t AudioDriver::Stop() {
   TRACE_DURATION("audio", "AudioDriver::Stop");
-  // TODO(fxbug.dev/13665): Figure out a better way to assert this!
+  // TODO(https://fxbug.dev/13665): Figure out a better way to assert this!
   OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
 
   // In order to stop, we must be in the Started state.
-  // TODO(fxbug.dev/13668): make Stop idempotent. Allow Stop when Configured/Stopping; disallow if
+  // TODO(https://fxbug.dev/13668): make Stop idempotent. Allow Stop when Configured/Stopping; disallow if
   // Shutdown; consider what to do if Uninitialized/MissingDriverInfo/Unconfigured/Configuring. Most
   // importantly, if driver is Starting, queue the request until Start completes (as we cannot
   // cancel driver commands). Finally, handle multiple Stop calls to be in-flight concurrently.
@@ -1001,11 +1001,11 @@ void AudioDriver::SetUpClocks() {
   // This clock begins as a clone of MONOTONIC, but because the hardware is NOT in the monotonic
   // clock domain, this clock must eventually diverge. We tune this clock based on notifications
   // provided by the audio driver, which correlate DMA position with CLOCK_MONOTONIC time.
-  // TODO(fxbug.dev/60027): Recovered clocks should be per-domain not per-driver.
+  // TODO(https://fxbug.dev/60027): Recovered clocks should be per-domain not per-driver.
   auto backing_clock = owner_->clock_factory()->CreateDeviceAdjustable(
       audio::clock::AdjustableCloneOfMonotonic(), clock_domain_);
 
-  // TODO(fxbug.dev/46648): If this clock domain is discovered to be hardware-tunable, we should
+  // TODO(https://fxbug.dev/46648): If this clock domain is discovered to be hardware-tunable, we should
   // support a mode where the RecoveredClock is optionally recovered OR tuned depending on how it
   // is used in the mix graph.
   recovered_clock_ = RecoveredClock::Create(
@@ -1106,7 +1106,7 @@ zx_status_t AudioDriver::SetActiveChannels(uint64_t chan_bit_mask) {
           (void)chan_bit_mask;  // avoid "unused lambda capture" compiler complaint
         }
 
-        // TODO(fxbug.dev/82423): assuming this might change the clients' minimum lead time, here we
+        // TODO(https://fxbug.dev/82423): assuming this might change the clients' minimum lead time, here we
         // should potentially kick off a notification -- including the set_active_channels_time.
       });
 

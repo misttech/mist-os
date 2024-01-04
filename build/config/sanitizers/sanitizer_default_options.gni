@@ -16,7 +16,7 @@ declare_args() {
   asan_default_options = [
     "detect_stack_use_after_return=1",
 
-    # TODO(fxbug.dev/67985): Using default quarantine size of 256MiB causes
+    # TODO(https://fxbug.dev/67985): Using default quarantine size of 256MiB causes
     # asan bots to OOM, this reduces the per-app quarantine size until we
     # investigate other possible fixes.
     "quarantine_size_mb=32",
@@ -60,7 +60,7 @@ declare_args() {
   # sanitizer_extra_options() target in their `deps` and then any options
   # injected that way can override that option's setting in this list.
   #
-  # TODO(fxbug.dev/89981): `ignore_noninstrumented_modules=1` can be reevaluated
+  # TODO(https://fxbug.dev/89981): `ignore_noninstrumented_modules=1` can be reevaluated
   # when/if we have an instrumented libstd for Rust.
   tsan_default_options = [ "ignore_noninstrumented_modules=1" ]
 

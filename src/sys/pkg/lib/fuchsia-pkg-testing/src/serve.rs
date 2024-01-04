@@ -309,7 +309,7 @@ impl ServedRepository {
 
     /// Generate a [`RepositoryConfig`] suitable for configuring a package resolver to use this
     /// served repository with local mirroring enabled.
-    // TODO(fxbug.dev/59827) delete this method once pkg-resolver can fetch metadata from a LocalMirror.
+    // TODO(https://fxbug.dev/59827) delete this method once pkg-resolver can fetch metadata from a LocalMirror.
     pub fn make_repo_config_with_local_mirror(&self, url: RepositoryUrl) -> RepositoryConfig {
         self.repo.make_repo_config(url, Some(self.get_mirror_config(false)), true)
     }
@@ -410,7 +410,7 @@ impl ServedRepository {
             auto_response_creator.create().await
         } else {
             let fs_path = repo.join(uri_path.strip_prefix("/").unwrap_or(uri_path));
-            // TODO(fxbug.dev/71372) synchronous IO in an async context.
+            // TODO(https://fxbug.dev/71372) synchronous IO in an async context.
             let mut file = match std::fs::File::open(fs_path) {
                 Ok(file) => file,
                 Err(ref err) if err.kind() == std::io::ErrorKind::NotFound => {
@@ -439,7 +439,7 @@ impl ServedRepository {
     }
 }
 
-// TODO(fxbug.dev/71260) use specific HTTP status codes for errors instead of mapping everything to
+// TODO(https://fxbug.dev/71260) use specific HTTP status codes for errors instead of mapping everything to
 // INTERNAL_SERVER_ERROR.
 fn make_range_response(
     mut file: std::fs::File,
@@ -448,7 +448,7 @@ fn make_range_response(
     let HttpRange { first_byte_pos, last_byte_pos } =
         range.try_into().context("parse range header")?;
     let file_size = file.metadata().context("file metadata")?.len();
-    // TODO(fxbug.dev/71260) return 416 if the range is invalid
+    // TODO(https://fxbug.dev/71260) return 416 if the range is invalid
     file.seek(std::io::SeekFrom::Start(first_byte_pos)).context("seeking file")?;
     let mut data = vec![0; 1 + last_byte_pos as usize - first_byte_pos as usize];
     file.read_exact(&mut data).context("reading file for range request")?;
@@ -482,7 +482,7 @@ impl HttpRange {
     }
 }
 
-// TODO(fxbug.dev/71260) use a spec compliant parser
+// TODO(https://fxbug.dev/71260) use a spec compliant parser
 impl TryFrom<&http::HeaderValue> for HttpRange {
     type Error = anyhow::Error;
 

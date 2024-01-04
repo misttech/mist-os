@@ -49,7 +49,7 @@ fuchsia_fidl_hlcpp_library(
     target_compatible_with = [ "@platforms//os:fuchsia" ],
 )
 
-# TODO(fxbug.dev/117103): Rename HLCPP generated bindings to "_hlcpp" suffix.
+# TODO(https://fxbug.dev/117103): Rename HLCPP generated bindings to "_hlcpp" suffix.
 alias(
     name = "{{name}}_hlcpp",
     actual = ":{{name}}_cc",

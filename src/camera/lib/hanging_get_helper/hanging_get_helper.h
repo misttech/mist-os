@@ -18,7 +18,7 @@ namespace camera {
 // previously sent one, defined by a caller-provided equality function. The helper is also usable
 // with non-movable types, for which equality with previously sent values is assumed false.
 
-// TODO(fxbug.dev/47611): convert to generic fuchsia lib
+// TODO(https://fxbug.dev/47611): convert to generic fuchsia lib
 template <class T, class Compare = std::equal_to<T>, bool = std::is_copy_constructible<T>::value>
 class HangingGetHelper;
 

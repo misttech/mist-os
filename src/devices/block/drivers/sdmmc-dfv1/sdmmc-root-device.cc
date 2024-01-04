@@ -126,7 +126,7 @@ void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
   if (metadata->removable()) {
     // This controller is connected to a removable card slot, and no card was inserted. Indicate
     // success so that our device remains available.
-    // TODO(fxbug.dev/130283): Enable detection of card insert/removal after initialization.
+    // TODO(https://fxbug.dev/130283): Enable detection of card insert/removal after initialization.
     zxlogf(INFO, "failed to probe removable device");
     return txn.Reply(ZX_OK);
   }

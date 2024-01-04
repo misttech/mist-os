@@ -25,7 +25,7 @@ struct VisitorRegistration {
   struct v1 {
     // Return a unique pointer to the visitor object or empty object in case of
     // error.
-    // TODO(fxbug.dev/134108) : Temporarily using C++ ABI. Move to C ABI once
+    // TODO(https://fxbug.dev/134108) : Temporarily using C++ ABI. Move to C ABI once
     // visitor interface is stabilized.
     std::unique_ptr<fdf_devicetree::Visitor> (*create_visitor)(fdf::Logger* logger);
   } v1;

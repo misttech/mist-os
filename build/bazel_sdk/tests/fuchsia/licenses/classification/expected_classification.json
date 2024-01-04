@@ -32,7 +32,7 @@
                             "http://mirror2"
                         ],
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
+                        "bug": "https://fxbug.dev/123",
                         "comment": [
                             "Test override rule"
                         ],
@@ -85,7 +85,7 @@
                             "http://mirror2"
                         ],
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
+                        "bug": "https://fxbug.dev/123",
                         "comment": [
                             "Test override rule"
                         ],
@@ -156,7 +156,7 @@
                             "http://mirror2"
                         ],
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
+                        "bug": "https://fxbug.dev/123",
                         "comment": [
                             "Test override rule"
                         ],
@@ -210,7 +210,7 @@
                             "http://mirror2"
                         ],
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
+                        "bug": "https://fxbug.dev/123",
                         "comment": [
                             "Test override rule"
                         ],
@@ -282,7 +282,7 @@
                             "http://mirror2"
                         ],
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
+                        "bug": "https://fxbug.dev/123",
                         "comment": [
                             "Test override rule"
                         ],
@@ -336,7 +336,7 @@
                             "http://mirror2"
                         ],
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
+                        "bug": "https://fxbug.dev/123",
                         "comment": [
                             "Test override rule"
                         ],
@@ -519,7 +519,7 @@
                     {
                         "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
+                        "bug": "https://fxbug.dev/123",
                         "comment": [
                             "Test override rule"
                         ],
@@ -584,7 +584,7 @@
                     {
                         "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
+                        "bug": "https://fxbug.dev/123",
                         "comment": [
                             "Test override rule"
                         ],

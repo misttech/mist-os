@@ -20,7 +20,7 @@ namespace registers {
 // ===========================================================================
 //                             Type-C FIA Registers
 // ===========================================================================
-// TODO(fxbug.dev/110198): Consider moving these register definitions into a
+// TODO(https://fxbug.dev/110198): Consider moving these register definitions into a
 // separated file.
 //
 // The Flexi I/O Adapter (FIA) muxes data and clocks between the USB-Type C PHY
@@ -264,7 +264,7 @@ class DynamicFlexIoScratchPad : public hwreg::RegisterBase<DynamicFlexIoScratchP
   // Callers must make sure they read from the correct FIA register.
   TypeCLiveState type_c_live_state(i915::DdiId ddi_id) const {
     ZX_ASSERT(IsDdiCoveredByThisRegister(ddi_id));
-    // TODO(fxbug.dev/110198): Move the logic to calculate register bit index
+    // TODO(https://fxbug.dev/110198): Move the logic to calculate register bit index
     // from given `ddi_id` to a separate method.
     const uint32_t bit_index = ((ddi_id - i915::DdiId::DDI_TC_1) & 0x1) * 8 + 5;
     auto val = hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index + 2, bit_index).get();
@@ -302,7 +302,7 @@ class DynamicFlexIoScratchPad : public hwreg::RegisterBase<DynamicFlexIoScratchP
   static auto GetForDdi(i915::DdiId ddi_id) {
     ZX_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
     ZX_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
-    // TODO(fxbug.dev/110198): Move the logic to calculate FIA field index
+    // TODO(https://fxbug.dev/110198): Move the logic to calculate FIA field index
     // from given `ddi_id` to a separate method.
     const uint32_t fia_index = (ddi_id - i915::DdiId::DDI_TC_1) >> 1;
     return hwreg::RegisterAddr<SelfType>(kFiaOffsets[fia_index]);
@@ -621,7 +621,7 @@ class DynamicFlexIoDisplayPortPhyModeStatus
 // ============================================================================
 //                        Dekel (DKL) PHY/PLL registers
 // ============================================================================
-// TODO(fxbug.dev/110198): Consider moving these register definitions into a
+// TODO(https://fxbug.dev/110198): Consider moving these register definitions into a
 // separated file.
 //
 // Registers below controls Type-C port PHY (i.e. Dekel PHY), including clock,

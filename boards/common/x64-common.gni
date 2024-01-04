@@ -43,7 +43,7 @@ board_package_labels += [
 ]
 
 # userspace PCI migration flags
-# fxbug.dev/32978
+# https://fxbug.dev/32978
 platform_enable_user_pci = true
 
 # This will enable suspend only if the enable_suspend flag is set to true

@@ -43,7 +43,7 @@ use std::{ffi::CString, os::unix::ffi::OsStrExt, path::Path, sync::Arc};
 /// Component controller epitaph value used as the base value to pass non-zero error
 /// codes to the calling component.
 ///
-/// TODO(fxbug.dev/130980): Cleanup this once we have a proper mechanism to
+/// TODO(https://fxbug.dev/130980): Cleanup this once we have a proper mechanism to
 /// get Linux exit code from component runner.
 const COMPONENT_EXIT_CODE_BASE: i32 = 1024;
 
@@ -64,7 +64,7 @@ pub async fn start_component(
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
     log_info!("start_component: {}", url);
 
-    // TODO(fxbug.dev/125782): We leak the directory created by this function.
+    // TODO(https://fxbug.dev/125782): We leak the directory created by this function.
     let component_path = generate_component_path(system_task)?;
 
     let mount_record = Arc::new(Mutex::new(MountRecord::default()));

@@ -38,7 +38,7 @@ pub mod network_selection;
 pub mod scoring_functions;
 
 /// Number of previous RSSI measurements to exponentially weigh into average.
-/// TODO(fxbug.dev/84870): Tune smoothing factor.
+/// TODO(https://fxbug.dev/84870): Tune smoothing factor.
 pub(crate) const EWMA_SMOOTHING_FACTOR: usize = 10;
 /// Number of previous RSSI velocities to exponentially weigh into the average. Keeping the number
 /// small lets the number react quickly and have a magnitude similar to if it weren't smoothed as
@@ -315,7 +315,7 @@ impl ConnectionSelector {
         credential: &network_config::Credential,
     ) -> Result<Option<types::ScannedCandidate>, Error> {
         // Scan for APs in this network
-        // TODO(fxbug.dev/132103) Use an active scan in cases where a faster scan is justified.
+        // TODO(https://fxbug.dev/132103) Use an active scan in cases where a faster scan is justified.
         let mut matching_scans = self
             .scan_requester
             .perform_scan(ScanReason::RoamSearch, vec![], vec![])

@@ -137,7 +137,7 @@ void GspiDevice::IrqThread() {
     }
 
     StatusReg reg = StatusReg::Get().ReadFrom(&mmio_);
-    // TODO(fxbug.dev/77485): pay attention to errors and deal with them appropriately.
+    // TODO(https://fxbug.dev/77485): pay attention to errors and deal with them appropriately.
     if (reg.rfs()) {
       sync_completion_signal(&ready_for_rx_);
     }
@@ -221,7 +221,7 @@ zx_status_t GspiDevice::SpiImplExchange(uint32_t cs, const uint8_t* txdata, size
       return_value = WaitForFifoService(/*rx=*/true);
       if (return_value != ZX_OK) {
         zxlogf(ERROR, "error while waiting for interrupt: %d", return_value);
-        // TODO(fxbug.dev/77485): what do we do here? reset the controller?
+        // TODO(https://fxbug.dev/77485): what do we do here? reset the controller?
         break;
       }
     } else {
@@ -383,7 +383,7 @@ zx_status_t GspiDevice::ValidateChildConfig(Con1Reg& con1) {
   bool cs_high = channels[0].cs_polarity_high();
   bool clk_high = channels[0].clock_polarity_high();
   for (auto& chan : channels) {
-    // TODO(fxbug.dev/77485): we should configure clocks, and also track each child. That way we
+    // TODO(https://fxbug.dev/77485): we should configure clocks, and also track each child. That way we
     // could support multiple devices with different configurations on the same bus.
     // For now we just require that everything has the same configuration.
     if (chan.clock_phase() != phase || chan.cs_polarity_high() != cs_high ||

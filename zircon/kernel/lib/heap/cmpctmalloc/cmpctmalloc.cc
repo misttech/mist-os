@@ -888,7 +888,7 @@ NO_ASAN void* cmpct_alloc(size_t size) {
     kcounter_add(malloc_size_other, 1);
   }
 #endif
-  // Large allocations are no longer allowed. See fxbug.dev/31229 for details.
+  // Large allocations are no longer allowed. See https://fxbug.dev/31229 for details.
   if (size > kHeapMaxAllocSize) {
     return NULL;
   }
@@ -1100,7 +1100,7 @@ NO_ASAN void* cmpct_memalign(size_t alignment, size_t size) {
   LockGuard guard(TheHeapLock::Get());
   LOCAL_TRACE_DURATION("locked", trace_lock);
 #if KERNEL_ASAN
-  // TODO(fxbug.dev/30033): Separately poison padding and the post-buffer redzone.
+  // TODO(https://fxbug.dev/30033): Separately poison padding and the post-buffer redzone.
   asan_poison_shadow(reinterpret_cast<uintptr_t>(unaligned), padded_size,
                      kAsanHeapLeftRedzoneMagic);
 #endif  // KERNEL_ASAN

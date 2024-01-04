@@ -14,7 +14,7 @@ use {
     tracing::{debug, info},
 };
 
-// TODO(fxbug.dev/80422): Remove this.
+// TODO(https://fxbug.dev/80422): Remove this.
 // Size of FIDL message header and FIDL error-wrapped vector header
 const FIDL_HEADER_AND_ERR_WRAPPED_VEC_HEADER_SIZE: usize = 56;
 
@@ -405,7 +405,7 @@ mod tests {
         assert_eq!(fidl_aps, scan_result_to_policy_scan_result(&internal_aps, false));
     }
 
-    // TODO(fxbug.dev/54255): Separate test case for "empty final vector not consumed" vs "partial ap list"
+    // TODO(https://fxbug.dev/54255): Separate test case for "empty final vector not consumed" vs "partial ap list"
     // consumed.
     #[fuchsia::test]
     fn partial_scan_result_consumption_has_no_error() {

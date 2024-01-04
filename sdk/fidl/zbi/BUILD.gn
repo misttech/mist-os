@@ -18,13 +18,13 @@ zbi_sources = [
   "zbi.fidl",
 ]
 
-# TODO(fxbug.dev/111453): This is not yet exported in the SDK - and rather is
+# TODO(https://fxbug.dev/111453): This is not yet exported in the SDK - and rather is
 # used to generate checked-in headers which are - but it will be eventually.
 fidl("zbi") {
   sources = zbi_sources
   enable_zither = true
 
-  # TODO(fxbug.dev/110021): For string_array<N> and overlay.
+  # TODO(https://fxbug.dev/110021): For string_array<N> and overlay.
   experimental_flags = [ "zx_c_types" ]
 
   zither = {

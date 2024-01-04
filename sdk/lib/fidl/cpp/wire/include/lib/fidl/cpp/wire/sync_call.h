@@ -42,7 +42,7 @@ constexpr uint32_t MaxSizeInChannel() {
 // arena or buffer span.
 template <typename Method>
 constexpr uint32_t SyncClientMethodBufferSizeInChannel() {
-  // TODO(fxbug.dev/85843): We should be able optimize this to just the max of
+  // TODO(https://fxbug.dev/85843): We should be able optimize this to just the max of
   // the send/receive size, once Zircon channel calls guarantee that the
   // send/receive buffers can overlap.
   uint32_t size = 0;

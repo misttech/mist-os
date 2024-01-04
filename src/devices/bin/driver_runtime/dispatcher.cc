@@ -252,10 +252,10 @@ std::unique_ptr<driver_runtime::CallbackRequest> Dispatcher::AsyncIrq::CreateCal
     Dispatcher& dispatcher) {
   auto async_dispatcher = dispatcher.GetAsyncDispatcher();
 
-  // TODO(fxbug.dev/102092): We should consider something more efficient than creating a callback
+  // TODO(https://fxbug.dev/102092): We should consider something more efficient than creating a callback
   // request each time the irq is triggered. This is complex due to an AsyncIrq not having a 1:1
   // mapping to interrupt callbacks, and we cannot easily return ownership of a |CallbackRequest|
-  // after dispatching it. See fxbug.dev/102092 for a longer explanation.
+  // after dispatching it. See https://fxbug.dev/102092 for a longer explanation.
   auto callback_request =
       std::make_unique<driver_runtime::CallbackRequest>(CallbackRequest::RequestType::kIrq);
   driver_runtime::Callback callback =
@@ -809,7 +809,7 @@ zx_status_t Dispatcher::QueuePacket(async_receiver_t* receiver, const zx_packet_
 
 zx_status_t Dispatcher::BindIrq(async_irq_t* irq) {
   if (unsynchronized()) {
-    // TODO(fxbug.dev/101913): support interrupts on unsynchronized dispatchers.
+    // TODO(https://fxbug.dev/101913): support interrupts on unsynchronized dispatchers.
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -823,7 +823,7 @@ zx_status_t Dispatcher::BindIrq(async_irq_t* irq) {
 
 zx_status_t Dispatcher::UnbindIrq(async_irq_t* irq) {
   if (unsynchronized()) {
-    // TODO(fxbug.dev/101913): support interrupts on unsynchronized dispatchers.
+    // TODO(https://fxbug.dev/101913): support interrupts on unsynchronized dispatchers.
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -950,7 +950,7 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
     //
     // Calling |request->InContainer| may crash if the callback request was destructed between
     // when we called |RegisterCallbackWithoutQueueing| and now.
-    // TODO(fxbug.dev/102771): if we change CallbackRequests to use RefPtrs, we should be
+    // TODO(https://fxbug.dev/102771): if we change CallbackRequests to use RefPtrs, we should be
     // able to switch this back to an |InContainer| check.
     callback_request =
         registered_callbacks_.erase_if([request](const CallbackRequest& callback_request) {
@@ -965,7 +965,7 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
 
     // Synchronous dispatchers do not allow parallel callbacks.
     // Blocking dispatchers are required to queue all callbacks onto the async loop.
-    // TODO(fxbug.dev/98168): we should be able to remove the task check once we track
+    // TODO(https://fxbug.dev/98168): we should be able to remove the task check once we track
     // drivers through banjo calls, or start each DFv2 driver with a ALLOW_SYNC_CALLS
     // dispatcher.
     if (unsynchronized_ || (!dispatching_sync_ && !allow_sync_calls_ &&
@@ -1825,7 +1825,7 @@ zx_status_t Dispatcher::ThreadPool::AddThread() {
   // This avoids starting an additional thread when there is only 1 dispatcher and
   // we have already started an initial thread for the thread pool.
   // Note this check is before we have incremented |num_dispatchers_| for the current dispatcher.
-  // TODO(fxbug.dev/125695): we should be able to remove the scheduler role check.
+  // TODO(https://fxbug.dev/125695): we should be able to remove the scheduler role check.
   if ((scheduler_role_ != kNoSchedulerRole) && (num_threads_ > num_dispatchers_)) [[likely]] {
     return ZX_OK;
   }

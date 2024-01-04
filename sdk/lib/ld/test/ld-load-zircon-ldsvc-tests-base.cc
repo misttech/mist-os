@@ -24,7 +24,7 @@ void LdLoadZirconLdsvcTestsBase::LdsvcExpectLoadObject(std::string_view name,
 }
 
 void LdLoadZirconLdsvcTestsBase::LdsvcExpectLoadObject(std::string_view name) {
-  // TODO(fxbug.dev/134897): We should add a LdsvcExpectConfig when the dynamic linker starts doing
+  // TODO(https://fxbug.dev/134897): We should add a LdsvcExpectConfig when the dynamic linker starts doing
   // so.
   const std::string path = std::filesystem::path("test") / "lib" / kLibprefix / name;
   zx::vmo vmo;

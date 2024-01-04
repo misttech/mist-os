@@ -6,7 +6,7 @@ This tutorial builds on the [C++ getting started tutorials][overview].
 
 ## Overview
 
-<!-- TODO(fxbug.dev/58758) <<../../common/pipelining/overview.md>> -->
+<!-- TODO(https://fxbug.dev/58758) <<../../common/pipelining/overview.md>> -->
 
 A common aspect of using FIDL on Fuchsia is passing protocol endpoints across
 protocols. Many FIDL messages include either the client end or the server end of
@@ -27,7 +27,7 @@ The full example code for this tutorial is located at
 
 ### The FIDL protocol
 
-<!-- TODO(fxbug.dev/58758) <<../../common/pipelining/launcher.md>> -->
+<!-- TODO(https://fxbug.dev/58758) <<../../common/pipelining/launcher.md>> -->
 
 This tutorial implements the `EchoLauncher` protocol from the
 [`fuchsia.examples`][examples-fidl] library:

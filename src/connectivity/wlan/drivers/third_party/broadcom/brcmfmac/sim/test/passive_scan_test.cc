@@ -38,7 +38,7 @@ struct ApInfo {
 
 class PassiveScanTestInterface : public SimInterface {
  public:
-  // TODO(fxbug.dev/https://fxbug.dev/83861): Align the way active_scan_test and passive_scan_test
+  // TODO(https://fxbug.dev/https://fxbug.dev/83861): Align the way active_scan_test and passive_scan_test
   // verify scan results.
 
   // Add a functor that can be run on each scan result by the VerifyScanResult method.
@@ -189,7 +189,7 @@ TEST_F(PassiveScanTest, BasicFunctionality) {
   env_->Run(kDefaultTestDuration);
 }
 
-// TODO(fxbug.dev/89484): The correct behavior is to default to scanning all supported channels.
+// TODO(https://fxbug.dev/89484): The correct behavior is to default to scanning all supported channels.
 TEST_F(PassiveScanTest, EmptyChannelList) {
   constexpr zx::duration kScanStartTime = zx::sec(1);
   constexpr zx::duration kDefaultTestDuration = zx::sec(100);

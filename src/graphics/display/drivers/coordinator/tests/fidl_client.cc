@@ -402,7 +402,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     }
     sysmem_collection = fidl::WireSyncClient<sysmem::BufferCollection>(std::move(client));
   }
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)sysmem_collection->SetName(10000u, "display-client-unittest");
   sysmem::wire::BufferCollectionConstraints constraints = {};
   constraints.min_buffer_count = 1;
@@ -445,7 +445,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     return zx::error(import_result.ok() ? import_result.value().res : import_result.status());
   }
 
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)sysmem_collection->Close();
   return zx::ok(image_id);
 }

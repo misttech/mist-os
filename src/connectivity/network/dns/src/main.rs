@@ -589,7 +589,7 @@ fn policy_lookup(addr: &net_types::ip::Ipv6Addr) -> &'static Policy {
 /// `DasCmpInfo` provides an implementation of a subset of Destination Address
 /// Selection according to the sorting rules defined in [RFC 6724 Section 6].
 ///
-/// TODO(fxbug.dev/65219): Implement missing rules 3, 4, and 7.
+/// TODO(https://fxbug.dev/65219): Implement missing rules 3, 4, and 7.
 /// Rules 3, 4, and 7 are omitted for compatibility with the equivalent
 /// implementation in Fuchsia's libc.
 ///
@@ -652,7 +652,7 @@ impl DasCmpInfo {
 }
 
 impl std::cmp::Ord for DasCmpInfo {
-    // TODO(fxbug.dev/65219): Implement missing rules 3, 4, and 7.
+    // TODO(https://fxbug.dev/65219): Implement missing rules 3, 4, and 7.
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::Ordering;
         let DasCmpInfo {

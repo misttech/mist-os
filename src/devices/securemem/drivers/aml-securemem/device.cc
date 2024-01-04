@@ -83,7 +83,7 @@ zx_status_t AmlogicSecureMemDevice::Bind() {
   return status;
 }
 
-// TODO(fxbug.dev/36888): Determine if we only ever use mexec to reboot from zedboot into a
+// TODO(https://fxbug.dev/36888): Determine if we only ever use mexec to reboot from zedboot into a
 // netboot(ed) image. Iff so, we could avoid some complexity here by not loading aml-securemem in
 // zedboot, and not handling suspend(mexec) here, and not having UnregisterSecureMem().
 void AmlogicSecureMemDevice::DdkSuspend(ddk::SuspendTxn txn) {

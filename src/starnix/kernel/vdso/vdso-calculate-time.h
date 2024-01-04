@@ -39,7 +39,7 @@ __attribute__((__visibility__("hidden"))) extern "C" vvar_data vvar;
 // Returns monotonic time in nanoseconds.
 // This should be equivalent to calling zx_clock_get_monotonic, however the result may
 // differ slightly.
-// TODO(fxbug.dev/301234275): Change the computation to always match Zircon computation
+// TODO(https://fxbug.dev/301234275): Change the computation to always match Zircon computation
 int64_t calculate_monotonic_time_nsec();
 
 // Returns utc time in nanoseconds

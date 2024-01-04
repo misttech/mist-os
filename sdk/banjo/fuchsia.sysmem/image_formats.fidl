@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.sysmem;
 
-// TODO(fxbug.dev/32119): change struct to table
+// TODO(https://fxbug.dev/32119): change struct to table
 /// Describes how the pixels within an image are represented.
 /// Simple formats need only a type.
 /// Parametric pixel formats may require additional properties.
@@ -15,7 +15,7 @@ type PixelFormat = struct {
     format_modifier FormatModifier;
 };
 
-// TODO(fxbug.dev/32128): add more formats.
+// TODO(https://fxbug.dev/32128): add more formats.
 /// The ordering of the channels in the format name reflects how
 /// the actual layout of the channel.
 ///
@@ -107,7 +107,7 @@ type PixelFormatType = strict enum {
     DO_NOT_CARE = 0xFFFFFFFE;
 };
 
-// TODO(fxbug.dev/32119): change struct to table
+// TODO(https://fxbug.dev/32119): change struct to table
 /// Describes how the pixels within an image are meant to be presented.
 /// Simple color spaces need only a type.
 /// Parametric color spaces may require additional properties.

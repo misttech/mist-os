@@ -326,7 +326,7 @@ if [[ "$(git rev-parse --is-inside-work-tree 2> /dev/null)" == "true" ]] && \
   shac_workdir="$(pwd)"
 fi
 
-# TODO(fxbug.dev/82386): Move all formatters into SHAC to ensure parity between
+# TODO(https://fxbug.dev/82386): Move all formatters into SHAC to ensure parity between
 # the formatters enforced by the infrastructure and those enforced locally.
 print-and-execute "${PREBUILT_SHAC}" fmt \
   --quiet \

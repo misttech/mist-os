@@ -66,7 +66,7 @@ if (current_toolchain == default_toolchain) {
       prefix_configs = [
         "//zircon/kernel:headers",
 
-        # TODO(fxbug.dev/44971): Many include/ headers use <ktl/*.h> headers.
+        # TODO(https://fxbug.dev/44971): Many include/ headers use <ktl/*.h> headers.
         "//zircon/kernel/lib/ktl:headers.config",
         "//sdk/lib/fit:headers.config",
         "//sdk/lib/stdcompat:headers.config",
@@ -135,7 +135,7 @@ if (current_toolchain == default_toolchain) {
       # enough to fix the issue.
       exclude_variant_tags = [ "fuzzer" ]
       if (cpu == "riscv64") {
-        # TODO(fxbug.dev/125245): no asan for riscv64 yet
+        # TODO(https://fxbug.dev/125245): no asan for riscv64 yet
         exclude_variant_tags += [ "asan" ]
       }
 
@@ -148,7 +148,7 @@ if (current_toolchain == default_toolchain) {
       configs += [ "//build/config:frame_pointers" ]
 
       if (cpu == "x64") {
-        # TODO(fxbug.dev/27321): x86 kernel can't be built without --gc-sections
+        # TODO(https://fxbug.dev/27321): x86 kernel can't be built without --gc-sections
         # because of crufty acpica code, and some compiler instrumentation
         # is broken wrt --gc-sections semantics.
         # Ensure that linker GC is enabled.
@@ -169,7 +169,7 @@ if (current_toolchain == default_toolchain) {
       }
       configs += [ "//build/config/zircon:assert_level_$kernel_assert_level" ]
 
-      # TODO(fxbug.dev/71321): the kernel crashes on boot if built with -O0.
+      # TODO(https://fxbug.dev/71321): the kernel crashes on boot if built with -O0.
       _optimize_none = [ "//build/config:optimize_none" ]
       if (configs + _optimize_none - _optimize_none != configs) {
         configs -= _optimize_none
@@ -191,7 +191,7 @@ config("standalone") {
     "-include",
     rebase_path("include/hidden.h", root_build_dir),
 
-    # We want `.debug_frame` for the kernel (fxbug.dev/30023).  And we still want
+    # We want `.debug_frame` for the kernel (https://fxbug.dev/30023).  And we still want
     # asynchronous unwind tables.  Alas there's (currently) no way to
     # achieve this with our GCC.  At the moment we compile with
     # `-fno-omit-frame-pointer`, which is good because we link with
@@ -276,9 +276,9 @@ if (is_kernel) {
       "//build/config/zircon:data_sections",
     ]
 
-    # TODO(fxbug.dev/27083): This dependency is conditional because when built
+    # TODO(https://fxbug.dev/27083): This dependency is conditional because when built
     # with GCC the kernel uses function scoped statics requiring dynamic
-    # initialization. Once fxbug.dev/27083 is fixed, this dependency can be
+    # initialization. Once https://fxbug.dev/27083 is fixed, this dependency can be
     # removed.
     if (is_gcc) {
       # Don't emit extra code making static initializers thread-safe.
@@ -344,7 +344,7 @@ if (is_kernel) {
       cflags += [ "-Wformat-signedness" ]
     }
 
-    # TODO(fxbug.dev/78934): Eventually enable -Wshadow for GCC.  It's currently
+    # TODO(https://fxbug.dev/78934): Eventually enable -Wshadow for GCC.  It's currently
     # disabled because GCC is more aggressive than Clang.
     if (!is_gcc) {
       cflags += [ "-Wshadow" ]
@@ -646,9 +646,9 @@ if (is_kernel) {
       "//zircon/kernel/lib/arch:headers",
     ]
 
-    # TODO(fxbug.dev/27083): This dependency is conditional because when built
+    # TODO(https://fxbug.dev/27083): This dependency is conditional because when built
     # with GCC BootCpuidIo uses a function scoped static requiring dynamic
-    # initialization, which won't pass symbol validation. Once fxbug.dev/27083
+    # initialization, which won't pass symbol validation. Once https://fxbug.dev/27083
     # is fixed, the dynamic initialization can be removed and this dependency
     # can be made unconditional.
     if (!is_gcc) {
@@ -799,9 +799,9 @@ if (is_kernel) {
       deps += [ "lib/libc/string/arch/x86:tests" ]
     }
 
-    # TODO(fxbug.dev/27083): This dependency is conditional because when built
+    # TODO(https://fxbug.dev/27083): This dependency is conditional because when built
     # with GCC the kernel uses function scoped statics requiring dynamic
-    # initialization. Once fxbug.dev/27083 is fixed, this dependency can be made
+    # initialization. Once https://fxbug.dev/27083 is fixed, this dependency can be made
     # unconditional.
     if (!is_gcc) {
       deps += [ "lib/cxxabi-dynamic-init/tests" ]
@@ -813,7 +813,7 @@ if (is_kernel) {
     }
   }
 
-  # TODO(fxbug.dev/130252): The x86 kernel gets loaded at a fixed physical
+  # TODO(https://fxbug.dev/130252): The x86 kernel gets loaded at a fixed physical
   # address of 1MiB. The UEFI environment under QEMU has some memory reserved
   # at about 8MiB. This limits the total kernel image size that can be loaded.
   # A larger kernel image size will get a panic in early boot (physboot).

@@ -142,7 +142,7 @@ void DebugAdapterServer::ConnectionResolvedMainThread(fbl::unique_fd client) {
 }
 
 // Connect again if the IDE client disconnects (we are expecting 1 disconnection).
-// TODO(fxbug.dev/116308): Differentiate behavior between use cases.
+// TODO(https://fxbug.dev/116308): Differentiate behavior between use cases.
 void DebugAdapterServer::OnDisconnect() {
   ResetClientConnection();
   for (auto& observer : observers_) {

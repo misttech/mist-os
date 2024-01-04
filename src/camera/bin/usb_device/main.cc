@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
           .and_then([&](std::unique_ptr<camera::DeviceImpl>& dev) {
             device = std::move(dev);
 
-            // TODO(fxbug.dev/44628): publish discoverable service name once
+            // TODO(https://fxbug.dev/44628): publish discoverable service name once
             // supported
             zx_status_t status =
                 context->outgoing()->AddPublicService(device->GetHandler(), outgoing_service_name);

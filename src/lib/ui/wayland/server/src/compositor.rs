@@ -590,7 +590,7 @@ impl Surface {
 
         // Create and register a release fence to release the last buffer unless
         // it's the same as the current buffer.
-        // TODO(fxbug.dev/85402): Track multiple usages of the same buffer and only
+        // TODO(https://fxbug.dev/85402): Track multiple usages of the same buffer and only
         // generate the release event when all usages drop to zero.
         let buffer_id = self.content.as_ref().map(|content| content.id());
         if last_buffer_id != buffer_id {

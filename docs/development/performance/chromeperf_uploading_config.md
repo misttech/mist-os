@@ -25,7 +25,7 @@ because it spans several locations:
         files that are checked in to `integration.git`.
     *   This enables uploading to Chromeperf only for CI builds.
     *   This mapping was implemented in
-        [fxbug.dev/49592](https://fxbug.dev/49592).
+        [https://fxbug.dev/49592](https://fxbug.dev/49592).
 
 *   **Subbuild:** The Infra recipes code sets various environment
     variables based on the input properties, including

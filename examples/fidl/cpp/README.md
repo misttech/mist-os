@@ -19,7 +19,7 @@ and include the following header:
 
 ## Client example
 
-<!-- TODO(fxbug.dev/103483): write full-fledged tutorial for the
+<!-- TODO(https://fxbug.dev/103483): write full-fledged tutorial for the
 bindings as it matures. -->
 
 To run the client example, run the `echo_realm` component.

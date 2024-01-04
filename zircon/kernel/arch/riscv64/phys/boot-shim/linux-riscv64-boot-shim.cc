@@ -35,7 +35,7 @@ using BoardInfoItem = boot_shim::SingleOptionalItem<zbi_board_info_t, ZBI_TYPE_D
 
 constexpr const char* kShimName = "linux-riscv64-boot-shim";
 
-// TODO(fxbug.dev/295031359): Once assembly generates this items, remove the hardcoded pair.
+// TODO(https://fxbug.dev/295031359): Once assembly generates this items, remove the hardcoded pair.
 constexpr zbi_platform_id_t kQemuPlatformId = {
     .vid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_VID.QEMU
     .pid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_PID.QEMU

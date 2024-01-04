@@ -182,7 +182,7 @@ fn calc_fire_instant(requested_time: fasync::Time) -> fasync::Time {
     // slightly after the scheduled time but never before. This should result in
     // less wake-ups for the timer dispatcher as well.
     //
-    // See http://fxbug.dev/125301 for more details.
+    // See https://fxbug.dev/125301 for more details.
     const GRANULARITY_AS_NANOS: i64 = GRANULARITY.into_nanos();
     let granularity_units =
         requested_time.into_nanos().saturating_add(GRANULARITY_AS_NANOS - 1) / GRANULARITY_AS_NANOS;
@@ -367,9 +367,9 @@ where
                     // the leak by deferring the creation of timers as much as
                     // possible.
                     //
-                    // See http://fxbug.dev/125301 for more details.
+                    // See https://fxbug.dev/125301 for more details.
                     //
-                    // TODO(http://fxbug.dev/125301): Revisit this bandaid for
+                    // TODO(https://fxbug.dev/125301): Revisit this bandaid for
                     // the executor's memory leak.
                     futures::future::Either::Left(
                         fut.get_or_insert_with(|| fasync::Timer::new(time).fuse()),

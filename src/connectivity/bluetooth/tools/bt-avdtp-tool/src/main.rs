@@ -20,7 +20,7 @@ use crate::types::{PeerFactoryMap, CLEAR_LINE, PROMPT};
 mod commands;
 mod types;
 
-// TODO(fxbug.dev/37089): Spawn listener for PeerEventStream to delete peer from map
+// TODO(https://fxbug.dev/37089): Spawn listener for PeerEventStream to delete peer from map
 // when a peer disconnects from service.
 async fn peer_manager_listener(
     avdtp_svc: &PeerManagerProxy,

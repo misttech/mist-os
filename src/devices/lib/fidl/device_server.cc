@@ -170,7 +170,7 @@ DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool mu
 
 namespace {
 
-// TODO(fxbug.dev/85473): This target uses uses internal FIDL machinery to ad-hoc compose protocols.
+// TODO(https://fxbug.dev/85473): This target uses uses internal FIDL machinery to ad-hoc compose protocols.
 // Ad-hoc composition of protocols (try to match a method against protocol A, then B, etc.) is not
 // supported by FIDL. We should move to public supported APIs.
 template <typename FidlProtocol>

@@ -29,7 +29,7 @@ fuchsia_test_package("display-pixel-ratio-test") {
   test_components = [ ":display-pixel-ratio-test-component" ]
   test_specs = {
     log_settings = {
-      # TODO(fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
+      # TODO(https://fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = [

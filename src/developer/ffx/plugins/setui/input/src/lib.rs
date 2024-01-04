@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 // Used to interact with the input interface.
-// TODO(fxbug.dev/66186): Support multiple devices.
+// TODO(https://fxbug.dev/66186): Support multiple devices.
 
 use anyhow::format_err;
 use anyhow::Result;

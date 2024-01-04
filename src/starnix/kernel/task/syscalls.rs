@@ -1131,7 +1131,7 @@ pub fn sys_getrusage(
 ) -> Result<(), Errno> {
     const RUSAGE_SELF: i32 = starnix_uapi::uapi::RUSAGE_SELF as i32;
     const RUSAGE_THREAD: i32 = starnix_uapi::uapi::RUSAGE_THREAD as i32;
-    // TODO(fxb/76811): Implement proper rusage.
+    // TODO(https://fxbug.dev/76811): Implement proper rusage.
     let time_stats = match who {
         RUSAGE_CHILDREN => current_task.task.thread_group.read().children_time_stats,
         RUSAGE_SELF => current_task.task.thread_group.time_stats(),

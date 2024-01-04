@@ -44,14 +44,14 @@ type AddMod = resource struct {
     /// Clients should provide `mod_name_transitional` instead.
     /// If both are provided, `mod_name` is ignored.
     ///
-    // TODO(fxbug.dev/16089): Convert to string
+    // TODO(https://fxbug.dev/16089): Convert to string
     mod_name vector<string:MAX>:MAX;
 
     /// The name of the mod within the story. This should be used instead of
     /// `mod_name`. If provided, it is equivalent to passing `mod_name` with
     /// a single item. If both are provided, `mod_name` is ignored.
     ///
-    // TODO(fxbug.dev/16089): Remove
+    // TODO(https://fxbug.dev/16089): Remove
     mod_name_transitional string:<MAX, optional>;
 
     intent Intent;
@@ -69,13 +69,13 @@ type RemoveMod = struct {
     /// Clients should provide `mod_name_transitional` instead.
     /// If both are provided, `mod_name` is ignored.
     ///
-    // TODO(fxbug.dev/16089): Convert to string
+    // TODO(https://fxbug.dev/16089): Convert to string
     mod_name vector<string:MAX>:MAX;
 
     /// The name of the mod within the story. This should be used instead of
     /// `mod_name`. If provided, it is equivalent to passing `mod_name` with
     /// a single item. If both are provided, `mod_name` is ignored.
     ///
-    // TODO(fxbug.dev/16089): Remove
+    // TODO(https://fxbug.dev/16089): Remove
     mod_name_transitional string:<MAX, optional>;
 };

@@ -23,7 +23,7 @@ use {
 
 const PASS_PHRASE: &str = "wpa2duel";
 
-// TODO(fxbug.dev/73871): Encode constants like this in the type system.
+// TODO(https://fxbug.dev/73871): Encode constants like this in the type system.
 const WAIT_FOR_PAYLOAD_INTERVAL: i64 = 500; // milliseconds
 const WAIT_FOR_ACK_INTERVAL: i64 = 500; // milliseconds
 
@@ -116,7 +116,7 @@ async fn verify_client_connects_to_ap(
     // Both tasks need to be running at the same time to ensure "packets" can reach each other.
 
     join!(client_fut, ap_fut);
-    // TODO(fxbug.dev/35339): Once AP supports status query, verify from the AP side that client associated.
+    // TODO(https://fxbug.dev/35339): Once AP supports status query, verify from the AP side that client associated.
 }
 
 // Data transfer stage
@@ -285,7 +285,7 @@ async fn verify_ethernet_in_both_directions(
     pin_mut!(peer_behind_ap_fut);
 
     let client_with_timeout = client_helper.run_until_complete_or_timeout(
-        // TODO(fxbug.dev/73821): This time should be reduced to 5 seconds
+        // TODO(https://fxbug.dev/73821): This time should be reduced to 5 seconds
         // once Policy no longer mistakenly schedules unneeded scans.
         60.seconds(),
         "client trying to exchange data with a peer behind AP",
@@ -295,7 +295,7 @@ async fn verify_ethernet_in_both_directions(
         client_fut,
     );
     let peer_behind_ap_with_timeout = ap_helper.run_until_complete_or_timeout(
-        // TODO(fxbug.dev/73821): This time should be reduced to 5 seconds
+        // TODO(https://fxbug.dev/73821): This time should be reduced to 5 seconds
         // once Policy no longer mistakenly schedules unneeded scans.
         60.seconds(),
         "AP forwarding data between client and its peer",

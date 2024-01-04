@@ -1305,7 +1305,7 @@ async fn does_asset_match_hash_and_size(
     Ok(None)
 }
 
-#[allow(clippy::result_large_err)] // TODO(fxbug.dev/117897)
+#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/117897)
 fn calculate_hash(buffer: &Buffer, mut remaining: usize) -> Result<Hash, PrepareError> {
     let mut hasher = Sha256::new();
     let mut offset = 0;

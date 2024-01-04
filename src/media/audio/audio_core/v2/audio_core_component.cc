@@ -72,7 +72,7 @@ std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> MakeGraphCli
       creator_client->Create(fuchsia_audio_mixer::wire::GraphCreatorCreateRequest::Builder(arena)
                                  .graph(std::move(graph_endpoints->server))
                                  .name(fidl::StringView::FromExternal("AudioCoreGraph"))
-                                 // TODO(fxbug.dev/98652): set .fidl_deadline_profile() to the same
+                                 // TODO(https://fxbug.dev/98652): set .fidl_deadline_profile() to the same
                                  // profile used for the main FIDL thread (see main.cc)
                                  .Build());
   if (!result.ok()) {
@@ -129,7 +129,7 @@ AudioCoreComponent::AudioCoreComponent(component::OutgoingDirectory& outgoing,
         << "Unable to set memory role for the audio_core process";
   }
 
-  // TODO(fxbug.dev/98652): replace uses of this function with newer functions such as
+  // TODO(https://fxbug.dev/98652): replace uses of this function with newer functions such as
   // component::Connect().
   auto component_context = sys::ComponentContext::Create();
 
@@ -141,7 +141,7 @@ AudioCoreComponent::AudioCoreComponent(component::OutgoingDirectory& outgoing,
   // Connect to the mixer service.
   graph_client_ = MakeGraphClient(fidl_dispatcher);
 
-  // TODO(fxbug.dev/98652): Create two graph threads by calling graph_client_->sync()->CreateThread
+  // TODO(https://fxbug.dev/98652): Create two graph threads by calling graph_client_->sync()->CreateThread
   // twice: once for input devices + capturers, and once for output devices + renderers.
 
   // Create objects.
@@ -175,7 +175,7 @@ AudioCoreComponent::AudioCoreComponent(component::OutgoingDirectory& outgoing,
                                 .creator = renderer_capturer_creator_,
                                 .route_graph = route_graph_,
                                 .stream_volume_manager = stream_volume_manager_,
-                                // TODO(fxbug.dev/98652): set `.audio_admin` here
+                                // TODO(https://fxbug.dev/98652): set `.audio_admin` here
                                 .default_volume_curve = process_config_.default_volume_curve(),
                             });
   });
@@ -185,7 +185,7 @@ AudioCoreComponent::AudioCoreComponent(component::OutgoingDirectory& outgoing,
         fidl_thread_, std::move(server_end),
         {
             .creator = renderer_capturer_creator_,
-            // TODO(fxbug.dev/98652): add ultrasound render and capture formats to process_config,
+            // TODO(https://fxbug.dev/98652): add ultrasound render and capture formats to process_config,
             // then set the values below. For now these are placeholders.
             //
             // In audio_core/v1, these formats were computed lazily once the renderer or capturer

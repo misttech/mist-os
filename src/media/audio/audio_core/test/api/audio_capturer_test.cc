@@ -253,7 +253,7 @@ TEST_F(AudioCapturerTestOldAPI, StopAsyncWithAllPacketsInFlight) {
 
   // Wait for over one mix period (100ms). This is not necessary for the test, however it
   // increases the chance of a mix period running before our StopAsyncCapture call, which
-  // increases our chance of finding bugs (e.g. fxbug.dev/72776).
+  // increases our chance of finding bugs (e.g. https://fxbug.dev/72776).
   usleep(150 * 1000);
 
   audio_capturer_->StopAsyncCapture(AddCallback("StopAsyncCapture"));
@@ -497,7 +497,7 @@ TEST_F(AudioCapturerClockTestOldAPI, SetRefClockAfterCaptureShouldDisconnect) {
 
 // Setting the reference clock should fail, any time after capture has started (even if cancelled).
 //
-// TODO(fxbug.dev/57079): deflake and re-enable.
+// TODO(https://fxbug.dev/57079): deflake and re-enable.
 TEST_F(AudioCapturerClockTestOldAPI, DISABLED_SetRefClockCaptureCancelledShouldDisconnect) {
   SetFormat();
   SetUpPayloadBuffer();

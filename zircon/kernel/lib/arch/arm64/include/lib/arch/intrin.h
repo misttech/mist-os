@@ -45,7 +45,7 @@
 // GCC's <arm_acle.h> is missing implementations of the following APIs
 // specified by ARM, so they are filled in here.  Clang's implementation
 // is already complete.
-// TODO(fxbug.dev/102847): Remove this after gcc adds these intrinsics.
+// TODO(https://fxbug.dev/102847): Remove this after gcc adds these intrinsics.
 
 // From ARM ACLE spec, 8.3 Memory Barriers:
 //   "Memory barriers ensure specific ordering properties between memory
@@ -147,7 +147,7 @@ namespace arch {
 /// Yield the processor momentarily.  This should be used in busy waits.
 inline void Yield() { __yield(); }
 
-// TODO(fxbug.dev/49941): Improve the docs on the barrier APIs, maybe rename/refine.
+// TODO(https://fxbug.dev/49941): Improve the docs on the barrier APIs, maybe rename/refine.
 
 /// Synchronize all memory accesses of all kinds.
 inline void DeviceMemoryBarrier() { __dsb(ARM_MB_SY); }

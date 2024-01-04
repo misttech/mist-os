@@ -241,7 +241,7 @@ zx::result<const usb_video_frame_header*> VerifyFrame(usb_desc_iter_t* iter) {
 // frame parameters. None of the frame parameters affect the operation of this driver; this
 // driver simply relays the reported frame parameters to a client program so the client
 // can select the desired frame configuration.
-// TODO(fxbug.dev/104233): Use of dwMaxVideoFrameBufferSize has been deprecated.  The
+// TODO(https://fxbug.dev/104233): Use of dwMaxVideoFrameBufferSize has been deprecated.  The
 // dwMaxVideoFrameSize field obtained from the Video Probe and Commit control exchange
 // should be used instead.
 zx::result<UvcFormat> ParseUvcFormat(const usb_video_format_header* format,

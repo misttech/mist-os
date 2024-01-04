@@ -4,7 +4,7 @@
 
 library fuchsia.usb;
 
-// TODO(fxb/62024): For now these protocol definitions are manually defined to match protodefs.h.
+// TODO(https://fxbug.dev/62024): For now these protocol definitions are manually defined to match protodefs.h.
 // Usually fuchsia.<namespace>.BIND_PROTOCOL.DEVICE would map to ZX_PROTOCOL_<namespace>, but in
 // this case it maps to ZX_PROTOCOL_USB_DEVICE. This is because the USB protocol is implemented by
 // two kinds of drivers: those that acquire an entire device (ZX_PROTOCOL_USB_DEVICE) and those

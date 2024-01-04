@@ -96,7 +96,7 @@ fbl::RefPtr<RefCountedVmoMapper> MapVmo(const Format& format, zx::vmo vmo, int64
   }
 
   // Map the VMO into our address space.
-  // TODO(fxbug.dev/35022): How do I specify the cache policy for this mapping?
+  // TODO(https://fxbug.dev/35022): How do I specify the cache policy for this mapping?
   zx_vm_option_t flags = ZX_VM_PERM_READ | (writable ? ZX_VM_PERM_WRITE : 0);
   auto vmo_mapper = fbl::MakeRefCounted<RefCountedVmoMapper>();
   status = vmo_mapper->Map(vmo, 0u, size, flags);

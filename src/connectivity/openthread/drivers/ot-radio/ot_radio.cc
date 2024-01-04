@@ -75,7 +75,7 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::Open(OpenCompleter::Sync& comple
   if (res == ZX_OK) {
     zxlogf(DEBUG, "open succeed, returning");
     ot_radio_obj_.power_status_ = OT_SPINEL_DEVICE_ON;
-    // TODO(fxbug.dev/94739): Consider handling errors instead of ignoring them.
+    // TODO(https://fxbug.dev/94739): Consider handling errors instead of ignoring them.
     (void)fidl::WireSendEvent(*ot_radio_obj_.fidl_binding_)
         ->OnReadyForSendFrames(kOutboundAllowanceInit);
     ot_radio_obj_.inbound_allowance_ = 0;
@@ -115,11 +115,11 @@ void OtRadioDevice::LowpanSpinelDeviceFidlImpl::SendFrame(SendFrameRequestView r
                  "ot_radio_obj_.outbound_allowance", ot_radio_obj_.outbound_allowance_,
                  "ot_radio_obj_.outbound_cnt", ot_radio_obj_.outbound_cnt_);
   if (ot_radio_obj_.power_status_ == OT_SPINEL_DEVICE_OFF) {
-    // TODO(fxbug.dev/94739): Consider handling errors instead of ignoring them.
+    // TODO(https://fxbug.dev/94739): Consider handling errors instead of ignoring them.
     (void)fidl::WireSendEvent(*ot_radio_obj_.fidl_binding_)
         ->OnError(lowpan_spinel_fidl::wire::Error::kClosed, false);
   } else if (request->data.count() > kMaxFrameSize) {
-    // TODO(fxbug.dev/94739): Consider handling errors instead of ignoring them.
+    // TODO(https://fxbug.dev/94739): Consider handling errors instead of ignoring them.
     (void)fidl::WireSendEvent(*ot_radio_obj_.fidl_binding_)
         ->OnError(lowpan_spinel_fidl::wire::Error::kOutboundFrameTooLarge, false);
   } else if (ot_radio_obj_.outbound_allowance_ == 0) {

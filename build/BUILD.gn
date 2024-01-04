@@ -60,13 +60,13 @@ group("non_hermetic_deps") {
   # See: fxrev.dev/528291
   visibility += [ "//build/rust:*" ]
 
-  # See: fxbug.dev/69444
+  # See: https://fxbug.dev/69444
   visibility += [ "//sdk:cts_generate" ]
 
-  # See: fxbug.dev/44889
+  # See: https://fxbug.dev/44889
   visibility += [ "//sdk:*" ]
 
-  # TODO(http://fxbug.dev/92612): Remove entries when
+  # TODO(https://fxbug.dev/92612): Remove entries when
   # assembly and board input bundle creation no longer triggers false-positives
   # in the action_tracer.py due to how it cleans it's dynamic outputs.
   visibility += [
@@ -92,10 +92,10 @@ group("non_hermetic_deps") {
     "//zircon/system/*",
   ]
 
-  # TODO(fxbug.dev/94463): Remove entry when action tracer can handle ld.lld invocations.
+  # TODO(https://fxbug.dev/94463): Remove entry when action tracer can handle ld.lld invocations.
   visibility += [ "//src/graphics/lib/magma/src/libmagma:*" ]
 
-  # TODO(fxbug.dev/109382): Hermetic deps checking is disabled on build_id_entry
+  # TODO(https://fxbug.dev/109382): Hermetic deps checking is disabled on build_id_entry
   visibility += [ "//third_party/intel/media-driver/fuchsia:*" ]
 
   # These repos are not in the default checkout.
@@ -136,7 +136,7 @@ group("non_hermetic_deps") {
     "//products/workbench:*",
   ]
 
-  # FIXME(http://fxbug.dev/121915): //build/packages/prebuilt_packages.gni
+  # FIXME(https://fxbug.dev/121915): //build/packages/prebuilt_packages.gni
   # needs `hermetic_action_ignored_prefixes`. Remove these entries when
   # `prebuilt_package` is hermetic.
   visibility += [
@@ -161,7 +161,7 @@ group("non_hermetic_deps") {
     "//src/ui/backlight/drivers:chromebook-keyboard-backlight",
   ]
 
-  # TODO(fxbug.dev/84924): License analysis uses the output of 'fx gn gen', which
+  # TODO(https://fxbug.dev/84924): License analysis uses the output of 'fx gn gen', which
   # can potentially touch every file in the repository. Remove this entry when license
   # management becomes a hermetic process.
   visibility += [ "//tools/check-licenses/util/cmd/gn/*" ]

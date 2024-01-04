@@ -39,7 +39,7 @@ namespace {
 //    |                                |    device     |
 //    |                                +---------------+
 //    |
-// TODO(fxb/124464): Migrate test to use dispatcher integration.
+// TODO(https://fxbug.dev/124464): Migrate test to use dispatcher integration.
 class WlanphyDeviceTest : public ::zxtest::Test,
                           public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl> {
  public:

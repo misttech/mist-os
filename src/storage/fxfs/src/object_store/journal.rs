@@ -495,7 +495,7 @@ impl Journal {
         checksum_list: &mut ChecksumList,
     ) -> Result<(), Error> {
         match mutation {
-            // TODO(fxbug.dev/313678158): This can be removed the next time we bump
+            // TODO(https://fxbug.dev/313678158): This can be removed the next time we bump
             // EARLIEST_SUPPORTED_VERSION, because the latest journal code writes all the checksums
             // out in a separate record.
             Mutation::ObjectStore(ObjectStoreMutation {
@@ -1582,7 +1582,7 @@ impl Journal {
                 let inspector = fuchsia_inspect::Inspector::default();
                 if let Some(this) = this_clone.upgrade() {
                     let (journal_min, journal_max, journal_reclaim_size) = {
-                        // TODO(fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
+                        // TODO(https://fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
                         let inner = this.inner.lock().unwrap();
                         (
                             round_down(
@@ -1599,7 +1599,7 @@ impl Journal {
                     root.record_uint("journal_size", journal_max - journal_min);
                     root.record_uint("journal_reclaim_size", journal_reclaim_size);
 
-                    // TODO(fxbug.dev/117057): Post-compute rather than manually computing metrics.
+                    // TODO(https://fxbug.dev/117057): Post-compute rather than manually computing metrics.
                     if let Some(x) = round_div(
                         100 * (journal_max - journal_min),
                         this.objects.allocator().get_disk_bytes(),

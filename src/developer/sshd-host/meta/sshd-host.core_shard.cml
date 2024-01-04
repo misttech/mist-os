@@ -4,7 +4,7 @@
 
 // Add sshd-host to core
 //
-// TODO(fxbug.dev/130576): Remove unused capabilities once shell tools run outside the sshd realm.
+// TODO(https://fxbug.dev/130576): Remove unused capabilities once shell tools run outside the sshd realm.
 {
     children: [
         {
@@ -192,7 +192,7 @@
         },
 
         // Used by `session_control`
-        // TODO(fxbug.dev/73588): Remove once session_control is deleted
+        // TODO(https://fxbug.dev/73588): Remove once session_control is deleted
         {
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
@@ -341,7 +341,7 @@
             protocol: [
                 "fuchsia.bluetooth.fastpair.Provider",
 
-                // TODO(fxbug.dev/1496): Bluetooth owner component should restrict access to Bootstrap API
+                // TODO(https://fxbug.dev/1496): Bluetooth owner component should restrict access to Bootstrap API
                 "fuchsia.bluetooth.sys.Bootstrap",
             ],
             from: "#bluetooth-core",

@@ -51,7 +51,7 @@ if (is_host) {
   }
 
   # QEMU is currently the host_cpu.
-  # TODO(fxbug.dev/106608) once arm64 is available for mac, provide it as well.
+  # TODO(https://fxbug.dev/106608) once arm64 is available for mac, provide it as well.
   if (current_cpu == host_cpu) {
     emu_companion("qemu_internal") {
       default_binary = "//prebuilt/third_party/qemu/${current_os}-${current_cpu}/bin/qemu-system-x86_64"

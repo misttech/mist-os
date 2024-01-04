@@ -1478,7 +1478,7 @@ TEST_F(Threads, WritingVectorRegisterState_UnsupportedFieldsIgnored) {
   ASSERT_NO_FATAL_FAILURE(vector_regs_expect_eq(regs, vector_regs_expected));
 }
 
-// Test for fxbug.dev/50632: Make sure zx_thread_write_state doesn't overwrite
+// Test for https://fxbug.dev/50632: Make sure zx_thread_write_state doesn't overwrite
 // reserved bits in mxcsr (x64 only).
 TEST_F(Threads, WriteThreadStateWithInvalidMxcsrIsInvalidArgs) {
 #if defined(__x86_64__)
@@ -1920,7 +1920,7 @@ TEST_F(Threads, DebugRegistersValidation) {
 }
 
 #if defined(__x86_64__)
-// This is a regression test for fxbug.dev/92181.
+// This is a regression test for https://fxbug.dev/92181.
 //
 // See that DR6 is reset after a hardware debug exception.
 TEST_F(Threads, DebugRegistersDr6ResetOnDebugException) {
@@ -2044,7 +2044,7 @@ TEST_F(Threads, DebugRegistersDr6CorrectAfterBreakpointRemoval) {
 }
 #endif
 
-// This is a regression test for fxbug.dev/34166. Verify that upon entry to the kernel via fault on
+// This is a regression test for https://fxbug.dev/34166. Verify that upon entry to the kernel via fault on
 // hardware that lacks SMAP, a subsequent usercopy does not panic.
 TEST_F(Threads, X86AcFlagUserCopy) {
 #if defined(__x86_64__)

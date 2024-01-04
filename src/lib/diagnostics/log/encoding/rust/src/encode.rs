@@ -129,7 +129,7 @@ where
     where
         F: FnOnce(&mut Self) -> Result<(), EncodingError>,
     {
-        // TODO(fxbug.dev/59992): on failure, zero out the region we were using
+        // TODO(https://fxbug.dev/59992): on failure, zero out the region we were using
         let starting_idx = self.buf.cursor();
         // Prepare the header, we'll finish writing once we know the full size of the record.
         let header_slot = self.buf.put_slot(std::mem::size_of::<u64>())?;
@@ -236,7 +236,7 @@ where
         unsafe {
             let align = std::mem::size_of::<u64>();
             let num_padding_bytes = (align - src.len() % align) % align;
-            // TODO(fxbug.dev/59993) need to enforce that the buffer is zeroed
+            // TODO(https://fxbug.dev/59993) need to enforce that the buffer is zeroed
             self.buf.advance_cursor(num_padding_bytes);
         }
         Ok(())

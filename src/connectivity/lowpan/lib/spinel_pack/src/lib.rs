@@ -325,10 +325,10 @@
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 #![warn(rust_2018_idioms)]
-// TODO(fxbug.dev/49842): Remove
+// TODO(https://fxbug.dev/49842): Remove
 #![allow(elided_lifetimes_in_paths)]
 #![allow(unused_mut)]
-// TODO(fxbug.dev/122028): Remove this allow once the lint is fixed.
+// TODO(https://fxbug.dev/122028): Remove this allow once the lint is fixed.
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
 
 mod eui;

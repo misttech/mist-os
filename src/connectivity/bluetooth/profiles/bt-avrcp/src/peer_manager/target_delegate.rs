@@ -170,7 +170,7 @@ impl TargetDelegate {
     }
 
     /// Watch for the change of the notification value
-    // TODO(fxbug.dev/54002): Instead of cloning the AbsoluteVolumeHandlerProxy and then
+    // TODO(https://fxbug.dev/54002): Instead of cloning the AbsoluteVolumeHandlerProxy and then
     // sending a new `on_volume_changed()` hanging-get request, AVRCP should
     // monitor any outstanding request, and subscribe each peer to the result
     // of the single outstanding request.

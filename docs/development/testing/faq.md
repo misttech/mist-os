@@ -146,7 +146,7 @@ Example:
 
 ```rust
 #[test]
-#[ignore] // TODO(fxbug.dev/NNNNN) re-enable this test when de-flaked
+#[ignore] // TODO(https://fxbug.dev/NNNNN) re-enable this test when de-flaked
 fn flaky_test_we_need_to_fix() { ... }
 ```
 

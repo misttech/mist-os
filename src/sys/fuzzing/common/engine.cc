@@ -84,7 +84,7 @@ zx_status_t Engine::RunFuzzer() {
 }
 
 zx_status_t Engine::RunTest() {
-  // TODO(fxbug.dev/109100): Rarely, spawned process output may be truncated. `LibFuzzerRunner`
+  // TODO(https://fxbug.dev/109100): Rarely, spawned process output may be truncated. `LibFuzzerRunner`
   // needs to return `ZX_ERR_IO_INVALID` in this case. By retying several times, the probability of
   // the underlying flake failing a test drops to almost zero.
   static constexpr const size_t kFuzzerTestRetries = 10;

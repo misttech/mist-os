@@ -441,7 +441,7 @@ fn generate_daemon_protocol_proxy(
 "The daemon protocol '{}' did not match any protocols on the daemon
 If you are not developing this plugin or the protocol it connects to, then this is a bug
 
-Please report it at http://fxbug.dev/new/ffx+User+Bug.",
+Please report it at https://fxbug.dev/new/ffx+User+Bug.",
                                         svc_name)
                                     ).into(),
                             ffx_core::macro_deps::fidl_fuchsia_developer_ffx::DaemonError::ProtocolOpenError =>
@@ -454,7 +454,7 @@ function. See the ffx.daemon.log for details at `ffx config get log.dir -p sub`.
 
 If you are NOT developing this plugin or the protocol it connects to, then this is a bug.
 
-Please report it at http://fxbug.dev/new/ffx+User+Bug.",
+Please report it at https://fxbug.dev/new/ffx+User+Bug.",
                                         svc_name
                                     )
                                 ).into(),
@@ -466,7 +466,7 @@ Please report it at http://fxbug.dev/new/ffx+User+Bug.",
 {:?}
 
 This is not intended behavior and is a bug.
-Please report it at http://fxbug.dev/new/ffx+User+Bug.",
+Please report it at https://fxbug.dev/new/ffx+User+Bug.",
 
                                         svc_name,
                                         unexpected,

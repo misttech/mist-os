@@ -113,7 +113,7 @@ zx_status_t Nelson::SdioInit() {
 
   fit::result sdmmc_metadata =
       fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
-                        // TODO(fxbug.dev/134787): Use the FIDL SDMMC protocol.
+                        // TODO(https://fxbug.dev/134787): Use the FIDL SDMMC protocol.
                         .use_fidl(false)
                         .Build());
   if (!sdmmc_metadata.is_ok()) {

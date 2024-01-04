@@ -278,7 +278,7 @@ void random(bool* field) {
 
 template <>
 void random<v1::HeapType>(v1::HeapType* field) {
-  // TODO(fxbug.dev/53067): Use generated-code array of valid values instead, when/if available.
+  // TODO(https://fxbug.dev/53067): Use generated-code array of valid values instead, when/if available.
   static constexpr uint64_t valid[] = {
       /*SYSTEM_RAM =*/0u,
       /*AMLOGIC_SECURE =*/1152921504606912512u,
@@ -299,7 +299,7 @@ static_assert(std::is_same_v<v1::wire::HeapType, v1::HeapType>);
 
 template <>
 void random<v1::PixelFormatType>(v1::PixelFormatType* field) {
-  // TODO(fxbug.dev/53067): Use generated-code array of valid values instead, when/if available.
+  // TODO(https://fxbug.dev/53067): Use generated-code array of valid values instead, when/if available.
   static constexpr uint32_t valid[] = {
       /*INVALID =*/0u,
       /*R8G8B8A8 =*/1u,
@@ -333,7 +333,7 @@ static_assert(std::is_same_v<v1::wire::PixelFormatType, v1::PixelFormatType>);
 
 template <>
 void random<v1::ColorSpaceType>(v1::ColorSpaceType* field) {
-  // TODO(fxbug.dev/53067): Use generated-code array of valid values instead, when/if available.
+  // TODO(https://fxbug.dev/53067): Use generated-code array of valid values instead, when/if available.
   static constexpr uint32_t valid[] = {
       /*INVALID =*/0u,
       /*SRGB =*/1u,
@@ -357,7 +357,7 @@ static_assert(std::is_same_v<v1::wire::ColorSpaceType, v1::ColorSpaceType>);
 
 template <>
 void random<v1::CoherencyDomain>(v1::CoherencyDomain* field) {
-  // TODO(fxbug.dev/53067): Use generated-code array of valid values instead, when/if available.
+  // TODO(https://fxbug.dev/53067): Use generated-code array of valid values instead, when/if available.
   static constexpr uint32_t valid[] = {
       /*CPU =*/0u,
       /*RAM =*/1u,

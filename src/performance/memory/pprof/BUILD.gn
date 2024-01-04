@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 
-# TODO(fxbug.dev/124169): Create our own copy of the protobuf file and avoid depending on perfetto.
+# TODO(https://fxbug.dev/124169): Create our own copy of the protobuf file and avoid depending on perfetto.
 rust_proto_library("pprof_proto") {
   sources = [ "//third_party/perfetto/protos/third_party/pprof/profile.proto" ]
   packages = [ "perfetto.third_party.perftools.profiles" ]

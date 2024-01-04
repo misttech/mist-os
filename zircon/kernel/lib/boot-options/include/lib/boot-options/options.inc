@@ -414,7 +414,7 @@ Specifies the number of pages per CPU to reserve for buffer chain allocations
 system is under load at the cost of using more memory when the system is
 idle.
 
-TODO(fxbug.dev/68456): Determine an upper bound for this value to prevent
+TODO(https://fxbug.dev/68456): Determine an upper bound for this value to prevent
 consuming too much memory.
 )""")
 
@@ -825,7 +825,7 @@ before they impact the system.
 )""")
 
 DEFINE_OPTION("kernel.experimental.serial_migration", bool, experimental_serial_migration, {false}, R"""(
-**TODO(fxbug.dev/89182)**
+**TODO(https://fxbug.dev/89182)**
 
 Temporary flag to assist on serial driver migration from kernel's implementation to
 ulib/uart implementation.

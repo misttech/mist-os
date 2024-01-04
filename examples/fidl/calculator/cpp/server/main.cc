@@ -14,7 +14,7 @@
 // 3. Well commented code
 // 4. FIDL interaction
 // 5. Error handling
-// 6. TODO(fxbug.dev/111289) Unit testing
+// 6. TODO(https://fxbug.dev/111289) Unit testing
 // ============================================================================
 
 // Include the generated bindings for the Calculator protocol

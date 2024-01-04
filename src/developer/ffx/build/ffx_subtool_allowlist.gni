@@ -4,7 +4,7 @@
 
 # These are FIDL libraries that are temporarily allowed
 # to be depended on by a ffx plugin/subtool.
-# TODO(fxb/130835): Add these to the SDK or remove the plugin from ffx.
+# TODO(https://fxbug.dev/130835): Add these to the SDK or remove the plugin from ffx.
 ffx_subtool_fidl_allowlist = [
   # ffx component
   "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal",

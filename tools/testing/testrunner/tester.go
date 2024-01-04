@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	// TODO(fxb/73171): Fix this path.
+	// TODO(https://fxbug.dev/73171): Fix this path.
 	// The output data directory for component v2 tests.
 	dataOutputDirV2 = "/tmp/test_manager:0/data/debug"
 
@@ -648,7 +648,7 @@ func processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, 
 		}
 		if metadata.ArtifactType == ffxutil.ReportType {
 			// Copy the report log into the filename expected by infra.
-			// TODO(fxbug.dev/91013): Remove dependencies on this filename.
+			// TODO(https://fxbug.dev/91013): Remove dependencies on this filename.
 			absPath := filepath.Join(suiteArtifactDir, artifact)
 			stdioPath = filepath.Join(suiteArtifactDir, runtests.TestOutputFilename)
 			if err := os.Rename(absPath, stdioPath); err != nil {
@@ -716,7 +716,7 @@ func processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, 
 	// The runResult's artifacts should contain a directory with the profiles from
 	// component v2 tests along with a summary.json that lists the data sinks per test.
 	// It should also contain a second directory with early boot data sinks.
-	// TODO(fxbug.dev/124611): Merge profiles on host when using ffx test. When using
+	// TODO(https://fxbug.dev/124611): Merge profiles on host when using ffx test. When using
 	// run-test-suite, we can just remove the entire artifact directory because we'll
 	// scp the profiles off the target at the end of the task instead.
 	if removeProfiles {
@@ -897,7 +897,7 @@ func (t *FFXTester) getEarlyBootSink(path string, sinksPerTest map[string]runtes
 	if !ok {
 		earlyBootSinks = runtests.DataSinkReference{Sinks: runtests.DataSinkMap{}}
 	}
-	// TODO(fxbug.dev/132081): Don't hardcode llvm-profile sink type.
+	// TODO(https://fxbug.dev/132081): Don't hardcode llvm-profile sink type.
 	earlyBootSinks.Sinks["llvm-profile"] = append(earlyBootSinks.Sinks["llvm-profile"], runtests.DataSink{Name: sinkFile, File: sinkFile})
 	sinksPerTest[earlyBootSinksTestName] = earlyBootSinks
 	return nil
@@ -1417,7 +1417,7 @@ func (t *FuchsiaSerialTester) Test(ctx context.Context, test testsharder.Test, s
 	}
 	logger.Debugf(ctx, "starting: %s", command)
 
-	// TODO(fxbug.dev/86771): Currently, serial output is coming out jumbled,
+	// TODO(https://fxbug.dev/86771): Currently, serial output is coming out jumbled,
 	// so the started string sometimes comes after the completed string, resulting
 	// in a timeout because we fail to read the completed string after the
 	// started string. Uncomment below to use the lastWriteSaver once the bug is
@@ -1521,7 +1521,7 @@ func commandForTest(test *testsharder.Test, useSerial bool, timeout time.Duratio
 			if test.Parallel != 0 {
 				command = append(command, "--parallel", fmt.Sprintf("%d", test.Parallel))
 			}
-			// TODO(fxbug.dev/49262): Once fixed, combine timeout flag setting for v1 and v2.
+			// TODO(https://fxbug.dev/49262): Once fixed, combine timeout flag setting for v1 and v2.
 			if timeout > 0 {
 				command = append(command, "--timeout", fmt.Sprintf("%d", int64(timeout.Seconds())))
 			}

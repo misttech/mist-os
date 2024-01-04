@@ -205,7 +205,7 @@ impl<'a> OpenRequest<'a> {
                 _ => Ok(None),
             },
             CapabilitySource::FilteredAggregate { capability_provider, component, .. } => {
-                // TODO(fxbug.dev/4776): This should cache the directory
+                // TODO(https://fxbug.dev/4776): This should cache the directory
                 Ok(Some(Box::new(
                     FilteredAggregateServiceProvider::new(
                         component.clone(),

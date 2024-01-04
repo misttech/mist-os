@@ -815,7 +815,7 @@ Results for test binary "host_x64-asan/fs-host":
 	testCaseCmp(t, stdout, want)
 }
 
-// Regression test for fxbug.dev/51327
+// Regression test for https://fxbug.dev/51327
 func TestFxb51327(t *testing.T) {
 	stdout := `
 [==========] Running 13 tests from 3 test suites.
@@ -1015,7 +1015,7 @@ ok 9 fuchsia-pkg://fuchsia.com/audio_pipeline_tests#meta/audio_pipeline_tests.cm
 	testCaseCmp(t, stdout, want)
 }
 
-// Regression test for fxbug.dev/52363
+// Regression test for https://fxbug.dev/52363
 func TestFxb52363(t *testing.T) {
 	stdout := `
 Running test in realm: test_env_25300c08

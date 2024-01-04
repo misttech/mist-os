@@ -88,7 +88,7 @@ sysroot_uninstrumented_libc_entries = [
         "zircon/types.h",
 
         # Note: Most of zircon/device is excluded from SDKs.
-        # TODO(fxbug.dev/7610,fxbug.dev/32355): remove this allowlist.
+        # TODO(https://fxbug.dev/7610,https://fxbug.dev/32355): remove this allowlist.
         "zircon/device/audio.h",
       ]
 
@@ -274,7 +274,7 @@ sysroot_uninstrumented_libc_entries = [
   },
   {
     sdk = {
-      # TODO(fxbug.dev/27181): The stripped binary doesn't even have section
+      # TODO(https://fxbug.dev/27181): The stripped binary doesn't even have section
       # headers, so the linker can't handle it.  Eventually we'll have
       # linker stubs.  For now, just use the unstripped library to link
       # against.  This matches what library() gives the SDK via
@@ -335,7 +335,7 @@ foreach(variant,
     _libc_unstripped = _libc_stripped + ".debug"
   }
 
-  # TODO(fxbug.dev/101860): Correctly set link, debug, dist and deps here.
+  # TODO(https://fxbug.dev/101860): Correctly set link, debug, dist and deps here.
   sysroot_instrumented_libc_entries += [
     {
       sdk = {

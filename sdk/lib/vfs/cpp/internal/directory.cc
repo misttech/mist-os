@@ -173,7 +173,7 @@ void Directory::Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags p
     return;
   }
 
-  // TODO(fxbug.dev/119413): Path handling does not conform to in-tree behavior.
+  // TODO(https://fxbug.dev/119413): Path handling does not conform to in-tree behavior.
   zx::result result = LookupPath(path);
   if (result.is_error()) {
     return SendOnOpenEventOnError(open_flags, std::move(request), result.error_value());

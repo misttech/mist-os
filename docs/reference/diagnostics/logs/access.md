@@ -35,7 +35,7 @@ matching the requested [Format], although JSON is the only currently supported f
 
 ### Buffer contents
 
-<!-- TODO(fxbug.dev/65241) link to JSON schema when available -->
+<!-- TODO(https://fxbug.dev/65241) link to JSON schema when available -->
 
 Each buffer contains a top-level array with all of its elements as objects:
 
@@ -59,7 +59,7 @@ VMOs.
 
 ### JSON object contents
 
-<!-- TODO(fxbug.dev/65241) link to JSON schema when available -->
+<!-- TODO(https://fxbug.dev/65241) link to JSON schema when available -->
 
 Each JSON object in the array is one log message or event. Like other data types in ArchiveAccessor,
 each object consists of several fields, although the contents of `metadata` and `payload` differ
@@ -104,7 +104,7 @@ not possible in today's system to *guarantee* the timestamps in the metadata of 
 
 #### Dropped logs
 
-<!-- TODO(fxbug.dev/65241) link to JSON schema when available -->
+<!-- TODO(https://fxbug.dev/65241) link to JSON schema when available -->
 
 Dropped logs are conveyed in the `metadata.errors` field of the results object, which is an array
 when present:

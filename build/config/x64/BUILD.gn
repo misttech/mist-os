@@ -10,14 +10,14 @@ config("x64") {
     "-mtune=generic",
   ]
 
-  # TODO(fxbug.dev/87237): the below is for Skylake through Cascade Lake.
+  # TODO(https://fxbug.dev/87237): the below is for Skylake through Cascade Lake.
   # Not all x86-64 builds need this.
   # Remove from baseline and apply via `board_configs` argument as needed.
   configs = [ ":mitigate_skylake_jcc" ]
 }
 
 # Mitigate Jump Conditional Code erratum.
-# See: fxbug.dev/44204
+# See: https://fxbug.dev/44204
 config("mitigate_skylake_jcc") {
   if (is_gcc) {
     cflags = [ "-Wa,-mbranches-within-32B-boundaries" ]

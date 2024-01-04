@@ -217,7 +217,7 @@ impl EventRegistry {
         subscriber: &WeakExtendedInstance,
         events: Vec<RoutedEvent>,
     ) -> Result<EventStream, ModelError> {
-        // TODO(fxbug.dev/48510): get rid of this channel and use FIDL directly.
+        // TODO(https://fxbug.dev/48510): get rid of this channel and use FIDL directly.
         let mut event_stream = EventStream::new();
 
         let mut dispatcher_map = self.dispatcher_map.lock().await;
@@ -247,7 +247,7 @@ impl EventRegistry {
         Ok(event_stream)
     }
 
-    // TODO(fxbug.dev/48510): get rid of this
+    // TODO(https://fxbug.dev/48510): get rid of this
     /// Sends the event to all dispatchers and waits to be unblocked by all
     async fn dispatch(&self, event: &ComponentEvent) {
         // Copy the senders so we don't hold onto the sender map lock

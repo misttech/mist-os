@@ -242,7 +242,7 @@ closed protocol LifecycleController {
     /// Opens a [`fuchsia.sys2/StorageAdmin`] protocol for the exposed storage capability of an
     /// instance identified by its moniker. This protocol is served by component manager.
     ///
-    /// TODO(http://fxbug.dev/97774): Move this function to [`fuchsia.sys2/RealmQuery`]
+    /// TODO(https://fxbug.dev/97774): Move this function to [`fuchsia.sys2/RealmQuery`]
     @available(added=11, deprecated=11, removed=12)
     strict GetStorageAdmin(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;

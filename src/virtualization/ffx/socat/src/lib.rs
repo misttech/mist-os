@@ -13,13 +13,13 @@ pub async fn guest_socat(
     _args: SocatArgs,
     _remote_control: RemoteControlProxy,
 ) -> Result<()> {
-    // TODO(fxbug.dev/116879): Remove when overnet supports duplicated socket handles.
+    // TODO(https://fxbug.dev/116879): Remove when overnet supports duplicated socket handles.
     println!("The ffx guest plugin doesn't support attaching to a running guest.");
     println!("Use the guest tool instead: `fx shell guest socat ..`");
-    println!("See fxbug.dev/116879 for updates.");
+    println!("See https://fxbug.dev/116879 for updates.");
     return Ok(());
 
-    // TODO(fxbug.dev/116879): Enable when overnet supports duplicated socket handles.
+    // TODO(https://fxbug.dev/116879): Enable when overnet supports duplicated socket handles.
     #[allow(unreachable_code)]
     {
         let services = guest_cli::platform::HostPlatformServices::new(_remote_control);

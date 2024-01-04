@@ -17,7 +17,7 @@
         forward_stderr_to: "log",
     },
 
-    // TODO(fxbug.dev/130576): Remove unused capabilities once shell tools run outside the
+    // TODO(https://fxbug.dev/130576): Remove unused capabilities once shell tools run outside the
     // sshd realm.
     use: [
         {

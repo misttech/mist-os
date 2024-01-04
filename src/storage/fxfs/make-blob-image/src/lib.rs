@@ -314,7 +314,7 @@ fn generate_blob(hash: Hash, path: PathBuf, fs_block_size: usize) -> Result<Blob
         .read_to_end(&mut contents)
         .with_context(|| format!("Unable to read contents of `{:?}'", &path))?;
     let hashes = {
-        // TODO(fxbug.dev/122056): Refactor to share implementation with blob.rs.
+        // TODO(https://fxbug.dev/122056): Refactor to share implementation with blob.rs.
         let mut builder = MerkleTreeBuilder::new();
         builder.write(&contents);
         let tree = builder.finish();

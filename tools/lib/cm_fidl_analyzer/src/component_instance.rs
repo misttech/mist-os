@@ -198,7 +198,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     // return immediately for `ComponentInstanceForAnalyzer` (see
     // `ComponentModelForAnalyzer::route_capability_sync()`).
     //
-    // TODO(fxbug.dev/87204): Remove this comment when Scrutiny's `DataController` can make async
+    // TODO(https://fxbug.dev/87204): Remove this comment when Scrutiny's `DataController` can make async
     // function calls.
     async fn lock_resolved_state<'a>(
         self: &'a Arc<Self>,

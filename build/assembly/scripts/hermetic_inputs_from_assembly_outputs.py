@@ -86,7 +86,7 @@ def main():
         required=True,
         help="The location to write the hermetic inputs file",
     )
-    # TODO(fxbug.dev/110940): Avoid including transitive dependencies (blobs).
+    # TODO(https://fxbug.dev/110940): Avoid including transitive dependencies (blobs).
     parser.add_argument(
         "--include-blobs",
         action="store_true",

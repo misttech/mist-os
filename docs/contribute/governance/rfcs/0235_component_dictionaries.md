@@ -50,7 +50,7 @@ brittle. Here is a sampling of these use cases:
         non-platform capabilities leak into `session_manager.cml`.
     -   `chromium`: Chromium cml files contain a lot of duplication and would be
         greatly simplified if capabilities could be grouped and routed under a
-        single name. [fxbug.dev/121320](https://fxbug.dev/121320))
+        single name. [https://fxbug.dev/121320](https://fxbug.dev/121320))
 -   Component Framework [environments][docs-component-environments] are a
     feature whereby [runners][docs-component-runners] and
     [resolvers][docs-component-resolvers] can be configured to be made available

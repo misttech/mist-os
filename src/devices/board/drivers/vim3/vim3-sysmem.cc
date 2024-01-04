@@ -34,7 +34,7 @@ static const sysmem_metadata_t sysmem_metadata = {
     // * "A311D Quick Reference Manual" revision 01, pages 2-3
     // * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
     //
-    // TODO(fxbug.dev/121456): Reserving this much memory seems wasteful. The
+    // TODO(https://fxbug.dev/121456): Reserving this much memory seems wasteful. The
     // quantity below is 10% of RAM on a VIM3 Basic and 5% of RAM on a VIM3 Pro.
     .contiguous_memory_size = int64_t{200} * 1024 * 1024,
 };

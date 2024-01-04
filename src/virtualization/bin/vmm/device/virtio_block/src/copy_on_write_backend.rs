@@ -171,7 +171,7 @@ impl BlockBackend for CopyOnWriteBackend {
         // Since we currently track changes in 512 byte chunks, we will never write a partial
         // sector.
         //
-        // TODO(fxbug.dev/99759): as an improvement we can allow for flexibility in the size of
+        // TODO(https://fxbug.dev/99759): as an improvement we can allow for flexibility in the size of
         // blocks tracked in the dirty bitmap. In that situation we would have to support reading
         // some (512-byte) sectors from the backing backend that are not explicitly in the input
         // request.

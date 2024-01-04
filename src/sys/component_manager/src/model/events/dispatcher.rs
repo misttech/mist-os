@@ -70,7 +70,7 @@ impl EventDispatcher {
         tx: mpsc::UnboundedSender<(Event, Option<Vec<ComponentEventRoute>>)>,
         route: Vec<ComponentEventRoute>,
     ) -> Self {
-        // TODO(fxbug.dev/48360): flatten scope_monikers. There might be monikers that are
+        // TODO(https://fxbug.dev/48360): flatten scope_monikers. There might be monikers that are
         // contained within another moniker in the list.
         Self { subscriber, scopes, tx: Mutex::new(tx), route }
     }
@@ -148,7 +148,7 @@ impl EventDispatcher {
     }
 
     fn find_scope(&self, event: &ComponentEvent) -> Option<&EventDispatcherScope> {
-        // TODO(fxbug.dev/48360): once flattening of monikers is done, we would expect to have a single
+        // TODO(https://fxbug.dev/48360): once flattening of monikers is done, we would expect to have a single
         // moniker here. For now taking the first one and ignoring the rest.
         // Ensure that the event is coming from a realm within the scope of this dispatcher and
         // matching the path filter if one exists.

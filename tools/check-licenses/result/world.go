@@ -16,7 +16,7 @@ import (
 // World is used to store all of the current run's information in a single object
 // that can be processed by go templates.
 //
-// TODO(fxbug.dev/126804): consider moving this into a separate build step.
+// TODO(https://fxbug.dev/126804): consider moving this into a separate build step.
 type world struct {
 	// file
 	AllFiles map[string]*file.File

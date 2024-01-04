@@ -20,7 +20,7 @@
 
 // While most of the code in this file is only available at HEAD, a subset is
 // available for a specific use case when
-// __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__ is defined. See fxbug.dev/42085119.
+// __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__ is defined. See https://fxbug.dev/42085119.
 #if (__Fuchsia_API_level__ < FUCHSIA_HEAD) && !defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
 #error Should only be included for API level HEAD where fuchsia.images2 and fuchsia.sysmem2 are supported.
 #endif

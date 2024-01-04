@@ -435,7 +435,7 @@ class Action(object):
             allowed_reads=_abspaths(
                 os.path.realpath(path) for path in allowed_reads
             ),
-            # TODO(fxbug.dev/69049): Should we follow links of outputs as well?
+            # TODO(https://fxbug.dev/69049): Should we follow links of outputs as well?
             # What's our stance on writing to soft links?
             allowed_writes=_abspaths(allowed_writes),
             required_writes=_abspaths(required_writes),
@@ -1002,7 +1002,7 @@ def main():
     ignored_path_parts = {
         # Python creates these directories with bytecode caches
         "__pycache__",
-        # fxbug.dev/68397: some actions are known to generate implicit outputs in
+        # https://fxbug.dev/68397: some actions are known to generate implicit outputs in
         # these directories that are unknown before the metadata collection phase.
         # It was decided to tolerate this behavior.
         "__untraced_shebangs__",

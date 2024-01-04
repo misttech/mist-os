@@ -581,7 +581,7 @@ impl ComponentModelForAnalyzer {
                 true
             }
             OfferTarget::Capability(_) => {
-                // TODO(fxbug.dev/301674053): Support dictionary routing.
+                // TODO(https://fxbug.dev/301674053): Support dictionary routing.
                 false
             }
         };
@@ -642,7 +642,7 @@ impl ComponentModelForAnalyzer {
                 (capability, route_request)
             }
             OfferDecl::Dictionary(_offer_decl) => {
-                // TODO(fxbug.dev/301674053): Support this.
+                // TODO(https://fxbug.dev/301674053): Support this.
                 return vec![];
             }
         };
@@ -1122,7 +1122,7 @@ impl ComponentModelForAnalyzer {
     // Routes a capability from a `ComponentInstanceForAnalyzer` and panics if the future returned by
     // `route_capability` is not ready immediately.
     //
-    // TODO(fxbug.dev/87204): Remove this function and use `route_capability` directly when Scrutiny's
+    // TODO(https://fxbug.dev/87204): Remove this function and use `route_capability` directly when Scrutiny's
     // `DataController`s allow async function calls.
     pub fn route_capability_sync(
         request: RouteRequest,
@@ -1149,7 +1149,7 @@ impl ComponentModelForAnalyzer {
     // Routes a storage capability and its backing directory from a `ComponentInstanceForAnalyzer` and
     // panics if the future returned by `route_storage_and_backing_directory` is not ready immediately.
     //
-    // TODO(fxbug.dev/87204): Remove this function and use `route_capability` directly when Scrutiny's
+    // TODO(https://fxbug.dev/87204): Remove this function and use `route_capability` directly when Scrutiny's
     // `DataController`s allow async function calls.
     fn route_storage_and_backing_directory_sync(
         use_decl: UseStorageDecl,

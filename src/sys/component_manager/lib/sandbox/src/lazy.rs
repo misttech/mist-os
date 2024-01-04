@@ -59,7 +59,7 @@ impl Capability for Lazy {}
 
 impl From<Lazy> for fsandbox::Capability {
     fn from(_lazy: Lazy) -> Self {
-        todo!("fxbug.dev/314848350: Implement the conversion from sandbox::Lazy to FIDL")
+        todo!("https://fxbug.dev/314848350: Implement the conversion from sandbox::Lazy to FIDL")
     }
 }
 

@@ -23,7 +23,7 @@ From here, you can compile and run the test as usual.
 (with some modifications), consider fixing the instructions and removing the
 disclaimer.
 
-TODO(fxbug.dev/109739): Automate the Chromium remote devtools setup.
+TODO(https://fxbug.dev/109739): Automate the Chromium remote devtools setup.
 
 A big drawback of Fuchsia's hermetic integration tests, at the time of this
 writing, is that all graphical output is sent to a fake hermetic display.

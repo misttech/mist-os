@@ -50,7 +50,7 @@ func (rule *respectColLength) OnDocStart(_ *core.Doc) {
 }
 
 func (rule *respectColLength) OnNext(tok core.Token) {
-	// TODO(fxbug.dev/76574): Remove this temporary heuristic.
+	// TODO(https://fxbug.dev/76574): Remove this temporary heuristic.
 	switch rule.linkDefState {
 	case linkDefNone:
 		if tok.Col == 1 && tok.Kind == core.Link {
@@ -82,7 +82,7 @@ func (rule *respectColLength) OnNext(tok core.Token) {
 		}
 	case core.Header:
 		rule.isHeaderLine = true
-	// TODO(fxbug.dev/76574): Remove this temporary heuristic.
+	// TODO(https://fxbug.dev/76574): Remove this temporary heuristic.
 	case core.URL:
 		// Do nothing.
 	default:

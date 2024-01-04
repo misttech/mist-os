@@ -237,7 +237,7 @@ them when the receiver object goes out of scope. Here are some approaches:
 - One may use [`async_patterns::Receiver`][receiver] to let other objects make
   calls on their objects, without forcing an ownership relationship. The calls
   are silently canceled if the receiver is destroyed.
-<!-- TODO(fxbug.dev/119641): Document other async_patterns helpers when they
+<!-- TODO(https://fxbug.dev/119641): Document other async_patterns helpers when they
      land. -->
 - One may reference count the objects, and pass a weak pointer to the posted
   task. The posted task should do nothing if the pointer is expired.

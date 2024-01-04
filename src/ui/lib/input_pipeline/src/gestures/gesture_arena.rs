@@ -574,7 +574,7 @@ impl std::convert::From<MouseEvent> for input_device::InputEvent {
                     wheel_h_range: None,
                     buttons: Some(vec![PRIMARY_BUTTON, SECONDARY_BUTTON]),
                     // Downstream stages ignore `counts_per_mm`, so any value is fine.
-                    // TODO(fxbug.dev/121127): remove `counts_per_mm` from descriptor.
+                    // TODO(https://fxbug.dev/121127): remove `counts_per_mm` from descriptor.
                     counts_per_mm: COUNTS_PER_MM,
                 },
             ),

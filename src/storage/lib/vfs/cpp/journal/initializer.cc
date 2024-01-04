@@ -18,7 +18,7 @@ void InitJournalBlock(cpp20::span<uint8_t> block) {
   JournalInfo* info = reinterpret_cast<JournalInfo*>(block.data());
   info->magic = kJournalMagic;
 
-  // TODO(fxbug.dev/42698): This checksum should be on entire block and not just JournalInfo.
+  // TODO(https://fxbug.dev/42698): This checksum should be on entire block and not just JournalInfo.
   info->checksum = crc32(0, block.data(), sizeof(fs::JournalInfo));
 }
 

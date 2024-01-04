@@ -48,7 +48,7 @@ bool use_new_serial = false;
 bool is_tx_irq_enabled = false;
 bool is_serial_enabled = false;
 
-// TODO(fxbug.dev/122470): Switch to lockdep::NullGuard once fbl::NullLock
+// TODO(https://fxbug.dev/122470): Switch to lockdep::NullGuard once fbl::NullLock
 // and NullGuard are both annotated, and the existing use cases are
 // TA compliant.
 class TA_SCOPED_CAP NullGuard {

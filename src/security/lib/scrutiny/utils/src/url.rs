@@ -10,7 +10,7 @@ use {
     tracing::warn,
 };
 
-// TODO(fxbug.dev/101234): Eliminate this API by requiring clients to declare a repository.
+// TODO(https://fxbug.dev/101234): Eliminate this API by requiring clients to declare a repository.
 pub fn from_package_name<D: Display>(name: D) -> Result<AbsolutePackageUrl> {
     warn!(package_name = %name, "Assuming package is served from fuchsia-pkg://fuchsia.com");
     let url_string = format!("fuchsia-pkg://fuchsia.com/{}", name);
@@ -25,7 +25,7 @@ pub fn from_package_name<D: Display>(name: D) -> Result<AbsolutePackageUrl> {
     Ok(url)
 }
 
-// TODO(fxbug.dev/101234): Eliminate this API by requiring clients to declare a repository.
+// TODO(https://fxbug.dev/101234): Eliminate this API by requiring clients to declare a repository.
 pub fn from_package_name_variant_path<D1: Display>(
     name_variant_path: D1,
 ) -> Result<AbsolutePackageUrl> {
@@ -47,7 +47,7 @@ pub fn from_package_name_variant_path<D1: Display>(
     Ok(url)
 }
 
-// TODO(fxbug.dev/101234): Eliminate this API by requiring clients to declare a repository.
+// TODO(https://fxbug.dev/101234): Eliminate this API by requiring clients to declare a repository.
 pub fn from_package_name_and_hash<D1: Display, D2: Display>(
     name: D1,
     hash: D2,

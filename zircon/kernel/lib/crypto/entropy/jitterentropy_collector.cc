@@ -19,7 +19,7 @@
 
 namespace {
 // TODO(andrewkrieger): after optimizing jitterentropy parameters
-// (see fxbug.dev/30967), replace JITTERENTROPY_MEM_SIZE by the optimal
+// (see https://fxbug.dev/30967), replace JITTERENTROPY_MEM_SIZE by the optimal
 // size.
 uint8_t g_collector_storage[JITTERENTROPY_MEM_SIZE];
 lazy_init::LazyInit<crypto::entropy::JitterentropyCollector, lazy_init::CheckType::None,
@@ -69,7 +69,7 @@ zx_status_t JitterentropyCollector::GetInstance(Collector** ptr) {
   }
 }
 
-// TODO(fxbug.dev/30968): Test jitterentropy in different environments (especially on
+// TODO(https://fxbug.dev/30968): Test jitterentropy in different environments (especially on
 // different platforms/architectures, and in multi-threaded mode). Ensure
 // entropy estimate is safe enough.
 
@@ -80,7 +80,7 @@ zx_status_t JitterentropyCollector::GetInstance(Collector** ptr) {
 // bytes of random data.
 JitterentropyCollector::JitterentropyCollector(uint8_t* mem, size_t len)
     : Collector("jitterentropy", /* entropy_per_1000_bytes */ 50) {
-  // TODO(fxbug.dev/30967): optimize default jitterentropy parameters and
+  // TODO(https://fxbug.dev/30967): optimize default jitterentropy parameters and
   // update them in //zircon/kernel/lib/boot-options/include/lib/boot-options/options.inc.
   const uint32_t bs = gBootOptions->jitterentropy_bs;
   const uint32_t bc = gBootOptions->jitterentropy_bc;
@@ -92,7 +92,7 @@ JitterentropyCollector::JitterentropyCollector(uint8_t* mem, size_t len)
 }
 
 size_t JitterentropyCollector::DrawEntropy(uint8_t* buf, size_t len) {
-  // TODO(fxbug.dev/30968): Test jitterentropy in multi-CPU environment. Disable
+  // TODO(https://fxbug.dev/30968): Test jitterentropy in multi-CPU environment. Disable
   // interrupts, or otherwise ensure that jitterentropy still performs well in
   // multi-threaded systems.
   Guard<Mutex> guard(&lock_);

@@ -25,7 +25,7 @@ namespace {
 // pass may take longer than 1.5 msec on a DEBUG build(!) on relevant hardware. The constant below
 // accounts for this, with additional padding for safety.
 //
-// TODO(fxbug.dev/91258): increase this, to account for worst-case cross-clock rate mismatches and
+// TODO(https://fxbug.dev/91258): increase this, to account for worst-case cross-clock rate mismatches and
 // mixes that may take longer than 1.5 msec.
 const zx::duration kPresentationDelayPadding = zx::msec(3);
 
@@ -474,7 +474,7 @@ void BaseCapturer::ReportStop() { reporter_->StopSession(zx::clock::get_monotoni
 // padding is greater than our 0.2% of uncertainty, for any capture presentation delays less than
 // 750 ms. That said, kPresentationDelayPadding assumes that the longest capture mix is 1.5 ms -- an
 // assumption that should be verified/updated.
-// TODO(fxbug.dev/91258): pad this further if needed, based on worst-case capture mix measurements.
+// TODO(https://fxbug.dev/91258): pad this further if needed, based on worst-case capture mix measurements.
 // Or reconsider continuously recalculating this delay.
 void BaseCapturer::RecomputePresentationDelay() {
   TRACE_DURATION("audio", "BaseCapturer::RecomputePresentationDelay");
@@ -842,7 +842,7 @@ void BaseCapturer::UpdateFormat(Format format) {
 
   // Allocate our MixStage for mixing.
   //
-  // TODO(fxbug.dev/39886): Limit this to something smaller than one second of frames.
+  // TODO(https://fxbug.dev/39886): Limit this to something smaller than one second of frames.
   uint32_t max_mix_frames = format_->frames_per_second();
   mix_stage_ = std::make_shared<MixStage>(mix_stage_format, max_mix_frames,
                                           ref_pts_to_fractional_frame_, reference_clock());

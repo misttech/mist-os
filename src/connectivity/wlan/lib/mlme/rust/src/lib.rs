@@ -23,7 +23,7 @@ pub mod error;
 pub mod key;
 mod logger;
 mod minstrel;
-#[allow(unused)] // TODO(fxbug.dev/79543): Remove annotation once used.
+#[allow(unused)] // TODO(https://fxbug.dev/79543): Remove annotation once used.
 mod probe_sequence;
 
 use {
@@ -43,7 +43,7 @@ use {
 };
 pub use {ddk_converter::*, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
 
-// TODO(fxbug.dev/135356): This trait is migratory and reads both newer and deprecated fields that
+// TODO(https://fxbug.dev/135356): This trait is migratory and reads both newer and deprecated fields that
 //                         encode the same information (and prioritizes the newer fields). Remove
 //                         this trait and directly access fields once the deprecated fields for
 //                         basic rates and operating channels are removed from the SoftMAC FIDL
@@ -96,7 +96,7 @@ impl WlanTxPacketExt for fidl_softmac::WlanTxPacket {
     fn template(mac_frame: Vec<u8>) -> Self {
         fidl_softmac::WlanTxPacket {
             mac_frame,
-            // TODO(fxbug.dev/105579): At time of writing, this field is ignored by the `iwlwifi`
+            // TODO(https://fxbug.dev/105579): At time of writing, this field is ignored by the `iwlwifi`
             //                         vendor driver (the only one other than the tap driver used
             //                         for testing). The data used here is meaningless.
             info: fidl_softmac::WlanTxInfo {
@@ -154,11 +154,11 @@ type MinstrelWrapper = Arc<Mutex<minstrel::MinstrelRateSelector<MinstrelTimer>>>
 // vendor driver as the context for wlan_softmac_ifc_protocol_ops.
 pub struct DriverEventSink(pub mpsc::UnboundedSender<DriverEvent>);
 
-// TODO(fxbug.dev/29063): Remove copies from MacFrame and EthFrame.
+// TODO(https://fxbug.dev/29063): Remove copies from MacFrame and EthFrame.
 pub enum DriverEvent {
     // Indicates that the device is being removed and our main loop should exit.
     Stop(StopStaCompleter),
-    // TODO(fxbug.dev/43456): We need to keep stats for these events and respond to StatsQueryRequest.
+    // TODO(https://fxbug.dev/43456): We need to keep stats for these events and respond to StatsQueryRequest.
     // Indicates receipt of a MAC frame from a peer.
     MacFrameRx { bytes: Vec<u8>, rx_info: banjo_wlan_softmac::WlanRxInfo },
     // Requests transmission of an ethernet frame over the air.
@@ -174,7 +174,7 @@ fn should_enable_minstrel(mac_sublayer: &fidl_common::MacSublayerSupport) -> boo
 }
 
 const MINSTREL_UPDATE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
-// Remedy for fxbug.dev/8165 (fxbug.dev/33151)
+// Remedy for https://fxbug.dev/8165 (https://fxbug.dev/33151)
 // See |DATA_FRAME_INTERVAL_NANOS|
 // in //src/connectivity/wlan/testing/hw-sim/test/rate_selection/src/lib.rs
 // Ensure at least one probe frame (generated every 16 data frames)
@@ -272,7 +272,7 @@ async fn main_loop_impl<T: MlmeImpl>(
                     }
                     DriverEvent::EthFrameTx { bytes } => {
                         if let Err(e) = mlme_impl.handle_eth_frame_tx(&bytes[..]) {
-                            // TODO(fxbug.dev/45464): Keep a counter of these failures.
+                            // TODO(https://fxbug.dev/45464): Keep a counter of these failures.
                             info!("Failed to handle eth frame: {}", e);
                         }
                     }

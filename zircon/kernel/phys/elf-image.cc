@@ -159,7 +159,7 @@ Allocation ElfImage::Load(ktl::optional<uint64_t> relocation_address, bool in_pl
   });
 
   if (in_place_ok && CanLoadInPlace() && extra_vaddr_size == 0) {
-    // TODO(fxbug.dev/113938): Could have a memalloc::Pool feature to
+    // TODO(https://fxbug.dev/113938): Could have a memalloc::Pool feature to
     // reclassify the memory range to the new type.
 
     // The full vaddr_size() fits in the pages the BOOTFS file occupies.  If

@@ -50,7 +50,7 @@ pub struct Channel {
 }
 
 /// SubCommands for `channel`.
-// TODO(fxbug.dev/60016): Make get/set symmetrical.
+// TODO(https://fxbug.dev/60016): Make get/set symmetrical.
 pub mod channel {
     use argh::{ArgsInfo, FromArgs};
 

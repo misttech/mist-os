@@ -43,7 +43,7 @@ template("project_json") {
 
     # This command runs "fx gn gen", which potentially touches thousands of files
     # across the repo. It cannot be hermetic.
-    # TODO(fxbug.dev/84924): Improve the way notice files are generated.
+    # TODO(https://fxbug.dev/84924): Improve the way notice files are generated.
     hermetic_deps = false
 
     outputs = [

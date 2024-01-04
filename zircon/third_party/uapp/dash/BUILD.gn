@@ -80,7 +80,7 @@ executable("dash") {
     defines = [ "ENABLE_SUSPEND" ]
   }
 
-  # TODO(fxbug.dev/97323): Remove this after fixing the leak.
+  # TODO(https://fxbug.dev/97323): Remove this after fixing the leak.
   deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
 
   # TODO(https://fxbug.dev/84060): Resolve this UB and remove.

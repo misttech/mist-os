@@ -20,7 +20,7 @@ fidl("fidl.service.test") {
   visibility = [
     ":*",
 
-    # TODO(fxbug.dev/113114): Migrate all the remaining libs in //sdk/lib/sys/component/cpp
+    # TODO(https://fxbug.dev/113114): Migrate all the remaining libs in //sdk/lib/sys/component/cpp
     # and its tests to //sdk/lib/component and remove this visibility target.
     "//sdk/lib/sys/component/cpp/tests:*",
   ]

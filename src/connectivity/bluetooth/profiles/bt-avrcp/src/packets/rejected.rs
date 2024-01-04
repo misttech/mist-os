@@ -10,7 +10,7 @@ use crate::packets::{Error, PacketResult, StatusCode, VendorDependentRawPdu};
 /// For rejection packets. This packets operates differently from most vendor dependant packets in
 /// that there is only a encoder and that the PDU ID can be set to match the PDU ID of the command
 /// we rejecting.
-/// TODO(fxbug.dev/2743): Add support for VendorResponse trait for RejectResponse.
+/// TODO(https://fxbug.dev/2743): Add support for VendorResponse trait for RejectResponse.
 /// AVRCP 1.6.1 section 6.15 Error handling
 pub struct RejectResponse {
     pub pdu_id: u8,

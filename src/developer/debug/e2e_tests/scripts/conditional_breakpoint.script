@@ -1,4 +1,4 @@
-# TODO(fxbug.dev/117067): fix the flake and reenable the test on arm64 targets.
+# TODO(https://fxbug.dev/117067): fix the flake and reenable the test on arm64 targets.
 ## require target_cpu=x64
 
 [zxdb] break loop.cc:9 if i > 2

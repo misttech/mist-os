@@ -340,7 +340,7 @@ where
                 // the dynamic index in pkgfs and allow subsequent OTAs to continue after a garbage
                 // collection.
                 //
-                // TODO(fxbug.dev/65571): remove previous_out_of_space_failure and this
+                // TODO(https://fxbug.dev/65571): remove previous_out_of_space_failure and this
                 // rebooting behavior when pkg-cache can clear previous OTA packages on its own
 
                 let (state_machine_state, previous_out_of_space_failure) = {
@@ -539,7 +539,7 @@ where
                 }
                 warn!("setting device to default channel: '{}' with app id: '{:?}'", name, appid);
             }
-            // TODO(fxbug.dev/58887): only OTA that follows can change the current channel.
+            // TODO(https://fxbug.dev/58887): only OTA that follows can change the current channel.
             // Simplify this logic.
             app_set.lock().await.set_system_target_channel(channel_name, appid);
         } else {

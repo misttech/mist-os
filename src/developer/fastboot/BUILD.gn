@@ -11,7 +11,7 @@ if (is_host) {
     name = "fastboot"
     edition = "2021"
 
-    # TODO(fxbug.dev/78438): this library contains unit tests, but they don't build
+    # TODO(https://fxbug.dev/78438): this library contains unit tests, but they don't build
     with_unit_tests = true
 
     deps = [

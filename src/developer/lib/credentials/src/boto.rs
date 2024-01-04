@@ -22,7 +22,7 @@ use {
 /// let boto_path = Path::new(&home_dir().expect("home dir")).join(".boto");
 /// ```
 ///
-/// TODO(fxbug.dev/82014): Using an ffx specific token will be preferred once
+/// TODO(https://fxbug.dev/82014): Using an ffx specific token will be preferred once
 /// that feature is created. For the near term, an existing gsutil token is
 /// workable.
 ///
@@ -56,7 +56,7 @@ mod test {
 
     /// Overwrite the 'gs_oauth2_refresh_token' in the file at `boto_path`.
     ///
-    /// TODO(fxbug.dev/82014): Using an ffx specific token will be preferred once
+    /// TODO(https://fxbug.dev/82014): Using an ffx specific token will be preferred once
     /// that feature is created. For the near term, an existing gsutil token is
     /// workable.
     ///

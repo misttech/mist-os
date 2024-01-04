@@ -32,12 +32,12 @@ use {
 async fn run_policy_and_assert_transparent_reconnect(
     test_realm_proxy: Arc<RealmProxyClient>,
     ssid: &'static Ssid,
-    // TODO(fxbug.dev/130230): Unify security protocol types and respect this parameter.
+    // TODO(https://fxbug.dev/130230): Unify security protocol types and respect this parameter.
     _protection: &Protection,
     password: Option<&str>,
     receiver: oneshot::Receiver<()>,
 ) {
-    // TODO(fxbug.dev/130230): Respect the parameter of the same name.
+    // TODO(https://fxbug.dev/130230): Respect the parameter of the same name.
     let protection = fidl_policy::SecurityType::Wpa2;
     // Connect to the client policy service and get a client controller.
     let (_client_controller, mut client_state_updates) = save_network_and_wait_until_connected(
@@ -85,7 +85,7 @@ fn scan_and_reassociate<'h>(
             move |control: &mut AuthenticationControl, _| {
                 use wlan_rsn::rsna::{SecAssocStatus::EssSaEstablished, SecAssocUpdate::Status};
 
-                // TODO(fxbug.dev/69580): Use `Vec::drain_filter` instead when the API is
+                // TODO(https://fxbug.dev/69580): Use `Vec::drain_filter` instead when the API is
                 //                        stabilized.
                 let mut index = 0;
                 while index < control.updates.len() {

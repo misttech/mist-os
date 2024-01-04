@@ -165,7 +165,7 @@ pub fn score_current_connection_signal_data(data: SignalData) -> u8 {
 /// network and to ultimately decide whether to switch to a new network or stay on the same one.
 /// score should be between 0 and 1, where 0 is an unusable connection and 1 is a great connection.
 pub fn score_connection_quality(_quality_data: &BssQualityData) -> f32 {
-    // TODO(fxbug.dev/84551) Actually implement the connection quality scoring and the threshold
+    // TODO(https://fxbug.dev/84551) Actually implement the connection quality scoring and the threshold
     // for a bad connection
     return 1.0;
 }

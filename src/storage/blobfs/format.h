@@ -123,7 +123,7 @@ constexpr uint64_t kFVMDataStart     = 0x40000;
 // - Blobfs Superblock
 // - Inode Table Blocks
 // - Block Bitmap Blocks
-// TODO(fxbug.dev/32911): Calculate the actual upper bound here; this number is not
+// TODO(https://fxbug.dev/32911): Calculate the actual upper bound here; this number is not
 // necessarily considering the worst cases of fragmentation.
 constexpr uint64_t kMaxEntryDataBlocks = 64;
 

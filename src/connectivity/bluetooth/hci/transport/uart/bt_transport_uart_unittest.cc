@@ -161,7 +161,7 @@ class BtTransportUartTest : public ::gtest::TestLoopFixture {
     ASSERT_TRUE(dut());
     EXPECT_TRUE(fake_serial_device_.enabled());
 
-    // TODO(fxb/91487): Due to Mock DDK limitations, we need to add the BT_HCI protocol to the
+    // TODO(https://fxbug.dev/91487): Due to Mock DDK limitations, we need to add the BT_HCI protocol to the
     // BtTransportUart MockDevice so that BtHciProtocolClient (and device_get_protocol) work.
     bt_hci_protocol_t proto;
     dut()->GetDeviceContext<bt_transport_uart::BtTransportUart>()->DdkGetProtocol(

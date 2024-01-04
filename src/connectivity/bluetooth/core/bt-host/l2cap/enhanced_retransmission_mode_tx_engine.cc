@@ -68,7 +68,7 @@ Engine::EnhancedRetransmissionModeTxEngine(ChannelId channel_id, uint16_t max_tx
 
 bool Engine::QueueSdu(ByteBufferPtr sdu) {
   BT_ASSERT(sdu);
-  // TODO(fxbug.dev/1033): Add support for segmentation
+  // TODO(https://fxbug.dev/1033): Add support for segmentation
   if (sdu->size() > max_tx_sdu_size_) {
     bt_log(INFO, "l2cap", "SDU size exceeds channel TxMTU (channel-id: %#.4x)", channel_id_);
     return false;
@@ -81,7 +81,7 @@ bool Engine::QueueSdu(ByteBufferPtr sdu) {
   frame.WriteObj(header);
   sdu->Copy(&body);
 
-  // TODO(fxbug.dev/1366): Limit the size of the queue.
+  // TODO(https://fxbug.dev/1366): Limit the size of the queue.
   pending_pdus_.push_back(std::move(frame));
   MaybeSendQueuedData();
   return true;
@@ -179,7 +179,7 @@ void Engine::ClearRemoteBusy() {
 }
 
 void Engine::SetRemoteBusy() {
-  // TODO(fxbug.dev/1367): Signal backpressure to the Channel.
+  // TODO(https://fxbug.dev/1367): Signal backpressure to the Channel.
   remote_is_busy_ = true;
   receiver_ready_poll_task_.Cancel();
 }
@@ -378,7 +378,7 @@ bool Engine::RetransmitUnackedData(std::optional<uint8_t> only_with_seq,
       set_is_poll_response = false;
     }
 
-    // TODO(fxbug.dev/1453): If the task is already running, we should not restart it.
+    // TODO(https://fxbug.dev/1453): If the task is already running, we should not restart it.
     SendPdu(&*cur_frame);
     *cur_frame->buf.AsMutable<EnhancedControlField>() = control_field;
   }

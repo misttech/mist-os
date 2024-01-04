@@ -125,7 +125,7 @@ class Vim3 : public Vim3Type {
     return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(init_arena_, ds_ua);
   }
 
-  // TODO(fxbug.dev/108070): migrate to fdf::SyncClient when it is available.
+  // TODO(https://fxbug.dev/108070): migrate to fdf::SyncClient when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
 
   std::optional<bool> has_lcd_;

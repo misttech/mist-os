@@ -703,7 +703,7 @@ int MsdIntelDevice::DeviceThreadLoop() {
       default:
         MAGMA_LOG(WARNING, "device_request_semaphore_ Wait failed: %d", status.get());
         DASSERT(false);
-        // TODO(fxbug.dev/13287): should we trigger a restart of the driver?
+        // TODO(https://fxbug.dev/13287): should we trigger a restart of the driver?
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 
@@ -877,17 +877,17 @@ bool MsdIntelDevice::InitContextForEngine(MsdIntelContext* context,
   if (!context->Map(gtt(), command_streamer->id()))
     return DRETF(false, "failed to map context");
 
-  // TODO(fxbug.dev/80906): any workarounds or cache config for VCS?
+  // TODO(https://fxbug.dev/80906): any workarounds or cache config for VCS?
   if (command_streamer->id() == RENDER_COMMAND_STREAMER) {
     if (DeviceId::is_gen9(device_id_)) {
-      // TODO(fxbug.dev/109211) - workarounds for gen12
+      // TODO(https://fxbug.dev/109211) - workarounds for gen12
       if (!command_streamer->InitContextWorkarounds(context))
         return DRETF(false, "failed to init workarounds");
 
       if (!command_streamer->InitContextCacheConfig(context))
         return DRETF(false, "failed to init cache config");
 
-      // TODO(fxbug.dev/109213) - indirect context for gen12
+      // TODO(https://fxbug.dev/109213) - indirect context for gen12
       command_streamer->InitIndirectContext(context, indirect_context_batch_);
     }
   }

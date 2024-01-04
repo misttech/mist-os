@@ -52,7 +52,7 @@ group("core") {
     deps += [
       "//src:e2e_tests",
 
-      # TODO(http://fxbug.dev/114960) Re-instate these tests when they correctly
+      # TODO(https://fxbug.dev/114960) Re-instate these tests when they correctly
       # select the environments that they can run on.
       #
       # "//tools:e2e_tests",

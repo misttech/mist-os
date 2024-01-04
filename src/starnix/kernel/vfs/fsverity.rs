@@ -46,7 +46,7 @@ fn fsverity_descriptor_from_enable_arg(
         return error!(EINVAL);
     }
     if src.sig_size > 0 {
-        // TODO(fxbug.dev/302620572) Under linux, signatures are supported up to 16128 bytes.
+        // TODO(https://fxbug.dev/302620572) Under linux, signatures are supported up to 16128 bytes.
         // We don't support these currently.
         not_implemented!("fsverity_enable signature");
         return error!(ENOTSUP);

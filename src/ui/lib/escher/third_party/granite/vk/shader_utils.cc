@@ -98,7 +98,7 @@ void GenerateShaderModuleResourceLayoutFromSpirv(std::vector<uint32_t> spirv, Sh
     layout->sets[set].stages |= stage_flags;
   }
 
-  // TODO(fxbug.dev/7321): determine what is required to support other pipeline stages,
+  // TODO(https://fxbug.dev/7321): determine what is required to support other pipeline stages,
   // such as tessellation and geometry shaders.
   if (stage == ShaderStage::kVertex) {
     for (auto& attrib : resources.stage_inputs) {

@@ -94,7 +94,7 @@ func NewDeviceFinderResolver(ctx context.Context, deviceFinder *DeviceFinder, no
 
 	var oldNodeName string
 
-	// FIXME(http://fxbug.dev/71146) we can switch back to the resolver
+	// FIXME(https://fxbug.dev/71146) we can switch back to the resolver
 	// resolving a single name after we no longer support testing builds
 	// older than 2021-02-22.
 	if name, err := translateToOldNodeName(nodeName); err == nil {
@@ -171,7 +171,7 @@ func NewFfxResolver(ctx context.Context, ffx *ffx.FFXTool, nodeName string) (*Ff
 
 	var oldNodeName string
 
-	// FIXME(http://fxbug.dev/71146) we can switch back to the resolver
+	// FIXME(https://fxbug.dev/71146) we can switch back to the resolver
 	// resolving a single name after we no longer support testing builds
 	// older than 2021-02-22.
 	if name, err := translateToOldNodeName(nodeName); err == nil {

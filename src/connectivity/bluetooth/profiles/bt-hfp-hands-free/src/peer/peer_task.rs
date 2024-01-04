@@ -67,19 +67,19 @@ impl PeerTask {
                     self.handle_procedure_output(procedure_output);
                 }
             }
-            // TODO(fxb/127025) Select on FIDL messages and unsolicited messages.
+            // TODO(https://fxbug.dev/127025) Select on FIDL messages and unsolicited messages.
         }
         Ok(())
     }
 
     fn handle_at_response(&mut self, at_response: at::Response) {
-        // TODO(fxb/127362) Handle unsolicited responses separately.
+        // TODO(https://fxbug.dev/127362) Handle unsolicited responses separately.
 
         let procedure_input = ProcedureInput::AtResponseFromAg(at_response);
         self.procedure_manager.enqueue(procedure_input);
     }
 
-    // TODO(fxb/127025) Handle procedure outputs.
+    // TODO(https://fxbug.dev/127025) Handle procedure outputs.
     fn handle_procedure_output(&self, _procedure_output: ProcedureOutput) {
         unimplemented!("handle_procedure_output");
     }

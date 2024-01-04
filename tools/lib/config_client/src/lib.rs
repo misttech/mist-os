@@ -12,11 +12,11 @@ pub mod rust;
 use syn::Error as SynError;
 use thiserror::Error;
 
-// TODO(http://fxbug.dev/91666): This list should be kept in sync with fidlgen_rust.
+// TODO(https://fxbug.dev/91666): This list should be kept in sync with fidlgen_rust.
 const RESERVED_SUFFIXES: [&str; 7] =
     ["Impl", "Marker", "Proxy", "ProxyProtocol", "ControlHandle", "Responder", "Server"];
 
-// TODO(http://fxbug.dev/91666): This list should be kept in sync with fidlgen_rust.
+// TODO(https://fxbug.dev/91666): This list should be kept in sync with fidlgen_rust.
 const RESERVED_WORDS: [&str; 73] = [
     "as",
     "box",
@@ -96,7 +96,7 @@ const RESERVED_WORDS: [&str; 73] = [
     "async",
     "on_open",
     "OnOpen",
-    // TODO(fxbug.dev/66767): Remove "WaitForEvent".
+    // TODO(https://fxbug.dev/66767): Remove "WaitForEvent".
     "wait_for_event",
     "WaitForEvent",
 ];
@@ -108,7 +108,7 @@ pub enum SourceGenError {
     InvalidIdentifier { input: String, source: SynError },
 }
 
-// TODO(http://fxbug.dev/91666): This logic should be kept in sync with fidlgen_rust.
+// TODO(https://fxbug.dev/91666): This logic should be kept in sync with fidlgen_rust.
 fn normalize_field_key(key: &str) -> String {
     let mut identifier = String::new();
     let mut saw_lowercase_or_digit = false;

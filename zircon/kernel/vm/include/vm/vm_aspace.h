@@ -281,7 +281,7 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
 
   // Returns whether this aspace is a guest physical address space.
-  // TODO(fxbug.dev/103417): Rationalize usage of `is_user` and `is_guest_physical`.
+  // TODO(https://fxbug.dev/103417): Rationalize usage of `is_user` and `is_guest_physical`.
   bool is_guest_physical() const { return type_ == Type::GuestPhysical; }
 
   // Encodes the idea that we can always unmap from user aspaces.

@@ -241,7 +241,7 @@
                 "tee02",
                 "time-schedule01",
 
-                // fxbug.dev/127682
+                // https://fxbug.dev/127682
                 "times03",
                 "umip_basic_test",
                 "umount02",
@@ -266,10 +266,10 @@
         {
             type: "skip",
             matchers: [
-                // fxbug.dev/136331
+                // https://fxbug.dev/136331
                 "fgetxattr01",
 
-                // fxbug.dev/135993
+                // https://fxbug.dev/135993
                 "open04",
 
                 // Flaky test.

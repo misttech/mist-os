@@ -11,14 +11,14 @@ llvm_libc_group("string") {
     ":str",
   ]
 
-  # TODO(fxbug.dev/102687): not yet using the llvm-libc versions of these
+  # TODO(https://fxbug.dev/102687): not yet using the llvm-libc versions of these
   non_test_deps = [
     "//zircon/third_party/ulib/musl/src/string:strerror_r",
     "//zircon/third_party/ulib/musl/src/string:strsignal",
     "//zircon/third_party/ulib/musl/src/string:strverscmp",
   ]
 
-  # TODO(fxbug.dev/102687): but run their tests in preparation
+  # TODO(https://fxbug.dev/102687): but run their tests in preparation
   testonly_deps = [ ":strsignalerror" ]
 }
 
@@ -66,7 +66,7 @@ foreach(funcs,
 
     cflags = []
 
-    # TODO(fxbug.dev/129360): gcc is not correctly honoring -fno-builtin-memmove,
+    # TODO(https://fxbug.dev/129360): gcc is not correctly honoring -fno-builtin-memmove,
     # but -fno-builtin correctly suppresses the call to memmove.
     if (funcs[0] == "memcpy" && is_gcc) {
       cflags += [ "-fno-builtin" ]
@@ -75,7 +75,7 @@ foreach(funcs,
     foreach(func, funcs) {
       cflags += [ "-fno-builtin-$func" ]
 
-      # TODO(fxbug.dev/126752): The .weakref shenanigans in dynlink.c aren't
+      # TODO(https://fxbug.dev/126752): The .weakref shenanigans in dynlink.c aren't
       # compatible with full LTO and a memcpy defined in C++. This only affects
       # riscv64 in practice, since others use assembly definitions regardless.
       if ((func == "memcpy" || func == "memset") && !is_gcc &&
@@ -168,7 +168,7 @@ llvm_libc_source_set("str") {
     "strtok",
     "strtok_r",
 
-    # TODO(fxbug.dev/102687): the llvm-libc versions of these are problematic
+    # TODO(https://fxbug.dev/102687): the llvm-libc versions of these are problematic
     #"strerror",
     #"strerror_r",
     #"strsignal",

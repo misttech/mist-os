@@ -14,7 +14,7 @@ use profile_client::{ProfileClient, ProfileEvent};
 use tracing::{info, warn};
 
 /// An example data buffer to be sent to the remote peer.
-// TODO(fxbug.dev/133369): Replace this with a well-formatted OPP type.
+// TODO(https://fxbug.dev/133369): Replace this with a well-formatted OPP type.
 const EXAMPLE_DATA: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 async fn write_example_data(id: PeerId, mut client: ObexClient) -> Result<(), Error> {
@@ -60,7 +60,7 @@ async fn handle_profile_events(
                         continue;
                     }
                 };
-                // TODO(fxbug.dev/133369): Update this to do whatever OBEX operation is specified
+                // TODO(https://fxbug.dev/133369): Update this to do whatever OBEX operation is specified
                 // in the config.
                 match write_example_data(id, client).await {
                     Ok(_) => info!("Finished writing data"),

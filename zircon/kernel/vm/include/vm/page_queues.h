@@ -118,7 +118,7 @@ class PageQueues {
   // prevent it from being considered part of the reclaim set, which makes it neither active nor
   // inactive. The specified page must be in the page queues, but if not presently in a reclaim
   // queue this method will do nothing.
-  // TODO(fxbug.dev/60238): Determine whether/how pages are moved back into the reclaim pool and
+  // TODO(https://fxbug.dev/60238): Determine whether/how pages are moved back into the reclaim pool and
   // either further generalize this to support pager backed, or specialize FailedReclaim to be
   // explicitly only anonymous.
   void CompressFailed(vm_page_t* page);

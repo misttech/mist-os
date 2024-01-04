@@ -128,7 +128,7 @@ constexpr bool operator!=(const RamReservation& lhs, const RamReservation& rhs) 
 }
 
 // List of command lines argument names that are explicitly referenced in code.
-// TODO(fxb/74740): remove all usages of this.
+// TODO(https://fxbug.dev/74740): remove all usages of this.
 constexpr std::string_view kForceWatchdogDisabledName = "kernel.force-watchdog-disabled";
 constexpr std::string_view kPageScannerEnableEvictionName = "kernel.page-scanner.enable-eviction";
 constexpr std::string_view kPmmCheckerActionName = "kernel.pmm-checker.action";

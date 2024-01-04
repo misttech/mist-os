@@ -464,7 +464,7 @@ impl Client {
         //
         // If you wish to remove this heuristic or change the threshold, consider doing a trace on
         // packages with varying numbers of blobs present/missing.
-        // TODO(fxbug.dev/77717) re-evaluate filter_to_missing_blobs heuristic.
+        // TODO(https://fxbug.dev/77717) re-evaluate filter_to_missing_blobs heuristic.
         let all_known_storage;
         let all_known = if let Some(all_known) = all_known {
             Some(all_known)

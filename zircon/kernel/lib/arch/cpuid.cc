@@ -141,7 +141,7 @@ uint8_t CpuidVersionInfo::model() const {
   return static_cast<uint8_t>(base_model());
 }
 
-// TODO(fxbug.dev/60649): check in a source of truth for this information and
+// TODO(https://fxbug.dev/60649): check in a source of truth for this information and
 // refer to that here.
 Microarchitecture CpuidVersionInfo::microarchitecture(Vendor vendor) const {
   switch (vendor) {

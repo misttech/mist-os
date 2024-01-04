@@ -220,7 +220,7 @@ func execute(
 				return fmt.Errorf("failed to initialize ffx tester: %w", err)
 			}
 			defer func() {
-				// TODO(fxbug.dev/124611): Once profiles are being merged on the host, this
+				// TODO(https://fxbug.dev/124611): Once profiles are being merged on the host, this
 				// will leave empty artifact directories within each test's output directories
 				// from where the profiles originated from. Clean up empty directories.
 				if err := ffxTester.RemoveAllEmptyOutputDirs(); err != nil {

@@ -352,7 +352,7 @@
             to: [ "#fshost" ],
         },
 
-        // TODO(fxbug.dev/88453): Add production components or custom protocol
+        // TODO(https://fxbug.dev/88453): Add production components or custom protocol
         // implementations.
         // {
         //     protocol: "fuchsia.pkg.LocalMirror",

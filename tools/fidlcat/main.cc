@@ -214,7 +214,7 @@ int ConsoleMain(int argc, const char* argv[]) {
               FX_LOGS(ERROR)
                   << "To authenticate, please run the following command and restart fidlcat\n\n"
                      "  rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login\n\n"
-                     "For more information, please see fxbug.dev/119250.";
+                     "For more information, please see https://fxbug.dev/119250.";
               start.reset();
             } else if (state == zxdb::SymbolServer::State::kReady) {
               FX_LOGS(INFO) << "Connected to symbol server " << server->name();

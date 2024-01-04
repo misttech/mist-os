@@ -128,7 +128,7 @@ def _codegen_impl(context):
         "driver/natural_messaging.cc",
     ]
 
-    # TODO(fxbug.dev/108680): Better workaround for skipping codegen for zx.
+    # TODO(https://fxbug.dev/108680): Better workaround for skipping codegen for zx.
     if name == "zx":
         source_files = ["markers.h"]
 

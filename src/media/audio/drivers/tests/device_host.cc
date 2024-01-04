@@ -25,7 +25,7 @@
 
 namespace media::audio::drivers::test {
 
-// TODO(fxbug.dev/65580): Previous implementation used value-parameterized testing. Consider
+// TODO(https://fxbug.dev/65580): Previous implementation used value-parameterized testing. Consider
 // reverting to this, moving AddDevices to a function called at static initialization time. If we
 // cannot access cmdline flags at that time, this would force us to always register admin tests,
 // skipping them at runtime based on the cmdline flag.

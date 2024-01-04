@@ -115,7 +115,7 @@ TEST(InlineXUnionInStruct, FailToEncodeAbsentXUnion) {
   input.after = fidl::StringView::FromExternal(empty_str);
   fidl::OwnedEncodeResult encoded = fidl::StandaloneEncode(input);
   EXPECT_FALSE(encoded.message().ok());
-  // TODO(fxbug.dev/35381): Test a reason enum instead of comparing strings.
+  // TODO(https://fxbug.dev/35381): Test a reason enum instead of comparing strings.
   EXPECT_EQ(std::string(encoded.message().error().lossy_description()),
             "non-nullable union is absent");
   EXPECT_EQ(encoded.message().status(), ZX_ERR_INVALID_ARGS);
@@ -139,7 +139,7 @@ TEST(InlineXUnionInStruct, FailToDecodeAbsentXUnion) {
   fit::result result = fidl::StandaloneInplaceDecode<llcpp_misc::wire::InlineXUnionInStruct>(
       fidl::EncodedMessage::Create(encoded_bytes), kV2Metadata);
   EXPECT_FALSE(result.is_ok());
-  // TODO(fxbug.dev/35381): Test a reason enum instead of comparing strings.
+  // TODO(https://fxbug.dev/35381): Test a reason enum instead of comparing strings.
   EXPECT_EQ(std::string(result.error_value().lossy_description()), "non-nullable union is absent");
   EXPECT_EQ(result.error_value().status(), ZX_ERR_INVALID_ARGS);
 }
@@ -163,7 +163,7 @@ TEST(InlineXUnionInStruct, FailToDecodeZeroOrdinalXUnion) {
   fit::result result = fidl::StandaloneInplaceDecode<llcpp_misc::wire::InlineXUnionInStruct>(
       fidl::EncodedMessage::Create(encoded_bytes), kV2Metadata);
   EXPECT_FALSE(result.is_ok());
-  // TODO(fxbug.dev/35381): Test a reason enum instead of comparing strings.
+  // TODO(https://fxbug.dev/35381): Test a reason enum instead of comparing strings.
   EXPECT_EQ(std::string(result.error_value().lossy_description()), "non-nullable union is absent");
   EXPECT_EQ(result.error_value().status(), ZX_ERR_INVALID_ARGS);
 }
@@ -279,7 +279,7 @@ TEST(ComplexTable, Success) {
   }
 }
 
-// TODO(fxbug.dev/82681): we should support large message encoding as part of
+// TODO(https://fxbug.dev/82681): we should support large message encoding as part of
 // FIDL-at-rest, at which point this test would be adjusted to check for
 // success.
 TEST(InputExceeds64KiB, EncodeUnsupported) {

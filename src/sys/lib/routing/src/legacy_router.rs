@@ -266,7 +266,7 @@ where
                     (o.source_name().clone(), decls)
                 },
             );
-            // TODO(fxbug.dev/71881) Make the Collection CapabilitySource type generic
+            // TODO(https://fxbug.dev/71881) Make the Collection CapabilitySource type generic
             // for other types of aggregations.
             Ok(CapabilitySource::<C>::FilteredAggregate {
                 capability: AggregateCapability::Service(source_name),
@@ -487,7 +487,7 @@ impl Sources {
 
     /// Checks whether capability sources are supported, returning [`RoutingError::UnsupportedRouteSource`]
     /// if they are not.
-    // TODO(fxb/61861): Add route mapping for capability sources.
+    // TODO(https://fxbug.dev/61861): Add route mapping for capability sources.
     pub fn capability_source(&self) -> Result<(), RoutingError> {
         if self.0.capability {
             Ok(())
@@ -913,7 +913,7 @@ impl Offer {
             let visit_offer = match &offer_bundle {
                 RouteBundle::Single(offer) => Some(offer),
                 RouteBundle::Aggregate(offers) => {
-                    // TODO(fxbug.dev/4776): Visit routes in all aggregates.
+                    // TODO(https://fxbug.dev/4776): Visit routes in all aggregates.
                     if offers.len() == 1 {
                         Some(&offers[0])
                     } else {
@@ -955,7 +955,7 @@ impl Offer {
                 RouteBundle::Aggregate(_) => {
                     let decl_target = offer_bundle.iter().next().unwrap().target();
                     if offer_bundle.iter().any(|o| o.target() != decl_target) {
-                        // TODO(fxbug.dev/298698003): This situation should be caught by the
+                        // TODO(https://fxbug.dev/298698003): This situation should be caught by the
                         // validator, but due to this bug it is not. Fail the route.
                         return Err(RoutingError::UnsupportedRouteSource {
                             source_type: "disallowed aggregate".into(),
@@ -1347,7 +1347,7 @@ impl Expose {
             let visit_expose = match &expose_bundle {
                 RouteBundle::Single(expose) => Some(expose),
                 RouteBundle::Aggregate(exposes) => {
-                    // TODO(fxbug.dev/4776): Visit routes in all aggregates.
+                    // TODO(https://fxbug.dev/4776): Visit routes in all aggregates.
                     if exposes.len() == 1 {
                         Some(&exposes[0])
                     } else {
@@ -1474,7 +1474,7 @@ fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildName) -> bo
             Some(target_collection) == child_moniker.collection()
         }
         OfferTarget::Capability(_target_capability) => {
-            // TODO(fxbug.dev/301674053): Support dictionary targets.
+            // TODO(https://fxbug.dev/301674053): Support dictionary targets.
             false
         }
     }

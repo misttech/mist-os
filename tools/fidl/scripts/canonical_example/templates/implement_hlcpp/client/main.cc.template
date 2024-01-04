@@ -38,7 +38,7 @@ int main(int argc, const char** argv) {
   // TODO(${dns}): Read config from the |conf| to process script events, and thereby make calls
   // to the server, here.
 
-  // TODO(fxbug.dev/76579): We need to sleep here to make sure all logs get drained. Once the
+  // TODO(https://fxbug.dev/76579): We need to sleep here to make sure all logs get drained. Once the
   // referenced bug has been resolved, we can remove the sleep.
   sleep(2);
   return 0;

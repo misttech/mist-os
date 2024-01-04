@@ -70,7 +70,7 @@ class FakeCamera : public fuchsia::hardware::camera::Device,
   fidl::Binding<fuchsia::camera2::hal::Controller> controller_binding_;
 };
 
-// TODO(fxbug.dev/53130): fix device_watcher_test flake
+// TODO(https://fxbug.dev/53130): fix device_watcher_test flake
 TEST_F(DeviceWatcherTest, DISABLED_WatchDevicesFindsCameras) {
   fidl::InterfaceHandle<fuchsia::hardware::camera::Device> camera;
   FakeCamera fake(camera.NewRequest());

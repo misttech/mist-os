@@ -219,7 +219,7 @@ std::shared_ptr<Sampler> PointSampler::Create(const Format& source_format,
     case fuchsia_audio::SampleType::kFloat32:
       return CreateWith<float>(source_channel_count, dest_channel_count);
     default:
-      // TODO(fxbug.dev/114243): Support `SampleType::kFloat64`.
+      // TODO(https://fxbug.dev/114243): Support `SampleType::kFloat64`.
       FX_LOGS(WARNING) << "PointSampler does not support this source sample type: "
                        << static_cast<uint32_t>(source_format.sample_type());
       return nullptr;

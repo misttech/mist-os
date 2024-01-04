@@ -435,7 +435,7 @@ void GuestManager::SnapshotConfig(const fuchsia::virtualization::GuestConfig& co
   if (config.has_net_devices()) {
     *guest_descriptor_.mutable_networks() = config.net_devices();
   }
-  // TODO(fxbug.dev/100514): After updating FIDL, this should also return the full MemoryDevice
+  // TODO(https://fxbug.dev/100514): After updating FIDL, this should also return the full MemoryDevice
   // structure.
   guest_descriptor_.set_mem(config.has_virtio_mem() && config.virtio_mem());
 }

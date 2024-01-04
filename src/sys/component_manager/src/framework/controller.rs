@@ -175,7 +175,7 @@ impl Drop for ExecutionControllerTask {
                 });
             }
             None => {
-                // TODO(fxbug.dev/130801): stop_payload is not when system is shutting down
+                // TODO(https://fxbug.dev/130801): stop_payload is not when system is shutting down
                 error!("stop_payload was not set before the ExecutionControllerTask was dropped");
             }
         }

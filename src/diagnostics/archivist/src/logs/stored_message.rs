@@ -68,7 +68,7 @@ impl StoredMessage {
             contents.pop();
         }
 
-        // TODO(fxbug.dev/32998): Once we support structured logs we won't need this
+        // TODO(https://fxbug.dev/32998): Once we support structured logs we won't need this
         // hack to match a string in klogs.
         const MAX_STRING_SEARCH_SIZE: usize = 170;
         let last = contents

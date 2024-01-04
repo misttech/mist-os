@@ -155,7 +155,7 @@ class Controller : public DeviceType,
   DisplayPllManager* dpll_manager() { return dpll_manager_.get(); }
 
   // Non-const getter to allow unit tests to modify the IGD.
-  // TODO(fxbug.dev/83998): Consider making a fake IGD object injectable as allowing mutable access
+  // TODO(https://fxbug.dev/83998): Consider making a fake IGD object injectable as allowing mutable access
   // to internal state that is intended to be externally immutable can be source of bugs if used
   // incorrectly. The various "ForTesting" methods are a typical anti-pattern that exposes internal
   // state and makes the class state machine harder to reason about.

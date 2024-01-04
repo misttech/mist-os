@@ -45,7 +45,7 @@ fidl::WireSyncClient<fuchsia_sysmem::Allocator> CreateSysmemAllocator() {
     return {};
   }
   fidl::WireSyncClient allocator(std::move(*client_end));
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)allocator->SetDebugClientInfo(fidl::StringView::FromExternal(fsl::GetCurrentProcessName()),
                                       fsl::GetCurrentProcessKoid());
   return allocator;

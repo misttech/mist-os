@@ -80,7 +80,7 @@ magma::Status MsdVsiContext::SubmitBatch(std::unique_ptr<MappedBatch> batch) {
   // If there are any mappings pending release, submit them now.
   connection->SubmitPendingReleaseMappings(context);
 
-  // TODO(fxbug.dev/42748): handle wait semaphores.
+  // TODO(https://fxbug.dev/42748): handle wait semaphores.
   return connection->SubmitBatch(std::move(batch));
 }
 
@@ -93,7 +93,7 @@ bool MsdVsiContext::MapRingbuffer(Ringbuffer* ringbuffer) {
 
   gpu_addr = AddressSpaceLayout::system_gpu_addr_base();
   std::shared_ptr<GpuMapping> gpu_mapping;
-  // TODO(fxbug.dev/50307): ringbuffer should be mapped read-only
+  // TODO(https://fxbug.dev/50307): ringbuffer should be mapped read-only
   bool res = ringbuffer->MultiMap(exec_address_space(), gpu_addr, &gpu_mapping);
   if (res) {
     exec_address_space()->SetRingbufferGpuMapping(gpu_mapping);

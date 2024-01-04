@@ -87,8 +87,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose/top.test.fidl",
         "data": "Top",
-        "start_offset": 228,
-        "end_offset": 231
+        "start_offset": 236,
+        "end_offset": 239
       },
       "methods": [
         {
@@ -113,8 +113,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose/top.test.fidl",
             "data": "test.middle.Middle",
-            "start_offset": 246,
-            "end_offset": 264
+            "start_offset": 254,
+            "end_offset": 272
           }
         }
       ]

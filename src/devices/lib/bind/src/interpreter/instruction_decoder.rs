@@ -17,7 +17,7 @@ pub struct DecodedCondition {
 }
 
 // Verifies and converts instruction bytecode into a set of DecodedInstructions.
-// TODO(fxb/93365): Add IDs to the Label and Jump statements.
+// TODO(https://fxbug.dev/93365): Add IDs to the Label and Jump statements.
 #[derive(Debug, PartialEq, Clone)]
 pub enum DecodedInstruction {
     UnconditionalAbort,
@@ -64,7 +64,7 @@ impl<'a> InstructionDecoder<'a> {
         &mut self,
         op_byte: RawOp,
     ) -> Result<DecodedInstruction, BytecodeError> {
-        // TODO(fxb/93278): verify offset amount takes you to a jump landing pad.
+        // TODO(https://fxbug.dev/93278): verify offset amount takes you to a jump landing pad.
         let offset_amount = next_u32(&mut self.inst_iter)?;
 
         let condition = match op_byte {

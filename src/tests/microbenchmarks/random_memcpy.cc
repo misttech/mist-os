@@ -12,7 +12,7 @@
 #include <perftest/perftest.h>
 
 // These tests are very slow under ASAN under ARM64 KVM-QEMU, so disable
-// them under ASAN in general (fxbug.dev/33182).
+// them under ASAN in general (https://fxbug.dev/33182).
 #if !__has_feature(address_sanitizer)
 
 namespace {

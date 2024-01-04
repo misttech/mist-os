@@ -159,7 +159,7 @@ async fn read_sensor_input_report(
     }
 }
 
-/// TODO(lingxueluo) Default and temporary report when sensor is not valid(fxbug.dev/42782).
+/// TODO(lingxueluo) Default and temporary report when sensor is not valid(https://fxbug.dev/42782).
 fn default_report() -> Result<Option<AmbientLightInputRpt>, Error> {
     Ok(Some(AmbientLightInputRpt { illuminance: 200.0, red: 200.0, green: 200.0, blue: 200.0 }))
 }

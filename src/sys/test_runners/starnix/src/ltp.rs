@@ -186,7 +186,7 @@ async fn read_ltp_test_result(
     // Base value used by the ComponentRunner implementation in Starnix to
     // return non-zero error codes (see src/starnix/kernel/execution/component_runner.rs ).
     //
-    // TODO(fxbug.dev/130980): Cleanup this once we have a proper mechanism to
+    // TODO(https://fxbug.dev/130980): Cleanup this once we have a proper mechanism to
     // get Linux exit code from component runner.
     const COMPONENT_EXIT_CODE_BASE: i32 = 1024;
 

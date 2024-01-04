@@ -397,7 +397,7 @@ func DescribeType(desc zither.TypeDescriptor, style CaseStyle) string {
 		layout, _ := fidlgen.MustReadName(desc.Type).SplitMember()
 		return casify(layout.DeclarationName())
 	case zither.TypeKindAlias, zither.TypeKindHandle:
-		// TODO(fxbug.dev/105758): This assumes that the alias/handle was defined
+		// TODO(https://fxbug.dev/105758): This assumes that the alias/handle was defined
 		// within the same package. That's true now, but this would need to be
 		// re-evaluated if/when zither supports library dependencies and the IR
 		// preserves imported alias names.

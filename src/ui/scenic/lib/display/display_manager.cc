@@ -101,7 +101,7 @@ void DisplayManager::OnDisplaysChanged(
 
   for (fuchsia::hardware::display::types::DisplayId id : removed) {
     if (default_display_ && fidl::Equals(default_display_->display_id(), id)) {
-      // TODO(fxbug.dev/23490): handle this more robustly.
+      // TODO(https://fxbug.dev/23490): handle this more robustly.
       FX_CHECK(false) << "Display disconnected";
       return;
     }

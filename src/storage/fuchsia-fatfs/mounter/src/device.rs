@@ -88,7 +88,7 @@ impl FatDevice {
                 return Ok(Some(entry.name.clone()));
             }
         }
-        // TODO(fxbug.dev/58577): should we set up a watcher with a timeout before giving up completely?
+        // TODO(https://fxbug.dev/58577): should we set up a watcher with a timeout before giving up completely?
 
         Ok(None)
     }

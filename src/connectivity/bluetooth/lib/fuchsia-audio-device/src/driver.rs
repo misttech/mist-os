@@ -398,7 +398,7 @@ impl SoftPcm {
             RingBufferRequest::GetProperties { responder } => {
                 let prop = RingBufferProperties {
                     needs_cache_flush_or_invalidate: Some(false),
-                    // TODO(fxbug.dev/123475): Make driver_transfer_bytes (output) more accurate.
+                    // TODO(https://fxbug.dev/123475): Make driver_transfer_bytes (output) more accurate.
                     driver_transfer_bytes: Some((self.packet_frames * self.frame_bytes) as u32),
                     ..Default::default()
                 };
@@ -472,7 +472,7 @@ impl SoftPcm {
             RingBufferRequest::WatchDelayInfo { responder } => {
                 if self.delay_info_replied {
                     // We will never change delay state.
-                    // TODO(fxbug.dev/51726): Reply again when the external_delay changes from
+                    // TODO(https://fxbug.dev/51726): Reply again when the external_delay changes from
                     // outside instead of just on startup.
                     responder.drop_without_shutdown();
                     return Ok(());

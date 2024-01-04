@@ -33,7 +33,7 @@ typedef enum {
   kOutputTypeTriangle,
   kOutputTypeImpulse,
 } OutputSignalType;
-// TODO(fxbug.dev/49220): refactor signal-generation to make it easier to add new generators.
+// TODO(https://fxbug.dev/49220): refactor signal-generation to make it easier to add new generators.
 
 typedef enum { Default, Flexible, Monotonic, Custom } ClockType;
 
@@ -49,7 +49,7 @@ constexpr std::array<std::pair<const char*, fuchsia::media::AudioRenderUsage>,
 
 // Any audio output device fed by the system audio mixer will have this min_lead_time, at least.
 // Until then, we cannot be confident that our renderer is routed to an actual device.
-// TODO(fxbug.dev/50117): remove the workaround once audio_core fixes the underlying fxbug.dev/50017
+// TODO(https://fxbug.dev/50117): remove the workaround once audio_core fixes the underlying https://fxbug.dev/50017
 constexpr zx::duration kRealDeviceMinLeadTime = zx::msec(1);
 
 }  // namespace

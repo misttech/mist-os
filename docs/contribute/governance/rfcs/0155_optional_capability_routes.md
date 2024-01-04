@@ -62,7 +62,7 @@ component uses an unavailable capability, but it unfortunately also allows
 builds to succeed when the capability route is misconfigured on builds where the
 capability _is_ available.
 
-Additionally once [fxbug.dev/92889][fxb/92889] is resolved, scrutiny will also
+Additionally once [https://fxbug.dev/92889][https://fxbug.dev/92889] is resolved, scrutiny will also
 be validating capability routes that originate in the session realms. Oftentimes
 the session components depend on capabilities originating from outside of the
 session, which will add friction if one of these components wishes to be added
@@ -90,7 +90,7 @@ _Reviewers:_
 _Socialization:_
 
 After receiving requirements from
-[fxbug.dev/87164](https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=87164) and
+[https://fxbug.dev/87164](https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=87164) and
 by soliciting feedback from some specific individuals, an early form of this RFC
 was shared among stakeholders.
 
@@ -485,4 +485,4 @@ TODO
 
 [rfc-0089]: ./0089_core_realm_variations.md
 [scrutiny-allowlist]: /src/security/policy/build/verify_routes_exceptions_allowlist.json5
-[fxb/92889]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=92889
+[https://fxbug.dev/92889]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=92889

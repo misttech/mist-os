@@ -153,7 +153,7 @@ void DeviceWatcherImpl::AddDeviceByPath(const std::string& path) {
   }
   auto camera_type = type_result.take_value();
 
-  // TODO(fxb/117811) - Need either A) an explanation for why this (2nd fetch of the camera handle)
+  // TODO(https://fxbug.dev/117811) - Need either A) an explanation for why this (2nd fetch of the camera handle)
   // is necessary, or B) figure out the right way to produce the right handle to pass down to the
   // child component.
   dev = nullptr;
@@ -191,7 +191,7 @@ fpromise::result<PersistentDeviceId, zx_status_t> DeviceWatcherImpl::AddMipiCsiD
     return fpromise::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  // TODO(fxbug.dev/43565): This generates the same ID for multiple instances of the same device. It
+  // TODO(https://fxbug.dev/43565): This generates the same ID for multiple instances of the same device. It
   // should be made unique by incorporating a truly unique value such as the bus ID.
   constexpr uint32_t kVendorShift = 16;
   PersistentDeviceId persistent_id =
@@ -223,7 +223,7 @@ fpromise::result<PersistentDeviceId, zx_status_t> DeviceWatcherImpl::AddUvcDevic
   device_info.set_vendor_id(kFakeInfoReturnVendorId);
   device_info.set_product_id(kFakeInfoReturnProductId);
 
-  // TODO(fxbug.dev/43565): This generates the same ID for multiple instances of the same device. It
+  // TODO(https://fxbug.dev/43565): This generates the same ID for multiple instances of the same device. It
   // should be made unique by incorporating a truly unique value such as the bus ID.
   constexpr uint32_t kVendorShift = 16;
   PersistentDeviceId persistent_id =

@@ -563,7 +563,7 @@ TEST_F(InspectTest, TreeGetsUpdates) {
   EXPECT_EQ(expected_mode_string.str(), actual_mode_string.str());
 }
 
-// TODO(fxbug.dev/49924): Improve tests to cover what happens if services aren't available at
+// TODO(https://fxbug.dev/49924): Improve tests to cover what happens if services aren't available at
 // startup.
 
 }  // namespace

@@ -56,7 +56,7 @@ fxfs_blob = true
 #
 # Support for `ffx`, `fx log`, and `fx shell`, and devhost registration.
 #
-# TODO(fxbug.dev/121402): Delete this section and do the equivalent via
+# TODO(https://fxbug.dev/121402): Delete this section and do the equivalent via
 # assembly.
 legacy_base_package_labels = [ "//src/connectivity:tools" ]
 

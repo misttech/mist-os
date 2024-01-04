@@ -165,7 +165,7 @@ func (c *stringInLogCheck) checkBytes(toCheck []byte, start int, end int) bool {
 }
 
 func (c *stringInLogCheck) Name() string {
-	// TODO(fxbug.dev/71529): With multi-device logs, the file names may be different than
+	// TODO(https://fxbug.dev/71529): With multi-device logs, the file names may be different than
 	// the log type. Consider using the actual filename of the log.
 	return path.Join("string_in_log", string(c.Type), strings.ReplaceAll(c.String, " ", "_"), c.testName)
 }
@@ -199,7 +199,7 @@ func (c *stringInLogCheck) OutputFiles() []string {
 // StringInLogsChecks returns checks to detect bad strings in certain logs.
 func StringInLogsChecks() []FailureModeCheck {
 	ret := []FailureModeCheck{
-		// For fxbug.dev/85875
+		// For https://fxbug.dev/85875
 		// This is printed by Swarming after a Swarming task's command completes, and
 		// suggests that a test leaked a subprocess that modified one of the task's
 		// output files after the task's command completed but before Swarming finished
@@ -237,7 +237,7 @@ func StringInLogsChecks() []FailureModeCheck {
 // device rather than from infrastructure host tools.
 func fuchsiaLogChecks() []FailureModeCheck {
 	ret := []FailureModeCheck{
-		// For fxbug.dev/57548.
+		// For https://fxbug.dev/57548.
 		// Hardware watchdog tripped, should not happen.
 		// This string is specified in u-boot.
 		// Astro uses an equal sign, Sherlock uses a colon. Consider allowing
@@ -246,16 +246,16 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		// already breaks down by device type.
 		&stringInLogCheck{String: "reboot_mode=watchdog_reboot", Type: serialLogType},
 		&stringInLogCheck{String: "reboot_mode:watchdog_reboot", Type: serialLogType},
-		// For fxbug.dev/55637
+		// For https://fxbug.dev/55637
 		&stringInLogCheck{String: " in fx_logger::GetSeverity() ", Type: swarmingOutputType},
-		// For fxbug.dev/71784. Do not check for this in swarming output as this does not indicate
+		// For https://fxbug.dev/71784. Do not check for this in swarming output as this does not indicate
 		// an error if logged by unit tests.
 		&stringInLogCheck{String: "intel-i915: No displays detected.", Type: serialLogType},
 		&stringInLogCheck{String: "intel-i915: No displays detected.", Type: syslogType},
-		// for fxbug.dev/132130. Broken HDMI emulator on vim3.
+		// for https://fxbug.dev/132130. Broken HDMI emulator on vim3.
 		&stringInLogCheck{String: "Failed to parse edid (0 bytes) \"Failed to validate base edid\"", Type: serialLogType},
 		&stringInLogCheck{String: "Failed to parse edid (0 bytes) \"Failed to validate base edid\"", Type: syslogType},
-		// For fxbug.dev/105382 dwc2 bug that breaks usb cdc networking
+		// For https://fxbug.dev/105382 dwc2 bug that breaks usb cdc networking
 		&stringInLogCheck{String: "diepint.timeout", Type: serialLogType, SkipAllPassedTests: true},
 		// For devices which, typically as a result of wear, fail to read any copy of the
 		// sys_config partition, give up on booting the intended slot, boot the R slot, and
@@ -299,7 +299,7 @@ func fuchsiaLogChecks() []FailureModeCheck {
 	// These are rather generic. New checks should probably go above here so that they run before these.
 	allLogTypes := []logType{serialLogType, swarmingOutputType, syslogType}
 	for _, lt := range allLogTypes {
-		// For fxbug.dev/43355.
+		// For https://fxbug.dev/43355.
 		ret = append(ret, []FailureModeCheck{
 			&stringInLogCheck{String: "Timed out loading dynamic linker from fuchsia.ldsvc.Loader", Type: lt},
 			&stringInLogCheck{String: "ERROR: AddressSanitizer", Type: lt, AttributeToTest: true, ExceptBlocks: []*logBlock{
@@ -358,40 +358,40 @@ func infraToolLogChecks() []FailureModeCheck {
 	return []FailureModeCheck{
 		// For b/291154636
 		&stringInLogCheck{String: "Hardware mismatch! Trying to flash images built for", Type: swarmingOutputType},
-		// For fxbug.dev/47649.
+		// For https://fxbug.dev/47649.
 		&stringInLogCheck{String: "kvm run failed Bad address", Type: swarmingOutputType},
-		// For fxbug.dev/44779.
+		// For https://fxbug.dev/44779.
 		&stringInLogCheck{String: netutilconstants.CannotFindNodeErrMsg, Type: swarmingOutputType},
-		// For fxbug.dev/51015.
+		// For https://fxbug.dev/51015.
 		&stringInLogCheck{
 			String:         bootserverconstants.FailedToSendErrMsg(bootserverconstants.CmdlineNetsvcName),
 			Type:           swarmingOutputType,
 			SkipPassedTask: true,
 		},
-		// For fxbug.dev/43188.
+		// For https://fxbug.dev/43188.
 		&stringInLogCheck{String: "/dev/net/tun (qemu): Device or resource busy", Type: swarmingOutputType},
 		// testrunner logs this when the serial socket goes away unexpectedly.
 		&stringInLogCheck{String: ".sock: write: broken pipe", Type: swarmingOutputType},
-		// For fxbug.dev/85596.
+		// For https://fxbug.dev/85596.
 		&stringInLogCheck{String: "connect: no route to host", Type: swarmingOutputType},
-		// For fxbug.dev/57463.
+		// For https://fxbug.dev/57463.
 		&stringInLogCheck{
 			String: fmt.Sprintf("%s: signal: segmentation fault", botanistconstants.QEMUInvocationErrorMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/129363.
+		// For https://fxbug.dev/129363.
 		&stringInLogCheck{
 			// LINT.IfChange(fastboot_timeout)
 			String: "Timed out while waiting to rediscover device in Fastboot",
 			// LINT.ThenChange(/src/developer/ffx/lib/fastboot/src/common/fidl_fastboot_compatibility.rs:fastboot_timeout)
 			Type: swarmingOutputType,
 		},
-		// For fxbug.dev/61452.
+		// For https://fxbug.dev/61452.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToResolveIPErrorMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/65073.
+		// For https://fxbug.dev/65073.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.PackageRepoSetupErrorMsg),
 			Type:   swarmingOutputType,
@@ -401,17 +401,17 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToServeMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/65073.
+		// For https://fxbug.dev/65073.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.SerialReadErrorMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/68743.
+		// For https://fxbug.dev/68743.
 		&stringInLogCheck{
 			String: botanistconstants.FailedToCopyImageMsg,
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/82454.
+		// For https://fxbug.dev/82454.
 		&stringInLogCheck{
 			String: botanistconstants.FailedToExtendFVMMsg,
 			Type:   swarmingOutputType,
@@ -432,17 +432,17 @@ func infraToolLogChecks() []FailureModeCheck {
 			// download can be retried and eventually succeeds.
 			SkipPassedTask: true,
 		},
-		// For fxbug.dev/89222.
+		// For https://fxbug.dev/89222.
 		&stringInLogCheck{
 			String: serialconstants.FailedToOpenSerialSocketMsg,
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/89437
+		// For https://fxbug.dev/89437
 		&stringInLogCheck{
 			String: serialconstants.FailedToFindCursorMsg,
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/103197. Usually indicates an issue with the bot. If the bots
+		// For https://fxbug.dev/103197. Usually indicates an issue with the bot. If the bots
 		// with the failures have been consistently failing with the same error, file
 		// a go/fxif-bug for the suspected bad bots.
 		&stringInLogCheck{
@@ -464,28 +464,28 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: "FAILED (Status read failed (Protocol error))",
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/53101.
+		// For https://fxbug.dev/53101.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToStartTargetMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/51441.
+		// For https://fxbug.dev/51441.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.ReadConfigFileErrorMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/59237.
+		// For https://fxbug.dev/59237.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", sshutilconstants.TimedOutConnectingMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/61420.
+		// For https://fxbug.dev/61420.
 		&stringInLogCheck{
 			String:       fmt.Sprintf("syslog: %s", syslogconstants.CtxReconnectError),
 			Type:         swarmingOutputType,
 			OnlyOnStates: []string{"TIMED_OUT"},
 		},
-		// For fxbug.dev/52719.
+		// For https://fxbug.dev/52719.
 		// Kernel panics and other low-level errors often cause crashes that
 		// manifest as SSH failures, so this check must come after all
 		// Zircon-related errors to ensure tefmocheck attributes these crashes to
@@ -494,12 +494,12 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", testrunnerconstants.FailedToReconnectMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/77689.
+		// For https://fxbug.dev/77689.
 		&stringInLogCheck{
 			String: testrunnerconstants.FailedToStartSerialTestMsg,
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/92141.
+		// For https://fxbug.dev/92141.
 		&stringInLogCheck{
 			String: ffxutilconstants.TimeoutReachingTargetMsg,
 			Type:   swarmingOutputType,
@@ -508,18 +508,18 @@ func infraToolLogChecks() []FailureModeCheck {
 			// connect after all retries and returns a fatal error.
 			SkipPassedTask: true,
 		},
-		// For fxbug.dev/128608.
+		// For https://fxbug.dev/128608.
 		&stringInLogCheck{
 			String:         "No daemon was running.",
 			Type:           swarmingOutputType,
 			SkipPassedTask: true,
 		},
-		// For fxbug.dev/127372.
+		// For https://fxbug.dev/127372.
 		&stringInLogCheck{
 			String: "FFX Daemon was told not to autostart",
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/133846.
+		// For https://fxbug.dev/133846.
 		&stringInLogCheck{
 			String: "Timed out waiting for the ffx daemon on the Overnet mesh over socket",
 			Type:   swarmingOutputType,
@@ -531,7 +531,7 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.CommandExceededTimeoutMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/94343.
+		// For https://fxbug.dev/94343.
 		&stringInLogCheck{
 			String: "There was an internal error running tests: Fidl(ClientChannelClosed { status: Status(PEER_CLOSED)",
 			Type:   swarmingOutputType,
@@ -545,7 +545,7 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", ffxutilconstants.CommandFailedMsg),
 			Type:   swarmingOutputType,
 		},
-		// For fxbug.dev/56651.
+		// For https://fxbug.dev/56651.
 		// This error usually happens due to an SSH failure, so that error should take precedence.
 		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", testrunnerconstants.FailedToRunSnapshotMsg),

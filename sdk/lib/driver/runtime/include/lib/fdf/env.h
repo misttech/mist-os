@@ -52,7 +52,7 @@ zx_status_t fdf_env_dispatcher_create_with_owner(const void* driver, uint32_t op
 void fdf_env_dispatcher_dump(fdf_dispatcher_t* dispatcher);
 
 // DO NOT USE THIS.
-// This is a temporary function added to debug fxbug.dev/118767.
+// This is a temporary function added to debug https://fxbug.dev/118767.
 //
 // Dumps the state of the dispatcher into |out_dump|, as a NULL terminated string.
 // The caller is responsible for freeing |out_dump|.

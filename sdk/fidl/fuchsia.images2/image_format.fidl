@@ -8,7 +8,7 @@
 
 // Some non-protocol types in this library are used by libmagma, which ships in
 // the IDK and must be built at all API levels supported by the IDK. See
-// fxbug.dev/42085119. The library is, however, unstable, and all other parts of
+// https://fxbug.dev/42085119. The library is, however, unstable, and all other parts of
 // it should be explicitly marked as `added=HEAD`.
 @available(added=12)
 library fuchsia.images2;

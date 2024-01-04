@@ -224,7 +224,7 @@ pub fn device_import(
     _control: virtio_magma_device_import_ctrl_t,
     response: &mut virtio_magma_device_import_resp_t,
 ) -> Result<MagmaDevice, Errno> {
-    // TODO(fxbug.dev/100454): This currently picks the first available device in the allowlist, but
+    // TODO(https://fxbug.dev/100454): This currently picks the first available device in the allowlist, but
     // multiple devices should probably be exposed to clients.
     let entries =
         std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());

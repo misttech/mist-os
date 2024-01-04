@@ -194,7 +194,7 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
                             [](auto result) { FX_CHECK(!result.is_err()); });
   }
 
-  // TODO(fxb/104285): Remove this function when async::Loop provides support for RunLoopUntil().
+  // TODO(https://fxbug.dev/104285): Remove this function when async::Loop provides support for RunLoopUntil().
   template <typename PredicateT>
   void RunLoopUntil(PredicateT predicate) {
     while (!predicate()) {

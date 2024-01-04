@@ -248,7 +248,7 @@ type ServiceInfo = table {
 
     /// Handles of other services that are included by this service.
     /// Optional for local services. Never present for remote services.
-    /// TODO(fxbug.dev/685): This is not currently supported for local services.
+    /// TODO(https://fxbug.dev/685): This is not currently supported for local services.
     5: includes vector<ServiceHandle>:MAX_SERVICE_COUNT;
 };
 

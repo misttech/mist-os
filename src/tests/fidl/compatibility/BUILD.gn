@@ -128,7 +128,7 @@ foreach(test, fidl_compatibility_tests_categories) {
           program = {
             binary = "bin/$output"
 
-            # TODO(fxbug.dev/126999): do not hardcode this here. These args must come from
+            # TODO(https://fxbug.dev/126999): do not hardcode this here. These args must come from
             # structured config and will look different in-tree and OOT. For now, we hardcode it
             # given that there's no support for structured config values for components using a
             # test runner.

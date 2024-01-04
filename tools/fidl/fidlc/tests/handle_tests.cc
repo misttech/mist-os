@@ -81,7 +81,7 @@ protocol P {
 )FIDL");
   library.UseLibraryZx();
 
-  // NOTE(fxbug.dev/72924): we provide a more general error because there are multiple
+  // NOTE(https://fxbug.dev/72924): we provide a more general error because there are multiple
   // possible interpretations.
   library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "zx/Rights");
   library.ExpectFail(fidl::ErrUnexpectedConstraint, "Handle");

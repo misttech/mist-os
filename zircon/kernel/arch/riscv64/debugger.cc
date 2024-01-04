@@ -27,7 +27,7 @@ zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
   // Punt if registers aren't available. E.g.,
-  // TODO(fxbug.dev/30521): Registers aren't available in synthetic exceptions.
+  // TODO(https://fxbug.dev/30521): Registers aren't available in synthetic exceptions.
   if (thread->arch().suspended_general_regs == nullptr) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -48,7 +48,7 @@ zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
   // Punt if registers aren't available. E.g.,
-  // TODO(fxbug.dev/30521): Registers aren't available in synthetic exceptions.
+  // TODO(https://fxbug.dev/30521): Registers aren't available in synthetic exceptions.
   if (thread->arch().suspended_general_regs == nullptr) {
     return ZX_ERR_NOT_SUPPORTED;
   }

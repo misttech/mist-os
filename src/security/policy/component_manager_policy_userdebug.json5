@@ -8,7 +8,7 @@
                 source_name: "fuchsia.boot.RootResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -19,7 +19,7 @@
                 source_name: "fuchsia.kernel.CpuResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -34,7 +34,7 @@
                     "/bootstrap/console",
                     "/core/trace_manager/cpuperf_provider/cpu-trace",
 
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -45,7 +45,7 @@
                 source_name: "fuchsia.kernel.FramebufferResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -56,7 +56,7 @@
                 source_name: "fuchsia.kernel.HypervisorResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -69,7 +69,7 @@
                 target_monikers: [
                     "/bootstrap/pkg-drivers:**",
 
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -80,7 +80,7 @@
                 source_name: "fuchsia.kernel.IommuResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -91,7 +91,7 @@
                 source_name: "fuchsia.kernel.IoportResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -102,7 +102,7 @@
                 source_name: "fuchsia.kernel.IrqResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -113,7 +113,7 @@
                 source_name: "fuchsia.kernel.MmioResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -124,7 +124,7 @@
                 source_name: "fuchsia.kernel.PowerResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -135,7 +135,7 @@
                 source_name: "fuchsia.kernel.RootJob",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -146,7 +146,7 @@
                 source_name: "fuchsia.kernel.RootJobForInspect",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -157,7 +157,7 @@
                 source_name: "fuchsia.kernel.SmcResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -168,7 +168,7 @@
                 source_name: "fuchsia.kernel.VmexResource",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -179,7 +179,7 @@
                 source_name: "bin",
                 capability: "directory",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -190,7 +190,7 @@
                 source_name: "blob",
                 capability: "directory",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -203,7 +203,7 @@
                 target_monikers: [
                     "/core/sshd-host",
 
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -214,7 +214,7 @@
                 source_name: "system",
                 capability: "directory",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -225,7 +225,7 @@
                 source_name: "tmp",
                 capability: "directory",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -236,7 +236,7 @@
                 source_name: "build-info",
                 capability: "directory",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -251,7 +251,7 @@
                     "/core/process_resolver",
                     "/bootstrap/full_resolver",
 
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -266,7 +266,7 @@
                     "/bootstrap/console-launcher",
                     "/bootstrap/pkg-cache",
 
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -316,7 +316,7 @@
                 source_name: "fuchsia.factory.lowpan.FactoryLookup",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -327,7 +327,7 @@
                 source_name: "fuchsia.lowpan.device.DeviceExtraConnector",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
@@ -338,7 +338,7 @@
                 source_name: "fuchsia.lowpan.device.DeviceRouterExtraConnector",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // TODO(https://fxbug.dev/130576): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],

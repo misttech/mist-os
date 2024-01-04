@@ -9,7 +9,7 @@ group("tests") {
     "rust:tests",
   ]
 
-  # TODO(fxbug.dev/135473): Enable once we have Linux on RISC-V support in Rust prebuilds.
+  # TODO(https://fxbug.dev/135473): Enable once we have Linux on RISC-V support in Rust prebuilds.
   if (target_cpu == "riscv64") {
     deps -= [ "rust:tests" ]
   }

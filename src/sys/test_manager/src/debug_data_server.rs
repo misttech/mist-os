@@ -172,7 +172,7 @@ pub(crate) async fn deprecated_send_kernel_debug_data(
         .unwrap_or_else(|e| warn!("Error copying kernel debug data: {:?}", e));
         // deliberately hold event_sender open even though we aren't sending anything... this
         // keeps RunController channel open, and run-test-suite running until copying files to
-        // tmp/ is complete. See fxbug.dev/14996#c11 for details.
+        // tmp/ is complete. See https://fxbug.dev/14996#c11 for details.
         event_sender.disconnect();
     }
 }

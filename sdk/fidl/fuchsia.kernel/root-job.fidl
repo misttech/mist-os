@@ -7,7 +7,7 @@ using zx;
 
 /// Protocol for providing the root job.
 ///
-/// TODO(fxbug.dev/33856): Do not use this without first consulting the Zircon team.
+/// TODO(https://fxbug.dev/33856): Do not use this without first consulting the Zircon team.
 @discoverable
 closed protocol RootJob {
     /// Get the root `job`.

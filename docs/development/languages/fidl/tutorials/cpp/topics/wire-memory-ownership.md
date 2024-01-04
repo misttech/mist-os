@@ -187,7 +187,7 @@ The standard pattern for using the arena is:
 * Upon exiting the function scope, all of these local variables are
   automatically de-allocated.
 
-<!-- TODO(fxbug.dev/103483): Write an example for the above pattern, and link
+<!-- TODO(https://fxbug.dev/103483): Write an example for the above pattern, and link
 to that. -->
 
 The arena needs to outlive all the view types that refer to objects within it.

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 encode_success("EncodeStructOfEndpoints_ExpectedRights") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = channel(rights: channel_default),
@@ -36,7 +36,7 @@ encode_success("EncodeStructOfEndpoints_ExpectedRights") {
 }
 
 encode_success("EncodeStructOfEndpoints_TypeAndRightsComeFromFIDL") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     // These types and rights should be ignored by the encoder.
     // The output types and rights metadata should come from FIDL schema.
@@ -71,7 +71,7 @@ encode_success("EncodeStructOfEndpoints_TypeAndRightsComeFromFIDL") {
 }
 
 decode_success("DecodeStructOfEndpoints_ExpectedRights") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = channel(rights: channel_default),
@@ -101,7 +101,7 @@ decode_success("DecodeStructOfEndpoints_ExpectedRights") {
 }
 
 decode_failure("DecodeStructOfEndpoints_WrongType") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = channel(rights: channel_default),
@@ -127,7 +127,7 @@ decode_failure("DecodeStructOfEndpoints_WrongType") {
 }
 
 decode_failure("DecodeStructOfEndpoints_InsufficientRights") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = channel(rights: channel_default),
@@ -153,7 +153,7 @@ decode_failure("DecodeStructOfEndpoints_InsufficientRights") {
 }
 
 success("StructOfEndpoints_Absent") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = channel(),
@@ -180,7 +180,7 @@ success("StructOfEndpoints_Absent") {
 }
 
 success("TableOfEndpoints") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = channel(),
@@ -214,7 +214,7 @@ success("TableOfEndpoints") {
 }
 
 success("UnionOfEndpoints_ClientEnd") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = channel(),
@@ -238,7 +238,7 @@ success("UnionOfEndpoints_ClientEnd") {
 }
 
 success("UnionOfEndpoints_ServerEnd") {
-    // TODO(fxbug.dev/62647): Support client_end/server_end.
+    // TODO(https://fxbug.dev/62647): Support client_end/server_end.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = channel(),

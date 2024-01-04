@@ -38,7 +38,7 @@ use std::rc::Rc;
 /// FIDL dependencies:
 ///     - fuchsia.hardware.cpu_ctrl.Device: used to query descriptions of CPU performance states
 //
-// TODO(fxbug.dev/84191): Update summary when CpuControlHandler is removed.
+// TODO(https://fxbug.dev/84191): Update summary when CpuControlHandler is removed.
 
 /// Builder struct for CpuDeviceHandler.
 pub struct CpuDeviceHandlerBuilder<'a, 'b> {

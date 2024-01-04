@@ -141,7 +141,7 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
                 .to(&single_counter),
         )
         .await?;
-    // TODO(fxbug.dev/76599): refactor these tests to use the single test archivist and remove
+    // TODO(https://fxbug.dev/76599): refactor these tests to use the single test archivist and remove
     // this archivist. We can also remove the `wrapper` realm when this is done. The
     // ArchiveAccessor and Log protocols routed here would be routed from AboveRoot instead. To
     // do so, uncomment the following routes and delete all the routes after this comment

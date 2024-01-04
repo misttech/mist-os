@@ -205,7 +205,7 @@ class DiagnosticStateWrapper {
   static trace_vthread_id_t GetNextVthreadID() {
     static std::atomic<uint64_t> id;
     // Vthread IDs are rounded to the nearest 1000 due to the double->float conversion. See
-    // fxbug.dev/22971/
+    // https://fxbug.dev/22971/
     constexpr uint32_t kVthreadIdDistance = 2000;
     return id.fetch_add(kVthreadIdDistance);
   }

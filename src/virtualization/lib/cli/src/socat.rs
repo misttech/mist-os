@@ -85,7 +85,7 @@ fn duplicate_socket(_socket: fidl::Socket) -> Result<(fidl::Socket, fidl::Socket
         Ok((_socket, other))
     }
 
-    // TODO(fxbug.dev/116879): Remove when overnet supports duplicated socket handles.
+    // TODO(https://fxbug.dev/116879): Remove when overnet supports duplicated socket handles.
     #[cfg(not(target_os = "fuchsia"))]
     unimplemented!()
 }

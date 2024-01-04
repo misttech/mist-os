@@ -674,7 +674,7 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
     )
     .await?;
 
-    // TODO(fxbug.dev/116879): Re-enable when overnet supports duplicated socket handles.
+    // TODO(https://fxbug.dev/116879): Re-enable when overnet supports duplicated socket handles.
     #[cfg(target_os = "fuchsia")]
     run_single_stream_bidirectional_test(
         active_connections.remove(&SINGLE_STREAM_BIDIRECTIONAL).expect("socket should exist"),

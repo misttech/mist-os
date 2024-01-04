@@ -7,7 +7,7 @@
 
 // This header exists to provide arm intrinsics that gcc does not provide.
 // These are specified by the arm spec and gcc should include them.
-// TODO(fxbug.dev/102847): Remove this after gcc adds these intrinsics.
+// TODO(https://fxbug.dev/102847): Remove this after gcc adds these intrinsics.
 
 #ifdef __clang__
 #error "clang already exposes these"

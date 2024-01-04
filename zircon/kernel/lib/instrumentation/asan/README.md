@@ -143,7 +143,7 @@ up to kQuarantineElements pointers and frees them in FIFO order.
 In `free`, the memory to be deallocated is added to the quarantine, and
 once the queue is full, the oldest element is actually freed.
 
-TODO(fxbug.dev/30033): kQuarantineElements is 65,536; this means that in the worst
+TODO(https://fxbug.dev/30033): kQuarantineElements is 65,536; this means that in the worst
 case it increases kernel heap memory usage by 256 MB (4K * 65536), which is the
 same as compiler-rt's default quarantine size. We could consider dynamically
 tuning this or having the quarantine not release memory until there is memory

@@ -158,7 +158,7 @@ struct ExamplePagingTraits {
     /// Gives the physical address of the table at the next level or that of
     /// the ultimate, physical page (or block) if the entry is terminal.
     ///
-    /// TODO(fxbug.dev/129344): document required alignment.
+    /// TODO(https://fxbug.dev/129344): document required alignment.
     constexpr uint64_t address() const { return 0; }
 
     /// If the entry is terminal, these accessors give the access permissions
@@ -663,7 +663,7 @@ class Paging : public PagingTraits {
       -> ReadonlyTerminalVisitor<std::decay_t<OnTerminalEntry>>;
 
  private:
-  // TODO(fxbug.dev/131202): Once hwreg is constexpr-friendly, we can add a static
+  // TODO(https://fxbug.dev/131202): Once hwreg is constexpr-friendly, we can add a static
   // assert that zeroed entries at any level report as non-present.
 
   /// A visitor tailor-made to help perform a mapping of

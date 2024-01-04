@@ -29,7 +29,7 @@ async fn connect_to_modern_wpa_network() {
     let () = loop_until_iface_is_found(&mut helper).await;
 
     let combinations = vec![
-        // TODO(fxbug.dev/101516): allow simulation for tkip
+        // TODO(https://fxbug.dev/101516): allow simulation for tkip
         // (Protection::Wpa1Wpa2PersonalTkipOnly, fidl_policy::SecurityType::Wpa, password),
         // (Protection::Wpa1Wpa2PersonalTkipOnly, fidl_policy::SecurityType::Wpa, psk),
         // (Protection::Wpa1Wpa2PersonalTkipOnly, fidl_policy::SecurityType::Wpa2, password),
@@ -46,11 +46,11 @@ async fn connect_to_modern_wpa_network() {
         (Protection::Wpa2Personal, fidl_policy::SecurityType::Wpa, psk),
         (Protection::Wpa2Personal, fidl_policy::SecurityType::Wpa2, password),
         (Protection::Wpa2Personal, fidl_policy::SecurityType::Wpa2, psk),
-        // TODO(fxbug.dev/85817): reenable credential upgrading
+        // TODO(https://fxbug.dev/85817): reenable credential upgrading
         // (Protection::Wpa2Wpa3Personal, fidl_policy::SecurityType::Wpa, password),
         (Protection::Wpa2Wpa3Personal, fidl_policy::SecurityType::Wpa2, password),
         (Protection::Wpa2Wpa3Personal, fidl_policy::SecurityType::Wpa3, password),
-        // TODO(fxbug.dev/85817): reenable credential upgrading
+        // TODO(https://fxbug.dev/85817): reenable credential upgrading
         // (Protection::Wpa3Personal, fidl_policy::SecurityType::Wpa, password),
         (Protection::Wpa3Personal, fidl_policy::SecurityType::Wpa2, password),
         (Protection::Wpa3Personal, fidl_policy::SecurityType::Wpa3, password),

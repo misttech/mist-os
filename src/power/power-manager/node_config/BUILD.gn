@@ -55,7 +55,7 @@ node_config("vim3") {
 # Make the node config files available for the power-manager-tests test package
 # to allow for some more advanced validation beyond what we can accomplish with
 # JSON schema validation alone.
-# TODO(fxbug.dev/52818): Explore build-time JSON validation
+# TODO(https://fxbug.dev/52818): Explore build-time JSON validation
 resource("test_config_data") {
   testonly = true
   sources = [

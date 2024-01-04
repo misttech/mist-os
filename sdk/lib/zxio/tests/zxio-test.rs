@@ -559,8 +559,8 @@ async fn test_open2() {
         assert_eq!(&buf[..CONTENT.len()], CONTENT);
         assert_eq!(&buf[CONTENT.len()..CONTENT.len() + APPEND_CONTENT.len()], APPEND_CONTENT);
 
-        // TODO(fxbug.dev/127341): Test create attributes.
-        // TODO(fxbug.dev/125830): Test for POSIX attributes.
+        // TODO(https://fxbug.dev/127341): Test create attributes.
+        // TODO(https://fxbug.dev/125830): Test for POSIX attributes.
     })
     .await;
 
@@ -713,7 +713,7 @@ async fn test_open2_node() {
     fixture.close().await;
 }
 
-// TODO(fxbug.dev/293943124): once fxfs supports allocate, use the test fixture.
+// TODO(https://fxbug.dev/293943124): once fxfs supports allocate, use the test fixture.
 struct AllocateFile {
     res: Result<(), Status>,
 }

@@ -48,7 +48,7 @@ class TouchSystem : public fuchsia::ui::pointer::augment::LocalHit {
                fuchsia::ui::pointer::augment::LocalHit::UpgradeCallback callback) override;
 
   // For tests.
-  // TODO(fxbug.dev/72919): Remove when integration tests are properly separated out.
+  // TODO(https://fxbug.dev/72919): Remove when integration tests are properly separated out.
   void RegisterA11yListener(
       fidl::InterfaceHandle<fuchsia::ui::input::accessibility::PointerEventListener> listener,
       A11yPointerEventRegistry::RegisterCallback callback) {

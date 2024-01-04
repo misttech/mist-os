@@ -25,7 +25,7 @@ open protocol ArchiveAccessor {
     /// The stream will carry data using the format documented in
     /// [Diagnostics schema][https://fuchsia.dev/fuchsia-src/reference/platform-spec/diagnostics/schema]
     ///
-    // TODO(fxbug.dev/35218, fxbug.dev/58168): stream FIDL data instead of other formats once
+    // TODO(https://fxbug.dev/35218, https://fxbug.dev/58168): stream FIDL data instead of other formats once
     // recursive types are supported in all bindings.
     flexible StreamDiagnostics(resource struct {
         parameters fuchsia.diagnostics.StreamParameters;

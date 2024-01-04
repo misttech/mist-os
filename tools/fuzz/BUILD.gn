@@ -50,7 +50,7 @@ go_library("lib") {
 
 # This tool can only be built on the host.
 # Also, only the Linux build is used by ClusterFuzz, so others are disabled to
-# work around a flake on macOS (see fxbug.dev/79219).
+# work around a flake on macOS (see https://fxbug.dev/79219).
 if (is_linux) {
   go_library("main") {
     source_dir = "cmd"
@@ -76,14 +76,14 @@ group("host_tests") {
   visibility = [ ":*" ]
   testonly = true
 
-  # Tests that shouldn't be built on macOS (fxbug.dev/79219)
+  # Tests that shouldn't be built on macOS (https://fxbug.dev/79219)
   if (is_linux) {
     deps = [ ":undercoat_tests" ]
   }
 }
 
 group("host_tools") {
-  # The tool shouldn't be built on macOS (fxbug.dev/79219)
+  # The tool shouldn't be built on macOS (https://fxbug.dev/79219)
   if (is_linux) {
     deps = [ ":undercoat_tool" ]
   }

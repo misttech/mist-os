@@ -24,7 +24,7 @@ bool FuchsiaSurface::Init() {
     RTN_MSG(false, "vkp::FuchsiaSurface::Init() failed - must provide instance.\n");
   }
 
-  // TODO(fxbug.dev/13252): Move to scenic (public) surface.
+  // TODO(https://fxbug.dev/13252): Move to scenic (public) surface.
   VkImagePipeSurfaceCreateInfoFUCHSIA info = {
       .sType = VK_STRUCTURE_TYPE_IMAGEPIPE_SURFACE_CREATE_INFO_FUCHSIA,
       .pNext = nullptr,

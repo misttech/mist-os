@@ -13,7 +13,7 @@ namespace driver_runtime {
 class Dispatcher;
 }  // namespace driver_runtime
 
-/// TODO(fxbug.dev/102881): rename to thread_context.
+/// TODO(https://fxbug.dev/102881): rename to thread_context.
 namespace driver_context {
 
 // Adds |driver| to the thread's current call stack.

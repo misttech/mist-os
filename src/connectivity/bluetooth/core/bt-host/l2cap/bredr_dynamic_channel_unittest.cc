@@ -19,7 +19,7 @@
 namespace bt::l2cap::internal {
 namespace {
 
-// TODO(fxbug.dev/1049): Add integration test with FakeChannelTest and
+// TODO(https://fxbug.dev/1049): Add integration test with FakeChannelTest and
 // BrEdrSignalingChannel using snooped connection data to verify signaling
 // channel traffic.
 

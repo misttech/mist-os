@@ -134,7 +134,7 @@ impl Bss {
     }
 }
 
-// TODO(fxbug.dev/113996): Move this into `wlan_common::bss` and use it in place of signal fields
+// TODO(https://fxbug.dev/113996): Move this into `wlan_common::bss` and use it in place of signal fields
 //                         in `BssDescription`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Signal {

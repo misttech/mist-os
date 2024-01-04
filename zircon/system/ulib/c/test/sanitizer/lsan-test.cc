@@ -418,7 +418,7 @@ TEST_F(LeakSanitizerTest, TlsReference) {
   }
 }
 
-// This is the regression test for ensuring the issue described in fxbug.dev/66819 is fixed. The
+// This is the regression test for ensuring the issue described in https://fxbug.dev/66819 is fixed. The
 // issue was that lsan would report leaks in libc++'s std::thread that weren't actual leaks. This
 // was because it was possible for the newly spawned thread to be suspended before actually
 // running any user code, meaning the memory snapshot would occur while the std::thread

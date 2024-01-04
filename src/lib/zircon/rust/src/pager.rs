@@ -275,7 +275,7 @@ mod tests {
 
         write_thread.join().unwrap();
 
-        // TODO(fxbug.dev/63989) Verify that the first page is dirty with `query_dirty_ranges`.
+        // TODO(https://fxbug.dev/63989) Verify that the first page is dirty with `query_dirty_ranges`.
         pager
             .op_range(
                 zx::PagerOp::WritebackBegin(zx::PagerWritebackBeginOptions::empty()),
@@ -284,7 +284,7 @@ mod tests {
             )
             .unwrap();
         pager.op_range(zx::PagerOp::WritebackEnd, vmo.as_ref(), 0..page_size).unwrap();
-        // TODO(fxbug.dev/63989) Verify that the first page is now clean with `query_dirty_ranges`.
+        // TODO(https://fxbug.dev/63989) Verify that the first page is now clean with `query_dirty_ranges`.
     }
 
     #[test]
@@ -297,7 +297,7 @@ mod tests {
         pager.supply_pages(&vmo, 0..page_size, &aux_vmo, 0).unwrap();
         vmo.set_size(page_size * 3).unwrap();
 
-        // TODO(fxbug.dev/63989) Verify that pages 2, and 3 are dirty and zero with
+        // TODO(https://fxbug.dev/63989) Verify that pages 2, and 3 are dirty and zero with
         // `query_dirty_ranges`.
 
         vmo.write(&[0, 1, 2, 3], page_size * 2).unwrap();
@@ -310,7 +310,7 @@ mod tests {
             .unwrap();
         pager.op_range(zx::PagerOp::WritebackEnd, &vmo, page_size..(page_size * 2)).unwrap();
 
-        // TODO(fxbug.dev/63989) Verify that page 2 is still dirty and not zero with
+        // TODO(https://fxbug.dev/63989) Verify that page 2 is still dirty and not zero with
         // `query_dirty_ranges`.
     }
 }

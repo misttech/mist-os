@@ -49,7 +49,7 @@ executable("chunked-compress") {
     "//zircon/system/ulib/fbl",
   ]
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -92,7 +92,7 @@ test("chunked-compression-unittests") {
     "//zircon/third_party/ulib/cksum",
   ]
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

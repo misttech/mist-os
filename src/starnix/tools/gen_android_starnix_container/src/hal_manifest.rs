@@ -24,8 +24,8 @@ pub struct ManifestBlobs {
 pub fn load_from_package(
     package_manifest: &PackageManifest,
 ) -> Result<(ManifestBlobs, Option<String>)> {
-    // TODO(fxbug.dev/130943): Move theses config files outside of the runtime package.
-    // TODO(fxbug.dev/129576): Always require HAL manifest after soft transition.
+    // TODO(https://fxbug.dev/130943): Move theses config files outside of the runtime package.
+    // TODO(https://fxbug.dev/129576): Always require HAL manifest after soft transition.
     const HAL_MANIFEST_PATH: &str = "__android_config__/manifest.json";
     let Some(hal_manifest) =
             package_manifest.blobs().iter().find(|blob| blob.path == HAL_MANIFEST_PATH) else

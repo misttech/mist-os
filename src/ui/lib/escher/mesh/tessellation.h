@@ -60,7 +60,7 @@ MeshPtr NewFullScreenMesh(MeshBuilderFactory* factory, BatchGpuUploader* gpu_upl
 // hidden faces of the octahedron.  During subdivision, the UV coordinates are
 // linearly interpolated for each new vertex.
 //
-// TODO(fxbug.dev/7329): the approach described above is wrong: the newly-inserted
+// TODO(https://fxbug.dev/7329): the approach described above is wrong: the newly-inserted
 // vertices are correct positions, but the all of the initial octahedron edges
 // are left untouched.  The proper approach is to double the number of vertices
 // at each subdivision level (and quadruple the triangle count) by splitting

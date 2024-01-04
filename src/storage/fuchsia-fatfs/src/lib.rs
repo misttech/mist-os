@@ -293,7 +293,7 @@ mod tests {
     const TEST_DISK_SIZE: u64 = 2048 << 10;
 
     #[fuchsia::test]
-    #[ignore] // TODO(fxbug.dev/56138): Clean up tasks to prevent panic on drop in FatfsFileRef
+    #[ignore] // TODO(https://fxbug.dev/56138): Clean up tasks to prevent panic on drop in FatfsFileRef
     async fn test_create_disk() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
 

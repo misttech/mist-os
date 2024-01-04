@@ -122,10 +122,10 @@ zx::result<> Bcache::VerifyDeviceInfo() {
   return zx::ok();
 }
 
-// TODO(fxbug.dev/130250): change this to __TA_ACQUIRE(mutex_) after clang roll.
+// TODO(https://fxbug.dev/130250): change this to __TA_ACQUIRE(mutex_) after clang roll.
 void Bcache::Pause() __TA_NO_THREAD_SAFETY_ANALYSIS { mutex_.lock(); }
 
-// TODO(fxbug.dev/130250): change this to __TA_RELEASE(mutex_) after clang roll.
+// TODO(https://fxbug.dev/130250): change this to __TA_RELEASE(mutex_) after clang roll.
 void Bcache::Resume() __TA_NO_THREAD_SAFETY_ANALYSIS { mutex_.unlock(); }
 
 }  // namespace minfs

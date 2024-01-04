@@ -12,7 +12,7 @@ type I2CChannel = table {
     /// Address of the device.
     1: address uint16;
     /// Class of the device.
-    /// TODO(fxbug.dev/78198): remove this once x86 uses ACPI properly.
+    /// TODO(https://fxbug.dev/78198): remove this once x86 uses ACPI properly.
     2: i2c_class uint32;
 
     /// Vendor ID. Used when binding via platform bus device IDs.

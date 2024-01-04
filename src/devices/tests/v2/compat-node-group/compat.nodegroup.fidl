@@ -6,7 +6,7 @@ library fuchsia.compat.nodegroup.test;
 
 using zx;
 
-// TODO(fxb/113089): Wrap this protocol in a Service.
+// TODO(https://fxbug.dev/113089): Wrap this protocol in a Service.
 @discoverable
 closed protocol Waiter {
     strict Ack(struct {

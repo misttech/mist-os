@@ -32,7 +32,8 @@ template("_common") {
     forward_variables_from(invoker,
                            "*",
                            [
-                             "target_name",  # Workaround for fxb/133723.
+                             "target_name",  # Workaround for
+                                             # https://fxbug.dev/133723.
                              "testonly",
                              "visibility",
                              "icu_deps",

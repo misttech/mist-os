@@ -118,8 +118,8 @@ async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
         }
     };
 
-    // TODO(fxbug.dev/108647): Use rgba format when available.
-    // TODO(fxbug.dev/103742): Use png format when available.
+    // TODO(https://fxbug.dev/108647): Use rgba format when available.
+    // TODO(https://fxbug.dev/103742): Use png format when available.
     let screenshot_response = screenshot_proxy
         .take_file(ScreenshotTakeFileRequest {
             format: Some(ScreenshotFormat::BgraRaw),
@@ -193,7 +193,7 @@ fn save_as_bgra(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>) {
     screenshot_file.write_all(&img_data[..]).expect("failed to write bgra image data.");
 }
 
-// TODO(fxbug.dev/108647): Use rgba format when available.
+// TODO(https://fxbug.dev/108647): Use rgba format when available.
 fn save_as_rgba(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>) {
     bgra_to_rgba(img_data);
 
@@ -202,7 +202,7 @@ fn save_as_rgba(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>) {
     screenshot_file.write_all(&img_data[..]).expect("failed to write rgba image data.");
 }
 
-// TODO(fxbug.dev/103742): Use png format when available.
+// TODO(https://fxbug.dev/103742): Use png format when available.
 fn save_as_png(screenshot_file_path: &mut PathBuf, img_data: &mut Vec<u8>, img_size: SizeU) {
     bgra_to_rgba(img_data);
 

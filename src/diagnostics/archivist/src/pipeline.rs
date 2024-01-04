@@ -212,7 +212,7 @@ impl PipelineMutableState {
         &self,
     ) -> Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>> {
         if self.static_selectors.is_some() {
-            // TODO(fxbug.dev/78871): can we avoid cloning here? This clone is not super expensive
+            // TODO(https://fxbug.dev/78871): can we avoid cloning here? This clone is not super expensive
             // as it'll be just cloning arcs, but we could be more efficient here.
             // Due to lock semantics we can't just return a reference at the moment as it leads to
             // an ABBA lock between inspect insertion into the repo and inspect reading.

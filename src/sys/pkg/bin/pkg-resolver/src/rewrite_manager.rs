@@ -37,10 +37,10 @@ struct RewriteManagerInspectState {
     dynamic_rules_node: inspect::Node,
     dynamic_rules_states: Vec<RuleInspectState>,
     generation_property: fuchsia_inspect::UintProperty,
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     dynamic_rules_path_property: fuchsia_inspect::StringProperty,
-    // TODO(fxbug.dev/84729)
+    // TODO(https://fxbug.dev/84729)
     #[allow(unused)]
     node: inspect::Node,
 }
@@ -84,7 +84,7 @@ impl RewriteManager {
         let config = RuleConfig::Version1(std::mem::take(dynamic_rules));
 
         let result = async {
-            // TODO(fxbug.dev/83342): We need to reopen because `resolve_succeeds_with_broken_minfs`
+            // TODO(https://fxbug.dev/83342): We need to reopen because `resolve_succeeds_with_broken_minfs`
             // expects it, this should be removed once the test is fixed.
             let data_proxy = fuchsia_fs::directory::open_directory(
                 data_proxy,

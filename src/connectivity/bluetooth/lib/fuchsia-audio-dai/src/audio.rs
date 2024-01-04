@@ -400,7 +400,7 @@ mod tests {
         let mut gain_state_fut =
             stream_proxy.watch_gain_state().check().expect("message sends fine");
 
-        // TODO(fxbug.dev/74427): FIDL client wakes up everything now. Once it's smarter at
+        // TODO(https://fxbug.dev/74427): FIDL client wakes up everything now. Once it's smarter at
         // waking up the right future, use a panic waker here.
         // We never expect to be woken, panic if we do.
         // let panic_waker = futures_test::task::panic_waker();
@@ -437,7 +437,7 @@ mod tests {
         let mut plug_state_fut =
             stream_proxy.watch_plug_state().check().expect("message sends fine");
 
-        // TODO(fxbug.dev/74427): FIDL client wakes up everything now. Once it's smarter at
+        // TODO(https://fxbug.dev/74427): FIDL client wakes up everything now. Once it's smarter at
         // waking up the right future, use a panic waker here.
         // We never expect to be woken, panic if we do.
         // let panic_waker = futures_test::task::panic_waker();

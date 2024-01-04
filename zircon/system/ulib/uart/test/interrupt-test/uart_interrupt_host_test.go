@@ -57,7 +57,7 @@ func TestLegacyUartSmallMessage(t *testing.T) {
 	arch := distro.TargetCPU()
 	t.Log(arch)
 
-	// TODO(fxbug.dev/129376): Disabled for legacy x86 uart driver.
+	// TODO(https://fxbug.dev/129376): Disabled for legacy x86 uart driver.
 	if arch == "x64" {
 		t.Skip()
 	}
@@ -85,7 +85,7 @@ func TestLegacyUartLargeMessage(t *testing.T) {
 	distro := emulatortest.UnpackFrom(t, filepath.Join(cwd, "test_data"), emulator.DistributionParams{Emulator: emulator.Qemu})
 	arch := distro.TargetCPU()
 
-	// TODO(fxbug.dev/129376): Disabled for legacy x86 uart driver.
+	// TODO(https://fxbug.dev/129376): Disabled for legacy x86 uart driver.
 	if arch == "x64" {
 		t.Skip()
 	}

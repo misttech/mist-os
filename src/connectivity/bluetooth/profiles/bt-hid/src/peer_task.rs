@@ -23,7 +23,7 @@ use crate::peer_info::PeerInfo;
 
 pub struct PeerTask {
     peer_id: PeerId,
-    // TODO(fxb/111451) Refactor PeerTask to use fewer MPSC channels.
+    // TODO(https://fxbug.dev/111451) Refactor PeerTask to use fewer MPSC channels.
     profile_event_sender: mpsc::Sender<ProfileEvent>,
     task: fasync::Task<()>,
 }
@@ -135,7 +135,7 @@ impl PeerTaskInner {
             self.interrupt_channel.set(channel);
         }
 
-        // TODO(fxb/106071) Set up FIDL connections to input device stack.
+        // TODO(https://fxbug.dev/106071) Set up FIDL connections to input device stack.
 
         Ok(())
     }
@@ -179,7 +179,7 @@ impl PeerTaskInner {
                         }
                     }
                 }
-                // TODO(fxb/106071) Handle FIDL messages here.
+                // TODO(https://fxbug.dev/106071) Handle FIDL messages here.
                 complete => {
                     debug!("Received nothing for Peer {:}", self.peer_id);
                     break;
@@ -280,7 +280,7 @@ impl PeerTaskInner {
         let channel_parameters = bredr::ChannelParameters {
             channel_mode: None,
             max_rx_sdu_size: None,
-            // TODO(fxb/96996) Consider security requirements.
+            // TODO(https://fxbug.dev/96996) Consider security requirements.
             security_requirements: None,
             // HID v1.1 5.2.7 The L2CAP Flush timeout parameter should be set to 0xFFFF.
             flush_timeout: Some(0xFFFF),

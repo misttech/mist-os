@@ -150,7 +150,7 @@ USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64 = [
     "netstack_migration_packages",
     "netstack_migration_packages_gub",
 
-    # TODO(fxbug.dev/128551): Move to the list above once build errors are
+    # TODO(https://fxbug.dev/128551): Move to the list above once build errors are
     # resolved and/or define a formal mechanism for AIBs to vary across
     # architectures.
     "virtualization_support",

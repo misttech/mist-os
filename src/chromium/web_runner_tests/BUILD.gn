@@ -70,7 +70,7 @@ fuchsia_test_package("web_runner_tests") {
   test_components = [ ":web_runner_integration_tests" ]
 
   deps = [
-    # TODO(fxbug.dev/119212): These should be provided by the Product
+    # TODO(https://fxbug.dev/119212): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
     "//src/chromium:web_context_provider_for_test",
     "//src/connectivity/network/netstack:component-debug",

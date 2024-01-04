@@ -125,8 +125,8 @@ void RenderPassInfo::InitRenderPassAttachmentInfosFromImages(RenderPassInfo* rpi
   }
 }
 
-// TODO(fxbug.dev/7174): unit-tests for validation.
-// TODO(fxbug.dev/7174): what other validation should be performed?
+// TODO(https://fxbug.dev/7174): unit-tests for validation.
+// TODO(https://fxbug.dev/7174): what other validation should be performed?
 bool RenderPassInfo::Validate() const {
   bool success = true;
 
@@ -356,7 +356,7 @@ bool RenderPassInfo::InitRenderPassInfo(RenderPassInfo* rp, vk::Rect2D render_ar
 
   InitRenderPassInfoHelper(rp, color_info, depth_stencil_info, msaa_texture ? &msaa_info : nullptr);
 
-  // TODO(fxbug.dev/43279): Can we get away sharing image views across multiple RenderPassInfo
+  // TODO(https://fxbug.dev/43279): Can we get away sharing image views across multiple RenderPassInfo
   // structs?
   ImageViewPtr output_image_view =
       allocator ? allocator->ObtainImageView(output_image) : ImageView::New(output_image);

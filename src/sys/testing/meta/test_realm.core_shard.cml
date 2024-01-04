@@ -158,7 +158,7 @@
             source_availability: "unknown",
         },
         {
-            // TODO(fxbug.dev/107526): After removing "weak" from the block
+            // TODO(https://fxbug.dev/107526): After removing "weak" from the block
             // below, merge them together
             protocol: [ "fuchsia.ui.input3.Keyboard" ],
             from: "#ui",
@@ -176,7 +176,7 @@
             from: "#ui",
             to: "#testing",
 
-            // TODO(fxbug.dev/107526): break the cycle, then merge the 2 blocks
+            // TODO(https://fxbug.dev/107526): break the cycle, then merge the 2 blocks
             dependency: "weak",
             source_availability: "unknown",
         },
@@ -363,7 +363,7 @@
         },
 
         // Tests of the media system want to test against the real hardware
-        // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
+        // TODO(https://fxbug.dev/83512): Remove when specialized test realms are ready.
         {
             directory: "dev-class",
             from: "parent",
@@ -392,7 +392,7 @@
         },
 
         // Tests of the media system change their behavior based on board
-        // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
+        // TODO(https://fxbug.dev/83512): Remove when specialized test realms are ready.
         {
             protocol: "fuchsia.sysinfo.SysInfo",
             from: "parent",
@@ -401,7 +401,7 @@
 
         // Needed for //src/cobalt/bin/meta/cobalt_testapp_for_prober_do_not_run_manually.cml
         // and chromium realm.
-        // TODO(fxbug.dev/83038): Remove once e2e is better supported.
+        // TODO(https://fxbug.dev/83038): Remove once e2e is better supported.
         {
             protocol: [ "fuchsia.net.http.Loader" ],
             from: "#network",
@@ -427,7 +427,7 @@
 
         // Needed by system-validation-tests
         {
-            // TODO(fxbug.dev/107526): After removing "weak" from the block
+            // TODO(https://fxbug.dev/107526): After removing "weak" from the block
             // below, merge them together
             protocol: [ "fuchsia.accessibility.semantics.SemanticsManager" ],
             from: "#ui",
@@ -440,7 +440,7 @@
             to: "#testing",
         },
 
-        // TODO(fxbug.dev/83038): Remove once e2e is better supported.
+        // TODO(https://fxbug.dev/83038): Remove once e2e is better supported.
         {
             protocol: [ "fuchsia.net.interfaces.State" ],
             from: "#network",

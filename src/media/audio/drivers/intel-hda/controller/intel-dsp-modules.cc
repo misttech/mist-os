@@ -244,7 +244,7 @@ zx::result<DspPipelineId> CreateSimplePipeline(DspModuleController* controller,
                                                std::initializer_list<DspModule> modules) {
   // Create a pipeline.
   //
-  // TODO(fxbug.dev/31426): Calculate actual memory usage.
+  // TODO(https://fxbug.dev/31426): Calculate actual memory usage.
   const uint16_t pipeline_memory_pages_needed = 4;
   zx::result<DspPipelineId> pipeline =
       controller->CreatePipeline(/*pipeline_priority=*/0,

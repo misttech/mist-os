@@ -259,7 +259,7 @@ def main():
         ldflags.extend(
             [
                 "-stdlib=libc++",
-                # TODO(fxbug.dev/64336): the following flags are not recognized by CGo.
+                # TODO(https://fxbug.dev/64336): the following flags are not recognized by CGo.
                 # '-rtlib=compiler-rt',
                 # '-unwindlib=libunwind',
             ]

@@ -42,7 +42,7 @@ debug\_agent, e.g.
 fx log --select core/debug_agent#DEBUG --tag debug_agent --hide_metadata --pretty
 ```
 
-Note: `ffx log` doesn't work here because of [fxbug.dev/99937](https://fxbug.dev/99937).
+Note: `ffx log` doesn't work here because of [https://fxbug.dev/99937](https://fxbug.dev/99937).
 
 ## Enable debug logging in zxdb
 

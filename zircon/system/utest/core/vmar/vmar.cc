@@ -2420,7 +2420,7 @@ TEST(Vmar, ConcurrentUnmapReadMemory) {
   t.join();
 }
 
-// Test for bug fxbug.dev/118226.
+// Test for bug https://fxbug.dev/118226.
 // Issuing a vmar operation on a range that is next to a vmar should not crash.
 TEST(Vmar, OpOnRangeWithChildVmarNextToIt) {
   auto root_vmar = zx::vmar::root_self();
@@ -2464,7 +2464,7 @@ TEST(Vmar, OpOnRangeWithChildVmarNextToIt) {
   EXPECT_OK(vmar_parent.op_range(ZX_VMAR_OP_MAP_RANGE, vmo_a_addr, kVmoSize, nullptr, 0));
 }
 
-// Test DECOMMIT on a vmar with two non-contiguous mappings (fxbug.dev/68272)
+// Test DECOMMIT on a vmar with two non-contiguous mappings (https://fxbug.dev/68272)
 TEST(Vmar, RangeOpCommitVmoPages2) {
   auto root_vmar = zx::vmar::root_self();
 

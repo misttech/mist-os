@@ -56,7 +56,7 @@ void DataRegister::Upsert(fuchsia::feedback::ComponentData data, UpsertCallback 
     FX_LOGS(WARNING) << fxl::StringPrintf(
         "Ignoring non-platform annotations, %s is a reserved namespace", data.namespace_().c_str());
 
-    // TODO(fxbug.dev/48664): close connection with ZX_ERR_INVALID_ARGS instead.
+    // TODO(https://fxbug.dev/48664): close connection with ZX_ERR_INVALID_ARGS instead.
     return;
   }
 
@@ -84,7 +84,7 @@ void DataRegister::Upsert(fuchsia::feedback::ComponentData data, UpsertCallback 
         new_size, max_num_annotations_);
     is_missing_annotations_ = true;
 
-    // TODO(fxbug.dev/48666): close all connections.
+    // TODO(https://fxbug.dev/48666): close all connections.
     return;
   }
 

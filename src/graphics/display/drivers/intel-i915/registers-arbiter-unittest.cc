@@ -352,7 +352,7 @@ TEST(MbusPipeDataBoxControlTest, GetForPipe) {
       registers::MbusPipeDataBoxControl::GetForPipe(PipeId::PIPE_C).FromValue(0);
   EXPECT_EQ(0x7203cu, pipe_mbus_dbox_ctl_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for pipe D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for pipe D, when we support it.
   // The MMIO address is 0x7303c.
 }
 
@@ -421,7 +421,7 @@ TEST(PipeArbiterControlTest, GetForPipe) {
   auto pipe_arb_ctl_c = registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_C).FromValue(0);
   EXPECT_EQ(0x72028u, pipe_arb_ctl_c.reg_addr());
 
-  // TODO(fxbug.dev/109278): Add a test for pipe D, when we support it.
+  // TODO(https://fxbug.dev/109278): Add a test for pipe D, when we support it.
   // The MMIO address is 0x73028.
 }
 

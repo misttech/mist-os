@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(fxbug.dev/10680): switch to the standard shebang line when the mocking library
+# TODO(https://fxbug.dev/10680): switch to the standard shebang line when the mocking library
 # is available.
 
 import unittest

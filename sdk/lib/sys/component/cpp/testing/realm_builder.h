@@ -191,7 +191,7 @@ class Realm final {
   //
   // Names must be unique. Duplicate names will result in a panic.
   //
-  // TODO(fxbug.dev/296292544): Remove this method when build-time support for
+  // TODO(https://fxbug.dev/296292544): Remove this method when build-time support for
   // API level 16 is removed.
   Realm& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                        const ChildOptions& options = kDefaultChildOptions)
@@ -329,7 +329,7 @@ class RealmBuilder final {
   // Add a component by raw pointer to a LocalComponent-derived instance.
   // See |Realm.AddLocalChild| for more details.
   //
-  // TODO(fxbug.dev/296292544): Remove this method when build-time support for
+  // TODO(https://fxbug.dev/296292544): Remove this method when build-time support for
   // API level 16 is removed.
   RealmBuilder& AddLocalChild(const std::string& child_name, LocalComponent* local_impl,
                               const ChildOptions& options = kDefaultChildOptions)

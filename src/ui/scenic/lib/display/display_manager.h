@@ -53,7 +53,7 @@ class DisplayManager {
     default_display_ = std::move(display);
   }
 
-  // TODO(fxbug.dev/76640): we may want to have multiple clients of this, so a single setter that
+  // TODO(https://fxbug.dev/76640): we may want to have multiple clients of this, so a single setter that
   // stomps previous callbacks may not be what we want.
   using VsyncCallback = fit::function<void(
       fuchsia::hardware::display::types::DisplayId display_id, zx::time timestamp,
@@ -76,11 +76,11 @@ class DisplayManager {
   std::shared_ptr<Display> default_display_;
 
   // When new displays are detected, ignore all displays which don't match this ID.
-  // TODO(fxb/76985): Remove this when we have proper multi-display support.
+  // TODO(https://fxbug.dev/76985): Remove this when we have proper multi-display support.
   const std::optional<fuchsia::hardware::display::types::DisplayId> i_can_haz_display_id_;
 
   // When a new display is picked, use display mode with this index.
-  // TODO(fxb/76985): Remove this when we have proper multi-display support.
+  // TODO(https://fxbug.dev/76985): Remove this when we have proper multi-display support.
   const std::optional<size_t> i_can_haz_display_mode_;
 
   fit::closure display_available_cb_;

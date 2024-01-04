@@ -270,7 +270,7 @@ zx_status_t wait_for_vsync(fhdt::wire::ConfigStamp expected_stamp) {
     void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override {
       // Acknowledge cookie if non-zero
       if (event->cookie) {
-        // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+        // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
         (void)dc->AcknowledgeVsync(event->cookie);
       }
 
@@ -309,7 +309,7 @@ zx_status_t set_minimum_rgb(uint8_t min_rgb) {
 }
 
 zx_status_t capture_setup() {
-  // TODO(fxbug.dev/41413): Pull common image setup code into a library
+  // TODO(https://fxbug.dev/41413): Pull common image setup code into a library
 
   // First make sure capture is supported on this platform
   auto support_resp = dc->IsCaptureSupported();
@@ -375,7 +375,7 @@ zx_status_t capture_setup() {
     printf("Could not duplicate token: %s\n", dup_res.FormatDescription().c_str());
     return dup_res.status();
   }
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)token->Sync();
   auto import_resp = dc->ImportBufferCollection(
       display::ToFidlBufferCollectionId(kBufferCollectionId), display_token.TakeClientEnd());
@@ -585,9 +585,9 @@ bool CompareCapturedImage(cpp20::span<const uint8_t> input_image,
 }
 
 void capture_release() {
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)dc->ReleaseImage(display::ToFidlImageId(kCaptureImageId));
-  // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
   (void)dc->ReleaseBufferCollection(display::ToFidlBufferCollectionId(kBufferCollectionId));
 }
 
@@ -892,7 +892,7 @@ int main(int argc, const char* argv[]) {
     }
   }
 
-  // TODO(fxbug.dev/125730): AFBC compression test doesn't work on
+  // TODO(https://fxbug.dev/125730): AFBC compression test doesn't work on
   // amlogic-display; the AFBC encoding format supported by amlogic-display
   // driver is not compatible with the AFBC buffer formats and generation logic
   // used by this test. Once amlogic-display supports non-tiled-header formats
@@ -902,7 +902,7 @@ int main(int argc, const char* argv[]) {
     fprintf(stderr,
             "AFBC compression test is not working for amlogic-display. "
             "The --enable-compression option will be re-enabled once "
-            "fxbug.dev/125730 is fixed.\n");
+            "https://fxbug.dev/125730 is fixed.\n");
     return -1;
   }
 

@@ -82,7 +82,7 @@ class AmlNnaDevice : public AmlNnaDeviceType,
   void DdkRelease();
 
   // Platform device protocol implementation.
-  // TODO(fxbug.dev/124172): Remove implementation of PDevProtocol and
+  // TODO(https://fxbug.dev/124172): Remove implementation of PDevProtocol and
   // ddk::GetProtocolable. Update child drivers to use the PlatformDevice FIDL
   // instead.
   zx_status_t PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio);

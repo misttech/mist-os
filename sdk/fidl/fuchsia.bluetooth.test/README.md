@@ -8,4 +8,4 @@ implementations of core Bluetooth system services and hardware protocols.
 Defines a management interface to create emulated Bluetooth controllers using the
 virtual driver (see [bt-hci-virtual](//src/connectivity/bluetooth/hci/virtual)).
 
-## TODO(fxbug.dev/1291): fake_profile.fidl
+## TODO(https://fxbug.dev/1291): fake_profile.fidl

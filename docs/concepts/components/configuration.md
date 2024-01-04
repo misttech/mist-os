@@ -163,7 +163,7 @@ types but runtime modifiable in others.
 
 
 [glossary.component-instance]: /docs/glossary/README.md#component-instance
-<!-- TODO(fxbug.dev/104819): Update link once better documentation exists -->
+<!-- TODO(https://fxbug.dev/104819): Update link once better documentation exists -->
 [rfc0115]: /docs/contribute/governance/rfcs/0115_build_types.md
 
 [board]: /docs/development/build/build_system/boards_and_products.md#boards

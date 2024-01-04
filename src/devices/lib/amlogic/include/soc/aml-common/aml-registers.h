@@ -7,7 +7,7 @@
 
 namespace aml_registers {
 
-// TODO(fxb/95933) : Move these to fuchsia.amlogic.platform bind library once extend string is
+// TODO(https://fxbug.dev/95933) : Move these to fuchsia.amlogic.platform bind library once extend string is
 // supported.
 constexpr char REGISTER_USB_PHY_V2_RESET[] = "usb_phy_v2_reset";
 constexpr char REGISTER_NNA_RESET_LEVEL2[] = "nna_reset_level2";

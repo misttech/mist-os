@@ -155,7 +155,7 @@ impl SavedNetworksManager {
 
     /// Load from persistent data from stash. The path for the legacy storage is used to remove the
     /// legacy storage if it exists.
-    /// TODO(fxbug.dev/85337) Eventually delete logic for deleting legacy storage
+    /// TODO(https://fxbug.dev/85337) Eventually delete logic for deleting legacy storage
     pub async fn new_with_stash_or_paths(
         stash: Option<Stash>,
         legacy_path: impl AsRef<Path>,
@@ -694,9 +694,9 @@ pub fn security_is_compatible(
 /// remove a saved network that has never been successfully connected to. If all have
 /// been successfully connected to, remove any. If a network config is evicted, that connection
 /// is forgotten for future connections.
-/// TODO(fxbug.dev/41232) - when network configs record information about successful connections,
+/// TODO(https://fxbug.dev/41232) - when network configs record information about successful connections,
 /// use this to make a better decision what to forget if all networks have connected before.
-/// TODO(fxbug.dev/41626) - make sure that we disconnect from the network if we evict a network config
+/// TODO(https://fxbug.dev/41626) - make sure that we disconnect from the network if we evict a network config
 /// for a network we are currently connected to.
 fn evict_if_needed(configs: &mut Vec<NetworkConfig>) -> Option<NetworkConfig> {
     if configs.len() < MAX_CONFIGS_PER_SSID {

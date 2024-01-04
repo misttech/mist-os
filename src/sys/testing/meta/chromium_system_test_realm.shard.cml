@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(fxbug.dev/91934): Consider making this not Chromium-specific or using
+// TODO(https://fxbug.dev/91934): Consider making this not Chromium-specific or using
 // //sdk/lib/sys/testing/system-test.shard.cml instead.
 {
     collections: [

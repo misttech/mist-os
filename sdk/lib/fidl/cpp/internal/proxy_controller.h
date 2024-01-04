@@ -90,7 +90,7 @@ class ProxyController : public MessageHandler {
 };
 
 // RAII object to disable ProxyController's client side error reporting when in scope.
-// TODO(fxbug.dev/68206) Remove this.
+// TODO(https://fxbug.dev/68206) Remove this.
 struct TransitoryProxyControllerClientSideErrorDisabler {
   TransitoryProxyControllerClientSideErrorDisabler();
   ~TransitoryProxyControllerClientSideErrorDisabler();

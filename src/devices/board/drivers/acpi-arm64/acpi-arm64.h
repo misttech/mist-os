@@ -37,7 +37,7 @@ class AcpiArm64 : public DeviceType {
   std::optional<acpi::FuchsiaManager> manager_;
   acpi::AcpiImpl acpi_;
   iommu::ArmIommuManager iommu_manager_;
-  // TODO(fxbug.dev/108070): Migrate to fdf::SyncClient when available.
+  // TODO(https://fxbug.dev/108070): Migrate to fdf::SyncClient when available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
 
   std::thread init_thread_;

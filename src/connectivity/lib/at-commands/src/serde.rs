@@ -156,7 +156,7 @@ pub(crate) mod internal {
     /// and responses to glue the various serde functions together.
     impl<T: SerDeMethods> SerDeOne for T {
         fn deserialize_one<R: io::Read>(source: &mut R) -> Result<Self, DeserializeError> {
-            //TODO(fxb/66041) Remove the intermediate String and parse directly from the Read.
+            //TODO(https://fxbug.dev/66041) Remove the intermediate String and parse directly from the Read.
             let mut bytes: Vec<u8> = Vec::new();
             let mut string = String::new();
 

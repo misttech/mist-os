@@ -1639,11 +1639,11 @@ TEST_F(VmoClone2TestCase, ParentStartLimitRegression) {
   } while (0)
 #endif
 
-// This is a regression test for fxbug.dev/56137 and checks that if both children of a hidden parent
+// This is a regression test for https://fxbug.dev/56137 and checks that if both children of a hidden parent
 // are dropped 'at the same time', then there are no races with their parallel destruction.
 TEST_F(VmoClone2TestCase, DropChildrenInParallel) {
   // Try some N times and hope that if there is a bug we get the right timing. Prior to fixing
-  // fxbug.dev/56137 this was enough iterations to reliably trigger.
+  // https://fxbug.dev/56137 this was enough iterations to reliably trigger.
   for (size_t i = 0; i < 1000; i++) {
     zx::vmo vmo;
 
@@ -1764,14 +1764,14 @@ TEST_F(VmoClone2TestCase, MapRangeReadOnly) {
   EXPECT_EQ(kNumPages * zx_system_get_page_size(), info.populated_bytes);
 }
 
-// Regression test for fxbug.dev/129800. The hierarchy generation count was previously incremented
+// Regression test for https://fxbug.dev/129800. The hierarchy generation count was previously incremented
 // in the VmObjectPaged destructor, not in the VmCowPages destructor. But the actual changes to the
 // page list take place in the VmCowPages destructor, which would affect attribution counts. We drop
 // the lock between invoking the two destructors, so it was possible for someone to query the
 // attribution count in between and see an old cached count.
 TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
   // Try some N times and hope that if there is a bug we get the right timing. Prior to fixing
-  // fxbug.dev/129800 this was enough iterations to reliably trigger.
+  // https://fxbug.dev/129800 this was enough iterations to reliably trigger.
   for (size_t i = 0; i < 1000; i++) {
     zx::vmo vmo;
     ASSERT_NO_FATAL_FAILURE(InitPageTaggedVmo(3, &vmo));

@@ -15,7 +15,7 @@ declare_args() {
   #
   # When all subtools that will be migrated to the SDK have been migrated,
   # this config flag will be set to true by default, deprecated, and eventually
-  # removed: fxb/117339
+  # removed: https://fxbug.dev/117339
   ffx_build_dual_mode_plugins_as_subtools = false
 }
 

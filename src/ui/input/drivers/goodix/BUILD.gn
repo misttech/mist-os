@@ -12,7 +12,7 @@ driver_bind_rules("gt92xx_bind") {
   rules = "gt92xx.bind"
   bind_output = "goodix.bindbc"
 
-  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # TODO(https://fxbug.dev/115757): Remove this once we no longer need to generate
   # fragments for composite bind rules.
   disable_fragment_gen = true
 

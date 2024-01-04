@@ -274,7 +274,7 @@ vm_page_t* VmTriPageStorage::AllocateBucketLocked(size_t len) {
   // slot, but since we have a strict 3 slots per page strategy if all of our data is small (i.e.
   // compresses well) then to get optimal memory usage we will have to place small items in large
   // slots and so it is not obviously bad.
-  // TODO(fxbug.dev/60238): Consider if there are scenarios that we can detect where this
+  // TODO(https://fxbug.dev/60238): Consider if there are scenarios that we can detect where this
   // fragmentation is undesirable.
   const uint64_t bucket = __builtin_ctzl(available_buckets);
   DEBUG_ASSERT(bucket < kNumBuckets);

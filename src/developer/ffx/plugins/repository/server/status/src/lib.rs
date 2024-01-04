@@ -52,7 +52,7 @@ mod tests {
         std::{future::Future, net::Ipv4Addr},
     };
 
-    // FIXME(http://fxbug.dev/80740): Unfortunately ffx_config is global, and so each of these tests
+    // FIXME(https://fxbug.dev/80740): Unfortunately ffx_config is global, and so each of these tests
     // could step on each others ffx_config entries if run in parallel. To avoid this, we will:
     //
     // * use the `serial_test` crate to make sure each test runs sequentially

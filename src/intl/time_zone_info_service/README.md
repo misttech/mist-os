@@ -2,7 +2,7 @@
 
 The Time Zone Info Service provides:
 
-*   Properties of time zones — [TODO(fxbug.dev/81902)](https://fxbug.dev/81902)
+*   Properties of time zones — [TODO(https://fxbug.dev/81902)](https://fxbug.dev/81902)
 *   Conversions between civil and absolute times
 
 For the protocols, see

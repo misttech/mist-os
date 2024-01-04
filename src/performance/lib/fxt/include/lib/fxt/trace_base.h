@@ -98,7 +98,7 @@ class [[nodiscard]] Scope {
 
   // Ends the Scope early with the given capture delegate to include additional arguments. The
   // delegate should be created by FXT_END_SCOPE(...) or a suitable wrapper macro.
-  // TODO(fxbug.dev/120535): Get consensus on ergonomic syntax for ending a scope with arguments.
+  // TODO(https://fxbug.dev/120535): Get consensus on ergonomic syntax for ending a scope with arguments.
   template <typename Capture>
   constexpr Scope& operator=(ScopeEnd<Capture>&& end) {
     if (delegate_.has_value()) {

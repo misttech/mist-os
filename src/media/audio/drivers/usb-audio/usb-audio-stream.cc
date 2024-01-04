@@ -141,7 +141,7 @@ zx_status_t UsbAudioStream::Bind() {
 
   thrd_t tmp_thrd;
   dispatcher_loop_.StartThread("usb-audio-stream-dispatcher-loop", &tmp_thrd);
-  // TODO(johngro) : See fxbug.dev/30888.  Eliminate this as soon as we have a more
+  // TODO(johngro) : See https://fxbug.dev/30888.  Eliminate this as soon as we have a more
   // official way of meeting real-time latency requirements.
   constexpr char role_name[] = "fuchsia.devices.usb.audio";
   const size_t role_name_size = strlen(role_name);

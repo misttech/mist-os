@@ -277,7 +277,7 @@ impl Issue {
         let issues_len = issues.len();
         for (i, issue) in issues.drain(..).enumerate() {
             if verbose {
-                println!("[{i}/{issues_len}] Rolling out fxbug.dev/{}", issue.id());
+                println!("[{i}/{issues_len}] Rolling out https://fxbug.dev/{}", issue.id());
             }
             let mut update_mask = "status,components".to_string();
             if issue.owner.is_some() {

@@ -79,7 +79,7 @@ impl Coordinator {
     ///   - This function connects to the first display-coordinator device that it observes. It
     ///   currently does not support selection of a specific device if multiple display-coordinator
     ///   devices are present.
-    // TODO(fxbug.dev/87469): This will currently result in an error if no displays are present on
+    // TODO(https://fxbug.dev/87469): This will currently result in an error if no displays are present on
     // the system (or if one is not attached within `TIMEOUT`). It wouldn't be neceesary to rely on
     // a timeout if the display driver sent en event with no displays.
     pub async fn init() -> Result<Coordinator> {
@@ -93,7 +93,7 @@ impl Coordinator {
         let (coordinator_proxy, coordinator_server_end) =
             fidl::endpoints::create_proxy::<display::CoordinatorMarker>()?;
 
-        // TODO(fxbug.dev/125034): Consider supporting virtcon client
+        // TODO(https://fxbug.dev/125034): Consider supporting virtcon client
         // connections.
         let () = zx::Status::ok(
             provider_proxy.open_coordinator_for_primary(coordinator_server_end).await?,
@@ -107,7 +107,7 @@ impl Coordinator {
     /// Returns an error if
     /// - An initial OnDisplaysChanged event is not received from the display driver within
     ///   `TIMEOUT` seconds.
-    // TODO(fxbug.dev/87469): This will currently result in an error if no displays are present on
+    // TODO(https://fxbug.dev/87469): This will currently result in an error if no displays are present on
     // the system (or if one is not attached within `TIMEOUT`). It wouldn't be neceesary to rely on
     // a timeout if the display driver sent en event with no displays.
     pub async fn init_with_proxy(proxy: display::CoordinatorProxy) -> Result<Coordinator> {
@@ -277,7 +277,7 @@ impl Coordinator {
         let _ = zx::Status::ok(proxy.import_buffer_collection(&id.into(), token).await?)?;
 
         // Tell the driver to assign any device-specific constraints.
-        // TODO(fxbug.dev/85320): These fields are effectively unused except for `type` in the case
+        // TODO(https://fxbug.dev/85320): These fields are effectively unused except for `type` in the case
         // of IMAGE_TYPE_CAPTURE.
         let _ = zx::Status::ok(
             proxy
@@ -454,7 +454,7 @@ mod tests {
         Ok(())
     }
 
-    // TODO(fxbug.dev/125022): We should have an automated test verifying that
+    // TODO(https://fxbug.dev/125022): We should have an automated test verifying that
     // the service provided by driver framework can be opened correctly.
 
     #[fuchsia::test]

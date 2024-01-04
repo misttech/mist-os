@@ -25,7 +25,7 @@ void main() {
   vec4 light_position =
       point_lights[PaperShaderPushConstants.light_index].position;
 
-  // TODO(fxbug.dev/7251): optimize length of extrusion vec so that it doesn't
+  // TODO(https://fxbug.dev/7251): optimize length of extrusion vec so that it doesn't
   // extend far below the floor of the stage.  This can improve performance
   // by reducing the number of stencil-buffer pixels that are touched.  On the
   // other hand, ensure that it extends far enough: there will be artifacts when

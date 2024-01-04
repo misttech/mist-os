@@ -54,7 +54,7 @@ pub(super) fn file_stream(
         buf.resize(min(CHUNK_SIZE, remaining_len as usize), 0);
 
         // Read a chunk from the file.
-        // FIXME(fxbug.dev/128882): We should figure out why we were occasionally getting
+        // FIXME(https://fxbug.dev/128882): We should figure out why we were occasionally getting
         // zero-sized reads from async IO, even though we knew there were more bytes available in
         // the file. Once that bug is fixed, we should switch back to async IO to avoid stalling
         // the executor.

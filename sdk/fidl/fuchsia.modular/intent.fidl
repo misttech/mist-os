@@ -11,7 +11,7 @@ type Intent = resource struct {
     /// The name of the action represented by this Intent.
     ///
     /// This is nullable for backwards compatibility.
-    // TODO(fxbug.dev/15983): Make action non-nullable.
+    // TODO(https://fxbug.dev/15983): Make action non-nullable.
     action string:<MAX, optional>;
 
     /// An explicit handler for the Intent. Specified as the component URL of the

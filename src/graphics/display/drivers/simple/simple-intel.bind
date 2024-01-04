@@ -16,7 +16,7 @@ primary node "pci" {
   // Reject all device IDs that i915 binds to as well. This is necessary
   // because the simple-intel driver binds to the FIDL node published by PCI,
   // but i915 binds to the banjo node.
-  // TODO(fxbug.dev/89649): Remove this once i915 uses FIDL as well.
+  // TODO(https://fxbug.dev/89649): Remove this once i915 uses FIDL as well.
   fuchsia.BIND_PCI_DID != 0x191b;
   fuchsia.BIND_PCI_DID != 0x1912;
   fuchsia.BIND_PCI_DID != 0x191d;

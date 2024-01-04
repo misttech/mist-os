@@ -105,7 +105,7 @@ fn construct_fs_error_to_mount_vmo_result(source: ConstructFsError) -> MountVmoR
                     ParseError::DirEntry2NonUtf8(DirEntry2NonUtf8 { data: val })
                 }
                 ParsingError::InvalidInputPath => {
-                    // TODO(fxbug.dev/122152): Get the actual path.
+                    // TODO(https://fxbug.dev/122152): Get the actual path.
                     ParseError::InvalidInputPath(InvalidInputPath { path: "".to_string() })
                 }
                 ParsingError::PathNotFound(path) => {

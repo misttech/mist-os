@@ -98,7 +98,7 @@ void Gatt2ClientServer::TrySendNextWatchServicesResult() {
 
   // Don't filter removed services by UUID because we don't know the UUIDs of these services
   // currently.
-  // TODO(fxbug.dev/36374): Filter removed services by UUID.
+  // TODO(https://fxbug.dev/36374): Filter removed services by UUID.
 
   std::vector<fbg::ServiceInfo> fidl_updated;
   for (const ServiceMap::value_type& svc_pair : next_watch_services_result_->updated) {
@@ -120,7 +120,7 @@ void Gatt2ClientServer::TrySendNextWatchServicesResult() {
     return;
   }
 
-  // TODO(fxbug.dev/84988): Use measure-tape to verify response fits in FIDL channel before sending.
+  // TODO(https://fxbug.dev/84988): Use measure-tape to verify response fits in FIDL channel before sending.
   // This is only an issue for peers with very large databases.
   bt_log(TRACE, "fidl", "notifying WatchServices() callback (removed: %zu, updated: %zu, peer: %s)",
          fidl_removed.size(), fidl_updated.size(), bt_str(peer_id_));
@@ -128,7 +128,7 @@ void Gatt2ClientServer::TrySendNextWatchServicesResult() {
   watch_services_request_.reset();
 }
 
-// TODO(fxbug.dev/84971): Do not send privileged services (e.g. Generic Attribute Profile Service)
+// TODO(https://fxbug.dev/84971): Do not send privileged services (e.g. Generic Attribute Profile Service)
 // to clients.
 void Gatt2ClientServer::WatchServices(std::vector<fb::Uuid> fidl_uuids,
                                       WatchServicesCallback callback) {

@@ -21,7 +21,7 @@ rustc_library("fuchsia-async") {
   version = "0.1.0"
   with_unit_tests = true
 
-  # TODO(fxbug.dev/97697) Remove --nocapture when this flake is found and fixed.
+  # TODO(https://fxbug.dev/97697) Remove --nocapture when this flake is found and fixed.
   if (is_host) {
     args = [ "--nocapture" ]
   }
@@ -133,7 +133,7 @@ fuchsia_unittest_package("fuchsia-async-tests") {
   }
 
   if (current_cpu == "riscv64") {
-    # TODO(fxbug.dev/299143724): Make this target depend on netstack3 on RISC-V
+    # TODO(https://fxbug.dev/299143724): Make this target depend on netstack3 on RISC-V
     # and remove these lines.
     test_specs = {
     }

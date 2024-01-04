@@ -299,7 +299,7 @@ impl GattService {
     }
 
     fn notify(&self, id: PeerId, handle: Handle, value: Vec<u8>) -> Result<(), Error> {
-        // TODO(fxbug.dev/96726): Only send request if we have enough credits.
+        // TODO(https://fxbug.dev/96726): Only send request if we have enough credits.
         let params = ValueChangedParameters {
             peer_ids: Some(vec![id.into()]),
             handle: Some(handle),
@@ -383,7 +383,7 @@ impl GattService {
             LocalServiceRequest::CharacteristicConfiguration { responder, .. } => {
                 let _ = responder.send();
             }
-            // TODO(fxbug.dev/96726): Track allocated credits
+            // TODO(https://fxbug.dev/96726): Track allocated credits
             LocalServiceRequest::ValueChangedCredit { .. } => {}
             LocalServiceRequest::PeerUpdate { responder, .. } => {
                 // Per FIDL docs, this can be safely ignored

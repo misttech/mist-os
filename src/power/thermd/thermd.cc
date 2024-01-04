@@ -135,7 +135,7 @@ void start_trace() {
   }
 }
 
-// TODO(fxbug.dev/108619): This code here needs an update, it's using some very old patterns.
+// TODO(https://fxbug.dev/108619): This code here needs an update, it's using some very old patterns.
 zx_status_t RunThermd() {
   zx::result power_resource = get_power_resource();
   if (power_resource.is_error()) {
@@ -174,7 +174,7 @@ zx_status_t RunThermd() {
               return ZX_OK;
             }
             // first sensor is ambient sensor
-            // TODO(fxbug.dev/108619): come up with a way to detect this is the ambient sensor
+            // TODO(https://fxbug.dev/108619): come up with a way to detect this is the ambient sensor
             auto& device = *static_cast<
                 std::optional<zx::result<fidl::ClientEnd<fuchsia_hardware_thermal::Device>>>*>(
                 cookie);

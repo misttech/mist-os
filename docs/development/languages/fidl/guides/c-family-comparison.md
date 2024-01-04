@@ -159,7 +159,7 @@ objects in the new C++ bindings.
 </table>
 </div>
 
-<!-- TODO(fxbug.dev/111281): Replace the canvas reference with key value store
+<!-- TODO(https://fxbug.dev/111281): Replace the canvas reference with key value store
      to align with the above, once the key value store example has landed. -->
 
 Here's the most common way to set up a client:
@@ -296,7 +296,7 @@ Refer to the [New C++ tutorial][cpp-tutorial] to get started.
 
 Refer to the [HLCPP tutorial][hlcpp-tutorial] to get started.
 
-<!-- TODO(fxbug.dev/NNNNN): Guide for migrating HLCPP to new C++. -->
+<!-- TODO(https://fxbug.dev/NNNNN): Guide for migrating HLCPP to new C++. -->
 
 ## Summary
 

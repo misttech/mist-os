@@ -166,9 +166,9 @@ fn main() {
         // and run for much longer.
         .sample_size(10);
 
-    // TODO(fxbug.dev/43505): Implement benchmarks where the real size doesn't match the inspector
+    // TODO(https://fxbug.dev/43505): Implement benchmarks where the real size doesn't match the inspector
     // size.
-    // TODO(fxbug.dev/43505): Enforce threads starting before benches run.
+    // TODO(https://fxbug.dev/43505): Enforce threads starting before benches run.
 
     // SNAPSHOT BENCHMARKS
     let mut bench = criterion::Benchmark::new("Snapshot/4K/1hz", move |b| {

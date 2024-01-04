@@ -35,7 +35,7 @@ using namespace std::string_view_literals;
 // This avoids libc++ functions the kernel can't use, and avoids strtoul so as
 // not to require NUL termination.
 //
-// TODO(fxbug.dev/62052): Reconsider the overflow policy below.
+// TODO(https://fxbug.dev/62052): Reconsider the overflow policy below.
 std::optional<int64_t> BootOptions::ParseInt(std::string_view value, std::string_view* rest) {
   int64_t neg = 1;
   if (value.substr(0, 1) == "-") {

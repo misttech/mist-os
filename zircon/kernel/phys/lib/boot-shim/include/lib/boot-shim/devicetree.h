@@ -692,7 +692,7 @@ class RiscvDevictreeCpuTopologyItem : public DevictreeCpuTopologyItem {
     DevictreeCpuTopologyItem::Init(
         shim,  //
         [](const CpuEntry&) {
-          // TODO(fxbug.dev/124336): Skip if "riscv,isa" is missing.
+          // TODO(https://fxbug.dev/124336): Skip if "riscv,isa" is missing.
           return true;
         },
         [this](zbi_topology_processor_t& node, const CpuEntry& cpu_entry) -> void {

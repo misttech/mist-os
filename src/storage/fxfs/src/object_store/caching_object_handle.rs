@@ -23,7 +23,7 @@ fn block_aligned_size(source: &impl ReadObjectHandle) -> usize {
 pub struct CachingObjectHandle<S> {
     source: S,
 
-    // TODO(fxbug.dev/294080669): Add a way to purge chunks that haven't been recently used when
+    // TODO(https://fxbug.dev/294080669): Add a way to purge chunks that haven't been recently used when
     // under memory pressure.
     buffer: UnsafeCell<Vec<u8>>,
 

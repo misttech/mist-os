@@ -29,7 +29,7 @@ source_set("far") {
   ]
   public_deps = [ "//third_party/googletest:gtest_prod" ]
   configs += [
-    # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
     "//build/config:Wno-conversion",
   ]
 }

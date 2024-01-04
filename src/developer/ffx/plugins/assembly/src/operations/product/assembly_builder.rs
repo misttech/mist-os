@@ -771,7 +771,7 @@ impl ImageAssemblyConfigBuilder {
                     .add_driver(driver_details, &package_url)
                     .with_context(|| format!("adding driver {}", &package_url))?;
             }
-            // TODO(fxbug.dev/128391): encapsulate manifests in a DomainConfig package.
+            // TODO(https://fxbug.dev/128391): encapsulate manifests in a DomainConfig package.
             let manifest_path = outdir.join(BASE_DRIVER_MANIFEST_PATH);
             driver_manifest_builder.create_manifest_file(&manifest_path)?;
             bootfs_files.add_entry(FileEntry {

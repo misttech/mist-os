@@ -78,7 +78,7 @@ class SimpleJobEnumerator final : public JobEnumerator {
     // visible and allowing handles to be constructed via object_get_child, could spuriously destroy
     // it. Once a process either has a handle, or has left the initial state, handles can freely be
     // constructed since any additional on_zero_handles invocations will be idempotent.
-    // TODO(fxb/93331): Consider whether long term needing to allow multiple on_zero_handles
+    // TODO(https://fxbug.dev/93331): Consider whether long term needing to allow multiple on_zero_handles
     // transitions is the correct strategy.
     if (proc->state() == ProcessDispatcher::State::INITIAL && Handle::Count(*proc) == 0) {
       return true;
@@ -322,7 +322,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
                                                                      nullptr);
     }
     case ZX_INFO_HANDLE_BASIC: {
-      // TODO(fxbug.dev/30418): Handle forward/backward compatibility issues
+      // TODO(https://fxbug.dev/30418): Handle forward/backward compatibility issues
       // with changes to the struct.
 
       fbl::RefPtr<Dispatcher> dispatcher;
@@ -344,7 +344,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }
     case ZX_INFO_PROCESS: {
-      // TODO(fxbug.dev/30418): Handle forward/backward compatibility issues
+      // TODO(https://fxbug.dev/30418): Handle forward/backward compatibility issues
       // with changes to the struct.
 
       // Grab a reference to the dispatcher.
@@ -430,7 +430,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       return ZX_OK;
     }
     case ZX_INFO_THREAD: {
-      // TODO(fxbug.dev/30418): Handle forward/backward compatibility issues
+      // TODO(https://fxbug.dev/30418): Handle forward/backward compatibility issues
       // with changes to the struct.
 
       // grab a reference to the dispatcher
@@ -477,7 +477,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       return single_record_result(_buffer, buffer_size, _actual, _avail, report);
     }
     case ZX_INFO_THREAD_STATS: {
-      // TODO(fxbug.dev/30418): Handle forward/backward compatibility issues
+      // TODO(https://fxbug.dev/30418): Handle forward/backward compatibility issues
       // with changes to the struct.
 
       // grab a reference to the dispatcher
@@ -497,7 +497,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }
     case ZX_INFO_TASK_STATS: {
-      // TODO(fxbug.dev/30418): Handle forward/backward compatibility issues
+      // TODO(https://fxbug.dev/30418): Handle forward/backward compatibility issues
       // with changes to the struct.
 
       // Grab a reference to the dispatcher. Only supports processes for
@@ -847,7 +847,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       stats.ipc_bytes = state_count[VmPageStateIndex(vm_page_state::IPC)] * PAGE_SIZE;
       sum_bytes += stats.ipc_bytes;
 
-      // TODO(fxbug.dev/68327): Extend zx_info_kmem_stats_t and
+      // TODO(https://fxbug.dev/68327): Extend zx_info_kmem_stats_t and
       // zx_info_kmem_stats_extended_t with SLAB and CACHE fields.
       sum_bytes += state_count[VmPageStateIndex(vm_page_state::CACHE)] * PAGE_SIZE;
       sum_bytes += state_count[VmPageStateIndex(vm_page_state::SLAB)] * PAGE_SIZE;
@@ -1642,7 +1642,7 @@ zx_status_t sys_object_get_child(zx_handle_t handle, uint64_t koid, zx_rights_t 
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  // TODO(fxb/93331): Constructing the handles below may cause the handle count to go from 0->1,
+  // TODO(https://fxbug.dev/93331): Constructing the handles below may cause the handle count to go from 0->1,
   // resulting in multiple on_zero_handles invocations. Presently this is benign, except for one
   // scenario with processes in the initial state. Such processes are filtered out by the
   // SimpleJobEnumerator and should not be able to be learned about. Further protection against

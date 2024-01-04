@@ -34,7 +34,7 @@ void DumpStageMetrics(std::ostringstream& os, const StageMetrics& metrics) {
 // This MONOTONIC-based duration is the maximum interval between trim operations.
 static constexpr zx::duration kMaxTrimPeriod = zx::msec(10);
 
-// TODO(fxbug.dev/49345): We should not need driver to be set for all Audio Devices.
+// TODO(https://fxbug.dev/49345): We should not need driver to be set for all Audio Devices.
 AudioOutput::AudioOutput(const std::string& name, const DeviceConfig& config,
                          ThreadingModel* threading_model, DeviceRegistry* registry,
                          LinkMatrix* link_matrix,

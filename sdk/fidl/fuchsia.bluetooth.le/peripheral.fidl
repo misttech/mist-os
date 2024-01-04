@@ -126,7 +126,7 @@ closed protocol Peripheral {
     /// is fulfilled, advertising may be briefly enabled before it is
     /// terminated. AdvertisedPeripheral lifetime is bounded by the lifetime of
     /// the Peripheral protocol, but this may be changed in the future
-    /// (fxbug.dev/77644).
+    /// (https://fxbug.dev/77644).
     ///
     /// + request `parameters` Parameters used while configuring the advertising
     ///   instance.

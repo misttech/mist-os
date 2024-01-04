@@ -24,7 +24,7 @@
 
 // Encapsulation of the Fuchsia trace observer and provider protocols,
 // for testing.
-// TODO(fxb/116343): Use a testable C++ API from trace engine if one becomes
+// TODO(https://fxbug.dev/116343): Use a testable C++ API from trace engine if one becomes
 // available.
 class FuchsiaTracing {
  public:

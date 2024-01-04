@@ -35,7 +35,7 @@ const BARRIER: &str = "<ffx symbolizer>\n";
 
 pub(crate) type Writer = MachineWriter<processed::ProcessesData>;
 
-// TODO(fxbug.dev/107973): The plugin must remain experimental until the FIDL API is strongly typed.
+// TODO(https://fxbug.dev/107973): The plugin must remain experimental until the FIDL API is strongly typed.
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_process"))]
 pub struct ProcessTool {

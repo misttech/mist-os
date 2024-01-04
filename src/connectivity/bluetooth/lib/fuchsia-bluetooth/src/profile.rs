@@ -246,7 +246,7 @@ impl From<&fidl_bredr::DataElement> for DataElement {
             fDataElement::Uint16(x) => DataElement::Uint16(*x),
             fDataElement::Uint32(x) => DataElement::Uint32(*x),
             fDataElement::Uint64(x) => DataElement::Uint64(*x),
-            // TODO(fxb/107513) Replace clones with moves where possible.
+            // TODO(https://fxbug.dev/107513) Replace clones with moves where possible.
             fDataElement::Str(v) => DataElement::Str(v.clone()),
             fDataElement::Url(s) => DataElement::Url(s.to_string()),
             fDataElement::Uuid(uuid) => DataElement::Uuid(uuid.clone()),

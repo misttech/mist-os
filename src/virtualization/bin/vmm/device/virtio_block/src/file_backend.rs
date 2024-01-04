@@ -18,7 +18,7 @@ const MAX_INFLIGHT_REQUESTS: usize = 64;
 
 pub struct FileBackend {
     file: FileProxy,
-    // fxbug.dev/12536: The guest can cause an unbounded number of requests to the backing file.
+    // https://fxbug.dev/12536: The guest can cause an unbounded number of requests to the backing file.
     // Due to the current lack of channel back-pressure this could result in a policy violation
     // and termination of the virtio-block process.
     //

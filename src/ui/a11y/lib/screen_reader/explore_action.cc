@@ -91,7 +91,7 @@ fpromise::promise<> ExploreAction::SetA11yFocusOrStopPromise(
 }
 
 void ExploreAction::Run(a11y::gesture_util_v2::GestureContext gesture_context) {
-  // TODO(fxbug.dev/95647): Use activity service to detect when user is using a fuchsia device.
+  // TODO(https://fxbug.dev/95647): Use activity service to detect when user is using a fuchsia device.
   screen_reader_context_->set_last_interaction(async::Now(async_get_default_dispatcher()));
 
   auto promise =

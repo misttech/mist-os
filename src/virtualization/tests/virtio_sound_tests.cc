@@ -40,11 +40,11 @@ constexpr AudioSampleFormat kSampleFormat = AudioSampleFormat::FLOAT;
 
 constexpr audio_stream_unique_id_t kOutputId = AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS;
 
-// TODO(fxbug.dev/87646): Consider creating a `virtio_audio_test_util` that directly communicates
+// TODO(https://fxbug.dev/87646): Consider creating a `virtio_audio_test_util` that directly communicates
 // with ALSA instead to have better control over the output buffer.
 constexpr char kAplayBinPath[] = "/tmp/vm_extras/aplay";
 
-// TODO(fxbug.dev/87646): Consider creating a `virtio_audio_test_util` that directly generates this
+// TODO(https://fxbug.dev/87646): Consider creating a `virtio_audio_test_util` that directly generates this
 // audio files on-the-fly.
 constexpr char kTestFilePath[] = "/tmp/extras/stereo_ramp_48khz_16bit.wav";
 
@@ -154,7 +154,7 @@ TYPED_TEST(VirtioSoundGuestTest, OutputFidelity) {
   const auto ring_buffer = this->GetOutputRingBuffer();
   ASSERT_EQ(ring_buffer.format().channels(), kStereoChannelCount);
 
-  // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+  // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
   if (this->OutputHasUnderflows()) {
     GTEST_SKIP() << "Skipping fidelity checks due to underflows";
     __builtin_unreachable();
@@ -168,7 +168,7 @@ TYPED_TEST(VirtioSoundGuestTest, OutputFidelity) {
   ASSERT_LE(end_frame, ring_buffer.NumFrames()) << "Not enough frames in ring buffer";
 
   const auto buffer_slice = AudioBufferSlice(&ring_buffer, *start_frame, end_frame);
-  // TODO(fxbug.dev/95106): Temporarily limit the end frame to `24000 - kZeroPaddingFrameCount`
+  // TODO(https://fxbug.dev/95106): Temporarily limit the end frame to `24000 - kZeroPaddingFrameCount`
   // until the buffer repetition issue is resolved (to be replaced by `kRampFrameCount`).
   for (int32_t frame = 0; frame < 24000 - kZeroPaddingFrameCount; ++frame) {
     EXPECT_FLOAT_EQ(buffer_slice.SampleAt(frame, 0),

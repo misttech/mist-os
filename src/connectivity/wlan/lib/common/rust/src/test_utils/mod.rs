@@ -174,7 +174,7 @@ mod tests {
         A(u8),
         B {
             named: u8,
-            // TODO(fxbug.dev/84729)
+            // TODO(https://fxbug.dev/84729)
             #[allow(unused)]
             bar: u16,
         },
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "unexpected variant")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_full_match_fail_with_same_variant_different_value() {
         assert_variant!(Foo::A(8), Foo::A(7));
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "unexpected variant")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_full_match_fail_with_different_variant() {
         assert_variant!(Foo::A(8), Foo::C);
@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "unexpected variant")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_multi_variant_failure() {
         assert_variant!(Foo::C, Foo::A(_) | Foo::B { .. });
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "unexpected variant")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_partial_match_failure() {
         assert_variant!(Foo::A(8), Foo::B { .. });
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "custom error message")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_custom_message_failure() {
         assert_variant!(Foo::A(8), Foo::B { .. }, "custom error message");
@@ -269,7 +269,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "custom error message token1 token2")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_custom_message_with_multiple_fmt_tokens_failure() {
         assert_variant!(Foo::A(8), Foo::B { .. }, "custom error message {} {}", "token1", "token2");
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "unexpected variant at 0 in v:\n[\n    0,\n    2,\n]")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_at_idx_failure() {
         let v = vec![0, 2];
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "custom error message")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_at_idx_custom_message_failure() {
         let v = vec![0, 2];
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "custom error message token1 token2")]
-    // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn assert_variant_at_idx_custom_message_with_multiple_tokens_failure() {
         let v = vec![0, 2];

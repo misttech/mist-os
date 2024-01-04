@@ -78,7 +78,7 @@ impl RegisteredServiceId {
 /// A ServiceRecord representing the information about a service.
 /// A ServiceRecord is considered "registered" when it has been assigned
 /// a unique RegisteredServiceId.
-// TODO(fxbug.dev/51454): Store all the fields of the ServiceDefinition here.
+// TODO(https://fxbug.dev/51454): Store all the fields of the ServiceDefinition here.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ServiceRecord {
     /// The Service Class IDs specified by this record. There must be at least one.
@@ -174,7 +174,7 @@ impl ServiceRecord {
     /// from the data in the ServiceRecord.
     ///
     /// Returns an error if the ServiceRecord has not been registered.
-    // TODO(fxbug.dev/51454): Build the full ServiceFoundResponse. Right now, we just
+    // TODO(https://fxbug.dev/51454): Build the full ServiceFoundResponse. Right now, we just
     // build the primary L2CAP Protocol, ServiceClassIdentifiers, and Profile Descriptors.
     pub fn to_service_found_response(&self) -> Result<ServiceFoundResponse, Error> {
         let peer_id =

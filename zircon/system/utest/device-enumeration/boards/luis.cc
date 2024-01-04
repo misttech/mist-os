@@ -39,12 +39,12 @@ TEST_F(DeviceEnumerationTest, LuisTest) {
       "composite-pd-little-core/power-1",
 
       // CPU Device.
-      // TODO(fxbug.dev/60492): Temporarily removed.
+      // TODO(https://fxbug.dev/60492): Temporarily removed.
       // "sys/platform/03:0c:6",
       // "class/cpu-ctrl/000",
       // "class/cpu-ctrl/001",
 
-      // USB ethernet; Can be RNDIS or CDC based on build config. Update this after fxbug.dev/58584
+      // USB ethernet; Can be RNDIS or CDC based on build config. Update this after https://fxbug.dev/58584
       // is fixed.
       "dwc2/dwc2/usb-peripheral/function-000",
   };

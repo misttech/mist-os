@@ -296,7 +296,7 @@ impl Inner {
                 .basic_info()
                 .expect("basic info should not require any rights")
                 .koid;
-            // TODO(fxbug.dev/309122518): Once crash introspection no longer relies on monikers,
+            // TODO(https://fxbug.dev/309122518): Once crash introspection no longer relies on monikers,
             // we can run components without knowing their moniker, by assigning a least privileged
             // job policy.
             let Some(target_moniker) = program::moniker_from_controller_koid(koid) else {

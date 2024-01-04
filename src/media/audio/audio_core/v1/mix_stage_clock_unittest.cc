@@ -116,7 +116,7 @@ constexpr bool kTraceClockSyncConvergence = false;
 class MixStageClockTest : public testing::ThreadingModelFixture {
  protected:
   // We measure long-running position across mixes of 10ms (our block size).
-  // TODO(fxbug.dev/56635): If our mix timeslice shortens, adjust the below and retune the PIDs.
+  // TODO(https://fxbug.dev/56635): If our mix timeslice shortens, adjust the below and retune the PIDs.
   static constexpr zx::duration kClockSyncMixDuration = zx::msec(10);
   static constexpr uint32_t kFramesToMix =
       kDefaultFrameRate * kClockSyncMixDuration.to_msecs() / 1000;

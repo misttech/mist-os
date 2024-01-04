@@ -36,7 +36,7 @@ impl {{ .Name }} {
     {{- else }}
     #[inline(always)]
     pub fn from_bits_allow_unknown(bits: {{ .UnderlyingType }}) -> Self {
-        {{- /* TODO(fxbug.dev/124335): Use `from_bits_retain` instead. */}}
+        {{- /* TODO(https://fxbug.dev/124335): Use `from_bits_retain` instead. */}}
         unsafe { Self::from_bits_unchecked(bits) }
     }
 

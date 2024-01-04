@@ -22,8 +22,8 @@ using Resampler = ::media::audio::Mixer::Resampler;
 constexpr auto kMaxInt24In32 = media_audio::kMaxInt24In32;
 constexpr auto kMinInt24In32 = media_audio::kMinInt24In32;
 
-// TODO(fxbug.dev/70578): Relocate position-related tests here, from audio_fidelity_tests
-// TODO(fxbug.dev/70580): Refactor the set of pass-thru, rechannel, accumulate and gain unittests,
+// TODO(https://fxbug.dev/70578): Relocate position-related tests here, from audio_fidelity_tests
+// TODO(https://fxbug.dev/70580): Refactor the set of pass-thru, rechannel, accumulate and gain unittests,
 // so they run on SincSampler as well  (perhaps moving them into a mixer_unittest.cc).
 class PointSamplerTest : public testing::Test {
  protected:
@@ -395,7 +395,7 @@ TEST_F(PointSamplerRechannelTest, QuadToMono) {
   std::vector<float> expect;
   if constexpr (media_audio::kEnable4ChannelWorkaround) {
     // For now, 4->1 just ignores channels 2 & 3.
-    // TODO(fxbug.dev/85201): Remove this workaround, once the device properly maps channels.
+    // TODO(https://fxbug.dev/85201): Remove this workaround, once the device properly maps channels.
     expect = {
         // clang-format off
               0.5,
@@ -445,7 +445,7 @@ TEST_F(PointSamplerRechannelTest, QuadToStereo) {
   std::vector<float> expect;
   if constexpr (media_audio::kEnable4ChannelWorkaround) {
     // For now, 4->2 just ignores channels 2 & 3.
-    // TODO(fxbug.dev/85201): Remove this workaround, once the device properly maps channels.
+    // TODO(https://fxbug.dev/85201): Remove this workaround, once the device properly maps channels.
     expect = {1, -1, -0x800000, 0x7FFFFF, 0x7FFFFF, 0};
   } else {
     expect = {0.5, -0.5, -0x800000, 0x7FFFFF, 0, 0};

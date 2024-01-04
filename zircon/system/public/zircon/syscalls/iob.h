@@ -13,7 +13,7 @@ __BEGIN_CDECLS
 // handle IOBuffers with extremely large numbers of regions.
 #define ZX_IOB_MAX_REGIONS 64
 
-// TODO(fxb/118650): Clarify and finalize the ringbuffer disciplines.
+// TODO(https://fxbug.dev/118650): Clarify and finalize the ringbuffer disciplines.
 #define ZX_IOB_DISCIPLINE_TYPE_NONE (0)
 
 #define ZX_IOB_REGION_TYPE_PRIVATE (0)

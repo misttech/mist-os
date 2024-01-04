@@ -250,7 +250,7 @@ icu_rustc_library("lib") {
     "src/trace.rs",
   ]
 
-  # TODO(fxbug.dev/85921): Split this library up to be less monolithic.
+  # TODO(https://fxbug.dev/85921): Split this library up to be less monolithic.
   # If building this massive crate runs into OOM issues on RBE, `disable_rbe = true`
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
@@ -362,7 +362,7 @@ icu_fuchsia_package("setui_service") {
 }
 
 # Core shard for products that don't have a camera.
-# TODO(fxbug.dev/117974): Make into an empty target on migration.
+# TODO(https://fxbug.dev/117974): Make into an empty target on migration.
 group("setui_service_core_shard") {
   visibility = [
     ":*",
@@ -380,7 +380,7 @@ core_shard("setui_service_core_shard_migration") {
 }
 
 # Core shard for products that have a camera.
-# TODO(fxbug.dev/117974): Make into an empty target on migration.
+# TODO(https://fxbug.dev/117974): Make into an empty target on migration.
 group("setui_service_with_camera_core_shard") {
   visibility = [
     ":*",

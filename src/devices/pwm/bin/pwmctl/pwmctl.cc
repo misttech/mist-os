@@ -66,7 +66,7 @@ zx_status_t set_config(fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>& client, 
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // TODO(fxbug.dev/41256): This is AML specific, factor this into a plugin or something.
+  // TODO(https://fxbug.dev/41256): This is AML specific, factor this into a plugin or something.
   aml_pwm::mode_config cfg;
   cfg.mode = aml_pwm::Mode::kOn;
 

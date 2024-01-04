@@ -3,4 +3,4 @@
 # found in the LICENSE file.
 
 import("//products/core.gni")
-# TODO(fxbug.dev/282896655): Remove this product (redundant with core).
+# TODO(https://fxbug.dev/282896655): Remove this product (redundant with core).

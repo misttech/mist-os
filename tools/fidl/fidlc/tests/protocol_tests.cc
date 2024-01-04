@@ -957,7 +957,7 @@ protocol MyProtocol {
   library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "bool");
   library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "example/Handle");
   library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "vector<bool>");
-  // TODO(fxbug.dev/93999): Should be "vector<bool>:optional".
+  // TODO(https://fxbug.dev/93999): Should be "vector<bool>:optional".
   library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "vector<bool>?");
 
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -1178,6 +1178,6 @@ protocol MyProtocol {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// TODO(fxbug.dev/93542): add bad `:optional` message body tests here.
+// TODO(https://fxbug.dev/93542): add bad `:optional` message body tests here.
 
 }  // namespace

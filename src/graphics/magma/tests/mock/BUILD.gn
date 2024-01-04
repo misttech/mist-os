@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(fxbug.dev/133551): Remove when mesa has been converted.
+# TODO(https://fxbug.dev/133551): Remove when mesa has been converted.
 group("magma_system") {
   deps = [ "//src/graphics/magma/lib/magma_client/mock:magma_system" ]
 }

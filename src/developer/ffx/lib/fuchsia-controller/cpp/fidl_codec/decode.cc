@@ -55,7 +55,7 @@ PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  /
     if (res == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
       return nullptr;
     }
-    // TODO(fxbug.dev/124288): Properly fill the handle disposition. The code will likely
+    // TODO(https://fxbug.dev/124288): Properly fill the handle disposition. The code will likely
     // not just be integers.
     c_handles[i] = zx_handle_disposition_t{.handle = res};
   }

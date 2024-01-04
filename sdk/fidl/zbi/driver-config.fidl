@@ -4,7 +4,7 @@
 
 library zbi;
 
-// TODO(fxbug.dev/111453): Figure out documentation convention.
+// TODO(https://fxbug.dev/111453): Figure out documentation convention.
 
 /// ZBI_TYPE_KERNEL_DRIVER item types (for zbi_header_t.extra)
 type KernelDriver = enum : uint32 {

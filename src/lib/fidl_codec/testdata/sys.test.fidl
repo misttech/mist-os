@@ -275,7 +275,7 @@ type ServiceList = resource struct {
     provider client_end:<Provider, optional>;
 
     // A channel to the directory hosting the services in `names`.
-    // TODO(fxbug.dev/31262): Support `host_directory` for CreateComponent and deprecate
+    // TODO(https://fxbug.dev/31262): Support `host_directory` for CreateComponent and deprecate
     // `provider`.
     host_directory zx.Handle:<CHANNEL, optional>;
 };
@@ -392,7 +392,7 @@ closed protocol Runner {
 //
 // This protocol is deprecated.  Services should be published as directory
 // entries instead, just like files.
-// TODO(fxbug.dev/31262): Point to the FIDL protocol for file I/O once RIO is migrated.
+// TODO(https://fxbug.dev/31262): Point to the FIDL protocol for file I/O once RIO is migrated.
 closed protocol Provider {
     // Asks the host to provide the service identified by `service_name` through
     // the `channel` endpoint supplied by the caller. If the host is not willing

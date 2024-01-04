@@ -149,7 +149,7 @@ closed protocol Vmar {
         child_addr Vaddr;
     }) error Status;
 
-    // TODO(fxbug.dev/32803): handle No rights required?
+    // TODO(https://fxbug.dev/32803): handle No rights required?
     /// ## Summary
     ///
     /// Destroy a virtual memory address region.
@@ -174,7 +174,7 @@ closed protocol Vmar {
     ///
     /// ## Rights
     ///
-    /// TODO(fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/32253)
     ///
     /// ## Return value
     ///
@@ -209,7 +209,7 @@ closed protocol Vmar {
         handle Handle:VMAR;
     }) -> () error Status;
 
-    // TODO(fxbug.dev/32253): TODO handle and vmo and options must all match, and options can't specify them.
+    // TODO(https://fxbug.dev/32253): TODO handle and vmo and options must all match, and options can't specify them.
     /// ## Summary
     ///
     /// Add a memory mapping.
@@ -376,7 +376,7 @@ closed protocol Vmar {
         mapped_addr Vaddr;
     }) error Status;
 
-    // TODO(fxbug.dev/32803): handle No rights required?
+    // TODO(https://fxbug.dev/32803): handle No rights required?
     /// ## Summary
     ///
     /// Unmap virtual memory pages.
@@ -402,7 +402,7 @@ closed protocol Vmar {
     ///
     /// ## Rights
     ///
-    /// TODO(fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/32253)
     ///
     /// ## Return value
     ///

@@ -71,7 +71,7 @@ func parseFlags() testsharderFlags {
 		"maximum and is used to make the average shard size not exceed the max size, but ultimately the shards will be sharded by duration, so some shards may have "+
 		"more than the max number of tests while others will have less. However, if max-shards-per-env is set, that will take precedence over max-shard-size, which "+
 		"may result in all shards exceeding the max size in order to fit within the max number of shards per environment.")
-	// TODO(fxbug.dev/10456): Support different timeouts for different tests.
+	// TODO(https://fxbug.dev/10456): Support different timeouts for different tests.
 	flag.IntVar(&flags.perTestTimeoutSecs, "per-test-timeout-secs", 0, "per-test timeout, applied to all tests. If <= 0, no timeout will be set")
 	flag.IntVar(&flags.targetTestCount, "target-test-count", 0, "target number of tests per shard. If <= 0, will be ignored. Otherwise, tests will be placed into more, smaller shards")
 	flag.StringVar(&flags.affectedTestsPath, "affected-tests", "", "path to a file containing names of tests affected by the change being tested. One test name per line.")

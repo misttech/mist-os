@@ -28,7 +28,7 @@ type InterfaceConfig = struct {
 type TestAddEthernetDeviceRequest = struct {
     topological_path string;
     config InterfaceConfig;
-    // TODO(fxbug.dev/7947): Use 'EthernetDevice device;' instead.
+    // TODO(https://fxbug.dev/7947): Use 'EthernetDevice device;' instead.
     this_should_be_a_handle uint32;
 };
 
@@ -36,7 +36,7 @@ type TestPackageResolverResolveRequest = resource struct {
     package_url string;
     selectors vector<string>;
     update_policy UpdatePolicy;
-    // TODO(fxbug.dev/7947): Use 'EthernetDevice device;' instead.
+    // TODO(https://fxbug.dev/7947): Use 'EthernetDevice device;' instead.
     this_should_be_a_handle uint32;
 };
 

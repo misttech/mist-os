@@ -98,7 +98,7 @@ impl IntlController {
         self.client.write_setting(current.merge(info).into(), id).await.into_handler_result()
     }
 
-    #[allow(clippy::result_large_err)] // TODO(fxbug.dev/117896)
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/117896)
     /// Checks if the given IntlInfo is valid.
     fn validate_intl_info(&self, info: IntlInfo) -> Result<(), ControllerError> {
         if let Some(time_zone_id) = info.time_zone_id {

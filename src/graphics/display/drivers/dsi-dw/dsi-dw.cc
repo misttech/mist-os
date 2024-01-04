@@ -862,7 +862,7 @@ zx_status_t DsiDw::SendCommand(const mipi_dsi_cmd_t& cmd) {
 }
 
 void DsiDw::SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& completer) {
-  // TODO(fxbug.dev/126565): We don't support READ at the moment. READ is complicated because it
+  // TODO(https://fxbug.dev/126565): We don't support READ at the moment. READ is complicated because it
   // consumes additional cycles required to get info from the LCD. This may cause issues if the
   // command is issued during the last line of a frame. If we want to support READ, we would want to
   // properly stop VIDEO, switch to COMMAND mode and perform the read. For now, we will not support

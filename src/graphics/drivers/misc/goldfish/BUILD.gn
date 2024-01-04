@@ -54,7 +54,7 @@ fuchsia_driver("goldfish_driver-driver") {
 
   configs += [ "//build/config:all_source" ]
 
-  # TODO(fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

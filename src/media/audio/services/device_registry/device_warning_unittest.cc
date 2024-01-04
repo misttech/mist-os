@@ -12,7 +12,7 @@ namespace media_audio {
 
 class DeviceWarningTest : public DeviceTestBase {};
 
-// TODO(fxbug.dev/117826): test behavior with non-compliant drivers (e.g. min_gain > max_gain).
+// TODO(https://fxbug.dev/117826): test behavior with non-compliant drivers (e.g. min_gain > max_gain).
 
 TEST_F(DeviceWarningTest, DeviceUnhealthy) {
   fake_driver_->set_health_state(false);
@@ -184,8 +184,8 @@ TEST_F(DeviceWarningTest, CannotSetGainWithoutControl) {
   EXPECT_FALSE(*gain_state.agc_enabled());
 }
 
-// TODO(fxbug.dev/117826): CreateRingBuffer with bad format.
+// TODO(https://fxbug.dev/117826): CreateRingBuffer with bad format.
 
-// TODO(fxbug.dev/117826): GetVmo size too large; min_frames too large
+// TODO(https://fxbug.dev/117826): GetVmo size too large; min_frames too large
 
 }  // namespace media_audio

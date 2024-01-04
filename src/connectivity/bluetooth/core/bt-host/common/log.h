@@ -121,7 +121,7 @@ PW_PRINTF_FORMAT(1, 2) constexpr void CheckFormat([[maybe_unused]] const char* f
 
 // This macro should be kept as small as possible to reduce binary size.
 // This macro should not wrap its contents in a lambda, as it breaks logs using __FUNCTION__.
-// TODO(fxbug.dev/1390): Due to limitations, |tag| is processed by printf-style formatters as a
+// TODO(https://fxbug.dev/1390): Due to limitations, |tag| is processed by printf-style formatters as a
 // format string, so check that |tag| does not specify any additional args.
 #define bt_log(level, tag, fmt...)                                                             \
   PW_LOG(static_cast<int>(bt::LogSeverity::level), tag, GetPwLogFlags(bt::LogSeverity::level), \

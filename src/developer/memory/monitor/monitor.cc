@@ -61,7 +61,7 @@ const char kTraceNameHighPrecisionBandwidthCamera[] =
 constexpr uint64_t kMaxPendingBandwidthMeasurements = 4;
 constexpr uint64_t kMemCyclesToMeasure = 792000000 / 20;                 // 50 ms on sherlock
 constexpr uint64_t kMemCyclesToMeasureHighPrecision = 792000000 / 1000;  // 1 ms
-// TODO(fxbug.dev/48254): Get default channel information through the FIDL API.
+// TODO(https://fxbug.dev/48254): Get default channel information through the FIDL API.
 struct RamChannel {
   const char* name;
   uint64_t mask;

@@ -42,7 +42,7 @@ type ResolutionContext = struct {
     bytes vector<uint8>:MAX_RESOLUTION_CONTEXT_SIZE;
 };
 
-// TODO(fxbug.dev/100050): Change this length to something smaller once
+// TODO(https://fxbug.dev/100050): Change this length to something smaller once
 // fuchsia.pkg implements subpackages, assuming fuchsia.pkg implements the
 // package context value as a much smaller lookup key (such as a package hash to
 // the package containing the subpackage map). Make a related change to

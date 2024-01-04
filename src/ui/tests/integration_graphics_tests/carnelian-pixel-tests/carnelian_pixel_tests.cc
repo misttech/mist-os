@@ -86,7 +86,7 @@ TEST_F(CarnelianPixelTest, ValidPixelTest) {
         auto histogram = screenshot.Histogram();
         if (histogram[utils::kBlue] == 0)
           return false;
-        // TODO(fxb/116631): Switch to exact comparisons after Astro
+        // TODO(https://fxbug.dev/116631): Switch to exact comparisons after Astro
         // precision issues are resolved.
         EXPECT_NEAR(histogram[utils::kMagenta], square_pixels, display_size().width);
         EXPECT_NEAR(histogram[utils::kBlue], background_pixels, display_size().width);

@@ -337,7 +337,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     // invokes the binary multiple times, resulting in main running several times. We may be
     // ignoring real issues by ignoreing the subsequent calls in the case that multiple parties
     // are invoking start unknowingly. Comparing the args may be a way to avoid that issue.
-    // TODO(http://fxbug.dev/122136): Remedy this situation
+    // TODO(https://fxbug.dev/122136): Remedy this situation
     if (is_started_) {
       completer.Reply(zx::ok());
       return;

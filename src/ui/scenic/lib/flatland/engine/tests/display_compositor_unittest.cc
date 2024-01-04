@@ -84,7 +84,7 @@ void SetConstraintsAndClose(fuchsia::sysmem::AllocatorSyncPtr& sysmem_allocator,
 
 // Creates a thread that waits until |num_messages| have been received by |mock|, then calls join()
 // on destruction. Returns a unique_ptr<> with a custom deleter.
-// TODO(fxbug.dev/71264): Use function call counters from MockDisplayCoordinator instead of counting
+// TODO(https://fxbug.dev/71264): Use function call counters from MockDisplayCoordinator instead of counting
 // them manually.
 auto CreateServerWaitingForMessages(flatland::MockDisplayCoordinator& mock,
                                     const uint32_t num_messages) {

@@ -182,7 +182,7 @@ class LocalComponentImpl {
 // The interface for backing implementations of components with a Source of Mock
 // when added by deprecated method AddLocalChild(..., LocalComponent*, ...).
 //
-// TODO(fxbug.dev/296292544): Remove this class when build-time support for API
+// TODO(https://fxbug.dev/296292544): Remove this class when build-time support for API
 // level 15 is removed.
 class LocalComponent {
  public:
@@ -204,7 +204,7 @@ using LocalComponentFactory = fit::function<std::unique_ptr<LocalComponentImpl>(
 // Type for either variation of implementation passed to AddLocalChild(): the
 // deprecated raw pointer, or one of the valid callback functions.
 #if __Fuchsia_API_level__ < 17
-// TODO(fxbug.dev/296292544): Remove this variant when build-time support for
+// TODO(https://fxbug.dev/296292544): Remove this variant when build-time support for
 // API level 15 is removed.
 using LocalComponentKind = cpp17::variant<LocalComponent*, LocalComponentFactory>;
 #else

@@ -13,7 +13,7 @@ group("tests") {
 
   # Certain test cases (e.g. position accuracy) are disabled by default (enabled by cmdline flag).
   # They have hard realtime constraints; debug builds are too slow.
-  # TODO(fxbug.dev/65608): Enable these cases in a new suite that runs only in realtime envs.
+  # TODO(https://fxbug.dev/65608): Enable these cases in a new suite that runs only in realtime envs.
 }
 
 fuchsia_unittest_package("audio_driver_tests") {

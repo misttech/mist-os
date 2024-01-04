@@ -184,7 +184,7 @@ impl Repository {
                     target_path,
                     anyhow!(other)
                 );
-                // TODO(fxbug.dev/43646) Should this bubble up a MerkleForError::TufError(other)?
+                // TODO(https://fxbug.dev/43646) Should this bubble up a MerkleForError::TufError(other)?
             }
         }
 
@@ -493,7 +493,7 @@ mod tests {
             TargetPath::new("just-meta-far/0".to_string()).expect("created target path");
 
         // When the server is blocked, we should fail at get_merkle_at_path
-        // TODO(fxbug.dev/39651) if the Repository can't connect to the remote server AND
+        // TODO(https://fxbug.dev/39651) if the Repository can't connect to the remote server AND
         // we've updated our local repo recently, then it should return the merkle that is stored locally
         should_fail.set();
         assert_matches!(

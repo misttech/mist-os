@@ -126,7 +126,7 @@ where
         if self.result_code == 0 {
             Ok(self)
         } else {
-            // TODO(fxbug.dev/90618): figure out what should happen if pinweaver returns an error we
+            // TODO(https://fxbug.dev/90618): figure out what should happen if pinweaver returns an error we
             // don't recognise.
             Err(PinWeaverError::from_primitive(self.result_code)
                 .unwrap_or(PinWeaverError::VersionMismatch))

@@ -139,25 +139,25 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_IMX_UART, zbi_dcfg_s
   template <class IoProvider>
   void EnableTxInterrupt(IoProvider& io, bool enable = true) {
     // Stubbed out implementation that does nothing.
-    // TODO(fxbug.dev/115620): implement me
+    // TODO(https://fxbug.dev/115620): implement me
   }
 
   template <class IoProvider>
   void EnableRxInterrupt(IoProvider& io, bool enable = true) {
     // Stubbed out implementation that does nothing.
-    // TODO(fxbug.dev/115620): implement me
+    // TODO(https://fxbug.dev/115620): implement me
   }
 
   template <class IoProvider, class EnableInterruptCallback>
   void InitInterrupt(IoProvider& io, EnableInterruptCallback&& enable_interrupt_callback) {
     // Stubber out implementation.
-    // TODO(fxbug.dev/115620): implement me
+    // TODO(https://fxbug.dev/115620): implement me
   }
 
   template <class IoProvider, class Lock, class Waiter, class Tx, class Rx>
   void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& rx, Rx&& tx) {
     // Stubber out implementation.
-    // TODO(fxbug.dev/115620): implement me
+    // TODO(https://fxbug.dev/115620): implement me
   }
 };
 

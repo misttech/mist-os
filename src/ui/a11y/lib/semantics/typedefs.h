@@ -12,7 +12,7 @@ using NodeFilter = fit::function<bool(const fuchsia::accessibility::semantics::N
 
 // Same as NodeFilter, but takes a pointer to the node's parent along with the node.
 // This saves us a costly call to 'GetParentNode'.
-// TODO(fxbug.dev/108397) Cache parent nodes so that 'GetParentNode' is less costly.
+// TODO(https://fxbug.dev/108397) Cache parent nodes so that 'GetParentNode' is less costly.
 using NodeFilterWithParent =
     fit::function<bool(const fuchsia::accessibility::semantics::Node* node,
                        const fuchsia::accessibility::semantics::Node* parent)>;

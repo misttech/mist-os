@@ -11,7 +11,7 @@ to touch events and echoes them to the syslog.
 `flatland-view-provider-vulkan.cm` is the same, except it uses Vulkan to render, instead
 of negotiating CPU-writable buffers with sysmem.
 
-TODO(fxbug.dev/104692): the Vulkan version uses a single filled rect, instead of rendering
+TODO(https://fxbug.dev/104692): the Vulkan version uses a single filled rect, instead of rendering
 each quadrant in a different color.
 
 To launch:

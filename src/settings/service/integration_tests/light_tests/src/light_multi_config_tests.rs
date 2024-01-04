@@ -246,7 +246,7 @@ async fn test_light_set_single_light() {
 
     let settings = light_proxy.watch_light_group(LIGHT_NAME_1).await.expect("watch completed");
 
-    // TODO(fxbug.dev/132310): Remove this second watch when the flake is fixed.
+    // TODO(https://fxbug.dev/132310): Remove this second watch when the flake is fixed.
     if settings != expected_light_group {
         // Create a second watcher to get the value for debugging purposes.
         let light_proxy2 = LightRealm::connect_to_light_marker(&realm);

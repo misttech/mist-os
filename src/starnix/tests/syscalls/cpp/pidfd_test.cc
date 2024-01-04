@@ -14,7 +14,7 @@
 
 namespace {
 
-// TODO(fxbug.dev/135633): This define will no longer be needed when x64 and arm64 switch to the
+// TODO(https://fxbug.dev/135633): This define will no longer be needed when x64 and arm64 switch to the
 // ubuntu20.04 sysroot too.
 #ifndef __riscv
 #define SYS_pidfd_open 434

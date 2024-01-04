@@ -61,7 +61,7 @@ class Image : public Resource {
   const ImageInfo& info() const { return info_; }
   vk::Image vk() const { return image_; }
   vk::Format format() const { return info_.format; }
-  // TODO(fxbug.dev/7173): decide whether to deprecate format().
+  // TODO(https://fxbug.dev/7173): decide whether to deprecate format().
   vk::Format vk_format() const { return info_.format; }
   uint32_t width() const { return info_.width; }
   uint32_t height() const { return info_.height; }
@@ -72,7 +72,7 @@ class Image : public Resource {
   vk::DeviceSize size() const { return size_; }
   uint8_t* host_ptr() const { return host_ptr_; }
 
-  // TODO(fxbug.dev/7174): how does this interact with swapchain_layout_?
+  // TODO(https://fxbug.dev/7174): how does this interact with swapchain_layout_?
   // Should it be locked so that the layout can't be changed during a render-pass
   // where it is used as an attachment?
 
@@ -127,7 +127,7 @@ class Image : public Resource {
   const vk::DeviceSize size_;
   uint8_t* const host_ptr_;
 
-  // TODO(fxbug.dev/7174): consider allowing image to have an initial layout.
+  // TODO(https://fxbug.dev/7174): consider allowing image to have an initial layout.
   vk::ImageLayout layout_ = vk::ImageLayout::eUndefined;
 
   vk::ImageLayout swapchain_layout_ = vk::ImageLayout::eUndefined;

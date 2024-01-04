@@ -94,7 +94,7 @@ class VideoInputUnit {
   // The OSD layers read images of `layer_image_size` and display them on
   // a display device of `display_contents_size`.
   //
-  // TODO(fxbug.dev/42062952): Fully support multiple layers.
+  // TODO(https://fxbug.dev/42062952): Fully support multiple layers.
   void ConfigOsdLayers(PixelGridSize2D layer_image_size, PixelGridSize2D display_contents_size);
 
   // Sets up the blending modules on the OSD layers and the Video Post
@@ -105,13 +105,13 @@ class VideoInputUnit {
   void ConfigSingleLayerBlending(PixelGridSize2D layer_size, PixelGridSize2D display_contents_size);
 
   // Disables framebuffer scaling.
-  // TODO(fxbug.dev/317922128): Add OSD scaler support.
+  // TODO(https://fxbug.dev/317922128): Add OSD scaler support.
   void DisableScaling();
 
   // Sets up the AFBC (ARM Frame Buffer Compression) decoder IP block for the
   // OSD1 layer. The input image of the layer is of `layer_image_size`.
   //
-  // TODO(fxbug.dev/42062952): Fully support multiple layers.
+  // TODO(https://fxbug.dev/42062952): Fully support multiple layers.
   void ConfigAfbcDecoder(PixelGridSize2D layer_image_size);
 
   bool ConfigNeededForSingleNonscaledLayer(PixelGridSize2D layer_image_size,

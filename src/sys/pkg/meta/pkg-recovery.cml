@@ -24,7 +24,7 @@
             url: "#meta/system-updater.cm",
         },
         {
-            // TODO(fxbug.dev/65383) investigate how isolated-ota should work with commits. GC is
+            // TODO(https://fxbug.dev/65383) investigate how isolated-ota should work with commits. GC is
             // traditionally blocked on the previous updated being committed. Here, we relax this
             // restriction because it does not make sense for recovery, and use a fake
             // system-update-committer that always reports the system is committed.

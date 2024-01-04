@@ -435,7 +435,7 @@ void MixStage::MixStream(Mixer& mixer, ReadableStream& stream) {
       float gain_db_to_report;
       const bool ramping = mixer.gain.IsRamping();
       if (ramping) {
-        // TODO(fxbug.dev/94160): make less error-prone
+        // TODO(https://fxbug.dev/94160): make less error-prone
         auto scale_arr_max = mixer.gain.CalculateScaleArray(
             mixer.scale_arr.get(), std::min(dest_frames - dest_offset, Mixer::kScaleArrLen),
             dest_frames_per_dest_ref_clock_nsec);
@@ -687,7 +687,7 @@ void MixStage::ReconcileClocksAndSetStepSize(::media_audio::ClockSynchronizer& c
     return;
   }
 
-  // TODO(fxbug.dev/63750): pass through a signal if we expect discontinuity (Play, Pause, packet
+  // TODO(https://fxbug.dev/63750): pass through a signal if we expect discontinuity (Play, Pause, packet
   // discontinuity bit); use it to log (or report to inspect) only unexpected discontinuities.
   // Add a test to validate that we log discontinuities only when we should.
 

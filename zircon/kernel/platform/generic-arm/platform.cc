@@ -127,7 +127,7 @@ static uint64_t ToMpid(const zbi_topology_processor_t& processor) {
          info.cpu_id;
 }
 
-// TODO(fxbug.dev/98351): Refactor platform_panic_start.
+// TODO(https://fxbug.dev/98351): Refactor platform_panic_start.
 void platform_panic_start(PanicStartHaltOtherCpus option) {
   arch_disable_ints();
   dlog_panic_start();

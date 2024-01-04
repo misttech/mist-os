@@ -131,7 +131,7 @@ closed protocol View {
     /// + request `ip_version` the IP version to read configurations from.
     /// - response `config` a snapshot of the interface's configuration.
     /// * error `ZX_ERR_NOT_FOUND` if `interface` does not exist.
-    // TODO(fxbug.dev/59058): Reading configuration should be moved to
+    // TODO(https://fxbug.dev/59058): Reading configuration should be moved to
     // interface-scoped protocols in fuchsia.net.interfaces.
     strict GetUnreachabilityConfig(struct {
         interface fuchsia.net.InterfaceId;
@@ -209,7 +209,7 @@ closed protocol Controller {
     /// * error `ZX_ERR_INVALID_ARGS` if `config` contains an invalid value,
     ///     see [`fuchsia.net.neighbor/UnreachabilityConfig`] for the list of
     ///     constraints.
-    // TODO(fxbug.dev/59058): Updating configuration should be moved to
+    // TODO(https://fxbug.dev/59058): Updating configuration should be moved to
     // interface-scoped protocols in fuchsia.net.interfaces.
     strict UpdateUnreachabilityConfig(struct {
         interface fuchsia.net.InterfaceId;

@@ -233,7 +233,7 @@ ZxPromise<Artifact> RealmFuzzerRunner::Minimize(Artifact artifact) {
                              << " bytes; exiting.";
                return fpromise::ok(std::move(input));
              }
-             // TODO(fxbug.dev/85424): This needs a more rigorous way of deduplicating crashes.
+             // TODO(https://fxbug.dev/85424): This needs a more rigorous way of deduplicating crashes.
              if (minimized.fuzz_result() != fuzz_result) {
                FX_LOGS(WARNING) << "Different error detected; will not minimize further.";
                return fpromise::ok(std::move(input));

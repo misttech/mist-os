@@ -370,7 +370,7 @@ class ChromiumInputTest : public MouseInputBase {
     };
   }
 
-  // TODO(fxbug.dev/58322): EnsureMouseIsReadyAndGetPosition will send a mouse click
+  // TODO(https://fxbug.dev/58322): EnsureMouseIsReadyAndGetPosition will send a mouse click
   // (down and up) and wait for response to ensure the mouse is ready to use. We will retry a
   // mouse click if we can not get the mouseup response in small timeout. This function returns
   // the cursor position in WebEngine coordinate system.

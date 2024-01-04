@@ -88,7 +88,7 @@ class TestPlatformPort : public testing::Test {
     semaphore->Reset();
     thread->join();
 
-    // TODO(fxbug.dev/30552) - enable: Verify WaitAsync/Wait then kill the handle
+    // TODO(https://fxbug.dev/30552) - enable: Verify WaitAsync/Wait then kill the handle
 #if 0
         semaphore->WaitAsync(port.get());
         thread.reset(new std::thread([port] {
@@ -104,7 +104,7 @@ class TestPlatformPort : public testing::Test {
 #endif
 
     // Verify close
-    // TODO(fxbug.dev/30552): test Close after Wait also
+    // TODO(https://fxbug.dev/30552): test Close after Wait also
     port->Close();
     thread.reset(new std::thread([port, semaphore] {
       DLOG("Waiting for semaphore");

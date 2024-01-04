@@ -35,7 +35,7 @@ const std::array<float, 4> kGpuRenderingDebugColor = {0.9f, 0.5f, 0.5f, 1.f};
 // Returns an image type that describes the tiling format used for buffer with
 // this pixel format. The values are display driver specific and not documented
 // in the display coordinator FIDL API.
-// TODO(fxbug.dev/33334): Remove this when image type is removed from the display
+// TODO(https://fxbug.dev/33334): Remove this when image type is removed from the display
 // coordinator API.
 uint32_t BufferCollectionPixelFormatToImageType(const fuchsia::sysmem::PixelFormat& pixel_format) {
   if (pixel_format.has_format_modifier) {
@@ -174,7 +174,7 @@ bool CheckBuffersAllocated(fuchsia::sysmem::BufferCollectionSyncPtr& token) {
 
 // Calls WaitForBuffersAllocated() on |token| and returns the pixel format of the allocation.
 // |token| must have already checked that buffers are allocated.
-// TODO(fxbug.dev/71344): Delete after we don't need the pixel format anymore.
+// TODO(https://fxbug.dev/71344): Delete after we don't need the pixel format anymore.
 fuchsia::sysmem::PixelFormat GetPixelFormat(fuchsia::sysmem::BufferCollectionSyncPtr& token) {
   zx_status_t allocation_status = ZX_OK;
   fuchsia::sysmem::BufferCollectionInfo_2 buffer_collection_info = {};
@@ -187,7 +187,7 @@ fuchsia::sysmem::PixelFormat GetPixelFormat(fuchsia::sysmem::BufferCollectionSyn
 
 // Consumes |token| and if its allocation is compatible with the display returns its pixel format.
 // Otherwise returns std::nullopt.
-// TODO(fxbug.dev/71344): Just return a bool after we don't need the pixel format anymore.
+// TODO(https://fxbug.dev/71344): Just return a bool after we don't need the pixel format anymore.
 std::optional<fuchsia::sysmem::PixelFormat> DetermineDisplaySupportFor(
     fuchsia::sysmem::BufferCollectionSyncPtr token) {
   std::optional<fuchsia::sysmem::PixelFormat> result = std::nullopt;
@@ -234,7 +234,7 @@ DisplayCompositor::~DisplayCompositor() {
     }
   }
 
-  // TODO(fxbug.dev/112156): Release |render_targets| and |protected_render_targets| collections and
+  // TODO(https://fxbug.dev/112156): Release |render_targets| and |protected_render_targets| collections and
   // images.
 }
 
@@ -344,7 +344,7 @@ fuchsia::sysmem::BufferCollectionSyncPtr DisplayCompositor::TakeDisplayBufferCol
 
 fuchsia::hardware::display::types::ImageConfig DisplayCompositor::CreateImageConfig(
     const allocation::ImageMetadata& metadata) const {
-  // TODO(fxbug.dev/71344): Pixel format should be ignored when using sysmem. We do not want to have
+  // TODO(https://fxbug.dev/71344): Pixel format should be ignored when using sysmem. We do not want to have
   // to deal with this default image format. Work was in progress to address this, but is currently
   // stalled: see fxr/716543.
   FX_DCHECK(buffer_collection_pixel_format_.count(metadata.collection_id));
@@ -513,7 +513,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
         return false;
       }
     } else {
-      // TODO(fxbug.dev/104887): Not all display hardware is able to handle color layers with
+      // TODO(https://fxbug.dev/104887): Not all display hardware is able to handle color layers with
       // specific sizes, which is required for doing solid-fill rects on the display path.
       // If we encounter one of those rects here -- unless it is the backmost layer and fullscreen
       // -- then we abort.
@@ -546,7 +546,7 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::types:
   (*display_coordinator_)
       ->SetLayerColorConfig(layer_id, fuchsia::images2::PixelFormat::BGRA32, col);
 
-// TODO(fxbug.dev/104887): Currently, not all display hardware supports the ability to
+// TODO(https://fxbug.dev/104887): Currently, not all display hardware supports the ability to
 // set either the position or the alpha on a color layer, as color layers are not primary
 // layers. There exist hardware that require a color layer to be the backmost layer and to be
 // the size of the entire display. This means that for the time being, we must rely on GPU
@@ -638,7 +638,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
   // are multiple displays which require GPU-composited content, we pass this event to be signaled
   // when the final display's content has finished rendering (thus guaranteeing that all previous
   // content has also finished rendering).
-  // TODO(fxbug.dev/77640): we might want to reuse events, instead of creating a new one every
+  // TODO(https://fxbug.dev/77640): we might want to reuse events, instead of creating a new one every
   // frame.
   zx::event render_finished_fence = utils::CreateEvent();
 
@@ -680,7 +680,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     // Reset the event data.
     auto& event_data = display_engine_data.frame_event_datas[curr_vmo];
 
-    // TODO(fxbug.dev/91737): Remove this after the direct-to-display path is stable.
+    // TODO(https://fxbug.dev/91737): Remove this after the direct-to-display path is stable.
     // We expect the retired event to already have been signaled. Verify this without waiting.
     {
       const zx_status_t status =
@@ -731,7 +731,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
 
     // We are being opportunistic and skipping the costly CheckConfig() call at this stage, because
     // we know that gpu composited layers work and there is no fallback case beyond this. See
-    // fxb/84271 for more details.
+    // https://fxbug.dev/84271 for more details.
 #ifndef NDEBUG
     if (!CheckConfig()) {
       FX_LOGS(ERROR) << "Both display hardware composition and GPU rendering have failed.";
@@ -787,7 +787,7 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
                                                 std::move(callback));
   }
 
-  // TODO(fxbug.dev/77414): we should be calling ApplyConfig2() here, but it's not implemented yet.
+  // TODO(https://fxbug.dev/77414): we should be calling ApplyConfig2() here, but it's not implemented yet.
   // Additionally, if the previous frame was "direct scanout" (but not if "gpu composited") we
   // should obtain the fences for that frame and pass them directly to ApplyConfig2().
   // ReleaseFenceManager is somewhat poorly suited to this, because it was designed for an old
@@ -805,7 +805,7 @@ bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& r
 
   for (const auto& data : render_data_list) {
     if (!SetRenderDataOnDisplay(data)) {
-      // TODO(fxbug.dev/77416): just because setting the data on one display fails (e.g. due to
+      // TODO(https://fxbug.dev/77416): just because setting the data on one display fails (e.g. due to
       // too many layers), that doesn't mean that all displays need to use GPU-composition.  Some
       // day we might want to use GPU-composition for some client images, and direct-scanout for
       // others.
@@ -927,7 +927,7 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
     std::scoped_lock lock(lock_);
     // When we add in a new display, we create a couple of layers for that display upfront to be
     // used when we directly composite render data in hardware via the display coordinator.
-    // TODO(fxbug.dev/77873): per-display layer lists are probably a bad idea; this approach doesn't
+    // TODO(https://fxbug.dev/77873): per-display layer lists are probably a bad idea; this approach doesn't
     // reflect the constraints of the underlying display hardware.
     for (uint32_t i = 0; i < max_display_layers_; i++) {
       display_engine_data.layers.push_back(CreateDisplayLayer());

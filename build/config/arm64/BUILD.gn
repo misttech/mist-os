@@ -24,7 +24,7 @@ config("cortex-a53") {
   ldflags = cflags
   asmflags = cflags
 
-  # TODO(fxbug.dev/87243): consider the below.
+  # TODO(https://fxbug.dev/87243): consider the below.
   #rustflags = [ "-Ctarget-cpu=cortex-a53" ]
 
   rustflags = [ "-Ctarget-feature=+crc,+aes,+sha2,+neon" ]

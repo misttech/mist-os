@@ -112,7 +112,7 @@ _environment_service_account =
 #
 #   workaround_broken_time_skip
 #   - Optional: whether to sleep 15 seconds and then reconnect after paving
-#     the device to avoid a known bug (fxbug.dev/74861) in netstack when
+#     the device to avoid a known bug (https://fxbug.dev/74861) in netstack when
 #     system time becomes accurate.
 #   - Type: boolean, default false
 #

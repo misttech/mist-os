@@ -468,7 +468,7 @@ impl MountState {
             let next_mount =
                 old_group.state.read().mounts.iter().next().map(|w| w.0.upgrade().unwrap());
             if let Some(next_mount) = next_mount {
-                // TODO(fxbug.dev/114002): Fix the lock ordering here. We've locked next_mount
+                // TODO(https://fxbug.dev/114002): Fix the lock ordering here. We've locked next_mount
                 // while self is locked, and since the propagation tree and mount tree are
                 // separate, this could violate the mount -> submount order previously established.
                 next_mount.write().set_upstream(upstream);

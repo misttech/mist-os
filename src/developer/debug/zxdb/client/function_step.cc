@@ -76,7 +76,7 @@ FunctionStep GetFunctionStepAction(Thread* thread) {
     return FunctionStep::kDefault;
   }
 
-  // TODO(fxbug.dev/5442) add functionality for determining whether this call is a system source
+  // TODO(https://fxbug.dev/5442) add functionality for determining whether this call is a system source
   // call. We probably want to skip over all calls to libc.so by default and return kStepOut. For
   // libc code that's inlined, we may want to be smarter, like for std::function we'd want to step
   // through until we get to user code for for std::vector maybe we'd want to step out.

@@ -313,7 +313,7 @@ developers expressed interest. This template or the concept of it can be ported
 to the GN SDK using GN metadata, as well as to the Bazel/Blaze SDK using Bazel
 Aspects or Bazel Providers.
 
-See also: [fxbug.dev/77007][fxb-77007]
+See also: [https://fxbug.dev/77007][fxb-77007]
 
 ## Performance
 

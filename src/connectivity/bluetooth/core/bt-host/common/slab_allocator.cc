@@ -12,7 +12,7 @@
 namespace bt {
 
 MutableByteBufferPtr NewBuffer(size_t size) {
-  // TODO(fxbug.dev/106841): Use Pigweed's slab allocator
+  // TODO(https://fxbug.dev/106841): Use Pigweed's slab allocator
   return std::make_unique<DynamicByteBuffer>(size);
 }
 

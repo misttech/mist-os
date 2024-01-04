@@ -143,7 +143,7 @@ TEST_F(TwoProvidersOneEngine, ErrorHandling) {
   RunAndVerify(kBasicIntegrationTestPath, "simple", "trace:test", 1, "oneshot");
 
   // Running this test twice should work.
-  // fxbug.dev/22912: Providers didn't properly reset themselves after a previous
+  // https://fxbug.dev/22912: Providers didn't properly reset themselves after a previous
   // trace was prematurely aborted.
   RunAndVerify(kBasicIntegrationTestPath, "simple", "trace:test", 1, "oneshot");
 }

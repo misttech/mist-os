@@ -84,7 +84,7 @@ const char kMediaValueWired[] = "wired";
 const char kMediaValueWireless[] = "wireless";
 const char kMediaValueBoth[] = "both";
 
-// TODO(fxb/113901): Remove this when alt_services is no longer needed.
+// TODO(https://fxbug.dev/113901): Remove this when alt_services is no longer needed.
 const char kAltServicesKey[] = "alt_services";
 
 }  // namespace

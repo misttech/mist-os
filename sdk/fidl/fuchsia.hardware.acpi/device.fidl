@@ -242,7 +242,7 @@ type PowerResource = struct {
     resource_order uint32;
 };
 
-// TODO(fxbug.dev/35218): This is a hack to work around the fact that FIDL
+// TODO(https://fxbug.dev/35218): This is a hack to work around the fact that FIDL
 // doesn't like unions with recursive types.
 type ObjectList = struct {
     value vector<Object>:<MAX, optional>;

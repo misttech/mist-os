@@ -299,7 +299,7 @@ template("sherlock_driver") {
       "//src/lib/ddk",
       "//src/lib/ddk:ddk-metadata-headers",
 
-      # TODO(fxb/38132): Migrate to the new bind rules and delete the below
+      # TODO(https://fxbug.dev/38132): Migrate to the new bind rules and delete the below
       ":sherlock-bind",
       ":sherlock-bind_header",
       "//src/lib/ddk:ddk-deprecated-binding-headers",
@@ -311,7 +311,7 @@ template("sherlock_driver") {
       "//zircon/system/ulib/zx",
     ]
 
-    # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
+    # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
     # rather than builders.
     configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
   }

@@ -78,7 +78,7 @@ func (s *Service) getIO() (io.NodeWithCtx, func() error, error) {
 }
 
 func (s *Service) addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(fxbug.dev/33595): this does not implement the node protocol correctly,
+	// TODO(https://fxbug.dev/33595): this does not implement the node protocol correctly,
 	// but matches the behaviour of SDK VFS.
 	if flags&io.OpenFlagsNodeReference != 0 {
 		stub := io.NodeWithCtxStub{Impl: s}

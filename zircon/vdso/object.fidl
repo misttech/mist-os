@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library zx;
 
-// TODO(fxbug.dev/110021): This should be modeled as a `bits`, but more thought
+// TODO(https://fxbug.dev/110021): This should be modeled as a `bits`, but more thought
 // needs to be given to the public/private split of the current C definition.
 alias Signals = uint32;
 

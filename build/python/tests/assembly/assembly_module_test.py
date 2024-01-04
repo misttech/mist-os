@@ -372,7 +372,7 @@ class AssemblyInputBundleTest(unittest.TestCase):
         assert_field_equal(parsed_aib, aib, "config_data")
         assert_field_equal(parsed_aib, aib, "base_drivers")
         assert_field_equal(parsed_aib, aib, "shell_commands")
-        # TODO(fxb/116908): support deserializing union data types
+        # TODO(https://fxbug.dev/116908): support deserializing union data types
         # assert_field_equal(parsed_aib, aib, "packages_to_compile")
         # self.assertEqual(parsed_aib, aib)
 

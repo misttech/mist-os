@@ -166,7 +166,7 @@ pub struct BlockDevicePayloadStreamer {
     inner: Mutex<BlockDevicePayloadStreamerInner>,
 }
 
-//TODO(fxb/107831): Increasing this may speed up the transfer once the UMS crash is fixed.
+//TODO(https://fxbug.dev/107831): Increasing this may speed up the transfer once the UMS crash is fixed.
 const DEVICE_VMO_SIZE: usize = 8192 * 16;
 
 impl BlockDevicePayloadStreamer {

@@ -106,7 +106,7 @@
                 // epoll_test - https://fxbug.dev/79261
                 "EpollTest.CloseFile",
 
-                // eventfd_test - splice() isn't implemented fxbug.dev/119324
+                // eventfd_test - splice() isn't implemented https://fxbug.dev/119324
                 "EventfdTest.SpliceReturnsEINVAL",
 
                 // exceptions_test
@@ -902,7 +902,7 @@
                 // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
 
-                // fxbug.dev/136337
+                // https://fxbug.dev/136337
                 "AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",
                 "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecNeg/*",
                 "AllSocketPairTest.SendTimeoutUsecTooLarge/*",
@@ -936,13 +936,13 @@
                 "FlockTest.TestSharedLockFailExclusiveHolderBlocking",
                 "FlockTest.TestExclusiveLockFailExclusiveHolderBlocking",
 
-                // TODO(fxbug.dev/105339): Re-enable once flake is resolved.
+                // TODO(https://fxbug.dev/105339): Re-enable once flake is resolved.
                 "Waiters/WaitSpecificChildTest.MultipleForkOutOfOrder/*",
 
-                // TODO(fxbug.dev/120705): Re-enable once flake is resolved.
+                // TODO(https://fxbug.dev/120705): Re-enable once flake is resolved.
                 "SharedPrivate/PrivateAndSharedFutexTest.Wait_BitsetTimeout/*",
 
-                // TODO(fxbug.dev/120707): Re-enable once flake is resolved.
+                // TODO(https://fxbug.dev/120707): Re-enable once flake is resolved.
                 "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecTooLarge/*",
 
                 // These tests are flaky.
@@ -975,7 +975,7 @@
                 "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
 
-                // socket_inet_loopback_isolated_test - flaky TODO(fxbug.dev/128640)
+                // socket_inet_loopback_isolated_test - flaky TODO(https://fxbug.dev/128640)
                 "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/*",
@@ -985,7 +985,7 @@
                 "AllInetTests/UdpSocketTest.ReadShutdownDifferentThread/*",
                 "AllInetTests/UdpSocketTest.ErrorQueue/*",
 
-                // TODO(fxbug.dev/114813): Re-enable once CLONE_VM | CLONE_THREAD is implemented
+                // TODO(https://fxbug.dev/114813): Re-enable once CLONE_VM | CLONE_THREAD is implemented
                 "Waiters/WaitAnyChildTest.CloneSIGCHLD/*",
                 "Waiters/WaitAnyChildTest.ForkAndClone/*",
                 "Waiters/WaitSpecificChildTest.CloneSIGCHLD/*",
@@ -1041,7 +1041,7 @@
                 "SpliceTest.ToPipeWithSmallCapacityDoesNotSpin",
 
                 // pty_test
-                //TODO(fxbug.dev/126724): Re-enable once flake is resolved.
+                //TODO(https://fxbug.dev/126724): Re-enable once flake is resolved.
                 "JobControlTest.ReleaseTTYSignals",
                 "JobControlTest.ReleaseUnsetTTY",
                 "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
@@ -1051,7 +1051,7 @@
 
                 // sigstop_test
 
-                // TODO(fxbug.dev/128870): Investigate failure on arm.
+                // TODO(https://fxbug.dev/128870): Investigate failure on arm.
                 "SigstopTest.RestartSyscall",
 
                 // exec_binary_test
@@ -1069,7 +1069,7 @@
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
 
-                // TODO(fxbug.dev/129161): Fix flake.
+                // TODO(https://fxbug.dev/129161): Fix flake.
                 "VforkTest.ExecedChildExitDoesntUnstopParent",
                 "VforkTest.ParentStopsUntilChildExits",
 

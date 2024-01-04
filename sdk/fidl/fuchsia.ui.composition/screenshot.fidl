@@ -12,7 +12,7 @@ using zx;
 type ScreenshotFormat = flexible enum : uint8 {
     /// The default format, requesting a tightly packed pixel data with 32 bit BGRA pixels.
     BGRA_RAW = 0;
-    // TODO(fxbug.dev/103742): Add png format.
+    // TODO(https://fxbug.dev/103742): Add png format.
 };
 
 /// Collects the current graphical content of a display.
@@ -58,7 +58,7 @@ closed protocol Screenshot {
     /// doing pixel equality checks making use of non-fully saturated colors should convert to a
     /// linear color space.
     ///
-    /// TODO(fxbug.dev/114595): Link to fuchsia.dev documentation when it's up.
+    /// TODO(https://fxbug.dev/114595): Link to fuchsia.dev documentation when it's up.
     ///
     /// Screenshot is taken immediately, populated with the display's content from the most recent
     /// VSYNC.

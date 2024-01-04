@@ -214,7 +214,7 @@ zx_status_t AmlRawNand::AmlWaitCmdQueueEmpty(zx::duration timeout, zx::duration 
 
 zx_status_t AmlRawNand::AmlWaitCmdFinish(zx::duration timeout, zx::duration first_interval,
                                          zx::duration polling_interval) {
-  // TODO(fxb/94715): We don't need to wait for the queue to be empty here, just for enough space
+  // TODO(https://fxbug.dev/94715): We don't need to wait for the queue to be empty here, just for enough space
   // available for the two idle commands below.
   // The queue could be full when this is called, so wait for it to be empty before writing the idle
   // commands.

@@ -99,7 +99,7 @@ closed protocol Stack {
 @discoverable
 closed protocol Log {
     /// Dynamically set packet logging.
-    // TODO(fxbug.dev/42432): replace with optional packet captures in Inspect
+    // TODO(https://fxbug.dev/42432): replace with optional packet captures in Inspect
     // output.
     strict SetLogPackets(struct {
         enabled bool;

@@ -60,7 +60,7 @@ type Info = struct {
     /// This field will be revised to better reflect the subtleties around
     /// modern display hardware, such as multiple layer types, and around
     /// pixel format modifiers, such as tiling and framebuffer compression
-    /// formats. See fxbug.dev/121328 and fxbug.dev/126156.
+    /// formats. See https://fxbug.dev/121328 and https://fxbug.dev/126156.
     ///
     /// The formats listed here reflect support from both the display engine
     /// hardware and the display device. This means some of the formats may be

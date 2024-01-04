@@ -465,7 +465,7 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReport) {
   CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
 }
 
-// TODO(fxbug.dev/117123): delete when CrashReporter::File is removed.
+// TODO(https://fxbug.dev/117123): delete when CrashReporter::File is removed.
 TEST_F(CrashReporterTest, Succeed_OnInputCrashReport_OldFile) {
   SetUpDataProviderServer(
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
@@ -722,7 +722,7 @@ TEST_F(CrashReporterTest, Fail_OnInvalidInputCrashReport) {
   EXPECT_EQ(result.err(), FilingError::INVALID_ARGS_ERROR);
 }
 
-// TODO(fxbug.dev/117123): delete when CrashReporter::File is removed.
+// TODO(https://fxbug.dev/117123): delete when CrashReporter::File is removed.
 TEST_F(CrashReporterTest, Fail_OnInvalidInputCrashReport_OldFile) {
   SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
   SetUpCrashReporterDefaultConfig();

@@ -442,7 +442,7 @@ class Minfs final : public TransactionalFs {
   // This event's koid is used as a unique identifier for this filesystem instance.
   zx::event fs_id_;
 
-  // TODO(fxbug.dev/108131): Stop accessing outside `dispatcher_` thread.
+  // TODO(https://fxbug.dev/108131): Stop accessing outside `dispatcher_` thread.
   async::TaskClosure journal_sync_task_;
 
   MinfsInspectTree inspect_tree_;

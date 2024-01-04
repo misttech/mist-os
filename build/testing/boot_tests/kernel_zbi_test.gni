@@ -25,7 +25,7 @@ cuckoo_kernel_zbi_test_params = {
 # capable of interacting with ffx and fx. This allows data exfiltration from arbitrary
 # devices for gathering data from the provided zbi. E.g. coverage, profile, etc.
 #
-# TODO(fxbug.dev/101831): This template longer term goal is to facilitate the
+# TODO(https://fxbug.dev/101831): This template longer term goal is to facilitate the
 # construction of Cuckoo Testing.
 #
 #  Parameters:
@@ -156,7 +156,7 @@ template("cuckoo_kernel_zbi_test") {
 # Composes a bootable kernel zbi test. That is, a zircon kernel that will launch
 # a custom user space process instead of component manager.
 #
-# TODO(fxbug.dev/101831): This template longer term goal is to facilitate the
+# TODO(https://fxbug.dev/101831): This template longer term goal is to facilitate the
 # construction of Cuckoo Testing.
 #
 # At this moment `kernel_zbi_test` has no additional parameters from a

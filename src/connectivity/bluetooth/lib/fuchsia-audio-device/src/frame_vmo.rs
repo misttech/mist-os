@@ -96,7 +96,7 @@ impl FrameVmo {
         self.format = Some(format);
         self.frames_per_second = frames_per_second;
         if notifications_per_ring > 0 {
-            // TODO(fxbug.dev/92947) : consider rounding this up to avoid delivering an extra
+            // TODO(https://fxbug.dev/92947) : consider rounding this up to avoid delivering an extra
             // notification sometimes.
             // (and always align the frames notified to the beginning of the buffer)
             self.frames_between_notifications = frames / notifications_per_ring as usize;
@@ -572,7 +572,7 @@ mod tests {
 
         // Should be able to get frames that span from the middle of the buffer to the middle of the
         // buffer (from index 12000 to index 11999).  This should be 24000 frames.
-        // TODO(fxbug.dev/90313): should mark the buffer somehow to confirm that the data is correct
+        // TODO(https://fxbug.dev/90313): should mark the buffer somehow to confirm that the data is correct
         let res = vmo.poll_read(TEST_FRAMES / 2, &mut full_buf, &mut no_wake_cx);
         let (frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 

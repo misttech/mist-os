@@ -62,7 +62,7 @@ type Table struct {
 	// WireTableFrame is the name of the table frame type associated with
 	// this table in wire domain objects.
 	WireTableFrame name
-	// TODO(fxbug.dev/118283): document these
+	// TODO(https://fxbug.dev/118283): document these
 	WireTableBuilder         name
 	WireTableExternalBuilder name
 	// FrameItems stores the members in ordinal order; "null" for reserved.

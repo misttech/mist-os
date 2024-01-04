@@ -15,7 +15,7 @@
 // not well defined, our libc does detect this behavior in some
 // circumstances.
 //
-// TODO(fxbug.dev/65753) precisely define our behavior in this sort of
+// TODO(https://fxbug.dev/65753) precisely define our behavior in this sort of
 // situation.
 
 namespace {
@@ -159,7 +159,7 @@ TEST(PthreadDetach, Idempotent) {
   // and Gate instances from the stack yet, even after the acknowledgement of
   // the last message.  While it would be nice to use a join for this, we have
   // detached this thread, so we will have to make due with a completion.
-  // See the write-up in fxb/70261 for details.
+  // See the write-up in https://fxbug.dev/70261 for details.
   thread.WaitForThreadExited();
 }
 

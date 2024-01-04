@@ -28,7 +28,7 @@ declare_args() {
 
   # Determines whether the fuchsia_async library used by many Rust targets will be compiled
   # with TRACE level log statements that increase binary size a measurable amount.
-  # TODO(fxbug.dev/80742) move this to a toolchain to allow multiple products to build together
+  # TODO(https://fxbug.dev/80742) move this to a toolchain to allow multiple products to build together
   fuchsia_async_trace_level_logging = true
 
   # The product assembly config used to configure the main Fuchsia image.
@@ -40,7 +40,7 @@ declare_args() {
   # The product assembly config used to configure the Zedboot image.
   zedboot_product_assembly_config_label = false
 
-  # TODO(fxbug.dev/94051): move to board definitions.
+  # TODO(https://fxbug.dev/94051): move to board definitions.
   # Adds a prefix to the start of the virtual device name. Used to distinguish
   # between similar virtual device's using different configuration's such as
   # `emu_window_size`.

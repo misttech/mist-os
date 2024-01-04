@@ -23,8 +23,8 @@ namespace fuzzing {
 // performance: it uses the ordering to constrain which mutations to pick from based on the input
 // size and output capacity.
 //
-// TODO(fxbug.dev/84365): This is currently missing a strategy to pull from the dictionary.
-// TODO(fxbug.dev/85308): Add support for data-flow-guided fuzzing.
+// TODO(https://fxbug.dev/84365): This is currently missing a strategy to pull from the dictionary.
+// TODO(https://fxbug.dev/85308): Add support for data-flow-guided fuzzing.
 enum Mutation : uint8_t {
   // 1 < size
   kSkipSome,

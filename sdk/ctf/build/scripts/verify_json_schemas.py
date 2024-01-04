@@ -82,7 +82,7 @@ class GoldenMismatchError(Exception):
         return ret_str
 
 
-# TODO(fxb/107079): Update JSON schemas check to be a compatibility test.
+# TODO(https://fxbug.dev/107079): Update JSON schemas check to be a compatibility test.
 # class BreakingChangesError(Exception):
 #     Exception raised when breaking changes are detected.
 

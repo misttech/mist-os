@@ -24,7 +24,7 @@ struct LoaderInfo {
   std::unique_ptr<BlobLayout> layout;
 
   // Used to verify the pages as they are read in.
-  // TODO(fxbug.dev/44742): Make BlobVerifier movable, unwrap from unique_ptr.
+  // TODO(https://fxbug.dev/44742): Make BlobVerifier movable, unwrap from unique_ptr.
   std::unique_ptr<BlobVerifier> verifier;
 
   // An optional decompressor used by the chunked compression strategy. The decompressor is invoked

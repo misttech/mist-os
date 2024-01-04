@@ -464,7 +464,7 @@ class RustRemoteAction(object):
             # else
             yield tok
 
-        # TODO(http://fxbug.dev/105799): relocate rust sysroot to
+        # TODO(https://fxbug.dev/105799): relocate rust sysroot to
         # be indepedent of host-platform to make remote commands
         # match for better caching.
         # The rust sysroot is home to the standard libraries for

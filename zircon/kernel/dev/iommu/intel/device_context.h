@@ -100,7 +100,7 @@ class DeviceContext : public fbl::DoublyLinkedListable<ktl::unique_ptr<DeviceCon
   // translation of requests-with-PASID.
   SecondLevelPageTable second_level_pt_;
   RegionAllocator region_alloc_;
-  // TODO(fxbug.dev/33017) Use a better data structure for these.  If the
+  // TODO(https://fxbug.dev/33017) Use a better data structure for these.  If the
   // region nodes were intrusive, we wouldn't need to have a
   // resizable array for this and we could have cheaper removal.  We
   // can fix this up when it's a problem though.

@@ -124,7 +124,7 @@ zx_status_t Capture::WriteImage(FILE* fp, WriteFlags flags, Crop& crop) {
   // workaround for bypass mode wrapped in NV16
   auto is_bayer_hack = (flags & WriteFlags::MOD_BAYER8HACK) != WriteFlags::NONE;
   if (is_bayer_hack && iformat.pixel_format.type == fuchsia::sysmem::PixelFormatType::NV12) {
-    // TODO(fxbug.dev/58283) remove when stream format is accurate for bayer mode
+    // TODO(https://fxbug.dev/58283) remove when stream format is accurate for bayer mode
     // 2200x2720 is from sensor config
     iformat.bytes_per_row = 2208;  // rounded up to %16?
     iformat.coded_width = 2200;

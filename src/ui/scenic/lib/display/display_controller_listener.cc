@@ -23,7 +23,7 @@ DisplayCoordinatorListener::DisplayCoordinatorListener(
     wait_coordinator_closed_.Begin(async_get_default_dispatcher());
 
     // Listen for events
-    // TODO(fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
+    // TODO(https://fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
     wait_event_msg_.set_object(coordinator_channel_handle_);
     wait_event_msg_.set_trigger(ZX_CHANNEL_READABLE);
     wait_event_msg_.Begin(async_get_default_dispatcher());
@@ -49,7 +49,7 @@ void DisplayCoordinatorListener::InitializeCallbacks(
 
   on_invalid_cb_ = std::move(on_invalid);
 
-  // TODO(fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
+  // TODO(https://fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
   auto event_dispatcher =
       static_cast<fuchsia::hardware::display::Coordinator::Proxy_*>(event_dispatcher_.get());
   event_dispatcher->OnDisplaysChanged = std::move(on_displays_changed_cb);
@@ -66,7 +66,7 @@ void DisplayCoordinatorListener::ClearCallbacks() {
 }
 
 void DisplayCoordinatorListener::SetOnVsyncCallback(OnVsyncCallback on_vsync_cb) {
-  // TODO(fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
+  // TODO(https://fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
   auto event_dispatcher =
       static_cast<fuchsia::hardware::display::Coordinator::Proxy_*>(event_dispatcher_.get());
   event_dispatcher->OnVsync = std::move(on_vsync_cb);
@@ -102,7 +102,7 @@ void DisplayCoordinatorListener::OnPeerClosedAsync(async_dispatcher_t* dispatche
 void DisplayCoordinatorListener::OnEventMsgAsync(async_dispatcher_t* dispatcher,
                                                  async::WaitBase* self, zx_status_t status,
                                                  const zx_packet_signal_t* signal) {
-  // TODO(fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
+  // TODO(https://fxbug.dev/7520): Resolve this hack when synchronous interfaces support events.
   if (status != ZX_OK) {
     FX_LOGS(WARNING)
         << "scenic_impl::gfx::DisplayCoordinatorImpl: Error while waiting on ZX_CHANNEL_READABLE: "

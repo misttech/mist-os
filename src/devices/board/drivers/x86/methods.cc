@@ -18,7 +18,7 @@
 
 #include "errors.h"
 
-// TODO(fxbug.dev/78349): delete these methods once users are in separate drivers.
+// TODO(https://fxbug.dev/78349): delete these methods once users are in separate drivers.
 static zx_status_t uuid_str_to_uint8_buf(const char* uuid_str, uint8_t* uuid) {
   if (strlen(uuid_str) != 36) {
     return ZX_ERR_WRONG_TYPE;

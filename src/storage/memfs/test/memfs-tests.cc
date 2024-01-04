@@ -236,7 +236,7 @@ TEST(MemfsTests, TestMemfsOverflow) {
   // Issue writes to the file in an order that previously would have triggered
   // an overflow in the memfs write path.
   //
-  // Values provided mimic the bug reported by syzkaller (fxbug.dev/33581).
+  // Values provided mimic the bug reported by syzkaller (https://fxbug.dev/33581).
   uint8_t buf[4096];
   memset(buf, 'a', sizeof(buf));
   fbl::unique_fd fd(openat(dirfd(d), "file", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));

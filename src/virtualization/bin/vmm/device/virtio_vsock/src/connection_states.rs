@@ -207,7 +207,7 @@ impl ClientInitiated {
                     let (client, device) = zx::Socket::create_stream();
                     let local_async = fasync::Socket::from_socket(device)?;
 
-                    // TODO(fxbug.dev/110903): Remove once flake is resolved.
+                    // TODO(https://fxbug.dev/110903): Remove once flake is resolved.
                     tracing::info!("Sending socket to client for {:?}", self.key);
 
                     self.responder.take().unwrap().send(Ok(client))?;
@@ -529,7 +529,7 @@ impl ReadWrite {
                 SocketState::SpuriousWakeup => {
                     num_spurious_wakeups += 1;
                     if num_spurious_wakeups > 1 {
-                        // TODO(fxbug.dev/108416): Investigate consecutive spurious wakeups.
+                        // TODO(https://fxbug.dev/108416): Investigate consecutive spurious wakeups.
                         tracing::error!(
                             "Connection saw {} consecutive spurious wakeups",
                             num_spurious_wakeups

@@ -17,7 +17,7 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
-// TODO(fxbug.dev/314347639): Build Router and sandbox for host.
+// TODO(https://fxbug.dev/314347639): Build Router and sandbox for host.
 #[cfg(target_os = "fuchsia")]
 pub mod router;
 
@@ -162,7 +162,7 @@ impl From<Vec<&ExposeDecl>> for RouteRequest {
                 Self::ExposeConfig(e.clone())
             }
             ExposeDecl::Dictionary(_) => {
-                todo!("fxbug.dev/301674053: implement dictionary routing");
+                todo!("https://fxbug.dev/301674053: implement dictionary routing");
             }
         }
     }
@@ -464,7 +464,7 @@ async fn route_service_from_offer<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    // TODO(fxbug.dev/4776): Figure out how to set the availability when `offer_bundle` contains
+    // TODO(https://fxbug.dev/4776): Figure out how to set the availability when `offer_bundle` contains
     // multiple routes with different availabilities. It's possible that manifest validation should
     // disallow this. For now, just pick the first.
     let mut availability_visitor =

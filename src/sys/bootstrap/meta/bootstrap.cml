@@ -124,7 +124,7 @@
             url: "fuchsia-boot:///virtual-console#meta/virtual-console.cm",
         },
 
-        // TODO(fxb/98535): Remove need for separate full_resolver component here.
+        // TODO(https://fxbug.dev/98535): Remove need for separate full_resolver component here.
         // Full resolver clone to be used by the full-pkg-drivers collection
         {
             name: "full_resolver",
@@ -287,7 +287,7 @@
             to: "#console-launcher",
 
             // Virtualization is not present in all configurations.
-            // See: fxbug.dev/103301
+            // See: https://fxbug.dev/103301
             availability: "optional",
         },
         {
@@ -855,14 +855,14 @@
             ],
         },
         {
-            // TODO(fxb/65708) This is only needed for an ordered shutdown.
+            // TODO(https://fxbug.dev/65708) This is only needed for an ordered shutdown.
             // Driver_manager has to shut down before shutdown_shim.
             protocol: "fuchsia.hardware.power.statecontrol.Admin",
             from: "#shutdown_shim",
             to: "#driver_manager",
         },
         {
-            // TODO(fxb/65708) This is only needed for an ordered shutdown.
+            // TODO(https://fxbug.dev/65708) This is only needed for an ordered shutdown.
             // Console should outlive driver_manager so that logs at the end of the boot process
             // can still be seen.
             protocol: "fuchsia.hardware.pty.Device",

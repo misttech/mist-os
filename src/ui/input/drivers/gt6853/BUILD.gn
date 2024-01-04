@@ -75,7 +75,7 @@ driver_bind_rules("gt6853-bind") {
   rules = "gt6853.bind"
   tests = "gt6853-bind-test.json"
 
-  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # TODO(https://fxbug.dev/115757): Remove this once we no longer need to generate
   # fragments for composite bind rules.
   disable_fragment_gen = true
 

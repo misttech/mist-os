@@ -194,7 +194,7 @@ pub struct InputFile {
 struct InputFileMutableState {
     events: VecDeque<uapi::input_event>,
     waiters: WaitQueue,
-    // TODO: fxb/131759 - remove `Optional` when implementing Inspect for Keyboard InputFiles
+    // TODO: https://fxbug.dev/131759 - remove `Optional` when implementing Inspect for Keyboard InputFiles
     // Touch InputFile will be initialized with a InspectStatus that holds Inspect data
     // `None` for Keyboard InputFile
     inspect_status: Option<InspectStatus>,

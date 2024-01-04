@@ -1537,7 +1537,7 @@ TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDyingMidStream_ShouldKi
   child_session->Present({});
   RunLoopUntil([&child_session] { return !child_session.is_bound(); });
 
-  // TODO(fxbug.dev/110461): Present on the root session to flush the changes.
+  // TODO(https://fxbug.dev/110461): Present on the root session to flush the changes.
   BlockingPresent(this, root_session_);
 
   // Next event should deliver a cancel event to the child (and close the injector since it's the

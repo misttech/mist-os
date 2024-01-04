@@ -333,7 +333,7 @@ zx_status_t Device::DisableLegacy() {
 
 // In general, if a device driver tries to disable an interrupt mode while
 // holding handles to individual interrupts then it's considered a bad state.
-// TODO(fxbug.dev/32978): Are there cases where the bus driver would want to hard disable
+// TODO(https://fxbug.dev/32978): Are there cases where the bus driver would want to hard disable
 // IRQs even though the driver holds outstanding handles? In the event of a driver
 // crash the handles will be released, but in a hard disable path they would still
 // exist.

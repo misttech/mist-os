@@ -127,7 +127,7 @@ template("clang_toolchain") {
         # Compare local vs. remote build.
         # Allow caching.
         # Use local concurrency.
-        # TODO(http://fxbug.dev/128947): enable file trace comparison
+        # TODO(https://fxbug.dev/128947): enable file trace comparison
         compiler_prefix_list += [
           "--compare",
 
@@ -353,7 +353,7 @@ template("clang_toolchain") {
           breakpad_name = "<_>"
         }
         if (output_gsym && invoker.toolchain_os == "fuchsia") {
-          # TODO(fxbug.dev/58294): enable for other targets.
+          # TODO(https://fxbug.dev/58294): enable for other targets.
           gsymutil = "${prefix}/llvm-gsymutil"
         }
       }
@@ -568,7 +568,7 @@ template("clang_toolchain") {
         if (invoker.toolchain_os == "mac") {
           command_suffix += " && {{REMOTE_STRIP_PREFIX}}$strip {{STRIP_ARGS}} \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
         } else {
-          # TODO(fxbug.dev/59286): Strip .rustc section from packaged dylibs.
+          # TODO(https://fxbug.dev/59286): Strip .rustc section from packaged dylibs.
           command_suffix += " && {{REMOTE_STRIP_PREFIX}}$strip {{STRIP_ARGS}} \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
         }
         if (use_buildidtool) {
@@ -615,7 +615,7 @@ template("clang_toolchain") {
           # On Fuchsia, lld is directly used to perform linking
           link_map_args = "-C link-args=--Map=\"{{UNSTRIPPED_OUTFILE}}.map\""
         } else if (invoker.toolchain_cpu == "wasm32") {
-          # TODO(fxbug.dev/56076): Remove need for ld location.
+          # TODO(https://fxbug.dev/56076): Remove need for ld location.
           # On WASM builds, rust-ldd has trouble finding libLLVM.
           # This workaround allows the build to proceed.
           shared_lib_dir = rebase_path("$rustc_prefix/lib", root_build_dir)
@@ -643,7 +643,7 @@ template("clang_toolchain") {
         # Possibly enable remote building for the rustc command.
         command += _rustc_wrapper
 
-        # TODO(fxbug.dev/47565): Replacement for rustenv
+        # TODO(https://fxbug.dev/47565): Replacement for rustenv
         command += "{{rustenv}}${ld_location_env} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target $link_map_args {{rustflags}}"
         command += " -o \"{{UNSTRIPPED_OUTFILE}}\" {{rustdeps}} {{externs}}"
@@ -762,7 +762,7 @@ template("clang_toolchain") {
         # Possibly enable remote building for the rustc command.
         command += _rustc_wrapper
 
-        # TODO(fxbug.dev/47565): Replacement for rustenv
+        # TODO(https://fxbug.dev/47565): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
         command += " -o {{output}} {{rustdeps}} {{externs}}"
@@ -788,7 +788,7 @@ template("clang_toolchain") {
         # Possibly enable remote building for the rustc command.
         command += _rustc_wrapper
 
-        # TODO(fxbug.dev/47565): Replacement for rustenv
+        # TODO(https://fxbug.dev/47565): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
         command += " -o {{output}} {{rustdeps}} {{externs}}"
@@ -832,7 +832,7 @@ template("clang_toolchain") {
         # Possibly enable remote building for the rustc command.
         command += _rustc_wrapper
 
-        # TODO(fxbug.dev/47565): Replacement for rustenv
+        # TODO(https://fxbug.dev/47565): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}} "
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
         command += " -o {{output}} --extern proc_macro {{rustdeps}} {{externs}}"
@@ -979,7 +979,7 @@ template("clang_toolchain") {
       _remote_strip_prefix = ""
 
       # If remotely linking, also remotely strip.
-      # TODO(http://fxbug.dev/133103): disable remote stripping when
+      # TODO(https://fxbug.dev/133103): disable remote stripping when
       # config includes //build/config:no_remote_link.
       if (use_strip && _link_rbe_enable) {
         _remote_strip_prefix = _link_common.remote_strip_prefix

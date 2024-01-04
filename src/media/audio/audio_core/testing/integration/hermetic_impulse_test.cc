@@ -81,7 +81,7 @@ void HermeticImpulseTest::Run(const HermeticImpulseTest::TestCase<InputFormat, O
   auto ring_buffer = device->SnapshotRingBuffer();
   Unbind(renderer);
   // If underflows occurred during our testing, SKIP (don't pass or fail).
-  // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+  // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
   if (DeviceHasUnderflows(DeviceUniqueIdToString(AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS))) {
     GTEST_SKIP() << "Skipping impulse position checks due to underflows";
     __builtin_unreachable();

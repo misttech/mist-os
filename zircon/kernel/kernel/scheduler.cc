@@ -808,7 +808,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   const cpu_num_t starting_cpu = last_cpu != INVALID_CPU ? last_cpu : current_cpu;
   const CpuSearchSet& search_set = percpu::Get(starting_cpu).search_set;
 
-  // TODO(fxbug.dev/98291): Working on isolating a low-frequency panic due to
+  // TODO(https://fxbug.dev/98291): Working on isolating a low-frequency panic due to
   // apparent memory corruption of percpu intersecting CpuSearchSet, resulting
   // in an invalid entry pointer and/or entry count. Adding an assert to help
   // catch the corruption and include additional context. This assert is enabled
@@ -1791,7 +1791,7 @@ void Scheduler::Reschedule() {
 
   // Pend the preemption rather than rescheduling if preemption is disabled or
   // if there is more than one spinlock held.
-  // TODO(fxbug.dev/64884): Remove check when spinlocks imply preempt disable.
+  // TODO(https://fxbug.dev/64884): Remove check when spinlocks imply preempt disable.
   if (!preempt_enabled || arch_num_spinlocks_held() > 1 || arch_blocking_disallowed()) {
     current_thread->preemption_state().preempts_pending_add(cpu_num_to_mask(current_cpu));
     return;

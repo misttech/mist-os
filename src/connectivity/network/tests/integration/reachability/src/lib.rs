@@ -469,7 +469,7 @@ async fn echo_reply_streams(
     configs: Vec<InterfaceConfig>,
     echo_notifier: mpsc::UnboundedSender<()>,
 ) {
-    // TODO(fxbug.dev/119965): Combine configs with the NetemulInterface struct
+    // TODO(https://fxbug.dev/119965): Combine configs with the NetemulInterface struct
     let stream = interfaces
         .iter()
         .zip(configs.iter())

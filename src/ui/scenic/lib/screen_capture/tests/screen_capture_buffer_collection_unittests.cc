@@ -75,7 +75,7 @@ class ScreenCaptureBufferCollectionTest : public flatland::RendererTest {
 class ScreenCaptureBCTestParameterized : public ScreenCaptureBufferCollectionTest,
                                          public testing::WithParamInterface<PixelFormatType> {};
 
-// TODO(fxbug.dev/78186): we don't want to "warm up" render passes and pipelines for multiple
+// TODO(https://fxbug.dev/78186): we don't want to "warm up" render passes and pipelines for multiple
 // framebuffer formats, so we allow only BGRA framebuffers.  This is supported by all current
 // platforms, including the emulator.
 INSTANTIATE_TEST_SUITE_P(, ScreenCaptureBCTestParameterized,

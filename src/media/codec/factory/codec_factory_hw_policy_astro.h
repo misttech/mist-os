@@ -11,7 +11,7 @@
 
 #include "codec_factory_policy.h"
 
-// TODO(fxbug.dev/68491): This platform/board/etc-specific allocation/creation
+// TODO(https://fxbug.dev/68491): This platform/board/etc-specific allocation/creation
 // policy code belongs in a platform/board/etc-specific binary.
 
 class CodecFactoryHwPolicyAstro : public CodecFactoryHwPolicy {

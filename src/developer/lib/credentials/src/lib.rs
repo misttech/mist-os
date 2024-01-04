@@ -166,7 +166,7 @@ impl Credentials {
 /// Alert: The refresh token is considered a private secret for the user. Do
 ///        not print the token to a log or otherwise disclose it.
 async fn legacy_read() -> Result<Credentials> {
-    // TODO(fxb/89584): Change to using ffx client Id and consent screen.
+    // TODO(https://fxbug.dev/89584): Change to using ffx client Id and consent screen.
     let mut credentials = Credentials::new();
     use home::home_dir;
     let boto_path = if let Ok(Some(boto_path)) =
