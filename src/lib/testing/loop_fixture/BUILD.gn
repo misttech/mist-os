@@ -25,7 +25,7 @@ source_set("gtest") {
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//third_party/googletest:gtest_no_testonly",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -46,7 +46,7 @@ executable("loop_fixture_unittests") {
   deps = [
     ":loop_fixture",
     "//sdk/lib/fit-promise",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/fxl/test:test_settings",
     "//src/lib/testing/predicates",
