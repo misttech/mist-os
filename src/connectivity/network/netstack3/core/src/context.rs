@@ -35,9 +35,9 @@
 //! just a matter of providing a different implementation of the transport layer
 //! context traits (this isn't what we do today, but we may in the future).
 
-use core::{ffi::CStr, fmt::Debug, ops::Deref, time::Duration};
+use core::{ffi::CStr, fmt::Debug, time::Duration};
 
-use lock_order::{wrap::LockedWrapper, Unlocked};
+use lock_order::Unlocked;
 use net_types::{
     ethernet::Mac,
     ip::{Ipv4, Ipv6},
@@ -384,64 +384,101 @@ impl<BC: BindingsContext> SyncCtx<BC> {
 ///
 /// `L` is the current lock level of `CoreCtx`. The alias [`UnlockedCoreCtx`] is
 /// provided at the [`Unlocked`] level.
-pub struct CoreCtx<'a, BT: BindingsTypes, L>(lock_order::Locked<&'a StackState<BT>, L>);
+pub type CoreCtx<'a, BT, L> = Locked<&'a StackState<BT>, L>;
 
-impl<'a, BT: BindingsTypes, L> LockedWrapper<&'a StackState<BT>, L> for CoreCtx<'a, BT, L> {
-    type AtLockLevel<'l, M> = CoreCtx<'l, BT, M>
+pub(crate) type CoreCtxAndResource<'a, BT, R, L> =
+    Locked<lock_order::OwnedTupleWrapper<&'a StackState<BT>, &'a R>, L>;
+
+/// An alias for an unlocked [`CoreCtx`].
+pub type UnlockedCoreCtx<'a, BT> = CoreCtx<'a, BT, Unlocked>;
+
+pub(crate) use locked::Locked;
+
+/// Provides a crate-local wrapper for `[lock_order::Locked]`.
+///
+/// This module is intentionally private so usage is limited to the type alias
+/// in [`CoreCtx`].
+mod locked {
+    use super::{BindingsTypes, CoreCtx, StackState, SyncCtx};
+
+    use core::ops::Deref;
+    use lock_order::{wrap::LockedWrapper, Locked as ExternalLocked, TupleWrapper, Unlocked};
+
+    /// A crate-local wrapper on [`lock_order::Locked`].
+    pub struct Locked<T, L>(ExternalLocked<T, L>);
+
+    impl<T, L> LockedWrapper<T, L> for Locked<T, L>
+    where
+        T: Deref,
+        T::Target: Sized,
+    {
+        type AtLockLevel<'l, M> = Locked<&'l T::Target, M>
     where
         M: 'l,
-        &'a StackState<BT>: 'l;
+        T: 'l;
 
-    type CastWrapper<X> = crate::lock_ordering::Locked<X, L>
+        type CastWrapper<X> = Locked<X, L>
     where
         X: Deref,
         X::Target: Sized;
 
-    fn wrap<'l, M>(locked: lock_order::Locked<&'l StackState<BT>, M>) -> CoreCtx<'l, BT, M>
+        fn wrap<'l, M>(locked: ExternalLocked<&'l T::Target, M>) -> Self::AtLockLevel<'l, M>
+        where
+            M: 'l,
+            T: 'l,
+        {
+            Locked(locked)
+        }
+
+        fn wrap_cast<R: Deref>(locked: ExternalLocked<R, L>) -> Self::CastWrapper<R>
+        where
+            R::Target: Sized,
+        {
+            Locked(locked)
+        }
+
+        fn get_mut(&mut self) -> &mut ExternalLocked<T, L> {
+            let Self(locked) = self;
+            locked
+        }
+
+        fn get(&self) -> &ExternalLocked<T, L> {
+            let Self(locked) = self;
+            locked
+        }
+    }
+
+    impl<'a, BT: BindingsTypes> CoreCtx<'a, BT, Unlocked> {
+        /// Creates a new `CoreCtx` from a borrowed [`StackState`].
+        pub fn new(stack_state: &'a StackState<BT>) -> Self {
+            Self(ExternalLocked::new(stack_state))
+        }
+
+        /// Creates a new `CoreCtx` from a borrowed [`SyncCtx`].
+        // TODO(https://fxbug.dev/42083910): This is a transitional method before we
+        // get rid of SyncCtx altogether.
+        pub(crate) fn new_deprecated(sync_ctx: &'a SyncCtx<BT>) -> Self {
+            Self(ExternalLocked::new(&sync_ctx.state))
+        }
+    }
+
+    impl<'a, BT, R, L, T> Locked<T, L>
     where
-        M: 'l,
+        R: 'a,
+        T: Deref<Target = TupleWrapper<&'a StackState<BT>, &'a R>>,
+        BT: BindingsTypes,
     {
-        CoreCtx(locked)
-    }
+        pub(crate) fn cast_resource(&mut self) -> Locked<&'_ R, L> {
+            let Self(locked) = self;
+            Locked(locked.cast_with(|c| c.right()))
+        }
 
-    fn wrap_cast<R>(locked: lock_order::Locked<R, L>) -> Self::CastWrapper<R>
-    where
-        R: Deref,
-        R::Target: Sized,
-    {
-        crate::lock_ordering::Locked::new(locked)
-    }
-
-    fn get_mut(&mut self) -> &mut lock_order::Locked<&'a StackState<BT>, L> {
-        let Self(locked) = self;
-        locked
-    }
-
-    fn get(&self) -> &lock_order::Locked<&'a StackState<BT>, L> {
-        let Self(locked) = self;
-        locked
+        pub(crate) fn cast_core_ctx(&mut self) -> CoreCtx<'_, BT, L> {
+            let Self(locked) = self;
+            crate::CoreCtx::<BT, L>::wrap(locked.cast_with(|c| c.left()))
+        }
     }
 }
-
-impl<'a, BT: BindingsTypes> CoreCtx<'a, BT, Unlocked> {
-    /// Creates a new `CoreCtx` from a borrowed [`StackState`].
-    pub fn new(stack_state: &'a StackState<BT>) -> Self {
-        Self(lock_order::Locked::new(stack_state))
-    }
-
-    /// Creates a new `CoreCtx` from a borrowed [`SyncCtx`].
-    // TODO(https://fxbug.dev/42083910): This is a transitional method before we
-    // get rid of SyncCtx altogether.
-    pub(crate) fn new_deprecated(sync_ctx: &'a SyncCtx<BT>) -> Self {
-        Self(lock_order::Locked::new(&sync_ctx.state))
-    }
-}
-
-pub(crate) type CoreCtxAndResource<'a, BT, R, L> =
-    crate::lock_ordering::Locked<lock_order::OwnedTupleWrapper<&'a StackState<BT>, &'a R>, L>;
-
-/// An alias for an unlocked [`CoreCtx`].
-pub type UnlockedCoreCtx<'a, BT> = CoreCtx<'a, BT, Unlocked>;
 
 /// Fake implementations of context traits.
 ///

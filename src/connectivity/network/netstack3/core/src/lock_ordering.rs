@@ -104,9 +104,9 @@
 
 pub(crate) use lock_order::Unlocked;
 
-use core::{convert::Infallible as Never, marker::PhantomData, ops::Deref};
+use core::{convert::Infallible as Never, marker::PhantomData};
 
-use lock_order::{impl_lock_after, relation::LockAfter, wrap::LockedWrapper, TupleWrapper};
+use lock_order::{impl_lock_after, relation::LockAfter};
 use net_types::ip::{Ipv4, Ipv6};
 
 pub(crate) struct IcmpSocketsTable<I>(PhantomData<I>, Never);
@@ -269,74 +269,3 @@ impl_lock_after!(EthernetDeviceDynamicState => EthernetTxQueue);
 
 impl_lock_after!(DeviceLayerState => DeviceSockets);
 impl_lock_after!(DeviceSockets => DeviceSocketState);
-
-/// A crate-local wrapper on [`lock_order::Locked`].
-pub struct Locked<T, L>(lock_order::Locked<T, L>);
-
-impl<T, L> LockedWrapper<T, L> for Locked<T, L>
-where
-    T: Deref,
-    T::Target: Sized,
-{
-    type AtLockLevel<'l, M> = Locked<&'l T::Target, M>
-    where
-        M: 'l,
-        T: 'l;
-
-    type CastWrapper<X> = Locked<X, L>
-    where
-        X: Deref,
-        X::Target: Sized;
-
-    fn wrap<'l, M>(locked: lock_order::Locked<&'l T::Target, M>) -> Self::AtLockLevel<'l, M>
-    where
-        M: 'l,
-        T: 'l,
-    {
-        Locked(locked)
-    }
-
-    fn wrap_cast<R: Deref>(locked: lock_order::Locked<R, L>) -> Self::CastWrapper<R>
-    where
-        R::Target: Sized,
-    {
-        Locked(locked)
-    }
-
-    fn get_mut(&mut self) -> &mut lock_order::Locked<T, L> {
-        let Self(locked) = self;
-        locked
-    }
-
-    fn get(&self) -> &lock_order::Locked<T, L> {
-        let Self(locked) = self;
-        locked
-    }
-}
-
-impl<T, L> Locked<T, L>
-where
-    T: Deref,
-    T::Target: Sized,
-{
-    pub(crate) fn new(locked: lock_order::Locked<T, L>) -> Self {
-        Self(locked)
-    }
-}
-
-impl<'a, BT, R, L, T> Locked<T, L>
-where
-    R: 'a,
-    T: Deref<Target = TupleWrapper<&'a crate::StackState<BT>, &'a R>>,
-    BT: crate::BindingsTypes,
-{
-    pub(crate) fn cast_resource(&mut self) -> Locked<&'_ R, L> {
-        let Self(locked) = self;
-        Locked(locked.cast_with(|c| c.right()))
-    }
-
-    pub(crate) fn cast_core_ctx(&mut self) -> crate::CoreCtx<'_, BT, L> {
-        let Self(locked) = self;
-        crate::CoreCtx::<BT, L>::wrap(locked.cast_with(|c| c.left()))
-    }
-}

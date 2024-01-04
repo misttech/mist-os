@@ -21,7 +21,7 @@ use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
-    context::{CoreCtxAndResource, CounterContext, RecvFrameContext, SendFrameContext},
+    context::{CoreCtxAndResource, CounterContext, Locked, RecvFrameContext, SendFrameContext},
     device::{
         ethernet::{
             self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
@@ -48,7 +48,6 @@ use crate::{
         IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceIpExt, IpDeviceSendContext,
         IpDeviceStateContext, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
     },
-    lock_ordering::Locked,
     sync::{PrimaryRc, StrongRc},
     BindingsContext, CoreCtx, StackState,
 };
