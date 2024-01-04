@@ -33,7 +33,6 @@ executable("touch-input-test-bin") {
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
-    "//sdk/fidl/fuchsia.web:fuchsia.web_hlcpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//sdk/lib/sys/component/cpp/testing:cpp",
@@ -53,7 +52,6 @@ executable("touch-input-test-bin") {
 }
 
 fuchsia_test_component("touch-input-test-component") {
-  restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/touch-input-test.cml"
   deps = [ ":touch-input-test-bin" ]
@@ -75,7 +73,6 @@ fuchsia_test_package("touch-input-test") {
     # Include some default config (it doesn't matter which, since we're going to override it).
     "//src/ui/testing/test_ui_stack:flatland_scene_manager_config",
     "//src/ui/testing/test_ui_stack:test-ui-stack-component",
-    "//src/ui/tests/integration_input_tests/touch/one-chromium:component",
     "//src/ui/tests/integration_input_tests/touch/touch-flatland-client:component",
   ]
   test_specs = {
@@ -157,11 +154,9 @@ group("tests") {
     # TODO(https://fxbug.dev/119212): Should these be deps of the individual test
     # targets above?
     "///src/graphics/display/testing/fake-coordinator-connector",
-    "//src/chromium:web_context_provider_for_test",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
-    "//src/ui/tests/integration_input_tests/touch/one-chromium",
     "//src/ui/tests/integration_input_tests/touch/touch-flatland-client",
   ]
 }

@@ -23,7 +23,6 @@
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
-#include <fuchsia/web/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -39,9 +38,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
 #include <memory>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -104,7 +101,6 @@ namespace {
 
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
-using component_testing::Directory;
 using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
@@ -326,8 +322,6 @@ InjectSwipeParams GetDownwardSwipeParams() {
           .expected_events = std::move(expected_events)};
 }
 
-bool CompareDouble(double f0, double f1, double epsilon) { return std::abs(f0 - f1) <= epsilon; }
-
 class ResponseState {
  public:
   const std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>&
@@ -412,31 +406,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
   // Subclass should implement this method to add components to the test realm
   // next to the base ones added.
   virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
-
-  bool LastEventReceivedMatchesLocation(float expected_x, float expected_y,
-                                        const std::string& component_name) {
-    const auto& events_received = response_state_->events_received();
-    if (events_received.empty()) {
-      return false;
-    }
-
-    const auto& last_event = events_received.back();
-
-    auto pixel_scale = last_event.has_device_pixel_ratio() ? last_event.device_pixel_ratio() : 1;
-
-    auto actual_x = pixel_scale * last_event.local_x();
-    auto actual_y = pixel_scale * last_event.local_y();
-    auto actual_component_name = last_event.component_name();
-
-    FX_LOGS(INFO) << "Expecting event for component " << component_name << " at (" << expected_x
-                  << ", " << expected_y << ")";
-    FX_LOGS(INFO) << "Received event for component " << actual_component_name << " at (" << actual_x
-                  << ", " << actual_y << "), accounting for pixel scale of " << pixel_scale;
-
-    return CompareDouble(actual_x, expected_x, pixel_scale) &&
-           CompareDouble(actual_y, expected_y, pixel_scale) &&
-           actual_component_name == component_name;
-  }
 
   bool LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase phase,
                                      const std::string& component_name) {
@@ -631,204 +600,6 @@ TEST_P(CppSwipeTest, CppClientSwipeTest) {
   const auto& actual_events = response_state()->events_received();
   ASSERT_EQ(actual_events.size(), expected_events.size());
   AssertSwipeEvents(actual_events, expected_events);
-}
-
-class WebEngineTest : public TouchInputBase<> {
- protected:
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
-    return {
-        std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
-        std::make_pair(kFontsProvider, kFontsProviderUrl),
-        std::make_pair(kIntl, kIntlUrl),
-        std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
-        std::make_pair(kMockCobalt, kMockCobaltUrl),
-        std::make_pair(kNetstack, kNetstackUrl),
-        std::make_pair(kOneChromiumClient, kOneChromiumUrl),
-        std::make_pair(kTextManager, kTextManagerUrl),
-        std::make_pair(kWebContextProvider, kWebContextProviderUrl),
-    };
-  }
-
-  std::vector<Route> GetTestRoutes() override {
-    return merge({GetWebEngineRoutes(ChildRef{kOneChromiumClient}),
-                  {
-                      {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
-                       .source = ChildRef{kOneChromiumClient},
-                       .targets = {ParentRef()}},
-                  }});
-  }
-
-  // Injects an input event, and posts a task to retry after `kTapRetryInterval`.
-  //
-  // We post the retry task because the first input event we send to WebEngine may be lost.
-  // The reason the first event may be lost is that there is a race condition as the WebEngine
-  // starts up.
-  //
-  // More specifically: in order for our web app's JavaScript code (see kAppCode in
-  // one-chromium.cc) to receive the injected input, two things must be true before we inject
-  // the input:
-  // * The WebEngine must have installed its `render_node_`, and
-  // * The WebEngine must have set the shape of its `input_node_`
-  //
-  // The problem we have is that the `is_rendering` signal that we monitor only guarantees us
-  // the `render_node_` is ready. If the `input_node_` is not ready at that time, Scenic will
-  // find that no node was hit by the touch, and drop the touch event.
-  //
-  // As for why `is_rendering` triggers before there's any hittable element, that falls out of
-  // the way WebEngine constructs its scene graph. Namely, the `render_node_` has a shape, so
-  // that node `is_rendering` as soon as it is `Present()`-ed. Walking transitively up the
-  // scene graph, that causes our `Session` to receive the `is_rendering` signal.
-  //
-  // For more details, see https://fxbug.dev/57268.
-  //
-  // TODO(https://fxbug.dev/58322): Improve synchronization when we move to Flatland.
-  void TryInject() {
-    InjectInput(TapLocation::kTopLeft);
-    async::PostDelayedTask(dispatcher(), [this] { TryInject(); }, kTapRetryInterval);
-  }
-
-  // Routes needed to setup Chromium client.
-  static std::vector<Route> GetWebEngineRoutes(ChildRef target) {
-    return {
-        {
-            .capabilities =
-                {
-                    Protocol{fuchsia::logger::LogSink::Name_},
-                },
-            .source = ParentRef(),
-            .targets =
-                {
-                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
-                    ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
-                    ChildRef{kMockCobalt},
-                    // Not including kNetstack here, since it emits spurious
-                    // FATAL errors.
-                },
-        },
-        {.capabilities = {Protocol{fuchsia::kernel::VmexResource::Name_},
-                          Protocol{fuchsia::process::Launcher::Name_}},
-         .source = ParentRef(),
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
-         .source = ChildRef{kMockResponseListener},
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::fonts::Provider::Name_}},
-         .source = ChildRef{kFontsProvider},
-         .targets = {target}},
-        {.capabilities =
-             {
-                 Protocol{fuchsia::tracing::provider::Registry::Name_},
-             },
-         .source = ParentRef(),
-         .targets = {target, ChildRef{kFontsProvider}}},
-        {.capabilities = {Protocol{fuchsia::ui::input::ImeService::Name_}},
-         .source = ChildRef{kTextManager},
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::memorypressure::Provider::Name_}},
-         .source = ChildRef{kMemoryPressureProvider},
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::net::interfaces::State::Name_}},
-         .source = ChildRef{kNetstack},
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::accessibility::semantics::SemanticsManager::Name_},
-                          Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-         .source = kTestUIStackRef,
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
-                          Protocol{fuchsia::ui::composition::Allocator::Name_}},
-         .source = kTestUIStackRef,
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::web::ContextProvider::Name_}},
-         .source = ChildRef{kWebContextProvider},
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_}},
-         .source = ParentRef(),
-         .targets = {ChildRef{kFontsProvider}}},
-        {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
-         .source = ChildRef{kMockCobalt},
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_}},
-         .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}, target}},
-        {.capabilities = {Protocol{fuchsia::kernel::RootJobForInspect::Name_},
-                          Protocol{fuchsia::kernel::Stats::Name_},
-                          Protocol{fuchsia::scheduler::ProfileProvider::Name_},
-                          Protocol{fuchsia::tracing::provider::Registry::Name_}},
-         .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_}},
-         .source = ChildRef{kNetstack},
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
-         .source = ChildRef{kBuildInfoProvider},
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::intl::PropertyProvider::Name_}},
-         .source = ChildRef{kIntl},
-         .targets = {target}},
-        {.capabilities = {Directory{
-             .name = "root-ssl-certificates",
-             .type = fuchsia::component::decl::DependencyType::STRONG,
-         }},
-         .source = ParentRef(),
-         .targets = {ChildRef{kWebContextProvider}}},
-    };
-  }
-
-  static constexpr auto kOneChromiumClient = "chromium_client";
-  static constexpr auto kOneChromiumUrl = "#meta/one-chromium.cm";
-
- private:
-  static constexpr auto kFontsProvider = "fonts_provider";
-  static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
-
-  static constexpr auto kTextManager = "text_manager";
-  static constexpr auto kTextManagerUrl = "#meta/text_manager.cm";
-
-  static constexpr auto kIntl = "intl";
-  static constexpr auto kIntlUrl = "#meta/intl_property_manager.cm";
-
-  static constexpr auto kMemoryPressureProvider = "memory_pressure_provider";
-  static constexpr auto kMemoryPressureProviderUrl = "#meta/memory_monitor.cm";
-
-  static constexpr auto kNetstack = "netstack";
-  static constexpr auto kNetstackUrl = "#meta/netstack.cm";
-
-  static constexpr auto kWebContextProvider = "web_context_provider";
-  static constexpr auto kWebContextProviderUrl =
-      "fuchsia-pkg://fuchsia.com/web_engine#meta/context_provider.cm";
-
-  static constexpr auto kBuildInfoProvider = "build_info_provider";
-  static constexpr auto kBuildInfoProviderUrl = "#meta/fake_build_info.cm";
-
-  static constexpr auto kMockCobalt = "cobalt";
-  static constexpr auto kMockCobaltUrl = "#meta/mock_cobalt.cm";
-
-  // The typical latency on devices we've tested is ~60 msec. The retry interval is chosen to be
-  // a) Long enough that it's unlikely that we send a new tap while a previous tap is still being
-  //    processed. That is, it should be far more likely that a new tap is sent because the first
-  //    tap was lost, than because the system is just running slowly.
-  // b) Short enough that we don't slow down tryjobs.
-  //
-  // The first property is important to avoid skewing the latency metrics that we collect.
-  // For an explanation of why a tap might be lost, see the documentation for TryInject().
-  static constexpr auto kTapRetryInterval = zx::sec(1);
-};
-
-INSTANTIATE_TEST_SUITE_P(WebEngineTestParameterized, WebEngineTest,
-                         testing::ValuesIn(AsTuples(ConfigsToTest())));
-TEST_P(WebEngineTest, ChromiumTap) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClient();
-  FX_LOGS(INFO) << "Client launched";
-
-  TryInject();
-  RunLoopUntil([this] {
-    return LastEventReceivedMatchesLocation(
-        /*expected_x=*/static_cast<float>(display_height()) / 4.f,
-        /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-        /*component_name=*/"one-chromium");
-  });
 }
 
 }  // namespace
