@@ -12,10 +12,10 @@ use fidl_fuchsia_media::{AudioCoreRequestStream, AudioRenderUsage, Usage};
 use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_component_test::LocalComponentHandles;
+use fuchsia_sync::RwLock;
 use futures::channel::mpsc::Sender;
 use futures::TryStreamExt;
 use futures::{SinkExt, StreamExt};
-use parking_lot::RwLock;
 
 pub(crate) async fn audio_core_service_mock(
     handles: LocalComponentHandles,

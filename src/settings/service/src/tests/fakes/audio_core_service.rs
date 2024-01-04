@@ -7,12 +7,12 @@ use anyhow::{format_err, Error};
 use fidl::{endpoints::ServerEnd, prelude::*};
 use fidl_fuchsia_media::{AudioRenderUsage, Usage};
 use fuchsia_async as fasync;
+use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use futures::FutureExt;
 use futures::TryStreamExt;
-use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
