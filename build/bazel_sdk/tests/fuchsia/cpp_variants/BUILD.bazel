@@ -3,8 +3,26 @@
 # found in the LICENSE file.
 
 load(":fuchsia_sdk_cc_source_library_test.bzl", "fuchsia_sdk_cc_source_library_test")
+load("@fuchsia_sdk//:api_version.bzl", "DEFAULT_TARGET_API", "VALID_TARGET_APIS")
 
 package(default_visibility = ["//visibility:public"])
+
+CC_VERSIONS = [
+    "17",
+    "20",
+]
+
+COPTS = [
+    [],
+    ["-Wshadow"],
+]
+
+# TODO(b/318701414): API 11 tests fail on an unknown identifier "QueryCallback".
+# Reorganize the tests to better recognize API version incompatibilities.
+# Consider attempting to compile the tests and verify the compiliation fails.
+NUM_APIS_IN_TEST = 6
+
+OLDEST_API = DEFAULT_TARGET_API - NUM_APIS_IN_TEST
 
 common_ignored_deps = [
     # error: redefinition of 'TreeServerSendPreference'
@@ -22,21 +40,20 @@ common_ignored_deps = [
     "//pkg/async_patterns_testing_cpp",
 ]
 
-fuchsia_sdk_cc_source_library_test(
-    name = "cc_17_all",
-    cc_version = "c++17",
-    ignored_deps = common_ignored_deps,
-)
+all_targets = [
+    fuchsia_sdk_cc_source_library_test(
+        api_level = entry.api_level,
+        cc_version = cc_version,
+        copts = copts,
+        ignored_deps = common_ignored_deps,
+    )
+    for cc_version in CC_VERSIONS
+    for entry in VALID_TARGET_APIS[:-1]
+    if entry.api_level.isdigit() and int(entry.api_level) > OLDEST_API
+    for copts in COPTS
+]
 
-fuchsia_sdk_cc_source_library_test(
-    name = "cc_20_all",
-    cc_version = "c++20",
-    ignored_deps = common_ignored_deps,
-)
-
-fuchsia_sdk_cc_source_library_test(
-    name = "cc_17_shadow",
-    cc_version = "c++17",
-    copts = ["-Wshadow"],
-    ignored_deps = common_ignored_deps,
+test_suite(
+    name = "tests",
+    tests = all_targets,
 )

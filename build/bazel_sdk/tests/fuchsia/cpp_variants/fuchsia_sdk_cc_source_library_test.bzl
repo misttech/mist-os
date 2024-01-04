@@ -65,7 +65,20 @@ cc_std_version_transition = transition(
 )
 
 # buildifier: disable=function-docstring
-def fuchsia_sdk_cc_source_library_test(name, cc_version, copts = [], ignored_deps = [], **kwargs):
+def fuchsia_sdk_cc_source_library_test(
+        cc_version,
+        api_level,
+        name = "",
+        copts = [],
+        ignored_deps = [],
+        **kwargs):
+    if name == "":
+        name = "cc_{}_api_{}".format(cc_version, api_level)
+        if len(copts) > 0:
+            name = name + "_" + "_".join([copt[1:] for copt in copts])
+
+    cc_version_str = "c++{}".format(cc_version)
+
     driver_binary_name = name + "_variant_test"
     driver_src_name = driver_binary_name + ".cc"
 
@@ -93,10 +106,13 @@ def fuchsia_sdk_cc_source_library_test(name, cc_version, copts = [], ignored_dep
     _fuchsia_sdk_cc_source_library_test(
         name = name,
         driver_binary = driver_binary_name,
-        cc_version = cc_version,
+        cc_version = cc_version_str,
         extra_copts = copts,
+        api_level = api_level,
         **kwargs
     )
+
+    return name
 
 def _gen_cpp_variants_test_driver_impl(ctx):
     includes_str = ""
@@ -131,7 +147,8 @@ _gen_cpp_variants_test_driver = rule(
 def _fuchsia_sdk_cc_source_library_test_impl(ctx):
     # Create a test script which depends on the driver_binary
     # to ensure it gets built and can be executed directly by bazel test.
-    script = ctx.actions.declare_file("ensure_built.sh")
+
+    script = ctx.actions.declare_file("{}_ensure_built.sh".format(ctx.attr.name))
 
     command = 'echo "echo %s\n" > %s\n' % (ctx.executable.driver_binary.short_path, script.path)
     ctx.actions.run_shell(
