@@ -301,7 +301,7 @@ rustls-native-certs = "0.5.0"
 serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will need to be re-audited.
 serial_test = "0.5.1" # Not for use on Fuchsia, only for a single process.
 shared_child = "1.0.0"
-signal-hook = "0.3.8"
+signal-hook = "0.3.17"
 simplelog = "0.10.2"
 strum = "0.25.0"
 strum_macros = "0.25.3"
@@ -681,7 +681,7 @@ rustflags = []
 [gn.package.sha1."0.10.5"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "sha1_visibility" }
 
-[gn.package.signal-hook."0.3.8"]
+[gn.package.signal-hook."0.3.17"]
 rustflags = []
 
 [gn.package.slab."0.4.7"]
@@ -701,7 +701,7 @@ deps = [
   ":libc-v0_2_149",
   ":mio-v0_8_5",
   ":num_cpus-v1_13_0",
-  ":signal-hook-registry-v1_3_0",
+  ":signal-hook-registry-v1_4_1",
   ":socket2-v0_4_4",
 ]
 rustflags = [

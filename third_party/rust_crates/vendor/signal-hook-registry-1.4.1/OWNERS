@@ -3,5 +3,5 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /third_party/rust_crates/vendor/signal-hook-0.1.17/OWNERS
-include /third_party/rust_crates/vendor/signal-hook-0.3.8/OWNERS
+include /third_party/rust_crates/vendor/signal-hook-0.3.17/OWNERS
 include /third_party/rust_crates/vendor/tokio-1.25.2/OWNERS

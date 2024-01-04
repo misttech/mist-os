@@ -856,7 +856,7 @@ if (!(current_os == "fuchsia")) {
 
 if (!(current_os == "fuchsia")) {
   group("signal-hook") {
-    public_deps = [ ":signal-hook-v0_3_8" ]
+    public_deps = [ ":signal-hook-v0_3_17" ]
   }
 }
 
@@ -13913,7 +13913,7 @@ rust_library("signal-hook-v0_1_17") {
   deps = []
   deps += [ ":libc-v0_2_149" ]
   deps += [ ":mio-v0_7_14" ]
-  deps += [ ":signal-hook-registry-v1_3_0" ]
+  deps += [ ":signal-hook-registry-v1_4_1" ]
 
   rustenv = []
 
@@ -13934,31 +13934,31 @@ rust_library("signal-hook-v0_1_17") {
   applicable_licenses = [ ":signal-hook-v0_1_17.license" ]
 }
 
-license("signal-hook-v0_3_8.license") {
+license("signal-hook-v0_3_17.license") {
   public_package_name = "signal_hook"
   license_files = [
-    "//third_party/rust_crates/vendor/signal-hook-0.3.8/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/signal-hook-0.3.8/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/signal-hook-0.3.17/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/signal-hook-0.3.17/LICENSE-MIT",
   ]
 }
 
-rust_library("signal-hook-v0_3_8") {
+rust_library("signal-hook-v0_3_17") {
   crate_name = "signal_hook"
-  crate_root = "//third_party/rust_crates/vendor/signal-hook-0.3.8/src/lib.rs"
-  output_name = "signal_hook-b70d0d3d48db33cc"
+  crate_root = "//third_party/rust_crates/vendor/signal-hook-0.3.17/src/lib.rs"
+  output_name = "signal_hook-fb829f1515f3d548"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":libc-v0_2_149" ]
-  deps += [ ":signal-hook-registry-v1_3_0" ]
+  deps += [ ":signal-hook-registry-v1_4_1" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=b70d0d3d48db33cc",
-    "-Cextra-filename=-b70d0d3d48db33cc",
+    "-Cmetadata=fb829f1515f3d548",
+    "-Cextra-filename=-fb829f1515f3d548",
     "--cfg=feature=\"channel\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"iterator\"",
@@ -13966,22 +13966,22 @@ rust_library("signal-hook-v0_3_8") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":signal-hook-v0_3_8.license" ]
+  applicable_licenses = [ ":signal-hook-v0_3_17.license" ]
 }
 
-license("signal-hook-registry-v1_3_0.license") {
+license("signal-hook-registry-v1_4_1.license") {
   public_package_name = "signal_hook_registry"
   license_files = [
-    "//third_party/rust_crates/vendor/signal-hook-registry-1.3.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/signal-hook-registry-1.3.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/signal-hook-registry-1.4.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/signal-hook-registry-1.4.1/LICENSE-MIT",
   ]
 }
 
-rust_library("signal-hook-registry-v1_3_0") {
+rust_library("signal-hook-registry-v1_4_1") {
   crate_name = "signal_hook_registry"
   crate_root =
-      "//third_party/rust_crates/vendor/signal-hook-registry-1.3.0/src/lib.rs"
-  output_name = "signal_hook_registry-13fb5f6650cce8dc"
+      "//third_party/rust_crates/vendor/signal-hook-registry-1.4.1/src/lib.rs"
+  output_name = "signal_hook_registry-337ec7a41227ca2"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -13992,13 +13992,13 @@ rust_library("signal-hook-registry-v1_3_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=13fb5f6650cce8dc",
-    "-Cextra-filename=-13fb5f6650cce8dc",
+    "-Cmetadata=337ec7a41227ca2",
+    "-Cextra-filename=-337ec7a41227ca2",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":signal-hook-registry-v1_3_0.license" ]
+  applicable_licenses = [ ":signal-hook-registry-v1_4_1.license" ]
 }
 
 license("signature-v1_6_4.license") {
@@ -15403,7 +15403,7 @@ rust_library("tokio-v1_25_2") {
     deps += [ ":libc-v0_2_149" ]
     deps += [ ":mio-v0_8_5" ]
     deps += [ ":num_cpus-v1_13_0" ]
-    deps += [ ":signal-hook-registry-v1_3_0" ]
+    deps += [ ":signal-hook-registry-v1_4_1" ]
     deps += [ ":socket2-v0_4_4" ]
   }
 

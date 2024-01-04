@@ -1,3 +1,50 @@
+# 0.3.17
+
+* Fix race condition leading into a panic in SignalsInfo::forever (#148).
+
+# 0.3.16
+
+* Fix compilation on OpenBSD (#147).
+
+# 0.3.15
+# signal-hook-registry-1.4.1
+
+* AIX support (experimental/not guaranteed to work).
+
+# 0.3.14
+
+* Added the SIGINFO signal (where available).
+
+# signal-hook-mio-0.2.3
+
+* Support for mio 0.8
+
+# signal-hook-async-std-0.2.2
+# signal-hook-tokio-0.3.1
+
+* Fix support for SignalsInfo with non-default info extractors.
+
+# 0.3.13
+
+* Add haiku support.
+
+# 0.3.12
+
+* Fix accidentally broken windows build.
+
+# 0.3.11
+
+* Provide fallback sigaddset, sigemptyset on certain androids, as they are
+  missing them.
+
+# 0.3.10
+
+* Doc link fixes.
+
+# 0.3.9
+
+* Deliver SIGCHLD even on stop/continue.
+
 # 0.3.8
 
 * Fix docs.rs build.

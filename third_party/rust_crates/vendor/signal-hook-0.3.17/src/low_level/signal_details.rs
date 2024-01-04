@@ -47,6 +47,15 @@ const DETAILS: &[Details] = &[
     s!(SIGHUP, Term),
     s!(SIGILL, Term),
     s!(SIGINT, Term),
+    #[cfg(any(
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "macos"
+    ))]
+    s!(SIGINFO, Ignore),
+    #[cfg(not(target_os = "haiku"))]
     s!(SIGIO, Ignore),
     // Can't override anyway, but...
     s!(SIGKILL, Term),
@@ -102,7 +111,15 @@ fn restore_default(signal: c_int) -> Result<(), Error> {
     unsafe {
         // A C structure, supposed to be memset to 0 before use.
         let mut action: libc::sigaction = mem::zeroed();
-        action.sa_sigaction = libc::SIG_DFL as _;
+        #[cfg(target_os = "aix")]
+        {
+            action.sa_union.__su_sigaction = mem::transmute::<
+                usize,
+                extern "C" fn(libc::c_int, *mut libc::siginfo_t, *mut libc::c_void),
+            >(libc::SIG_DFL);
+        }
+        #[cfg(not(target_os = "aix"))]
+        { action.sa_sigaction = libc::SIG_DFL as _; }
         if libc::sigaction(signal, &action, ptr::null_mut()) == 0 {
             Ok(())
         } else {
@@ -175,9 +192,38 @@ pub fn emulate_default_handler(signal: c_int) -> Result<(), Error> {
                 #[cfg(not(windows))]
                 unsafe {
                     #[allow(deprecated)]
-                    let mut newsigs: sigset_t = mem::uninitialized();
-                    libc::sigemptyset(&mut newsigs);
-                    libc::sigaddset(&mut newsigs, signal);
+                    let mut newsigs: sigset_t = mem::zeroed();
+
+                    // Some android versions don't have the sigemptyset and sigaddset.
+                    // Unfortunately, we don't have an access to the android _version_. We just
+                    // know that 64bit versions are all OK, so this is a best-effort guess.
+                    //
+                    // For the affected/guessed versions, we provide our own implementation. We
+                    // hope it to be correct (it's inspired by a libc implementation and we assume
+                    // the kernel uses the same format ‒ it's unlikely to be different both because
+                    // of compatibility and because there's really nothing to invent about a
+                    // bitarray).
+                    //
+                    // We use the proper way for other systems.
+                    #[cfg(all(target_os = "android", target_pointer_width = "32"))]
+                    unsafe fn prepare_sigset(set: *mut sigset_t, mut signal: c_int) {
+                        signal -= 1;
+                        let set_raw: *mut libc::c_ulong = set.cast();
+                        let size = mem::size_of::<libc::c_ulong>();
+                        assert_eq!(set_raw as usize % mem::align_of::<libc::c_ulong>(), 0);
+                        let pos = signal as usize / size;
+                        assert!(pos < mem::size_of::<sigset_t>() / size);
+                        let bit = 1 << (signal as usize % size);
+                        set_raw.add(pos).write(bit);
+                    }
+
+                    #[cfg(not(all(target_os = "android", target_pointer_width = "32")))]
+                    unsafe fn prepare_sigset(set: *mut sigset_t, signal: c_int) {
+                        libc::sigemptyset(set);
+                        libc::sigaddset(set, signal);
+                    }
+
+                    prepare_sigset(&mut newsigs, signal);
                     // Ignore the result, if it doesn't work, we try anyway
                     // Also, sigprocmask is unspecified, but available on more systems. And we want
                     // to just enable _something_. And if it doesn't work, we'll terminate
