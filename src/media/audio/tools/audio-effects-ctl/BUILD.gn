@@ -10,7 +10,7 @@ executable("bin") {
   deps = [
     "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_hlcpp",
     "//sdk/lib/sys/cpp",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
   ]
 }
 

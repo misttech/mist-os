@@ -12,6 +12,7 @@ executable("bin") {
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
     "//sdk/lib/media/audio/cpp",
     "//sdk/lib/sys/cpp",
+    "//src/lib/fxl:fxl_cli",
     "//src/media/audio/lib/analysis",
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/format",
