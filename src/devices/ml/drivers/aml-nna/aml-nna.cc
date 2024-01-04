@@ -178,8 +178,8 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  pdev_board_info_t info;
-  status = pdev.GetBoardInfo(&info);
+  pdev_device_info_t info;
+  status = pdev.GetDeviceInfo(&info);
   if (status != ZX_OK) {
     zxlogf(ERROR, "pdev_.GetDeviceInfo failed %d\n", status);
     return status;
@@ -189,7 +189,6 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
   zx::resource smc_monitor;
   switch (info.pid) {
     case PDEV_PID_AMLOGIC_A311D:
-    case PDEV_PID_AMLOGIC_S905D2:
     case PDEV_PID_AMLOGIC_T931:
       nna_block = T931NnaBlock;
       break;

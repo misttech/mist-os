@@ -45,7 +45,6 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/clock-controller-ff63c000",
       "sys/platform/fuchsia-contiguous",
       "sys/platform/register-controller-1000",
-      "sys/platform/nna-ff100000",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());

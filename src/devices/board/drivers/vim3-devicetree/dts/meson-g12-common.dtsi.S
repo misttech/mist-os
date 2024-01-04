@@ -64,16 +64,4 @@
 			};
 		};
 	};
-
-	nna@ff100000 {
-		compatible = "amlogic,nna";
-		reg = <0x0 A311D_NNA_BASE 0x0 A311D_NNA_LENGTH>,
-				<0x0 A311D_HIU_BASE 0x0 A311D_HIU_LENGTH>,
-				<0x0 A311D_POWER_DOMAIN_BASE 0x0 A311D_POWER_DOMAIN_LENGTH>,
-				<0x0 A311D_MEMORY_PD_BASE 0x0 A311D_MEMORY_PD_LENGTH>,
-				<0x0 A311D_NNA_SRAM_BASE  0x0 A311D_NNA_SRAM_LENGTH>;
-		interrupts = <GIC_SPI 147 GIC_IRQ_MODE_LEVEL_HIGH>;
-		iommus = <&dummy_iommu 2>;
-		registers = <&reset A311D_RESET2_LEVEL 4 0x0 0x1000>;
-	};
 };
