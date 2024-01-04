@@ -142,17 +142,14 @@ class UsbAdbTest : public zxtest::Test {
     mock_usb_.ExpectAllocEp(ZX_OK, USB_DIR_OUT, kBulkOutEp);
     mock_usb_.ExpectAllocEp(ZX_OK, USB_DIR_IN, kBulkInEp);
     mock_usb_.ExpectSetInterface(ZX_OK, {});
-    adb_loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNeverAttachToThread);
-    auto adb = std::make_unique<UsbAdbDevice>(parent_.get(), adb_loop_->dispatcher(), &stop_sync_);
+    auto adb = std::make_unique<UsbAdbDevice>(parent_.get(), adb_loop_.dispatcher(), &stop_sync_);
     auto dev = adb.get();
     incoming_.SyncCall([](IncomingNamespace* infra) {
       infra->fake_dev->ExpectConnectToEndpoint(kBulkOutEp);
       infra->fake_dev->ExpectConnectToEndpoint(kBulkInEp);
     });
-    // adb_loop_ needs to run for a bit for Init() to be able to call RegisterVmos()
-    adb_loop_->StartThread();
+    adb_loop_.StartThread("usb-abd-test-adb-loop");
     ASSERT_OK(dev->Init());
-    adb_loop_->ResetQuit();  // Stop threads so we can control adb_loop_ execution
     // Mock ddk owns the reference.
     [[maybe_unused]] auto released = adb.release();
 
@@ -176,7 +173,6 @@ class UsbAdbTest : public zxtest::Test {
           infra->fake_dev->fake_endpoint(kBulkOutEp).RequestComplete(ZX_ERR_CANCELED, 0);
         }
       });
-      adb_loop_->RunUntilIdle();
     }
     parent_->GetLatestChild()->WaitUntilSuspendReplyCalled();
     fidl_loop_.Shutdown();
@@ -188,7 +184,7 @@ class UsbAdbTest : public zxtest::Test {
   MockUsbFunction mock_usb_;
   std::shared_ptr<MockDevice> parent_;
   async::Loop fidl_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  std::unique_ptr<async::Loop> adb_loop_;
+  async::Loop adb_loop_{&kAsyncLoopConfigNeverAttachToThread};
   fidl::WireSyncClient<fuchsia_hardware_adb::Device> adb_client_;
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
@@ -200,38 +196,39 @@ class UsbAdbTest : public zxtest::Test {
 // Fake Adb protocol service.
 class FakeAdbDaemon : public fidl::WireAsyncEventHandler<fuchsia_hardware_adb::UsbAdbImpl> {
  public:
-  explicit FakeAdbDaemon() : loop_(&kAsyncLoopConfigNeverAttachToThread) {
+  explicit FakeAdbDaemon(async_dispatcher_t* dispatcher, sync_completion_t* status_changed)
+      : status_changed_(status_changed) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_adb::UsbAdbImpl>();
     ASSERT_TRUE(endpoints.is_ok());
     client_ = fidl::WireSharedClient<fuchsia_hardware_adb::UsbAdbImpl>(std::move(endpoints->client),
-                                                                       loop_.dispatcher(), this);
+                                                                       dispatcher, this);
     server_ = std::move(endpoints->server);
   }
-
-  ~FakeAdbDaemon() { loop_.Shutdown(); }
 
   fidl::ServerEnd<fuchsia_hardware_adb::UsbAdbImpl>&& GetServer() { return std::move(server_); }
 
   void OnStatusChanged(
       fidl::WireEvent<fuchsia_hardware_adb::UsbAdbImpl::OnStatusChanged>* event) override {
     status_ = event->status;
+    if (status_changed_) {
+      sync_completion_signal(status_changed_);
+    }
   }
 
-  async::Loop& loop() { return loop_; }
   fuchsia_hardware_adb::StatusFlags status() { return status_; }
   fidl::WireSharedClient<fuchsia_hardware_adb::UsbAdbImpl>& client() { return client_; }
 
  private:
   fidl::WireSharedClient<fuchsia_hardware_adb::UsbAdbImpl> client_;
   fuchsia_hardware_adb::StatusFlags status_;
-  async::Loop loop_;
+  sync_completion_t* status_changed_;
   fidl::ServerEnd<fuchsia_hardware_adb::UsbAdbImpl> server_;
 };
 
 TEST_F(UsbAdbTest, SetUpTearDown) { ASSERT_NO_FATAL_FAILURE(); }
 
 TEST_F(UsbAdbTest, StartStop) {
-  auto fake_adb = std::make_unique<FakeAdbDaemon>();
+  auto fake_adb = std::make_unique<FakeAdbDaemon>(fidl_loop_.dispatcher(), nullptr);
   ASSERT_NO_FATAL_FAILURE();
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
@@ -242,35 +239,34 @@ TEST_F(UsbAdbTest, StartStop) {
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
   // Close fake_adb so that Stop() will be invoked.
   fake_adb.reset();
-  adb_loop_->RunUntilIdle();
   sync_completion_wait(&stop_sync_, ZX_TIME_INFINITE);
 }
 
 TEST_F(UsbAdbTest, SendAdbMessage) {
-  auto fake_adb = std::make_unique<FakeAdbDaemon>();
+  sync_completion_t status_changed;
+  auto fake_adb = std::make_unique<FakeAdbDaemon>(fidl_loop_.dispatcher(), &status_changed);
   ASSERT_NO_FATAL_FAILURE();
 
   // Start adb transactions.
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
   ASSERT_OK(adb_client_->Start(std::move(fake_adb->GetServer())));
+  sync_completion_wait(&status_changed, zx::duration::infinite().get());
+  EXPECT_EQ(fake_adb->status(), fuchsia_hardware_adb::StatusFlags(0));
 
   // Call set_configured of usb adb to bring the interface online.
   mock_usb_.ExpectConfigEp(ZX_OK, {}, {});
   mock_usb_.ExpectConfigEp(ZX_OK, {}, {});
-  mock_usb_.function.ops->set_configured(mock_usb_.function.ctx, true, USB_SPEED_FULL);
+  sync_completion_reset(&status_changed);
+  EXPECT_OK(mock_usb_.function.ops->set_configured(mock_usb_.function.ctx, true, USB_SPEED_FULL));
   configured_ = true;
-  // Run loop to send event
-  adb_loop_->RunUntilIdle();
-  // Run loop to receive event
-  while (fake_adb->status() != fuchsia_hardware_adb::StatusFlags::kOnline) {
-    EXPECT_EQ(ZX_OK, fake_adb->loop().RunUntilIdle());
-  }
+  // Wait for status changed.
+  sync_completion_wait(&status_changed, zx::duration::infinite().get());
+  EXPECT_EQ(fake_adb->status(), fuchsia_hardware_adb::StatusFlags::kOnline);
 
   // Queue transaction and check that the request is passed down the driver stack.
   uint8_t test_data[] = "test-data";
   sync_completion_t completion;
-  ASSERT_OK(fake_adb->loop().StartThread("adb-send-thread"));
   fake_adb->client()
       ->QueueTx(fidl::VectorView<uint8_t>::FromExternal(test_data, sizeof(test_data)))
       .ThenExactlyOnce(
@@ -278,20 +274,17 @@ TEST_F(UsbAdbTest, SendAdbMessage) {
             ASSERT_TRUE(response->is_ok());
             sync_completion_signal(&completion);
           });
-  adb_loop_->RunUntilIdle();
   sync_completion_wait(&completion, zx::duration::infinite().get());
 
   incoming_.SyncCall([&](IncomingNamespace* infra) {
     infra->fake_dev->fake_endpoint(kBulkInEp).RequestComplete(ZX_ERR_CANCELED, 0);
   });
-  adb_loop_->RunUntilIdle();
 
   // Calls during Stop().
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
   // Close fake_adb so that Stop() will be invoked.
   fake_adb.reset();
-  adb_loop_->RunUntilIdle();
   sync_completion_wait(&stop_sync_, ZX_TIME_INFINITE);
 }
 
@@ -299,29 +292,27 @@ TEST_F(UsbAdbTest, RecvAdbMessage) {
   // Call set_configured of usb adb.
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
-  mock_usb_.function.ops->set_configured(mock_usb_.function.ctx, true, USB_SPEED_FULL);
+  EXPECT_OK(mock_usb_.function.ops->set_configured(mock_usb_.function.ctx, true, USB_SPEED_FULL));
   configured_ = true;
 
-  auto fake_adb = std::make_unique<FakeAdbDaemon>();
+  sync_completion_t status_changed;
+  auto fake_adb = std::make_unique<FakeAdbDaemon>(fidl_loop_.dispatcher(), &status_changed);
   ASSERT_NO_FATAL_FAILURE();
 
   // Start adb transactions. This will also result in endpoint configuration.
   mock_usb_.ExpectConfigEp(ZX_OK, {}, {});
   mock_usb_.ExpectConfigEp(ZX_OK, {}, {});
+  sync_completion_reset(&status_changed);
   ASSERT_OK(adb_client_->Start(std::move(fake_adb->GetServer())));
 
-  // Run loop to send event
-  adb_loop_->RunUntilIdle();
-  // Run loop to receive event
-  while (fake_adb->status() != fuchsia_hardware_adb::StatusFlags::kOnline) {
-    EXPECT_EQ(ZX_OK, fake_adb->loop().RunUntilIdle());
-  }
+  // Wait for status changed.
+  sync_completion_wait(&status_changed, zx::duration::infinite().get());
+  EXPECT_EQ(fake_adb->status(), fuchsia_hardware_adb::StatusFlags::kOnline);
 
   // Queue a receive request before the data is available. The request will not get an immediate
   // reply. Queue a Receive request.
   const uint8_t test_data[] = "test-data";
   sync_completion_t completion;
-  ASSERT_OK(fake_adb->loop().StartThread("adb-recv-thread"));
   fake_adb->client()->Receive().ThenExactlyOnce(
       [&](fidl::WireUnownedResult<::fuchsia_hardware_adb::UsbAdbImpl::Receive>& response) -> void {
         ASSERT_OK(response.status());
@@ -333,9 +324,6 @@ TEST_F(UsbAdbTest, RecvAdbMessage) {
   incoming_.SyncCall([&](IncomingNamespace* infra) {
     infra->fake_dev->fake_endpoint(kBulkOutEp).RequestComplete(ZX_OK, sizeof(test_data));
   });
-
-  // Process the Receive request and wait for completion.
-  adb_loop_->RunUntilIdle();
   sync_completion_wait(&completion, zx::duration::infinite().get());
 
   // Calls during Stop().
@@ -343,7 +331,6 @@ TEST_F(UsbAdbTest, RecvAdbMessage) {
   mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
   // Close fake_adb so that Stop() will be invoked.
   fake_adb.reset();
-  adb_loop_->RunUntilIdle();
   sync_completion_wait(&stop_sync_, ZX_TIME_INFINITE);
 }
 

@@ -383,8 +383,8 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetConfigured(bool configured, usb
   {
     fbl::AutoLock _(&adb_mutex_);
     if (adb_binding_.has_value()) {
-      fbl::AutoLock _(&lock_);
-      auto result = fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(status_);
+      auto result = fidl::WireSendEvent(adb_binding_.value())
+                        ->OnStatusChanged(fuchsia_hardware_adb::StatusFlags(configured));
       if (!result.ok()) {
         zxlogf(ERROR, "Could not call AdbInterface Status - %d.", result.status());
         return ZX_ERR_IO;
@@ -446,8 +446,7 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetInterface(uint8_t interface, ui
 
   fbl::AutoLock _(&adb_mutex_);
   if (adb_binding_.has_value()) {
-    fbl::AutoLock _(&lock_);
-    auto result = fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(status_);
+    auto result = fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(online);
     if (!result.ok()) {
       zxlogf(ERROR, "Could not call AdbInterface Status.");
       return ZX_ERR_IO;
