@@ -1085,7 +1085,15 @@ func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdo
 			if err != nil {
 				logger.Debugf(ctx, "failed to get run result: %s", err)
 			} else if runResult != nil {
-				return processTestResult(runResult, test, clock.Now(ctx).Sub(startTime), true)
+				if result, err := processTestResult(runResult, test, clock.Now(ctx).Sub(startTime), true); err != nil {
+					// Log the error and continue to construct the test result
+					// without the run_summary.json in the outputs.
+					logger.Debugf(ctx, "failed to process run result: %s", err)
+				} else {
+					// If there was no processing error, return the test result
+					// constructed from the run_summary.json in the outputs.
+					return result, nil
+				}
 			}
 		}
 	}
