@@ -1,6 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <stdarg.h>
 
 #include <wlan/drivers/log_instance.h>
@@ -10,7 +11,7 @@ extern "C" void wlan_drivers_log_with_severity(FuchsiaLogSeverity severity, uint
                                                const char* fmt, ...) {
   using wlan::drivers::log::Instance;
 
-  auto logger = Instance::GetLogger();
+  fdf::Logger* logger = fdf::Logger::GlobalInstance();
 
   va_list args;
   va_start(args, fmt);
