@@ -66,7 +66,6 @@ use {
     fidl::{
         endpoints::{self, ServerEnd},
         epitaph::ChannelEpitaphExt,
-        handle::fuchsia_handles::Channel,
     },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
@@ -1497,12 +1496,11 @@ impl ResolvedInstanceState {
                     "framework hook dispatcher",
                     receiver,
                     Some((component.context.policy().clone(), capability_source.clone())),
-                    Arc::new(move |message| {
+                    Arc::new(move |mut channel, target| {
                         let weak_component = weak_component.clone();
                         let capability_source = capability_source.clone();
                         async move {
-                            let mut channel: Channel = message.payload.channel.into();
-                            if let Ok(target) = message.target.upgrade() {
+                            if let Ok(target) = target.upgrade() {
                                 if let Ok(component) = weak_component.upgrade() {
                                     if let Some(provider) = target
                                         .context
@@ -1515,7 +1513,7 @@ impl ResolvedInstanceState {
                                         provider
                                             .open(
                                                 component.nonblocking_task_group(),
-                                                message.payload.flags,
+                                                fio::OpenFlags::empty(),
                                                 PathBuf::from(""),
                                                 &mut channel,
                                             )

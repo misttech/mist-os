@@ -235,12 +235,12 @@ impl ElfRunnerProgram {
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
             elf_runner_receiver,
             None,
-            Arc::new(move |message| {
+            Arc::new(move |server_end, _| {
                 inner
                     .clone()
                     .serve_component_runner(sandbox_util::take_handle_as_stream::<
                         fcrunner::ComponentRunnerMarker,
-                    >(message))
+                    >(server_end))
                     .boxed()
             }),
         );
@@ -251,9 +251,11 @@ impl ElfRunnerProgram {
             freport::SnapshotProviderMarker::PROTOCOL_NAME,
             snapshot_provider_receiver,
             None,
-            Arc::new(move |message| {
+            Arc::new(move |server_end, _| {
                 inner.clone().elf_runner.serve_memory_reporter(
-                    sandbox_util::take_handle_as_stream::<freport::SnapshotProviderMarker>(message),
+                    sandbox_util::take_handle_as_stream::<freport::SnapshotProviderMarker>(
+                        server_end,
+                    ),
                 );
                 std::future::ready(Result::<(), anyhow::Error>::Ok(())).boxed()
             }),

@@ -425,8 +425,8 @@ impl BuiltinDictBuilder {
             name,
             receiver,
             Some((self.policy_checker.clone(), capability_source)),
-            Arc::new(move |message| {
-                task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(message)).boxed()
+            Arc::new(move |server_end, _| {
+                task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
         ));
     }
@@ -1265,8 +1265,8 @@ impl BuiltinEnvironment {
             name,
             receiver,
             Some((self.model.root().context.policy().clone(), capability_source)),
-            Arc::new(move |message| {
-                task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(message)).boxed()
+            Arc::new(move |server_end, _| {
+                task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
         );
 

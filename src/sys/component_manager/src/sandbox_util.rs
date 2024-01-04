@@ -24,7 +24,7 @@ use {
     },
     lazy_static::lazy_static,
     sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Message, Open, Receiver, Sender},
-    std::sync::Arc,
+    std::sync::{self, Arc},
     tracing::{info, warn},
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
 };
@@ -35,12 +35,41 @@ lazy_static! {
     static ref SENDER: Name = "sender".parse().unwrap();
 }
 
-pub fn take_handle_as_stream<P: ProtocolMarker>(
-    msg: Message<WeakComponentInstance>,
-) -> P::RequestStream {
-    let channel = AsyncChannel::from_channel(msg.payload.channel)
-        .expect("failed to convert handle into async channel");
+pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
+    let channel =
+        AsyncChannel::from_channel(channel).expect("failed to convert handle into async channel");
     P::RequestStream::from_channel(channel)
+}
+
+pub trait ProtocolPayloadExt {
+    /// If the protocol connection request requires serving the `fuchsia.io/Node`
+    /// protocol, serve that internally and return `None`. Otherwise, handle the
+    /// connection flags such as `DESCRIBE` and return the server endpoint such
+    /// that a custom FIDL protocol may be served on it.
+    fn unwrap_server_end_or_serve_node(self) -> Option<zx::Channel>;
+}
+
+impl ProtocolPayloadExt for fsandbox::ProtocolPayload {
+    fn unwrap_server_end_or_serve_node(self) -> Option<zx::Channel> {
+        let server_end_return = Arc::new(sync::Mutex::new(None));
+        let server_end_return_clone = server_end_return.clone();
+        let service = vfs::service::endpoint(
+            move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
+                let mut server_end_return = server_end_return_clone.lock().unwrap();
+                *server_end_return = Some(server_end.into_zx_channel());
+            },
+        );
+        let flags = self.flags;
+        let server_end = self.channel;
+        service.open(ExecutionScope::new(), flags, Path::dot(), server_end.into());
+
+        let mut server_end_return = server_end_return.lock().unwrap();
+        if let Some(server_end) = server_end_return.take() {
+            Some(server_end)
+        } else {
+            None
+        }
+    }
 }
 
 // TODO: use the `Name` type in `Dict`, so that Dicts aren't holding duplicate strings.
@@ -253,7 +282,7 @@ pub fn new_terminating_router(sender: Sender<WeakComponentInstance>) -> Router {
 pub struct LaunchTaskOnReceive {
     receiver: Receiver<WeakComponentInstance>,
     task_to_launch: Arc<
-        dyn Fn(Message<WeakComponentInstance>) -> BoxFuture<'static, Result<(), anyhow::Error>>
+        dyn Fn(zx::Channel, WeakComponentInstance) -> BoxFuture<'static, Result<(), anyhow::Error>>
             + Sync
             + Send
             + 'static,
@@ -273,7 +302,10 @@ impl LaunchTaskOnReceive {
         receiver: Receiver<WeakComponentInstance>,
         policy: Option<(GlobalPolicyChecker, CapabilitySource<ComponentInstance>)>,
         task_to_launch: Arc<
-            dyn Fn(Message<WeakComponentInstance>) -> BoxFuture<'static, Result<(), anyhow::Error>>
+            dyn Fn(
+                    zx::Channel,
+                    WeakComponentInstance,
+                ) -> BoxFuture<'static, Result<(), anyhow::Error>>
                 + Sync
                 + Send
                 + 'static,
@@ -295,40 +327,94 @@ impl LaunchTaskOnReceive {
                 }
             }
 
-            // The open must be wrapped in a [vfs] to correctly implement the full
-            // contract of `fuchsia.io`, including OPEN_FLAGS_DESCRIBE, etc.
-            //
-            // The path is checked in the [`Open`] returned within [`new_terminating_router`],
-            // and the request is dropped in case of non-empty paths.
-            let flags = message.payload.flags;
-            let target = message.target;
-            let server_end = message.payload.channel.into();
-            let task_to_launch = self.task_to_launch.clone();
-            let task_group = self.task_group.clone();
+            let Some(server_end) = message.payload.unwrap_server_end_or_serve_node() else {
+                continue;
+            };
+            let fut = (self.task_to_launch)(server_end, message.target);
             let task_name = self.task_name.clone();
-            let service = vfs::service::endpoint(
-                move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
-                    let message = Message {
-                        payload: fsandbox::ProtocolPayload { channel: server_end.into(), flags },
-                        target: target.clone(),
-                    };
-                    let fut = (task_to_launch)(message);
-                    let task_name = task_name.clone();
-                    task_group.spawn(async move {
-                        if let Err(error) = fut.await {
-                            warn!(%error, "{} failed", task_name);
-                        }
-                    });
-                },
-            );
-            service.open(ExecutionScope::new(), flags, Path::dot(), server_end);
+            self.task_group.spawn(async move {
+                if let Err(error) = fut.await {
+                    warn!(%error, "{} failed", task_name);
+                }
+            });
         }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use {super::*, std::iter};
+    use super::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::ClientEnd;
+    use std::iter;
+
+    #[fuchsia::test]
+    async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
+        let (receiver, sender) = Receiver::<()>::new();
+        let open: Open = sender.into();
+        let (client_end, server_end) = zx::Channel::create();
+        let scope = ExecutionScope::new();
+        open.open(
+            scope,
+            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
+            ".",
+            server_end,
+        );
+        let message = receiver.receive().await.unwrap();
+
+        // We never get the channel because it was intercepted by the VFS.
+        assert_matches!(message.payload.unwrap_server_end_or_serve_node(), None);
+
+        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
+        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        let result = node.take_event_stream().next().await.unwrap();
+        assert_matches!(
+            result,
+            Ok(fio::NodeEvent::OnOpen_ { s, info })
+            if s == zx::Status::OK.into_raw()
+            && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
+        );
+    }
+
+    #[fuchsia::test]
+    async fn unwrap_server_end_or_serve_node_describe() {
+        let (receiver, sender) = Receiver::<()>::new();
+        let open: Open = sender.into();
+        let (client_end, server_end) = zx::Channel::create();
+        let scope = ExecutionScope::new();
+        open.open(scope, fio::OpenFlags::DESCRIBE, ".", server_end);
+        let message = receiver.receive().await.unwrap();
+
+        // The VFS should send the DESCRIBE event, then hand us the channel.
+        assert_matches!(message.payload.unwrap_server_end_or_serve_node(), Some(_));
+
+        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
+        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        let result = node.take_event_stream().next().await.unwrap();
+        assert_matches!(
+            result,
+            Ok(fio::NodeEvent::OnOpen_ { s, info })
+            if s == zx::Status::OK.into_raw()
+            && *info.as_ref().unwrap().as_ref() == fio::NodeInfoDeprecated::Service(fio::Service {})
+        );
+    }
+
+    #[fuchsia::test]
+    async fn unwrap_server_end_or_serve_node_empty() {
+        let (receiver, sender) = Receiver::<()>::new();
+        let open: Open = sender.into();
+        let (client_end, server_end) = zx::Channel::create();
+        let scope = ExecutionScope::new();
+        open.open(scope, fio::OpenFlags::empty(), ".", server_end);
+        let message = receiver.receive().await.unwrap();
+
+        // The VFS should not send any event, but directly hand us the channel.
+        assert_matches!(message.payload.unwrap_server_end_or_serve_node(), Some(_));
+
+        let client_end: ClientEnd<fio::NodeMarker> = client_end.into();
+        let node: fio::NodeProxy = client_end.into_proxy().unwrap();
+        assert_matches!(node.take_event_stream().next().await, None);
+    }
 
     #[fuchsia::test]
     async fn get_capability() {
