@@ -202,25 +202,23 @@ class LoadModule {
 
   // Use ths TlsLayout object to assign a static TLS offset for this module's
   // PT_TLS segment, if it has one.  SetTls() has already been called if it
-  // will be, so the module ID is known.  The two arrays have enough elements
-  // for all the module IDs assigned; this sets the slots for this module's ID.
+  // will be, so the module ID is known.  If the result is not std::nullopt,
+  // then the Abi array fields at the returned index should be filled using
+  // .tls_module() and .static_tls_bias().
   template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, size_type RedZone = 0>
-  constexpr void AssignStaticTls(elfldltl::TlsLayout<Elf>& tls_layout,
-                                 cpp20::span<TlsModule> tls_modules,
-                                 cpp20::span<Addr> tls_offsets) {
-    if (tls_module_id() != 0) {
-      // These correspond to the p_memsz and p_align of the PT_TLS.
-      const size_type memsz = tls_module_.tls_size();
-      const size_type align = tls_module_.tls_alignment;
-
-      // Save the offset for use in resolving IE relocations.
-      static_tls_bias_ = tls_layout.template Assign<Machine, RedZone>(memsz, align);
-
-      // Fill out the separate TLS module arrays for the passive ABI.
-      const size_t idx = tls_module_id() - 1;
-      tls_modules[idx] = tls_module_;
-      tls_offsets[idx] = static_tls_bias_;
+  constexpr std::optional<size_type> AssignStaticTls(elfldltl::TlsLayout<Elf>& tls_layout) {
+    if (tls_module_id() == 0) {
+      return std::nullopt;
     }
+
+    // These correspond to the p_memsz and p_align of the PT_TLS.
+    const size_type memsz = tls_module_.tls_size();
+    const size_type align = tls_module_.tls_alignment;
+
+    // Save the offset for use in resolving IE relocations.
+    static_tls_bias_ = tls_layout.template Assign<Machine, RedZone>(memsz, align);
+
+    return tls_module_id() - 1;
   }
 
   // The following methods satisfy the Module template API for use with

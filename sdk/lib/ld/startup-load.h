@@ -466,7 +466,10 @@ struct StartupLoadModule : public StartupLoadModuleBase,
       new_array(tls_offsets);
 
       for (StartupLoadModule& module : modules) {
-        module.AssignStaticTls(mutable_abi.static_tls_layout, tls_modules, tls_offsets);
+        if (auto tls = module.AssignStaticTls(mutable_abi.static_tls_layout)) {
+          tls_modules[*tls] = module.tls_module();
+          tls_offsets[*tls] = module.static_tls_bias();
+        }
 
 #ifdef NDEBUG
         if (module.tls_module_id() == tls_modules.size()) {
