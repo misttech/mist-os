@@ -1,4 +1,4 @@
-### Reasoning
+### Reasoning {:.hide-from-toc}
 
 The [key-value store baseline
 example's](/docs/development/languages/fidl/examples/key_value_store#baseline)
@@ -8,7 +8,7 @@ instance a UTF-8 string to be stored as an untyped byte array erases this
 valuable type information for readers of the *.fidl file, as well as for
 programmers using bindings generated from it.
 
-### Implementation
+### Implementation {:.hide-from-toc}
 
 The main goal of this change is to replace the baseline case's `vector<byte>`
 typed `value` member with a `union` that stores many possible types. In fact, as

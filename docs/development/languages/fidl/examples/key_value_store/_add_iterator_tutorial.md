@@ -2,7 +2,7 @@ A useful operation for key-value stores is in-order iteration: that is, when
 given a key, to return a (usually paginated) list of elements that appear after
 it, in order.
 
-### Reasoning
+### Reasoning {:.hide-from-toc}
 
 In FIDL, this is best done using an iterator, which is generally implemented as
 a separate protocol over which this iteration can occur. Using a separate
@@ -31,7 +31,7 @@ control. It also creates a natural pagination boundary: rather than a giant dump
 of all of the results at once, the server only needs to prepare small batches at
 a time.
 
-### Implementation
+### Implementation {:.hide-from-toc}
 
 Note: The source code for this example is located at
 [//examples/fidl/new/key_value_store/add_iterator](/examples/fidl/new/key_value_store/add_iterator).
