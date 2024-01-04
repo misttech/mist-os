@@ -49,7 +49,7 @@ icu_source_set("lib") {
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl:fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/icu:data",
     "//src/lib/icu:lib",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
