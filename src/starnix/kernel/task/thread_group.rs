@@ -5,7 +5,6 @@
 use crate::{
     device::terminal::{ControllingSession, Terminal},
     mutable_state::{state_accessor, state_implementation},
-    selinux::fs::SeLinuxThreadGroupState,
     signals::{
         send_signal, send_standard_signal, syscalls::WaitingOptions, SignalActions, SignalDetail,
         SignalInfo,
@@ -21,6 +20,7 @@ use crate::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use macro_rules_attribute::apply;
+use selinux::hooks::SeLinuxThreadGroupState;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_error, log_warn, not_implemented};
 use starnix_sync::{Mutex, MutexGuard, RwLock};
@@ -104,7 +104,8 @@ pub struct ThreadGroupMutableState {
 
     pub terminating: bool,
 
-    pub selinux: SeLinuxThreadGroupState,
+    /// The SELinux security structure. `None` if SELinux is disabled.
+    pub selinux_state: Option<SeLinuxThreadGroupState>,
 
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
@@ -310,6 +311,9 @@ impl ThreadGroup {
     ) -> Arc<ThreadGroup> {
         let timers = TimerTable::new();
         let itimer_real_id = timers.create(CLOCK_REALTIME as ClockId, None).unwrap();
+        // TODO(http://b/316181721): propagate initial contexts to tasks.
+        let selinux_state =
+            kernel.security_server.as_ref().map(|ss| SeLinuxThreadGroupState::new_default(ss));
         let mut thread_group = ThreadGroup {
             kernel,
             process,
@@ -340,7 +344,7 @@ impl ThreadGroup {
                 last_signal: None,
                 leader_exit_info: None,
                 terminating: false,
-                selinux: Default::default(),
+                selinux_state,
                 children_time_stats: Default::default(),
                 personality: parent.as_ref().map(|p| p.personality).unwrap_or(Default::default()),
                 allowed_ptracers: PtraceAllowedPtracers::None,
