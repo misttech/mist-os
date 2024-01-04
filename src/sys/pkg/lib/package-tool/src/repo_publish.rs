@@ -153,10 +153,11 @@ pub async fn repo_package_manifest_list(
     let package_manifest_list_path = manifests_dir.join("package_manifests.list");
 
     // Create repository based on src repository path
-    let blobs_dir = src_repo_path.join("blobs");
     create_dir_all(&manifests_dir)?;
+    let mut package_manifest_list = Vec::new();
     let src_repos = get_repositories(src_repo_path)?;
     for src_repo in src_repos {
+        let blobs_dir = src_repo.blob_repo_path();
         let buf = async_fs::read(&src_trusted_root_path)
             .await
             .with_context(|| format!("reading trusted root {src_trusted_root_path}"))?;
@@ -171,8 +172,6 @@ pub async fn repo_package_manifest_list(
 
         let packages =
             client.list_packages(ListFields::empty()).await.context("listing packages")?;
-
-        let mut package_manifest_list = Vec::new();
 
         for package in packages {
             let package = RepositoryPackage::from(package);
@@ -194,16 +193,16 @@ pub async fn repo_package_manifest_list(
 
             package_manifest_list.push(package_manifest_path);
         }
-
-        // Sort the package manifest list so it is in a consistent order.
-        package_manifest_list.sort();
-
-        let package_manifest_list = PackageManifestList::from(package_manifest_list);
-
-        let file = File::create(&package_manifest_list_path)?;
-
-        package_manifest_list.to_writer(BufWriter::new(file))?;
     }
+
+    // Sort the package manifest list so it is in a consistent order.
+    package_manifest_list.sort();
+
+    let package_manifest_list = PackageManifestList::from(package_manifest_list);
+
+    let file = File::create(&package_manifest_list_path)?;
+
+    package_manifest_list.to_writer(BufWriter::new(file))?;
 
     Ok(())
 }
@@ -1228,6 +1227,18 @@ mod tests {
         };
         assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
 
+        // Prepare a second empty src repo
+        let second_repo_path = src_repo_path.join("second");
+        test_utils::make_pm_repository(&second_repo_path).await;
+
+        let cmd = RepoPublishCommand {
+            package_manifests: vec![],
+            repo_path: second_repo_path.to_path_buf(),
+            clean: true,
+            ..default_command_for_test()
+        };
+        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
+
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
             product_version: "".to_string(),
@@ -1236,16 +1247,28 @@ mod tests {
             system_a: None,
             system_b: None,
             system_r: None,
-            repositories: vec![Repository {
-                name: "fuchsia.com".into(),
-                metadata_path: src_repo_path.join("repository"),
-                blobs_path: src_repo_path.join("repository").join("blobs"),
-                delivery_blob_type: None,
-                root_private_key_path: None,
-                targets_private_key_path: None,
-                snapshot_private_key_path: None,
-                timestamp_private_key_path: None,
-            }],
+            repositories: vec![
+                Repository {
+                    name: "fuchsia.com".into(),
+                    metadata_path: src_repo_path.join("repository"),
+                    blobs_path: src_repo_path.join("repository").join("blobs"),
+                    delivery_blob_type: None,
+                    root_private_key_path: None,
+                    targets_private_key_path: None,
+                    snapshot_private_key_path: None,
+                    timestamp_private_key_path: None,
+                },
+                Repository {
+                    name: "fuchsia.com".into(),
+                    metadata_path: second_repo_path.join("repository"),
+                    blobs_path: second_repo_path.join("repository").join("blobs"),
+                    delivery_blob_type: None,
+                    root_private_key_path: None,
+                    targets_private_key_path: None,
+                    snapshot_private_key_path: None,
+                    timestamp_private_key_path: None,
+                },
+            ],
             update_package_hash: None,
             virtual_devices_path: None,
         });

@@ -160,6 +160,10 @@ impl FileSystemRepository {
         Self::builder(metadata_repo_path, blob_repo_path).build()
     }
 
+    pub fn blob_repo_path(&self) -> &Utf8PathBuf {
+        &self.blob_repo_path
+    }
+
     fn fetch<'a>(
         &'a self,
         repo_path: &Utf8Path,
