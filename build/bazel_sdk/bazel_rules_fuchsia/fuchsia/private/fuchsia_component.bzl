@@ -3,8 +3,8 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols")
 load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
+load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageResourcesInfo", "FuchsiaUnitTestComponentInfo")
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variant", "rule_variants")
 
