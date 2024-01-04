@@ -13,7 +13,7 @@ use core::{
     sync::atomic::AtomicU16,
 };
 
-use lock_order::{lock::LockFor, relation::LockBefore, wrap::prelude::*, Locked};
+use lock_order::{lock::LockFor, relation::LockBefore, wrap::prelude::*};
 use net_types::{
     ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
@@ -98,14 +98,15 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
         let SlaacAddrs { core_ctx, device_id, config: _, _marker } = self;
         let CoreCtxWithIpDeviceConfiguration { config: _, core_ctx } = core_ctx;
         crate::device::integration::with_ip_device_state(core_ctx, device_id, |mut state| {
-            let addrs = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
+            let (addrs, mut locked) =
+                state.read_lock_and::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
             addrs.iter().for_each(|entry| {
                 let addr_sub = entry.addr_sub;
-                let mut entry =
-                    Locked::<_, crate::lock_ordering::IpDeviceAddresses<Ipv6>>::new_locked(
-                        &**entry,
-                    );
-                let mut state = entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>();
+                let mut locked = locked.adopt(&**entry);
+                let mut state = locked
+                    .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| {
+                        c.right()
+                    });
                 let Ipv6AddressState {
                     config,
                     flags: Ipv6AddressFlags { deprecated, assigned: _ },
@@ -177,10 +178,9 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
         )
         .map(|entry| {
             let addr_sub = entry.addr_sub;
-            let mut entry = Locked::<_, crate::lock_ordering::IpDeviceAddresses<Ipv6>>::new_locked(
-                entry.deref(),
-            );
-            let mut state = entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>();
+            let mut locked = core_ctx.core_ctx.adopt(entry.deref());
+            let mut state = locked
+                .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
             let Ipv6AddressState { config, flags: Ipv6AddressFlags { deprecated, assigned: _ } } =
                 &mut *state;
             and_then(
@@ -748,8 +748,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> Da
         addr: &Self::AddressId,
         cb: F,
     ) -> O {
-        let mut entry = Locked::<_, L>::new_locked(addr.deref());
-        let mut state = entry.write_lock::<crate::lock_ordering::Ipv6DeviceAddressState>();
+        let mut locked = self.core_ctx.adopt(addr.deref());
+        let mut state = locked
+            .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
         let Ipv6AddressState { flags: Ipv6AddressFlags { deprecated: _, assigned }, config: _ } =
             &mut *state;
 
@@ -837,30 +838,13 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> DadContex
             },
         );
 
-        let mut entry = {
-            // Get a `Locked` at the same lock-level of our `core_ctx`. We show
-            // add an empty assignment here for readability to make it clear
-            // that we are operating at the same lock-level.
-            type CurrentLockLevel = crate::lock_ordering::IpDeviceConfiguration<Ipv6>;
-            let _: &mut CoreCtx<'_, _, CurrentLockLevel> = core_ctx;
-            Locked::<_, CurrentLockLevel>::new_locked(addr.deref())
-        };
-
+        let mut core_ctx = core_ctx.adopt(addr.deref());
         let config = Borrow::borrow(&*config);
 
-        let (mut dad_state, mut core_ctx) = {
-            // The type/lock-levevel is specified when `Self::DadAddressCtx<'_>` is
-            // impl-ed but we explicitly specify it here as well to audit this in
-            // the event of a lock-level change.
-            type AcquireLockLevel = crate::lock_ordering::Ipv6DeviceAddressDad;
-            (
-                entry.lock::<AcquireLockLevel>(),
-                CoreCtxWithIpDeviceConfiguration {
-                    config,
-                    core_ctx: core_ctx.cast_locked::<AcquireLockLevel>(),
-                },
-            )
-        };
+        let (mut dad_state, mut locked) =
+            core_ctx.lock_with_and::<crate::lock_ordering::Ipv6DeviceAddressDad, _>(|c| c.right());
+        let mut core_ctx =
+            CoreCtxWithIpDeviceConfiguration { config, core_ctx: locked.cast_core_ctx() };
 
         cb(DadStateRef {
             state: Some(DadAddressStateRef {
@@ -1056,25 +1040,12 @@ impl<'a, Config, BC: BindingsContext> Ipv6RouteDiscoveryContext<BC>
         crate::device::integration::with_ip_device_state_and_core_ctx(
             core_ctx,
             device_id,
-            |mut state, core_ctx| {
-                let mut state = state.lock::<crate::lock_ordering::Ipv6DeviceRouteDiscovery>();
-                // We lock the state according to the IPv6 route discovery
-                // lock level but the callback needs access to the core context
-                // so we cast its lock-level to IPv6 route discovery so that
-                // only locks that may be acquired _after_ the IPv6 route
-                // discovery lock may be acquired.
-                //
-                // Note that specifying the lock-level type in `cast_locked`
-                // is not explicitly needed as `Self::WithDiscoveredRoutesMutCtx`
-                // includes the lock-level, but we do it here to be explicit
-                // and catch changes to the associated type.
-                //
-                // TODO(https://fxbug.dev/126743): Support this natively in the
-                // lock-order crate.
-                cb(
-                    &mut state,
-                    &mut core_ctx.cast_locked::<crate::lock_ordering::Ipv6DeviceRouteDiscovery>(),
-                )
+            |mut core_ctx_and_resource| {
+                let (mut state, mut locked) = core_ctx_and_resource
+                    .lock_with_and::<crate::lock_ordering::Ipv6DeviceRouteDiscovery, _>(
+                    |x| x.right(),
+                );
+                cb(&mut state, &mut locked.cast_core_ctx())
             },
         )
     }

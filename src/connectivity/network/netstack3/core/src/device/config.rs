@@ -4,6 +4,7 @@
 
 //! Device link layer configuration types.
 
+use lock_order::wrap::prelude::*;
 use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{

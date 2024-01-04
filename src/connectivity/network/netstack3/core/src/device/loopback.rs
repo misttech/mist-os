@@ -465,10 +465,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>
         device::integration::with_loopback_state_and_core_ctx(
             self,
             device_id,
-            |mut state, core_ctx| {
-                let mut x = state.lock::<crate::lock_ordering::LoopbackRxDequeue>();
-                let mut locked = core_ctx.cast_locked();
-                cb(&mut x, &mut locked)
+            |mut core_ctx_and_resource| {
+                let (mut x, mut locked) =
+                    core_ctx_and_resource
+                        .lock_with_and::<crate::lock_ordering::LoopbackRxDequeue, _>(|c| c.right());
+                cb(&mut x, &mut locked.cast_core_ctx())
             },
         )
     }
@@ -554,10 +555,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>
         device::integration::with_loopback_state_and_core_ctx(
             self,
             device_id,
-            |mut state, core_ctx| {
-                let mut x = state.lock::<crate::lock_ordering::LoopbackTxDequeue>();
-                let mut locked = core_ctx.cast_locked();
-                cb(&mut x, &mut locked)
+            |mut core_ctx_and_resource| {
+                let (mut x, mut locked) =
+                    core_ctx_and_resource
+                        .lock_with_and::<crate::lock_ordering::LoopbackTxDequeue, _>(|c| c.right());
+                cb(&mut x, &mut locked.cast_core_ctx())
             },
         )
     }

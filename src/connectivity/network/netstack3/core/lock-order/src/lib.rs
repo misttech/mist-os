@@ -536,9 +536,36 @@ where
     /// Adopts reference `n` to the locked context.
     ///
     /// This allows access on disjoint structures to adopt the same lock level.
-    pub fn adopt<'a, N>(&'a mut self, n: &'a N) -> Locked<OwnedWrapper<(&'a T::Target, &'a N)>, L> {
+    pub fn adopt<'a, N>(
+        &'a mut self,
+        n: &'a N,
+    ) -> Locked<OwnedTupleWrapper<&'a T::Target, &'a N>, L> {
         let Self(t, PhantomData) = self;
-        Locked(OwnedWrapper((t, n)), PhantomData)
+        Locked(OwnedWrapper(TupleWrapper(Deref::deref(t), n)), PhantomData)
+    }
+
+    /// Casts the left reference of the [`TupleWrapper`] deref'ed by `T`.
+    pub fn cast_left<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&A::Target) -> &X>(
+        &'a mut self,
+        f: F,
+    ) -> Locked<OwnedTupleWrapper<&X, &B::Target>, L>
+    where
+        T: Deref<Target = TupleWrapper<A, B>>,
+    {
+        let Self(t, PhantomData) = self;
+        Locked(Deref::deref(t).cast_left(f), PhantomData)
+    }
+
+    /// Casts the right reference of the [`TupleWrapper`] deref'ed by `T`.
+    pub fn cast_right<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&B::Target) -> &X>(
+        &'a mut self,
+        f: F,
+    ) -> Locked<OwnedTupleWrapper<&A::Target, &X>, L>
+    where
+        T: Deref<Target = TupleWrapper<A, B>>,
+    {
+        let Self(t, PhantomData) = self;
+        Locked(Deref::deref(t).cast_right(f), PhantomData)
     }
 }
 
@@ -551,6 +578,49 @@ impl<T> Deref for OwnedWrapper<T> {
     fn deref(&self) -> &Self::Target {
         let Self(t) = self;
         t
+    }
+}
+
+/// A convenient alias for a [`TupleWrapper`] inside an [`OwnedWrapper`].
+pub type OwnedTupleWrapper<A, B> = OwnedWrapper<TupleWrapper<A, B>>;
+
+/// A wrapper for tuples to support implementing [`Locked::adopt`].
+pub struct TupleWrapper<A, B>(A, B);
+
+impl<A, B> TupleWrapper<A, B>
+where
+    A: Deref,
+    B: Deref,
+{
+    pub fn left(&self) -> &A::Target {
+        let Self(a, _) = self;
+        a.deref()
+    }
+
+    pub fn right(&self) -> &B::Target {
+        let Self(_, b) = self;
+        b.deref()
+    }
+
+    pub fn both(&self) -> (&A::Target, &B::Target) {
+        let Self(a, b) = self;
+        (a.deref(), b.deref())
+    }
+
+    pub fn cast_left<X, F: FnOnce(&A::Target) -> &X>(
+        &self,
+        f: F,
+    ) -> OwnedTupleWrapper<&X, &B::Target> {
+        let Self(a, b) = self;
+        OwnedWrapper(TupleWrapper(f(Deref::deref(a)), Deref::deref(b)))
+    }
+
+    pub fn cast_right<X, F: FnOnce(&B::Target) -> &X>(
+        &self,
+        f: F,
+    ) -> OwnedTupleWrapper<&A::Target, &X> {
+        let Self(a, b) = self;
+        OwnedWrapper(TupleWrapper(Deref::deref(a), f(Deref::deref(b))))
     }
 }
 
@@ -733,8 +803,8 @@ mod test {
         let data_right = Data { a: Mutex::new(66), b: Mutex::new(22), ..Data::default() };
         let mut locked = locked.adopt(&data_right);
 
-        let (guard_left, mut locked) = locked.lock_with_and::<A, Data>(|(left, _right)| left);
-        let guard_right = locked.lock_with::<B, Data>(|(_left, right)| *right);
+        let (guard_left, mut locked) = locked.lock_with_and::<A, Data>(|t| t.left());
+        let guard_right = locked.lock_with::<B, Data>(|t| t.right());
         assert_eq!(*guard_left, 55);
         assert_eq!(*guard_right, 22);
     }

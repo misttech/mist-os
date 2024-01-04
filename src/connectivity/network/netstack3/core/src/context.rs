@@ -437,6 +437,9 @@ impl<'a, BT: BindingsTypes> CoreCtx<'a, BT, Unlocked> {
     }
 }
 
+pub(crate) type CoreCtxAndResource<'a, BT, R, L> =
+    crate::lock_ordering::Locked<lock_order::OwnedTupleWrapper<&'a StackState<BT>, &'a R>, L>;
+
 /// An alias for an unlocked [`CoreCtx`].
 pub type UnlockedCoreCtx<'a, BT> = CoreCtx<'a, BT, Unlocked>;
 

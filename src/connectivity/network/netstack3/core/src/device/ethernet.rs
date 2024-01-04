@@ -210,18 +210,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
-            |mut state, core_ctx| {
-                // We lock the state at the Ethernet IPv6 NUD lock level, but
-                // the callback needs access to the core context as well as the
-                // NUD state, so we also cast its lock level to the same so that
-                // only locks that may be acquired _after_ the IPv6 NUD lock may
-                // be acquired in the callback.
-                type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
-                let mut nud = state.lock::<LockLevel>();
-                let mut locked = CoreCtxWithDeviceId {
-                    device_id,
-                    core_ctx: &mut core_ctx.cast_locked::<LockLevel>(),
-                };
+            |mut core_ctx_and_resource| {
+                let (mut nud, mut locked) =
+                    core_ctx_and_resource
+                        .lock_with_and::<crate::lock_ordering::EthernetIpv6Nud, _>(|c| c.right());
+                let mut locked =
+                    CoreCtxWithDeviceId { device_id, core_ctx: &mut locked.cast_core_ctx() };
                 cb(&mut nud, &mut locked)
             },
         )
@@ -241,18 +235,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
-            |mut state, core_ctx| {
-                // We lock the state at the Ethernet IPv6 NUD lock level, but
-                // the callback needs access to the core context as well as the
-                // NUD state, so we also cast its lock level to the same so that
-                // only locks that may be acquired _after_ the IPv6 NUD lock may
-                // be acquired in the callback.
-                type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
-                let mut nud = state.lock::<LockLevel>();
-                let mut locked = CoreCtxWithDeviceId {
-                    device_id,
-                    core_ctx: &mut core_ctx.cast_locked::<LockLevel>(),
-                };
+            |mut core_ctx_and_resource| {
+                let (mut nud, mut locked) =
+                    core_ctx_and_resource
+                        .lock_with_and::<crate::lock_ordering::EthernetIpv6Nud, _>(|c| c.right());
+                let mut locked =
+                    CoreCtxWithDeviceId { device_id, core_ctx: &mut locked.cast_core_ctx() };
                 cb(&mut nud, &mut locked)
             },
         )
@@ -775,10 +763,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>
         device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
-            |mut state, core_ctx| {
-                let mut x = state.lock::<crate::lock_ordering::EthernetTxDequeue>();
-                let mut locked = core_ctx.cast_locked();
-                cb(&mut x, &mut locked)
+            |mut core_ctx_and_resource| {
+                let (mut x, mut locked) =
+                    core_ctx_and_resource
+                        .lock_with_and::<crate::lock_ordering::EthernetTxDequeue, _>(|c| c.right());
+                cb(&mut x, &mut locked.cast_core_ctx())
             },
         )
     }
@@ -1274,12 +1263,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
-            |mut state, core_ctx| {
-                let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
-                let mut locked = CoreCtxWithDeviceId {
-                    device_id,
-                    core_ctx: &mut core_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>(),
-                };
+            |mut core_ctx_and_resource| {
+                let (mut arp, mut locked) =
+                    core_ctx_and_resource
+                        .lock_with_and::<crate::lock_ordering::EthernetIpv4Arp, _>(|c| c.right());
+                let mut locked =
+                    CoreCtxWithDeviceId { device_id, core_ctx: &mut locked.cast_core_ctx() };
                 cb(&mut arp, &mut locked)
             },
         )
@@ -1320,12 +1309,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         device::integration::with_ethernet_state_and_core_ctx(
             self,
             device_id,
-            |mut state, core_ctx| {
-                let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
-                let mut locked = CoreCtxWithDeviceId {
-                    device_id,
-                    core_ctx: &mut core_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>(),
-                };
+            |mut core_ctx_and_resource| {
+                let (mut arp, mut locked) =
+                    core_ctx_and_resource
+                        .lock_with_and::<crate::lock_ordering::EthernetIpv4Arp, _>(|c| c.right());
+                let mut locked =
+                    CoreCtxWithDeviceId { device_id, core_ctx: &mut locked.cast_core_ctx() };
                 cb(&mut arp, &mut locked)
             },
         )

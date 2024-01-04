@@ -106,7 +106,7 @@ pub(crate) use lock_order::Unlocked;
 
 use core::{convert::Infallible as Never, marker::PhantomData, ops::Deref};
 
-use lock_order::{impl_lock_after, relation::LockAfter, wrap::LockedWrapper};
+use lock_order::{impl_lock_after, relation::LockAfter, wrap::LockedWrapper, TupleWrapper};
 use net_types::ip::{Ipv4, Ipv6};
 
 pub(crate) struct IcmpSocketsTable<I>(PhantomData<I>, Never);
@@ -322,12 +322,21 @@ where
     pub(crate) fn new(locked: lock_order::Locked<T, L>) -> Self {
         Self(locked)
     }
+}
 
-    pub(crate) fn to_core_ctx_with<BT: crate::BindingsTypes>(
-        &mut self,
-        f: impl FnOnce(&T::Target) -> &crate::StackState<BT>,
-    ) -> crate::CoreCtx<'_, BT, L> {
+impl<'a, BT, R, L, T> Locked<T, L>
+where
+    R: 'a,
+    T: Deref<Target = TupleWrapper<&'a crate::StackState<BT>, &'a R>>,
+    BT: crate::BindingsTypes,
+{
+    pub(crate) fn cast_resource(&mut self) -> Locked<&'_ R, L> {
         let Self(locked) = self;
-        crate::CoreCtx::<BT, L>::wrap(locked.cast_with(f))
+        Locked(locked.cast_with(|c| c.right()))
+    }
+
+    pub(crate) fn cast_core_ctx(&mut self) -> crate::CoreCtx<'_, BT, L> {
+        let Self(locked) = self;
+        crate::CoreCtx::<BT, L>::wrap(locked.cast_with(|c| c.left()))
     }
 }

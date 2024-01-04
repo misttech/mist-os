@@ -4,7 +4,9 @@
 
 //! Wrappers for using `Locked` features on newtypes.
 
-use crate::{LockBefore, LockFor, Locked, OwnedWrapper, RwLockFor, UnlockedAccess};
+use crate::{
+    LockBefore, LockFor, Locked, OwnedTupleWrapper, RwLockFor, TupleWrapper, UnlockedAccess,
+};
 use core::ops::Deref;
 
 /// A prelude to include all the wrapper traits into scope and thus wrappers can
@@ -266,7 +268,7 @@ where
     }
 
     /// Like [`Locked::cast`].
-    fn cast<'a, R: Deref>(&'a mut self) -> Self::CastWrapper<&'a R>
+    fn cast<'a, R>(&'a mut self) -> Self::CastWrapper<&'a R>
     where
         T: 'a,
         L: 'a,
@@ -304,12 +306,36 @@ where
     fn adopt<'a, N>(
         &'a mut self,
         n: &'a N,
-    ) -> Self::CastWrapper<OwnedWrapper<(&'a T::Target, &'a N)>>
+    ) -> Self::CastWrapper<OwnedTupleWrapper<&'a T::Target, &'a N>>
     where
         T: 'a,
         L: 'a,
     {
         Self::wrap_cast(self.get_mut().adopt(n))
+    }
+
+    /// Like [`Locked::cast_left`].
+    fn cast_left<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&A::Target) -> &X>(
+        &'a mut self,
+        f: F,
+    ) -> Self::CastWrapper<OwnedTupleWrapper<&X, &B::Target>>
+    where
+        L: 'a,
+        T: Deref<Target = TupleWrapper<A, B>> + 'a,
+    {
+        Self::wrap_cast(self.get_mut().cast_left(f))
+    }
+
+    /// Like [`Locked::cast_right`].
+    fn cast_right<'a, X, A: Deref + 'a, B: Deref + 'a, F: FnOnce(&B::Target) -> &X>(
+        &'a mut self,
+        f: F,
+    ) -> Self::CastWrapper<OwnedTupleWrapper<&A::Target, &X>>
+    where
+        L: 'a,
+        T: Deref<Target = TupleWrapper<A, B>> + 'a,
+    {
+        Self::wrap_cast(self.get_mut().cast_right(f))
     }
 }
 
