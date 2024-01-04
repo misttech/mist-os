@@ -778,7 +778,7 @@ mod tests {
         client_router: Arc<Router>,
         service: &'static str,
     ) -> futures::channel::oneshot::Receiver<Channel> {
-        use parking_lot::Mutex;
+        use fuchsia_sync::Mutex;
         let (send, recv) = futures::channel::oneshot::channel();
         serving_router
             .service_map()

@@ -15,10 +15,10 @@ use {
     anyhow::Error,
     circuit::multi_stream::multi_stream_node_connection_to_async,
     fuchsia_async::Task,
+    fuchsia_sync::Mutex,
     futures::channel::mpsc::unbounded,
     futures::prelude::*,
     overnet_core::{log_errors, ListablePeer, NodeId, NodeIdGenerator, Router},
-    parking_lot::Mutex,
     std::sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
