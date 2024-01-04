@@ -1768,7 +1768,7 @@ pub enum UpdateIpConfigurationError {
 /// This type is a witness for a valid IPv4 configuration for a device ID `D`.
 pub struct PendingIpv4DeviceConfigurationUpdate<'a, D>(Ipv4DeviceConfigurationUpdate, &'a D);
 
-// TODO(https://fxbug.dev/133996): Get rid of this impl block and make the inner
+// TODO(https://fxbug.dev/42083910): Get rid of this impl block and make the inner
 // function publicly accessible once we can safely expose sealed traits.
 impl<'a, BC: crate::BindingsContext>
     PendingIpv4DeviceConfigurationUpdate<'a, crate::device::DeviceId<BC>>
@@ -1933,7 +1933,7 @@ pub struct Ipv6DeviceConfigurationUpdate {
 /// This type is a witness for a valid IPv6 configuration for a device ID `D`.
 pub struct PendingIpv6DeviceConfigurationUpdate<'a, D>(Ipv6DeviceConfigurationUpdate, &'a D);
 
-// TODO(https://fxbug.dev/133996): Get rid of this impl block and make the inner
+// TODO(https://fxbug.dev/42083910): Get rid of this impl block and make the inner
 // function publicly accessible once we can safely expose sealed traits.
 impl<'a, BC: crate::BindingsContext>
     PendingIpv6DeviceConfigurationUpdate<'a, crate::device::DeviceId<BC>>

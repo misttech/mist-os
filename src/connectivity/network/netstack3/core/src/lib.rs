@@ -63,7 +63,7 @@ pub mod device {
 
     // Re-exported freestanding functions.
     //
-    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
     pub use base::{
         add_ethernet_device_with_state, add_ip_addr_subnet, add_loopback_device_with_state,
@@ -96,7 +96,7 @@ pub mod device {
 pub mod device_socket {
     // Re-exported functions.
     //
-    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
     pub use crate::device::socket::{
         create, get_info, remove, send_datagram, send_frame, set_device, set_device_and_protocol,
@@ -122,7 +122,7 @@ pub mod error;
 pub mod inspect {
     // Re-exported functions.
     //
-    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
     pub use crate::counters::inspect_counters;
 
@@ -134,7 +134,7 @@ pub mod inspect {
 pub mod icmp {
     // Re-exported functions.
     //
-    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
     pub use crate::ip::icmp::{
         bind, close, connect, disconnect, get_bound_device, get_info, get_multicast_hop_limit,
@@ -194,7 +194,7 @@ pub mod neighbor {
 pub mod routes {
     // Re-exported functions.
     //
-    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
     pub use crate::ip::base::{get_all_routes, resolve_route};
     pub use crate::ip::forwarding::{select_device_for_gateway, set_routes, with_routes};
