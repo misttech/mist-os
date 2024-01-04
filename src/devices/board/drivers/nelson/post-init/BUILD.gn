@@ -45,6 +45,7 @@ fuchsia_driver("post-init-driver") {
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/lib/amlogic",
     "//src/graphics/display/lib/device-protocol-display",
+    "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/inspect",

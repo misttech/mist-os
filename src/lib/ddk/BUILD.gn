@@ -186,6 +186,7 @@ sdk_static_library("ddk") {
     "//src/devices/board/drivers/integration-test:*",
     "//src/devices/board/drivers/machina:*",
     "//src/devices/board/drivers/nelson:*",
+    "//src/devices/board/drivers/nelson/post-init:*",
     "//src/devices/board/drivers/qemu-arm64:*",
     "//src/devices/board/drivers/qemu-riscv64:*",
     "//src/devices/board/drivers/sherlock:*",
