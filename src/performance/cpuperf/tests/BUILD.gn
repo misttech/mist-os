@@ -58,7 +58,7 @@ executable("cpuperf_integration_tests_bin") {
 
   deps = [
     "//sdk/lib/fdio",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/fxl/test:test_settings",
     "//src/performance/cpuperf:session_result_spec",
     "//src/performance/cpuperf:session_spec",

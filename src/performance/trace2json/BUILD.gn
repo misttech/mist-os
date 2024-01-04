@@ -14,7 +14,7 @@ executable("bin") {
 
   deps = [
     ":lib",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
   ]
 }
 

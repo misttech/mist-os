@@ -11,7 +11,7 @@ source_set("session_spec") {
   ]
 
   public_deps = [
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/json_parser",
     "//src/performance/lib/perfmon",
     "//third_party/rapidjson",
@@ -27,7 +27,7 @@ source_set("session_result_spec") {
   ]
 
   public_deps = [
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/json_parser",
     "//src/performance/lib/perfmon",
     "//third_party/rapidjson",
@@ -46,7 +46,7 @@ executable("bin") {
   deps = [
     ":session_result_spec",
     ":session_spec",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/performance/lib/perfmon",
     "//src/zircon/lib/zircon",
   ]
@@ -90,7 +90,7 @@ source_set("unittests") {
   deps = [
     ":session_result_spec",
     ":session_spec",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//third_party/googletest:gtest",
   ]
 }

@@ -39,7 +39,7 @@ source_set("categories") {
   }
 
   deps = [
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/fbl",
   ]
 
@@ -64,7 +64,7 @@ executable("bin") {
   deps = [
     ":categories",
     "//sdk/lib/sys/cpp",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/performance/lib/perfmon",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -103,7 +103,7 @@ executable("cpuperf_provider_integration_tests_bin") {
   sources = [ "cpuperf_provider_integration_tests.cc" ]
 
   deps = [
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/lib/fxl/test:test_settings",
     "//src/performance/lib/perfmon",
     "//src/performance/lib/test_utils",
