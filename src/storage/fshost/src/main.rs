@@ -70,6 +70,7 @@ async fn main() -> Result<(), Error> {
     // Potentially launch the boot items ramdisk. It's not fatal, so if it fails we print an error
     // and continue.
     let ramdisk_path = if config.ramdisk_image {
+        tracing::info!("setting up ramdisk image from boot items");
         ramdisk::set_up_ramdisk().await.unwrap_or_else(|error| {
             tracing::error!(?error, "failed to set up ramdisk filesystems");
             None
