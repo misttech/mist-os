@@ -9,7 +9,7 @@ source_set("lib") {
   ]
 
   deps = [
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/fbl",
   ]
 
