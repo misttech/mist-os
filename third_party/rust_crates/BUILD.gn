@@ -2375,7 +2375,9 @@ rust_library("bitflags-v1_3_2") {
     "--cfg=feature=\"default\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//third_party/alacritty/alacritty_terminal:*" ]
 
   applicable_licenses = [ ":bitflags-v1_3_2.license" ]
 }
