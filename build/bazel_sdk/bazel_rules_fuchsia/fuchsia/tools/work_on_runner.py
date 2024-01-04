@@ -52,14 +52,14 @@ def build_config_from_toml(file, key):
     with open(file, "rb") as f:
         data = tomllib.load(f)
         try:
-            config_path = data["fuchsia"]["config"][key]
+            config_path = data["fuchsia"]["project"][key]
             if os.path.isabs(config_path):
                 return config_path
             else:
                 return os.path.join(os.path.dirname(file), config_path)
         except Exception as e:
             print(
-                f"fuchsia_env.toml file does not contain fuchsia.config.{key} entry"
+                f"fuchsia_env.toml file does not contain fuchsia.project.{key} entry"
             )
     return None
 
