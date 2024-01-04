@@ -8,7 +8,7 @@ use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig,
 };
 use assembly_config_schema::FileEntry;
-use assembly_util::read_config;
+use assembly_util::{read_config, write_json_file};
 use sampler_config::ComponentIdInfoList;
 use std::collections::BTreeSet;
 
@@ -37,6 +37,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             archivist_pipelines,
             additional_serial_log_components,
             sampler,
+            memory_monitor,
         } = diagnostics_config;
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
@@ -147,6 +148,28 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                     destination: format!("fire/assembly/{}", filename),
                 })
                 .context(format!("Adding fire config to sampler: {}", &fire_config))?;
+        }
+
+        if let Some(buckets_path) = &memory_monitor.buckets {
+            let mut buckets: Vec<serde_json::Value> =
+                read_config(&buckets_path).context("reading product memory buckets config")?;
+
+            // Add the platform buckets.
+            let platform_buckets_path = context.get_resource("buckets.json");
+            let mut platform_buckets: Vec<serde_json::Value> = read_config(platform_buckets_path)?;
+            buckets.append(&mut platform_buckets);
+
+            // Write the result back to a file and add as config_data.
+            let gendir = context.get_gendir().context("Getting gendir for diagnostics")?;
+            let buckets_path = gendir.join("buckets.json");
+            write_json_file(&buckets_path, &buckets)?;
+            builder
+                .package("memory_monitor")
+                .config_data(FileEntry {
+                    source: buckets_path.clone(),
+                    destination: "buckets.json".into(),
+                })
+                .context(format!("Adding buckets config to memory_monitor: {}", &buckets_path))?;
         }
 
         Ok(())

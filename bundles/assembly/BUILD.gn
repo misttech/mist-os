@@ -3209,6 +3209,7 @@ assembly_input_bundle("fonts_hermetic") {
 # Static resources files to make available to product assembly subsystems.
 assembly_resources_directory("resources") {
   sources = [
+    "//src/developer/memory/buckets/buckets.json",
     "//src/sys/core/core_component_id_index.json5",
 
     # Platform configs for the component_manager config.

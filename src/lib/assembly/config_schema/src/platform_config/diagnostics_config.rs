@@ -17,6 +17,8 @@ pub struct DiagnosticsConfig {
     pub additional_serial_log_components: Vec<String>,
     #[serde(default)]
     pub sampler: SamplerConfig,
+    #[serde(default)]
+    pub memory_monitor: MemoryMonitorConfig,
 }
 
 /// Diagnostics configuration options for the archivist configuration area.
@@ -45,6 +47,15 @@ pub struct SamplerConfig {
     /// The fire configs to pass to sampler.
     #[serde(default)]
     pub fire_configs: Vec<Utf8PathBuf>,
+}
+
+/// Diagnostics configuration options for the memory monitor configuration area.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryMonitorConfig {
+    /// The memory buckets config file to provide to memory monitor.
+    #[serde(default)]
+    pub buckets: Option<Utf8PathBuf>,
 }
 
 #[cfg(test)]
@@ -87,7 +98,8 @@ mod tests {
                 archivist: None,
                 archivist_pipelines: Vec::new(),
                 additional_serial_log_components: Vec::new(),
-                sampler: SamplerConfig::default()
+                sampler: SamplerConfig::default(),
+                memory_monitor: MemoryMonitorConfig::default(),
             }
         );
     }
@@ -110,7 +122,8 @@ mod tests {
                 archivist: None,
                 archivist_pipelines: Vec::new(),
                 additional_serial_log_components: Vec::new(),
-                sampler: SamplerConfig::default()
+                sampler: SamplerConfig::default(),
+                memory_monitor: MemoryMonitorConfig::default(),
             }
         );
     }
@@ -138,6 +151,7 @@ mod tests {
                 archivist_pipelines: Vec::new(),
                 additional_serial_log_components: vec!["/foo".to_string()],
                 sampler: SamplerConfig::default(),
+                memory_monitor: MemoryMonitorConfig::default(),
             }
         );
     }

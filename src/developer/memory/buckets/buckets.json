@@ -36,6 +36,24 @@
         "event_code": 5
     },
     {
+        "name": "Camera",
+        "process": "camera_device.*\\.cm|driver_host:pdev:05:04:15",
+        "vmo": "",
+        "event_code": 38
+    },
+    {
+        "name": "Thread",
+        "process": "lowpan.*|ot-stack.*",
+        "vmo": "",
+        "event_code": 56
+    },
+    {
+        "name": "Weave",
+        "process": "weave.*",
+        "vmo": "",
+        "event_code": 57
+    },
+    {
         "name": "Fxblob",
         "process": "fxfs\\.cm",
         "vmo": "blob-.*",
@@ -115,7 +133,7 @@
     },
     {
         "name": "Feedback",
-        "process": "exceptions\\.cm|feedback\\.cm|system_log_recorder",
+        "process": "exceptions\\.cm|feedback\\.cm|system_log_recorder|feedback_id\\.cm",
         "vmo": "",
         "event_code": 46
     },
