@@ -44,12 +44,13 @@ use {
         AcceptorProxy, ConnectionRequest, ConnectionRequestStream, ConnectionTransport,
         ConnectorRequest, ConnectorRequestStream,
     },
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
+    fuchsia_zircon as zx,
     futures::{
         channel::{mpsc, oneshot},
         future, select, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
     },
-    parking_lot::Mutex,
     std::{
         collections::HashMap,
         convert::Infallible,
@@ -530,14 +531,14 @@ impl Deref for Vsock {
 
 impl LockedState {
     // Acquires the lock on `inner`, and processes any pending messages
-    fn lock(&self) -> parking_lot::MutexGuard<'_, State> {
+    fn lock(&self) -> fuchsia_sync::MutexGuard<'_, State> {
         let mut guard = self.inner.lock();
         self.deregister_rx.try_iter().for_each(|e| guard.deregister(e));
         guard
     }
     // Tries to acquire the lock on `inner`, and processes any pending messages
     // if successful
-    fn try_lock(&self) -> Option<parking_lot::MutexGuard<'_, State>> {
+    fn try_lock(&self) -> Option<fuchsia_sync::MutexGuard<'_, State>> {
         if let Some(mut guard) = self.inner.try_lock() {
             self.deregister_rx.try_iter().for_each(|e| guard.deregister(e));
             Some(guard)
