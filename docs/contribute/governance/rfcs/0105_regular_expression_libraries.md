@@ -29,7 +29,7 @@ backreferences. This turns regular expressions into a vector for denial of
 service (DoS) attacks: if a malicious user controls the pattern or the string to
 match, then the user may be able to trigger an exponential search that exhausts
 CPU and causes a DoS. See
-[Davis et al](https://people.cs.vt.edu/davisjam/downloads/publications/DavisCoghlanServantLee-EcosystemREDOS-ESECFSE18.pdf),
+[Davis et al](https://davisjam.github.io/files/publications/DavisCoghlanServantLee-EcosystemREDOS-ESECFSE18.pdf),
 [Russ Cox](https://swtch.com/~rsc/regexp/regexp1.html),
 [V8](https://v8.dev/blog/non-backtracking-regexp), and
 [Wikipedia](https://en.wikipedia.org/wiki/ReDoS) for further discussion.
@@ -135,7 +135,7 @@ Go, Rust, and Dart programs, as those are already compliant with this RFC.
 After that migration is complete, two kinds of rules will be added:
 
 1.  A presubmit rule based on
-    [clang-tidy](https://clang.llvm.org/extra/clang-tidy/checks/portability-restrict-system-includes.html)
+    [clang-tidy](https://clang.llvm.org/extra/clang-tidy/checks/portability/restrict-system-includes.html)
     will be added to ban `<regex>` and `<regex.h>` in C++ code.
 
 1.  A

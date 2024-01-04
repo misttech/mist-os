@@ -204,7 +204,7 @@ even if CTS coverage never reaches 100% of the platform surface.
 [oot-system-testing]: /docs/contribute/roadmap/2021/oot_system_testing.md
 [package-url]: /docs/concepts/packages/package_url.md
 [procargs]: /docs/concepts/process/program_loading.md#the_processargs_protocol
-[sdk-tools]: https://fuchsia.dev/reference/tools/sdk/README.md
+[sdk-tools]: https://fuchsia.dev/reference/tools/sdk/ffx
 [selectors]: /docs/reference/diagnostics/selectors.md
 [sl4a]: https://android.googlesource.com/platform/external/sl4a/
 [sl4f]: /docs/development/testing/sl4f.md

@@ -324,7 +324,7 @@ covered in a [separate roadmap document][oot-system-testing].
 [runner-rust]: /docs/development/testing/components/test_runner_framework.md#rust-runner
 [rust]: https://www.rust-lang.org/
 [sanitizers]: /docs/contribute/testing/sanitizers.md
-[sdk-tools]: https://fuchsia.dev/reference/tools/sdk/README.md
+[sdk-tools]: https://fuchsia.dev/reference/tools/sdk/ffx
 [sl4f]: /docs/development/testing/sl4f.md
 [sl4f-client]: /sdk/testing/sl4f/client/
 [stress-tests]: /docs/development/testing/stress_tests.md
