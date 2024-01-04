@@ -5,6 +5,7 @@
 use {
     crate::input_reports_reader::InputReportsReader,
     anyhow::{Context as _, Error},
+    async_utils::event::Event as AsyncEvent,
     fidl::endpoints::ServerEnd,
     fidl::Error as FidlError,
     fidl_fuchsia_input_report::{
@@ -12,7 +13,7 @@ use {
         InputReportsReaderMarker,
     },
     fuchsia_async as fasync,
-    futures::{future, pin_mut, StreamExt, TryFutureExt},
+    futures::{channel::mpsc, future, pin_mut, StreamExt, TryFutureExt},
 };
 
 /// Implements the server side of the
@@ -47,12 +48,17 @@ impl InputDevice {
     pub(super) fn new(
         request_stream: InputDeviceRequestStream,
         descriptor: DeviceDescriptor,
+        got_input_reports_reader: AsyncEvent,
     ) -> Self {
-        let (report_sender, report_receiver) = futures::channel::mpsc::unbounded::<InputReport>();
+        let (report_sender, report_receiver) = mpsc::unbounded::<InputReport>();
 
         // Create a `Task` to keep serving the `fuchsia.input.report.InputDevice` protocol.
-        let input_device_task =
-            fasync::Task::local(Self::serve_reports(request_stream, descriptor, report_receiver));
+        let input_device_task = fasync::Task::local(Self::serve_reports(
+            request_stream,
+            descriptor,
+            report_receiver,
+            got_input_reports_reader,
+        ));
 
         Self { report_sender, _input_device_task: input_device_task }
     }
@@ -94,12 +100,18 @@ impl InputDevice {
     async fn serve_reports(
         request_stream: InputDeviceRequestStream,
         descriptor: DeviceDescriptor,
-        report_receiver: futures::channel::mpsc::UnboundedReceiver<InputReport>,
+        report_receiver: mpsc::UnboundedReceiver<InputReport>,
+        got_input_reports_reader: AsyncEvent,
     ) {
         // Process `fuchsia.input.report.InputDevice` requests, waiting for the `InputDevice`
         // client to provide a `ServerEnd<InputReportsReader>` by calling `GetInputReportsReader()`.
-        let mut input_reports_reader_server_end_stream = request_stream
-            .filter_map(|r| future::ready(Self::handle_device_request(r, &descriptor)));
+        let mut input_reports_reader_server_end_stream = request_stream.filter_map(|r| {
+            future::ready(Self::handle_device_request(
+                r,
+                &descriptor,
+                got_input_reports_reader.clone(),
+            ))
+        });
         let input_reports_reader_fut = {
             let reader_server_end = input_reports_reader_server_end_stream
                 .next()
@@ -158,9 +170,11 @@ impl InputDevice {
     fn handle_device_request(
         request: Result<InputDeviceRequest, FidlError>,
         descriptor: &DeviceDescriptor,
+        got_input_reports_reader: AsyncEvent,
     ) -> Option<ServerEnd<InputReportsReaderMarker>> {
         match request {
             Ok(InputDeviceRequest::GetInputReportsReader { reader: reader_server_end, .. }) => {
+                let _ = got_input_reports_reader.signal();
                 Some(reader_server_end)
             }
             Ok(InputDeviceRequest::GetDescriptor { responder }) => {
@@ -204,8 +218,13 @@ mod tests {
         async fn single_request_before_call_to_get_feature_report() -> Result<(), Error> {
             let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                 .context("creating InputDevice proxy and stream")?;
-            let input_device_server_fut =
-                Box::new(InputDevice::new(request_stream, DeviceDescriptor::default())).flush();
+
+            let input_device_server_fut = Box::new(InputDevice::new(
+                request_stream,
+                DeviceDescriptor::default(),
+                AsyncEvent::new(),
+            ))
+            .flush();
             let get_feature_report_fut = proxy.get_feature_report();
 
             // Avoid unrelated `panic()`: `InputDevice` requires clients to get an input
@@ -243,8 +262,13 @@ mod tests {
         async fn single_request_before_call_to_get_input_reports_reader() -> Result<(), Error> {
             let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                 .context("creating InputDevice proxy and stream")?;
-            let input_device_server_fut =
-                Box::new(InputDevice::new(request_stream, make_touchscreen_descriptor())).flush();
+
+            let input_device_server_fut = Box::new(InputDevice::new(
+                request_stream,
+                make_touchscreen_descriptor(),
+                AsyncEvent::new(),
+            ))
+            .flush();
             let get_descriptor_fut = proxy.get_descriptor();
 
             // Avoid unrelated `panic()`: `InputDevice` requires clients to get an input
@@ -268,8 +292,13 @@ mod tests {
             let mut executor = fasync::TestExecutor::new();
             let (proxy, request_stream) = endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                 .context("creating InputDevice proxy and stream")?;
-            let input_device_server_fut =
-                Box::new(InputDevice::new(request_stream, make_touchscreen_descriptor())).flush();
+
+            let input_device_server_fut = Box::new(InputDevice::new(
+                request_stream,
+                make_touchscreen_descriptor(),
+                AsyncEvent::new(),
+            ))
+            .flush();
             pin_mut!(input_device_server_fut);
 
             let mut get_descriptor_fut = proxy.get_descriptor();
@@ -292,7 +321,8 @@ mod tests {
         #[test]
         fn after_call_to_get_input_reports_reader_with_report_pending() -> Result<(), Error> {
             let mut executor = fasync::TestExecutor::new();
-            let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+            let (input_device_proxy, input_device, got_input_reports_reader) =
+                make_input_device_proxy_and_struct();
             input_device
                 .send_input_report(InputReport {
                     event_time: None,
@@ -321,6 +351,13 @@ mod tests {
                 Poll::Pending
             );
             assert_matches!(executor.run_until_stalled(&mut get_descriptor_fut), Poll::Ready(_));
+
+            let mut got_input_reports_reader_fut = got_input_reports_reader.wait();
+            assert_matches!(
+                executor.run_until_stalled(&mut got_input_reports_reader_fut),
+                Poll::Ready(_)
+            );
+
             Ok(())
         }
     }
@@ -340,7 +377,8 @@ mod tests {
             #[test]
             fn if_device_request_channel_was_closed() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
                 input_device
@@ -361,7 +399,8 @@ mod tests {
             #[test]
             fn even_if_device_request_channel_is_open() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
                 input_device
@@ -381,7 +420,8 @@ mod tests {
             #[test]
             fn even_if_reports_was_empty_and_device_request_channel_is_open() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
                 let _input_reports_fut = input_reports_reader_proxy.read_input_reports();
@@ -399,7 +439,8 @@ mod tests {
             #[should_panic]
             fn if_reports_were_available() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 input_device
                     .send_input_report(InputReport {
                         event_time: None,
@@ -420,7 +461,8 @@ mod tests {
             #[should_panic]
             fn even_if_no_reports_were_available() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
                 std::mem::drop(input_device_proxy);
@@ -437,7 +479,8 @@ mod tests {
             #[test]
             fn if_reports_were_available() {
                 let mut executor = fasync::TestExecutor::new();
-                let (_input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (_input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 input_device
                     .send_input_report(InputReport {
                         event_time: None,
@@ -454,7 +497,8 @@ mod tests {
             #[test]
             fn even_if_no_reports_were_available() {
                 let mut executor = fasync::TestExecutor::new();
-                let (_input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (_input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
                 assert_matches!(executor.run_until_stalled(&mut input_device_fut), Poll::Pending)
@@ -463,7 +507,8 @@ mod tests {
             #[test]
             fn even_if_get_device_descriptor_has_been_called() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
                 let _get_descriptor_fut = input_device_proxy.get_descriptor();
@@ -478,7 +523,8 @@ mod tests {
             #[test]
             fn if_device_request_channel_is_open() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let _input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
                 input_device
@@ -497,7 +543,8 @@ mod tests {
             #[test]
             fn even_if_device_channel_is_closed() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let _input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
                 input_device
@@ -524,7 +571,8 @@ mod tests {
             #[test]
             fn if_device_request_channel_is_open() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
                 (0..=MAX_DEVICE_REPORT_COUNT).for_each(|_| {
@@ -547,7 +595,8 @@ mod tests {
             #[test]
             fn even_if_device_request_channel_is_closed() {
                 let mut executor = fasync::TestExecutor::new();
-                let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
+                let (input_device_proxy, input_device, _got_input_reports_reader) =
+                    make_input_device_proxy_and_struct();
                 let input_reports_reader_proxy =
                     make_input_reports_reader_proxy(&input_device_proxy);
                 (0..=MAX_DEVICE_REPORT_COUNT).for_each(|_| {
@@ -622,20 +671,23 @@ mod tests {
 
         /// Creates an `InputDeviceProxy`, for sending `fuchsia.input.report.InputDevice`
         /// requests, and an `InputDevice` struct that will receive the FIDL requests
-        /// from the `InputDeviceProxy`.
+        /// from the `InputDeviceProxy`.S
         ///
         /// # Returns
         /// A tuple of the proxy and struct. The struct is `Box`-ed so that the caller
         /// can easily invoke `flush()`.
-        pub(super) fn make_input_device_proxy_and_struct() -> (InputDeviceProxy, Box<InputDevice>) {
+        pub(super) fn make_input_device_proxy_and_struct(
+        ) -> (InputDeviceProxy, Box<InputDevice>, AsyncEvent) {
             let (input_device_proxy, input_device_request_stream) =
                 endpoints::create_proxy_and_stream::<InputDeviceMarker>()
                     .expect("creating InputDevice proxy and stream");
+            let got_input_reports_reader = AsyncEvent::new();
             let input_device = Box::new(InputDevice::new(
                 input_device_request_stream,
                 DeviceDescriptor::default(),
+                got_input_reports_reader.clone(),
             ));
-            (input_device_proxy, input_device)
+            (input_device_proxy, input_device, got_input_reports_reader)
         }
 
         /// Creates an `InputReportsReaderProxy`, for sending

@@ -5,6 +5,7 @@
 use {
     crate::{input_device::InputDevice, new_fake_device_info},
     anyhow::{Context as _, Error},
+    async_utils::event::Event as AsyncEvent,
     fidl::endpoints,
     fidl_fuchsia_input::Key,
     fidl_fuchsia_input_injection::InputDeviceRegistryProxy,
@@ -21,11 +22,12 @@ use {
 /// Implements the client side of the `fuchsia.input.injection.InputDeviceRegistry` protocol.
 pub(crate) struct InputDeviceRegistry {
     proxy: InputDeviceRegistryProxy,
+    got_input_reports_reader: AsyncEvent,
 }
 
 impl InputDeviceRegistry {
-    pub fn new(proxy: InputDeviceRegistryProxy) -> Self {
-        Self { proxy }
+    pub fn new(proxy: InputDeviceRegistryProxy, got_input_reports_reader: AsyncEvent) -> Self {
+        Self { proxy, got_input_reports_reader }
     }
 
     /// Registers a touchscreen device, with in injection coordinate space that spans [-1000, 1000]
@@ -192,7 +194,7 @@ impl InputDeviceRegistry {
     fn add_device(&self, descriptor: DeviceDescriptor) -> Result<InputDevice, Error> {
         let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>()?;
         self.proxy.register(client_end)?;
-        Ok(InputDevice::new(request_stream, descriptor))
+        Ok(InputDevice::new(request_stream, descriptor, self.got_input_reports_reader.clone()))
     }
 }
 
@@ -222,7 +224,12 @@ mod tests {
         let (proxy, request_stream) =
             endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
                 .context("failed to create proxy and stream for InputDeviceRegistry")?;
-        add_device_method(&mut InputDeviceRegistry { proxy }).context("adding device")?;
+
+        add_device_method(&mut InputDeviceRegistry {
+            proxy,
+            got_input_reports_reader: AsyncEvent::new(),
+        })
+        .context("adding device")?;
 
         let requests = match executor.run_until_stalled(&mut request_stream.collect::<Vec<_>>()) {
             Poll::Ready(reqs) => reqs,
@@ -272,7 +279,10 @@ mod tests {
         let (registry_proxy, mut registry_request_stream) =
             endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
                 .context("failed to create proxy and stream for InputDeviceRegistry")?;
-        let mut input_device_registry = InputDeviceRegistry { proxy: registry_proxy };
+        let mut input_device_registry = InputDeviceRegistry {
+            proxy: registry_proxy,
+            got_input_reports_reader: AsyncEvent::new(),
+        };
         let input_device =
             add_device_method(&mut input_device_registry).context("adding input device")?;
 

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    async_utils::event::Event as AsyncEvent,
     fidl_fuchsia_input::Key,
     fidl_fuchsia_input_injection::InputDeviceRegistryMarker,
     fidl_fuchsia_input_report::{
@@ -129,8 +130,12 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
         .try_for_each_concurrent(None, |request| async {
             let input_device_registry = connect_to_protocol::<InputDeviceRegistryMarker>()
                 .expect("connect to input_device_registry");
-            let mut registry =
-                input_device_registry::InputDeviceRegistry::new(input_device_registry);
+            let got_input_reports_reader = AsyncEvent::new();
+
+            let mut registry = input_device_registry::InputDeviceRegistry::new(
+                input_device_registry,
+                got_input_reports_reader.clone(),
+            );
             let mut task_group = fasync::TaskGroup::new();
 
             match request {
@@ -174,6 +179,10 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                         .await;
                     });
 
+                    info!("wait for input-pipeline setup input-reader");
+                    let _ = got_input_reports_reader.wait().await;
+                    info!("input-pipeline setup input-reader");
+
                     responder.send().expect("Failed to respond to RegisterTouchScreen request");
                 }
                 RegistryRequest::RegisterMediaButtonsDevice { payload, responder, .. } => {
@@ -195,6 +204,10 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                     } else {
                         error!("no media buttons device provided in registration request");
                     }
+
+                    info!("wait for input-pipeline setup input-reader");
+                    let _ = got_input_reports_reader.wait().await;
+                    info!("input-pipeline setup input-reader");
 
                     responder
                         .send()
@@ -220,6 +233,10 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                         error!("no keyboard device provided in registration request");
                     }
 
+                    info!("wait for input-pipeline setup input-reader");
+                    let _ = got_input_reports_reader.wait().await;
+                    info!("input-pipeline setup input-reader");
+
                     responder.send().expect("Failed to respond to RegisterKeyboard request");
                 }
                 RegistryRequest::RegisterMouse { payload, responder } => {
@@ -242,6 +259,10 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                     } else {
                         error!("no mouse device provided in registration request");
                     }
+
+                    info!("wait for input-pipeline setup input-reader");
+                    let _ = got_input_reports_reader.wait().await;
+                    info!("input-pipeline setup input-reader");
 
                     responder.send().expect("Failed to respond to RegisterMouse request");
                 }
