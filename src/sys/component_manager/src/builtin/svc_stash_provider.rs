@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error, fidl_fuchsia_boot as fuchsia_boot, fuchsia_zircon::Channel, futures::prelude::*,
-    parking_lot::Mutex, std::sync::Arc,
+    anyhow::Error, fidl_fuchsia_boot as fuchsia_boot, fuchsia_sync::Mutex, fuchsia_zircon::Channel,
+    futures::prelude::*, std::sync::Arc,
 };
 
 pub struct SvcStashCapability {
