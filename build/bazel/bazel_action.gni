@@ -5,6 +5,7 @@
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
+import("//build/bazel/remote_services.gni")
 import("//build/config/compiler.gni")
 
 declare_args() {
@@ -13,12 +14,6 @@ declare_args() {
   # uses the //:console pool to print its output directly
   # to stdout/stderr during the Ninja build.
   bazel_quiet = false
-
-  # Configure bazel to build remotely where supported.
-  # This option requires that bazel invocations have direct
-  # external network access, and that users are authenticated to
-  # access the configured RBE instance.
-  bazel_remote = false
 }
 
 # Wrap a Bazel command with a GN action.
@@ -137,12 +132,12 @@ declare_args() {
 #     Type: boolean
 #     Default: true
 #
-#   remote: (optional)
-#     Set this to true to override the global default `bazel_remote`
+#   remote_build: (optional)
+#     Set this to true to override the global default `enable_bazel_remote_rbe`
 #     setting which controls whether the underlying bazel invocation
 #     will build remotely using RBE.
 #     Type: boolean
-#     Default: `bazel_remote` (global)
+#     Default: `enable_bazel_remote_rbe` (global)
 #
 #   deps:
 #   metadata:
@@ -416,11 +411,11 @@ template("bazel_action") {
       }
     }
 
-    _remote = bazel_remote
-    if (defined(invoker.remote)) {
-      _remote = invoker.remote
+    _remote_build = enable_bazel_remote_rbe
+    if (defined(invoker.remote_build)) {
+      _remote_build = invoker.remote_build
     }
-    if (_remote) {
+    if (_remote_build) {
       args += [ "--config=remote" ]
     }
 

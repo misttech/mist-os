@@ -70,37 +70,6 @@ build --experimental_writable_outputs
 build --java_runtime_version=embedded_jdk
 build --tool_java_runtime_version=embedded_jdk
 
-# Enable gcert authentication. This will use gcert credentials instead of application default credentials.  Applicable to Google FTEs.
-build:gcertauth --experimental_credential_helper=/google/src/head/depot/google3/devtools/blaze/bazel/credhelper/credhelper
-
-# Setup remote build
-build:remote --remote_instance_name={remote_instance_name}
-build:remote --define=EXECUTOR=remote
-build:remote --remote_executor=grpcs://remotebuildexecution.googleapis.com
-build:remote --incompatible_strict_action_env=true
-build:remote --google_default_credentials=true
-# Only accept outputs from remote execution on the back-end (remote workers).
-build:remote --noremote_upload_local_results
-
-# Setup sponge (go/sponge-bazel)
-build:sponge --bes_backend=buildeventservice-pa.googleapis.com
-build:sponge --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
-build:sponge --google_default_credentials=true
-build:sponge --bes_instance_name={rbe_project}
-build:sponge --bes_header=X-Goog-User-Project={rbe_project}
-build:sponge --bes_results_url=http://sponge2/
-build:sponge --bes_keywords=fuchsia
-
-# Setup ResultStore
-build:resultstore --bes_backend=buildeventservice.googleapis.com
-build:resultstore --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
-build:resultstore --google_default_credentials=true
-build:resultstore --bes_instance_name={rbe_project}
-build:resultstore --bes_header=X-Goog-User-Project={rbe_project}
-build:resultstore --bes_results_url=https://source.cloud.google.com/results/invocations/
-build:resultstore --bes_keywords=fuchsia
-build:resultstore --remote_instance_name=projects/{rbe_project}/instances/default
-
 # Set up DEFINE flags for libraries imported from @internal_sdk at a project
 # level. See fxbug.dev/115709 for more information.
 build --per_file_copt=src/lib/diagnostics/accessor2logger_accessor2logger/log_message.cc@-DRAPIDJSON_HAS_STDSTRING,-DRAPIDJSON_HAS_CXX11_RANGE_FOR,-DRAPIDJSON_HAS_CXX11_RVALUE_REFS,-DRAPIDJSON_HAS_CXX11_TYPETRAITS,-DRAPIDJSON_HAS_CXX11_NOEXCEPT

@@ -22,7 +22,7 @@ import shlex
 import sys
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Tuple, Union
+from typing import Dict, Iterable, Optional, Sequence, Tuple, Union
 
 _HAS_FX = None
 
@@ -37,7 +37,7 @@ def _generate_command_string(
     args: Sequence[StrOrPath],
     env: Optional[Dict[str, str]] = None,
     cwd: Optional[Path] = None,
-):
+) -> str:
     """Generate a string that prints a command to be run.
 
     Args:
@@ -88,7 +88,7 @@ def _run_command(
     args = [str(a) for a in cmd_args]
     if _VERBOSE:
         print(
-            "RUN_COMMAND:%s"
+            "RUN_COMMAND: %s"
             % _generate_command_string(cmd_args, env=env, cwd=cwd)
         )
 
@@ -165,6 +165,20 @@ def _depfile_quote(path: str) -> str:
     return path.replace("\\", "\\\\").replace(" ", "\\ ")
 
 
+def _flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
+    """Flatten ["a,b", "c,d"] -> ["a", "b", "c", "d"].
+
+    This is useful for merging repeatable flags, which also
+    have comma-separated values.
+
+    Yields:
+      Elements that were separated by commas, flattened over
+      the original sequence..
+    """
+    for item in items:
+        yield from item.split(",")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -223,6 +237,21 @@ def main():
         "--test_target",
         default="//:tests",
         help="Which target to invoke with `bazel test` (default is '//:tests')",
+    )
+    parser.add_argument(
+        "--bazelrc",
+        help="Additional Bazel configuration file to load",
+        type=Path,
+        default=[],
+        metavar="FILE",
+        action="append",
+    )
+    parser.add_argument(
+        "--bazel-config",
+        help="Additional Bazel --config options, comma-separated, repeatable",
+        default=[],
+        metavar="CFG",
+        action="append",
     )
     parser.add_argument("extra_args", nargs=argparse.REMAINDER)
 
@@ -423,10 +452,19 @@ def main():
 
     # These options must appear before the Bazel command
     bazel_startup_args = [
-        bazel,
+        str(bazel),
         # Disable parsing of $HOME/.bazelrc to avoid unwanted side-effects.
         "--nohome_rc",
     ]
+
+    # bazelrc files are passed relative to the current working directory,
+    # but need to be adjusted relative to the workspace dir.
+    rc_relpath = os.path.relpath(os.curdir, start=workspace_dir)
+    for rc in args.bazelrc:
+        bazel_startup_args += [
+            f"--bazelrc={rc_relpath}/{rc}" for rc in args.bazelrc
+        ]
+
     if args.output_user_root:
         output_user_root = Path(args.output_user_root).resolve()
         output_user_root.mkdir(parents=True, exist_ok=True)
@@ -516,6 +554,11 @@ def main():
         # See https://fxbug.dev/121003
         "--experimental_writable_outputs",
     ]
+
+    # Forward additional --config's.
+    bazel_config_args.extend(
+        f"--config={cfg}" for cfg in _flatten_comma_list(args.bazel_config)
+    )
 
     bazel_test_args = []
 
@@ -754,6 +797,10 @@ def main():
             env=cquery_env,
         )
         if ret.returncode != 0:
+            print(
+                "command: " + _generate_command_string(cquery_args),
+                file=sys.stderr,
+            )
             print("ERROR: " + ret.stderr, file=sys.stderr)
             ret.check_returncode()
         source_files = set()
@@ -771,13 +818,16 @@ def main():
 
         return source_files
 
-    ret = _run_command(
+    test_command = (
         bazel_startup_args
         + ["test"]
         + bazel_config_args
         + bazel_test_args
         + [args.test_target]
-        + extra_args,
+        + extra_args
+    )
+    ret = _run_command(
+        test_command,
         env=bazel_env,
         cwd=workspace_dir,
     )
@@ -786,6 +836,11 @@ def main():
     # raise an exception, because the stack trace printed by that will just be
     # noise in the failure output.
     if ret.returncode != 0:
+        print(
+            "command: " + _generate_command_string(test_command),
+            file=sys.stderr,
+        )
+        print(f"from working dir: {workspace_dir}")
         return ret.returncode
 
     if args.stamp_file:

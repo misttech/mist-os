@@ -82,6 +82,7 @@ action("generate_main_workspace") {
     # The script expands these templates
     "//build/bazel/templates/template.bazel.sh",
     "//build/bazel/templates/template.bazelrc",
+    "//build/bazel/templates/template.remote_services.bazelrc",
     "//build/bazel/templates/template.platform_mappings",
 
     # The script reads this configuration file

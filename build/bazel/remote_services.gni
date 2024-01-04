@@ -1,0 +1,15 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  # Configure bazel to build remotely with RBE where supported.
+  # This can speed up builds via remote caching.
+  # This option requires that bazel invocations have direct
+  # external network access, and that users are authenticated to
+  # access a remote execution service.
+  # The Remote Execution API can be found at:
+  # https://github.com/bazelbuild/remote-apis
+  # For an overview of remote execution for Bazel, see https://bazel.build/remote/rbe
+  enable_bazel_remote_rbe = false
+}

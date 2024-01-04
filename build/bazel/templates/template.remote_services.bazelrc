@@ -1,0 +1,37 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# AUTO-GENERATED - DO NOT EDIT!
+
+# Enable gcert authentication. This will use gcert credentials instead of application default credentials.  Applicable to Google FTEs only.
+build:gcertauth --experimental_credential_helper=/google/src/head/depot/google3/devtools/blaze/bazel/credhelper/credhelper
+
+# Setup remote build (RBE)
+build:remote --remote_instance_name={remote_instance_name}
+build:remote --define=EXECUTOR=remote
+build:remote --remote_executor=grpcs://remotebuildexecution.googleapis.com
+build:remote --incompatible_strict_action_env=true
+build:remote --google_default_credentials=true
+# Only accept outputs from remote execution on the back-end (remote workers).
+build:remote --noremote_upload_local_results
+
+# Setup sponge (go/sponge-bazel)
+build:sponge --bes_backend=buildeventservice-pa.googleapis.com
+build:sponge --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
+build:sponge --google_default_credentials=true
+build:sponge --bes_instance_name={rbe_project}
+build:sponge --bes_header=X-Goog-User-Project={rbe_project}
+build:sponge --bes_results_url=http://sponge2/
+build:sponge --bes_keywords=fuchsia
+
+# Setup ResultStore
+build:resultstore --bes_backend=buildeventservice.googleapis.com
+build:resultstore --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform
+build:resultstore --google_default_credentials=true
+build:resultstore --bes_instance_name={rbe_project}
+build:resultstore --bes_header=X-Goog-User-Project={rbe_project}
+build:resultstore --bes_results_url=https://source.cloud.google.com/results/invocations/
+build:resultstore --bes_keywords=fuchsia
+build:resultstore --remote_instance_name=projects/{rbe_project}/instances/default
+

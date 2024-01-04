@@ -40,7 +40,7 @@ import shutil
 import stat
 import subprocess
 import sys
-from typing import Sequence
+from typing import Dict, Sequence
 
 import check_ninja_build_plan
 import compute_content_hash
@@ -242,7 +242,7 @@ def get_reclient_config(fuchsia_dir):
     }
 
 
-def generate_fuchsia_build_config(fuchsia_dir):
+def generate_fuchsia_build_config(fuchsia_dir) -> Dict[str, str]:
     """Generate a dictionary containing build configuration information."""
     rbe_config = get_reclient_config(fuchsia_dir)
     host_os = get_host_platform()
@@ -752,6 +752,8 @@ block *
         config_file=os.path.relpath(
             os.path.join(topdir, "download_config_file"), workspace_dir
         ),
+    ) + expand_template_file(
+        "template.remote_services.bazelrc",
         remote_instance_name=build_config["rbe_instance_name"],
         rbe_project=build_config["rbe_project"],
     )

@@ -231,7 +231,12 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
 
 
 def read_config_file_lines(lines: Iterable[str]) -> Dict[str, str]:
-    """Generic parser for reading flag files.
+    """Parser for reading RBE config files.
+
+    RBE config files are text files with lines of "VAR=VALUE"
+    (ignoring whole-line #-comments and blank lines).
+    Spec details can be found at:
+    https://github.com/bazelbuild/reclient/blob/main/internal/pkg/rbeflag/rbeflag.go
 
     Args:
       lines: lines of config from a file

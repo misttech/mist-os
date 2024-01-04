@@ -4,6 +4,7 @@
 
 import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
+import("//build/bazel/remote_services.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/config.gni")
 import("//build/sdk/idk.gni")
@@ -57,6 +58,28 @@ generate_prebuilt_dir_content_hash("prebuilt_clang_content_hash") {
   cipd_name = "clang"
 }
 
+# Generate remote service configs into a bazelrc.
+_services_bazelrc_path = "$target_out_dir/remote_services.bazelrc"
+
+action("remote_services_bazelrc") {
+  script = "//build/bazel/scripts/generate_services_bazelrc.py"
+  _output = _services_bazelrc_path
+  outputs = [ _output ]
+  _template = "//build/bazel/templates/template.remote_services.bazelrc"
+  _configs = [
+    "//build/rbe/fuchsia-reproxy.cfg",
+    "//build/rbe/fuchsia-rewrapper.cfg",
+  ]
+  inputs = [ _template ] + _configs
+  args = [
+           "--template",
+           rebase_path(_template, root_build_dir),
+           "--output",
+           rebase_path(_output, root_build_dir),
+           "--cfgs",
+         ] + rebase_path(_configs, root_build_dir)
+}
+
 # Run the //build/bazel_sdk/tests/scripts/bazel_test.sh
 # script, which runs the test suite for the Fuchsia Bazel
 # SDK rules, using the IDK built from the platform build
@@ -89,6 +112,9 @@ generate_prebuilt_dir_content_hash("prebuilt_clang_content_hash") {
 #       GN label of target used to generate the directory pointed to by
 #       `idk_exported_dir`, if provided.
 #
+#    remote_build: (optional)
+#       Override the global `enable_bazel_remote_rbe` setting for building.
+#       Set to false to prevent use of remote services for building.
 template("bazel_sdk_tests_for") {
   _use_idk_exported = defined(invoker.idk_exported_path)
   if (_use_idk_exported) {
@@ -152,18 +178,34 @@ template("bazel_sdk_tests_for") {
       "--depfile=" + rebase_path(depfile, root_build_dir),
       "--quiet",
     ]
+
+    deps = []
+
+    _remote_build = enable_bazel_remote_rbe
+    if (defined(invoker.remote_build)) {
+      _remote_build = invoker.remote_build
+    }
+    if (_remote_build) {
+      args += [
+        "--bazelrc",
+        rebase_path(_services_bazelrc_path, root_build_dir),
+        "--bazel-config=remote",
+      ]
+      deps += [ ":remote_services_bazelrc" ]
+    }
+
     if (_use_idk_exported) {
       args += [
         "--fuchsia_idk_directory",
         rebase_path(_idk_exported_path, root_build_dir),
       ]
-      deps = [ _idk_exported_target ]
+      deps += [ _idk_exported_target ]
     } else {
       args += [
         "--fuchsia_build_dir",
         rebase_path(root_build_dir, root_build_dir),
       ]
-      deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
+      deps += [ "//build/bazel:generate_fuchsia_sdk_repository" ]
     }
     args += [
       "--prebuilt-python-version-file",
