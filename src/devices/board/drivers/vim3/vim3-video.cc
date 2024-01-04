@@ -8,11 +8,17 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-meson/g12b-clk.h>
 
-#include "src/devices/board/drivers/vim3/vim3-video-bind.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
@@ -70,7 +76,7 @@ static const std::vector<fpbus::Irq> vim_video_irqs{
 
 zx_status_t Vim3::VideoInit() {
   fpbus::Node video_dev;
-  video_dev.name() = "aml-video";
+  video_dev.name() = "aml_video";
   video_dev.vid() = PDEV_VID_AMLOGIC;
   video_dev.pid() = PDEV_PID_AMLOGIC_A311D;
   video_dev.did() = PDEV_DID_AMLOGIC_VIDEO;
@@ -78,20 +84,82 @@ zx_status_t Vim3::VideoInit() {
   video_dev.irq() = vim_video_irqs;
   video_dev.bti() = vim_video_btis;
 
+  auto video_sysmem = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+          },
+  }};
+
+  auto video_canvas = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(
+                  bind_fuchsia::FIDL_PROTOCOL,
+                  bind_fuchsia_amlogic_platform::BIND_FIDL_PROTOCOL_CANVAS_SERVICE),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_amlogic_platform::BIND_FIDL_PROTOCOL_CANVAS_SERVICE),
+          },
+  }};
+
+  auto video_clock_dos_vdec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeAcceptBindRule(
+                  bind_fuchsia::CLOCK_ID,
+                  bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_DOS_GCLK_VDEC),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeProperty(bind_fuchsia::CLOCK_ID, bind_fuchsia_clock::FUNCTION_DOS_GCLK_VDEC),
+          },
+  }};
+
+  auto video_clock_dos = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID,
+                                      bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_DOS),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeProperty(bind_fuchsia::CLOCK_ID, bind_fuchsia_clock::FUNCTION_DOS),
+          },
+  }};
+
+  auto video_spec = fuchsia_driver_framework::CompositeNodeSpec{{
+      .name = "aml_video",
+      .parents = {{video_sysmem, video_canvas, video_clock_dos_vdec, video_clock_dos}},
+  }};
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('VIDE');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, video_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, vim3_video_fragments,
-                                               std::size(vim3_video_fragments)),
-      "pdev");
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, video_dev),
+                                                          fidl::ToWire(fidl_arena, video_spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Video(video_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Video(video_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Video(video_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Video(video_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

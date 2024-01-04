@@ -169,7 +169,6 @@ fuchsia_driver("nelson-module-driver") {
     ":aml_thermal_pll_bind_header",
     ":nelson-bind",
     ":nelson_aml_sdio_bind_header",
-    ":nelson_aml_video_bind_header",
     ":nelson_emmc_bind_header",
     ":nelson_wifi_bind_header",
     ":pwm_init_bind_header",
@@ -194,6 +193,7 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.adc:fuchsia.adc_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform.meson:fuchsia.amlogic.platform.meson_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3:fuchsia.amlogic.platform.s905d3_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
@@ -212,6 +212,7 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.rpmb:fuchsia.rpmb_cpp",
     "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//src/devices/bind/fuchsia.tee:fuchsia.tee_cpp",
     "//src/devices/bind/fuchsia.tee:fuchsia.tee_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
     "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
@@ -272,8 +273,6 @@ group("tests") {
     ":aml_thermal_pll_bind_test",
     ":nelson-bind_test",
     ":nelson_aml_sdio_bind_test",
-    ":nelson_aml_video_bind_test",
-    ":nelson_aml_video_bind_test",
     ":nelson_wifi_bind_test",
   ]
 }
