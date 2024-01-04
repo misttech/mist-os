@@ -7,9 +7,13 @@
 
 #include <cinttypes>
 
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+
 namespace edid {
 
-typedef struct timing_params {
+// TODO(fxbug.dev/135377): The type name violates the C++ style guide. Delete
+// the struct once all the clients are migrated.
+struct timing_params {
   uint32_t pixel_freq_khz;
 
   uint32_t horizontal_addressable;
@@ -34,7 +38,11 @@ typedef struct timing_params {
   static constexpr uint32_t kDoubleClocked = (1 << 4);
 
   uint32_t vertical_refresh_e2;
-} timing_params_t;
+};
+
+// TODO(fxbug.dev/135377): The type name violates the C++ style guide. Delete
+// the struct once all the clients are migrated.
+using timing_params_t = timing_params;
 
 namespace internal {
 
@@ -45,6 +53,9 @@ extern const timing_params_t* cea_timings;
 extern const uint32_t cea_timings_count;
 
 }  // namespace internal
+
+display::DisplayTiming ToDisplayTiming(const timing_params& params);
+
 }  // namespace edid
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_EDID_TIMINGS_H_
