@@ -241,6 +241,7 @@ impl LogIterator {
     fn new(mode: fdiagnostics::StreamMode) -> Result<Self, Errno> {
         let accessor = connect_to_protocol_sync::<fdiagnostics::ArchiveAccessorMarker>()
             .map_err(|_| errno!(ENOENT, format!("Failed to connecto to ArchiveAccessor")))?;
+        let is_subscribe = matches!(mode, fdiagnostics::StreamMode::Subscribe);
         let stream_parameters = fdiagnostics::StreamParameters {
             stream_mode: Some(mode),
             data_type: Some(fdiagnostics::DataType::Logs),
@@ -255,8 +256,14 @@ impl LogIterator {
         accessor.stream_diagnostics(&stream_parameters, server_end).map_err(|err| {
             errno!(EIO, format!("ArchiveAccessor/StreamDiagnostics failed: {err}"))
         })?;
+        let iterator = fdiagnostics::BatchIteratorSynchronousProxy::new(client_end.into_channel());
+        if is_subscribe {
+            let () = iterator.wait_for_ready(zx::Time::INFINITE).map_err(|err| {
+                errno!(EIO, format!("Failed to wait for BatchIterator being ready: {err}"))
+            })?;
+        }
         Ok(Self {
-            iterator: fdiagnostics::BatchIteratorSynchronousProxy::new(client_end.into_channel()),
+            iterator,
             pending_formatted_contents: VecDeque::new(),
             pending_datas: VecDeque::new(),
         })

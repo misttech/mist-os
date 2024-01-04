@@ -259,18 +259,12 @@ TEST_F(SyslogTest, DevKmsgSeekEnd) {
 
   lseek(fd, 0, SEEK_END);
 
-  // TODO(b/317135298): there's a race today in which we can't know precisely the moment at which
-  // we'll be subscribing. Therefore we need to re-emit this log as we read. The main thing this
-  // test asserts is that we don't see the previous log. As we improve the API between archivist and
-  // starnix we should have this single log here, read in a blocking way and stop emitting the log
-  // in the do-while below.
   dprintf(fd, "DevKmsgSeekEnd: bye\n");
 
   // We should see the second log but never the first one.
   std::fill_n(buf, 4096, 0);
   do {
     size_t size_read = read(fd, buf, sizeof(buf));
-    dprintf(fd, "DevKmsgSeekEnd: bye\n");
     ASSERT_GT(size_read, 0ul);
     EXPECT_EQ(strstr(buf, "DevKmsgSeekEnd: hello"), nullptr);
   } while (strstr(buf, "DevKmsgSeekEnd: bye") == nullptr);
