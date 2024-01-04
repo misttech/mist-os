@@ -24,7 +24,8 @@ use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_mac, net_subnet_v4};
 use net_types::ip::Ipv4;
 use netemul::{DhcpClient, DEFAULT_MTU};
 use netstack_testing_common::{
-    annotate, dhcpv4 as dhcpv4_helper, interfaces,
+    annotate, dhcpv4 as dhcpv4_helper,
+    interfaces::{self, TestInterfaceExt as _},
     realms::{
         constants, DhcpClientVersion, KnownServiceProvider, Netstack, NetstackAndDhcpClient,
         NetstackVersion, TestSandboxExt as _,
@@ -781,6 +782,7 @@ fn test_dhcp<'a, D: DhcpClient>(
                                     )
                                     .await
                                     .expect("failed to install server endpoint");
+                                iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
                                 let (static_addrs, server_should_bind) = match ep_type {
                                     DhcpEndpointType::Client { expected_acquired: _, static_address: _ } => {
                                         panic!(
