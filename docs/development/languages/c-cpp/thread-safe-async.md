@@ -195,6 +195,14 @@ This style works well when the callback references a single receiver that owns
 the wait/task, i.e. the callback is an upcall. These APIs are typically also
 thread-unsafe and requires the aforementioned *synchronized access*.
 
+By contrast, `async::PostTask` may call the provided callback even if an
+object captured by the callback is destroyed. In fact `async::PostTask` will
+always call the provided callback unless the async dispatcher is shut down.
+You may use [`async_patterns::TaskScope`][TaskScope] if you need to post
+tasks that can be canceled: destroying an
+[`async_patterns::TaskScope`][TaskScope] will discard unexecuted callbacks
+scheduled on that scope.
+
 Other objects will always call the the registered callback exactly once, even
 during destruction. Those calls would typically provide an error or status
 indicating cancellation. They are said to guarantee *exactly once delivery*.
@@ -202,11 +210,11 @@ indicating cancellation. They are said to guarantee *exactly once delivery*.
 One should consult the corresponding documentation when using an
 asynchronous API to understand the cancellation semantics.
 
-It is possible to convert an *exactly once* API into an *at most once* API by
-discarding the upcall if the object making the upcalls is already destroyed.
-[`closure-queue`][closure-queue] is a library that implements this idea;
-destroying a `ClosureQueue` will discard unexecuted callbacks scheduled on that
-queue.
+If you need to work with an *exactly once* callback API while the object
+captured by the callback may go out of scope, consider using a
+[`async_patterns::Receiver`][receiver] in your object. The `Receiver` allows
+thread-unsafe asynchronous objects to silently cancel callbacks directed
+towards it when going out of scope.
 
 ### Use an object belonging to a different synchronized dispatcher
 
@@ -267,7 +275,7 @@ tasks in Chrome][chrome].
 [data-race]: http://eel.is/c++draft/intro.races#21
 [abseil-thread-safety]: https://abseil.io/blog/20180531-regular-types#data-races-and-thread-safety-properties
 [cpp-threading-guide]: /docs/development/languages/fidl/tutorials/cpp/topics/threading.md
-[closure-queue]: /zircon/system/ulib/closure-queue/include/lib/closure-queue/closure_queue.h
+[TaskScope]: /sdk/lib/async_patterns/cpp/task_scope.h
 [chrome]: https://chromium.googlesource.com/chromium/src/+/master/docs/threading_and_tasks.md
 [java]: https://openjdk.org/jeps/425
 [golang]: https://go.dev/blog/codelab-share
