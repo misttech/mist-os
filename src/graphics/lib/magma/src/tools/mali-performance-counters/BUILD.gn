@@ -10,7 +10,7 @@ source_set("sources") {
     "mali-performance-counters.h",
   ]
 
-  public_deps = [ "//src/lib/fxl" ]
+  public_deps = [ "//src/lib/fxl:fxl_cli" ]
   deps = [
     "//third_party/github.com/ARM-software/HWCPipe:mali_profiler",
     "//zircon/system/ulib/async-loop",

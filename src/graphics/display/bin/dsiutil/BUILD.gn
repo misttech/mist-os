@@ -12,7 +12,7 @@ executable("dsiutil") {
     "//sdk/fidl/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/graphics/display/lib/mipi-dsi",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
   ]
 }
 

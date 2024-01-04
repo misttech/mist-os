@@ -51,7 +51,7 @@ executable("magma-info-bin") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/magma_client:magma_headers",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//src/zircon/lib/zircon",
   ]
 }
