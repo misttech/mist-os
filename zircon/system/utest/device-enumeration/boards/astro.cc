@@ -86,7 +86,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // BT
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom/bt_host",
 
-      "sys/platform/05:03:e/aml_video",
+      "sys/platform/05:03:e/aml-video",
 
       // WLAN
       "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",

@@ -44,15 +44,7 @@ if (target_cpu == "arm64") {
   driver_bind_rules("amlogic_video_bind") {
     rules = "amlogic_video.bind"
     tests = "bind_tests.json"
-    disable_fragment_gen = true
-    deps = [
-      "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
-      "//src/devices/bind/fuchsia.amlogic.platform",
-      "//src/devices/bind/fuchsia.clock",
-      "//src/devices/bind/fuchsia.platform",
-      "//src/devices/bind/fuchsia.sysmem",
-      "//src/devices/bind/fuchsia.tee",
-    ]
+    deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
   }
 
   # Note: This target uses the same source as above, the only difference is the addition of
@@ -60,15 +52,7 @@ if (target_cpu == "arm64") {
   driver_bind_rules("amlogic_video_test_bind") {
     rules = "amlogic_video.bind"
     disable_autobind = true
-    disable_fragment_gen = true
-    deps = [
-      "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
-      "//src/devices/bind/fuchsia.amlogic.platform",
-      "//src/devices/bind/fuchsia.clock",
-      "//src/devices/bind/fuchsia.platform",
-      "//src/devices/bind/fuchsia.sysmem",
-      "//src/devices/bind/fuchsia.tee",
-    ]
+    deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
   }
 
   fuchsia_driver("amlogic_video_decoder-driver") {

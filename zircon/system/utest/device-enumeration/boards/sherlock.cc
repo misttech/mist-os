@@ -96,7 +96,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/gdc",
       "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/ge2d",
 
-      "sys/platform/05:04:e/aml_video",
+      "sys/platform/05:04:e/aml-video",
 
       "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52840_radio/ot-radio",
 

@@ -5,6 +5,19 @@
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
+driver_bind_rules("vim3-video-bind") {
+  rules = "vim3-video.bind"
+  header_output = "vim3-video-bind.h"
+  bind_output = "vim3-video-bind.bc"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.amlogic.platform.meson",
+    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
+}
+
 driver_bind_rules("vim3-sdio-bind") {
   rules = "vim3-sdio.bind"
   header_output = "vim3-sdio-bind.h"
@@ -108,6 +121,7 @@ fuchsia_driver("vim3-driver") {
     ":vim3-emmc-bind_header",
     ":vim3-pwm-bind_header",
     ":vim3-sdio-bind_header",
+    ":vim3-video-bind_header",
     ":vim3-wifi-bind_header",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",

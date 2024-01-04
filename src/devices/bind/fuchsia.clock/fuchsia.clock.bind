@@ -18,8 +18,6 @@ extend uint fuchsia.BIND_INIT_STEP {
 
 enum FUNCTION {
   CAMERA_SENSOR,
-  DOS,
-  DOS_GCLK_VDEC,
   SYS_CPU_DIV16,
   SYS_CPUB_DIV16,
   SYS_PLL_DIV16,
