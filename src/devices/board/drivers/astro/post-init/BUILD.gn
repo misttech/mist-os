@@ -1,0 +1,39 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+
+driver_bind_rules("astro-post-init-bind") {
+  rules = "post-init.bind"
+  tests = "post-init-bind-test.json"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
+    "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
+    "//src/devices/bind/fuchsia.google.platform",
+    "//src/devices/bind/fuchsia.gpio",
+  ]
+}
+
+fuchsia_driver("post-init-driver") {
+  output_name = "astro-post-init"
+  sources = [ "post-init.cc" ]
+  deps = [
+    ":astro-post-init-bind",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+  ]
+}
+
+fuchsia_driver_component("post-init") {
+  component_name = "astro-post-init"
+  deps = [ ":post-init-driver" ]
+  info = "post-init-info.json"
+  manifest = "meta/post-init.cml"
+}

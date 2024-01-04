@@ -1,0 +1,54 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+composite post_init;
+
+using fuchsia.amlogic.platform.t931;
+using fuchsia.google.platform;
+using fuchsia.gpio;
+using fuchsia.hardware.platform.bus;
+
+primary node "pbus" {
+  fuchsia.hardware.platform.bus.Service == fuchsia.hardware.platform.bus.Service.DriverTransport;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.SHERLOCK;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 1;
+}
+
+node "hw-id-0" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOA_PIN_ID.PIN_11;
+}
+
+node "hw-id-1" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOA_PIN_ID.PIN_12;
+}
+
+node "hw-id-2" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOC_PIN_ID.PIN_6;
+}
+
+node "hw-id-3" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOC_PIN_ID.PIN_4;
+}
+
+node "hw-id-4" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOC_PIN_ID.PIN_5;
+}
+
+// Panel detect
+node "disp-soc-id1" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOH_PIN_ID.PIN_0;
+}
+
+// DDIC detect
+node "disp-soc-id2" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOH_PIN_ID.PIN_2;
+}

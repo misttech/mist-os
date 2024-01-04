@@ -96,6 +96,7 @@
 //src/devices/block/drivers/zxcrypt:zxcrypt-driver
 //src/devices/board/drivers/acpi-arm64:acpi-arm64-driver
 //src/devices/board/drivers/astro:astro-driver
+//src/devices/board/drivers/astro/post-init:post-init-driver
 //src/devices/board/drivers/integration-test:integration-test-driver
 //src/devices/board/drivers/machina:machina-driver
 //src/devices/board/drivers/nelson:nelson-module-driver
@@ -104,6 +105,7 @@
 //src/devices/board/drivers/qemu-riscv64:qemu-riscv64-driver
 //src/devices/board/drivers/sherlock:sherlock-driver
 //src/devices/board/drivers/sherlock:sherlock-factory-driver
+//src/devices/board/drivers/sherlock/post-init:post-init-driver
 //src/devices/board/drivers/vim3-devicetree:vim3-devicetree-driver
 //src/devices/board/drivers/vim3:vim3-driver
 //src/devices/bus/drivers/pci/test:pci_fake-driver

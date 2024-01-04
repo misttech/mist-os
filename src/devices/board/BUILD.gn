@@ -6,6 +6,7 @@ group("drivers") {
   deps = [
     "drivers/acpi-arm64",
     "drivers/astro",
+    "drivers/astro/post-init",
     "drivers/integration-test",
     "drivers/machina",
     "drivers/nelson",
@@ -14,6 +15,7 @@ group("drivers") {
     "drivers/qemu-riscv64",
     "drivers/sherlock:sherlock",
     "drivers/sherlock:sherlock-factory",
+    "drivers/sherlock/post-init",
     "drivers/vim3",
     "drivers/vim3-devicetree",
   ]
