@@ -9,6 +9,8 @@
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 
+#include <type_traits>
+
 #include "diagnostics.h"
 #include "load.h"
 #include "mapped-vmo-file.h"
@@ -63,6 +65,7 @@ class SegmentWithVmo {
     VmoHolder() = default;
 
     VmoHolder(VmoHolder&&) = default;
+    VmoHolder& operator=(VmoHolder&&) = default;
 
     explicit VmoHolder(zx::vmo vmo) : vmo_{std::move(vmo)} {}
 
@@ -72,6 +75,8 @@ class SegmentWithVmo {
    private:
     zx::vmo vmo_;
   };
+  static_assert(std::is_move_constructible_v<VmoHolder>);
+  static_assert(std::is_move_assignable_v<VmoHolder>);
 
   // The Copy and NoCopy templates are shorthands using this.
   template <class Copy>
@@ -88,6 +93,8 @@ class SegmentWithVmo {
       // does, its CanMergeWith is the one to return false.
       template <class Other>
       bool CanMergeWith(const Other& other) const {
+        static_assert(std::is_move_constructible_v<WithVmo>);
+        static_assert(std::is_move_assignable_v<WithVmo>);
         return !vmo();
       }
     };

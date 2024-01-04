@@ -28,6 +28,9 @@ using GetMutableMemory = elfldltl::SegmentWithVmo::GetMutableMemory<LoadInfo>;
 using size_type = elfldltl::Elf<>::size_type;
 using Phdr = elfldltl::Elf<>::Phdr;
 
+static_assert(std::is_move_constructible_v<LoadInfo::Segment>);
+static_assert(std::is_move_assignable_v<LoadInfo::Segment>);
+
 TEST(ElfldltlSegmentWithVmoTests, GetMutableMemoryCtor) {
   // Default-constructible.
   GetMutableMemory default_constructed;
