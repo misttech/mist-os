@@ -46,16 +46,13 @@ zx_status_t TestBoard::ClockInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('TCLK');
 
-  auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_CLOCK_IMPL,
-                                                     fidl::ToWire(fidl_arena, clock_dev));
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, clock_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd request failed: %s", __func__,
-           result.FormatDescription().data());
+    zxlogf(ERROR, "%s: NodeAdd request failed: %s", __func__, result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "%s: NodeAdd failed: %s", __func__, zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;

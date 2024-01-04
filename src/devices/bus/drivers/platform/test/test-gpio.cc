@@ -47,8 +47,7 @@ zx_status_t TestBoard::GpioInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('TGPI');
-  auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_GPIO_IMPL,
-                                                     fidl::ToWire(fidl_arena, gpio_dev));
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_dev));
   if (!result.ok()) {
     zxlogf(ERROR, "%s: DeviceAdd Gpio request failed: %s", __func__,
            result.FormatDescription().data());

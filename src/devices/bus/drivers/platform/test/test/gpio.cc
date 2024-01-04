@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
@@ -29,7 +28,6 @@ class TestGpioDevice : public DeviceType,
   explicit TestGpioDevice(zx_device_t* parent) : DeviceType(parent) {}
 
   zx_status_t Create(std::unique_ptr<TestGpioDevice>* out);
-  zx_status_t Init();
 
   // Methods required by the ddk mixins
   void DdkRelease();
@@ -53,47 +51,6 @@ class TestGpioDevice : public DeviceType,
   uint64_t drive_strengths_[PIN_COUNT] = {};
 };
 
-zx_status_t TestGpioDevice::Init() {
-  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "create endpoints failed");
-    return endpoints.error_value();
-  }
-
-  zx_status_t status = device_connect_runtime_protocol(
-      parent(), fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
-      fuchsia_hardware_platform_bus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect to platform bus");
-    return status;
-  }
-
-  fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus(
-      std::move(endpoints->client));
-
-  gpio_impl_protocol_t gpio_proto = {
-      .ops = &gpio_impl_protocol_ops_,
-      .ctx = this,
-  };
-  fdf::Arena arena('GPIO');
-  auto result = pbus.buffer(arena)->RegisterProtocol(
-      ZX_PROTOCOL_GPIO_IMPL, fidl::VectorView<uint8_t>::FromExternal(
-                                 reinterpret_cast<uint8_t*>(&gpio_proto), sizeof(gpio_proto)));
-
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: RegisterProtocol request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: RegisterProtocol failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  return ZX_OK;
-}
-
 zx_status_t TestGpioDevice::Create(zx_device_t* parent) {
   auto dev = std::make_unique<TestGpioDevice>(parent);
   pdev_protocol_t pdev;
@@ -114,9 +71,9 @@ zx_status_t TestGpioDevice::Create(zx_device_t* parent) {
     return status;
   }
   // devmgr is now in charge of dev.
-  auto ptr = dev.release();
+  [[maybe_unused]] auto ptr = dev.release();
 
-  return ptr->Init();
+  return ZX_OK;
 }
 
 void TestGpioDevice::DdkRelease() { delete this; }

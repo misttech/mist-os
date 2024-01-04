@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
@@ -29,7 +28,6 @@ class TestClockDevice : public DeviceType,
   explicit TestClockDevice(zx_device_t* parent) : DeviceType(parent) {}
 
   zx_status_t Create(std::unique_ptr<TestClockDevice>* out);
-  zx_status_t Init();
 
   // Methods required by the ddk mixins
   void DdkRelease();
@@ -51,37 +49,6 @@ class TestClockDevice : public DeviceType,
   static constexpr uint32_t kMaxClock = 8;
 };
 
-zx_status_t TestClockDevice::Init() {
-  auto client_end =
-      DdkConnectRuntimeProtocol<fuchsia_hardware_platform_bus::Service::PlatformBus>();
-  if (client_end.is_error()) {
-    return client_end.error_value();
-  }
-
-  clock_impl_protocol_t clock_proto = {
-      .ops = &clock_impl_protocol_ops_,
-      .ctx = this,
-  };
-
-  fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus(std::move(*client_end));
-
-  fdf::Arena arena('PCLK');
-  auto result = pbus.buffer(arena)->RegisterProtocol(
-      ZX_PROTOCOL_CLOCK_IMPL, fidl::VectorView<uint8_t>::FromExternal(
-                                  reinterpret_cast<uint8_t*>(&clock_proto), sizeof(clock_proto)));
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s pbus RegisterProtocol request failed %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s pbus_register_protocol failed %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  return ZX_OK;
-}
-
 zx_status_t TestClockDevice::Create(zx_device_t* parent) {
   auto dev = std::make_unique<TestClockDevice>(parent);
   pdev_protocol_t pdev;
@@ -102,9 +69,9 @@ zx_status_t TestClockDevice::Create(zx_device_t* parent) {
     return status;
   }
   // devmgr is now in charge of dev.
-  auto ptr = dev.release();
+  [[maybe_unused]] auto ptr = dev.release();
 
-  return ptr->Init();
+  return ZX_OK;
 }
 
 void TestClockDevice::DdkRelease() { delete this; }
