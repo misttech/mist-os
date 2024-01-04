@@ -27,7 +27,7 @@ use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     ip::IpExt,
-    socket::Shutdown,
+    socket::ShutdownType,
     transport::tcp::{
         self,
         buffer::{
@@ -879,13 +879,10 @@ where
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let shutdown_recv = mode.contains(fposix_socket::ShutdownMode::READ);
         let shutdown_send = mode.contains(fposix_socket::ShutdownMode::WRITE);
-        let is_conn = shutdown::<I, _>(
-            &core_ctx,
-            bindings_ctx,
-            id,
-            Shutdown { send: shutdown_send, receive: shutdown_recv },
-        )
-        .map_err(IntoErrno::into_errno)?;
+        let shutdown_type = ShutdownType::from_send_receive(shutdown_send, shutdown_recv)
+            .ok_or(fposix::Errno::Einval)?;
+        let is_conn = shutdown::<I, _>(&core_ctx, bindings_ctx, id, shutdown_type)
+            .map_err(IntoErrno::into_errno)?;
         if is_conn {
             let peer_disposition = shutdown_send.then_some(zx::SocketWriteDisposition::Disabled);
             let my_disposition = shutdown_recv.then_some(zx::SocketWriteDisposition::Disabled);

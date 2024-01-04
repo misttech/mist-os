@@ -167,7 +167,7 @@ use crate::{
             ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
         },
         AddrVec, Bound, BoundSocketMap, EitherStack, IncompatibleError, InsertError, Inserter,
-        ListenerAddrInfo, MaybeDualStack, RemoveResult, Shutdown, SocketMapAddrSpec,
+        ListenerAddrInfo, MaybeDualStack, RemoveResult, ShutdownType, SocketMapAddrSpec,
         SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
         SocketMapStateSpec, SocketMapUpdateSharingPolicy, UpdateSharingError,
     },
@@ -1618,7 +1618,7 @@ pub(crate) trait SocketHandler<I: DualStackIpExt, BC: TcpBindingsContext<Self::W
         &mut self,
         bindings_ctx: &mut BC,
         id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        shutdown: Shutdown,
+        shutdown: ShutdownType,
     ) -> Result<bool, NoConnection>;
 
     fn get_info(
@@ -2251,15 +2251,16 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         &mut self,
         bindings_ctx: &mut BC,
         id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        shutdown: Shutdown,
+        shutdown: ShutdownType,
     ) -> Result<bool, NoConnection> {
+        let (shutdown_send, shutdown_receive) = shutdown.to_send_receive();
         let (result, pending) = self.with_socket_mut_transport_demux(
             id,
             |core_ctx, socket_state| {
                 match socket_state {
                 TcpSocketState::Unbound(_) => Err(NoConnection),
                 TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                    if !shutdown.send {
+                    if !shutdown_send {
                         return Ok((true, None));
                     }
                     fn do_shutdown<SockI, WireI, CC, BC>(
@@ -2306,7 +2307,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                     addr,
                 ))) => {
                     let (core_ctx, _converter) = core_ctx.into_single_stack();
-                    if !shutdown.receive {
+                    if !shutdown_receive {
                         return Ok((false, None));
                     }
                     match maybe_listener {
@@ -3716,7 +3717,7 @@ pub fn shutdown<I, BC>(
     core_ctx: &SyncCtx<BC>,
     bindings_ctx: &mut BC,
     id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    shutdown: Shutdown,
+    shutdown: ShutdownType,
 ) -> Result<bool, NoConnection>
 where
     I: DualStackIpExt,
@@ -5167,12 +5168,7 @@ mod tests {
 
         net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
             assert_eq!(
-                SocketHandler::shutdown(
-                    core_ctx,
-                    bindings_ctx,
-                    &server,
-                    Shutdown { receive: true, send: false },
-                ),
+                SocketHandler::shutdown(core_ctx, bindings_ctx, &server, ShutdownType::Receive),
                 Ok(false)
             );
             SocketHandler::close(core_ctx, bindings_ctx, server);
@@ -6250,12 +6246,7 @@ mod tests {
         );
         net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
             assert_eq!(
-                SocketHandler::shutdown(
-                    core_ctx,
-                    bindings_ctx,
-                    &local,
-                    Shutdown { send: true, receive: false }
-                ),
+                SocketHandler::shutdown(core_ctx, bindings_ctx, &local, ShutdownType::Send),
                 Ok(true)
             );
         });
@@ -6314,7 +6305,7 @@ mod tests {
                         core_ctx,
                         bindings_ctx,
                         id,
-                        Shutdown { send: true, receive: false }
+                        ShutdownType::Send
                     ),
                     Ok(true)
                 );
@@ -6335,7 +6326,7 @@ mod tests {
                         core_ctx,
                         bindings_ctx,
                         id,
-                        Shutdown { send: true, receive: false }
+                        ShutdownType::Send
                     ),
                     Ok(true)
                 );
@@ -6505,7 +6496,7 @@ mod tests {
                     core_ctx,
                     bindings_ctx,
                     &local_listener,
-                    Shutdown { send: false, receive: true },
+                    ShutdownType::Receive,
                 ),
                 Ok(false)
             );
@@ -6754,7 +6745,7 @@ mod tests {
                     core_ctx,
                     bindings_ctx,
                     &local_connection,
-                    Shutdown { send: true, receive: false },
+                    ShutdownType::Send,
                 ),
                 Ok(true)
             );
@@ -6768,7 +6759,7 @@ mod tests {
                     core_ctx,
                     bindings_ctx,
                     &remote_connection,
-                    Shutdown { send: true, receive: false },
+                    ShutdownType::Send,
                 ),
                 Ok(true),
             );
@@ -7027,12 +7018,7 @@ mod tests {
                 SocketHandler::accept(core_ctx, bindings_ctx, &server).expect("pending connection");
 
             assert_eq!(
-                SocketHandler::shutdown(
-                    core_ctx,
-                    bindings_ctx,
-                    &server,
-                    Shutdown { send: false, receive: true },
-                ),
+                SocketHandler::shutdown(core_ctx, bindings_ctx, &server, ShutdownType::Receive),
                 Ok(false)
             );
             SocketHandler::close(core_ctx, bindings_ctx, server);

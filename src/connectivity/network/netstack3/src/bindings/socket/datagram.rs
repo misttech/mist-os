@@ -2035,15 +2035,11 @@ where
                 },
             ctx,
         } = self;
-        let how = match (
-            how.contains(fposix_socket::ShutdownMode::READ),
+        let how = ShutdownType::from_send_receive(
             how.contains(fposix_socket::ShutdownMode::WRITE),
-        ) {
-            (true, true) => ShutdownType::SendAndReceive,
-            (false, true) => ShutdownType::Send,
-            (true, false) => ShutdownType::Receive,
-            (false, false) => return Err(fposix::Errno::Einval),
-        };
+            how.contains(fposix_socket::ShutdownMode::READ),
+        )
+        .ok_or(fposix::Errno::Einval)?;
         T::shutdown(ctx, id, how).map_err(IntoErrno::into_errno)?;
         match how {
             ShutdownType::Receive | ShutdownType::SendAndReceive => {

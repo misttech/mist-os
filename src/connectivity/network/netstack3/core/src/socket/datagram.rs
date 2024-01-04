@@ -47,8 +47,8 @@ use crate::{
             ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr, TryUnmapResult,
         },
         AddrVec, BoundSocketMap, EitherStack, InsertError, MaybeDualStack,
-        NotDualStackCapableError, Shutdown, SocketMapAddrSpec, SocketMapConflictPolicy,
-        SocketMapStateSpec,
+        NotDualStackCapableError, Shutdown, ShutdownType, SocketMapAddrSpec,
+        SocketMapConflictPolicy, SocketMapStateSpec,
     },
 };
 
@@ -3371,18 +3371,6 @@ fn disconnect_to_listener<
     }
 }
 
-/// Which direction(s) to shut down for a socket.
-#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
-#[generic_over_ip()]
-pub enum ShutdownType {
-    /// Prevent sending packets on the socket.
-    Send,
-    /// Prevent receiving packets on the socket.
-    Receive,
-    /// Prevent sending and receiving packets on the socket.
-    SendAndReceive,
-}
-
 pub(crate) fn shutdown_connected<
     I: IpExt,
     BC: DatagramStateBindingsContext<I, S>,
@@ -3406,11 +3394,7 @@ pub(crate) fn shutdown_connected<
                 }
             }
         };
-        let (shutdown_send, shutdown_receive) = match which {
-            ShutdownType::Send => (true, false),
-            ShutdownType::Receive => (false, true),
-            ShutdownType::SendAndReceive => (true, true),
-        };
+        let (shutdown_send, shutdown_receive) = which.to_send_receive();
         let Shutdown { send, receive } = match core_ctx.dual_stack_context() {
             MaybeDualStack::DualStack(ds) => ds.converter().convert(state).as_mut(),
             MaybeDualStack::NotDualStack(nds) => nds.converter().convert(state).as_mut(),
@@ -3445,12 +3429,7 @@ pub(crate) fn get_shutdown_connected<
             MaybeDualStack::DualStack(ds) => ds.converter().convert(state).as_ref(),
             MaybeDualStack::NotDualStack(nds) => nds.converter().convert(state).as_ref(),
         };
-        Some(match (send, receive) {
-            (false, false) => return None,
-            (true, false) => ShutdownType::Send,
-            (false, true) => ShutdownType::Receive,
-            (true, true) => ShutdownType::SendAndReceive,
-        })
+        ShutdownType::from_send_receive(*send, *receive)
     })
 }
 

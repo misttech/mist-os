@@ -73,10 +73,9 @@ use crate::{
         },
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
-            DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError, ShutdownType,
-            SocketHopLimits,
+            DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError, SocketHopLimits,
         },
-        AddrVec, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack,
+        AddrVec, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType,
         SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::{Mutex, RwLock},

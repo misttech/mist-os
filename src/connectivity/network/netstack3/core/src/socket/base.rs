@@ -106,7 +106,7 @@ pub struct NotDualStackCapableError;
 
 /// Describes which direction(s) of the data path should be shut down.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub struct Shutdown {
+pub(crate) struct Shutdown {
     /// True if the send path is shut down for the owning socket.
     ///
     /// If this is true, the socket should not be able to send packets.
@@ -115,6 +115,38 @@ pub struct Shutdown {
     ///
     /// If this is true, the socket should not be able to receive packets.
     pub receive: bool,
+}
+
+/// Which direction(s) to shut down for a socket.
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
+#[generic_over_ip()]
+pub enum ShutdownType {
+    /// Prevent sending packets on the socket.
+    Send,
+    /// Prevent receiving packets on the socket.
+    Receive,
+    /// Prevent sending and receiving packets on the socket.
+    SendAndReceive,
+}
+
+impl ShutdownType {
+    pub(crate) fn to_send_receive(&self) -> (bool, bool) {
+        match self {
+            Self::Send => (true, false),
+            Self::Receive => (false, true),
+            Self::SendAndReceive => (true, true),
+        }
+    }
+
+    /// Creates a [`ShutdownType`] from a pair of bools for send and receive.
+    pub fn from_send_receive(send: bool, receive: bool) -> Option<Self> {
+        match (send, receive) {
+            (true, false) => Some(Self::Send),
+            (false, true) => Some(Self::Receive),
+            (true, true) => Some(Self::SendAndReceive),
+            (false, false) => None,
+        }
+    }
 }
 
 /// Determines whether the provided address is underspecified by itself.

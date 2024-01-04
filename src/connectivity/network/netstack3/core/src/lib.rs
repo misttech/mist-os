@@ -217,11 +217,10 @@ pub mod socket {
     pub(crate) use base::*;
 
     pub use address::SocketZonedIpAddr;
-    pub use base::{NotDualStackCapableError, SetDualStackEnabledError, Shutdown};
+    pub use base::{NotDualStackCapableError, SetDualStackEnabledError, ShutdownType};
     pub use datagram::{
         ConnectError, ExpectedConnError, ExpectedUnboundError, MulticastInterfaceSelector,
         MulticastMembershipInterfaceSelector, SendError, SendToError, SetMulticastMembershipError,
-        ShutdownType,
     };
 }
 
