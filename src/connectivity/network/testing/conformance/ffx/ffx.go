@@ -247,22 +247,6 @@ func (ffxInstance *FfxInstance) WaitUntilTargetIsAccessible(
 	ctx context.Context,
 	nodename string,
 ) error {
-	// The ffx daemon seems to periodically fail to connect to the
-	// network-conformance emulator even though the emulator is clearly running.
-	// Since we suspect the fault has to do with cross-talk between ffx daemon
-	// instances, force the daemon to restart.
-	// TODO(https://fxbug.dev/317876884): Narrow down what the real root cause is.
-	if err := ffxInstance.RunWithTarget(
-		ctx,
-		"doctor",
-		"--restart-daemon",
-	); err != nil {
-		return fmt.Errorf(
-			"Error while doing `ffx doctor --restart-daemon`: %w",
-			err,
-		)
-	}
-
 	if err := ffxInstance.TargetWait(ctx); err != nil {
 		return fmt.Errorf(
 			"Error while doing `ffx -t %s target wait`: %w",
