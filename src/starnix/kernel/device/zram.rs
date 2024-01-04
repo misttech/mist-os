@@ -5,9 +5,9 @@
 use crate::{
     device::{
         kobject::{Device, DeviceMetadata, KObjectHandle},
-        simple_device_ops, DeviceMode,
+        DeviceMode, DeviceOps,
     },
-    fs::sysfs::{BlockDeviceDirectory, DeviceSysfsOps, SysfsOps},
+    fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo, DeviceSysfsOps, SysfsOps},
     task::{CurrentTask, KernelStats},
     vfs::{
         fileops_impl_dataless, fileops_impl_seekless, fs_node_impl_dir_readonly,
@@ -25,23 +25,54 @@ use starnix_uapi::{
     file_mode::mode,
     open_flags::OpenFlags,
 };
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 #[derive(Default)]
-pub struct DevZram;
+pub struct ZramDevice {
+    kernel_stats: Arc<KernelStats>,
+}
 
-impl FileOps for DevZram {
+impl ZramDevice {
+    fn get_stats(&self) -> Result<fidl_fuchsia_kernel::MemoryStatsCompression, Errno> {
+        self.kernel_stats.get().get_memory_stats_compression(zx::Time::INFINITE).map_err(|e| {
+            log_error!("FIDL error getting memory compression stats: {e}");
+            errno!(EIO)
+        })
+    }
+}
+
+impl DeviceOps for Arc<ZramDevice> {
+    fn open(
+        &self,
+        _current_task: &CurrentTask,
+        _id: DeviceType,
+        _node: &FsNode,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        Ok(Box::new(self.clone()))
+    }
+}
+
+impl FileOps for Arc<ZramDevice> {
     fileops_impl_seekless!();
     fileops_impl_dataless!();
 }
 
+impl BlockDeviceInfo for ZramDevice {
+    fn size(&self) -> Result<usize, Errno> {
+        Ok(self.get_stats()?.uncompressed_storage_bytes.unwrap_or_default() as usize)
+    }
+}
+
 pub struct ZramDeviceDirectory {
+    device: Weak<ZramDevice>,
     base_dir: BlockDeviceDirectory,
 }
 
 impl ZramDeviceDirectory {
-    pub fn new(device: Device) -> Self {
-        Self { base_dir: BlockDeviceDirectory::new(device) }
+    pub fn new(device: Device, zram_device: Weak<ZramDevice>) -> Self {
+        let base_dir = BlockDeviceDirectory::new(device, zram_device.clone());
+        Self { device: zram_device, base_dir }
     }
 }
 
@@ -82,11 +113,14 @@ impl FsNodeOps for ZramDeviceDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match name {
-            b"mm_stat" => Ok(node.fs().create_node(
-                current_task,
-                MmStatFile::new_node(&current_task.kernel().stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            )),
+            b"mm_stat" => {
+                let device = self.device.upgrade().ok_or_else(|| errno!(EINVAL))?;
+                Ok(node.fs().create_node(
+                    current_task,
+                    MmStatFile::new_node(device),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                ))
+            }
             _ => self.base_dir.lookup(node, current_task, name),
         }
     }
@@ -94,22 +128,16 @@ impl FsNodeOps for ZramDeviceDirectory {
 
 #[derive(Clone)]
 struct MmStatFile {
-    kernel_stats: Arc<KernelStats>,
+    device: Arc<ZramDevice>,
 }
 impl MmStatFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
+    pub fn new_node(device: Arc<ZramDevice>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { device })
     }
 }
 impl DynamicFileSource for MmStatFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let stats =
-            self.kernel_stats.get().get_memory_stats_compression(zx::Time::INFINITE).map_err(
-                |e| {
-                    log_error!("FIDL error getting memory compression stats: {e}");
-                    errno!(EIO)
-                },
-            )?;
+        let stats = self.device.get_stats()?;
 
         let compressed_storage_bytes = stats.compressed_storage_bytes.unwrap_or_default();
         let compressed_fragmentation_bytes =
@@ -127,18 +155,23 @@ impl DynamicFileSource for MmStatFile {
         let pages_compacted = 0;
         let huge_pages = 0;
 
-        writeln!(sink, "{orig_data_size} {compr_data_size} {mem_used_total} {mem_limit} {mem_used_max} {same_pages} {pages_compacted} {huge_pages}")?;
+        writeln!(
+            sink,
+            "{orig_data_size} {compr_data_size} {mem_used_total} {mem_limit} \
+                        {mem_used_max} {same_pages} {pages_compacted} {huge_pages}"
+        )?;
         Ok(())
     }
 }
 
 pub fn zram_device_init(system_task: &CurrentTask) {
+    let zram_dev = Arc::new(ZramDevice::default());
+    let zram_dev_weak = Arc::downgrade(&zram_dev);
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
-
     let virtual_block_class = registry.get_or_create_class(b"block", registry.virtual_bus());
     registry
-        .register_device(ZRAM_MAJOR, 0, 1, simple_device_ops::<DevZram>, DeviceMode::Block)
+        .register_device(ZRAM_MAJOR, 0, 1, zram_dev, DeviceMode::Block)
         .expect("Failed to register zram device.");
 
     registry.add_device(
@@ -146,6 +179,6 @@ pub fn zram_device_init(system_task: &CurrentTask) {
         b"zram0",
         DeviceMetadata::new(b"zram0", DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),
         virtual_block_class,
-        ZramDeviceDirectory::new,
+        move |dev| ZramDeviceDirectory::new(dev, zram_dev_weak.clone()),
     );
 }

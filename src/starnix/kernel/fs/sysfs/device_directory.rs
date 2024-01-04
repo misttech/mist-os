@@ -10,14 +10,15 @@ use crate::{
         buffers::InputBuffer, fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly,
         fs_node_impl_not_dir, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf,
         DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        VecDirectory, VecDirectoryEntry,
+        VecDirectory, VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
     },
 };
 use starnix_logging::not_implemented;
 use starnix_uapi::{
-    auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::mode,
+    auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::mode,
     open_flags::OpenFlags,
 };
+use std::sync::Weak;
 
 pub trait DeviceSysfsOps: SysfsOps {
     fn device(&self) -> Device;
@@ -102,13 +103,18 @@ impl FsNodeOps for DeviceDirectory {
     }
 }
 
+pub trait BlockDeviceInfo: Send + Sync {
+    fn size(&self) -> Result<usize, Errno>;
+}
+
 pub struct BlockDeviceDirectory {
     base_dir: DeviceDirectory,
+    block_info: Weak<dyn BlockDeviceInfo>,
 }
 
 impl BlockDeviceDirectory {
-    pub fn new(device: Device) -> Self {
-        Self { base_dir: DeviceDirectory::new(device) }
+    pub fn new(device: Device, block_info: Weak<dyn BlockDeviceInfo>) -> Self {
+        Self { base_dir: DeviceDirectory::new(device), block_info }
     }
 }
 
@@ -119,6 +125,11 @@ impl BlockDeviceDirectory {
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::DIR,
             name: b"queue".to_vec(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"size".to_vec(),
             inode: None,
         });
         entries
@@ -160,6 +171,11 @@ impl FsNodeOps for BlockDeviceDirectory {
                 current_task,
                 BlockDeviceQueueDirectory::new(self.kobject()),
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+            )),
+            b"size" => Ok(node.fs().create_node(
+                current_task,
+                BlockDeviceSizeFile::new_node(self.block_info.clone()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
             _ => self.base_dir.lookup(node, current_task, name),
         }
@@ -206,6 +222,26 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
                 error!(ENOENT)
             }
         }
+    }
+}
+
+#[derive(Clone)]
+struct BlockDeviceSizeFile {
+    block_info: Weak<dyn BlockDeviceInfo>,
+}
+
+impl BlockDeviceSizeFile {
+    pub fn new_node(block_info: Weak<dyn BlockDeviceInfo>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { block_info })
+    }
+}
+
+impl DynamicFileSource for BlockDeviceSizeFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let size = self.block_info.upgrade().ok_or_else(|| errno!(EINVAL))?.size()?;
+        let size_blocks = size / DEFAULT_BYTES_PER_BLOCK;
+        writeln!(sink, "{}", size_blocks)?;
+        Ok(())
     }
 }
 

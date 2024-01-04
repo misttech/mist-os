@@ -4,7 +4,7 @@
 
 use crate::{
     device::{kobject::DeviceMetadata, DeviceMode},
-    fs::sysfs::BlockDeviceDirectory,
+    fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo},
     mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
     vfs::{
@@ -134,6 +134,8 @@ impl LoopDevice {
         let registry = &kernel.device_registry;
         let loop_device_name = format!("loop{minor}");
         let virtual_block_class = registry.get_or_create_class(b"block", registry.virtual_bus());
+        let device = Arc::new(Self { number: minor, state: Default::default() });
+        let device_weak = Arc::<LoopDevice>::downgrade(&device);
         registry.add_device(
             current_task,
             loop_device_name.as_bytes(),
@@ -143,9 +145,9 @@ impl LoopDevice {
                 DeviceMode::Block,
             ),
             virtual_block_class,
-            BlockDeviceDirectory::new,
+            move |dev| BlockDeviceDirectory::new(dev, device_weak.clone()),
         );
-        Arc::new(Self { number: minor, state: Default::default() })
+        device
     }
 
     fn create_file_ops(self: &Arc<Self>) -> Box<dyn FileOps> {
@@ -175,6 +177,12 @@ fn check_block_size(block_size: u32) -> Result<(), Errno> {
         allowed_size *= 2;
     }
     error!(EINVAL)
+}
+
+impl BlockDeviceInfo for LoopDevice {
+    fn size(&self) -> Result<usize, Errno> {
+        Ok(self.state.lock().size_limit as usize)
+    }
 }
 
 struct LoopDeviceFile {

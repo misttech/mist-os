@@ -12,7 +12,7 @@ use crate::{
         CacheMode, DirectoryEntryType, DirentSink, FdEvents, FileObject, FileOps, FileSystem,
         FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
         FsNodeOps, FsStr, FsString, InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget,
-        ValueOrSize,
+        ValueOrSize, DEFAULT_BYTES_PER_BLOCK,
     },
 };
 use anyhow::{anyhow, ensure, Error};
@@ -495,7 +495,7 @@ fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsN
     // For now, we just use some made up values. We might need to revisit this.
     info.size = 1;
     info.blocks = 1;
-    info.blksize = 512;
+    info.blksize = DEFAULT_BYTES_PER_BLOCK;
     info.link_count = 1;
     info
 }

@@ -15,7 +15,7 @@ use crate::{
         Anon, CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FdEvents,
         FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
         FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
+        SeekTarget, SymlinkTarget, ValueOrSize, XattrOp, DEFAULT_BYTES_PER_BLOCK,
     },
 };
 use fidl::AsHandleRef;
@@ -304,17 +304,15 @@ pub fn create_fuchsia_pipe(
 
 // Update info from attrs if they are set.
 pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
-    /// st_blksize is measured in units of 512 bytes.
-    const BYTES_PER_BLOCK: usize = 512;
     // TODO - store these in FsNodeState and convert on fstat
     if attrs.has.content_size {
         info.size = attrs.content_size.try_into().unwrap_or(std::usize::MAX);
     }
     if attrs.has.storage_size {
-        info.blocks =
-            usize::try_from(attrs.storage_size).unwrap_or(std::usize::MAX) / BYTES_PER_BLOCK;
+        info.blocks = usize::try_from(attrs.storage_size).unwrap_or(std::usize::MAX)
+            / DEFAULT_BYTES_PER_BLOCK;
     }
-    info.blksize = BYTES_PER_BLOCK;
+    info.blksize = DEFAULT_BYTES_PER_BLOCK;
     if attrs.has.link_count {
         info.link_count = attrs.link_count.try_into().unwrap_or(std::usize::MAX);
     }

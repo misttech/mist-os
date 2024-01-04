@@ -251,8 +251,8 @@ impl FlockInfo {
     }
 }
 
-/// st_blksize is measured in units of 512 bytes.
-const DEFAULT_BYTES_PER_BLOCK: usize = 512;
+/// `st_blksize` is measured in units of 512 bytes.
+pub const DEFAULT_BYTES_PER_BLOCK: usize = 512;
 
 pub struct FlockOperation {
     operation: u32,
