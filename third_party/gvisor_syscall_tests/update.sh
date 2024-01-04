@@ -23,37 +23,38 @@ LICENSE_FILENAME="LICENSE"
 rm -rf "${PATH_TO_TMP}"
 rm -rf "${PATH_TO_GVISOR}"
 
-# Get the full gVisor repository.
-git clone https://github.com/google/gvisor.git "${PATH_TO_TMP}"
+# Limit the clone to up to N commits so we don't need a full checkout.
+# The history is only used to display the delta at the end of this script.
+git clone --depth=2000 https://github.com/google/gvisor.git "${PATH_TO_TMP}"
 
 # Create the test source and util file directories, if they don't yet exist.
 mkdir -p "${PATH_TO_GVISOR}/${PATH_TO_TEST_SRCS}"
 
 # Move test source files.
 while read -r filename; do
-    cp "${PATH_TO_TMP}/${PATH_TO_TEST_SRCS}/${filename}" "${PATH_TO_GVISOR}/${PATH_TO_TEST_SRCS}/${filename}";
-done < "${PATH_TO_SYSCALLS_DIR}/${TEST_SRC_FILENAMES}"
+  cp "${PATH_TO_TMP}/${PATH_TO_TEST_SRCS}/${filename}" "${PATH_TO_GVISOR}/${PATH_TO_TEST_SRCS}/${filename}"
+done <"${PATH_TO_SYSCALLS_DIR}/${TEST_SRC_FILENAMES}"
 
 # Create the test util file directory, if it doesn't yet exist.
 mkdir -p "${PATH_TO_GVISOR}/${PATH_TO_TEST_UTILS}"
 
 # Move test util files.
 while read -r filename; do
-    cp "${PATH_TO_TMP}/${PATH_TO_TEST_UTILS}/${filename}" "${PATH_TO_GVISOR}/${PATH_TO_TEST_UTILS}/${filename}";
-done < "${PATH_TO_SYSCALLS_DIR}/${TEST_UTILS_FILENAMES}"
+  cp "${PATH_TO_TMP}/${PATH_TO_TEST_UTILS}/${filename}" "${PATH_TO_GVISOR}/${PATH_TO_TEST_UTILS}/${filename}"
+done <"${PATH_TO_SYSCALLS_DIR}/${TEST_UTILS_FILENAMES}"
 
 # Move License file.
 cp "${PATH_TO_TMP}/${LICENSE_FILENAME}" "${PATH_TO_SYSCALLS_DIR}/${LICENSE_FILENAME}"
 
 # Save a list of commits being imported.
-TEST_SRC_PATHS=$(awk "{print \"${PATH_TO_TEST_SRCS}/\" \$0}" < ${PATH_TO_SYSCALLS_DIR}/${TEST_SRC_FILENAMES})
-TEST_UTILS_PATHS=$(awk "{print \"${PATH_TO_TEST_UTILS}/\" \$0}" < ${PATH_TO_SYSCALLS_DIR}/${TEST_UTILS_FILENAMES})
+TEST_SRC_PATHS=$(awk "{print \"${PATH_TO_TEST_SRCS}/\" \$0}" <${PATH_TO_SYSCALLS_DIR}/${TEST_SRC_FILENAMES})
+TEST_UTILS_PATHS=$(awk "{print \"${PATH_TO_TEST_UTILS}/\" \$0}" <${PATH_TO_SYSCALLS_DIR}/${TEST_UTILS_FILENAMES})
 
 LAST_IMPORTED_COMMIT=$(cat "${PATH_TO_SYSCALLS_DIR}/${COMMIT_HASH_FILENAME}")
 IMPORTED=$(git -C "${PATH_TO_TMP}" log --format="+ %C(auto) %h %s" ${LAST_IMPORTED_COMMIT}..HEAD -- ${TEST_SRC_PATHS} ${TEST_UTILS_PATHS})
 
 # Store the hash of the latest commit.
-git -C "${PATH_TO_TMP}" rev-parse HEAD > "${PATH_TO_SYSCALLS_DIR}/${COMMIT_HASH_FILENAME}"
+git -C "${PATH_TO_TMP}" rev-parse HEAD >"${PATH_TO_SYSCALLS_DIR}/${COMMIT_HASH_FILENAME}"
 
 # Clean up gVisor.
 rm -rf "${PATH_TO_TMP}"
