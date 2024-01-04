@@ -37,6 +37,19 @@ class DsiHost {
   // Returns a non-null pointer to the DsiHost instance on success.
   static zx::result<std::unique_ptr<DsiHost>> Create(zx_device_t* parent, uint32_t panel_type);
 
+  // Production code should prefer using the `Create()` factory method.
+  //
+  // `panel_config` must be non-null and must overlive the `DsiHost` instance.
+  DsiHost(zx_device_t* parent, uint32_t panel_type, const PanelConfig* panel_config,
+          fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_gpio);
+
+  ~DsiHost() = default;
+
+  DsiHost(const DsiHost&) = delete;
+  DsiHost& operator=(const DsiHost&) = delete;
+  DsiHost(DsiHost&&) = delete;
+  DsiHost& operator=(DsiHost&&) = delete;
+
   // This function sets up mipi dsi interface. It includes both DWC and AmLogic blocks
   // The DesignWare setup could technically be moved to the dw_mipi_dsi driver. However,
   // given the highly configurable nature of this block, we'd have to provide a lot of
@@ -52,9 +65,6 @@ class DsiHost {
   uint32_t panel_type() const { return panel_type_; }
 
  private:
-  DsiHost(zx_device_t* parent, uint32_t panel_type,
-          fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_gpio);
-
   void PhyEnable();
   void PhyDisable();
 
@@ -84,7 +94,7 @@ class DsiHost {
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> lcd_gpio_;
 
   uint32_t panel_type_;
-  const PanelConfig* panel_config_ = nullptr;
+  const PanelConfig& panel_config_;
 
   bool enabled_ = false;
 

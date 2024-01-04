@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 
 #include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
 #include <cstdint>
@@ -69,6 +70,10 @@ struct PanelConfig {
   const cpp20::span<const PowerOp> power_on;
   const cpp20::span<const PowerOp> power_off;
 };
+
+// If the `panel_type` is supported, returns the panel configuration.
+// Otherwise returns nullptr.
+const PanelConfig* GetPanelConfig(uint32_t panel_type);
 
 }  // namespace amlogic_display
 

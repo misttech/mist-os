@@ -6,99 +6,28 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/device-protocol/display-panel.h>
+#include <zircon/assert.h>
 #include <zircon/status.h>
 
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
-#include "src/graphics/display/drivers/amlogic-display/initcodes-inl.h"
 
 namespace amlogic_display {
 
-namespace {
-
-constexpr uint8_t kEmptySequence[] = {};
-constexpr cpp20::span<const uint8_t> kEmptySequenceSpan = {kEmptySequence, 0};
-
-// Convenience function for building PanelConfigs. Most op sequences are shared
-// between panel types.
-constexpr PanelConfig MakeConfigForAstroSherlockNelson(const char* name,
-                                                       cpp20::span<const uint8_t> init_seq) {
-  return {.name = name,
-          .dsi_on = init_seq,
-          .dsi_off = {lcd_shutdown_sequence, std::size(lcd_shutdown_sequence)},
-          .power_on = {kLcdPowerOnSequenceForAstroSherlockNelson,
-                       std::size(kLcdPowerOnSequenceForAstroSherlockNelson)},
-          .power_off = {kLcdPowerOffSequenceForAstroSherlockNelson,
-                        std::size(kLcdPowerOffSequenceForAstroSherlockNelson)}};
-}
-
-constexpr PanelConfig kVim3Ts050PanelConfig = {
-    .name = "MTF050FHDI_03",
-    .dsi_on = {lcd_init_sequence_MTF050FHDI_03, std::size(lcd_init_sequence_MTF050FHDI_03)},
-    .dsi_off = {lcd_shutdown_sequence, std::size(lcd_shutdown_sequence)},
-    .power_on = {kLcdPowerOnSequenceForVim3Ts050, std::size(kLcdPowerOnSequenceForVim3Ts050)},
-    .power_off = {kLcdPowerOffSequenceForVim3Ts050, std::size(kLcdPowerOffSequenceForVim3Ts050)},
-};
-
-// LINT.IfChange
-/// Panel type IDs are compact. This array should be updated when
-/// <lib/device-protocol/display-panel.h> is.
-constexpr PanelConfig kPanelConfig[] = {
-    MakeConfigForAstroSherlockNelson(
-        "TV070WSM_FT", {lcd_init_sequence_TV070WSM_FT, std::size(lcd_init_sequence_TV070WSM_FT)}),
-    MakeConfigForAstroSherlockNelson(
-        "P070ACB_FT", {lcd_init_sequence_P070ACB_FT, std::size(lcd_init_sequence_P070ACB_FT)}),
-    MakeConfigForAstroSherlockNelson(
-        "TV101WXM_FT", {lcd_init_sequence_TV101WXM_FT, std::size(lcd_init_sequence_TV101WXM_FT)}),
-    MakeConfigForAstroSherlockNelson(
-        "G101B158_FT", {lcd_init_sequence_G101B158_FT, std::size(lcd_init_sequence_G101B158_FT)}),
-    // ILI9881C & ST7701S are not supported
-    MakeConfigForAstroSherlockNelson("ILI9881C", kEmptySequenceSpan),
-    MakeConfigForAstroSherlockNelson("ST7701S", kEmptySequenceSpan),
-    MakeConfigForAstroSherlockNelson(
-        "TV080WXM_FT", {lcd_init_sequence_TV080WXM_FT, std::size(lcd_init_sequence_TV080WXM_FT)}),
-    MakeConfigForAstroSherlockNelson(
-        "TV101WXM_FT_9365",
-        {lcd_init_sequence_TV101WXM_FT_9365, std::size(lcd_init_sequence_TV101WXM_FT_9365)}),
-    MakeConfigForAstroSherlockNelson(
-        "TV070WSM_FT_9365",
-        {lcd_init_sequence_TV070WSM_FT_9365, std::size(lcd_init_sequence_TV070WSM_FT_9365)}),
-    MakeConfigForAstroSherlockNelson(
-        "KD070D82_FT", {lcd_init_sequence_KD070D82_FT, std::size(lcd_init_sequence_KD070D82_FT)}),
-    MakeConfigForAstroSherlockNelson(
-        "KD070D82_FT_9365",
-        {lcd_init_sequence_KD070D82_FT_9365, std::size(lcd_init_sequence_KD070D82_FT_9365)}),
-    MakeConfigForAstroSherlockNelson(
-        "TV070WSM_ST7703I",
-        {lcd_init_sequence_TV070WSM_ST7703I, std::size(lcd_init_sequence_TV070WSM_ST7703I)}),
-    kVim3Ts050PanelConfig,
-};
-// LINT.ThenChange(//src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h)
-
-const PanelConfig* GetPanelConfig(uint32_t panel_type) {
-  ZX_DEBUG_ASSERT(panel_type <= PANEL_MTF050FHDI_03);
-  ZX_DEBUG_ASSERT(panel_type != PANEL_ILI9881C);
-  ZX_DEBUG_ASSERT(panel_type != PANEL_ST7701S);
-  if (panel_type == PANEL_ILI9881C || panel_type == PANEL_ST7701S) {
-    return nullptr;
-  }
-  return &(kPanelConfig[panel_type]);
-}
-
-}  // namespace
-
-DsiHost::DsiHost(zx_device_t* parent, uint32_t panel_type,
+DsiHost::DsiHost(zx_device_t* parent, uint32_t panel_type, const PanelConfig* panel_config,
                  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_gpio)
     : pdev_(ddk::PDevFidl::FromFragment(parent)),
       dsiimpl_(parent, "dsi"),
       lcd_gpio_(std::move(lcd_gpio)),
-      panel_type_(panel_type) {}
+      panel_type_(panel_type),
+      panel_config_(*panel_config) {
+  ZX_DEBUG_ASSERT(panel_config != nullptr);
+}
 
 // static
 zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32_t panel_type) {
-  fbl::AllocChecker ac;
   const char* kLcdGpioFragmentName = "gpio-lcd-reset";
   zx::result lcd_gpio =
       ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
@@ -107,17 +36,23 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
     zxlogf(ERROR, "Failed to get gpio protocol from fragment: %s", kLcdGpioFragmentName);
     return lcd_gpio.take_error();
   }
+
+  const PanelConfig* panel_config = GetPanelConfig(panel_type);
+  if (panel_config == nullptr) {
+    zxlogf(ERROR, "Failed to get panel config for panel type %" PRIu32, panel_type);
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  fbl::AllocChecker alloc_checker;
   std::unique_ptr<DsiHost> self = fbl::make_unique_checked<DsiHost>(
-      &ac, DsiHost(parent, panel_type, std::move(lcd_gpio.value())));
-  if (!ac.check()) {
+      &alloc_checker, parent, panel_type, panel_config, std::move(lcd_gpio).value());
+  if (!alloc_checker.check()) {
     zxlogf(ERROR, "No memory to allocate a DSI host");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  self->panel_config_ = GetPanelConfig(panel_type);
-  if (self->panel_config_ == nullptr) {
-    zxlogf(ERROR, "Unrecognized panel type %d", panel_type);
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
+
+  // TODO(fxbug.dev/42082357): Replace the long multi-step initialization with
+  // builder / factory pattern.
   if (!self->pdev_.is_valid()) {
     zxlogf(ERROR, "DsiHost: Could not get ZX_PROTOCOL_PDEV protocol");
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -145,7 +80,7 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
     return lcd_gpio.take_error();
   }
   zx::result<std::unique_ptr<Lcd>> lcd_or_status =
-      Lcd::Create(self->panel_type_, self->panel_config_->dsi_on, self->panel_config_->dsi_off,
+      Lcd::Create(self->panel_type_, self->panel_config_.dsi_on, self->panel_config_.dsi_off,
                   fit::bind_member(self.get(), &DsiHost::SetSignalPower), self->dsiimpl_,
                   std::move(lcd_gpio.value()), kBootloaderDisplayEnabled);
   if (lcd_or_status.is_error()) {
@@ -358,7 +293,7 @@ void DsiHost::Disable(const display_setting_t& disp_setting) {
   };
 
   zx::result<> power_off_result =
-      PerformPowerOpSequence(panel_config_->power_off, std::move(power_off));
+      PerformPowerOpSequence(panel_config_.power_off, std::move(power_off));
   if (!power_off_result.is_ok()) {
     zxlogf(ERROR, "Failed to power off the DSI display: %s", power_off_result.status_string());
   }
@@ -436,7 +371,7 @@ zx::result<> DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bit
   };
 
   zx::result<> power_on_result =
-      PerformPowerOpSequence(panel_config_->power_on, std::move(power_on));
+      PerformPowerOpSequence(panel_config_.power_on, std::move(power_on));
   if (!power_on_result.is_ok()) {
     zxlogf(ERROR, "Failed to power on the DSI Display: %s", power_on_result.status_string());
     return power_on_result.take_error();
