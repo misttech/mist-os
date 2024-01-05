@@ -595,7 +595,7 @@ def ValidatePerfCompare(args, out_fh):
 
 def Main(argv, out_fh, run_cmd=subprocess.check_call):
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(required=True)
 
     subparser = subparsers.add_parser(
         "compare_perf",
