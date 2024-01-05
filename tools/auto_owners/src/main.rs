@@ -1123,7 +1123,7 @@ mod tests {
     static PATHS: Lazy<Paths> = Lazy::new(|| {
         let cwd = Utf8PathBuf::from_path_buf(std::env::current_dir().unwrap()).unwrap();
 
-        let first_arg = "host_x64/auto_owners_test";
+        let first_arg = concat!(env!("ROOT_OUT_DIR"), "/auto_owners_test");
         //let first_arg = std::env::args().next().unwrap();
         let test_binary_path = cwd.join(first_arg);
 

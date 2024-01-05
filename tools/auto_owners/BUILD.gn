@@ -23,12 +23,14 @@ if (is_host) {
     "//tools/gn_desc/gn_json",
   ]
 
+  relative_root_out_dir = rebase_path(root_out_dir, root_build_dir)
   rustc_binary("auto_owners_bin") {
     edition = "2021"
     output_name = "auto_owners"
     with_unit_tests = false
     deps = crate_deps
     sources = [ "src/main.rs" ]
+    rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
   }
 
   rustc_test("auto_owners_test") {
@@ -48,6 +50,7 @@ if (is_host) {
       ":auto_owners_gn",
       ":auto_owners_test_data",
     ]
+    rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
   }
 
   test_output_dir = "$root_out_dir/test_data/tools/auto_owners"
