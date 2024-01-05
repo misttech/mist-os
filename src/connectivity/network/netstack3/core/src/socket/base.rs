@@ -215,7 +215,7 @@ pub trait SocketMapAddrSpec {
     type RemoteIdentifier: Copy + Clone + Debug + Hash + Eq;
 }
 
-pub(crate) struct ListenerAddrInfo {
+pub struct ListenerAddrInfo {
     pub(crate) has_device: bool,
     pub(crate) specified_addr: bool,
 }
@@ -285,7 +285,7 @@ impl<T> Inserter<T> for Never {
 }
 
 /// Describes an entry in a [`SocketMap`] for a listener or connection address.
-pub(crate) trait SocketMapAddrStateSpec {
+pub trait SocketMapAddrStateSpec {
     /// The type of ID that can be present at the address.
     type Id;
 
@@ -343,13 +343,8 @@ pub(crate) trait SocketMapAddrStateUpdateSharingSpec: SocketMapAddrStateSpec {
     ) -> Result<(), IncompatibleError>;
 }
 
-pub(crate) trait SocketMapConflictPolicy<
-    Addr,
-    SharingState,
-    I: Ip,
-    D: device::Id,
-    A: SocketMapAddrSpec,
->: SocketMapStateSpec
+pub trait SocketMapConflictPolicy<Addr, SharingState, I: Ip, D: device::Id, A: SocketMapAddrSpec>:
+    SocketMapStateSpec
 {
     /// Checks whether a new socket with the provided state can be inserted at
     /// the given address in the existing socket map, returning an error
@@ -381,7 +376,7 @@ where
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "S::ListenerAddrState: Debug, S::ConnAddrState: Debug"))]
-pub(crate) enum Bound<S: SocketMapStateSpec + ?Sized> {
+pub enum Bound<S: SocketMapStateSpec + ?Sized> {
     Listen(S::ListenerAddrState),
     Conn(S::ConnAddrState),
 }
@@ -408,7 +403,7 @@ pub(crate) enum Bound<S: SocketMapStateSpec + ?Sized> {
     PartialEq(bound = "D: PartialEq"),
     Hash(bound = "D: Hash")
 )]
-pub(crate) enum AddrVec<I: Ip, D, A: SocketMapAddrSpec + ?Sized> {
+pub enum AddrVec<I: Ip, D, A: SocketMapAddrSpec + ?Sized> {
     Listen(ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
     Conn(ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>),
 }
@@ -918,7 +913,7 @@ where
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) enum InsertError {
+pub enum InsertError {
     ShadowAddrExists,
     Exists,
     ShadowerExists,

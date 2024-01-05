@@ -40,7 +40,7 @@ pub trait IterShadows {
 ///
 /// This can be used to provide a summary value, e.g. even or odd for an
 /// integer-like type.
-pub(crate) trait Tagged<A> {
+pub trait Tagged<A> {
     type Tag: Copy + Eq + core::fmt::Debug;
 
     /// Returns the tag value for `self` at the given address.
@@ -66,7 +66,7 @@ pub(crate) trait Tagged<A> {
 /// separated into buckets for different tags of type `V::Tag`.
 #[derive(Derivative, Debug)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct SocketMap<A: Hash + Eq, V: Tagged<A>> {
+pub struct SocketMap<A: Hash + Eq, V: Tagged<A>> {
     map: HashMap<A, MapValue<V, V::Tag>>,
     len: usize,
 }
@@ -94,7 +94,7 @@ struct DescendantCounts<T, const INLINE_SIZE: usize = 1> {
 /// exists, `SocketMap::get(map, a)` is `Some(v)`, i.e. the `HashMap` that
 /// [`SocketMap`] wraps contains a [`MapValue`] whose `value` field is
 /// `Some(v)`.
-pub(crate) struct OccupiedEntry<'a, A: Hash + Eq, V: Tagged<A>>(&'a mut SocketMap<A, V>, A);
+pub struct OccupiedEntry<'a, A: Hash + Eq, V: Tagged<A>>(&'a mut SocketMap<A, V>, A);
 
 /// An entry for a key in a map that does not have a value.
 ///
@@ -103,11 +103,11 @@ pub(crate) struct OccupiedEntry<'a, A: Hash + Eq, V: Tagged<A>>(&'a mut SocketMa
 /// `SocketMap` wraps, either there is no value for key `a` or there is a
 /// `MapValue` whose `value` field is `None`.
 #[cfg_attr(test, derive(Debug))]
-pub(crate) struct VacantEntry<'a, A: Hash + Eq, V: Tagged<A>>(&'a mut SocketMap<A, V>, A);
+pub struct VacantEntry<'a, A: Hash + Eq, V: Tagged<A>>(&'a mut SocketMap<A, V>, A);
 
 /// An entry in a map that can be used to manipulate the value in-place.
 #[cfg_attr(test, derive(Debug))]
-pub(crate) enum Entry<'a, A: Hash + Eq, V: Tagged<A>> {
+pub enum Entry<'a, A: Hash + Eq, V: Tagged<A>> {
     // NB: Both `OccupiedEntry` and `VacantEntry` store a reference to the map
     // and a key directly since they need access to the entire map to update
     // descendant counts. This means that any operation on them requires an

@@ -198,7 +198,7 @@ pub struct ListenerIpAddr<A: IpAddress, LI> {
 
 /// The address of a listening socket.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct ListenerAddr<A, D> {
+pub struct ListenerAddr<A, D> {
     pub(crate) ip: A,
     pub(crate) device: Option<D>,
 }
@@ -342,7 +342,7 @@ impl<I: Ip, A: SocketMapAddrSpec> IpAddrVec<I, A> {
     }
 }
 
-enum AddrVecIterInner<I: Ip, D, A: SocketMapAddrSpec> {
+pub(crate) enum AddrVecIterInner<I: Ip, D, A: SocketMapAddrSpec> {
     WithDevice { device: D, emitted_device: bool, addr: IpAddrVec<I, A> },
     NoDevice { addr: IpAddrVec<I, A> },
     Done,
@@ -394,7 +394,7 @@ impl<I: Ip, D: Clone, A: SocketMapAddrSpec> Iterator for AddrVecIterInner<I, D, 
 ///
 /// The first yielded address is always the one provided via
 /// [`AddrVecIter::with_device`] or [`AddrVecIter::without_device`].
-pub(crate) struct AddrVecIter<I: Ip, D, A: SocketMapAddrSpec>(AddrVecIterInner<I, D, A>);
+pub struct AddrVecIter<I: Ip, D, A: SocketMapAddrSpec>(AddrVecIterInner<I, D, A>);
 
 impl<I: Ip, D, A: SocketMapAddrSpec> AddrVecIter<I, D, A> {
     pub(crate) fn with_device(addr: IpAddrVec<I, A>, device: D) -> Self {
