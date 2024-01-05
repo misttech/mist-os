@@ -126,9 +126,14 @@ impl FsManagementFilesystemInstance {
         }
     }
 
-    /// If the component exists, return the relative moniker to it.
-    pub fn get_component_moniker(&self) -> Option<String> {
-        self.fs.get_component_moniker()
+    // Instead of returning the directory that is the data root for this filesystem, return the root
+    // that would be used for accessing top level service protocols.
+    fn exposed_services_dir(&self) -> &fio::DirectoryProxy {
+        let fs = self.serving_filesystem.as_ref().unwrap();
+        match fs {
+            FsType::SingleVolume(serving_filesystem) => serving_filesystem.exposed_dir(),
+            FsType::MultiVolume(serving_filesystem) => serving_filesystem.exposed_dir(),
+        }
     }
 }
 
