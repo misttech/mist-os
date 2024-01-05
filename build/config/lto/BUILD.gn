@@ -49,7 +49,10 @@ variant("lto") {
     }
   }
 
-  rustflags = [ "-Clto=fat" ]
+  rustflags = [
+    "-Clto=fat",
+    "-Zdylib-lto",
+  ]
 }
 
 variant("thinlto") {
@@ -89,5 +92,8 @@ variant("thinlto") {
     ]
   }
 
-  rustflags = [ "-Clto=thin" ]
+  rustflags = [
+    "-Clto=thin",
+    "-Zdylib-lto",
+  ]
 }
