@@ -1,0 +1,71 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
+import("//build/test.gni")
+
+group("tests") {
+  deps = [ ":i2c-bus-visitor-test" ]
+  testonly = true
+}
+
+devicetree_visitor("i2c-bus-visitor") {
+  deps = [ ":i2c-bus" ]
+}
+
+source_set("i2c-bus") {
+  sources = [
+    "i2c-bus-visitor.cc",
+    "i2c-bus-visitor.h",
+  ]
+  deps = [
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devicetree/manager",
+    "//sdk/lib/driver/devicetree/visitors:common-types",
+    "//sdk/lib/driver/devicetree/visitors:registration",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/lib/ddk",
+    "//src/lib/ddk:ddk-metadata-headers",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
+    "//sdk/lib/driver/devicetree/visitors:driver-visitor",
+  ]
+}
+
+test("i2c-bus-visitor-test-bin") {
+  sources = [ "test/i2c-bus-visitor-test.cc" ]
+  deps = [
+    ":i2c-bus",
+    "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
+    "//sdk/lib/driver/devicetree/visitors:registry",
+    "//sdk/lib/driver/devicetree/visitors/default/bind-property",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+dtb("i2c-dtb") {
+  sources = [ "test/dts/i2c.dts.S" ]
+}
+
+resource("i2c-dtb-file") {
+  sources = get_target_outputs(":i2c-dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":i2c-dtb" ]
+}
+
+fuchsia_unittest_package("i2c-bus-visitor-test") {
+  component_name = "i2c-bus-visitor-test"
+  deps = [
+    ":i2c-bus-visitor-test-bin",
+    ":i2c-dtb-file",
+  ]
+}

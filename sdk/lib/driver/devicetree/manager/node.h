@@ -14,6 +14,7 @@
 #include <optional>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace fdf_devicetree {
@@ -144,8 +145,16 @@ class ChildNode {
 
   explicit operator bool() const { return (node_ != nullptr); }
 
+  const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties() const {
+    return node_->properties();
+  }
+
+  void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
+    node_->AddNodeSpec(std::move(spec));
+  }
+
  private:
-  const Node* node_;
+  Node* node_;
 };
 
 }  // namespace fdf_devicetree

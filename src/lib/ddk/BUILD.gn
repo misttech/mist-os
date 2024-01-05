@@ -98,8 +98,7 @@ sdk_static_library("ddk") {
     "//examples/drivers/transport/banjo/v1:*",
     "//sdk/banjo/*",
     "//sdk/fidl/*",
-    "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor:*",
-    "//sdk/lib/driver/devicetree/visitors/drivers/registers:*",
+    "//sdk/lib/driver/devicetree/visitors/*",
     "//sdk/lib/driver_test_realm:*",
     "//src/camera/drivers/bus/aml_mipicsi:*",
     "//src/camera/drivers/controller:*",
@@ -473,7 +472,7 @@ library_headers("ddk-metadata-headers") {
   # Please allowlist entire directories rather than individual targets as it
   # requires less allowlist churn over time.
   visibility = [
-    "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor:*",
+    "//sdk/lib/driver/devicetree/visitors/*",
     "//sdk/lib/driver_test_realm:*",
     "//src/camera/drivers/bus/aml_mipicsi:*",
     "//src/camera/drivers/sensors/imx227:*",
