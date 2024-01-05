@@ -10,10 +10,14 @@ import("//src/lib/icu/tzdata/icu_tzres_source.gni")
 # The following files will be available in the component's namespace:
 #
 # * /pkg/tzdata/revision.txt
-# * /pkg/tzdata/icu/${data_version}/$[format}/revision.txt
-# * /pkg/tzdata/icu/${data_version}/$[format}/metaZones.res
-# * /pkg/tzdata/icu/${data_version}/$[format}/timezoneTypes.res
-# * /pkg/tzdata/icu/${data_version}/$[format}/zoneinfo64.res
+# * /pkg/tzdata/icu/revision.txt
+# * /pkg/tzdata/icu/${data_version}/${format}/revision.txt
+# * /pkg/tzdata/icu/${data_version}/${format}/metaZones.res
+# * /pkg/tzdata/icu/${data_version}/${format}/timezoneTypes.res
+# * /pkg/tzdata/icu/${data_version}/${format}/zoneinfo64.res
+#
+# We provide several instances of `revision.txt` as the tzdata_provider
+# component offers several different flavors of ICU-related capabilities.
 #
 # For `testonly = true` targets, the rule will add a marker file:
 #
@@ -85,12 +89,24 @@ template("icu_tzdata_resource") {
     outputs =
         [ "data/tzdata/icu/${data_version}/${format}/{{source_file_part}}" ]
 
-    # get_target_outputs("//src/lib/icu/tzdata:revision") can only be used in
-    # //src/lib/icu/tzdata/BUILD.gn, so we have to hard-code the file path.
+    # See above.
     sources = [
       # This is usually `out/default/gen/src/lib/icu/tzdata/revision.txt`
       "${root_gen_dir}/src/lib/icu/tzdata/revision.txt",
     ]
+  }
+
+  _revision_tzdata_icu_versioned_label =
+      "_${target_name}_tzdata_icu_revision_versioned"
+  resource(_revision_tzdata_icu_versioned_label) {
+    forward_variables_from(invoker, [ "testonly" ])
+
+    deps = [ "//src/lib/icu/tzdata:revision" ]
+
+    outputs = [ "data/tzdata/icu/{{source_file_part}}" ]
+
+    # See above.
+    sources = [ "${root_gen_dir}/src/lib/icu/tzdata/revision.txt" ]
   }
 
   # Includes a placeholder file only for test targets.
@@ -109,7 +125,15 @@ template("icu_tzdata_resource") {
 
     deps = [
       ":${_resources_label}",
+
+      # Used via the `config-data` capability.
       ":${_revision_label}",
+      ":${_revision_versioned_label}",
+
+      # Used via the `tzdata-icu` capability.
+      ":${_revision_tzdata_icu_versioned_label}",
+
+      # Used via the `tzdata-icu-44-le` capability.
       ":${_revision_versioned_label}",
     ]
   }
@@ -124,7 +148,14 @@ template("icu_tzdata_resource") {
     testonly = true
     deps = [
       ":${_resources_label}",
+
+      # Used via the `config-data` capability.
       ":${_revision_label}",
+
+      # Used via the `tzdata-icu` capability.
+      ":${_revision_tzdata_icu_versioned_label}",
+
+      # Used via the `tzdata-icu-44-le` capability.
       ":${_revision_versioned_label}",
     ]
 
