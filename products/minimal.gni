@@ -14,8 +14,6 @@ include_shell_commands_package = true
 # Kernel command line arguments.
 product_bootfs_labels = [ "//products/kernel_cmdline:oom.reboot-timeout--low" ]
 
-legacy_base_package_labels = [ "//src/developer/memory/buckets" ]
-
 # Use the product assembly config target to specify the product configuration.
 #
 # This should be overridden by products which inherit from minimal.

@@ -150,27 +150,28 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 .context(format!("Adding fire config to sampler: {}", &fire_config))?;
         }
 
+        // Read the platform buckets.
+        let platform_buckets_path = context.get_resource("buckets.json");
+        let mut buckets: Vec<serde_json::Value> = read_config(platform_buckets_path)?;
+
+        // Optionally, add the product buckets.
         if let Some(buckets_path) = &memory_monitor.buckets {
-            let mut buckets: Vec<serde_json::Value> =
+            let mut product_buckets: Vec<serde_json::Value> =
                 read_config(&buckets_path).context("reading product memory buckets config")?;
-
-            // Add the platform buckets.
-            let platform_buckets_path = context.get_resource("buckets.json");
-            let mut platform_buckets: Vec<serde_json::Value> = read_config(platform_buckets_path)?;
-            buckets.append(&mut platform_buckets);
-
-            // Write the result back to a file and add as config_data.
-            let gendir = context.get_gendir().context("Getting gendir for diagnostics")?;
-            let buckets_path = gendir.join("buckets.json");
-            write_json_file(&buckets_path, &buckets)?;
-            builder
-                .package("memory_monitor")
-                .config_data(FileEntry {
-                    source: buckets_path.clone(),
-                    destination: "buckets.json".into(),
-                })
-                .context(format!("Adding buckets config to memory_monitor: {}", &buckets_path))?;
+            buckets.append(&mut product_buckets);
         }
+
+        // Write the result back to a file and add as config_data.
+        let gendir = context.get_gendir().context("Getting gendir for diagnostics")?;
+        let buckets_path = gendir.join("buckets.json");
+        write_json_file(&buckets_path, &buckets)?;
+        builder
+            .package("memory_monitor")
+            .config_data(FileEntry {
+                source: buckets_path.clone(),
+                destination: "buckets.json".into(),
+            })
+            .context(format!("Adding buckets config to memory_monitor: {}", &buckets_path))?;
 
         Ok(())
     }
@@ -188,9 +189,16 @@ mod tests {
 
     #[test]
     fn test_define_configuration_default() {
+        let temp_dir = TempDir::new().unwrap();
+        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let buckets_path = resource_dir.join("buckets.json");
+        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
+        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
+
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::Eng,
+            resource_dir,
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics =
@@ -242,9 +250,16 @@ mod tests {
 
     #[test]
     fn test_define_configuration_additional_serial_log_components() {
+        let temp_dir = TempDir::new().unwrap();
+        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let buckets_path = resource_dir.join("buckets.json");
+        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
+        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
+
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::Eng,
+            resource_dir,
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
@@ -272,9 +287,16 @@ mod tests {
 
     #[test]
     fn test_define_configuration_low_mem() {
+        let temp_dir = TempDir::new().unwrap();
+        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let buckets_path = resource_dir.join("buckets.json");
+        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
+        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
+
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::Eng,
+            resource_dir,
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics =
@@ -301,9 +323,16 @@ mod tests {
 
     #[test]
     fn test_default_on_bootstrap() {
+        let temp_dir = TempDir::new().unwrap();
+        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let buckets_path = resource_dir.join("buckets.json");
+        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
+        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
+
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Bootstrap,
             build_type: &BuildType::Eng,
+            resource_dir,
             ..ConfigurationContext::default_for_tests()
         };
         let mut builder = ConfigurationBuilderImpl::default();
@@ -326,9 +355,16 @@ mod tests {
 
     #[test]
     fn test_default_for_user() {
+        let temp_dir = TempDir::new().unwrap();
+        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let buckets_path = resource_dir.join("buckets.json");
+        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
+        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
+
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
+            resource_dir,
             ..ConfigurationContext::default_for_tests()
         };
         let mut builder = ConfigurationBuilderImpl::default();
@@ -358,8 +394,12 @@ mod tests {
     #[test]
     fn test_fire_config() {
         let temp_dir = TempDir::new().unwrap();
-        let fire_config_path =
-            Utf8PathBuf::from_path_buf(temp_dir.path().join("fire_config.json")).unwrap();
+        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let buckets_path = resource_dir.join("buckets.json");
+        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
+        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
+
+        let fire_config_path = resource_dir.join("fire_config.json");
         let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
         serde_json::to_writer(
             &mut fire_config,
@@ -376,6 +416,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
+            resource_dir,
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
@@ -390,8 +431,12 @@ mod tests {
     #[test]
     fn test_invalid_fire_config() {
         let temp_dir = TempDir::new().unwrap();
-        let fire_config_path =
-            Utf8PathBuf::from_path_buf(temp_dir.path().join("fire_config.json")).unwrap();
+        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
+        let buckets_path = resource_dir.join("buckets.json");
+        let mut buckets_config = std::fs::File::create(&buckets_path).unwrap();
+        serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
+
+        let fire_config_path = resource_dir.join("fire_config.json");
         let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
         serde_json::to_writer(
             &mut fire_config,
@@ -404,6 +449,7 @@ mod tests {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Minimal,
             build_type: &BuildType::User,
+            resource_dir,
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {

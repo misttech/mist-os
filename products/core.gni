@@ -9,10 +9,8 @@ legacy_base_package_labels = []
 legacy_cache_package_labels = []
 core_realm_shards = []
 
-legacy_base_package_labels += [
-  "//src/connectivity/policy/netcfg:config-default",
-  "//src/developer/memory/buckets",
-]
+legacy_base_package_labels +=
+    [ "//src/connectivity/policy/netcfg:config-default" ]
 
 legacy_cache_package_labels += [
   "//src/media/codec/bundles:services",
