@@ -5,6 +5,7 @@
 #include "src/developer/forensics/feedback/namespace_init.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/utf-utils/utf-utils.h>
 
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/production_encoding.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/version.h"
@@ -12,10 +13,12 @@
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/lib/fxl/strings/substitute.h"
 
 namespace forensics::feedback {
 namespace {
 
+// TODO: https://fxbug.dev/317256133 - Remove UTF8 validity checks.
 void MoveFile(const std::string& from, const std::string& to) {
   // Bail if the file doesn't exist.
   if (!files::IsFile(from)) {
@@ -27,6 +30,15 @@ void MoveFile(const std::string& from, const std::string& to) {
   if (!files::ReadFileToString(from, &content)) {
     FX_LOGS(ERROR) << "Failed to read file " << from;
     return;
+  }
+
+  if (const bool valid = utfutils_is_valid_utf8(content.c_str(), content.size()); !valid) {
+    std::string invalid_bytes;
+    for (const char& c : content) {
+      invalid_bytes += fxl::StringPrintf("%02X", c);
+    }
+    FX_LOGS(ERROR) << fxl::Substitute("Invalid UTF8 string found in '$0': '$1'", from,
+                                      invalid_bytes);
   }
 
   // Copy the file content – we cannot move as the two files are under different namespaces.
