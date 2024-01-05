@@ -484,5 +484,5 @@ and its impacts on validation.
 TODO
 
 [rfc-0089]: ./0089_core_realm_variations.md
-[scrutiny-allowlist]: /src/security/policy/build/verify_routes_exceptions_allowlist.json5
+[scrutiny-allowlist]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/security/policy/build/verify_routes_exceptions_allowlist.json5;drc=b014dec16d4265d8292ea4dc5a3fd071ad1469f1
 [https://fxbug.dev/92889]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=92889

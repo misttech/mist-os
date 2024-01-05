@@ -1,12 +1,5 @@
 # Additional Inputs for Build-Time Verification
 
-## Verify Routes Exceptions Allowlist(s)
-
-Files named `verify_routes_exceptions_allowlist*.json` are allowlists for the
-_verify routes_ scrutiny command/verifier. They are integrated into the build
-via the `verify_routes()` gn template and setting gn args that begin with
-`fuchsia_verify_routes_exceptions_allowlist`.
-
 ## Pre-signing Policies
 
 These policy files are intended for use by Scrutiny's pre-signing verifier. They enforce platform-level constraints based on build type (userdebug and user), following the strategy from https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0115_build_types.
