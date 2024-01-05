@@ -22,7 +22,6 @@
                 "fuchsia.boot.RootResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
-                "fuchsia.kernel.MmioResource",
             ],
         },
         { service: "fuchsia.hardware.platform.device.Service" },

@@ -42,18 +42,24 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
   fbl::AutoLock lock(&lock_);
   RegionAllocator* allocator = nullptr;
   const char* allocator_name = nullptr;
-
+  uint32_t rsrc_kind = 0;
   if (type == kIo) {
     allocator = &io_alloc_;
     allocator_name = "Io";
+
+    if (io_type_ == PCI_ADDRESS_SPACE_MEMORY) {
+      rsrc_kind = ZX_RSRC_KIND_MMIO;
+    } else {
+      rsrc_kind = ZX_RSRC_KIND_IOPORT;
+    }
   } else if (type == kMmio32) {
     allocator = &mmio32_alloc_;
     allocator_name = "Mmio32";
-
+    rsrc_kind = ZX_RSRC_KIND_MMIO;
   } else if (type == kMmio64) {
     allocator = &mmio64_alloc_;
     allocator_name = "Mmio64";
-
+    rsrc_kind = ZX_RSRC_KIND_MMIO;
   } else {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -90,9 +96,9 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
 
   // Craft a resource handle for the request. All information for the allocation that the
   // caller needs is held in the resource, so we don't need explicitly pass back other parameters.
-  st = zx::resource::create(*zx::unowned_resource(mmio_resource_),
-                            ZX_RSRC_KIND_MMIO | ZX_RSRC_FLAG_EXCLUSIVE, new_base, new_size,
-                            name.data(), name.size(), out_resource);
+  st = zx::resource::create(*zx::unowned_resource(root_resource_),
+                            rsrc_kind | ZX_RSRC_FLAG_EXCLUSIVE, new_base, new_size, name.data(),
+                            name.size(), out_resource);
   if (st != ZX_OK) {
     zxlogf(ERROR, "Failed to create resource for %s [%#lx, %#lx): %s\n", name.data(), new_base,
            new_base + new_size, zx_status_get_string(st));
