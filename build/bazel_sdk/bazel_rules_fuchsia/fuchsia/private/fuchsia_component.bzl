@@ -5,6 +5,7 @@
 # buildifier: disable=module-docstring
 load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols")
+load(":fuchsia_driver_runner_manifest.bzl", "fuchsia_driver_runner_manifest")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageResourcesInfo", "FuchsiaUnitTestComponentInfo")
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variant", "rule_variants")
 
@@ -57,21 +58,72 @@ def fuchsia_test_component(name, manifest, deps = None, **kwargs):
         **kwargs
     )
 
-def fuchsia_driver_component(name, manifest, driver_lib, bind_bytecode, deps = [], **kwargs):
+def fuchsia_driver_component(
+        name,
+        driver_lib,
+        bind_bytecode,
+        manifest = None,
+        deps = [],
+        fallback = None,
+        colocate = None,
+        root_resource = None,
+        uses_profiles = None,
+        uses_sysmem = None,
+        uses_boot_args = None,
+        default_dispatcher_opts = None,
+        default_dispatcher_scheduler_role = None,
+        **kwargs):
     """Creates a Fuchsia component that can be registered as a driver.
 
     Args:
         name: The target name.
-        manifest: The component manifest file.
+        manifest: The component manifest file. If this is not provided, one will
+           be generated based on the optional options provided to this rule.
         driver_lib: The shared library that will be registered with the driver manager.
            This file will end up in /driver/<lib_name> and should match what is listed
            in the manifest. See https://fuchsia.dev/fuchsia-src/concepts/components/v2/driver_runner
            for more details.
         bind_bytecode: The driver bind bytecode needed for binding the driver.
         deps: A list of targets that this component depends on.
+        fallback: If manifest is not set, this value will be used to set the fallback entry in
+           the manifest file. See https://fuchsia.dev/fuchsia-src/concepts/components/v2/driver_runner#fallback
+           for more information.
+        colocate: If manifest is not set, this value will be used to set the colocate entry in
+           the manifest file. See https://fuchsia.dev/fuchsia-src/concepts/components/v2/driver_runner#colocate
+           for more information.
+        root_resource: If manifest is not set and if this is true, the driver will be given access to the
+           root resource.
+        uses_profiles: If manifest is not set and if this is true, the driver will be given access to the
+           profile provider service.
+        uses_sysmem: If manifest is not set and if this is true, the driver will be given access to sysmem.
+        uses_boot_args: If manifest is not set and if this is true, the driver will be given access to the
+            boot arguments service.
+        default_dispatcher_opts: If manifest is not set, this value will be used to set the default dispatcher
+            options. See https://fuchsia.dev/fuchsia-src/concepts/components/v2/driver_runner#default_dispatcher_options
+            for more information.
+        default_dispatcher_scheduler_role: If manifest is not set, this value will be used to set the
+           default_dispatcher_scheduler_role entry in the manifest file.
+           See https://fuchsia.dev/fuchsia-src/concepts/components/v2/driver_runner#fallback for more information.
         **kwargs: Extra attributes to forward to the build rule.
     """
-    manifest_target = _manifest_target(name, manifest)
+    if manifest:
+        manifest_target = _manifest_target(name, manifest)
+    else:
+        manifest_target = name + "_generated_driver_manifest"
+        fuchsia_driver_runner_manifest(
+            name = manifest_target,
+            component_name = kwargs.get("component_name", name),
+            bind_bytecode = bind_bytecode,
+            driver_lib = driver_lib,
+            fallback = fallback,
+            colocate = colocate,
+            root_resource = root_resource,
+            uses_profiles = uses_profiles,
+            uses_sysmem = uses_sysmem,
+            uses_boot_args = uses_boot_args,
+            default_dispatcher_opts = default_dispatcher_opts,
+            default_dispatcher_scheduler_role = default_dispatcher_scheduler_role,
+        )
 
     _fuchsia_component(
         name = name,

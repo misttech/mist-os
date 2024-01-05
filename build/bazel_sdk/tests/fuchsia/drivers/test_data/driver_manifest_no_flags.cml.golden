@@ -1,0 +1,11 @@
+{
+    "program": {
+        "binary": "driver/libdriver_no_src.so",
+        "bind": "meta/bind/foo.bindbc",
+        "default_dispatcher_opts": [
+            "allow_sync_calls"
+        ],
+        "runner": "driver"
+    },
+    "use": []
+}
