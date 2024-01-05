@@ -50,11 +50,17 @@ inline bool virtmagma_send_command(int32_t file_descriptor, void* request, size_
   command.request_size = request_size;
   command.response_address = reinterpret_cast<uintptr_t>(response);
   command.response_size = response_size;
-  if (ioctl(file_descriptor, VIRTMAGMA_IOCTL_MAGMA_COMMAND, &command)) {
+  while (true) {
+    if (ioctl(file_descriptor, VIRTMAGMA_IOCTL_MAGMA_COMMAND, &command) == 0) {
+      return true;
+    }
+
+    if (errno == EINTR) {
+      continue;
+    }
     DMESSAGE("virtmagma ioctl fd %d failed: %d", file_descriptor, errno);
     return false;
   }
-  return true;
 }
 
 class OwnedFd {
