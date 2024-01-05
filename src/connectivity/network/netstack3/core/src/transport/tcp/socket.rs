@@ -34,7 +34,7 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    AddrAndZone, NonMappedAddr, SpecifiedAddr, ZonedAddr,
+    AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
 use packet_formats::ip::IpProto;
 use rand::RngCore;
@@ -160,8 +160,8 @@ use crate::{
     },
     socket::{
         address::{
-            dual_stack_remote_ip, ConnAddr, ConnIpAddr, DualStackRemoteIp, ListenerAddr,
-            ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
+            dual_stack_remote_ip, AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackRemoteIp,
+            ListenerAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
         },
         AddrVec, Bound, BoundSocketMap, EitherStack, IncompatibleError, InsertError, Inserter,
         ListenerAddrInfo, MaybeDualStack, RemoveResult, ShutdownType, SocketMapAddrSpec,
@@ -1733,17 +1733,19 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
     ) -> Result<(), BindError> {
         debug!("bind {id:?} to {addr:?}:{port:?}");
         // TODO(https://fxbug.dev/21198): Support dual-stack bind.
-        if let Some(addr) = addr.as_ref() {
-            match NonMappedAddr::new(addr.deref().addr()) {
-                Some(_addr) => {}
-                None => {
-                    // Prevent binding to ipv4-mapped-ipv6 addrs for now.
-                    return Err(BindError::LocalAddressError(
-                        LocalAddressError::AddressUnexpectedlyMapped,
-                    ));
+        let addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, _>> =
+            match addr {
+                None => None,
+                Some(addr) => {
+                    let (addr, zone) = addr.into_inner().into_addr_zone();
+                    let addr = addr.try_into().map_err(|AddrIsMappedError {}| {
+                        BindError::LocalAddressError(LocalAddressError::AddressUnexpectedlyMapped)
+                    })?;
+                    Some(ZonedAddr::new(addr, zone).unwrap_or_else(|| {
+                        unreachable!("Address must still be a valid `ZonedAddr`.")
+                    }))
                 }
-            }
-        }
+            };
 
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
         self.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
@@ -1767,7 +1769,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                     // to which the socket was previously bound.
                     let (addr, required_device) =
                         crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
-                            addr.into_inner(),
+                            addr,
                             bound_device.clone(),
                         )
                         .map_err(LocalAddressError::Zone)?;
@@ -1776,7 +1778,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                         I,
                         _,
                     >>::get_devices_with_assigned_addr(
-                        core_ctx, addr
+                        core_ctx, addr.clone().into()
                     );
                     if !assigned_to.any(|d| {
                         required_device
@@ -1796,12 +1798,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                 core_ctx.with_demux_mut(move |DemuxState { socketmap, port_alloc }| {
                     let port = match port {
                         None => {
-                            // TODO(https://fxbug.dev/132092): Delete conversion
-                            // once `SocketZonedIpAddr` holds `SocketIpAddr`.
-                            let addr = local_ip
-                                .as_ref()
-                                .map(|a| SocketIpAddr::new_from_specified_or_panic(*a));
-                            match port_alloc.try_alloc(&addr, &socketmap) {
+                            match port_alloc.try_alloc(&local_ip, &socketmap) {
                                 Some(port) => {
                                     NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
                                 }
@@ -1813,9 +1810,6 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                         Some(port) => port,
                     };
 
-                    // TODO(https://fxbug.dev/132092): Delete conversion
-                    // once `SocketZonedIpAddr` holds `SocketIpAddr`.
-                    let local_ip = local_ip.map(SocketIpAddr::new_from_specified_or_panic);
                     let addr = ListenerAddr {
                         ip: ListenerIpAddr { addr: local_ip, identifier: port },
                         device: weak_device,
