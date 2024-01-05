@@ -12,32 +12,29 @@ use assembly_config_schema::{
     image_assembly_config::{BoardDriverArguments, KernelConfig},
     platform_config::BuildType,
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
-    BoardInformation, DriverDetails, FileEntry, PackageDetails, PackageSet,
+    BoardInformation, DriverDetails, PackageDetails, PackageSet,
 };
-use assembly_named_file_map::NamedFileMap;
-
 use assembly_domain_config::DomainConfigPackage;
-use assembly_driver_manifest::{
-    DriverManifestBuilder, DriverPackageType, BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH,
-};
+use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
+use assembly_named_file_map::NamedFileMap;
 use assembly_package_set::PackageEntry;
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
 use assembly_platform_configuration::{
-    ComponentConfigs, DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
+    BootfsComponentConfigs, DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
 };
 use assembly_shell_commands::ShellCommandsBuilder;
-use assembly_structured_config::Repackager;
+use assembly_structured_config::{BootfsRepackager, Repackager};
 use assembly_tool::ToolProvider;
 use assembly_util as util;
-use assembly_util::{InsertAllUniqueExt, InsertUniqueExt, NamedMap};
+use assembly_util::{
+    BootfsDestination, FileEntry, InsertAllUniqueExt, InsertUniqueExt, NamedMap, PackageDestination,
+};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use itertools::Itertools;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
-
-const DEDUP_CONFIG_DATA: bool = false;
 
 #[derive(Debug, Serialize)]
 pub struct ImageAssemblyConfigBuilder {
@@ -51,10 +48,10 @@ pub struct ImageAssemblyConfigBuilder {
     cache: assembly_package_set::PackageSet,
 
     /// The base driver packages from the AssemblyInputBundles
-    base_drivers: NamedMap<DriverDetails>,
+    base_drivers: NamedMap<String, DriverDetails>,
 
     /// The boot driver packages from the AssemblyInputBundles
-    boot_drivers: NamedMap<DriverDetails>,
+    boot_drivers: NamedMap<String, DriverDetails>,
 
     /// The system packages from the AssemblyInputBundles
     system: assembly_package_set::PackageSet,
@@ -66,10 +63,10 @@ pub struct ImageAssemblyConfigBuilder {
     boot_args: BTreeSet<String>,
 
     /// The bootfs_files from the AssemblyInputBundles
-    bootfs_files: NamedFileMap,
+    bootfs_files: NamedFileMap<BootfsDestination>,
 
     /// Modifications that must be made to structured config within bootfs.
-    bootfs_structured_config: ComponentConfigs,
+    bootfs_structured_config: BootfsComponentConfigs,
 
     /// Modifications that must be made to configuration for packages.
     package_configs: PackageConfigs,
@@ -109,7 +106,7 @@ impl ImageAssemblyConfigBuilder {
             boot_args: BTreeSet::default(),
             shell_commands: ShellCommands::default(),
             bootfs_files: NamedFileMap::new("bootfs files"),
-            bootfs_structured_config: ComponentConfigs::new("component configs"),
+            bootfs_structured_config: BootfsComponentConfigs::new("bootfs component configs"),
             package_configs: PackageConfigs::new("package configs"),
             domain_configs: DomainConfigs::new("domain configs"),
             kernel_path: None,
@@ -175,7 +172,7 @@ impl ImageAssemblyConfigBuilder {
         // Base drivers are added to the base packages
         for driver_details in base_drivers {
             let driver_package_path = &bundle_path.join(&driver_details.package);
-            self.add_unique_package_from_path(driver_package_path, &PackageSet::Base)?;
+            self.add_aib_package_from_path(driver_package_path, &PackageSet::Base)?;
 
             let package_url = DriverManifestBuilder::get_package_url(
                 DriverPackageType::Base,
@@ -187,7 +184,7 @@ impl ImageAssemblyConfigBuilder {
         // Boot drivers are added to the bootfs package set
         for driver_details in boot_drivers {
             let driver_package_path = &bundle_path.join(&driver_details.package);
-            self.add_unique_package_from_path(driver_package_path, &PackageSet::Bootfs)?;
+            self.add_aib_package_from_path(driver_package_path, &PackageSet::Bootfs)?;
 
             let package_url = DriverManifestBuilder::get_package_url(
                 DriverPackageType::Boot,
@@ -265,7 +262,7 @@ impl ImageAssemblyConfigBuilder {
             // Always add the drivers if bootfs, and only add non-bootfs drivers
             // if this is not a bootstrap_only build.
             if set == PackageSet::Bootfs || !bootstrap_only {
-                self.add_unique_package_from_path(&package, &set)?;
+                self.add_product_package_from_path(&package, &set)?;
 
                 let package_url =
                     DriverManifestBuilder::get_package_url(driver_package_type, &package)?;
@@ -286,7 +283,7 @@ impl ImageAssemblyConfigBuilder {
             // Always add the package if bootfs, and only add non-bootfs packages
             // if this is not a bootstrap_only build.
             if set == PackageSet::Bootfs || !bootstrap_only {
-                self.add_unique_package_from_path(package, &set)?;
+                self.add_product_package_from_path(package, &set)?;
             }
         }
 
@@ -323,9 +320,9 @@ impl ImageAssemblyConfigBuilder {
     }
 
     /// Add all the bootfs file entries to the builder.
-    pub fn add_bootfs_files(&mut self, files: &NamedMap<FileEntry>) -> Result<()> {
-        for (_, entry) in files {
-            self.bootfs_files.add_entry_as_blob(entry.to_owned())?;
+    pub fn add_bootfs_files(&mut self, files: &NamedFileMap<BootfsDestination>) -> Result<()> {
+        for entry in files.clone().into_file_entries() {
+            self.bootfs_files.add_entry(entry.to_owned())?;
         }
         Ok(())
     }
@@ -346,27 +343,39 @@ impl ImageAssemblyConfigBuilder {
                 blob.path = path.to_string();
             }
             self.bootfs_files
-                .add_blob(blob)
+                .add_blob_from_aib(blob)
                 .with_context(|| format!("adding bootfs file from {path}"))?;
         }
         Ok(())
     }
 
-    fn add_unique_package_from_path(
+    fn add_aib_package_from_path(
         &mut self,
         path: impl AsRef<Utf8Path>,
         to_package_set: &PackageSet,
     ) -> Result<()> {
         // Create PackageEntry
         let package_entry = PackageEntry::parse_from(path.as_ref().to_owned())?;
+        let d = PackageDestination::FromAIB(package_entry.name().to_string());
+        self.add_unique_package_entry(d, package_entry, to_package_set)
+    }
 
-        self.add_unique_package_entry(package_entry, to_package_set)
+    fn add_product_package_from_path(
+        &mut self,
+        path: impl AsRef<Utf8Path>,
+        to_package_set: &PackageSet,
+    ) -> Result<()> {
+        // Create PackageEntry
+        let package_entry = PackageEntry::parse_from(path.as_ref().to_owned())?;
+        let d = PackageDestination::FromProduct(package_entry.name().to_string());
+        self.add_unique_package_entry(d, package_entry, to_package_set)
     }
 
     /// Adds a package via PackageEntry to the package set, only if it is unique across all other
     /// packages in the builder
     fn add_unique_package_entry(
         &mut self,
+        d: PackageDestination,
         package_entry: PackageEntry,
         to_package_set: &PackageSet,
     ) -> Result<()> {
@@ -387,7 +396,7 @@ impl ImageAssemblyConfigBuilder {
         self.package_urls.try_insert_unique(package_url).map_err(|e| {
             anyhow::anyhow!("duplicate package {} found in {}", e, package_set.name)
         })?;
-        package_set.add_package(package_entry)?;
+        package_set.add_package(d, package_entry)?;
 
         Ok(())
     }
@@ -410,7 +419,7 @@ impl ImageAssemblyConfigBuilder {
                 (&PackageSet::System, _) => PackageSet::System,
                 (&PackageSet::Bootfs, _) => PackageSet::Bootfs,
             };
-            self.add_unique_package_from_path(manifest_path, &set)?;
+            self.add_aib_package_from_path(manifest_path, &set)?;
         }
 
         Ok(())
@@ -418,8 +427,8 @@ impl ImageAssemblyConfigBuilder {
 
     fn file_entry_paths_from_bundle(
         base: &Utf8Path,
-        entries: impl IntoIterator<Item = FileEntry>,
-    ) -> Vec<FileEntry> {
+        entries: impl IntoIterator<Item = FileEntry<String>>,
+    ) -> Vec<FileEntry<String>> {
         entries
             .into_iter()
             .map(|entry| FileEntry {
@@ -454,7 +463,8 @@ impl ImageAssemblyConfigBuilder {
                 Self::parse_product_package_entry(entry)?;
             let package_manifest_name = pkg_manifest.name().to_string();
             let package_entry = PackageEntry { path: manifest_path.into(), manifest: pkg_manifest };
-            self.add_unique_package_entry(package_entry, &to_package_set)?;
+            let d = PackageDestination::FromProduct(package_entry.name().to_string());
+            self.add_unique_package_entry(d, package_entry, &to_package_set)?;
             // Add the config data entries to the map
             for config in config_data {
                 self.add_config_data_entry(&package_manifest_name, config)?;
@@ -477,8 +487,10 @@ impl ImageAssemblyConfigBuilder {
                 PackageManifest::try_load_from(&driver_details.package).with_context(|| {
                     format!("parsing {} as a package manifest", driver_details.package)
                 })?;
+            let entry = PackageEntry { path: driver_details.package.clone(), manifest };
+            let d = PackageDestination::FromProduct(entry.name().to_string());
             self.base
-                .add_package(PackageEntry { path: driver_details.package.clone(), manifest })
+                .add_package(d, entry)
                 .context(format!("Adding driver {}", &driver_details.package))?;
             let package_url = DriverManifestBuilder::get_package_url(
                 DriverPackageType::Base,
@@ -493,7 +505,7 @@ impl ImageAssemblyConfigBuilder {
     /// package manifest, and any configuration associated with the package.
     fn parse_product_package_entry(
         entry: ProductPackageDetails,
-    ) -> Result<(PackageManifestPathBuf, PackageManifest, Vec<FileEntry>)> {
+    ) -> Result<(PackageManifestPathBuf, PackageManifest, Vec<FileEntry<String>>)> {
         // Load the PackageManifest from the given path
         let manifest = PackageManifest::try_load_from(&entry.manifest)
             .with_context(|| format!("parsing {} as a package manifest", &entry.manifest))?;
@@ -517,18 +529,17 @@ impl ImageAssemblyConfigBuilder {
 
     /// Add an entry to `config_data` for the given package.  If the entry
     /// duplicates an existing entry, return an error.
-    fn add_config_data_entry(&mut self, package: impl AsRef<str>, entry: FileEntry) -> Result<()> {
+    fn add_config_data_entry(
+        &mut self,
+        package: impl AsRef<str>,
+        entry: FileEntry<String>,
+    ) -> Result<()> {
         let config_data = &mut self
             .package_configs
             .entry(package.as_ref().into())
             .or_insert_with(|| PackageConfiguration::new(package.as_ref()))
             .config_data;
-        let result = if DEDUP_CONFIG_DATA {
-            config_data.add_entry_as_blob(entry)
-        } else {
-            config_data.add_entry(entry)
-        };
-        result.map_err(|dup| {
+        config_data.add_entry(entry).map_err(|dup| {
             anyhow!(
                 "duplicate config data file found for package: {}\n  error: {}",
                 package.as_ref(),
@@ -555,7 +566,7 @@ impl ImageAssemblyConfigBuilder {
             })
     }
 
-    pub fn set_bootfs_structured_config(&mut self, config: ComponentConfigs) {
+    pub fn set_bootfs_structured_config(&mut self, config: BootfsComponentConfigs) {
         self.bootfs_structured_config = config;
     }
 
@@ -576,10 +587,10 @@ impl ImageAssemblyConfigBuilder {
     /// Add a domain config package.
     pub fn add_domain_config(
         &mut self,
-        package: impl AsRef<str>,
+        package: PackageDestination,
         config: DomainConfig,
     ) -> Result<()> {
-        if self.domain_configs.insert(package.as_ref().to_owned(), config).is_none() {
+        if self.domain_configs.insert(package.into(), config).is_none() {
             Ok(())
         } else {
             Err(anyhow::format_err!("duplicate domain config"))
@@ -602,9 +613,9 @@ impl ImageAssemblyConfigBuilder {
         compiled_package_def: &CompiledPackageDefinition,
         bundle_path: &Utf8Path,
     ) -> Result<()> {
-        let name = compiled_package_def.name();
+        let name = compiled_package_def.name().to_string();
         self.packages_to_compile
-            .entry(name.to_string())
+            .entry(name.clone())
             .or_insert_with(|| CompiledPackageBuilder::new(name))
             .add_package_def(compiled_package_def, bundle_path)
             .context("adding package def")?;
@@ -666,18 +677,19 @@ impl ImageAssemblyConfigBuilder {
                 .with_context(|| format!("building compiled package {}", &package_name))?;
 
             if let Some(p) = package_manifest_path {
-                base.add_package_from_path(p)
+                let d = PackageDestination::FromProduct(package_name.clone());
+                base.add_package_from_path(d, p)
                     .with_context(|| format!("adding compiled package {}", &package_name))?;
             };
         }
 
         // Add structured config value files to bootfs
-        let mut bootfs_repackager = Repackager::for_bootfs(&mut bootfs_files, outdir);
+        let mut bootfs_repackager = BootfsRepackager::new(&mut bootfs_files, outdir);
         for (component, values) in bootfs_structured_config {
             // check if we should try to configure the component before attempting so we can still
             // return errors for other conditions like a missing config field or a wrong type
-            if bootfs_repackager.has_component(&component) {
-                bootfs_repackager.set_component_config(&component, values.fields.into())?;
+            if bootfs_repackager.has_component(component.clone()) {
+                bootfs_repackager.set_component_config(component, values.fields.into())?;
             } else {
                 // TODO(https://fxbug.dev/101556) return an error here
             }
@@ -691,10 +703,10 @@ impl ImageAssemblyConfigBuilder {
                     .add_driver(driver_details, &package_url)
                     .with_context(|| format!("adding driver {}", &package_url))?;
             }
-            let manifest_path = outdir.join(BOOT_DRIVER_MANIFEST_PATH);
+            let manifest_path = outdir.join(BootfsDestination::BootDriverManifest.to_string());
             driver_manifest_builder.create_manifest_file(&manifest_path)?;
             bootfs_files.add_entry(FileEntry {
-                destination: BOOT_DRIVER_MANIFEST_PATH.to_string(),
+                destination: BootfsDestination::BootDriverManifest,
                 source: manifest_path,
             })?;
         }
@@ -703,9 +715,12 @@ impl ImageAssemblyConfigBuilder {
         for (package, config) in &package_configs {
             // Only process configs that have component entries for structured config.
             if !config.components.is_empty() {
+                // All repackaged packages come from AIBs.
+                let d = PackageDestination::FromAIB(package.to_string());
+
                 // Get the manifest for this package name, returning the set from which it was removed
                 if let Some((manifest, source_package_set)) = remove_package_from_sets(
-                    package,
+                    &d,
                     [&mut base, &mut cache, &mut system, &mut bootfs_packages],
                 )
                 .with_context(|| format!("removing {package} for repackaging"))?
@@ -725,7 +740,7 @@ impl ImageAssemblyConfigBuilder {
                         .with_context(|| format!("building repackaged {package}"))?;
                     let new_entry = PackageEntry::parse_from(new_path)
                         .with_context(|| format!("parsing repackaged {package}"))?;
-                    source_package_set.insert(new_entry.name().to_owned(), new_entry);
+                    source_package_set.insert(d, new_entry);
                 } else {
                     // TODO(https://fxbug.dev/101556) return an error here
                 }
@@ -734,14 +749,14 @@ impl ImageAssemblyConfigBuilder {
 
         // Construct the domain config packages
         for (package_name, config) in domain_configs {
-            let outdir = outdir.join(&package_name);
+            let outdir = outdir.join(package_name.to_string());
             std::fs::create_dir_all(&outdir)
                 .with_context(|| format!("creating directory {outdir}"))?;
             let package = DomainConfigPackage::new(config);
             let (path, manifest) = package
                 .build(outdir)
                 .with_context(|| format!("building domain config package {package_name}"))?;
-            base.add_package_ignore_duplicates(PackageEntry { path, manifest })
+            base.add_package(package_name.clone(), PackageEntry { path, manifest })
                 .with_context(|| format!("Adding domain config package: {}", package_name))?;
         }
 
@@ -758,7 +773,7 @@ impl ImageAssemblyConfigBuilder {
                         format!("building config capabilties package {package_name}")
                     })?;
             bootfs_packages
-                .add_package(PackageEntry { path, manifest })
+                .add_package(PackageDestination::Config, PackageEntry { path, manifest })
                 .with_context(|| format!("Adding config capabilities package: {}", package_name))?;
         }
 
@@ -772,10 +787,10 @@ impl ImageAssemblyConfigBuilder {
                     .with_context(|| format!("adding driver {}", &package_url))?;
             }
             // TODO(https://fxbug.dev/128391): encapsulate manifests in a DomainConfig package.
-            let manifest_path = outdir.join(BASE_DRIVER_MANIFEST_PATH);
+            let manifest_path = outdir.join(BootfsDestination::BaseDriverManifest.to_string());
             driver_manifest_builder.create_manifest_file(&manifest_path)?;
             bootfs_files.add_entry(FileEntry {
-                destination: BASE_DRIVER_MANIFEST_PATH.to_string(),
+                destination: BootfsDestination::BaseDriverManifest,
                 source: manifest_path,
             })?;
         }
@@ -795,7 +810,7 @@ impl ImageAssemblyConfigBuilder {
             let manifest_path = config_data_builder
                 .build(outdir)
                 .context("writing the 'config_data' package metafar.")?;
-            base.add_package_from_path(manifest_path)
+            base.add_package_from_path(PackageDestination::ConfigData, manifest_path)
                 .context("adding generated config-data package")?;
         }
 
@@ -804,9 +819,15 @@ impl ImageAssemblyConfigBuilder {
             shell_commands_builder.add_shell_commands(shell_commands, "fuchsia.com".to_string());
             let manifest =
                 shell_commands_builder.build(outdir).context("building shell commands package")?;
-            base.add_package_from_path(manifest)
+            base.add_package_from_path(PackageDestination::ShellCommands, manifest)
                 .context("adding shell commands package to base")?;
         }
+
+        let bootfs_files = bootfs_files
+            .into_file_entries()
+            .iter()
+            .map(|e| FileEntry { source: e.source.clone(), destination: e.destination.to_string() })
+            .collect();
 
         // Construct a single "partial" config from the combined fields, and
         // then pass this to the ImageAssemblyConfig::try_from_partials() to get the
@@ -823,7 +844,7 @@ impl ImageAssemblyConfigBuilder {
             },
             qemu_kernel: qemu_kernel.context("A qemu kernel configuration must be specified")?,
             boot_args: boot_args.into_iter().collect(),
-            bootfs_files: bootfs_files.into_file_entries(),
+            bootfs_files,
             bootfs_packages: bootfs_packages.into_paths().sorted().collect(),
             images_config: Default::default(),
             board_driver_arguments,
@@ -835,7 +856,7 @@ impl ImageAssemblyConfigBuilder {
 /// Remove a package with a matching name from the provided package sets, returning its parsed
 /// manifest and a mutable reference to the set from which it was removed.
 fn remove_package_from_sets<'a, 'b: 'a, const N: usize>(
-    package_name: &str,
+    package_name: &PackageDestination,
     package_sets: [&'a mut assembly_package_set::PackageSet; N],
 ) -> anyhow::Result<Option<(PackageManifest, &'a mut assembly_package_set::PackageSet)>> {
     let mut matches_name = None;
@@ -864,9 +885,11 @@ mod tests {
     use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_named_file_map::SourceMerklePair;
     use assembly_package_utils::PackageManifestPathBuf;
+    use assembly_platform_configuration::ComponentConfigs;
     use assembly_test_util::generate_test_manifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolCommandLog;
+    use assembly_util::CompiledPackageDestination;
     use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_archive;
     use fuchsia_pkg::{
@@ -1083,7 +1106,11 @@ mod tests {
                 .map(|f| f.destination.to_owned())
                 .sorted()
                 .collect::<Vec<_>>(),
-            vec![BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH, "dest/file/path"]
+            vec![
+                "config/driver_index/base_driver_manifest",
+                "config/driver_index/boot_driver_manifest",
+                "dest/file/path",
+            ],
         );
 
         assert_eq!(result.kernel.path, vars.outdir.join("kernel/path"));
@@ -1126,7 +1153,11 @@ mod tests {
                 .map(|f| f.destination.to_owned())
                 .sorted()
                 .collect::<Vec<_>>(),
-            vec![BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH, "dest/file/path"]
+            vec![
+                BootfsDestination::BaseDriverManifest.to_string(),
+                BootfsDestination::BootDriverManifest.to_string(),
+                "dest/file/path".into(),
+            ],
         );
 
         assert_eq!(result.kernel.path, vars.outdir.join("kernel/path"));
@@ -1169,7 +1200,11 @@ mod tests {
                 .map(|f| f.destination.to_owned())
                 .sorted()
                 .collect::<Vec<_>>(),
-            vec![BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH, "dest/file/path"]
+            vec![
+                BootfsDestination::BaseDriverManifest.to_string(),
+                BootfsDestination::BootDriverManifest.to_string(),
+                "dest/file/path".into(),
+            ],
         );
 
         assert_eq!(result.kernel.path, vars.outdir.join("kernel/path"));
@@ -1214,11 +1249,15 @@ mod tests {
 
         assert_eq!(
             result.bootfs_files.iter().map(|f| f.destination.clone()).sorted().collect::<Vec<_>>(),
-            vec![BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH, "dest/file/path"],
+            vec![
+                BootfsDestination::BaseDriverManifest.to_string(),
+                BootfsDestination::BootDriverManifest.to_string(),
+                "dest/file/path".into(),
+            ],
         );
 
         let base_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
-            File::open(vars.outdir.join(BASE_DRIVER_MANIFEST_PATH))?,
+            File::open(vars.outdir.join(BootfsDestination::BaseDriverManifest.to_string()))?,
         ))?;
 
         assert_eq!(
@@ -1236,7 +1275,7 @@ mod tests {
         );
 
         let boot_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
-            File::open(vars.outdir.join(BOOT_DRIVER_MANIFEST_PATH))?,
+            File::open(vars.outdir.join(BootfsDestination::BootDriverManifest.to_string()))?,
         ))?;
         assert_eq!(
             boot_driver_manifest,
@@ -1266,14 +1305,17 @@ mod tests {
 
         assert_eq!(
             result.bootfs_files.iter().map(|f| f.destination.clone()).sorted().collect::<Vec<_>>(),
-            vec![BASE_DRIVER_MANIFEST_PATH, BOOT_DRIVER_MANIFEST_PATH],
+            vec![
+                BootfsDestination::BaseDriverManifest.to_string(),
+                BootfsDestination::BootDriverManifest.to_string()
+            ],
         );
 
         let base_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
-            File::open(vars.outdir.join(BASE_DRIVER_MANIFEST_PATH))?,
+            File::open(vars.outdir.join(BootfsDestination::BaseDriverManifest.to_string()))?,
         ))?;
         let boot_driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
-            File::open(vars.outdir.join(BOOT_DRIVER_MANIFEST_PATH))?,
+            File::open(vars.outdir.join(BootfsDestination::BootDriverManifest.to_string()))?,
         ))?;
 
         assert!(base_driver_manifest.is_empty());
@@ -1516,7 +1558,7 @@ mod tests {
         );
 
         let driver_manifest: Vec<DriverManifest> = serde_json::from_reader(BufReader::new(
-            File::open(outdir.join(BASE_DRIVER_MANIFEST_PATH))?,
+            File::open(outdir.join(BootfsDestination::BaseDriverManifest.to_string()))?,
         ))?;
         assert_eq!(
             driver_manifest,
@@ -1541,8 +1583,8 @@ mod tests {
         let tools = FakeToolProvider::default();
         // Write the expected output component files since the component
         // compiler is mocked.
-        let component1_dir = vars.outdir.join("foo/component1");
-        let component2_dir = vars.outdir.join("foo/component2");
+        let component1_dir = vars.outdir.join("for-test/component1");
+        let component2_dir = vars.outdir.join("for-test/component2");
         std::fs::create_dir_all(&component1_dir).unwrap();
         std::fs::create_dir_all(&component2_dir).unwrap();
         std::fs::write(component1_dir.join("component1.cm"), "component fake contents").unwrap();
@@ -1552,7 +1594,7 @@ mod tests {
         let mut bundle1 = make_test_assembly_bundle(&vars.outdir, &vars.bundle_path);
         bundle1.packages_to_compile.push(CompiledPackageDefinition::MainDefinition(
             MainPackageDefinition {
-                name: "foo".into(),
+                name: CompiledPackageDestination::ForTest,
                 components: BTreeMap::from([
                     ("component1".into(), "cml1".into()),
                     ("component2".into(), "cml2".into()),
@@ -1565,7 +1607,7 @@ mod tests {
         let bundle2 = AssemblyInputBundle {
             packages_to_compile: vec![CompiledPackageDefinition::Additional(
                 AdditionalPackageContents {
-                    name: "foo".into(),
+                    name: CompiledPackageDestination::ForTest,
                     component_shards: BTreeMap::from([(
                         "component2".into(),
                         vec!["shard1".into()],
@@ -1588,7 +1630,7 @@ mod tests {
                     "args": [
                         "merge",
                          "--output",
-                          vars.outdir.join("foo/component1/component1.cml").as_str(),
+                          vars.outdir.join("for-test/component1/component1.cml").as_str(),
                           vars.outdir.join("bundle/cml1").as_str()
                     ]
                 },
@@ -1603,8 +1645,8 @@ mod tests {
                         "--config-package-path",
                         "meta/component1.cvf",
                         "-o",
-                        vars.outdir.join("foo/component1/component1.cm").as_str(),
-                        vars.outdir.join("foo/component1/component1.cml").as_str()
+                        vars.outdir.join("for-test/component1/component1.cm").as_str(),
+                        vars.outdir.join("for-test/component1/component1.cml").as_str()
                     ]
                 },
                 {
@@ -1612,7 +1654,7 @@ mod tests {
                     "args": [
                         "merge",
                         "--output",
-                        vars.outdir.join("foo/component2/component2.cml").as_str(),
+                        vars.outdir.join("for-test/component2/component2.cml").as_str(),
                         vars.outdir.join("bundle/cml2").as_str(),
                         vars.outdir.join("bundle/shard1")
                     ]
@@ -1628,8 +1670,8 @@ mod tests {
                         "--config-package-path",
                         "meta/component2.cvf",
                         "-o",
-                        vars.outdir.join("foo/component2/component2.cm").as_str(),
-                        vars.outdir.join("foo/component2/component2.cml").as_str()
+                        vars.outdir.join("for-test/component2/component2.cm").as_str(),
+                        vars.outdir.join("for-test/component2/component2.cml").as_str()
                     ]
                 }
             ]

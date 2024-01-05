@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use assembly_util::NamedMap;
+use assembly_util::{NamedMap, PackageDestination};
 use camino::Utf8PathBuf;
 use fuchsia_merkle::Hash;
 use fuchsia_pkg::PackageManifest;
@@ -45,7 +45,7 @@ impl PartialEq for PackageEntry {
 #[derive(Debug, Serialize)]
 pub struct PackageSet {
     /// Map of packages keyed by the package name.
-    map: NamedMap<PackageEntry>,
+    map: NamedMap<PackageDestination, PackageEntry>,
 }
 
 impl PackageSet {
@@ -56,21 +56,19 @@ impl PackageSet {
 
     /// Add the package described by the ProductPackageSetEntry to the
     /// PackageSet
-    pub fn add_package(&mut self, entry: PackageEntry) -> Result<()> {
-        self.map.try_insert_unique(entry.name().to_owned(), entry)
-    }
-
-    /// Add the package described by the ProductPackageSetEntry to the
-    /// PackageSet, and ignore exact duplicates.
-    pub fn add_package_ignore_duplicates(&mut self, entry: PackageEntry) -> Result<()> {
-        self.map.try_insert_unique_ignore_duplicates(entry.name().to_owned(), entry)
+    pub fn add_package(&mut self, d: PackageDestination, entry: PackageEntry) -> Result<()> {
+        self.map.try_insert_unique(d, entry)
     }
 
     /// Parse the given path as a PackageManifest, and add it to the PackageSet.
-    pub fn add_package_from_path<P: Into<Utf8PathBuf>>(&mut self, path: P) -> Result<()> {
+    pub fn add_package_from_path<P: Into<Utf8PathBuf>>(
+        &mut self,
+        d: PackageDestination,
+        path: P,
+    ) -> Result<()> {
         {
             let entry = PackageEntry::parse_from(path)?;
-            self.add_package(entry)
+            self.add_package(d, entry)
         }
         .with_context(|| format!("Adding package to set: {}", self.map.name))
     }
@@ -87,7 +85,7 @@ impl PackageSet {
 }
 
 impl std::ops::Deref for PackageSet {
-    type Target = NamedMap<PackageEntry>;
+    type Target = NamedMap<PackageDestination, PackageEntry>;
 
     fn deref(&self) -> &Self::Target {
         &self.map

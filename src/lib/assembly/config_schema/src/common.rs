@@ -83,23 +83,6 @@ pub struct PackageDetails {
     pub set: PackageSet,
 }
 
-/// A mapping between a file source and destination.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(deny_unknown_fields)]
-pub struct FileEntry {
-    /// The path of the source file.
-    pub source: Utf8PathBuf,
-
-    /// The destination path to put the file.
-    pub destination: String,
-}
-
-impl std::fmt::Display for FileEntry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(src={}, dest={})", self.source, self.destination)
-    }
-}
-
 /// A typename to clarify intent around what Strings are package names.
 pub(crate) type PackageName = String;
 

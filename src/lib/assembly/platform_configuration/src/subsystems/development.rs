@@ -5,6 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
+use assembly_util::FileEntry;
 
 pub(crate) struct DevelopmentConfig;
 impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfig {
@@ -37,7 +38,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             (_, Some(authorized_ssh_keys_path)) => {
                 builder
                     .package("sshd-host")
-                    .config_data(assembly_config_schema::FileEntry {
+                    .config_data(FileEntry {
                         source: authorized_ssh_keys_path.clone(),
                         destination: "authorized_keys".into(),
                     })
@@ -53,7 +54,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             (_, Some(authorized_ssh_ca_certs_path)) => {
                 builder
                     .package("sshd-host")
-                    .config_data(assembly_config_schema::FileEntry {
+                    .config_data(FileEntry {
                         source: authorized_ssh_ca_certs_path.clone(),
                         destination: "ssh_ca_pub_keys".into(),
                     })

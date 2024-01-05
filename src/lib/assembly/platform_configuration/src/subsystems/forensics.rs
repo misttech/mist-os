@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use crate::util;
 use assembly_config_schema::platform_config::forensics_config::ForensicsConfig;
-use assembly_config_schema::FileEntry;
+use assembly_util::FileEntry;
 
 pub(crate) struct ForensicsSubsystem;
 impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {

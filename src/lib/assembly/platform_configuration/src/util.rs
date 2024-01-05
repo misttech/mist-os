@@ -4,7 +4,8 @@
 
 use crate::common::{ConfigurationBuilder, ConfigurationContext};
 use anyhow::Context;
-use assembly_config_schema::{BuildType, FileEntry};
+use assembly_config_schema::BuildType;
+use assembly_util::FileEntry;
 use fuchsia_url::AbsoluteComponentUrl;
 use fuchsia_url::AbsolutePackageUrl::{Pinned, Unpinned};
 use handlebars::Handlebars;

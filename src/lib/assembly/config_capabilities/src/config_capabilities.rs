@@ -16,7 +16,7 @@ use std::num::NonZeroU32;
 pub use cm_rust::ConfigValueType;
 /// A collection of configuration capabilities.
 /// The name is the capability name, and the Config struct contains the configuration type and value.
-pub type CapabilityNamedMap = NamedMap<Config>;
+pub type CapabilityNamedMap = NamedMap<String, Config>;
 
 /// This represents a single configuration capabilility. It can easily be
 /// converted into CML.

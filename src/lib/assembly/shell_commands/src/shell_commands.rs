@@ -5,13 +5,13 @@
 use anyhow::{Context, Result};
 use assembly_config_schema::assembly_config::ShellCommands;
 use assembly_package_utils::PackageInternalPathBuf;
+use assembly_util::PackageDestination;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use std::collections::BTreeSet;
 
 type RefToPackage<'a> = (&'a String, &'a BTreeSet<PackageInternalPathBuf>);
 
-const SHELL_COMMANDS_PACKAGE_NAME: &str = "shell-commands";
 const SHELL_COMMANDS_MANIFEST_FILE_NAME: &str = "package_manifest.json";
 
 type ShellCommandsManifestPath = Utf8PathBuf;
@@ -38,8 +38,9 @@ impl ShellCommandsBuilder {
     /// Builds the package, after the add_shell_commands function has been called to configure
     /// the builder instance
     pub fn build(self, out_dir: impl AsRef<Utf8Path>) -> Result<ShellCommandsManifestPath> {
-        let mut package_builder = PackageBuilder::new(SHELL_COMMANDS_PACKAGE_NAME);
-        let packages_dir = out_dir.as_ref().join(SHELL_COMMANDS_PACKAGE_NAME);
+        let mut package_builder =
+            PackageBuilder::new(PackageDestination::ShellCommands.to_string());
+        let packages_dir = out_dir.as_ref().join(PackageDestination::ShellCommands.to_string());
         let manifest_path = packages_dir.join(SHELL_COMMANDS_MANIFEST_FILE_NAME);
         package_builder.repository(&self.repository);
         package_builder.manifest_path(&manifest_path);
@@ -118,7 +119,7 @@ mod tests {
 
     fn test_folder_structure(outdir: &Utf8PathBuf) -> Result<()> {
         let mut count = 0;
-        for entry in fs::read_dir(&outdir.join(SHELL_COMMANDS_PACKAGE_NAME))? {
+        for entry in fs::read_dir(&outdir.join(PackageDestination::ShellCommands.to_string()))? {
             count += 1;
             let file = entry.unwrap();
             let file_type = file.file_type().unwrap();
@@ -147,16 +148,16 @@ mod tests {
 
     fn test_mismatch_case(outdir: &Utf8PathBuf) -> Result<()> {
         let contents = fs::read_to_string(
-            outdir.join(SHELL_COMMANDS_PACKAGE_NAME).join("pkgctl").join("bin"),
+            outdir.join(PackageDestination::ShellCommands.to_string()).join("pkgctl").join("bin"),
         )?;
         assert!(contents.contains("bin/multi"));
         Ok(())
     }
 
     fn test_bash_files(outdir: &Utf8PathBuf, package: &String) -> Result<()> {
-        for entry in
-            fs::read_dir(outdir.join(SHELL_COMMANDS_PACKAGE_NAME).join(package).join("bin"))?
-        {
+        for entry in fs::read_dir(
+            outdir.join(PackageDestination::ShellCommands.to_string()).join(package).join("bin"),
+        )? {
             let file_path = &entry.unwrap().path();
             let file_name = file_path.file_name();
             let contents = fs::read_to_string(&file_path)?;

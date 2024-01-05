@@ -7,7 +7,7 @@ use anyhow::Context;
 use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
 use assembly_config_schema::platform_config::starnix_config::PlatformStarnixConfig;
 use assembly_config_schema::product_config::ComponentPolicyConfig;
-use assembly_config_schema::FileEntry;
+use assembly_util::{BootfsDestination, FileEntry};
 use component_manager_config::{compile, Args};
 use std::path::PathBuf;
 
@@ -66,7 +66,10 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
         // Add the policy to the system.
         builder
             .bootfs()
-            .file(FileEntry { source: config, destination: "config/component_manager".into() })
+            .file(FileEntry {
+                source: config,
+                destination: BootfsDestination::ComponentManagerConfig,
+            })
             .context("Adding component_manager config")?;
         Ok(())
     }

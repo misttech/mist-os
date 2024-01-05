@@ -7,17 +7,23 @@ use anyhow::{anyhow, Result};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-/// A named set of things, which are mapped by a String key.
+/// A key for a NamedMap
+pub trait Key: Ord + std::fmt::Display + std::fmt::Debug {}
+
+impl Key for &str {}
+impl Key for String {}
+
+/// A named set of things, which are mapped by a String K.
 #[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct NamedMap<T> {
+pub struct NamedMap<K: Key, T> {
     /// The name of the Map.
     pub name: String,
 
     /// The entries in the map.
-    pub entries: BTreeMap<String, T>,
+    pub entries: BTreeMap<K, T>,
 }
 
-impl<T> NamedMap<T>
+impl<K: Key, T> NamedMap<K, T>
 where
     T: std::fmt::Debug + std::cmp::PartialEq,
 {
@@ -34,7 +40,7 @@ where
     /// If the key is a duplicate, and the value is different, return Err((false, anyhow::Error))
     fn try_insert_check_for_duplicate(
         &mut self,
-        name: String,
+        name: K,
         value: T,
     ) -> Result<(), (bool, anyhow::Error)> {
         let result = self.entries.try_insert_unique(MapEntry(name, value)).map_err(|e| {
@@ -56,13 +62,13 @@ where
     }
 
     /// Insert `value` into the map ensuring that `name` is unique.
-    pub fn try_insert_unique(&mut self, name: String, value: T) -> Result<()> {
+    pub fn try_insert_unique(&mut self, name: K, value: T) -> Result<()> {
         // Ignore the returned 'duplicate' boolean. If there is an error, return it.
         self.try_insert_check_for_duplicate(name, value).map_err(|(_, e)| e)
     }
 
     /// Insert `value` into the map ensuring that if `name` is found that the values are identical.
-    pub fn try_insert_unique_ignore_duplicates(&mut self, name: String, value: T) -> Result<()> {
+    pub fn try_insert_unique_ignore_duplicates(&mut self, name: K, value: T) -> Result<()> {
         match self.try_insert_check_for_duplicate(name, value) {
             // If the key is unique or the value is a duplicate, return Ok(())
             Ok(_) | Err((true, _)) => Ok(()),
@@ -72,50 +78,50 @@ where
     }
 }
 
-impl<T> std::ops::Deref for NamedMap<T> {
-    type Target = BTreeMap<String, T>;
+impl<K: Key, T> std::ops::Deref for NamedMap<K, T> {
+    type Target = BTreeMap<K, T>;
 
     fn deref(&self) -> &Self::Target {
         &self.entries
     }
 }
 
-impl<T> std::ops::DerefMut for NamedMap<T> {
+impl<K: Key, T> std::ops::DerefMut for NamedMap<K, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.entries
     }
 }
 
-impl<T> IntoIterator for NamedMap<T> {
-    type Item = (String, T);
-    type IntoIter = std::collections::btree_map::IntoIter<String, T>;
+impl<K: Key, T> IntoIterator for NamedMap<K, T> {
+    type Item = (K, T);
+    type IntoIter = std::collections::btree_map::IntoIter<K, T>;
     fn into_iter(self) -> Self::IntoIter {
         self.entries.into_iter()
     }
 }
 
-impl<'a, T> IntoIterator for &'a NamedMap<T> {
-    type Item = (&'a String, &'a T);
-    type IntoIter = std::collections::btree_map::Iter<'a, String, T>;
+impl<'a, K: Key, T> IntoIterator for &'a NamedMap<K, T> {
+    type Item = (&'a K, &'a T);
+    type IntoIter = std::collections::btree_map::Iter<'a, K, T>;
     fn into_iter(self) -> Self::IntoIter {
         (&self.entries).into_iter()
     }
 }
 
-impl<T> FromIterator<(String, T)> for NamedMap<T> {
-    fn from_iter<I: IntoIterator<Item = (String, T)>>(iter: I) -> Self {
+impl<K: Key, T> FromIterator<(K, T)> for NamedMap<K, T> {
+    fn from_iter<I: IntoIterator<Item = (K, T)>>(iter: I) -> Self {
         Self { name: "from iterator".into(), entries: BTreeMap::from_iter(iter) }
     }
 }
 
-impl<T, const N: usize> From<[(String, T); N]> for NamedMap<T> {
-    fn from(arr: [(String, T); N]) -> Self {
+impl<K: Key, T, const N: usize> From<[(K, T); N]> for NamedMap<K, T> {
+    fn from(arr: [(K, T); N]) -> Self {
         Self { name: "from".into(), entries: BTreeMap::from(arr) }
     }
 }
 
-impl<T> From<NamedMap<T>> for BTreeMap<String, T> {
-    fn from(map: NamedMap<T>) -> Self {
+impl<K: Key, T> From<NamedMap<K, T>> for BTreeMap<K, T> {
+    fn from(map: NamedMap<K, T>) -> Self {
         map.entries
     }
 }
@@ -127,17 +133,17 @@ mod tests {
     #[test]
     fn test_try_insert_unique() {
         let mut map = NamedMap::new("test");
-        map.try_insert_unique("a".into(), "alpha").unwrap();
-        map.try_insert_unique("b".into(), "beta").unwrap();
-        assert!(map.try_insert_unique("a".into(), "alpha").is_err());
+        map.try_insert_unique("a".to_string(), "alpha").unwrap();
+        map.try_insert_unique("b".to_string(), "beta").unwrap();
+        assert!(map.try_insert_unique("a".to_string(), "alpha").is_err());
     }
 
     #[test]
     fn test_try_insert_unique_ignore_duplicates() {
         let mut map = NamedMap::new("test");
-        map.try_insert_unique("a".into(), "alpha").unwrap();
-        map.try_insert_unique("b".into(), "beta").unwrap();
+        map.try_insert_unique("a".to_string(), "alpha").unwrap();
+        map.try_insert_unique("b".to_string(), "beta").unwrap();
         map.try_insert_unique_ignore_duplicates("a".into(), "alpha").unwrap();
-        assert!(map.try_insert_unique_ignore_duplicates("a".into(), "beta").is_err());
+        assert!(map.try_insert_unique_ignore_duplicates("a".to_string(), "beta").is_err());
     }
 }

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Context as _;
-use assembly_config_schema::{FileEntry, ImageAssemblyConfig};
+use assembly_config_schema::ImageAssemblyConfig;
+use assembly_util::FileEntry;
 use assembly_validate_util::{BootfsContents, PkgNamespace};
 use camino::Utf8PathBuf;
 use fuchsia_pkg::PackageManifest;
@@ -62,9 +63,9 @@ pub fn validate_product(
 /// Validate the contents of bootfs.
 ///
 /// Assumes that all component manifests have a `.cm` extension within the destination namespace.
-fn validate_bootfs(bootfs_files: &[FileEntry]) -> Result<(), BootfsValidationError> {
+fn validate_bootfs(bootfs_files: &[FileEntry<String>]) -> Result<(), BootfsValidationError> {
     let mut bootfs = BootfsContents::from_iter(
-        bootfs_files.iter().map(|entry| (&entry.destination, &entry.source)),
+        bootfs_files.iter().map(|entry| (entry.destination.to_string(), &entry.source)),
     )
     .map_err(BootfsValidationError::ReadContents)?;
 

@@ -30,18 +30,18 @@ class CompiledPackageTest(unittest.TestCase):
         manifest = json.load(open(os.path.join(outdir, "image_assembly.json")))
 
         self.assertIn(
-            os.path.join(outdir, "foo", "package_manifest.json"),
+            os.path.join(outdir, "for-test", "package_manifest.json"),
             manifest["base"],
-            "The image assembly config should have 'foo' in the base set",
+            "The image assembly config should have 'for-test' in the base set",
         )
 
         # Make sure the components were compiled
         self.assertTrue(
-            os.path.exists(os.path.join(outdir, "foo/bar/bar.cm")),
+            os.path.exists(os.path.join(outdir, "for-test/bar/bar.cm")),
             "The bar component should have been compiled",
         )
         self.assertTrue(
-            os.path.exists(os.path.join(outdir, "foo/baz/baz.cm")),
+            os.path.exists(os.path.join(outdir, "for-test/baz/baz.cm")),
             "The baz component should have been compiled",
         )
 
@@ -50,9 +50,9 @@ class CompiledPackageTest(unittest.TestCase):
         manifest = json.load(open(os.path.join(outdir, "image_assembly.json")))
 
         self.assertNotIn(
-            os.path.join(outdir, "qux", "package_manifest.json"),
+            os.path.join(outdir, "for-test2", "package_manifest.json"),
             manifest["base"],
-            "The image assembly config should not have qux in the base package list since it should be in bootfs",
+            "The image assembly config should not have for-test2 in the base package list since it should be in bootfs",
         )
 
         self.assertIn(
@@ -63,7 +63,7 @@ class CompiledPackageTest(unittest.TestCase):
 
         # Make sure the components were compiled
         self.assertTrue(
-            os.path.exists(os.path.join(outdir, "qux/qux/qux.cm")),
+            os.path.exists(os.path.join(outdir, "for-test2/qux/qux.cm")),
             "The qux component should have been compiled",
         )
 

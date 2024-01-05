@@ -9,15 +9,12 @@ use assembly_config_schema::ImageAssemblyConfig;
 use assembly_images_config::{Zbi, ZbiCompression};
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_package_list::{PackageList, WritablePackageList};
-use assembly_package_set::PackageSet;
+use assembly_package_set::{PackageEntry, PackageSet};
 use assembly_tool::Tool;
+use assembly_util::{BootfsDestination, PackageDestination};
 use camino::{Utf8Path, Utf8PathBuf};
 use utf8_path::path_relative_from_current_dir;
 use zbi::ZbiBuilder;
-
-/// The path to the package index file for bootfs packages in gendir and
-/// in the bootfs.
-const BOOTFS_PACKAGE_INDEX: &str = "data/bootfs_packages";
 
 #[allow(clippy::too_many_arguments)]
 pub fn construct_zbi(
@@ -73,7 +70,12 @@ pub fn construct_zbi(
     // Add the packages to a set first, to ensure uniqueness, and ensure a deterministic order.
     let mut bootfs_package_set = PackageSet::new("bootfs packages");
     for bootfs_package in &product.bootfs_packages {
-        bootfs_package_set.add_package_from_path(bootfs_package)?;
+        // While these are not technically _all_ from the product, at this point, we do not care.
+        // Product Assembly has already succeeded, which is the piece that cares that all the
+        // destinations are provided and correct.
+        let entry = PackageEntry::parse_from(bootfs_package)?;
+        let d = PackageDestination::FromProduct(entry.name().to_string());
+        bootfs_package_set.add_package(d, entry)?;
     }
 
     for entry in bootfs_package_set.into_values() {
@@ -85,18 +87,26 @@ pub fn construct_zbi(
 
     // Write the bootfs package index to the gendir, unconditionally, to satisfy
     // ninja file-use.
-    bootfs_package_list.write_index_file(gendir.as_ref(), "bootfs", BOOTFS_PACKAGE_INDEX)?;
+    bootfs_package_list.write_index_file(
+        gendir.as_ref(),
+        "bootfs",
+        BootfsDestination::BootfsPackageIndex.to_string(),
+    )?;
 
     if !bootfs_package_list.is_empty() {
-        let bootfs_package_index_source = gendir.as_ref().join(BOOTFS_PACKAGE_INDEX);
+        let bootfs_package_index_source =
+            gendir.as_ref().join(BootfsDestination::BootfsPackageIndex.to_string());
 
         // Write the bootfs package index from the gendir to the bootfs.
-        zbi_builder.add_bootfs_file(&bootfs_package_index_source, BOOTFS_PACKAGE_INDEX);
+        zbi_builder.add_bootfs_file(
+            &bootfs_package_index_source,
+            BootfsDestination::BootfsPackageIndex.to_string(),
+        );
     }
 
     // Add the BootFS files.
     for bootfs_entry in &product.bootfs_files {
-        zbi_builder.add_bootfs_file(&bootfs_entry.source, &bootfs_entry.destination);
+        zbi_builder.add_bootfs_file(&bootfs_entry.source, &bootfs_entry.destination.to_string());
     }
 
     // Add the ramdisk image in the ZBI if necessary.
@@ -163,7 +173,7 @@ pub fn vendor_sign_zbi(
 
 #[cfg(test)]
 mod tests {
-    use super::{construct_zbi, vendor_sign_zbi, BOOTFS_PACKAGE_INDEX};
+    use super::{construct_zbi, vendor_sign_zbi};
 
     use crate::base_package::BasePackage;
     use assembly_config_schema::ImageAssemblyConfig;
@@ -171,6 +181,7 @@ mod tests {
     use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
+    use assembly_util::BootfsDestination;
     use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_hash::Hash;
     use regex::Regex;
@@ -242,7 +253,9 @@ mod tests {
         )
         .unwrap();
 
-        let bootfs_index_string = std::fs::read_to_string(dir.join(BOOTFS_PACKAGE_INDEX)).unwrap();
+        let bootfs_index_string =
+            std::fs::read_to_string(dir.join(BootfsDestination::BootfsPackageIndex.to_string()))
+                .unwrap();
         assert_eq!("", bootfs_index_string);
 
         // Create a fake archivist.
@@ -266,7 +279,9 @@ mod tests {
         )
         .unwrap();
 
-        let bootfs_index_string = std::fs::read_to_string(dir.join(BOOTFS_PACKAGE_INDEX)).unwrap();
+        let bootfs_index_string =
+            std::fs::read_to_string(dir.join(BootfsDestination::BootfsPackageIndex.to_string()))
+                .unwrap();
 
         assert_eq!(
             "archivist/1=0000000000000000000000000000000000000000000000000000000000000000\n",

@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use assembly_config_schema::FileEntry;
 use assembly_platform_configuration::{DomainConfig, FileOrContents};
+use assembly_util::FileEntry;
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl::persist;
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
@@ -28,7 +28,7 @@ impl DomainConfigPackage {
         std::fs::create_dir_all(&outdir)
             .with_context(|| format!("creating directory {}", &outdir))?;
 
-        let mut builder = PackageBuilder::new(&self.config.name);
+        let mut builder = PackageBuilder::new(&self.config.name.to_string());
         let manifest_path = outdir.join("package_manifest.json");
         let metafar_path = outdir.join("meta.far");
         builder.manifest_path(&manifest_path);
@@ -105,7 +105,7 @@ impl DomainConfigPackage {
 mod tests {
     use super::*;
     use assembly_platform_configuration::DomainConfigDirectory;
-    use assembly_util::NamedMap;
+    use assembly_util::{NamedMap, PackageDestination};
     use assert_matches::assert_matches;
     use cm_rust::{ComponentDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget};
     use fidl::unpersist;
@@ -127,7 +127,7 @@ mod tests {
         // Prepare the domain config input.
         let config_source = outdir.join("config_source.json");
         std::fs::write(&config_source, "bleep bloop").unwrap();
-        let mut entries = NamedMap::<FileOrContents>::new("config files");
+        let mut entries = NamedMap::<String, FileOrContents>::new("config files");
         entries
             .try_insert_unique(
                 "config.json".to_string(),
@@ -138,7 +138,7 @@ mod tests {
             )
             .unwrap();
         let config = DomainConfig {
-            name: "my-package".into(),
+            name: PackageDestination::ForTest,
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
             expose_directories: true,
         };
@@ -150,7 +150,7 @@ mod tests {
         assert_eq!(path, outdir.join("package_manifest.json"));
         let loaded_manifest = PackageManifest::try_load_from(path).unwrap();
         assert_eq!(manifest, loaded_manifest);
-        assert_eq!(manifest.name(), &PackageName::from_str("my-package").unwrap());
+        assert_eq!(manifest.name(), &PackageName::from_str("for-test").unwrap());
         let blobs = manifest.into_blobs();
         assert_eq!(blobs.len(), 2);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
@@ -168,8 +168,8 @@ mod tests {
         let far_path = outdir.join("meta.far");
         let mut far_reader = Utf8Reader::new(File::open(&far_path).unwrap()).unwrap();
         let package = far_reader.read_file("meta/package").unwrap();
-        assert_eq!(package, br#"{"name":"my-package","version":"0"}"#);
-        let cm_bytes = far_reader.read_file("meta/my-package.cm").unwrap();
+        assert_eq!(package, br#"{"name":"for-test","version":"0"}"#);
+        let cm_bytes = far_reader.read_file("meta/for-test.cm").unwrap();
         let fidl_component_decl: Component = unpersist(&cm_bytes).unwrap();
         let component = ComponentDecl::try_from(fidl_component_decl).unwrap();
         assert_eq!(component.exposes.len(), 1);
@@ -204,7 +204,7 @@ mod tests {
         // Prepare the domain config input.
         let config_source = outdir.join("config_source.json");
         std::fs::write(&config_source, "bleep bloop").unwrap();
-        let mut entries = NamedMap::<FileOrContents>::new("config files");
+        let mut entries = NamedMap::<String, FileOrContents>::new("config files");
         entries
             .try_insert_unique(
                 "config.json".to_string(),
@@ -215,7 +215,7 @@ mod tests {
             )
             .unwrap();
         let config = DomainConfig {
-            name: "my-package".into(),
+            name: PackageDestination::ForTest,
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
             expose_directories: false,
         };
@@ -227,7 +227,7 @@ mod tests {
         assert_eq!(path, outdir.join("package_manifest.json"));
         let loaded_manifest = PackageManifest::try_load_from(path).unwrap();
         assert_eq!(manifest, loaded_manifest);
-        assert_eq!(manifest.name(), &PackageName::from_str("my-package").unwrap());
+        assert_eq!(manifest.name(), &PackageName::from_str("for-test").unwrap());
         let blobs = manifest.into_blobs();
         assert_eq!(blobs.len(), 2);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
@@ -245,7 +245,7 @@ mod tests {
         let far_path = outdir.join("meta.far");
         let mut far_reader = Utf8Reader::new(File::open(&far_path).unwrap()).unwrap();
         let package = far_reader.read_file("meta/package").unwrap();
-        assert_eq!(package, br#"{"name":"my-package","version":"0"}"#);
+        assert_eq!(package, br#"{"name":"for-test","version":"0"}"#);
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
         let expected_contents = "\
@@ -262,7 +262,7 @@ mod tests {
 
         // Prepare the domain config input.
         let config = DomainConfig {
-            name: "my-package".into(),
+            name: PackageDestination::ForTest,
             directories: NamedMap::new("directories"),
             expose_directories: true,
         };
@@ -273,7 +273,7 @@ mod tests {
         assert_eq!(path, outdir.join("package_manifest.json"));
         let loaded_manifest = PackageManifest::try_load_from(path).unwrap();
         assert_eq!(manifest, loaded_manifest);
-        assert_eq!(manifest.name(), &PackageName::from_str("my-package").unwrap());
+        assert_eq!(manifest.name(), &PackageName::from_str("for-test").unwrap());
         let blobs = manifest.into_blobs();
         assert_eq!(blobs.len(), 1);
         let blob = blobs.iter().find(|&b| b.path == "meta/").unwrap();
@@ -283,8 +283,8 @@ mod tests {
         let far_path = outdir.join("meta.far");
         let mut far_reader = Utf8Reader::new(File::open(&far_path).unwrap()).unwrap();
         let package = far_reader.read_file("meta/package").unwrap();
-        assert_eq!(package, br#"{"name":"my-package","version":"0"}"#);
-        let cm_bytes = far_reader.read_file("meta/my-package.cm").unwrap();
+        assert_eq!(package, br#"{"name":"for-test","version":"0"}"#);
+        let cm_bytes = far_reader.read_file("meta/for-test.cm").unwrap();
         let fidl_component_decl: Component = unpersist(&cm_bytes).unwrap();
         let component = ComponentDecl::try_from(fidl_component_decl).unwrap();
         assert_eq!(component.exposes.len(), 0);
@@ -302,9 +302,9 @@ mod tests {
         let outdir = Utf8Path::from_path(tmp.path()).unwrap();
 
         // Prepare the domain config input.
-        let entries = NamedMap::<FileOrContents>::new("config files");
+        let entries = NamedMap::<String, FileOrContents>::new("config files");
         let config = DomainConfig {
-            name: "my-package".into(),
+            name: PackageDestination::ForTest,
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
             expose_directories: true,
         };
@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(path, outdir.join("package_manifest.json"));
         let loaded_manifest = PackageManifest::try_load_from(path).unwrap();
         assert_eq!(manifest, loaded_manifest);
-        assert_eq!(manifest.name(), &PackageName::from_str("my-package").unwrap());
+        assert_eq!(manifest.name(), &PackageName::from_str("for-test").unwrap());
         let blobs = manifest.into_blobs();
         assert_eq!(blobs.len(), 2);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
@@ -329,8 +329,8 @@ mod tests {
         let far_path = outdir.join("meta.far");
         let mut far_reader = Utf8Reader::new(File::open(&far_path).unwrap()).unwrap();
         let package = far_reader.read_file("meta/package").unwrap();
-        assert_eq!(package, br#"{"name":"my-package","version":"0"}"#);
-        let cm_bytes = far_reader.read_file("meta/my-package.cm").unwrap();
+        assert_eq!(package, br#"{"name":"for-test","version":"0"}"#);
+        let cm_bytes = far_reader.read_file("meta/for-test.cm").unwrap();
         let fidl_component_decl: Component = unpersist(&cm_bytes).unwrap();
         let component = ComponentDecl::try_from(fidl_component_decl).unwrap();
         assert_eq!(component.exposes.len(), 1);

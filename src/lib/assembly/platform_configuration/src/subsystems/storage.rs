@@ -6,10 +6,10 @@ use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_component_id_index::ComponentIdIndexBuilder;
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
-use assembly_config_schema::FileEntry;
 use assembly_images_config::{
     BlobfsLayout, DataFilesystemFormat, DataFvmVolumeConfig, FvmVolumeConfig, VolumeConfig,
 };
+use assembly_util::{BootfsComponentForRepackage, BootfsDestination, FileEntry};
 
 pub(crate) struct StorageSubsystemConfig;
 impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
@@ -57,7 +57,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             .bootfs()
             .file(FileEntry {
                 source: zxcrypt_config_path,
-                destination: "config/zxcrypt".to_string(),
+                destination: BootfsDestination::Zxcrypt,
             })
             .context("Adding zxcrypt config to bootfs")?;
 
@@ -66,7 +66,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         builder
             .bootfs()
             .file(FileEntry {
-                destination: "config/component_id_index".to_string(),
+                destination: BootfsDestination::ComponentIdIndex,
                 source: index_path.clone(),
             })
             .with_context(|| format!("Adding bootfs file {}", &index_path))?;
@@ -147,7 +147,8 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("use_fxblob", fxfs_blob)?
                 .field("use_system_image", true)?;
 
-            let mut fshost_config_builder = builder.bootfs().component("meta/fshost.cm")?;
+            let mut fshost_config_builder =
+                builder.bootfs().component(BootfsComponentForRepackage::Fshost)?;
             fshost_config_builder
                 .field("blobfs", true)?
                 .field("blobfs_max_bytes", blobfs_max_bytes)?

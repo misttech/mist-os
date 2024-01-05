@@ -6,15 +6,20 @@
 
 //! Utility methods and traits used throughout assembly.
 mod fast_copy;
+mod files;
 mod insert_unique;
 mod named_map;
 mod paths;
 
 pub use fast_copy::fast_copy;
+pub use files::{
+    BootfsComponentForRepackage, BootfsDestination, CompiledPackageDestination, Destination,
+    FileEntry, PackageDestination,
+};
 pub use insert_unique::{
     BTreeMapDuplicateKeyError, DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry,
 };
-pub use named_map::NamedMap;
+pub use named_map::{Key as NamedMapKey, NamedMap};
 pub use paths::{PathTypeMarker, TypedPathBuf};
 
 use anyhow::{Context as _, Result};

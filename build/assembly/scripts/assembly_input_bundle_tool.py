@@ -31,7 +31,10 @@ from serialization.serialization import (
 
 logger = logging.getLogger()
 
-BOOTFS_COMPILED_PACKAGE_ALLOWLIST = ["fshost", "qux"]  # test package
+BOOTFS_COMPILED_PACKAGE_ALLOWLIST = [
+    "fshost",
+    "for-test2",
+]  # test package
 
 
 def create_bundle(args: argparse.Namespace) -> None:

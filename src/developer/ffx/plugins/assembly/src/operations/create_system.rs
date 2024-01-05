@@ -15,6 +15,7 @@ use assembly_manifest::AssemblyManifest;
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use assembly_util as util;
+use assembly_util::PackageDestination;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::{CreateSystemArgs, PackageMode};
 use fuchsia_pkg::{PackageManifest, PackagePath};
@@ -33,7 +34,8 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         mode,
     } = args;
     let gendir = gendir.unwrap_or_else(|| outdir.clone());
-    let base_package_name = base_package_name.unwrap_or_else(|| "system_image".to_string());
+    let base_package_name =
+        base_package_name.unwrap_or_else(|| PackageDestination::Base.to_string());
 
     let image_assembly_config: ImageAssemblyConfig = util::read_config(image_assembly_config)
         .context("Failed to read the image assembly config")?;

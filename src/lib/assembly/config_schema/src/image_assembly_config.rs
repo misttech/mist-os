@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use assembly_images_config::ImagesConfig;
+use assembly_util::FileEntry;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
-
-use crate::common::FileEntry;
 
 /// The set of information that defines a fuchsia product.  This is capable of
 /// being a complete configuration (it at least has a kernel).
@@ -45,7 +44,7 @@ pub struct ImageAssemblyConfig {
 
     /// The set of files to be placed in BOOTFS in the ZBI.
     #[serde(default)]
-    pub bootfs_files: Vec<FileEntry>,
+    pub bootfs_files: Vec<FileEntry<String>>,
 
     /// The packages that are in the bootfs package list, which are
     /// added to the BOOTFS in the ZBI.

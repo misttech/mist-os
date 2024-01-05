@@ -5,6 +5,7 @@
 use {
     anyhow::Result,
     assembly_package_list::{PackageList, PackageUrlList, WritablePackageList},
+    assembly_util::PackageDestination,
     camino::{Utf8Path, Utf8PathBuf},
     fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo},
     std::collections::BTreeMap,
@@ -84,7 +85,7 @@ impl BasePackageBuilder {
 
         // All base packages are named 'system-image' internally, for
         // consistency on the platform.
-        let mut builder = PackageBuilder::new("system_image");
+        let mut builder = PackageBuilder::new(PackageDestination::Base.to_string());
         // However, they can have different published names.  And the name here
         // is the name to publish it under (and to include in the generated
         // package manifest).

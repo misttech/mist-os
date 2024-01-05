@@ -5,6 +5,7 @@
 use anyhow::{anyhow, Context, Error, Result};
 use assembly_config_schema::BoardDriverArguments;
 use assembly_tool::Tool;
+use assembly_util::BootfsDestination;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -171,8 +172,10 @@ impl ZbiBuilder {
         out: &mut impl Write,
     ) -> Result<()> {
         let mut bootfs_files = self.bootfs_files.clone();
-        bootfs_files
-            .insert("config/additional_boot_args".to_string(), additional_boot_args_path.into());
+        bootfs_files.insert(
+            BootfsDestination::AdditionalBootArgs.to_string(),
+            additional_boot_args_path.into(),
+        );
         for (destination, source) in bootfs_files {
             write!(out, "{}", destination)?;
             write!(out, "=")?;

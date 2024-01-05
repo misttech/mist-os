@@ -4,13 +4,10 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_components::ComponentBuilder;
-use assembly_config_schema::{
-    assembly_config::{CompiledPackageDefinition, MainPackageDefinition},
-    FileEntry,
-};
+use assembly_config_schema::assembly_config::{CompiledPackageDefinition, MainPackageDefinition};
 use assembly_named_file_map::NamedFileMap;
 use assembly_tool::Tool;
-use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry};
+use assembly_util::{BootfsDestination, DuplicateKeyError, FileEntry, InsertUniqueExt, MapEntry};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use serde::Serialize;
@@ -46,7 +43,7 @@ impl CompiledPackageBuilder {
         entry: &CompiledPackageDefinition,
         bundle_dir: impl AsRef<Utf8Path>,
     ) -> Result<&mut Self> {
-        let name = entry.name();
+        let name = entry.name().to_string();
 
         if name != self.name {
             bail!(
@@ -158,7 +155,7 @@ impl CompiledPackageBuilder {
     fn build_bootfs(
         &self,
         cmc_tool: &dyn Tool,
-        bootfs_files: &mut NamedFileMap,
+        bootfs_files: &mut NamedFileMap<BootfsDestination>,
         main_definition: &MainPackageDefinition,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<()> {
@@ -177,7 +174,7 @@ impl CompiledPackageBuilder {
             let component_path = format!("meta/{component_manifest_file_name}");
             bootfs_files.add_entry(FileEntry {
                 source: component_manifest_path.to_owned(),
-                destination: component_path,
+                destination: BootfsDestination::FromAIB(component_path),
             })?;
         }
 
@@ -209,8 +206,10 @@ impl CompiledPackageBuilder {
         }
 
         for entry in &main_definition.contents {
-            package_builder
-                .add_file_as_blob(&entry.destination, &self.main_bundle_dir.join(&entry.source))?;
+            package_builder.add_file_as_blob(
+                entry.destination.to_string(),
+                &self.main_bundle_dir.join(&entry.source),
+            )?;
         }
 
         let package_manifest_path = outdir.join("package_manifest.json");
@@ -229,7 +228,7 @@ impl CompiledPackageBuilder {
     pub fn build(
         self,
         cmc_tool: &dyn Tool,
-        bootfs_files: &mut NamedFileMap,
+        bootfs_files: &mut NamedFileMap<BootfsDestination>,
         outdir: impl AsRef<Utf8Path>,
     ) -> Result<Option<Utf8PathBuf>> {
         let main_definition = &self.main_definition.as_ref().context("no main definition")?;
@@ -247,9 +246,10 @@ impl CompiledPackageBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_config_schema::{assembly_config::AdditionalPackageContents, FileEntry};
+    use assembly_config_schema::assembly_config::AdditionalPackageContents;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolProvider;
+    use assembly_util::{CompiledPackageDestination, FileEntry};
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageManifest;
     use std::fs::File;
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn add_package_def_appends_entries_to_builder() {
-        let mut compiled_package_builder = CompiledPackageBuilder::new("foo");
+        let mut compiled_package_builder = CompiledPackageBuilder::new("for-test");
         let outdir_tmp = TempDir::new().unwrap();
         let outdir = Utf8Path::from_path(outdir_tmp.path()).unwrap();
         make_test_package_and_components(outdir);
@@ -265,7 +265,7 @@ mod tests {
         compiled_package_builder
             .add_package_def(
                 &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                    name: "foo".into(),
+                    name: CompiledPackageDestination::ForTest,
                     components: BTreeMap::from([
                         ("component1".into(), "cml1".into()),
                         ("component2".into(), "cml2".into()),
@@ -282,7 +282,7 @@ mod tests {
             .unwrap()
             .add_package_def(
                 &CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                    name: "foo".into(),
+                    name: CompiledPackageDestination::ForTest,
                     component_shards: BTreeMap::from([(
                         "component2".into(),
                         vec!["shard1".into()],
@@ -296,14 +296,14 @@ mod tests {
         assert_eq!(
             compiled_package_builder,
             CompiledPackageBuilder {
-                name: "foo".into(),
+                name: "for-test".into(),
                 component_shards: BTreeMap::from([(
                     "component2".into(),
                     BTreeMap::from([("shard1".into(), outdir.join("shard1"))])
                 )]),
                 main_bundle_dir: outdir.into(),
                 main_definition: Some(MainPackageDefinition {
-                    name: "foo".into(),
+                    name: CompiledPackageDestination::ForTest,
                     components: BTreeMap::from([
                         ("component1".into(), "cml1".into()),
                         ("component2".into(), "cml2".into()),
@@ -321,7 +321,7 @@ mod tests {
 
     #[test]
     fn build_builds_package() {
-        let mut compiled_package_builder = CompiledPackageBuilder::new("foo");
+        let mut compiled_package_builder = CompiledPackageBuilder::new("for-test");
         let tools = FakeToolProvider::default();
         let outdir_tmp = TempDir::new().unwrap();
         let outdir = Utf8Path::from_path(outdir_tmp.path()).unwrap();
@@ -331,7 +331,7 @@ mod tests {
         compiled_package_builder
             .add_package_def(
                 &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                    name: "foo".into(),
+                    name: CompiledPackageDestination::ForTest,
                     components: BTreeMap::from([
                         ("component1".into(), "cml1".into()),
                         ("component2".into(), "cml2".into()),
@@ -348,7 +348,7 @@ mod tests {
             .unwrap()
             .add_package_def(
                 &CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                    name: "foo".into(),
+                    name: CompiledPackageDestination::ForTest,
                     component_shards: BTreeMap::from([(
                         "component2".into(),
                         vec!["shard1".into()],
@@ -362,9 +362,9 @@ mod tests {
             .build(tools.get_tool("cmc").unwrap().as_ref(), &mut bootfs_files, outdir)
             .unwrap();
 
-        let compiled_package_file = File::open(outdir.join("foo/foo.far")).unwrap();
+        let compiled_package_file = File::open(outdir.join("for-test/for-test.far")).unwrap();
         let mut far_reader = Utf8Reader::new(&compiled_package_file).unwrap();
-        let manifest_path = outdir.join("foo/package_manifest.json");
+        let manifest_path = outdir.join("for-test/package_manifest.json");
         assert_far_contents_eq(
             &mut far_reader,
             "meta/contents",
@@ -372,7 +372,7 @@ mod tests {
         );
         assert_far_contents_eq(&mut far_reader, "meta/component1.cm", "component fake contents");
         let package_manifest = PackageManifest::try_load_from(manifest_path).unwrap();
-        assert_eq!(package_manifest.name().as_ref(), "foo");
+        assert_eq!(package_manifest.name().as_ref(), "for-test");
     }
 
     #[test]
@@ -381,7 +381,7 @@ mod tests {
 
         let result = compiled_package_builder.add_package_def(
             &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                name: "foo".into(),
+                name: CompiledPackageDestination::ForTest,
                 components: BTreeMap::new(),
                 contents: Vec::default(),
                 includes: Vec::default(),
@@ -399,7 +399,7 @@ mod tests {
 
         let result = compiled_package_builder.add_package_def(
             &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                name: "bar".into(),
+                name: CompiledPackageDestination::ForTest,
                 components: BTreeMap::new(),
                 contents: vec![FileEntry { source: "file1".into(), destination: "file1".into() }],
                 includes: Vec::default(),
@@ -413,11 +413,11 @@ mod tests {
 
     #[test]
     fn validate_without_main_definition_returns_err() {
-        let mut compiled_package_builder = CompiledPackageBuilder::new("foo");
+        let mut compiled_package_builder = CompiledPackageBuilder::new("for-test");
         compiled_package_builder
             .add_package_def(
                 &CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                    name: "foo".into(),
+                    name: CompiledPackageDestination::ForTest,
                     component_shards: BTreeMap::from([(
                         "component2".into(),
                         vec!["shard1".into()],
@@ -434,12 +434,15 @@ mod tests {
 
     #[test]
     fn add_package_def_with_duplicate_main_definition_returns_err() {
-        let mut compiled_package_builder = CompiledPackageBuilder::new("foo");
+        let mut compiled_package_builder = CompiledPackageBuilder::new("for-test");
         compiled_package_builder
             .add_package_def(
                 &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                    name: "foo".into(),
-                    ..Default::default()
+                    name: CompiledPackageDestination::ForTest,
+                    components: BTreeMap::default(),
+                    contents: Vec::default(),
+                    includes: Vec::default(),
+                    bootfs_unpackaged: false,
                 }),
                 "assembly/input/bundle/path/compiled_packages/include",
             )
@@ -447,8 +450,11 @@ mod tests {
 
         let result = compiled_package_builder.add_package_def(
             &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                name: "foo".into(),
-                ..Default::default()
+                name: CompiledPackageDestination::ForTest,
+                components: BTreeMap::default(),
+                contents: Vec::default(),
+                includes: Vec::default(),
+                bootfs_unpackaged: false,
             }),
             "assembly/input/bundle/path/compiled_packages/include",
         );
@@ -474,8 +480,8 @@ mod tests {
         std::fs::write(file1, "file1 contents").unwrap();
         // Write the expected output component files since the component
         // compiler is mocked.
-        let component1_dir = outdir.join("foo/component1");
-        let component2_dir = outdir.join("foo/component2");
+        let component1_dir = outdir.join("for-test/component1");
+        let component2_dir = outdir.join("for-test/component2");
         std::fs::create_dir_all(&component1_dir).unwrap();
         std::fs::create_dir_all(&component2_dir).unwrap();
         std::fs::write(component1_dir.join("component1.cm"), "component fake contents").unwrap();

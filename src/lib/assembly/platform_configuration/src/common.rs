@@ -10,9 +10,11 @@ use std::collections::{btree_map::Entry, BTreeSet};
 use tempfile::TempDir;
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
-use assembly_config_schema::{BoardInformation, BuildType, FileEntry, ICUConfig};
+use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
 use assembly_named_file_map::NamedFileMap;
-use assembly_util::NamedMap;
+use assembly_util::{
+    BootfsComponentForRepackage, BootfsDestination, FileEntry, NamedMap, PackageDestination,
+};
 
 /// The platform's base service level.
 ///
@@ -152,7 +154,7 @@ pub(crate) trait ConfigurationBuilder {
     fn package(&mut self, name: &str) -> &mut dyn PackageConfigBuilder;
 
     /// Create a new domain config package.
-    fn add_domain_config(&mut self, name: &str) -> &mut dyn DomainConfigBuilder;
+    fn add_domain_config(&mut self, name: PackageDestination) -> &mut dyn DomainConfigBuilder;
 
     /// Add a core shard.
     fn core_shard(&mut self, path: &Utf8PathBuf);
@@ -168,10 +170,16 @@ pub(crate) trait ConfigurationBuilder {
 /// The interface for specifying the configuration to provide for bootfs.
 pub(crate) trait BootfsConfigBuilder {
     /// Add configuration to the builder for a component within a package.
-    fn component(&mut self, pkg_path: &str) -> Result<&mut dyn ComponentConfigBuilder>;
+    fn component(
+        &mut self,
+        component: BootfsComponentForRepackage,
+    ) -> Result<&mut dyn ComponentConfigBuilder>;
 
     /// Add a file to bootfs.
-    fn file(&mut self, file_entry: FileEntry) -> Result<&mut dyn BootfsConfigBuilder>;
+    fn file(
+        &mut self,
+        file_entry: FileEntry<BootfsDestination>,
+    ) -> Result<&mut dyn BootfsConfigBuilder>;
 }
 
 /// The interface for specifying the configuration to provide for a package.
@@ -180,7 +188,10 @@ pub(crate) trait PackageConfigBuilder {
     fn component(&mut self, pkg_path: &str) -> Result<&mut dyn ComponentConfigBuilder>;
 
     /// Add a config data file to the package in the builder.
-    fn config_data(&mut self, file_entry: FileEntry) -> Result<&mut dyn PackageConfigBuilder>;
+    fn config_data(
+        &mut self,
+        file_entry: FileEntry<String>,
+    ) -> Result<&mut dyn PackageConfigBuilder>;
 }
 
 /// The interface for building a domain config.
@@ -195,7 +206,10 @@ pub(crate) trait DomainConfigBuilder {
 /// The interface for specifying the config files to add to a domain config package directory.
 pub(crate) trait DomainConfigDirectoryBuilder {
     /// Add a file to the directory.
-    fn entry(&mut self, file_entry: FileEntry) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
+    fn entry(
+        &mut self,
+        file_entry: FileEntry<String>,
+    ) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
 
     /// Add a file to the directory using the contents provided.
     fn entry_from_contents(
@@ -337,13 +351,16 @@ pub struct CompletedConfiguration {
 }
 
 /// A map from package names to the configuration to apply to them.
-pub type PackageConfigs = NamedMap<PackageConfiguration>;
+pub type PackageConfigs = NamedMap<String, PackageConfiguration>;
 
-/// A map from component manifest path with a namespace to the values for for the component.
-pub type ComponentConfigs = NamedMap<ComponentConfiguration>;
+/// A map from component manifest path with a namespace to the values for the component.
+pub type ComponentConfigs = NamedMap<String, ComponentConfiguration>;
+
+/// A map from bootfs component manifest to the values for the component.
+pub type BootfsComponentConfigs = NamedMap<BootfsComponentForRepackage, ComponentConfiguration>;
 
 /// A map from package name to domain config.
-pub type DomainConfigs = NamedMap<DomainConfig>;
+pub type DomainConfigs = NamedMap<PackageDestination, DomainConfig>;
 
 /// All of the configuration that applies to a single package.
 ///
@@ -358,7 +375,7 @@ pub struct PackageConfiguration {
     pub components: ComponentConfigs,
 
     /// A map of config data entries, keyed by the destination path.
-    pub config_data: NamedFileMap,
+    pub config_data: NamedFileMap<String>,
 
     /// The package name.
     pub name: String,
@@ -382,7 +399,7 @@ impl PackageConfiguration {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ComponentConfiguration {
     /// Structured Config key-value pairs.
-    pub fields: NamedMap<serde_json::Value>,
+    pub fields: NamedMap<String, serde_json::Value>,
 
     /// The component's manifest path in its package or in bootfs
     manifest_path: String,
@@ -396,20 +413,20 @@ impl Default for ComponentConfiguration {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DomainConfig {
-    pub directories: NamedMap<DomainConfigDirectory>,
-    pub name: String,
+    pub directories: NamedMap<String, DomainConfigDirectory>,
+    pub name: PackageDestination,
     pub expose_directories: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum FileOrContents {
-    File(FileEntry),
+    File(FileEntry<String>),
     Contents(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DomainConfigDirectory {
-    pub entries: NamedMap<FileOrContents>,
+    pub entries: NamedMap<String, FileOrContents>,
 }
 
 trait ICUMapExt<'a> {
@@ -456,10 +473,10 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         })
     }
 
-    fn add_domain_config(&mut self, name: &str) -> &mut dyn DomainConfigBuilder {
-        self.domain_configs.entry(name.to_string()).or_insert_with_key(|name| DomainConfig {
+    fn add_domain_config(&mut self, name: PackageDestination) -> &mut dyn DomainConfigBuilder {
+        self.domain_configs.entry(name.clone()).or_insert_with_key(|name| DomainConfig {
             directories: NamedMap::new("directories"),
-            name: name.to_owned(),
+            name: name.clone(),
             expose_directories: true,
         })
     }
@@ -503,7 +520,10 @@ impl DomainConfigBuilder for DomainConfig {
 }
 
 impl DomainConfigDirectoryBuilder for DomainConfigDirectory {
-    fn entry(&mut self, file_entry: FileEntry) -> Result<&mut dyn DomainConfigDirectoryBuilder> {
+    fn entry(
+        &mut self,
+        file_entry: FileEntry<String>,
+    ) -> Result<&mut dyn DomainConfigDirectoryBuilder> {
         self.entries
             .try_insert_unique(file_entry.destination.clone(), FileOrContents::File(file_entry))
             .context("A config destination can only be set once for a domain config")?;
@@ -542,9 +562,12 @@ impl PackageConfigBuilder for PackageConfiguration {
         }
     }
 
-    fn config_data(&mut self, file_entry: FileEntry) -> Result<&mut dyn PackageConfigBuilder> {
+    fn config_data(
+        &mut self,
+        file_entry: FileEntry<String>,
+    ) -> Result<&mut dyn PackageConfigBuilder> {
         self.config_data
-            .add_entry_as_blob(file_entry)
+            .add_entry(file_entry)
             .context("A config data destination can only be set once for a package")?;
         Ok(self)
     }
@@ -572,17 +595,17 @@ impl ComponentConfigBuilder for ComponentConfiguration {
 pub struct BootfsConfig {
     /// A map from manifest paths within bootfs to the configuration values for
     /// the component.
-    pub components: ComponentConfigs,
+    pub components: BootfsComponentConfigs,
 
     /// A map from bootfs destination to bootfs file entry.
-    pub files: NamedMap<FileEntry>,
+    pub files: NamedFileMap<BootfsDestination>,
 }
 
 impl Default for BootfsConfig {
     fn default() -> Self {
         Self {
-            components: ComponentConfigs::new("component configs"),
-            files: NamedMap::new("bootfs files"),
+            components: BootfsComponentConfigs::new("bootfs component configs"),
+            files: NamedFileMap::new("bootfs files"),
         }
     }
 }
@@ -591,37 +614,30 @@ impl BootfsConfigBuilder for BootfsConfig {
     /// Add configuration to the builder for a component within bootfs.
     fn component(
         &mut self,
-        component_manifest_path: &str,
+        component: BootfsComponentForRepackage,
     ) -> Result<&mut dyn ComponentConfigBuilder> {
-        match self.components.entry(component_manifest_path.to_owned()) {
+        match self.components.entry(component.clone()) {
             entry @ Entry::Vacant(_) => {
-                Ok(entry.or_insert_with_key(|component_manifest_path| ComponentConfiguration {
+                Ok(entry.or_insert_with_key(|component| ComponentConfiguration {
                     fields: NamedMap::new("structured config fields"),
-                    manifest_path: component_manifest_path.to_owned(),
+                    manifest_path: component.to_string(),
                 }))
             }
             Entry::Occupied(_) => {
                 Err(anyhow!("Each component's configuration can only be set once"))
-                    .with_context(|| {
-                        format!("Setting configuration for component: {component_manifest_path}")
-                    })
+                    .with_context(|| format!("Setting configuration for component: {component}"))
                     .context("Setting configuration in bootfs")
             }
         }
     }
 
     /// Add a file to bootfs.
-    fn file(&mut self, file_entry: FileEntry) -> Result<&mut dyn BootfsConfigBuilder> {
-        match self.files.entry(file_entry.destination.to_owned()) {
-            entry @ Entry::Vacant(_) => {
-                entry.or_insert(file_entry);
-                Ok(self)
-            }
-            Entry::Occupied(_) => Err(anyhow!(
-                "A bootfs destination may only be used once: {}",
-                file_entry.destination
-            )),
-        }
+    fn file(
+        &mut self,
+        file_entry: FileEntry<BootfsDestination>,
+    ) -> Result<&mut dyn BootfsConfigBuilder> {
+        self.files.add_entry(file_entry)?;
+        Ok(self)
     }
 }
 
@@ -803,7 +819,10 @@ mod tests {
 
         // using an inner
         let make_config = |builder: &mut dyn ConfigurationBuilder| -> Result<()> {
-            builder.bootfs().component("some/bootfs_component")?.field("key", "value")?;
+            builder
+                .bootfs()
+                .component(BootfsComponentForRepackage::ForTest)?
+                .field("key", "value")?;
 
             builder
                 .package("package_a")
@@ -837,7 +856,7 @@ mod tests {
         assert_eq!(config.bootfs.components.len(), 1);
 
         assert_eq!(
-            config.bootfs.components.get("some/bootfs_component").unwrap().fields,
+            config.bootfs.components.get(&BootfsComponentForRepackage::ForTest).unwrap().fields,
             NamedMap {
                 name: "structured config fields".into(),
                 entries: [("key".into(), "value".into())].into(),
@@ -880,17 +899,11 @@ mod tests {
                         entries: [
                             (
                                 "config/one".into(),
-                                SourceMerklePair {
-                                    merkle: Some("dc966c915497607d4b7fdfef3b57d03fd4583771f255837545d1c7319a992566".parse().unwrap()),
-                                    source: relative_one.clone(),
-                                }
+                                SourceMerklePair { merkle: None, source: relative_one.clone() }
                             ),
                             (
                                 "config/two".into(),
-                                SourceMerklePair {
-                                    merkle: Some("08a4e9e7edc4d4c049f045870d4bd809956a1a0e3e3846003fa19fdc2ea79fc4".parse().unwrap()),
-                                    source: relative_two.clone(),
-                                }
+                                SourceMerklePair { merkle: None, source: relative_two.clone() }
                             ),
                         ]
                         .into(),
@@ -925,10 +938,7 @@ mod tests {
                         name: "config data".into(),
                         entries: [(
                             "config/one".into(),
-                            SourceMerklePair {
-                                merkle: Some("dc966c915497607d4b7fdfef3b57d03fd4583771f255837545d1c7319a992566".parse().unwrap()),
-                                source: relative_one.clone(),
-                            }
+                            SourceMerklePair { merkle: None, source: relative_one.clone() }
                         )]
                         .into(),
                     },
@@ -942,8 +952,8 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let mut builder = ConfigurationBuilderImpl::default();
 
-        assert!(builder.bootfs().component("foo").is_ok());
-        assert!(builder.bootfs().component("foo").is_err());
+        assert!(builder.bootfs().component(BootfsComponentForRepackage::ForTest).is_ok());
+        assert!(builder.bootfs().component(BootfsComponentForRepackage::ForTest).is_err());
 
         assert!(builder.package("foo").component("bar").is_ok());
         assert!(builder.package("foo").component("bar").is_err());
@@ -971,10 +981,6 @@ mod tests {
         assert!(builder
             .package("foo")
             .config_data(FileEntry { destination: "cat".into(), source: cat.clone() })
-            .is_ok());
-        assert!(builder
-            .package("foo")
-            .config_data(FileEntry { destination: "cat".into(), source: cat })
             .is_ok());
         assert!(builder
             .package("foo")
@@ -1007,14 +1013,17 @@ mod tests {
 
         let mut builder = ConfigurationBuilderImpl::default();
 
-        builder.bootfs().component("foo").unwrap();
-        let result = builder.bootfs().component("foo").context("Configuring Subsystem");
+        builder.bootfs().component(BootfsComponentForRepackage::ForTest).unwrap();
+        let result = builder
+            .bootfs()
+            .component(BootfsComponentForRepackage::ForTest)
+            .context("Configuring Subsystem");
 
         assert_eq!(
             format_result(result),
             r"Configuring Subsystem Failed
     1.  Setting configuration in bootfs
-    2.  Setting configuration for component: foo
+    2.  Setting configuration for component: for-test
     3.  Each component's configuration can only be set once"
         );
 

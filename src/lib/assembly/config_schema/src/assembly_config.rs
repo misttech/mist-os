@@ -5,11 +5,12 @@
 use crate::image_assembly_config::PartialKernelConfig;
 use crate::PackageDetails;
 use assembly_package_utils::PackageInternalPathBuf;
+use assembly_util::{CompiledPackageDestination, FileEntry};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::common::{DriverDetails, FileEntry, PackageName};
+use crate::common::{DriverDetails, PackageName};
 use crate::platform_config::PlatformConfig;
 use crate::product_config::ProductConfig;
 
@@ -50,7 +51,7 @@ pub struct AssemblyInputBundle {
 
     /// The set of files to be placed in BOOTFS in the ZBI.
     #[serde(default)]
-    pub bootfs_files: Vec<FileEntry>,
+    pub bootfs_files: Vec<FileEntry<String>>,
 
     /// Package entries that internally specify their package set, instead of being grouped
     /// separately.
@@ -59,7 +60,7 @@ pub struct AssemblyInputBundle {
 
     /// Entries for the `config_data` package.
     #[serde(default)]
-    pub config_data: BTreeMap<String, Vec<FileEntry>>,
+    pub config_data: BTreeMap<String, Vec<FileEntry<String>>>,
 
     /// The blobs index of the AIB.  This currently isn't used by product
     /// assembly, as the package manifests contain the same information.
@@ -103,16 +104,16 @@ pub enum CompiledPackageDefinition {
 
 /// Primary definition of a compiled package. Only a single AIB should
 /// contain the main definition for a given package.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct MainPackageDefinition {
-    pub name: PackageName,
+    pub name: CompiledPackageDestination,
     /// Components to add to the package, mapping component name to
     /// the primary cml definition of the component.
     pub components: BTreeMap<String, Utf8PathBuf>,
     /// Non-component files to add to the package.
     #[serde(default)]
-    pub contents: Vec<FileEntry>,
+    pub contents: Vec<FileEntry<String>>,
     /// CML files included by the component cml.
     #[serde(default)]
     pub includes: Vec<Utf8PathBuf>,
@@ -125,19 +126,19 @@ pub struct MainPackageDefinition {
 /// Additional contents of the package to be defined in
 /// secondary AssemblyInputBundles. There can be many of these, and
 /// they will be merged into the final compiled package.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AdditionalPackageContents {
     /// Name of the package to which these contents are associated.
     /// This package should have a corresponding MainDefinition in another
     /// AIB.
-    pub name: PackageName,
+    pub name: CompiledPackageDestination,
     /// Additional component shards to combine with the primary manifest.
     pub component_shards: BTreeMap<String, Vec<Utf8PathBuf>>,
 }
 
 impl CompiledPackageDefinition {
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &CompiledPackageDestination {
         match self {
             CompiledPackageDefinition::MainDefinition(MainPackageDefinition { name, .. }) => name,
             CompiledPackageDefinition::Additional(AdditionalPackageContents { name, .. }) => name,
@@ -362,7 +363,7 @@ mod tests {
               },
               packages_to_compile: [
                 {
-                    name: "package_name",
+                    name: "core",
                     components: {
                         "component1": "path/to/component1.cml",
                         "component2": "path/to/component2.cml",
@@ -376,7 +377,7 @@ mod tests {
                     includes: [ "src/path/to/include.cml" ]
                 },
                 {
-                   name: "package_name",
+                   name: "core",
                    component_shards: {
                         "component1": [
                             "path/to/shard1.cml",

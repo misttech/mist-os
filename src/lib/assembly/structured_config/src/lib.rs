@@ -4,23 +4,71 @@
 
 //! Utilities for working with structured configuration during the product assembly process.
 
-use anyhow::{ensure, format_err, Context};
-use assembly_config_schema::FileEntry;
+use anyhow::{format_err, Context};
 use assembly_named_file_map::NamedFileMap;
+use assembly_util::{BootfsComponentForRepackage, BootfsDestination, FileEntry};
 use assembly_validate_util::PkgNamespace;
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8PathBuf;
 use cm_rust::{FidlIntoNative, NativeIntoFidl};
 use fidl::{unpersist, Persistable};
 use fuchsia_pkg::{PackageBuilder, PackageManifest, RelativeTo};
 use std::{collections::BTreeMap, fmt::Debug};
 
-/// Add structured configuration values to an existing package.
-pub struct Repackager<B> {
-    builder: B,
+pub struct BootfsRepackager<'f> {
+    files: &'f mut NamedFileMap<BootfsDestination>,
     outdir: Utf8PathBuf,
 }
 
-impl Repackager<PackageBuilder> {
+impl<'f> BootfsRepackager<'f> {
+    pub fn new(
+        files: &'f mut NamedFileMap<BootfsDestination>,
+        outdir: impl Into<Utf8PathBuf>,
+    ) -> Self {
+        Self { files, outdir: outdir.into() }
+    }
+
+    /// Check if the package we're building has a particular component manifest.
+    pub fn has_component(&self, manifest_path: BootfsComponentForRepackage) -> bool {
+        self.read_contents(manifest_path).is_ok()
+    }
+
+    /// Apply structured configuration values to this package, failing if the package already has
+    /// a configuration value file for the component.
+    pub fn set_component_config(
+        &mut self,
+        component: BootfsComponentForRepackage,
+        values: BTreeMap<String, serde_json::Value>,
+    ) -> Result<(), RepackageError> {
+        let manifest_bytes =
+            self.read_contents(component.clone()).map_err(RepackageError::ReadManifest)?;
+        let (config_bytes, _) = config_for_manifest(manifest_bytes, values)?;
+
+        let path: BootfsDestination = component.config();
+        let out_path = self.outdir.join("bootfs/repackaging/components").join(path.to_string());
+        std::fs::create_dir_all(out_path.parent().unwrap())
+            .context("creating outdir")
+            .map_err(RepackageError::WriteValueFile)?;
+        std::fs::write(&out_path, config_bytes)
+            .with_context(|| format!("writing {}", out_path))
+            .map_err(RepackageError::WriteValueFile)?;
+        self.files
+            .add_entry(FileEntry { source: out_path, destination: path })
+            .map_err(RepackageError::WriteValueFile)
+    }
+
+    fn read_contents(&self, component: BootfsComponentForRepackage) -> anyhow::Result<Vec<u8>> {
+        let path = component.manifest();
+        let src_path = &self.files.get(&path).ok_or_else(|| format_err!("missing {path}"))?.source;
+        Ok(std::fs::read(src_path).with_context(|| format!("reading {}", src_path))?)
+    }
+}
+
+pub struct Repackager {
+    builder: PackageBuilder,
+    outdir: Utf8PathBuf,
+}
+
+impl Repackager {
     /// Read an existing package manifest for modification. The new manifest will be written to
     /// `outdir` along with any needed temporary files.
     pub fn new(
@@ -31,6 +79,24 @@ impl Repackager<PackageBuilder> {
         let builder = PackageBuilder::from_manifest(original_manifest, &outdir)
             .map_err(RepackageError::CreatePackageBuilder)?;
         Ok(Self { builder, outdir })
+    }
+
+    /// Apply structured configuration values to this package, failing if the package already has
+    /// a configuration value file for the component.
+    pub fn set_component_config(
+        &mut self,
+        manifest_path: &str,
+        values: BTreeMap<String, serde_json::Value>,
+    ) -> Result<(), RepackageError> {
+        let manifest_bytes = self
+            .builder
+            .read_contents_from_far(manifest_path)
+            .map_err(RepackageError::ReadManifest)?;
+        let (config_bytes, path) = config_for_manifest(manifest_bytes, values)?;
+        self.builder
+            .add_contents_to_far(path, config_bytes, self.outdir.as_std_path())
+            .map_err(RepackageError::WriteValueFile)?;
+        Ok(())
     }
 
     /// Build the modified package, returning a path to its new manifest.
@@ -44,95 +110,24 @@ impl Repackager<PackageBuilder> {
     }
 }
 
-impl<'f> Repackager<&'f mut NamedFileMap> {
-    pub fn for_bootfs(files: &'f mut NamedFileMap, outdir: impl Into<Utf8PathBuf>) -> Self {
-        Self { builder: files, outdir: outdir.into() }
-    }
-}
+/// Parse the component manifest and return the bytes for the new structured config value file.
+fn config_for_manifest(
+    manifest_bytes: Vec<u8>,
+    values: BTreeMap<String, serde_json::Value>,
+) -> Result<(Vec<u8>, String), RepackageError> {
+    let manifest: cm_rust::ComponentDecl =
+        read_and_validate_fidl(&manifest_bytes, cm_fidl_validator::validate)
+            .map_err(RepackageError::ParseManifest)?;
 
-impl<B: PkgNamespaceBuilder> Repackager<B> {
-    /// Check if the package we're building has a particular component manifest.
-    pub fn has_component(&self, manifest_path: &str) -> bool {
-        self.builder.read_contents(manifest_path).is_ok()
-    }
-
-    /// Apply structured configuration values to this package, failing if the package already has
-    /// a configuration value file for the component.
-    pub fn set_component_config(
-        &mut self,
-        manifest_path: &str,
-        values: BTreeMap<String, serde_json::Value>,
-    ) -> Result<(), RepackageError> {
-        // read the manifest from the meta.far and parse it
-        let manifest_bytes =
-            self.builder.read_contents(manifest_path).map_err(RepackageError::ReadManifest)?;
-        let manifest: cm_rust::ComponentDecl =
-            read_and_validate_fidl(&manifest_bytes, cm_fidl_validator::validate)
-                .map_err(RepackageError::ParseManifest)?;
-
-        if let Some(config_decl) = manifest.config {
-            // create a value file
-            let config_values =
-                config_value_file::populate_value_file(&config_decl, values)?.native_into_fidl();
-            let config_bytes =
-                fidl::persist(&config_values).map_err(RepackageError::EncodeConfig)?;
-
-            // write it to the meta.far at the path expected by the resolver
-            let cm_rust::ConfigValueSource::PackagePath(path) = &config_decl.value_source;
-            self.builder
-                .add_contents(path, &config_bytes, &self.outdir)
-                .map_err(RepackageError::WriteValueFile)?;
-            Ok(())
-        } else {
-            Err(RepackageError::MissingConfigDecl)
-        }
-    }
-}
-
-pub trait PkgNamespaceBuilder {
-    fn read_contents(&self, path: &str) -> anyhow::Result<Vec<u8>>;
-    fn add_contents(
-        &mut self,
-        path: &str,
-        contents: &[u8],
-        outdir: impl AsRef<Utf8Path>,
-    ) -> anyhow::Result<()>;
-}
-
-impl PkgNamespaceBuilder for PackageBuilder {
-    fn read_contents(&self, path: &str) -> anyhow::Result<Vec<u8>> {
-        ensure!(path.starts_with("meta/"), "reading outside of meta/ is not supported");
-        self.read_contents_from_far(path)
-    }
-
-    fn add_contents(
-        &mut self,
-        path: &str,
-        contents: &[u8],
-        outdir: impl AsRef<Utf8Path>,
-    ) -> anyhow::Result<()> {
-        ensure!(path.starts_with("meta/"), "writing outside of meta/ is not supported");
-        self.add_contents_to_far(path, contents, outdir.as_ref().as_std_path())
-    }
-}
-
-impl PkgNamespaceBuilder for &mut NamedFileMap {
-    fn read_contents(&self, path: &str) -> anyhow::Result<Vec<u8>> {
-        let src_path = &self.get(path).ok_or_else(|| format_err!("missing {path}"))?.source;
-        Ok(std::fs::read(src_path).with_context(|| format!("reading {}", src_path))?)
-    }
-
-    fn add_contents(
-        &mut self,
-        path: &str,
-        contents: &[u8],
-        outdir: impl AsRef<Utf8Path>,
-    ) -> anyhow::Result<()> {
-        let out_path = outdir.as_ref().join("bootfs/repackaging/components").join(path);
-        std::fs::create_dir_all(out_path.parent().unwrap()).context("creating outdir")?;
-        std::fs::write(&out_path, contents).with_context(|| format!("writing {}", out_path))?;
-        self.add_entry(FileEntry { source: out_path, destination: path.to_owned() })?;
-        Ok(())
+    if let Some(config_decl) = manifest.config {
+        // create a value file
+        let config_values =
+            config_value_file::populate_value_file(&config_decl, values)?.native_into_fidl();
+        let config_bytes = fidl::persist(&config_values).map_err(RepackageError::EncodeConfig)?;
+        let cm_rust::ConfigValueSource::PackagePath(path) = &config_decl.value_source;
+        Ok((config_bytes, path.to_string()))
+    } else {
+        Err(RepackageError::MissingConfigDecl)
     }
 }
 

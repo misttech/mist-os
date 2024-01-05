@@ -7,7 +7,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_schema::platform_config::swd_config::{
     OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
 };
-use assembly_config_schema::FileEntry;
+use assembly_util::FileEntry;
 use camino::Utf8PathBuf;
 use std::fs::File;
 

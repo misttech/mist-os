@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry, NamedMap};
+use assembly_util::{DuplicateKeyError, InsertUniqueExt, MapEntry, NamedMap, PackageDestination};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use std::collections::BTreeMap;
@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 type FileEntryMap = BTreeMap<Utf8PathBuf, Utf8PathBuf>;
 
 // The config_data entries for each package, by package name
-type ConfigDataMap = NamedMap<FileEntryMap>;
+type ConfigDataMap = NamedMap<String, FileEntryMap>;
 
 /// A builder for the config_data package.
 pub struct ConfigDataBuilder {
@@ -50,7 +50,7 @@ impl ConfigDataBuilder {
     /// path to the `config_data` package's manifest.
     pub fn build(self, outdir: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
         let outdir = outdir.as_ref().join("config_data");
-        let mut package_builder = PackageBuilder::new("config-data");
+        let mut package_builder = PackageBuilder::new(PackageDestination::ConfigData.to_string());
 
         for (package_name, entries) in self.for_packages.entries {
             for (destination_path, source_file) in entries {

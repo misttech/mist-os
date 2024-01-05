@@ -4,7 +4,8 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
-use assembly_config_schema::{platform_config::ui_config::PlatformUiConfig, FileEntry};
+use assembly_config_schema::platform_config::ui_config::PlatformUiConfig;
+use assembly_util::{FileEntry, PackageDestination};
 
 pub(crate) struct UiSubsystem;
 
@@ -87,7 +88,8 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             .field("display_rotation", ui_config.display_rotation)?
             .field("viewing_distance", ui_config.viewing_distance.as_ref())?;
 
-        let config_dir = builder.add_domain_config("sensor-config").directory("sensor-config");
+        let config_dir =
+            builder.add_domain_config(PackageDestination::SensorConfig).directory("sensor-config");
         if let Some(sensor_config_path) = &ui_config.sensor_config {
             config_dir.entry(FileEntry {
                 source: sensor_config_path.clone(),

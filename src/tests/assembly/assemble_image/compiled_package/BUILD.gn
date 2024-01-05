@@ -54,11 +54,11 @@ if (is_host) {
       get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
           "/outdir/image_assembly.json",
       get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
-          "/outdir/foo/bar/bar.cm",
+          "/outdir/for-test/bar/bar.cm",
       get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
-          "/outdir/foo/baz/baz.cm",
+          "/outdir/for-test/baz/baz.cm",
       get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
-          "/outdir/qux/qux/qux.cm",
+          "/outdir/for-test2/qux/qux.cm",
     ]
     deps = [ ":compiled_package" ]
   }

@@ -35,6 +35,7 @@ rustc_library("config_schema") {
     "//src/lib/assembly/file_relative_path",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/package_utils",
+    "//src/lib/assembly/util",
     "//src/lib/include_str_from_working_dir",
     "//src/ui/lib/input-device-constants:lib",
     "//third_party/rust_crates:anyhow",
@@ -45,8 +46,6 @@ rustc_library("config_schema") {
   ]
 
   non_rust_deps = [ ":git_info_json" ]
-
-  test_deps = [ "//src/lib/assembly/util" ]
 
   sources = [
     "src/assembly_config.rs",

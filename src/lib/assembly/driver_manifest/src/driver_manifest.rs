@@ -84,7 +84,6 @@ impl DriverManifestBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BASE_DRIVER_MANIFEST_PATH;
     use assembly_test_util::generate_test_manifest;
     use camino::{Utf8Path, Utf8PathBuf};
     use std::fs;
@@ -116,7 +115,7 @@ mod tests {
             )?,
         )?;
 
-        let manifest_path = &outdir.join(BASE_DRIVER_MANIFEST_PATH);
+        let manifest_path = &outdir.join("manifest");
         driver_manifest_builder.create_manifest_file(manifest_path)?;
 
         let manifest_contents = fs::read_to_string(manifest_path)?;

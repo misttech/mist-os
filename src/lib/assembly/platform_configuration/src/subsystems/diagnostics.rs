@@ -7,8 +7,7 @@ use anyhow::{anyhow, Context};
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig,
 };
-use assembly_config_schema::FileEntry;
-use assembly_util::{read_config, write_json_file};
+use assembly_util::{read_config, write_json_file, BootfsDestination, FileEntry};
 use sampler_config::ComponentIdInfoList;
 use std::collections::BTreeSet;
 
@@ -98,11 +97,16 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         for pipeline in archivist_pipelines {
             let ArchivistPipeline { name, files } = pipeline;
             for file in files {
-                let file_name = file
+                let filename = file
                     .file_name()
                     .ok_or(anyhow!("Failed to get filename for archivist pipeline: {}", &file))?;
-                let path = format!("config/archivist/{}/{}", name, file_name);
-                builder.bootfs().file(FileEntry { source: file.clone(), destination: path })?;
+                builder.bootfs().file(FileEntry {
+                    source: file.clone(),
+                    destination: BootfsDestination::ArchivistConfig(format!(
+                        "{}/{}",
+                        name, filename
+                    )),
+                })?;
             }
         }
 

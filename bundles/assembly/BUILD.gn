@@ -3010,7 +3010,7 @@ assembly_input_bundle("example_assembly_bundle") {
   compiled_packages = [
     # Main definition for another package
     {
-      name = "foo"
+      name = "for-test"
 
       # Test that multiple components work
       components = [
@@ -3040,7 +3040,7 @@ assembly_input_bundle("example_assembly_bundle") {
     },
 
     {
-      name = "qux"
+      name = "for-test2"
       components = [
         {
           component_name = "qux"

@@ -153,7 +153,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     if !configuration.core_shards.is_empty() {
         let compiled_package_def =
             CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                name: "core".to_string(),
+                name: util::CompiledPackageDestination::Core,
                 component_shards: BTreeMap::from([(
                     "core".to_string(),
                     configuration.core_shards.clone(),

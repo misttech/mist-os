@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
-use assembly_config_schema::FileEntry;
+use assembly_util::{BootfsDestination, FileEntry};
 
 use crate::subsystems::prelude::*;
 
@@ -20,7 +20,7 @@ impl DefineSubsystemConfiguration<()> for PowerManagementSubsystem {
                 .bootfs()
                 .file(FileEntry {
                     source: power_manager_config.as_utf8_pathbuf().into(),
-                    destination: "config/power_manager/node_config.json".into(),
+                    destination: BootfsDestination::PowerManagerNodeConfig,
                 })
                 .context("Adding power_manager config file")?;
         }
@@ -30,7 +30,7 @@ impl DefineSubsystemConfiguration<()> for PowerManagementSubsystem {
                 .bootfs()
                 .file(FileEntry {
                     source: thermal_config.as_utf8_pathbuf().into(),
-                    destination: "config/power_manager/thermal_config.json".into(),
+                    destination: BootfsDestination::PowerManagerThermalConfig,
                 })
                 .context("Adding power_manager's thermal config file")?;
         }
