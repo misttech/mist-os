@@ -4,5 +4,6 @@
 global-integration-roller@fuchsia-infra.iam.gserviceaccount.com #{LAST_RESORT_SUGGESTION}
 releases-prod-builder@fuchsia-infra.iam.gserviceaccount.com #{LAST_RESORT_SUGGESTION}
 # Include users to debug submodules.
-nmulcahey@google.com #{LAST_RESORT_SUGGESTION}
-yupingz@google.com #{LAST_RESORT_SUGGESTION}
+zarvox@google.com #{LAST_RESORT_SUGGESTION}
+
+per-file owners.toml = file: /third_party/rust_crates/OWNERS
