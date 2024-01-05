@@ -8,15 +8,11 @@ use diagnostics_data::LogsData;
 use ffx_config::TestEnv;
 use ffx_isolate::Isolate;
 use fuchsia_async::TimeoutExt;
-use futures::{
-    channel::{mpsc::TrySendError, oneshot},
-    Stream, StreamExt,
-};
+use futures::{channel::mpsc::TrySendError, Stream, StreamExt};
 use serde::Deserialize;
 use std::{
-    fs::File,
-    io::{BufRead, BufReader, Write},
-    process::{ChildStdin, ChildStdout, Command, Stdio},
+    io::{BufRead, BufReader},
+    process::{Command, Stdio},
     sync::Mutex,
     time::Duration,
 };
@@ -28,8 +24,6 @@ const PRODUCT_BUNDLE_PATH: &str = env!("PRODUCT_BUNDLE_PATH");
 
 struct EmuState {
     emu: std::process::Child,
-    diagnostics: bool,
-    output_task: Option<fuchsia_async::Task<()>>,
 }
 
 /// An isolated environment for testing ffx against a running emulator.
@@ -49,40 +43,13 @@ impl IsolatedEmulator {
     /// bundle and package repository from the Fuchsia build directory. Streams logs in the
     /// background and allows resolving packages from universe.
     pub async fn start(name: &str) -> anyhow::Result<Self> {
-        Self::start_internal(name, Some(AMBER_FILES_PATH), false).await
-    }
-
-    async fn diagnostics_after_startup(
-        mut emu_stdin: ChildStdin,
-        timeout: Duration,
-        rx_got_emu_msg: oneshot::Receiver<()>,
-    ) {
-        let cmds = &[
-            "component list",
-            "component show core/sshd-host",
-            "threads --all-processes",
-            "iquery show bootstrap/driver_manager",
-            "/bin/log_listener --dump_logs yes",
-        ];
-        let _ = rx_got_emu_msg.await;
-        // OK, start the timer.  If things work, we'll be cancelled first
-        fuchsia_async::Timer::new(timeout).await;
-        for cmd in cmds.iter() {
-            writeln!(&mut emu_stdin, "{cmd}").expect("Couldn't write to stdin");
-        }
-        emu_stdin.flush().expect("couldn't flush");
+        Self::start_internal(name, Some(AMBER_FILES_PATH)).await
     }
 
     // This is private to be used for testing with a path to a different package repo. Path
     // to amber-files is optional for testing to ensure that other successful tests are actually
     // matching a developer workflow.
-    // TODO(slgrady) remove "do_diagnostics" once we have debugged the flake in which the ssh
-    // connection is never made
-    async fn start_internal(
-        name: &str,
-        amber_files_path: Option<&str>,
-        do_diagnostics: bool,
-    ) -> anyhow::Result<Self> {
+    async fn start_internal(name: &str, amber_files_path: Option<&str>) -> anyhow::Result<Self> {
         let emu_name = format!("{name}-emu");
 
         info!(%name, "making ffx isolate");
@@ -141,15 +108,12 @@ impl IsolatedEmulator {
                 "user",
                 "--name",
                 &this.emu_name,
-                // "--log",
-                // &*emulator_log,
+                "--log",
+                &*emulator_log,
                 // TODO(slgrady) remove once we have debugged the flake in which the
                 // ssh connection is never made
-                // "--startup-timeout",
-                // "120",
-                // TODO(slgrady) remove once we have debugged the flake in which the
-                // ssh connection is never made
-                "--console",
+                "--startup-timeout",
+                "120",
                 "--kernel-args",
                 "TERM=dumb",
                 PRODUCT_BUNDLE_PATH,
@@ -157,49 +121,13 @@ impl IsolatedEmulator {
             .await
             .context("creating emulator command")?;
 
-        // TODO(slgrady) remove once we have debugged the flake in which the
-        // ssh connection is never made
-        emulator_cmd.stdin(Stdio::piped());
-        emulator_cmd.stdout(Stdio::piped());
-
-        let mut emu = emulator_cmd.spawn().context("spawning emulator command")?;
-        let emu_stdout =
-            BufReader::new(emu.stdout.take().expect("Failed to open stdout of emulator"));
-
-        let (tx_got_emu_msg, rx_got_emu_msg) = oneshot::channel();
-        let output_task = Some(Self::capture_output(
-            emu_stdout,
-            tx_got_emu_msg,
-            format!("{}.serial", emulator_log),
-        )?);
-
-        let diagnostic_task = if do_diagnostics {
-            // 8 seconds after we see the initial Zircon boot msg, request
-            // diagnostics.  This will pretty much always be before we know
-            // that something has failed; but unfortunately the usual failure
-            // means that we don't have any logs after 10 seconds, maybe because
-            // Zircon is failing, or the emulator is being shut down? So we need
-            // to grab the information while we can.
-            Some(fuchsia_async::Task::spawn(Self::diagnostics_after_startup(
-                emu.stdin.take().expect("Failed to open stdin of emulator"),
-                Duration::from_secs(8),
-                rx_got_emu_msg,
-            )))
-        } else {
-            None
-        };
+        let emu = emulator_cmd.spawn().context("spawning emulator command")?;
 
         this.ffx(&["target", "wait"])
             .on_timeout(Duration::from_secs(120), || anyhow::bail!("emulator never started"))
             .await?;
 
-        if do_diagnostics {
-            // If we've gotten this far, we don't need the diagnostics any more
-            diagnostic_task.unwrap().cancel().await;
-        }
-
-        *this.emu_state.lock().unwrap() =
-            Some(EmuState { emu, diagnostics: do_diagnostics, output_task });
+        *this.emu_state.lock().unwrap() = Some(EmuState { emu });
 
         info!("streaming system logs to output directory");
         let mut system_logs_command = this
@@ -243,38 +171,6 @@ impl IsolatedEmulator {
         }
 
         Ok(this)
-    }
-
-    fn capture_output(
-        mut emu_stdout: BufReader<ChildStdout>,
-        tx_got_emu_msg: oneshot::Sender<()>,
-        out_path: String,
-    ) -> anyhow::Result<fuchsia_async::Task<()>> {
-        let mut f = File::options().create(true).append(true).open(&out_path)?;
-        let mut tx_once = Some(tx_got_emu_msg);
-        Ok(fuchsia_async::Task::spawn(fuchsia_async::unblock(move || {
-            let mut output = String::new();
-            while let Ok(o) = emu_stdout.read_line(&mut output) {
-                if o == 0 {
-                    // EOF
-                    break;
-                }
-                if tx_once.is_some() {
-                    // Wait until we see a Zircon message with a timestamp
-                    if output.contains("[00000.000]") {
-                        let tx_got_emu_msg = tx_once.take().unwrap();
-                        tx_got_emu_msg.send(()).unwrap_or_else(|e| {
-                            tracing::error!("Couldn't send <got_emu_msg> oneshot: {e:?}")
-                        });
-                    }
-                }
-                const TIME_FORMAT: &str = "%b %d %H:%M:%S%.3f";
-                let timestamp = chrono::Local::now().format(TIME_FORMAT);
-                write!(&mut f, "{timestamp}: {output}")
-                    .unwrap_or_else(|e| tracing::warn!("Couldn't write emu log: {e:?}"));
-                output = String::new();
-            }
-        })))
     }
 
     fn make_args<'a>(&'a self, args: &[&'a str]) -> Vec<&str> {
@@ -419,20 +315,9 @@ impl IsolatedEmulator {
 
     // TODO(slgrady): remove when some variation of fxr/907483 gets added
     pub async fn stop(&self) {
-        let diag = self.emu_state.lock().unwrap().as_ref().unwrap().diagnostics;
-        if diag {
-            // Technically we should wait until the output is idle. But this
-            // is a temporary hack to get the netstack diagnostics, and it's a pain
-            // to implement the correct cross-task idle logic, so we'll just
-            // sleep instead.
-            fuchsia_async::Timer::new(Duration::from_secs(45)).await;
-        }
         self.ffx(&["emu", "stop", &self.emu_name]).await.expect("emu stop failed");
         let mut emu = self.emu_state.lock().unwrap();
         if let Some(ref mut c) = emu.as_mut() {
-            if let Some(task) = c.output_task.take() {
-                task.cancel().await;
-            }
             c.emu.kill().ok();
         }
     }
@@ -470,10 +355,9 @@ mod tests {
     async fn public_apis_succeed() {
         // TODO(slgrady) change back to start() when we have debugged the flake in which the ssh
         // connection is never made
-        let emu =
-            IsolatedEmulator::start_internal("e2e_emu_public_apis", Some(AMBER_FILES_PATH), true)
-                .await
-                .expect("Couldn't start emulator");
+        let emu = IsolatedEmulator::start_internal("e2e_emu_public_apis", Some(AMBER_FILES_PATH))
+            .await
+            .expect("Couldn't start emulator");
 
         info!("Checking target monotonic time to ensure we can connect and get stdout");
         let time = emu.ffx_output(&["target", "get-time"]).await.unwrap();
@@ -507,7 +391,6 @@ mod tests {
         let emu = IsolatedEmulator::start_internal(
             "pkg_resolve",
             Some(env!("TEST_PACKAGE_REPOSITORY_PATH")),
-            true,
         )
         .await
         .unwrap();
@@ -519,7 +402,7 @@ mod tests {
     /// demonstrating that the same package is unavailable when there's no server running.
     #[fuchsia::test]
     async fn fail_to_resolve_package_when_no_package_server_running() {
-        let emu = IsolatedEmulator::start_internal("pkg_resolve_fail", None, true).await.unwrap();
+        let emu = IsolatedEmulator::start_internal("pkg_resolve_fail", None).await.unwrap();
         emu.ssh(&["pkgctl", "resolve", TEST_PACKAGE_URL]).await.unwrap_err();
         emu.stop().await;
     }
