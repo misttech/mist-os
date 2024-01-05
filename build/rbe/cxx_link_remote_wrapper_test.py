@@ -96,7 +96,7 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
             c.remote_action.inputs_relative_to_project_root,
             # re-client will automatically collect named linker inputs,
             # so they need not be listed here.
-            [],
+            [fake_builddir / source],
         )
         with mock.patch.object(
             cxx_link_remote_wrapper.CxxLinkRemoteAction,
@@ -298,8 +298,8 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
         self.assertEqual(
             c.remote_action.inputs_relative_to_project_root,
             # re-client will automatically collect named linker inputs,
-            # so they need not be listed here.
-            [],
+            # so listing them here is redundant.
+            [fake_builddir / source],
         )
         self.assertEqual(
             c.remote_action.output_files_relative_to_project_root,
@@ -365,6 +365,51 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
             c._rewrite_remote_depfile()
             new_depfile = (fake_cwd / depfile).read_text()
             self.assertEqual(new_depfile, "lib/bar.a: obj/foo.o\n")
+
+    def test_clang_cxx_link_response_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            fake_root = Path("/home/project")
+            fake_builddir = Path("out/really-not-default")
+            fake_cwd = fake_root / fake_builddir
+            compiler = Path("clang++")
+            source = Path("hello.o")
+            rspfile = tdp / "hello.rsp"
+            rspfile.write_text(f"{source}\n")
+            output = Path("hello.a")
+            target = "riscv64-apple-darwin21"
+            command = _strs(
+                [
+                    compiler,
+                    f"--target={target}",
+                    f"@{rspfile}",
+                    "-o",
+                    output,
+                ]
+            )
+            c = cxx_link_remote_wrapper.CxxLinkRemoteAction(
+                ["--"] + command,
+                exec_root=fake_root,
+                working_dir=fake_cwd,
+                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+                auto_reproxy=False,
+            )
+
+            with mock.patch.object(
+                fuchsia, "remote_clang_linker_toolchain_inputs", return_value=[]
+            ):
+                self.assertEqual(c.prepare(), 0)
+            self.assertEqual(
+                c.cxx_action.linker_inputs,
+                [source],
+            )
+            self.assertEqual(
+                c.remote_action.inputs_relative_to_working_dir,
+                [
+                    source,  # from response file
+                    rspfile,
+                ],
+            )
 
 
 class MainTests(unittest.TestCase):

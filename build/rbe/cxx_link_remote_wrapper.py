@@ -270,10 +270,11 @@ class CxxLinkRemoteAction(object):
             )
 
     def prepare(self) -> int:
-        """Setup everything ahead of remote execution."""
-        assert (
-            not self.local_only
-        ), "This should not be reached in local-only mode."
+        """Setup everything ahead of remote execution.
+
+        This may also be needed ahead of local execution to
+        evaluate the set of inputs that may need to be downloaded.
+        """
 
         if self._prepare_status is not None:
             return self._prepare_status
@@ -284,9 +285,14 @@ class CxxLinkRemoteAction(object):
         remote_inputs = []
 
         remote_inputs.extend(self.cxx_action.linker_inputs_from_flags())
-        # If re-client is unable to process inputs inside response files:
-        # remote_inputs.extend(self.cxx_action.linker_inputs)
-        # remote_inputs.extend(self.cxx_action.response_files)
+
+        # re-client in link-mode is already able to process inputs inside
+        # response files, however, local execution will need the same
+        # information from response files to download intermediate inputs.
+        # It is safe to specify remote inputs redundantly.
+        remote_inputs.extend(self.cxx_action.linker_inputs)
+        remote_inputs.extend(self.cxx_action.response_files)
+
         # TODO(b/307418630): remove the following workaround when fixed.
         remote_inputs.extend(self.cxx_action.linker_response_files)
 
@@ -491,7 +497,23 @@ class CxxLinkRemoteAction(object):
         return fuchsia.remote_executable(self.host_compiler)
 
     def _run_locally(self) -> int:
-        export_dir = self.miscomparison_export_dir
+        # It is possible that inputs come from a previous remote action
+        # whose outputs were not downloaded.  Ensure that those inputs
+        # are downloaded before executing the action locally.
+        prepare_status = self.prepare()
+        if prepare_status != 0:
+            return prepare_status
+
+        remote_artifact_suffixes = {".o", ".a", ".so", ".dylib"}
+        download_statuses = self.remote_action.download_inputs(
+            lambda path: path.suffix in remote_artifact_suffixes
+            and not str(path).startswith(str(self.remote_action.exec_root_rel))
+        )
+        for path, status in download_statuses.items():
+            if status.returncode != 0:
+                msg(f"Failed to download input: {path}\n{status.stderr_text}")
+                return status.returncode
+
         if self.check_determinism:
             self.vmsg(
                 "Running the original link command locally twice and comparing outputs."
@@ -506,6 +528,7 @@ class CxxLinkRemoteAction(object):
                 )
                 max_attempts = override_attempts
 
+            export_dir = self.miscomparison_export_dir
             command = fuchsia.check_determinism_command(
                 exec_root=self.exec_root_rel,
                 outputs=output_files,
