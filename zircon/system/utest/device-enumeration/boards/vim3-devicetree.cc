@@ -20,6 +20,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/fuchsia-contiguous/sysmem",
       "sys/platform/register-controller-1000/registers-device",
       "sys/platform/nna-ff100000",
+      "sys/platform/dsi-7000/dw-dsi",
 
   };
 

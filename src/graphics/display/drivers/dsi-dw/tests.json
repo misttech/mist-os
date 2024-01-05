@@ -15,5 +15,13 @@
         },
         "expected": "match",
         "name": "Correct"
+    },
+    {
+        "device": {
+            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE",
+            "fuchsia.devicetree.FIRST_COMPATIBLE": "\"dw,dsi\""
+        },
+        "expected": "match",
+        "name": "Match devicetree"
     }
 ]

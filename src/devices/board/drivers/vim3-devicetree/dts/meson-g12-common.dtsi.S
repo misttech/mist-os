@@ -49,18 +49,23 @@
 			#size-cells = <2>;
 			ranges = <0x0 0x0 0x0 0xFFD00000 0x0 0x100000>;
 
+			reset: register-controller@1000 {
+				compatible = "fuchsia,registers";
+				reg = <0x0 0x1000 0x0 0x100>;
+				#register-cells = <4>;
+			};
+
+			mipi_dsi: dsi@7000 {
+				compatible = "dw,dsi";
+				reg = <0x0 0x7000 0x0 0x1000>;
+			};
+
 			i2c3: i2c@1c000 {
 				compatible = "amlogic,meson-axg-i2c";
 				reg = <0x0 0x1c000 0x0 0x20>;
 				interrupts = <GIC_SPI 39 GIC_IRQ_MODE_EDGE_RISING>;
 				#address-cells = <1>;
 				#size-cells = <0>;
-			};
-
-			reset: register-controller@1000 {
-				compatible = "fuchsia,registers";
-				reg = <0x0 0x1000 0x0 0x100>;
-				#register-cells = <4>;
 			};
 		};
 	};

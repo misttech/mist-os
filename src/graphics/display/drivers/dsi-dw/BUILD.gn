@@ -11,7 +11,10 @@ driver_bind_rules("dsi_dw_bind") {
   rules = "dsi_dw.bind"
   bind_output = "dsi-dw.bindbc"
   tests = "tests.json"
-  deps = [ "//src/devices/bind/fuchsia.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.devicetree",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
 source_set("common_srcs") {
