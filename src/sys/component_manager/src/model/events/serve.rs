@@ -5,8 +5,10 @@
 use {
     crate::model::{
         events::{event::Event, registry::ComponentEventRoute, stream::EventStream},
-        hooks::{EventPayload, EventType, HasEventType},
+        hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType},
     },
+    crate::sandbox_util::ProtocolPayloadExt,
+    async_utils::stream::FlattenUnorderedExt,
     cm_rust::{ChildRef, EventScope},
     cm_types::Name,
     cm_util::io::clone_dir,
@@ -16,7 +18,7 @@ use {
     fuchsia_zircon::{
         self as zx, sys::ZX_CHANNEL_MAX_MSG_BYTES, sys::ZX_CHANNEL_MAX_MSG_HANDLES, HandleBased,
     },
-    futures::{lock::Mutex, stream::Peekable, Stream, StreamExt},
+    futures::{stream, stream::Peekable, Stream, StreamExt},
     measure_tape_for_events::Measurable,
     moniker::{ChildNameBase, ExtendedMoniker, Moniker, MonikerBase},
     std::{pin::Pin, sync::Arc, task::Poll},
@@ -308,8 +310,10 @@ pub async fn serve_event_stream_as_stream(
         }
         Some(event)
     }
-    async fn try_into_fidl_object(event: Event) -> Option<fcomponent::Event> {
-        match create_event_fidl_object(event).await {
+    async fn filter_log_errors(
+        result: Result<fcomponent::Event, anyhow::Error>,
+    ) -> Option<fcomponent::Event> {
+        match result {
             Ok(event_fidl_object) => Some(event_fidl_object),
             Err(error) => {
                 warn!(?error, "Failed to create event object");
@@ -317,8 +321,13 @@ pub async fn serve_event_stream_as_stream(
             }
         }
     }
-    let event_stream = event_stream.filter_map(filter_event).filter_map(try_into_fidl_object);
-    let mut event_stream = event_stream.peekable();
+    let event_stream = event_stream
+        .filter_map(filter_event)
+        .map(create_event_fidl_objects)
+        .fuse()
+        .flatten_unordered()
+        .filter_map(filter_log_errors);
+    let event_stream = event_stream.boxed().peekable();
     let mut event_stream = std::pin::pin!(event_stream);
 
     let mut buffer = None;
@@ -347,26 +356,32 @@ pub async fn serve_event_stream(
     serve_event_stream_as_stream(event_stream, stream).await;
 }
 
-async fn create_event_result(
-    event_result: &EventPayload,
-) -> Result<fcomponent::EventPayload, fidl::Error> {
-    match event_result {
+type BoxStream<T> = Pin<Box<dyn Stream<Item = T> + Send + 'static>>;
+
+fn stream_once<T: Send + 'static>(value: T) -> BoxStream<T> {
+    stream::once(std::future::ready(value)).boxed()
+}
+
+fn create_event_payloads(
+    event_payload: &EventPayload,
+) -> BoxStream<Result<fcomponent::EventPayload, fidl::Error>> {
+    match event_payload {
         EventPayload::DirectoryReady { name, node, .. } => {
-            Ok(create_directory_ready_payload(name.to_string(), node)?)
+            stream_once(create_directory_ready_payload(name.to_string(), node))
         }
-        EventPayload::CapabilityRequested { name, capability, .. } => {
-            Ok(create_capability_requested_payload(name.to_string(), capability.clone()).await)
+        EventPayload::CapabilityRequested { name, receiver, .. } => {
+            create_capability_requested_payload(name.to_string(), receiver.clone())
         }
         EventPayload::Stopped { status } => {
-            Ok(fcomponent::EventPayload::Stopped(fcomponent::StoppedPayload {
+            stream_once(Ok(fcomponent::EventPayload::Stopped(fcomponent::StoppedPayload {
                 status: Some(status.into_raw()),
                 ..Default::default()
-            }))
+            })))
         }
         EventPayload::DebugStarted { runtime_dir, break_on_start } => {
-            Ok(create_debug_started_payload(runtime_dir, break_on_start))
+            stream_once(Ok(create_debug_started_payload(runtime_dir, break_on_start)))
         }
-        payload => Ok(match payload.event_type() {
+        payload => stream_once(Ok(match payload.event_type() {
             EventType::Discovered => {
                 fcomponent::EventPayload::Discovered(fcomponent::DiscoveredPayload::default())
             }
@@ -383,7 +398,7 @@ async fn create_event_result(
                 fcomponent::EventPayload::Started(fcomponent::StartedPayload::default())
             }
             _ => unreachable!("Unsupported event type"),
-        }),
+        })),
     }
 }
 
@@ -407,17 +422,42 @@ fn create_directory_ready_payload(
     Ok(fcomponent::EventPayload::DirectoryReady(payload))
 }
 
-async fn create_capability_requested_payload(
+fn create_capability_requested_payload(
     name: String,
-    capability: Arc<Mutex<Option<zx::Channel>>>,
-) -> fcomponent::EventPayload {
-    let capability = capability.lock().await.take();
-    let payload = fcomponent::CapabilityRequestedPayload {
-        name: Some(name),
-        capability,
-        ..Default::default()
-    };
-    fcomponent::EventPayload::CapabilityRequested(payload)
+    receiver: CapabilityReceiver,
+) -> BoxStream<Result<fcomponent::EventPayload, fidl::Error>> {
+    match receiver.take() {
+        // If this component has the opportunity to intercept capability requests,
+        // emit a CapabilityRequested event for every request it receives.
+        Some(receiver) => stream::unfold(receiver, move |receiver| {
+            let name = name.clone();
+            async move {
+                let Some(message) = receiver.receive().await else {
+                    return None;
+                };
+                let Some(channel) = message.payload.unwrap_server_end_or_serve_node() else {
+                    return None;
+                };
+                let payload = fcomponent::CapabilityRequestedPayload {
+                    name: Some(name),
+                    capability: Some(channel),
+                    ..Default::default()
+                };
+                Some((Ok(fcomponent::EventPayload::CapabilityRequested(payload)), receiver))
+            }
+        })
+        .boxed(),
+        // If someone else took away the opportunity to intercept capability requests,
+        // emit a CapabilityRequested event with an absent capability.
+        None => stream::once(std::future::ready(Ok(
+            fcomponent::EventPayload::CapabilityRequested(fcomponent::CapabilityRequestedPayload {
+                name: Some(name),
+                capability: None,
+                ..Default::default()
+            }),
+        )))
+        .boxed(),
+    }
 }
 
 fn create_debug_started_payload(
@@ -436,8 +476,8 @@ fn create_debug_started_payload(
     })
 }
 
-/// Creates the basic FIDL Event object
-async fn create_event_fidl_object(event: Event) -> Result<fcomponent::Event, anyhow::Error> {
+/// Creates a stream of FIDL Event objects from an Event.
+fn create_event_fidl_objects(event: Event) -> BoxStream<Result<fcomponent::Event, anyhow::Error>> {
     let moniker_string = match (&event.event.target_moniker, &event.scope_moniker) {
         (moniker @ ExtendedMoniker::ComponentManager, _) => moniker.to_string(),
         (ExtendedMoniker::ComponentInstance(target), ExtendedMoniker::ComponentManager) => {
@@ -447,15 +487,31 @@ async fn create_event_fidl_object(event: Event) -> Result<fcomponent::Event, any
             target.strip_prefix(scope).expect("target must be a child of event scope").to_string()
         }
     };
+    let event_type = match event.event.event_type().try_into() {
+        Ok(event_type) => event_type,
+        Err(error) => return stream::once(std::future::ready(Err(error))).boxed(),
+    };
     let header = fcomponent::EventHeader {
-        event_type: Some(event.event.event_type().try_into()?),
+        event_type: Some(event_type),
         moniker: Some(moniker_string),
         component_url: Some(event.event.component_url.clone()),
         timestamp: Some(event.event.timestamp.into_nanos()),
         ..Default::default()
     };
-    let payload = create_event_result(&event.event.payload).await?;
-    Ok(fcomponent::Event { header: Some(header), payload: Some(payload), ..Default::default() })
+    let payload_stream = create_event_payloads(&event.event.payload);
+    payload_stream
+        .map(move |payload| {
+            payload
+                .and_then(|payload| {
+                    Ok(fcomponent::Event {
+                        header: Some(header.clone()),
+                        payload: Some(payload),
+                        ..Default::default()
+                    })
+                })
+                .map_err(Into::into)
+        })
+        .boxed()
 }
 
 #[cfg(test)]

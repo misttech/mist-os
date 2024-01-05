@@ -410,31 +410,39 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            hooks::{Event as ComponentEvent, EventPayload},
+            hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload},
             testing::test_helpers::{TestModelResult, *},
         },
         assert_matches::assert_matches,
         cm_rust::{Availability, UseSource},
-        fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+        fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::StreamExt,
         moniker::Moniker,
+        sandbox::Message,
         std::str::FromStr,
     };
 
     async fn dispatch_capability_requested_event(registry: &EventRegistry) {
         let (_, capability_server_end) = zx::Channel::create();
-        let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
+        let (receiver, sender) = CapabilityReceiver::new();
         let event = ComponentEvent::new_for_test(
             Moniker::root(),
             "fuchsia-pkg://root",
             EventPayload::CapabilityRequested {
                 source_moniker: Moniker::root(),
                 name: "foo".to_string(),
-                capability: capability_server_end,
-                flags: fio::OpenFlags::empty(),
-                relative_path: "".into(),
+                receiver,
             },
         );
+        sender
+            .send(Message {
+                payload: fsandbox::ProtocolPayload {
+                    channel: capability_server_end,
+                    flags: fio::OpenFlags::empty(),
+                },
+                target: (),
+            })
+            .unwrap();
         registry.dispatch(&event).await;
     }
 

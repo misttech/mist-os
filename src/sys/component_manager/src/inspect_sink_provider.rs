@@ -4,10 +4,11 @@
 
 use crate::model::{
     events::synthesizer::{EventSynthesisProvider, ExtendedComponent},
-    hooks::{Event, EventPayload},
+    hooks::{CapabilityReceiver, Event, EventPayload},
 };
 use async_trait::async_trait;
 use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_inspect::InspectSinkMarker;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TaskGroup;
@@ -16,7 +17,7 @@ use futures::lock::Mutex;
 use inspect_runtime::{publish, PublishOptions};
 use moniker::Moniker;
 use routing::event::EventFilter;
-use std::sync::Arc;
+use sandbox::Message;
 
 /// A struct for providing CapabilityRequested events carrying a channel for
 /// `fuchsia.inspect.InspectSink`.
@@ -62,12 +63,18 @@ impl EventSynthesisProvider for InspectSinkProvider {
                 return vec![];
             };
 
+            let (receiver, sender) = CapabilityReceiver::new();
+            let _ = sender.send(Message {
+                payload: fsandbox::ProtocolPayload {
+                    channel: server.into_channel(),
+                    flags: fio::OpenFlags::empty(),
+                },
+                target: (),
+            });
             vec![Event::new_builtin(EventPayload::CapabilityRequested {
                 source_moniker,
                 name: InspectSinkMarker::PROTOCOL_NAME.into(),
-                capability: Arc::new(Mutex::new(Some(server.into_channel()))),
-                flags: fio::OpenFlags::empty(),
-                relative_path: "".into(),
+                receiver,
             })]
         } else {
             vec![]

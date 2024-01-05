@@ -16,12 +16,12 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{channel::oneshot, lock::Mutex},
     moniker::{ExtendedMoniker, Moniker},
+    sandbox::{Receiver, Sender},
     std::{
         collections::HashMap,
         convert::TryFrom,
         fmt,
-        path::PathBuf,
-        sync::{Arc, Weak},
+        sync::{Arc, Mutex as StdMutex, Weak},
     },
     tracing::warn,
 };
@@ -203,15 +203,49 @@ impl HooksRegistration {
     }
 }
 
+/// A [`CapabilityReceiver`] lets a `CapabilityRequested` event subscriber take the
+/// opportunity to monitor requests for the corresponding capability.
+#[derive(Clone)]
+pub struct CapabilityReceiver {
+    inner: Arc<StdMutex<Option<Receiver<()>>>>,
+}
+
+impl CapabilityReceiver {
+    /// Creates a [`CapabilityReceiver`] that receives connection requests sent via the
+    /// [`Sender`] capability.
+    pub fn new() -> (Self, Sender<()>) {
+        let (receiver, sender) = Receiver::<()>::new();
+        let inner = Arc::new(StdMutex::new(Some(receiver)));
+        (Self { inner }, sender)
+    }
+
+    /// Take the opportunity to monitor requests.
+    pub fn take(&self) -> Option<Receiver<()>> {
+        self.inner.lock().unwrap().take()
+    }
+
+    /// Did someone call `take` on this capability receiver.
+    pub fn is_taken(&self) -> bool {
+        self.inner.lock().unwrap().is_none()
+    }
+}
+
+#[async_trait]
+impl TransferEvent for CapabilityReceiver {
+    async fn transfer(&self) -> Self {
+        let receiver = self.take();
+        let inner = Arc::new(StdMutex::new(receiver));
+        Self { inner }
+    }
+}
+
 #[derive(Clone)]
 pub enum EventPayload {
     // Keep the events listed below in alphabetical order!
     CapabilityRequested {
         source_moniker: Moniker,
         name: String,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-        capability: Arc<Mutex<Option<zx::Channel>>>,
+        receiver: CapabilityReceiver,
     },
     DirectoryReady {
         name: String,
@@ -367,20 +401,11 @@ impl Event {
 impl TransferEvent for EventPayload {
     async fn transfer(&self) -> Self {
         match self {
-            EventPayload::CapabilityRequested {
-                source_moniker,
-                name,
-                capability,
-                flags,
-                relative_path,
-            } => {
-                let capability = capability.lock().await.take();
+            EventPayload::CapabilityRequested { source_moniker, name, receiver } => {
                 EventPayload::CapabilityRequested {
                     source_moniker: source_moniker.clone(),
                     name: name.to_string(),
-                    flags: *flags,
-                    relative_path: relative_path.clone(),
-                    capability: Arc::new(Mutex::new(capability)),
+                    receiver: receiver.transfer().await,
                 }
             }
             result => result.clone(),
@@ -494,40 +519,35 @@ impl Hooks {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, moniker::MonikerBase, std::sync::Arc};
+    use {super::*, moniker::MonikerBase};
 
     // This test verifies that the payload of the CapabilityRequested event will be transferred.
     #[fuchsia::test]
     async fn capability_requested_transfer() {
-        let (_, capability_server_end) = zx::Channel::create();
-        let capability_server_end = Arc::new(Mutex::new(Some(capability_server_end)));
+        let (receiver, _sender) = CapabilityReceiver::new();
         let event = Event::new_for_test(
             Moniker::root(),
             "fuchsia-pkg://root",
             EventPayload::CapabilityRequested {
                 source_moniker: Moniker::root(),
                 name: "foo".to_string(),
-                capability: capability_server_end,
-                flags: fio::OpenFlags::empty(),
-                relative_path: "".into(),
+                receiver,
             },
         );
 
         // Verify the transferred event carries the capability.
         let transferred_event = event.transfer().await;
         match transferred_event.payload {
-            EventPayload::CapabilityRequested { capability, .. } => {
-                let capability = capability.lock().await;
-                assert!(capability.is_some());
+            EventPayload::CapabilityRequested { receiver, .. } => {
+                assert!(!receiver.is_taken());
             }
             _ => panic!("Event type unexpected"),
         }
 
         // Verify that the original event no longer carries the capability.
         match &event.payload {
-            EventPayload::CapabilityRequested { capability, .. } => {
-                let capability = capability.lock().await;
-                assert!(capability.is_none());
+            EventPayload::CapabilityRequested { receiver, .. } => {
+                assert!(receiver.is_taken());
             }
             _ => panic!("Event type unexpected"),
         }
@@ -535,9 +555,8 @@ mod tests {
         // Transferring the original event again should give an empty capability provider.
         let second_transferred_event = event.transfer().await;
         match &second_transferred_event.payload {
-            EventPayload::CapabilityRequested { capability, .. } => {
-                let capability = capability.lock().await;
-                assert!(capability.is_none());
+            EventPayload::CapabilityRequested { receiver, .. } => {
+                assert!(receiver.is_taken());
             }
             _ => panic!("Event type unexpected"),
         }

@@ -7,7 +7,7 @@ use {
         model::{
             component::{ComponentInstance, StartReason, WeakComponentInstance},
             error::{CapabilityProviderError, ComponentProviderError},
-            hooks::{Event, EventPayload},
+            hooks::{CapabilityReceiver, Event, EventPayload},
         },
     },
     ::routing::path::PathBufExt,
@@ -17,8 +17,8 @@ use {
     cm_util::channel,
     cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::lock::Mutex,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    sandbox::{Message, Sender},
     std::{path::PathBuf, sync::Arc},
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
 };
@@ -42,8 +42,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), CapabilityProviderError> {
-        let capability = Arc::new(Mutex::new(Some(channel::take_channel(server_end))));
-        let res = async {
+        let (component, sender) = async {
             // Start the source component, if necessary
             let source = self
                 .source
@@ -61,6 +60,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 )
                 .await?;
 
+            let (receiver, sender) = CapabilityReceiver::new();
             let event = Event::new(
                 &self
                     .target
@@ -69,31 +69,38 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 EventPayload::CapabilityRequested {
                     source_moniker: source.moniker.clone(),
                     name: self.name.to_string(),
-                    flags: flags,
-                    relative_path: relative_path.clone(),
-                    capability: capability.clone(),
+                    receiver: receiver.clone(),
                 },
             );
             source.hooks.dispatch(&event).await;
-            Result::<Arc<ComponentInstance>, ComponentProviderError>::Ok(source)
+            let sender = if receiver.is_taken() { Some(sender) } else { None };
+            Result::<(Arc<ComponentInstance>, Option<Sender<()>>), ComponentProviderError>::Ok((
+                source, sender,
+            ))
         }
-        .await;
+        .await?;
 
-        // If the capability transported through the event above wasn't transferred
-        // out, then we can open the capability through the component's outgoing directory.
-        // If some hook consumes the capability, then we don't bother looking in the outgoing
-        // directory.
-        let capability = capability.lock().await.take();
-        if let Some(mut server_end_in) = capability {
+        let path = self.path.to_path_buf().attach(relative_path);
+        let path = path.to_str().ok_or(CapabilityProviderError::BadPath)?;
+        // If no component intercepts the capability request via hooks, then we
+        // can open the capability through the component's outgoing directory.
+        // If some hook intercepts the capability request, then we don't bother
+        // looking in the outgoing directory.
+        if let Some(sender) = sender {
+            let _ = sender.send(Message {
+                payload: fsandbox::ProtocolPayload {
+                    channel: channel::take_channel(server_end),
+                    flags,
+                },
+                target: (),
+            });
+        } else {
             // Pass back the channel so the caller can set the epitaph, if necessary.
-            *server_end = channel::take_channel(&mut server_end_in);
-            let path = self.path.to_path_buf().attach(relative_path);
-            let path = path.to_str().ok_or(CapabilityProviderError::BadPath)?;
-            res?.open_outgoing(flags, path, server_end)
+            *server_end = channel::take_channel(server_end);
+            component
+                .open_outgoing(flags, path, server_end)
                 .await
                 .map_err(|e| CapabilityProviderError::ComponentProviderError { err: e.into() })?;
-        } else {
-            res?;
         }
         Ok(())
     }

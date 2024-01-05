@@ -23,7 +23,7 @@ use {
             StopActionError, StructuredConfigError, UnresolveActionError,
         },
         exposed_dir::ExposedDir,
-        hooks::{Event, EventPayload, Hooks},
+        hooks::{CapabilityReceiver, Event, EventPayload, Hooks},
         namespace::create_namespace,
         routing::{
             self,
@@ -68,6 +68,7 @@ use {
         epitaph::ChannelEpitaphExt,
     },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client,
@@ -77,7 +78,7 @@ use {
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Dict, Receiver},
+    sandbox::{Dict, Message, Receiver, Sender},
     std::iter::{self, Iterator},
     std::{
         boxed::Box,
@@ -2152,49 +2153,51 @@ impl DictDispatcher {
                         .find(|decl| decl.name() == &name)
                         .expect("capability received for name not in dict");
                     // Check if the hooks system wants to claim the handle.
-                    if let Some(channel) = Self::dispatch_capability_routed_hook(
+                    let channel = message.payload.channel;
+                    if let Some(sender) = Self::dispatch_capability_requested_hook(
                         &component,
                         name.to_string(),
-                        message.payload.channel,
                         message.target,
-                        message.payload.flags,
-                        "".into(),
                     )
                     .await
                     {
-                        // Deliver the handle to the component.
-                        let path = fuchsia_fs::canonicalize_path(
-                            capability_decl
-                                .path()
-                                .expect("invalid protocol capability decl")
-                                .as_str(),
-                        );
-                        let server_end = ServerEnd::new(channel);
-                        // There's not much we can do if the open fails. The component's probably
-                        // crashed, and the stop action should be initiated momentarily or already
-                        // have started.
-                        let _ = directory.open(
-                            message.payload.flags,
-                            fio::ModeType::empty(),
-                            path,
-                            server_end,
-                        );
+                        // Deliver the handle to the event system.
+                        let _ = sender.send(Message {
+                            payload: fsandbox::ProtocolPayload {
+                                channel,
+                                flags: message.payload.flags,
+                            },
+                            target: (),
+                        });
+                        continue;
                     }
+                    // Deliver the handle to the component.
+                    let path = fuchsia_fs::canonicalize_path(
+                        capability_decl.path().expect("invalid protocol capability decl").as_str(),
+                    );
+                    let server_end = ServerEnd::new(channel);
+                    // There's not much we can do if the open fails. The component's probably
+                    // crashed, and the stop action should be initiated momentarily or already
+                    // have started.
+                    let _ = directory.open(
+                        message.payload.flags,
+                        fio::ModeType::empty(),
+                        path,
+                        server_end,
+                    );
                 }
             }),
         }
     }
 
-    /// Dispatches the capability routed hook. Returns the handle if none of the hooks took it.
-    async fn dispatch_capability_routed_hook(
+    /// Dispatches the capability routed hook. Returns an [`Sender`] if a hook wants to
+    /// intercept the capability request. The caller should then send the server
+    /// endpoint to the [`Sender`].
+    async fn dispatch_capability_requested_hook(
         source_component: &WeakComponentInstance,
         name: String,
-        channel: zx::Channel,
         target_component: WeakComponentInstance,
-        flags: fio::OpenFlags,
-        relative_path: PathBuf,
-    ) -> Option<zx::Channel> {
-        let capability = Arc::new(Mutex::new(Some(channel)));
+    ) -> Option<Sender<()>> {
         let source_component = match source_component.upgrade() {
             Ok(component) => component,
             Err(_) => {
@@ -2210,19 +2213,21 @@ impl DictDispatcher {
                 return None;
             }
         };
+        let (receiver, sender) = CapabilityReceiver::new();
         let event = Event::new(
             &target_component,
             EventPayload::CapabilityRequested {
                 source_moniker: source_component.moniker.clone(),
                 name,
-                capability: capability.clone(),
-                flags,
-                relative_path,
+                receiver: receiver.clone(),
             },
         );
         source_component.hooks.dispatch(&event).await;
-        let mut guard = capability.lock().await;
-        guard.take()
+        if receiver.is_taken() {
+            Some(sender)
+        } else {
+            None
+        }
     }
 }
 
