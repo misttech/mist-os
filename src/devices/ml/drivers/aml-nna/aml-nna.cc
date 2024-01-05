@@ -178,16 +178,47 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  pdev_device_info_t info;
-  status = pdev.GetDeviceInfo(&info);
+  pdev_board_info_t info;
+  // TODO(fxb/318736574) : Replace with GetDeviceInfo.
+  status = pdev.GetBoardInfo(&info);
   if (status != ZX_OK) {
     zxlogf(ERROR, "pdev_.GetDeviceInfo failed %d\n", status);
     return status;
   }
 
+  uint32_t nna_pid = 0;
+  if (info.vid == PDEV_VID_AMLOGIC) {
+    nna_pid = info.pid;
+  } else if (info.vid == PDEV_VID_GOOGLE) {
+    switch (info.pid) {
+      case PDEV_PID_SHERLOCK:
+        nna_pid = PDEV_PID_AMLOGIC_T931;
+        break;
+      case PDEV_PID_NELSON:
+        nna_pid = PDEV_PID_AMLOGIC_S905D3;
+        break;
+      default:
+        zxlogf(ERROR, "unhandled PID 0x%x for VID 0x%x", info.pid, info.vid);
+        return ZX_ERR_INVALID_ARGS;
+    }
+  } else if (info.vid == PDEV_VID_KHADAS) {
+    switch (info.pid) {
+      case PDEV_PID_VIM3:
+        nna_pid = PDEV_PID_AMLOGIC_A311D;
+        break;
+      default:
+        zxlogf(ERROR, "unhandled PID 0x%x for VID 0x%x", info.pid, info.vid);
+        return ZX_ERR_INVALID_ARGS;
+    }
+  } else {
+    zxlogf(ERROR, "unhandled VID 0x%x", info.vid);
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   NnaBlock nna_block;
   zx::resource smc_monitor;
-  switch (info.pid) {
+
+  switch (nna_pid) {
     case PDEV_PID_AMLOGIC_A311D:
     case PDEV_PID_AMLOGIC_T931:
       nna_block = T931NnaBlock;
@@ -204,7 +235,7 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
       }
       break;
     default:
-      zxlogf(ERROR, "unhandled PID 0x%x", info.pid);
+      zxlogf(ERROR, "unhandled PID 0x%x", nna_pid);
       return ZX_ERR_INVALID_ARGS;
   }
 
