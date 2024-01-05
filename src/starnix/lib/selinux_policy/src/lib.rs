@@ -23,6 +23,7 @@ use {
     metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature},
     parser::{ByRef, ParseStrategy},
     symbols::{
+        find_class_by_name, find_class_permission_by_name, find_type_alias_or_attribute_by_name,
         Category, Class, CommonSymbol, ConditionalBoolean, Role, Sensitivity, SymbolList, Type,
         User,
     },
@@ -154,6 +155,84 @@ where
     /// policy.
     pub fn handle_unknown(&self) -> &HandleUnknown {
         self.config.handle_unknown()
+    }
+
+    /// Returns whether the input access vector is explicitly allowed by some `allow [...];` policy
+    /// statement, or an error if lookups for input query strings fail.
+    pub fn is_explicitly_allowed(
+        &self,
+        source_type_name: &str,
+        target_type_name: &str,
+        target_class_name: &str,
+        permission_name: &str,
+    ) -> Result<bool, ()> {
+        let source_type =
+            find_type_alias_or_attribute_by_name(&self.types.data, source_type_name).ok_or(())?;
+        let target_type =
+            find_type_alias_or_attribute_by_name(&self.types.data, target_type_name).ok_or(())?;
+        let target_class = find_class_by_name(&self.classes.data, target_class_name).ok_or(())?;
+        let permission =
+            find_class_permission_by_name(&self.common_symbols.data, target_class, permission_name)
+                .ok_or(())?;
+        let permission_value = permission.value();
+        let permission_bit = (1 as u32) << (permission_value - 1);
+
+        let source_type_value = source_type.value();
+        let target_type_value = target_type.value();
+        let target_class_value = target_class.value();
+
+        for access_vector in self.access_vectors.data.iter() {
+            // Concern ourselves only with explicit `allow [...];` policy statements.
+            if !access_vector.is_allow() {
+                continue;
+            }
+
+            // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
+            // policy statements where `[class]` matches `target_class_value`.
+            if access_vector.target_class() != target_class_value as u16 {
+                continue;
+            }
+
+            // Concern ourselves only with
+            // `allow [source-type] [target-type]:[class] { [permissions] };` policy statements
+            // where `permission_bit` refers to one of `[permissions]`.
+            match access_vector.permission_mask() {
+                Some(mask) => {
+                    if (mask & permission_bit) == 0 {
+                        continue;
+                    }
+                }
+                None => continue,
+            }
+
+            // Note: Perform bitmap lookups last: they are the most expensive comparison operation.
+
+            // Note: Type values start at 1, but are 0-indexed in bitmaps: hence the `type - 1` bitmap
+            // lookups below.
+
+            // Concern ourselves only with `allow [source-type] [...];` policy statements where
+            // `[source-type]` is associated with `source_type_value`.
+            let source_attribute_bitmap: &ExtensibleBitmap<PS> =
+                &self.attribute_maps[(source_type_value - 1) as usize];
+            if !source_attribute_bitmap.is_set((access_vector.source_type() - 1) as u32) {
+                continue;
+            }
+
+            // Concern ourselves only with `allow [source-type] [target-type][...];` policy
+            // statements where `[target-type]` is associated with `target_type_value`.
+            let target_attribute_bitmap: &ExtensibleBitmap<PS> =
+                &self.attribute_maps[(target_type_value - 1) as usize];
+            if !target_attribute_bitmap.is_set((access_vector.target_type() - 1) as u32) {
+                continue;
+            }
+
+            // `access_vector` explicitly allows the source, target, permission in this query.
+            return Ok(true);
+        }
+
+        // Failed to find any explicit-allow access vector for this source, target, permission
+        // query.
+        Ok(false)
     }
 }
 

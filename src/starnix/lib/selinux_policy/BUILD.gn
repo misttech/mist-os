@@ -34,7 +34,7 @@ fuchsia_unittest_package("selinux_policy-tests") {
 }
 
 if (is_host) {
-  testdata_files = [
+  testdata_policies = [
     "emulator",
     "minimal",
     "selinux_testsuite",
@@ -42,7 +42,7 @@ if (is_host) {
 
   policy_files = []
   expectation_files = []
-  foreach(file, testdata_files) {
+  foreach(file, testdata_policies) {
     policy_files += [ "testdata/policies/$file" ]
     expectation_files += [ "testdata/expectations/$file" ]
   }
@@ -57,6 +57,29 @@ if (is_host) {
     outputs = [ "$target_out_dir/testdata/expectations/{{source_file_part}}" ]
   }
 
+  testdata_micro_policies = [
+    "allow_a_attr_b_attr_class0_perm0",
+    "allow_a_t_b_attr_class0_perm0",
+    "allow_a_t_b_t_class0_perm0",
+    "minimal",
+    "no_allow_a_attr_b_attr_class0_perm0",
+    "no_allow_a_t_b_attr_class0_perm0",
+    "no_allow_a_t_b_t_class0_perm0",
+  ]
+
+  micro_policy_files = []
+  foreach(file, testdata_micro_policies) {
+    micro_policy_files += [
+      "testdata/micro_policies/${file}_policy.conf",
+      "testdata/micro_policies/${file}_policy.pp",
+    ]
+  }
+
+  host_test_data("testdata_micro_policies") {
+    sources = micro_policy_files
+    outputs = [ "$target_out_dir/testdata/micro_policies/{{source_file_part}}" ]
+  }
+
   config("config") {
     testdata_dir = "$target_out_dir/testdata"
     rustenv = [ "TESTDATA_DIR=" + rebase_path(testdata_dir, root_build_dir) ]
@@ -69,6 +92,7 @@ if (is_host) {
     deps = [
       ":selinux_policy",
       ":testdata_expectations",
+      ":testdata_micro_policies",
       ":testdata_policies",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json5",

@@ -17,6 +17,18 @@ use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 /// [`TypeSet`].
 const CONSTRAINT_TYPE_HAS_EXTENSIBLE_BITMAP_AND_TYPE_SET: u32 = 5;
 
+/// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux type.
+///
+/// TODO: Eliminate `dead_code` guard.
+#[allow(dead_code)]
+pub(crate) const TYPE_PROPERTIES_TYPE: u32 = 1;
+
+/// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux alias.
+pub(crate) const TYPE_PROPERTIES_ALIAS: u32 = 0;
+
+/// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux attribute.
+pub(crate) const TYPE_PROPERTIES_ATTRIBUTE: u32 = 0;
+
 /// [`SymbolList`] is an [`Array`] of items with the count of items determined by [`Metadata`] as
 /// [`Counted`].
 #[derive(Debug, PartialEq)]
@@ -103,6 +115,17 @@ impl<PS: ParseStrategy> Validate for [CommonSymbol<PS>] {
 array_type!(CommonSymbol, PS, CommonSymbolMetadata<PS>, Permissions<PS>);
 
 array_type_validate_deref_none_data_vec!(CommonSymbol);
+
+pub(crate) type CommonSymbols<PS> = Vec<CommonSymbol<PS>>;
+
+impl<PS: ParseStrategy> CommonSymbol<PS> {
+    /// Returns the name of this common symbol (a string), encoded a borrow of a byte slice. For
+    /// example, the policy statement `common file { common_file_perm }` induces a [`CommonSymbol`]
+    /// where `name_bytes() == "file".as_slice()`.
+    pub fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.metadata.data)
+    }
+}
 
 impl<PS: ParseStrategy> Counted for CommonSymbol<PS>
 where
@@ -204,6 +227,19 @@ impl<PS: ParseStrategy> Validate for Permissions<PS> {
 array_type!(Permission, PS, PS::Output<PermissionMetadata>, PS::Slice<u8>);
 
 array_type_validate_deref_both!(Permission);
+
+impl<PS: ParseStrategy> Permission<PS> {
+    /// Returns the name of this permission (a string), encoded a borrow of a byte slice. For
+    /// example the class named `"file"` class has a permission named `"entrypoint"` and the
+    /// `"process"` class has a permission named `"fork"`.
+    pub fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.data)
+    }
+
+    pub fn value(&self) -> u32 {
+        PS::deref(&self.metadata).value.get()
+    }
+}
 
 impl<PS: ParseStrategy> ValidateArray<PermissionMetadata, u8> for Permission<PS> {
     type Error = anyhow::Error;
@@ -323,8 +359,6 @@ impl Validate for ConstraintCount {
     }
 }
 
-pub(crate) type Constraints<PS> = Vec<Constraint<PS>>;
-
 impl<PS: ParseStrategy> Validate for Constraints<PS> {
     type Error = anyhow::Error;
 
@@ -341,6 +375,8 @@ pub(crate) struct Constraint<PS: ParseStrategy> {
     names: Option<ExtensibleBitmap<PS>>,
     names_type_set: Option<TypeSet<PS>>,
 }
+
+pub(crate) type Constraints<PS> = Vec<Constraint<PS>>;
 
 impl<PS: ParseStrategy> Parse<PS> for Constraint<PS>
 where
@@ -424,6 +460,110 @@ where
     }
 }
 
+/// Locates a class named `name` among `classes`. Returns the first such class found, though policy
+/// validation should ensure that only one such class exists.
+pub(crate) fn find_class_by_name<'a, PS: ParseStrategy>(
+    classes: &'a Classes<PS>,
+    name: &str,
+) -> Option<&'a Class<PS>> {
+    find_class_by_name_bytes(classes, name.as_bytes())
+}
+
+fn find_class_by_name_bytes<'a, PS: ParseStrategy>(
+    classes: &'a Classes<PS>,
+    name_bytes: &[u8],
+) -> Option<&'a Class<PS>> {
+    for cls in classes.into_iter() {
+        if cls.name_bytes() == name_bytes {
+            return Some(cls);
+        }
+    }
+
+    None
+}
+
+/// Locates a class named `name` among `classes`. Returns the first such class found, though policy
+/// validation should ensure that only one such class exists.
+///
+/// TODO: Eliminate `dead_code` guard.
+#[allow(dead_code)]
+pub(crate) fn find_common_symbol_by_name<'a, PS: ParseStrategy>(
+    common_symbols: &'a CommonSymbols<PS>,
+    name: &str,
+) -> Option<&'a CommonSymbol<PS>> {
+    find_common_symbol_by_name_bytes(common_symbols, name.as_bytes())
+}
+
+fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
+    common_symbols: &'a CommonSymbols<PS>,
+    name_bytes: &[u8],
+) -> Option<&'a CommonSymbol<PS>> {
+    for common_symbol in common_symbols.into_iter() {
+        if common_symbol.name_bytes() == name_bytes {
+            return Some(common_symbol);
+        }
+    }
+
+    None
+}
+
+/// Locates a permission named `name` associated with `class`. The policy language supports a
+/// limited form of inheritance. For example:
+///
+/// ```config
+/// common file { ioctl read write create [...] }
+/// class file inherits file { execute_no_trans entrypoint }
+/// ```
+///
+/// Each `class` may inherit from zero or one `common`, in which case the permissions specified in
+/// the denoted `common` are also permissions in `class`. Locating these "common" permissions is the
+/// reason that `classes` is received as a function input.
+pub(crate) fn find_class_permission_by_name<'a, PS: ParseStrategy>(
+    common_symbols: &'a CommonSymbols<PS>,
+    class: &'a Class<PS>,
+    name: &'a str,
+) -> Option<&'a Permission<PS>> {
+    let name_bytes = name.as_bytes();
+    if let Some(permission) = find_own_class_permission_by_name_bytes(class, name_bytes) {
+        Some(permission)
+    } else if let Some(common_symbol) =
+        find_common_symbol_by_name_bytes(common_symbols, class.common_name_bytes())
+    {
+        find_common_permission_by_name_bytes(common_symbol, name_bytes)
+    } else {
+        None
+    }
+}
+
+fn find_own_class_permission_by_name_bytes<'a, PS: ParseStrategy>(
+    class: &'a Class<PS>,
+    name_bytes: &'a [u8],
+) -> Option<&'a Permission<PS>> {
+    let own_permissions: &Permissions<PS> = &class.constraints.metadata.data;
+    find_own_permission_by_name_bytes(own_permissions, name_bytes)
+}
+
+fn find_common_permission_by_name_bytes<'a, PS: ParseStrategy>(
+    common_symbol: &'a CommonSymbol<PS>,
+    name_bytes: &'a [u8],
+) -> Option<&'a Permission<PS>> {
+    let own_permissions: &Permissions<PS> = &common_symbol.data;
+    find_own_permission_by_name_bytes(own_permissions, name_bytes)
+}
+
+fn find_own_permission_by_name_bytes<'a, PS: ParseStrategy>(
+    own_permissions: &'a Permissions<PS>,
+    name_bytes: &'a [u8],
+) -> Option<&'a Permission<PS>> {
+    for permission in own_permissions {
+        if permission.name_bytes() == name_bytes {
+            return Some(permission);
+        }
+    }
+
+    None
+}
+
 impl<PS: ParseStrategy> Validate for [Class<PS>] {
     type Error = anyhow::Error;
 
@@ -438,6 +578,55 @@ pub(crate) struct Class<PS: ParseStrategy> {
     constraints: ClassConstraints<PS>,
     validate_transitions: ClassValidateTransitions<PS>,
     defaults: PS::Output<ClassDefaults>,
+}
+
+pub(crate) type Classes<PS> = Vec<Class<PS>>;
+
+impl<PS: ParseStrategy> Class<PS> {
+    /// Returns the name of the `common` from which this `class` inherits as a borrow of a byte
+    /// slice. For example, `common file { common_file_perm }`,
+    /// `class file inherits file { file_perm }` yields two [`Class`] objects, one that refers to a
+    /// permission named `"common_file_perm"` permission and has `self.common_name_bytes() == ""`,
+    /// and another that refers to a permission named `"file_perm"` and has
+    /// `self.common_name_bytes() == "file"`.
+    pub fn common_name_bytes(&self) -> &[u8] {
+        // `ClassCommonKey` is an `Array` of `[u8]` with metadata `ClassKey`, and
+        // `ClassKey::count()` returns the `common_key_length` field. That is, the `[u8]` string
+        // on `ClassCommonKey` is the "common key" (name in the inherited `common` statement) for
+        // this class.
+        let class_common_key: &ClassCommonKey<PS> = &self.constraints.metadata.metadata;
+        PS::deref_slice(&class_common_key.data)
+    }
+
+    /// Returns the name of this class as a borrow of a byte slice.
+    pub fn name_bytes(&self) -> &[u8] {
+        // `ClassKey` is an `Array` of `[u8]` with metadata `ClassMetadata`, and
+        // `ClassMetadata::count()` returns the `key_length` field. That is, the `[u8]` string on
+        // `ClassKey` is the "class key" (name in the `class` or `common` statement) for this class.
+        let class_key: &ClassKey<PS> = &self.constraints.metadata.metadata.metadata;
+        PS::deref_slice(&class_key.data)
+    }
+
+    /// Returns the value associated with this class. The value is used to index into collections
+    /// and bitmaps associated with this class. The value is 1-indexed, whereas most collections and
+    /// bitmaps are 0-indexed, so clients of this API will usually use `value - 1`.
+    pub fn value(&self) -> u32 {
+        let class_metadata: &ClassMetadata =
+            &PS::deref(&self.constraints.metadata.metadata.metadata.metadata);
+        class_metadata.value.get()
+    }
+
+    /// Returns whether this class inherits from a named `common` policy statement. For example,
+    /// `common file { common_file_perm }`, `class file inherits file { file_perm }` yields two
+    /// [`Class`] objects, one that refers to a permission named `"common_file_perm"` permission and
+    /// has `self.has_common() == false`, and another that refers to a permission named
+    /// `"file_perm"` and has `self.has_common() == true`.
+    ///
+    /// TODO: Eliminate `dead_code` guard.
+    #[allow(dead_code)]
+    pub fn has_common(&self) -> bool {
+        self.common_name_bytes().len() != 0
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for Class<PS>
@@ -725,6 +914,46 @@ impl Validate for RoleStaticMetadata {
     }
 }
 
+/// Returns a type or type alias or attribute named `name`, if one exists in the collection,
+/// `types`.
+///
+/// TODO: Eliminate `dead_code` guard.
+#[allow(dead_code)]
+pub(crate) fn find_type_alias_or_attribute_by_name<'a, PS: ParseStrategy>(
+    types: &'a Types<PS>,
+    name: &str,
+) -> Option<&'a Type<PS>> {
+    let name_bytes = name.as_bytes();
+
+    for taa in types.into_iter() {
+        if taa.name_bytes() == name_bytes {
+            return Some(taa);
+        }
+    }
+
+    None
+}
+
+/// Returns whether `ty` is associated with `attr` via the mappings `attribute_maps`. Such
+/// associations arise from policy statements of the form `typeattribute [ty] [attributes];` where
+/// `attr` appears in the comma-separated list, `[attributes]`.
+///
+/// TODO: Eliminate `dead_code` guard.
+#[allow(dead_code)]
+pub(crate) fn type_has_attribute<'a, PS: ParseStrategy>(
+    ty: &'a Type<PS>,
+    attr: &'a Type<PS>,
+    attribute_maps: &Vec<ExtensibleBitmap<PS>>,
+) -> bool {
+    let type_id = PS::deref(&ty.metadata).value.get();
+    let type_index = type_id - 1;
+
+    let attribute_id = PS::deref(&attr.metadata).value.get();
+    let attribute_index = attribute_id - 1;
+
+    attribute_maps[type_index as usize].is_set(attribute_index)
+}
+
 impl<PS: ParseStrategy> Validate for [Type<PS>] {
     type Error = anyhow::Error;
 
@@ -738,10 +967,51 @@ array_type!(Type, PS, PS::Output<TypeMetadata>, PS::Slice<u8>);
 
 array_type_validate_deref_both!(Type);
 
+pub(crate) type Types<PS> = Vec<Type<PS>>;
+
+impl<PS: ParseStrategy> Type<PS> {
+    /// Returns the name of this type.
+    pub fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.data)
+    }
+
+    /// Returns the value associated with this type. The value is used to index into collections and
+    /// bitmaps associated with this type. The value is 1-indexed, whereas most collections and
+    /// bitmaps are 0-indexed, so clients of this API will usually use `value - 1`.
+    pub fn value(&self) -> u32 {
+        PS::deref(&self.metadata).value.get()
+    }
+
+    /// Returns whether this type is from a `type [name];` policy statement.
+    ///
+    /// TODO: Eliminate `dead_code` guard.
+    #[allow(dead_code)]
+    pub fn is_type(&self) -> bool {
+        PS::deref(&self.metadata).value.get() == TYPE_PROPERTIES_TYPE
+    }
+
+    /// Returns whether this type is from a `typealias [typename] alias [aliasname];` policy
+    /// statement.
+    ///
+    /// TODO: Eliminate `dead_code` guard.
+    #[allow(dead_code)]
+    pub fn is_alias(&self) -> bool {
+        PS::deref(&self.metadata).value.get() == TYPE_PROPERTIES_ALIAS
+    }
+
+    /// Returns whether this type is from an `attribute [name];` policy statement.
+    ///
+    /// TODO: Eliminate `dead_code` guard.
+    #[allow(dead_code)]
+    pub fn is_attribute(&self) -> bool {
+        PS::deref(&self.metadata).value.get() == TYPE_PROPERTIES_ATTRIBUTE
+    }
+}
+
 impl<PS: ParseStrategy> ValidateArray<TypeMetadata, u8> for Type<PS> {
     type Error = anyhow::Error;
 
-    /// TODO: Validate that `self.data.deref()` is an ascii string that contains a valid type name.
+    /// TODO: Validate that `PS::deref(&self.data)` is an ascii string that contains a valid type name.
     fn validate_array<'a>(_metadata: &'a TypeMetadata, _data: &'a [u8]) -> Result<(), Self::Error> {
         Ok(())
     }

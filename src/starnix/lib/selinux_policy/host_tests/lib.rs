@@ -2,13 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use selinux_policy::{metadata::HandleUnknown, parser::ByValue, Policy};
+use selinux_policy::{
+    metadata::HandleUnknown,
+    parser::{ByRef, ByValue},
+    Policy,
+};
 
 use serde::Deserialize;
 use std::io::{Cursor, Read as _};
 
 const TESTDATA_DIR: &str = env!("TESTDATA_DIR");
 const POLICIES_SUBDIR: &str = "policies";
+const MICRO_POLICIES_SUBDIR: &str = "micro_policies";
 const EXPECTATIONS_SUBDIR: &str = "expectations";
 
 #[derive(Debug, Deserialize)]
@@ -60,10 +65,104 @@ fn known_policies() {
 
         let by_value = ByValue::new(Cursor::new(policy_bytes));
 
-        let policy = Policy::parse(by_value).expect("parse policy");
-        let policy = policy.validate().expect("validate policy");
+        let policy =
+            Policy::parse(by_value).expect("parse policy").validate().expect("validate policy");
 
         assert_eq!(expectations.expected_policy_version, policy.policy_version());
         assert_eq!(&expectations.expected_handle_unknown, policy.handle_unknown());
     }
+}
+
+#[test]
+fn explicit_allow_type_type() {
+    let policy_path =
+        format!("{}/{}/allow_a_t_b_t_class0_perm0_policy.pp", TESTDATA_DIR, MICRO_POLICIES_SUBDIR);
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    assert!(policy
+        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+        .expect("query well-formed"));
+}
+
+#[test]
+fn no_explicit_allow_type_type() {
+    let policy_path = format!(
+        "{}/{}/no_allow_a_t_b_t_class0_perm0_policy.pp",
+        TESTDATA_DIR, MICRO_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    assert!(!policy
+        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+        .expect("query well-formed"));
+}
+
+#[test]
+fn explicit_allow_type_attr() {
+    let policy_path = format!(
+        "{}/{}/allow_a_t_b_attr_class0_perm0_policy.pp",
+        TESTDATA_DIR, MICRO_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    assert!(policy
+        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+        .expect("query well-formed"));
+}
+
+#[test]
+fn no_explicit_allow_type_attr() {
+    let policy_path = format!(
+        "{}/{}/no_allow_a_t_b_attr_class0_perm0_policy.pp",
+        TESTDATA_DIR, MICRO_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    assert!(!policy
+        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+        .expect("query well-formed"));
+}
+
+#[test]
+fn explicit_allow_attr_attr() {
+    let policy_path = format!(
+        "{}/{}/allow_a_attr_b_attr_class0_perm0_policy.pp",
+        TESTDATA_DIR, MICRO_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    assert!(policy
+        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+        .expect("query well-formed"));
+}
+
+#[test]
+fn no_explicit_allow_attr_attr() {
+    let policy_path = format!(
+        "{}/{}/no_allow_a_attr_b_attr_class0_perm0_policy.pp",
+        TESTDATA_DIR, MICRO_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+        .expect("parse policy")
+        .validate()
+        .expect("validate policy");
+    assert!(!policy
+        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+        .expect("query well-formed"));
 }

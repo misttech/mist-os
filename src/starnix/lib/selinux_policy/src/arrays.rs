@@ -18,6 +18,10 @@ use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 pub(crate) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
 pub(crate) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
 
+/// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
+/// comes from an `allow [source] [target]:[class] { [permissions] };` policy statement.
+pub(crate) const ACCESS_VECTOR_TYPE_ALLOW_MASK: u16 = 1;
+
 #[allow(type_alias_bounds)]
 pub(crate) type SimpleArray<PS: ParseStrategy, T> = Array<PS, PS::Output<le::U32>, T>;
 
@@ -160,6 +164,42 @@ pub(crate) struct AccessVector<PS: ParseStrategy> {
     extended_permissions: ExtendedPermissions<PS>,
 }
 
+impl<PS: ParseStrategy> AccessVector<PS> {
+    /// Returns whether this access vector comes from an
+    /// `allow [source] [target]:[class] { [permissions] };` policy statement.
+    pub fn is_allow(&self) -> bool {
+        PS::deref(&self.metadata).is_allow()
+    }
+
+    /// Returns the source type value in this access vector. This value corresponds to the
+    /// [`super::symbols::Type`] `value()` of some type or attribute in the same policy.
+    pub fn source_type(&self) -> u16 {
+        PS::deref(&self.metadata).source_type.get()
+    }
+
+    /// Returns the target type value in this access vector. This value corresponds to the
+    /// [`super::symbols::Type`] `value()` of some type or attribute in the same policy.
+    pub fn target_type(&self) -> u16 {
+        PS::deref(&self.metadata).target_type.get()
+    }
+
+    /// Returns the target class value in this access vector. This value corresponds to the
+    /// [`super::symbols::Class`] `value()` of some class in the same policy.
+    pub fn target_class(&self) -> u16 {
+        PS::deref(&self.metadata).class.get()
+    }
+
+    /// A bit mask that corresponds to the permissions in this access vector. Permission bits are
+    /// specified using a [`super::symbols::Permission`] `value()` as follows:
+    /// `1 << (Permission::value() - 1)`.
+    pub fn permission_mask(&self) -> Option<u32> {
+        match &self.extended_permissions {
+            ExtendedPermissions::PermissionMask(mask) => Some(PS::deref(mask).get()),
+            _ => None,
+        }
+    }
+}
+
 impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
     type Error = anyhow::Error;
 
@@ -211,8 +251,16 @@ pub(crate) struct AccessVectorMetadata {
 }
 
 impl AccessVectorMetadata {
+    /// Returns the access vector type field that indicates the type of policy statement this
+    /// access vector comes from; for example `allow ...;`, `auditallow ...;`.
     pub fn access_vector_type(&self) -> u16 {
         self.access_vector_type.get()
+    }
+
+    /// Returns whether this access vector comes from an
+    /// `allow [source] [target]:[class] { [permissions] };` policy statement.
+    pub fn is_allow(&self) -> bool {
+        (self.access_vector_type() & ACCESS_VECTOR_TYPE_ALLOW_MASK) != 0
     }
 }
 
