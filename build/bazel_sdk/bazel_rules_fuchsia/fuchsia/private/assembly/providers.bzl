@@ -139,7 +139,7 @@ FuchsiaScrutinyConfigInfo = provider(
         "routes_config_golden": "Config file for route resources validation",
         "component_resolver_allowlist": "Allowlist of components that can be resolved using privileged component resolvers",
         "component_route_exceptions": "Allowlist of all capability routes that are exempt from route checking",
-        "base_packages": "Set of base packages expected in the fvm",
+        "static_packages": "Set of base and cache packages expected in the fvm",
         "structured_config_policy": "File describing the policy of structured config",
         "pre_signing_policy": "File describing the policy of checks required before signing",
     },

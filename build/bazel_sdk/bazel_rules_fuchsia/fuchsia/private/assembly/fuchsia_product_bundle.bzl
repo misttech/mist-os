@@ -136,7 +136,7 @@ def _scrutiny_validation(
         ffx_invocation,
         ffx_tool,
         pb_out_dir,
-        [scrutiny_config.base_packages, platform_scrutiny_config.base_packages],
+        scrutiny_config.static_packages + platform_scrutiny_config.static_packages,
     )
     deps.append(_verify_pre_signing(
         ctx,

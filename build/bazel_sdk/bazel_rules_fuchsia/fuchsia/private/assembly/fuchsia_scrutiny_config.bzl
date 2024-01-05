@@ -6,6 +6,11 @@
 load(":providers.bzl", "FuchsiaScrutinyConfigInfo")
 
 def _fuchsia_scrutiny_config_impl(ctx):
+    static_packages = []
+    if ctx.files.static_packages:
+        static_packages.extend(ctx.files.static_packages)
+    if ctx.file.base_packages:
+        static_packages.append(ctx.file.base_packages)
     return [
         FuchsiaScrutinyConfigInfo(
             bootfs_files = ctx.files.bootfs_files,
@@ -15,7 +20,7 @@ def _fuchsia_scrutiny_config_impl(ctx):
             component_resolver_allowlist = ctx.file.component_resolver_allowlist,
             component_route_exceptions = ctx.files.component_route_exceptions,
             component_tree_config = ctx.file.component_tree_config,
-            base_packages = ctx.file.base_packages,
+            static_packages = static_packages,
             structured_config_policy = ctx.file.structured_config_policy,
             pre_signing_policy = ctx.file.pre_signing_policy,
         ),
@@ -57,6 +62,10 @@ fuchsia_scrutiny_config = rule(
         "base_packages": attr.label(
             doc = "Set of base packages expected in the fvm",
             allow_single_file = True,
+        ),
+        "static_packages": attr.label_list(
+            doc = "Set of base and cache packages expected in the fvm",
+            allow_files = True,
         ),
         "structured_config_policy": attr.label(
             doc = "File describing the policy of structured config",
