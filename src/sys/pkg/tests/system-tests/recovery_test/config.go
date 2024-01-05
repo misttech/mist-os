@@ -27,6 +27,7 @@ type config struct {
 	afterInitScript  string
 	afterTestScript  string
 	useFlash         bool
+	checkABR         bool
 }
 
 func newConfig(fs *flag.FlagSet) (*config, error) {
@@ -54,6 +55,7 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.StringVar(&c.afterInitScript, "after-init-script", "", "Run this script after initializing device for testing")
 	fs.StringVar(&c.afterTestScript, "after-test-script", "", "Run this script after a test step")
 	fs.BoolVar(&c.useFlash, "use-flash", false, "Provision device using flashing instead of paving")
+	fs.BoolVar(&c.checkABR, "check-abr", true, "Check that the device booted into the expected ABR slot (default is true)")
 
 	return c, nil
 }

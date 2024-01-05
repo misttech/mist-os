@@ -152,6 +152,10 @@ _environment_service_account =
 #   bootfs_compression
 #   - Optional: setting to use when compressing bootfs in the zbi
 #   - Type: string
+#
+#   check_abr
+#   - Optional: check that the device booted into the expected ABR slot.
+#   - Type: bool, default true
 template("system_test_upgrade_suite") {
   assert(is_linux || is_mac, "system_tests are for linux/mac only")
 
@@ -385,6 +389,12 @@ template("system_test_upgrade_suite") {
       ]
     }
 
+    if (!defined(invoker.check_abr) || invoker.check_abr) {
+      _args += [ "--check-abr=true" ]
+    } else {
+      _args += [ "--check-abr=false" ]
+    }
+
     host_test(_host_test_target_name) {
       binary_path = _test_binary
       args = _args
@@ -454,6 +464,10 @@ template("system_test_upgrade_suite") {
 #   sleep_after_reboot
 #   - Optional: How long to sleep after we trigger a reboot and connect to the device.
 #   - Type: duration string
+#
+#   check_abr
+#   - Optional: check that the device booted into the expected ABR slot.
+#   - Type: bool, default true
 template("system_test_reboot_suite") {
   assert(is_linux || is_mac, "system_test_reboot_suite is for linux/mac only")
 
@@ -545,6 +559,12 @@ template("system_test_reboot_suite") {
       ]
     }
 
+    if (!defined(invoker.check_abr) || invoker.check_abr) {
+      _args += [ "--check-abr=true" ]
+    } else {
+      _args += [ "--check-abr=false" ]
+    }
+
     host_test(_host_test_target_name) {
       binary_path = _test_binary
       args = _args
@@ -610,6 +630,10 @@ template("system_test_reboot_suite") {
 #   device_connect_timeout
 #   - Optional: How long to wait between connection attempts.
 #   - Type: duration string
+#
+#   check_abr
+#   - Optional: check that the device booted into the expected ABR slot.
+#   - Type: bool, default true
 template("system_test_recovery_suite") {
   assert(is_linux || is_mac, "system_test_recovery_suite is for linux/mac only")
 
@@ -689,6 +713,12 @@ template("system_test_recovery_suite") {
         "-device-connect-timeout",
         invoker.device_connect_timeout,
       ]
+    }
+
+    if (!defined(invoker.check_abr) || invoker.check_abr) {
+      _args += [ "--check-abr=true" ]
+    } else {
+      _args += [ "--check-abr=false" ]
     }
 
     host_test(_host_test_target_name) {

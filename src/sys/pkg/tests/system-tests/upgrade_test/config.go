@@ -34,6 +34,7 @@ type config struct {
 	maxUpdateImagesSize        uint64
 	maxSystemImageSize         uint64
 	useNewUpdateFormat         bool
+	checkABR                   bool
 }
 
 func newConfig(fs *flag.FlagSet) (*config, error) {
@@ -67,6 +68,8 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.Uint64Var(&c.maxUpdateImagesSize, "max-update-images-size", 0, "Maximum size of all the blobs in the update images")
 	fs.Uint64Var(&c.maxSystemImageSize, "max-system-image-size", 0, "Maximum size of all the blobs in the system image")
 	fs.BoolVar(&c.useNewUpdateFormat, "use-new-update-format", false, "Use the new update format")
+	fs.BoolVar(&c.checkABR, "check-abr", true, "Check that the device booted into the expected ABR slot (default is true)")
+
 	return c, nil
 }
 

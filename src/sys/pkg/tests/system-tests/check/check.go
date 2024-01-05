@@ -56,6 +56,19 @@ func determineActiveABRConfig(
 
 func DetermineCurrentABRConfig(
 	ctx context.Context,
+	device *device.Client,
+	repo *packages.Repository,
+) (*sl4f.Configuration, error) {
+	rpcClient, err := device.StartRpcSession(ctx, repo)
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to sl4f: %w", err)
+	}
+
+	return determineCurrentABRConfig(ctx, rpcClient)
+}
+
+func determineCurrentABRConfig(
+	ctx context.Context,
 	rpcClient *sl4f.Client,
 ) (*sl4f.Configuration, error) {
 	if rpcClient == nil {
@@ -76,33 +89,17 @@ func DetermineCurrentABRConfig(
 	return &currentConfig, nil
 }
 
-func DetermineTargetABRConfig(
+func checkABRConfig(
 	ctx context.Context,
-	rpcClient *sl4f.Client,
-) (*sl4f.Configuration, error) {
-	currentConfig, err := DetermineCurrentABRConfig(ctx, rpcClient)
-	if err != nil {
-		return nil, fmt.Errorf("could not determine target config when querying active config: %w", err)
-	}
-	if currentConfig == nil {
-		return nil, nil
-	}
-
-	var targetConfig sl4f.Configuration
-	if *currentConfig == sl4f.ConfigurationA {
-		targetConfig = sl4f.ConfigurationB
-	} else {
-		targetConfig = sl4f.ConfigurationA
-	}
-
-	return &targetConfig, nil
-}
-
-func CheckABRConfig(
-	ctx context.Context,
-	rpcClient *sl4f.Client,
+	device *device.Client,
+	repo *packages.Repository,
 	expectedConfig *sl4f.Configuration,
 ) error {
+	rpcClient, err := device.StartRpcSession(ctx, repo)
+	if err != nil {
+		return fmt.Errorf("unable to connect to sl4f: %w", err)
+	}
+
 	if expectedConfig == nil {
 		logger.Infof(ctx, "no configuration expected, so not checking ABR configuration")
 		return nil
@@ -114,7 +111,7 @@ func CheckABRConfig(
 	}
 
 	// Ensure the device is booting from the expected boot slot.
-	currentConfig, err := DetermineCurrentABRConfig(ctx, rpcClient)
+	currentConfig, err := determineCurrentABRConfig(ctx, rpcClient)
 	if err != nil {
 		return fmt.Errorf("unable to determine current boot configuration: %w", err)
 	}
@@ -131,10 +128,10 @@ func CheckABRConfig(
 func ValidateDevice(
 	ctx context.Context,
 	device *device.Client,
-	rpcClient *sl4f.Client,
+	repo *packages.Repository,
 	expectedSystemImage *packages.SystemImagePackage,
 	expectedConfig *sl4f.Configuration,
-	warnOnABR bool,
+	checkABR bool,
 ) error {
 	// At the this point the system should have been updated to the target
 	// system version. Confirm the update by fetching the device's current
@@ -153,17 +150,10 @@ func ValidateDevice(
 	if err := device.ValidateStaticPackages(ctx); err != nil {
 		return fmt.Errorf("failed to validate static packages without sl4f: %w", err)
 	}
-	if rpcClient != nil {
-		if err := CheckABRConfig(ctx, rpcClient, expectedConfig); err != nil {
-			// FIXME(43336): during the rollout of ABR, the N-1 build might
-			// not be writing to the inactive partition, so don't
-			// err out during that phase. This will be removed once
-			// ABR has rolled through GI.
-			if warnOnABR {
-				logger.Infof(ctx, "ignoring error during ABR rollout: %v", err)
-			} else {
-				return fmt.Errorf("failed to validate device: %w", err)
-			}
+
+	if checkABR {
+		if err := checkABRConfig(ctx, device, repo, expectedConfig); err != nil {
+			return fmt.Errorf("failed to validate device: %w", err)
 		}
 	}
 

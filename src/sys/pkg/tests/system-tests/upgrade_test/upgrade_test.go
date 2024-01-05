@@ -121,10 +121,10 @@ func doTest(ctx context.Context, deviceClient *device.Client) error {
 	initialBuild := chainedBuilds[0]
 	chainedBuilds = chainedBuilds[1:]
 
-	ch := make(chan *sl4f.Client, 1)
+	ch := make(chan *sl4f.Configuration, 1)
 	if err := util.RunWithTimeout(ctx, c.paveTimeout, func() error {
-		rpcClient, err := initializeDevice(ctx, deviceClient, initialBuild)
-		ch <- rpcClient
+		currentBootSlot, err := initializeDevice(ctx, deviceClient, initialBuild)
+		ch <- currentBootSlot
 		return err
 	}); err != nil {
 		err = fmt.Errorf("device failed to initialize: %w", err)
@@ -132,21 +132,16 @@ func doTest(ctx context.Context, deviceClient *device.Client) error {
 		return err
 	}
 
-	rpcClient := <-ch
-	defer func() {
-		if rpcClient != nil {
-			rpcClient.Close()
-		}
-	}()
+	currentBootSlot := <-ch
 
-	return testOTAs(ctx, deviceClient, chainedBuilds, &rpcClient)
+	return testOTAs(ctx, deviceClient, chainedBuilds, currentBootSlot)
 }
 
 func testOTAs(
 	ctx context.Context,
 	device *device.Client,
 	builds []artifacts.Build,
-	rpcClient **sl4f.Client,
+	currentBootSlot *sl4f.Configuration,
 ) error {
 	for i := uint(1); i <= c.cycleCount; i++ {
 		logger.Infof(ctx, "OTA Attempt %d", i)
@@ -158,7 +153,7 @@ func testOTAs(
 			}
 
 			if err := util.RunWithTimeout(ctx, c.cycleTimeout, func() error {
-				return doTestOTAs(ctx, device, build, rpcClient, checkPrime)
+				return doTestOTAs(ctx, device, build, currentBootSlot, checkPrime)
 			}); err != nil {
 				return fmt.Errorf("OTA Attempt %d failed: %w", i, err)
 			}
@@ -172,7 +167,7 @@ func doTestOTAs(
 	ctx context.Context,
 	device *device.Client,
 	build artifacts.Build,
-	rpcClient **sl4f.Client,
+	currentBootSlot *sl4f.Configuration,
 	checkPrime bool,
 ) error {
 	logger.Infof(ctx, "Starting OTA test cycle. Time out in %s", c.cycleTimeout)
@@ -251,9 +246,8 @@ func doTestOTAs(
 				ctx,
 				rand,
 				device,
-				rpcClient,
 				repo,
-				true,
+				currentBootSlot,
 				!c.buildExpectUnknownFirmware,
 			); lastError == nil {
 				logger.Infof(ctx, "OTA from N-1 -> N successful in %s", time.Now().Sub(otaTime))
@@ -281,16 +275,6 @@ func doTestOTAs(
 				return fmt.Errorf("failed to create ota test client: %w", err)
 			}
 			*device = *newClient
-
-			if rpcClient != nil && *rpcClient != nil {
-				(*rpcClient).Close()
-				*rpcClient = nil
-			}
-
-			*rpcClient, err = device.StartRpcSession(ctx, repo)
-			if err != nil {
-				return fmt.Errorf("unable to connect to sl4f while retrying OTA: %w", err)
-			}
 		}
 	}
 
@@ -300,7 +284,7 @@ func doTestOTAs(
 
 	logger.Infof(ctx, "starting OTA N -> N' test")
 	otaTime := time.Now()
-	if err := systemPrimeOTA(ctx, rand, device, rpcClient, repo, false); err != nil {
+	if err := systemPrimeOTA(ctx, rand, device, repo, currentBootSlot); err != nil {
 		return fmt.Errorf("OTA from N -> N' failed: %w", err)
 	}
 	logger.Infof(ctx, "OTA from N -> N' successful in %s", time.Now().Sub(otaTime))
@@ -313,14 +297,13 @@ func initializeDevice(
 	ctx context.Context,
 	device *device.Client,
 	build artifacts.Build,
-) (*sl4f.Client, error) {
+) (*sl4f.Configuration, error) {
 	logger.Infof(ctx, "Initializing device")
 
 	startTime := time.Now()
 
 	var repo *packages.Repository
 	var expectedSystemImage *packages.SystemImagePackage
-	var err error
 
 	if build != nil {
 		ffx, err := c.deviceConfig.FFXTool()
@@ -346,9 +329,11 @@ func initializeDevice(
 		expectedSystemImage = systemImage
 	}
 
-	if err := script.RunScript(ctx, device, repo, nil, c.beforeInitScript); err != nil {
+	if err := script.RunScript(ctx, device, repo, c.beforeInitScript); err != nil {
 		return nil, fmt.Errorf("failed to run before-init-script: %w", err)
 	}
+
+	var currentBootSlot *sl4f.Configuration
 
 	if build != nil {
 		// Only pave if the device is not running the expected version.
@@ -370,58 +355,44 @@ func initializeDevice(
 				}
 			}
 		}
-	}
-
-	// Creating a sl4f.Client requires knowing the build currently running
-	// on the device, which not all test cases know during start. Store the
-	// one true client here, and pass around pointers to the various
-	// functions that may use it or device.Client to interact with the
-	// target. All OTA attempts must first Close and nil out an existing
-	// rpcClient and replace it with a new one after reboot. The final
-	// rpcClient, if present, will be closed by the defer here.
-	var rpcClient *sl4f.Client
-	var expectedConfig *sl4f.Configuration
-	if build != nil {
-		rpcClient, err = device.StartRpcSession(ctx, repo)
-		if err != nil {
-			return nil, fmt.Errorf("unable to connect to sl4f after pave: %w", err)
-		}
 
 		// We always boot into the A partition after a pave.
 		config := sl4f.ConfigurationA
-		expectedConfig = &config
+		currentBootSlot = &config
+	} else if c.checkABR {
+		config, err := check.DetermineCurrentABRConfig(ctx, device, repo)
+		if err != nil {
+			return nil, err
+		}
+		currentBootSlot = config
 	}
 
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		rpcClient,
+		repo,
 		expectedSystemImage,
-		expectedConfig,
-		true,
+		currentBootSlot,
+		c.checkABR,
 	); err != nil {
-		if rpcClient != nil {
-			rpcClient.Close()
-		}
 		return nil, fmt.Errorf("failed to validate during initialization: %w", err)
 	}
 
-	if err := script.RunScript(ctx, device, repo, &rpcClient, c.afterInitScript); err != nil {
+	if err := script.RunScript(ctx, device, repo, c.afterInitScript); err != nil {
 		return nil, fmt.Errorf("failed to run after-init-script: %w", err)
 	}
 
 	logger.Infof(ctx, "initialization successful in %s", time.Now().Sub(startTime))
 
-	return rpcClient, nil
+	return currentBootSlot, nil
 }
 
 func systemOTA(
 	ctx context.Context,
 	rand *rand.Rand,
 	device *device.Client,
-	rpcClient **sl4f.Client,
 	repo *packages.Repository,
-	checkABR bool,
+	currentBootSlot *sl4f.Configuration,
 	checkForUnknownFirmware bool,
 ) error {
 	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
@@ -433,11 +404,10 @@ func systemOTA(
 		ctx,
 		rand,
 		device,
-		rpcClient,
 		repo,
+		currentBootSlot,
 		updatePackage,
 		"ota-test-update/0",
-		checkABR,
 		checkForUnknownFirmware,
 	)
 }
@@ -446,9 +416,8 @@ func systemPrimeOTA(
 	ctx context.Context,
 	rand *rand.Rand,
 	device *device.Client,
-	rpcClient **sl4f.Client,
 	repo *packages.Repository,
-	checkABR bool,
+	currentBootSlot *sl4f.Configuration,
 ) error {
 	avbTool, err := c.installerConfig.AVBTool()
 	if err != nil {
@@ -526,11 +495,10 @@ func systemPrimeOTA(
 		ctx,
 		rand,
 		device,
-		rpcClient,
 		repo,
+		currentBootSlot,
 		dstUpdate,
 		"ota-test-update_prime2/0",
-		checkABR,
 		true,
 	)
 }
@@ -539,11 +507,10 @@ func otaToPackage(
 	ctx context.Context,
 	rand *rand.Rand,
 	device *device.Client,
-	rpcClient **sl4f.Client,
 	repo *packages.Repository,
+	currentBootSlot *sl4f.Configuration,
 	srcUpdate *packages.UpdatePackage,
 	dstUpdatePath string,
-	checkABR bool,
 	checkForUnknownFirmware bool,
 ) error {
 	dstUpdate, dstSystemImage, err := AddRandomFilesToUpdate(
@@ -563,11 +530,6 @@ func otaToPackage(
 		dstUpdate.Merkle(),
 	)
 	logger.Infof(ctx, "Generated update package %s", dstUpdatePackageUrl)
-
-	expectedConfig, err := check.DetermineTargetABRConfig(ctx, *rpcClient)
-	if err != nil {
-		return fmt.Errorf("error determining target config: %w", err)
-	}
 
 	upToDate, err := check.IsDeviceUpToDate(ctx, device, dstSystemImage)
 	if err != nil {
@@ -596,32 +558,29 @@ func otaToPackage(
 
 	logger.Infof(ctx, "Validating device")
 
-	// Disconnect from sl4f since we rebooted the device.
-	//
-	// FIXME(47145) To avoid https://fxbug.dev/47145, we need to delay
-	// disconnecting from sl4f until after we reboot the device. Otherwise
-	// we risk leaving the ssh session in a bad state.
-	if *rpcClient != nil {
-		(*rpcClient).Close()
-		*rpcClient = nil
+	if currentBootSlot != nil {
+		switch *currentBootSlot {
+		case sl4f.ConfigurationA:
+			*currentBootSlot = sl4f.ConfigurationB
+		case sl4f.ConfigurationB:
+			*currentBootSlot = sl4f.ConfigurationA
+		case sl4f.ConfigurationRecovery:
+			return fmt.Errorf("device should not be in ABR recovery")
+		}
 	}
 
-	*rpcClient, err = device.StartRpcSession(ctx, repo)
-	if err != nil {
-		return fmt.Errorf("unable to connect to sl4f after OTA: %w", err)
-	}
 	if err := check.ValidateDevice(
 		ctx,
 		device,
-		*rpcClient,
+		repo,
 		dstSystemImage,
-		expectedConfig,
-		checkABR,
+		currentBootSlot,
+		c.checkABR,
 	); err != nil {
 		return fmt.Errorf("failed to validate after OTA: %w", err)
 	}
 
-	if err := script.RunScript(ctx, device, repo, rpcClient, c.afterTestScript); err != nil {
+	if err := script.RunScript(ctx, device, repo, c.afterTestScript); err != nil {
 		return fmt.Errorf("failed to run test script after OTA: %w", err)
 	}
 

@@ -33,7 +33,6 @@ type Client struct {
 	url       string
 	repoName  string
 	seq       uint64
-	server    *sshutil.Session
 }
 
 func NewClient(ctx context.Context, sshClient *sshutil.Client, addr string, repoName string) (*Client, error) {
@@ -48,14 +47,6 @@ func NewClient(ctx context.Context, sshClient *sshutil.Client, addr string, repo
 	}
 
 	return c, nil
-}
-
-func (c *Client) Close() {
-	if c.server != nil {
-		// Closing the session kills the remote command.
-		c.server.Close()
-		c.server = nil
-	}
 }
 
 func (c *Client) connect(ctx context.Context) error {
