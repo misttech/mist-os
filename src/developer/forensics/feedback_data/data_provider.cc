@@ -8,6 +8,7 @@
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/utf-utils/utf-utils.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -31,6 +32,8 @@
 #include "src/developer/forensics/utils/utc_clock_ready_watcher.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/fsl/vmo/vector.h"
+#include "src/lib/fxl/strings/string_printf.h"
+#include "src/lib/fxl/strings/substitute.h"
 #include "src/lib/uuid/uuid.h"
 
 namespace forensics {
@@ -51,6 +54,37 @@ const zx::duration kDefaultDataTimeout = zx::sec(30);
 //
 // 10 seconds seems reasonable to take a screenshot.
 const zx::duration kScreenshotTimeout = zx::sec(10);
+
+// TODO: https://fxbug.dev/317256133 - Remove this function.
+void PrintBytesIfInvalidUTF8(const std::string& key, const std::string& value) {
+  std::string key_bytes;
+  const bool key_valid = utfutils_is_valid_utf8(key.c_str(), key.size());
+  if (!key_valid) {
+    for (const char& c : value) {
+      key_bytes += fxl::StringPrintf("%02X", c);
+    }
+  }
+
+  std::string value_bytes;
+  const bool value_valid = utfutils_is_valid_utf8(value.c_str(), value.size());
+  if (!value_valid) {
+    for (const char& c : value) {
+      value_bytes += fxl::StringPrintf("%02X", c);
+    }
+  }
+
+  if (!key_valid && !value_valid) {
+    FX_LOGS(ERROR) << fxl::Substitute(
+        "Invalid UTF8 string in the Annotations: {(invalid) '$0', (invalid) '$1'}", key_bytes,
+        value_bytes);
+  } else if (!key_valid) {
+    FX_LOGS(ERROR) << fxl::Substitute(
+        "Invalid UTF8 string in the Annotations: {(invalid) '$0', '$1'}", key_bytes, value);
+  } else if (!value_valid) {
+    FX_LOGS(ERROR) << fxl::Substitute(
+        "Invalid UTF8 string in the Annotations: {'$0', (invalid) '$1'}", key, value_bytes);
+  }
+}
 
 }  // namespace
 
@@ -171,8 +205,24 @@ void DataProvider::GetSnapshotInternal(
         const auto& attachments = std::get<1>(results).value();
         std::map<std::string, std::string> snapshot_files;
 
+        // TODO: https://fxbug.dev/317256133 - Remove UTF8 validity checks.
+        for (const auto& [key, value] : annotations) {
+          if (!value.HasValue()) {
+            // Errors get excluded during encoding.
+            continue;
+          }
+
+          PrintBytesIfInvalidUTF8(key, value.Value());
+        }
+
         // Add the annotations to |snapshot_files|
         auto file = feedback::Encode<std::string>(annotations);
+
+        // TODO: https://fxbug.dev/317256133 - Remove UTF8 validity checks.
+        if (const bool valid = utfutils_is_valid_utf8(file.c_str(), file.size()); !valid) {
+          FX_LOGS(ERROR) << "Invalid UTF8 string in the encoded Annotations: " << file;
+        }
+
         snapshot_files[kAttachmentAnnotations] = std::move(file);
 
         // Add the attachments to |snapshot_files|
