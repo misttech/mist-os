@@ -40,8 +40,9 @@ def fuchsia_product_bundle(
         product_name = "<your_product_name>",
     )
     ```
-    - product_bundle.flash: Calling run on this target will flash the device this created product_bundle.
-    - product_bundle.ota: <TBA>.
+    - product_bundle.flash: Calling run on this target will flash the device with the created product_bundle.
+    - product_bundle.ota: Calling run on this target will ota the device with the created product_bundle.
+    - product_bundle.zip: Calling build on this target will create a zipped version of the product_bundle.
     - product_bundle.emu: <TBA>.
     """
 
@@ -54,10 +55,46 @@ def fuchsia_product_bundle(
         **kwargs
     )
 
+    _build_zipped_product_bundle(
+        name = name + ".zip",
+        product_bundle = name,
+    )
+
     fuchsia_product_bundle_tasks(
         name = "%s_tasks" % name,
         product_bundle = name,
     )
+
+def _build_zipped_product_bundle_impl(ctx):
+    pb_zip = ctx.actions.declare_file(ctx.label.name)
+    product_bundle = ctx.attr.product_bundle[FuchsiaProductBundleInfo].product_bundle
+
+    ctx.actions.run_shell(
+        inputs = ctx.files.product_bundle,
+        outputs = [pb_zip],
+        command = """(cd $PRODUCT_BUNDLE_PATH && zip -r pb.zip . 1> /dev/null)
+            mv $PRODUCT_BUNDLE_PATH/pb.zip $PB_ZIP_PATH
+        """,
+        env = {
+            "PRODUCT_BUNDLE_PATH": product_bundle.path,
+            "PB_ZIP_PATH": pb_zip.path,
+        },
+        progress_message = "Creating zipped product bundle for %s" % ctx.label.name,
+    )
+
+    return [DefaultInfo(files = depset(direct = [pb_zip]))]
+
+_build_zipped_product_bundle = rule(
+    doc = """Creates zipped product bundle.""",
+    implementation = _build_zipped_product_bundle_impl,
+    attrs = {
+        "product_bundle": attr.label(
+            doc = "The Product Bundle to be zipped",
+            providers = [FuchsiaProductBundleInfo],
+            mandatory = True,
+        ),
+    },
+)
 
 def _scrutiny_validation(
         ctx,
