@@ -87,16 +87,18 @@ class SSH:
         end_time: float = start_time + timeout
 
         _LOGGER.debug("Waiting for %s to allow ssh connection...", self._name)
+        err = None
         while time.time() < end_time:
             try:
                 self.run(command=_CMDS["ECHO"])
                 break
-            except Exception:  # pylint: disable=broad-except
+            except Exception as e:  # pylint: disable=broad-except
+                err = e
                 time.sleep(1)
         else:
             raise errors.SshConnectionError(
                 f"SSH connection check failed for {self._name}"
-            )
+            ) from err
         _LOGGER.debug("%s is available via ssh.", self._name)
 
     def run(
