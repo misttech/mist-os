@@ -1446,7 +1446,7 @@ impl<
                         core_ctx,
                         bindings_ctx,
                         Some(device),
-                        remote_ip,
+                        SocketIpAddr::new_ipv4_specified(remote_ip),
                         local_ip,
                         |src_ip| {
                             buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
@@ -1513,7 +1513,7 @@ impl<
                             core_ctx,
                             bindings_ctx,
                             Some(device),
-                            remote_ip,
+                            SocketIpAddr::new_ipv4_specified(remote_ip),
                             local_ip,
                             |src_ip| {
                                 buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
@@ -2000,7 +2000,7 @@ fn receive_ndp_packet<
             //
             //        ...
             let src_ip = match src_ip {
-                Ipv6SourceAddr::Unicast(ip) => match LinkLocalUnicastAddr::new(ip) {
+                Ipv6SourceAddr::Unicast(ip) => match LinkLocalUnicastAddr::new(*ip) {
                     Some(ip) => ip,
                     None => return,
                 },
@@ -2233,7 +2233,7 @@ impl<
                     counters.echo_request.increment();
                 });
 
-                if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
+                if let Some(src_ip) = SocketIpAddr::new_from_ipv6_source(src_ip) {
                     let req = *echo_request.message();
                     let code = echo_request.code();
                     let (local_ip, remote_ip) = (dst_ip, src_ip);
@@ -2243,12 +2243,12 @@ impl<
                         core_ctx,
                         bindings_ctx,
                         Some(device),
-                        remote_ip.into_specified(),
+                        remote_ip,
                         local_ip,
                         |src_ip| {
                             buffer.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                                 src_ip,
-                                remote_ip,
+                                remote_ip.addr(),
                                 code,
                                 req.reply(),
                             ))
@@ -2361,7 +2361,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: Option<&CC::DeviceId>,
-    original_src_ip: SpecifiedAddr<I::Addr>,
+    original_src_ip: SocketIpAddr<I::Addr>,
     original_dst_ip: SpecifiedAddr<I::Addr>,
     get_body_from_src_ip: F,
 ) where
@@ -2380,13 +2380,6 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     // TODO(https://fxbug.dev/132092): Plumb `SocketIpAddr` throughout the ICMP
     // implementation, so that this error is surfaced earlier in the packet
     // processing pipeline.
-    let original_src_ip = match original_src_ip.try_into() {
-        Ok(addr) => addr,
-        Err(AddrIsMappedError {}) => {
-            trace!("send_icmpv6_error_message: original_src_ip is mapped");
-            return;
-        }
-    };
     let original_dst_ip = match original_dst_ip.try_into() {
         Ok(addr) => addr,
         Err(AddrIsMappedError {}) => {

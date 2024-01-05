@@ -11,8 +11,8 @@ use core::{
 
 use derivative::Derivative;
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr},
-    NonMappedAddr, ScopeableAddress, SpecifiedAddr, ZonedAddr,
+    ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Ipv6SourceAddr},
+    NonMappedAddr, ScopeableAddress, SpecifiedAddr, UnicastAddr, Witness, ZonedAddr,
 };
 
 use crate::socket::{AddrVec, DualStackIpExt, SocketMapAddrSpec};
@@ -132,6 +132,21 @@ impl SocketIpAddr<Ipv4Addr> {
         addr.try_into().unwrap_or_else(|AddrIsMappedError {}| {
             unreachable!("IPv4 addresses must be non-mapped")
         })
+    }
+}
+
+impl SocketIpAddr<Ipv6Addr> {
+    /// Optionally constructs a [`SocketIpAddr`] from the given
+    /// [`Ipv6SourceAddr`], returning `None` if the given addr is `Unspecified`.
+    pub(crate) fn new_from_ipv6_source(addr: Ipv6SourceAddr) -> Option<Self> {
+        match addr {
+            Ipv6SourceAddr::Unspecified => None,
+            Ipv6SourceAddr::Unicast(addr) => {
+                let addr: UnicastAddr<NonMappedAddr<_>> = addr.transpose();
+                let addr: NonMappedAddr<SpecifiedAddr<_>> = addr.into_specified().transpose();
+                Some(SocketIpAddr(addr))
+            }
+        }
     }
 }
 

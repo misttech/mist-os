@@ -417,7 +417,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
     /// Unlike [`IpHeader::src_ip`], `src_ipv6` returns an `Ipv6SourceAddr`,
     /// which represents the valid values that a source address can take
     /// (namely, a unicast or unspecified address) or `None` if the address is
-    /// invalid (namely, a multicast address).
+    /// invalid (namely, a multicast address or an ipv4-mapped-ipv6 address).
     pub fn src_ipv6(&self) -> Option<Ipv6SourceAddr> {
         Ipv6SourceAddr::new(self.fixed_hdr.src_ip)
     }

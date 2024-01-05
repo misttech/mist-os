@@ -69,8 +69,8 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 use crate::{
     sealed, LinkLocalAddr, LinkLocalAddress, LinkLocalMulticastAddr, LinkLocalUnicastAddr,
-    MappedAddress, MulticastAddr, MulticastAddress, Scope, ScopeableAddress, SpecifiedAddr,
-    SpecifiedAddress, UnicastAddr, UnicastAddress, Witness,
+    MappedAddress, MulticastAddr, MulticastAddress, NonMappedAddr, Scope, ScopeableAddress,
+    SpecifiedAddr, SpecifiedAddress, UnicastAddr, UnicastAddress, Witness,
 };
 
 // NOTE on passing by reference vs by value: Clippy advises us to pass IPv4
@@ -2223,11 +2223,13 @@ impl Debug for Ipv6Addr {
 /// The source address from an IPv6 packet.
 ///
 /// An `Ipv6SourceAddr` represents the source address from an IPv6 packet, which
-/// may only be either unicast or unspecified.
+/// may only be either:
+///   * unicast and non-mapped (e.g. not an ipv4-mapped-ipv6 address), or
+///   * unspecified.
 #[allow(missing_docs)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Ipv6SourceAddr {
-    Unicast(UnicastAddr<Ipv6Addr>),
+    Unicast(NonMappedAddr<UnicastAddr<Ipv6Addr>>),
     Unspecified,
 }
 
@@ -2236,11 +2238,12 @@ impl crate::sealed::Sealed for Ipv6SourceAddr {}
 impl Ipv6SourceAddr {
     /// Constructs a new `Ipv6SourceAddr`.
     ///
-    /// Returns `None` if `addr` is neither unicast nor unspecified.
+    /// Returns `None` if `addr` does not satisfy the properties required of an
+    /// `Ipv6SourceAddr`.
     #[inline]
     pub fn new(addr: Ipv6Addr) -> Option<Ipv6SourceAddr> {
         if let Some(addr) = UnicastAddr::new(addr) {
-            Some(Ipv6SourceAddr::Unicast(addr))
+            NonMappedAddr::new(addr).map(Ipv6SourceAddr::Unicast)
         } else if !addr.is_specified() {
             Some(Ipv6SourceAddr::Unspecified)
         } else {
@@ -2263,7 +2266,7 @@ impl Witness<Ipv6Addr> for Ipv6SourceAddr {
     #[inline]
     fn into_addr(self) -> Ipv6Addr {
         match self {
-            Ipv6SourceAddr::Unicast(addr) => addr.get(),
+            Ipv6SourceAddr::Unicast(addr) => **addr,
             Ipv6SourceAddr::Unspecified => Ipv6::UNSPECIFIED_ADDRESS,
         }
     }
@@ -2307,12 +2310,6 @@ impl From<&'_ Ipv6SourceAddr> for Ipv6Addr {
             Ipv6SourceAddr::Unicast(addr) => addr.get(),
             Ipv6SourceAddr::Unspecified => Ipv6::UNSPECIFIED_ADDRESS,
         }
-    }
-}
-
-impl From<UnicastAddr<Ipv6Addr>> for Ipv6SourceAddr {
-    fn from(addr: UnicastAddr<Ipv6Addr>) -> Ipv6SourceAddr {
-        Ipv6SourceAddr::Unicast(addr)
     }
 }
 
