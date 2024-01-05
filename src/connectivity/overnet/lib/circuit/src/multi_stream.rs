@@ -134,17 +134,22 @@ pub async fn multi_stream(
         // Send stream errors to our error output. This functions as a stream that never returns anything
         // so we can wrap it in a select with read_result_stream and thereby continuously poll it as
         // we handle errors.
-        let stream_errors = stream_errors.filter_map(move |x| {
-            let stream_errors_out = stream_errors_out.clone();
-            async move {
-                if let Err(x) = x.await.unwrap_or(Err(Error::ConnectionClosed(Some(
-                    "Stream handler hung up without returning a status".to_owned(),
-                )))) {
-                    let _ = stream_errors_out.unbounded_send(x);
+        let stream_errors = stream_errors
+            .map(move |x| {
+                let stream_errors_out = stream_errors_out.clone();
+                async move {
+                    if let Err(x) = x.await.unwrap_or(Err(Error::ConnectionClosed(Some(
+                        "Stream handler hung up without returning a status".to_owned(),
+                    )))) {
+                        let _ = stream_errors_out.unbounded_send(x);
+                    }
                 }
-                None
-            }
-        });
+            })
+            // Buffer unordered all the stream errors otherwise we'll block the
+            // reader task.
+            .buffer_unordered(usize::MAX)
+            // Never yield anything and match the type of read_result_stream.
+            .filter_map(|()| futures::future::ready(None));
 
         let read_result_stream = futures::stream::select(stream_errors, read_result_stream);
 
@@ -194,9 +199,8 @@ pub async fn multi_stream(
     let handle_write = new_readers.for_each_concurrent(None, move |(id, stream)| {
         let writer = Arc::clone(&writer);
         async move {
-            let res = write_as_chunks(id, &stream, writer).await;
-            stream.close(format!("Stream terminated: {res:?}"));
-            res
+            let () = write_as_chunks(id, &stream, writer).await;
+            stream.close(format!("Stream terminated"));
         }
     });
 
@@ -501,10 +505,35 @@ pub async fn multi_stream_node_connection_to_async(
         }
     };
 
-    futures::future::try_join3(read_fut, write_fut, conn_fut)
-        .await
-        .map(|((), (), ())| ())
-        .map_err(Into::into)
+    let read_write = futures::future::try_join(read_fut, write_fut);
+
+    futures::pin_mut!(conn_fut);
+
+    let cleanup = {
+        // We must pin read_write to this scope so the streams are dropped when
+        // we leave this scope and conn_fut can run to completion. If it's
+        // pinned to the stack alongside conn_fut then the streams aren't
+        // dropped and conn_fut doesn't observe the closed status.
+        futures::pin_mut!(read_write);
+
+        match futures::future::select(conn_fut, read_write).await {
+            Either::Left((res, _)) => {
+                return res;
+            }
+            Either::Right((read_write_result, conn_fut)) => {
+                conn_fut.map(move |conn_fut_result| match (conn_fut_result, read_write_result) {
+                    (Ok(()), Ok(((), ()))) => Ok(()),
+                    // Report back any errors, preferring the one from the
+                    // connection future.
+                    (Ok(()), Err(e)) | (Err(e), _) => Err(e),
+                })
+            }
+        }
+    };
+
+    // If the read/write future finished first, we need to wait for the
+    // connection future to run to completion to ensure cleanup happens.
+    cleanup.await
 }
 
 #[cfg(test)]
