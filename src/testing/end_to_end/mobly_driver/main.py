@@ -7,7 +7,7 @@
 import argparse
 import os
 import sys
-
+import signal
 import driver_factory
 import mobly_driver_lib
 
@@ -73,6 +73,9 @@ def main():
         ffx_path=os.path.abspath(args.ffx_path),
     )
     driver = factory.get_driver()
+
+    signal.signal(signal.SIGINT, driver.teardown)
+    signal.signal(signal.SIGTERM, driver.teardown)
 
     # Use the same Python runtime for Mobly test execution as the one that's
     # currently running this Mobly driver script.

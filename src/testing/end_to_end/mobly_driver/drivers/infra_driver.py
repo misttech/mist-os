@@ -113,7 +113,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
         except (IOError, OSError) as e:
             raise common.DriverException("Failed to open file: %")
 
-    def teardown(self) -> None:
+    def teardown(self, *args) -> None:
         """Performs any required clean up upon Mobly test completion."""
         results_path = api_mobly.get_result_path(
             self._log_path, self._TESTBED_NAME
