@@ -85,6 +85,9 @@ cpp17::variant<cpp17::monostate, std::string> synchronization_checker::is_synchr
 void synchronization_checker::lock() const __TA_ACQUIRE() {
   cpp17::variant<cpp17::monostate, std::string> result = is_synchronized();
   if (cpp17::holds_alternative<std::string>(result)) {
+    // If you encounter this panic, look for more details in the message string,
+    // usually printed to the system or kernel logs.
+    // See also https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async
     ZX_PANIC("%s", cpp17::get<std::string>(result).c_str());
   }
 }
