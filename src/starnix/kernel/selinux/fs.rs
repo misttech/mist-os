@@ -13,9 +13,10 @@ use crate::{
         StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry, VmoFileNode,
     },
 };
+
 use selinux::{security_context::SecurityContext, security_server::SecurityServer};
 use selinux_policy::SUPPORTED_POLICY_VERSION;
-use starnix_logging::not_implemented;
+use starnix_logging::{log_error, log_info, not_implemented};
 use starnix_sync::Mutex;
 use starnix_uapi::{
     device_type::DeviceType,
@@ -190,7 +191,11 @@ impl SeLoad {
 impl BytesFileOps for SeLoad {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         not_implemented!("ignoring selinux policy");
-        self.security_server.load_policy(data).map_err(|_| errno!(EINVAL))
+        log_info!("Loading {} byte policy", data.len());
+        self.security_server.load_policy(data).map_err(|error| {
+            log_error!("Policy load error: {}", error);
+            errno!(EINVAL)
+        })
     }
 }
 
