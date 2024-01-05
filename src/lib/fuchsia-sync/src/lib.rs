@@ -16,6 +16,7 @@ pub use rwlock::*;
 
 #[cfg(not(target_os = "fuchsia"))]
 pub use parking_lot::{
-    MappedMutexGuard, Mutex, MutexGuard, RawMutex as RawSyncMutex, RawRwLock as RawSyncRwLock,
-    RwLock, RwLockReadGuard, RwLockWriteGuard,
+    MappedMutexGuard, MappedRwLockReadGuard, MappedRwLockWriteGuard, Mutex, MutexGuard,
+    RawMutex as RawSyncMutex, RawRwLock as RawSyncRwLock, RwLock, RwLockReadGuard,
+    RwLockWriteGuard,
 };
