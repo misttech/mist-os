@@ -200,8 +200,6 @@ mod tests {
         *,
     };
 
-    use std::io::Cursor;
-
     // TODO: Run this test over `validate()`.
     #[test]
     fn no_magic() {
@@ -210,7 +208,7 @@ mod tests {
         bytes.pop();
         let bytes = bytes;
         assert_eq!(None, ByRef::parse::<Magic>(ByRef::new(bytes.as_slice())),);
-        assert_eq!(None, ByValue::parse::<Magic>(ByValue::new(Cursor::new(bytes))),);
+        assert_eq!(None, ByValue::parse::<Magic>(ByValue::new(bytes)),);
     }
 
     #[test]
@@ -229,8 +227,7 @@ mod tests {
             magic.validate()
         );
 
-        let (magic, tail) =
-            ByValue::parse::<Magic>(ByValue::new(Cursor::new(bytes))).expect("magic");
+        let (magic, tail) = ByValue::parse::<Magic>(ByValue::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidMagic { found_magic: expected_invalid_magic }),
@@ -305,7 +302,7 @@ mod tests {
         );
 
         let (policy_version, tail) =
-            ByValue::parse::<PolicyVersion>(ByValue::new(Cursor::new(bytes))).expect("magic");
+            ByValue::parse::<PolicyVersion>(ByValue::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidPolicyVersion {
@@ -326,7 +323,7 @@ mod tests {
         );
 
         let (policy_version, tail) =
-            ByValue::parse::<PolicyVersion>(ByValue::new(Cursor::new(bytes))).expect("magic");
+            ByValue::parse::<PolicyVersion>(ByValue::new(bytes)).expect("magic");
         assert_eq!(0, tail.len());
         assert_eq!(
             Err(ValidateError::InvalidPolicyVersion {

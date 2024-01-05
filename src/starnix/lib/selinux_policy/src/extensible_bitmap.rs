@@ -224,7 +224,7 @@ mod tests {
         },
         *,
     };
-    use std::{borrow::Borrow, io::Cursor, marker::PhantomData};
+    use std::{borrow::Borrow, marker::PhantomData};
 
     pub struct ExtensibleBitmapIterator<PS: ParseStrategy, B: Borrow<ExtensibleBitmap<PS>>> {
         extensible_bitmap: B,
@@ -428,7 +428,7 @@ mod tests {
                         );
                     }
                 };
-                None::<(ExtensibleBitmap<ByValue<Cursor<_>>>, ByValue<Cursor<_>>)>
+                None::<(ExtensibleBitmap<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)>
             }
         );
 
@@ -544,7 +544,7 @@ mod tests {
                         );
                     }
                 };
-                None::<(ExtensibleBitmap<ByValue<Cursor<_>>>, ByValue<Cursor<_>>)>
+                None::<(ExtensibleBitmap<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)>
             }
         );
     }

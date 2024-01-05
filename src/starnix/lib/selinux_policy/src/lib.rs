@@ -970,21 +970,17 @@ pub(crate) mod test {
 
             fn check_by_value(
                 $result: Result<
-                    ($parse_output<ByValue<Cursor<Vec<u8>>>>, ByValue<Cursor<Vec<u8>>>),
-                    <$parse_output<ByValue<Cursor<Vec<u8>>>> as crate::Parse<
-                        ByValue<Cursor<Vec<u8>>>,
-                    >>::Error,
+                    ($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>),
+                    <$parse_output<ByValue<Vec<u8>>> as crate::Parse<ByValue<Vec<u8>>>>::Error,
                 >,
-            ) -> Option<($parse_output<ByValue<Cursor<Vec<u8>>>>, ByValue<Cursor<Vec<u8>>>)>
-            {
+            ) -> Option<($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)> {
                 $check_impl
             }
 
             let by_ref = ByRef::new(data.as_slice());
             let by_ref_result = $parse_output::parse(by_ref);
             check_by_ref(by_ref_result);
-            let by_value_result =
-                $parse_output::<ByValue<Cursor<Vec<u8>>>>::parse(ByValue::new(Cursor::new(data)));
+            let by_value_result = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data));
             let _ = check_by_value(by_value_result);
         }};
     }
@@ -1001,10 +997,7 @@ pub(crate) mod test {
             }
 
             fn check_by_value(
-                $result: Result<
-                    (),
-                    <$parse_output<ByValue<Cursor<Vec<u8>>>> as crate::Validate>::Error,
-                >,
+                $result: Result<(), <$parse_output<ByValue<Vec<u8>>> as crate::Validate>::Error>,
             ) {
                 $check_impl
             }
@@ -1014,9 +1007,8 @@ pub(crate) mod test {
                 $parse_output::parse(by_ref).expect("successful parse for validate test");
             let by_ref_result = by_ref_parsed.validate();
             check_by_ref(by_ref_result);
-            let (by_value_parsed, _) =
-                $parse_output::<ByValue<Cursor<Vec<u8>>>>::parse(ByValue::new(Cursor::new(data)))
-                    .expect("successful parse for validate test");
+            let (by_value_parsed, _) = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data))
+                .expect("successful parse for validate test");
             let by_value_result = by_value_parsed.validate();
             check_by_value(by_value_result);
         }};

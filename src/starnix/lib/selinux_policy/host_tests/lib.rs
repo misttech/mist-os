@@ -9,7 +9,7 @@ use selinux_policy::{
 };
 
 use serde::Deserialize;
-use std::io::{Cursor, Read as _};
+use std::io::Read as _;
 
 const TESTDATA_DIR: &str = env!("TESTDATA_DIR");
 const POLICIES_SUBDIR: &str = "policies";
@@ -63,7 +63,7 @@ fn known_policies() {
         let mut policy_bytes = vec![];
         policy_file.read_to_end(&mut policy_bytes).expect("read policy file");
 
-        let by_value = ByValue::new(Cursor::new(policy_bytes));
+        let by_value = ByValue::new(policy_bytes);
 
         let policy =
             Policy::parse(by_value).expect("parse policy").validate().expect("validate policy");

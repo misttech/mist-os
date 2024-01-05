@@ -10,7 +10,7 @@ use std::{
 use zerocopy::{ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
 /// Trait for a cursor that can emit a slice of "remaining" data, and advance forward.
-pub trait ParseCursor: Sized {
+trait ParseCursor: Sized {
     /// The inner representation that owns the underlying data.
     type Inner;
 
@@ -30,8 +30,8 @@ pub trait ParseCursor: Sized {
     fn into_inner(self) -> Self::Inner;
 }
 
-impl ParseCursor for Cursor<Vec<u8>> {
-    type Inner = Vec<u8>;
+impl<T: AsRef<[u8]>> ParseCursor for Cursor<T> {
+    type Inner = T;
     type Error = std::io::Error;
 
     fn remaining_slice(&self) -> &[u8] {
@@ -42,7 +42,7 @@ impl ParseCursor for Cursor<Vec<u8>> {
 
     fn len(&self) -> usize {
         let position = self.position() as usize;
-        self.get_ref().len() - position
+        self.get_ref().as_ref().len() - position
     }
 
     fn seek_forward(&mut self, num_bytes: usize) -> Result<(), Self::Error> {
@@ -180,37 +180,43 @@ impl<B: Debug + ByteSlice + PartialEq> ParseStrategy for ByRef<B> {
 /// be retained outside the lexical from which parsing is invoked. For example:
 ///
 /// ```rust,ignore
-/// fn do_by_value<PC: ParseCursor, T: zerocopy::FromBytes + zerocopy::Unaligned>(
-///     parse_cursor: PC,
-/// ) -> (T, ByValue<PC>) {
-///     let parser = ByValue::new(parse_cursor);
+/// fn do_by_value<
+///     D: AsRef<[u8]> + Debug + PartialEq,
+///     T: zerocopy::FromBytes + zerocopy::Unaligned,
+/// >(
+///     data: D,
+/// ) -> (T, ByValue<D>) {
+///     let parser = ByValue::new(data);
 ///     parser.parse::<T>().unwrap()
 /// }
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-pub struct ByValue<PC: ParseCursor>(PC);
+pub struct ByValue<T: AsRef<[u8]>>(Cursor<T>);
 
-impl<PC: ParseCursor> ByValue<PC> {
-    /// Returns a new [`ByValue`] that wraps `parse_cursor`.
-    pub fn new(parse_cursor: PC) -> Self {
-        Self(parse_cursor)
+impl<T: AsRef<[u8]>> ByValue<T> {
+    /// Returns a new [`ByValue`] that wraps `data` in a [`Cursor`] for parsing.
+    pub fn new(data: T) -> Self {
+        Self(Cursor::new(data))
     }
 
-    /// Consumes this [`ByValue`] and returns the [`ParseCursor`] that it wraps.
-    pub fn into_inner(self) -> PC {
-        self.0
+    /// Consumes this [`ByValue`] and returns the `T` that it wraps.
+    pub fn into_inner(self) -> T {
+        self.0.into_inner()
     }
 }
 
-impl<P: Debug + ParseCursor + PartialEq> ParseStrategy for ByValue<P> {
-    type Output<T: Debug + FromBytes + NoCell + PartialEq + Unaligned> = T;
-    type Slice<T: Debug + FromBytes + NoCell + PartialEq + Unaligned> = Vec<T>;
+impl<T: AsRef<[u8]> + Debug + PartialEq> ParseStrategy for ByValue<T>
+where
+    Cursor<T>: Debug + ParseCursor + PartialEq,
+{
+    type Output<O: Debug + FromBytes + NoCell + PartialEq + Unaligned> = O;
+    type Slice<S: Debug + FromBytes + NoCell + PartialEq + Unaligned> = Vec<S>;
 
-    /// Returns a `T` as the parsed output of the next bytes in the underlying [`ParseCursor`].
-    fn parse<T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    /// Returns an `P` as the parsed output of the next bytes in the underlying [`Cursor`] data.
+    fn parse<P: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
         mut self,
-    ) -> Option<(Self::Output<T>, Self)> {
-        let output = T::read_from_prefix(self.0.remaining_slice())?;
+    ) -> Option<(Self::Output<P>, Self)> {
+        let output = P::read_from_prefix(ParseCursor::remaining_slice(&self.0))?;
         if self.0.seek_forward(std::mem::size_of_val(&output)).is_err() {
             return None;
         }
@@ -218,12 +224,12 @@ impl<P: Debug + ParseCursor + PartialEq> ParseStrategy for ByValue<P> {
     }
 
     /// Returns a `Vec<T>` of `count` items as the parsed output of the next bytes in the underlying
-    /// [`ParseCursor`].
-    fn parse_slice<T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    /// [`Cursor`] data.
+    fn parse_slice<PS: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
         mut self,
         count: usize,
-    ) -> Option<(Self::Slice<T>, Self)> {
-        let (slice, _) = T::slice_from_prefix(self.0.remaining_slice(), count)?;
+    ) -> Option<(Self::Slice<PS>, Self)> {
+        let (slice, _) = PS::slice_from_prefix(ParseCursor::remaining_slice(&self.0), count)?;
         let size = std::mem::size_of_val(&slice);
         let slice = slice.to_owned();
         if self.0.seek_forward(size).is_err() {
@@ -232,15 +238,15 @@ impl<P: Debug + ParseCursor + PartialEq> ParseStrategy for ByValue<P> {
         Some((slice, self))
     }
 
-    fn deref<'a, T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
-        output: &'a Self::Output<T>,
-    ) -> &'a T {
+    fn deref<'a, D: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+        output: &'a Self::Output<D>,
+    ) -> &'a D {
         output
     }
 
-    fn deref_slice<'a, T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
-        slice: &'a Self::Slice<T>,
-    ) -> &'a [T] {
+    fn deref_slice<'a, DS: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+        slice: &'a Self::Slice<DS>,
+    ) -> &'a [DS] {
         slice
     }
 
@@ -265,22 +271,22 @@ mod tests {
 
     // Ensure that "return parser + parsed output" pattern works on `ByValue`.
     fn do_by_value<
-        PC: Debug + ParseCursor + PartialEq,
+        D: AsRef<[u8]> + Debug + PartialEq,
         T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned,
     >(
-        parse_cursor: PC,
-    ) -> (T, ByValue<PC>) {
-        let parser = ByValue::new(parse_cursor);
+        data: D,
+    ) -> (T, ByValue<D>) {
+        let parser = ByValue::new(data);
         parser.parse::<T>().expect("some numbers")
     }
     fn do_slice_by_value<
-        PC: Debug + ParseCursor + PartialEq,
+        D: AsRef<[u8]> + Debug + PartialEq,
         T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned,
     >(
-        parse_cursor: PC,
+        data: D,
         count: usize,
-    ) -> (Vec<T>, ByValue<PC>) {
-        let parser = ByValue::new(parse_cursor);
+    ) -> (Vec<T>, ByValue<D>) {
+        let parser = ByValue::new(data);
         parser.parse_slice::<T>(count).expect("some numbers")
     }
 
@@ -311,18 +317,18 @@ mod tests {
 
     #[test]
     fn by_value_cursor_vec_u8() {
-        let bytes: Cursor<Vec<u8>> = Cursor::new((0..8).collect());
+        let bytes: Vec<u8> = (0..8).collect();
         let (some_numbers, parser) = do_by_value::<_, SomeNumbers>(bytes);
         assert_eq!(0, some_numbers.a);
         assert_eq!(7, some_numbers.d);
         assert_eq!(8, parser.0.position());
-        assert_eq!(8, parser.into_inner().into_inner().len());
+        assert_eq!(8, parser.into_inner().len());
     }
 
     #[test]
     fn by_value_slice_u8_parse_slice() {
-        let bytes: Cursor<Vec<u8>> = Cursor::new((0..24).collect());
-        let (some_numbers, parser) = do_slice_by_value::<_, SomeNumbers>(bytes, 3);
+        let bytes: Vec<u8> = (0..24).collect();
+        let (some_numbers, parser) = do_slice_by_value::<_, SomeNumbers>(bytes.as_slice(), 3);
         assert_eq!(3, some_numbers.len());
         assert_eq!(0, some_numbers[0].a);
         assert_eq!(7, some_numbers[0].d);
@@ -330,6 +336,6 @@ mod tests {
         assert_eq!(15, some_numbers[1].d);
         assert_eq!(16, some_numbers[2].a);
         assert_eq!(23, some_numbers[2].d);
-        assert_eq!(24, parser.into_inner().into_inner().len());
+        assert_eq!(24, parser.into_inner().len());
     }
 }
