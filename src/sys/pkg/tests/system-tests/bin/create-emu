@@ -227,8 +227,17 @@ are documented in that script, and can be discovered by passing -h or
 
       # Flash the device.
       ffx_path = args.fuchsia_build_dir / 'host-tools/ffx'
-      flash_args = [ffx_path, '--target', device_name, '--timeout', '60', 'target', 'flash']
+      flash_args = [
+          ffx_path,
+          '--target', device_name,
+          '--timeout', '60',
+          'target', 'flash',
+          '--manifest', args.fuchsia_build_dir / 'flash.json',
+      ]
       print(f'Running: {shlex.join(str(s) for s in flash_args)}')
+
+      # Sleep a little bit for ffx to notice the device is in fastboot
+      await asyncio.sleep(5)
 
       process = await asyncio.create_subprocess_exec(*flash_args)
       return_code = await process.wait()
