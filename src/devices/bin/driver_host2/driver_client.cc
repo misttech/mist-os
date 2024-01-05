@@ -21,22 +21,32 @@ void DriverClient::Start(fuchsia_driver_framework::DriverStartArgs start_args,
   fdf::Arena arena('DSTT');
   driver_client_.buffer(arena)
       ->Start(fidl::ToWire(arena, std::move(start_args)))
-      .Then([cb = std::move(callback)](
+      .Then([this, cb = std::move(callback)](
                 fdf::WireUnownedResult<fuchsia_driver_framework::Driver::Start>& result) mutable {
         if (!result.ok()) {
           LOGF(WARNING, "Failed to start driver: %s", result.FormatDescription().c_str());
+          start_status_ = result.error().status();
           cb(zx::error(result.error().status()));
         } else if (result.value().is_error()) {
           LOGF(WARNING, "Failed to start driver: %s",
                zx_status_get_string(result.value().error_value()));
+          start_status_ = result.value().error_value();
           cb(zx::error(result.value().error_value()));
         } else {
+          start_status_ = ZX_OK;
           cb(zx::ok());
         }
       });
 }
 
 void DriverClient::Stop() {
+  if (!start_status_) {
+    LOGF(WARNING, "Driver %s Stop() hook is executed before start is completed", url_.c_str());
+  } else if (start_status_.value() != ZX_OK) {
+    LOGF(WARNING, "Driver %s Stop() hook is executed after start failed with status %s",
+         url_.c_str(), zx_status_get_string(start_status_.value()));
+  }
+
   fdf::Arena arena('DSTP');
   fidl::OneWayStatus stop_status = driver_client_.buffer(arena)->Stop();
   if (!stop_status.ok()) {

@@ -57,6 +57,10 @@ class DriverServer : public fdf::WireServer<fuchsia_driver_framework::Driver> {
 
   virtual ~DriverServer() {
     if (driver_) {
+      if (!complete_start_call_) {
+        FDF_LOGL(WARNING, driver_->logger(),
+                 "Driver server invoking Stop() hook before Start() is complete");
+      }
       driver_->Stop();
     }
   }
@@ -76,6 +80,7 @@ class DriverServer : public fdf::WireServer<fuchsia_driver_framework::Driver> {
     async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_),
                     [this, inner_completer = std::move(start_completer)]() mutable {
                       driver_->Start(std::move(inner_completer));
+                      complete_start_call_ = true;
                     });
   }
 
@@ -111,6 +116,10 @@ class DriverServer : public fdf::WireServer<fuchsia_driver_framework::Driver> {
   }
 
   fdf_dispatcher_t* dispatcher_;
+
+  // TODO(b/42081095): Remove this and the warning message once we finish debugging shutdown flakes.
+  bool complete_start_call_ = false;
+
   std::optional<fdf::ServerBinding<fuchsia_driver_framework::Driver>> binding_;
   std::unique_ptr<fdf::DriverBase> driver_;
 };

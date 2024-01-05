@@ -37,6 +37,9 @@ class DriverClient : public fdf::WireAsyncEventHandler<fuchsia_driver_framework:
   fbl::RefPtr<Driver> driver_;
   std::string url_;
   fdf::WireClient<fuchsia_driver_framework::Driver> driver_client_;
+
+  // TODO(b/42081095): Remove this and the warning message once we finish debugging shutdown flakes.
+  std::optional<zx_status_t> start_status_;
 };
 
 }  // namespace dfv2
