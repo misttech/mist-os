@@ -362,18 +362,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:15
-
-### bazel_remote
-
-Configure bazel to build remotely where supported.
-This option requires that bazel invocations have direct
-external network access, and that users are authenticated to
-access the configured RBE instance.
-
-**Current value (from the default):** `false`
-
-From //build/bazel/bazel_action.gni:21
+From //build/bazel/bazel_action.gni:16
 
 ### bless_goldens
 
@@ -1412,7 +1401,7 @@ changing the netcfg configuration at runtime.
 
 **Current value (from the default):** `false`
 
-From //src/connectivity/network/netcfg/delegated_network_provisioning.gni:9
+From //src/connectivity/policy/netcfg/delegated_network_provisioning.gni:9
 
 ### delivery_blob_type
 
@@ -2681,6 +2670,21 @@ Configuration to override the default window size for the virtual device in pixe
 **Current value (from the default):** `false`
 
 From //build/product.gni:50
+
+### enable_bazel_remote_rbe
+
+Configure bazel to build remotely with RBE where supported.
+This can speed up builds via remote caching.
+This option requires that bazel invocations have direct
+external network access, and that users are authenticated to
+access a remote execution service.
+The Remote Execution API can be found at:
+https://github.com/bazelbuild/remote-apis
+For an overview of remote execution for Bazel, see https://bazel.build/remote/rbe
+
+**Current value (from the default):** `false`
+
+From //build/bazel/remote_services.gni:14
 
 ### enable_frame_pointers
 
@@ -9044,7 +9048,7 @@ From //src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni:8
 
 ### anv_enable_external_sync_fd
 
-TODO(https://fxbug.dev/67565) - remove once external sync FD extensions fully supported
+TODO(fxbug.dev/67565) - remove once external sync FD extensions fully supported
 
 **Current value (from the default):** `false`
 
