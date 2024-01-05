@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    fidl::endpoints::{create_proxy, ControlHandle},
+    fidl::endpoints::ControlHandle,
     fidl_fuchsia_logger::LogSinkMarker,
     fidl_fuchsia_scheduler::ProfileProviderMarker,
     fidl_fuchsia_sysmem::AllocatorMarker,
@@ -19,7 +19,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
-    fuchsia_scenic as scenic, fuchsia_zircon_status as zx_status,
+    fuchsia_zircon_status as zx_status,
     futures::{StreamExt, TryStreamExt},
 };
 
@@ -36,20 +36,16 @@ const AUXILIARY_PUPPET_FACTORY_SERVICE: &str = "auxiliary-puppet-factory-service
 /// All FIDL services that are exposed by this component's ServiceFs.
 enum Service {
     RealmFactoryServer(ui_test_context::RealmFactoryRequestStream),
-    FactoryServer(ui_test_context::FactoryRequestStream),
 }
 
 #[fuchsia::main(logging_tags = ["ui_launcher"])]
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
-    fs.dir("svc")
-        .add_fidl_service(Service::RealmFactoryServer)
-        .add_fidl_service(Service::FactoryServer);
+    fs.dir("svc").add_fidl_service(Service::RealmFactoryServer);
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(None, |conn| async move {
         match conn {
             Service::RealmFactoryServer(stream) => run_realm_factory_server(stream).await,
-            Service::FactoryServer(stream) => run_factory_server(stream).await,
         }
     })
     .await;
@@ -88,144 +84,6 @@ async fn run_realm_factory_server(stream: ui_test_context::RealmFactoryRequestSt
         })
         .await
         .expect("failed to serve test realm factory request stream");
-}
-
-// TODO(b/315480571): remove after all tests migrated to test realm factory.
-async fn run_factory_server(stream: ui_test_context::FactoryRequestStream) {
-    stream
-        .try_for_each_concurrent(None, |request| async {
-            match request {
-                ui_test_context::FactoryRequest::Create { payload, .. } => {
-                    let context_server =
-                        payload.context_server.expect("missing context server endpoint");
-                    run_context_server(
-                        context_server.into_stream().expect("invalid context server"),
-                    )
-                    .await
-                    .expect("failed to run context server");
-                }
-            }
-
-            Ok(())
-        })
-        .await
-        .expect("failed to serve test context factory request stream");
-}
-
-// TODO(b/315480571): remove after all tests migrated to test realm factory.
-/// Serve the test suite protocol.
-async fn run_context_server(
-    mut stream: ui_test_context::ContextRequestStream,
-) -> Result<(), Error> {
-    // Create the puppet + ui stack for this test context.
-    let puppet_realm = assemble_puppet_realm().await;
-
-    // We only allow one "root puppet" per test case, so we will fail if we see
-    // multiple `GetRootViewToken` requests.
-    let mut created_root_view_token = false;
-
-    // We only allow one "puppet under test" per test case, so we will fail if
-    // we see multiple `ConnectToPuppetUnderTest` requests.
-    let mut connected_to_puppet_under_test = false;
-    while let Some(event) = stream.try_next().await? {
-        match event {
-            ui_test_context::ContextRequest::GetDisplayDimensions { responder, .. } => {
-                let info_proxy = puppet_realm
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<InfoMarker>()
-                    .expect("failed to connect to display info service");
-                let display_metrics =
-                    info_proxy.get_metrics().await.expect("failed to get display metrics");
-                let dimensions =
-                    display_metrics.extent_in_px.expect("display metrics missing dimensions");
-                responder
-                    .send(&ui_test_context::ContextGetDisplayDimensionsResponse {
-                        width_in_physical_px: Some(dimensions.width),
-                        height_in_physical_px: Some(dimensions.height),
-                        ..Default::default()
-                    })
-                    .expect("failed to respond to get display dimensions request");
-            }
-            ui_test_context::ContextRequest::GetRootViewToken { responder, .. } => {
-                assert!(!created_root_view_token);
-                created_root_view_token = true;
-                let scene_controller = puppet_realm
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<test_scene::ControllerMarker>()
-                    .expect("failed to connect to scene controller");
-                let root_view_token_pair = scenic::flatland::ViewCreationTokenPair::new()
-                    .expect("failed to create root view token pair");
-                let present_view_request = test_scene::ControllerPresentClientViewRequest {
-                    viewport_creation_token: Some(root_view_token_pair.viewport_creation_token),
-                    ..Default::default()
-                };
-                scene_controller
-                    .present_client_view(present_view_request)
-                    .expect("failed to present root puppet view");
-                responder
-                    .send(root_view_token_pair.view_creation_token)
-                    .expect("failed to respond to `GetRootViewToken`");
-            }
-            ui_test_context::ContextRequest::ConnectToPuppetUnderTest {
-                payload,
-                responder,
-                ..
-            } => {
-                assert!(!connected_to_puppet_under_test);
-                connected_to_puppet_under_test = true;
-                let (puppet_factory_proxy, puppet_factory_server) =
-                    create_proxy::<ui_conformance::PuppetFactoryMarker>()
-                        .expect("failed to open puppet factory channel");
-                puppet_realm
-                    .root
-                    .connect_request_to_named_protocol_at_exposed_dir(
-                        PUPPET_UNDER_TEST_FACTORY_SERVICE,
-                        puppet_factory_server.into_channel(),
-                    )
-                    .expect("failed to connect to puppet");
-                puppet_factory_proxy
-                    .create(payload)
-                    .await
-                    .expect("failed to create puppet-under-test instance");
-                responder.send().expect("failed to respond to ConnectToPuppetUnderTest request");
-            }
-            ui_test_context::ContextRequest::ConnectToAuxiliaryPuppet {
-                payload,
-                responder,
-                ..
-            } => {
-                let (puppet_factory_proxy, puppet_factory_server) =
-                    create_proxy::<ui_conformance::PuppetFactoryMarker>()
-                        .expect("failed to open puppet factory channel");
-                puppet_realm
-                    .root
-                    .connect_request_to_named_protocol_at_exposed_dir(
-                        AUXILIARY_PUPPET_FACTORY_SERVICE,
-                        puppet_factory_server.into_channel(),
-                    )
-                    .expect("failed to connect to puppet");
-                puppet_factory_proxy
-                    .create(payload)
-                    .await
-                    .expect("failed to create auxilliary puppet instance");
-                responder.send().expect("failed to respond to ConnectToAuxiliaryPuppet request");
-            }
-            ui_test_context::ContextRequest::ConnectToFlatland { server_end, .. } => {
-                puppet_realm
-                    .root
-                    .connect_request_to_protocol_at_exposed_dir(server_end)
-                    .expect("failed to connect to flatland");
-            }
-            ui_test_context::ContextRequest::ConnectToInputRegistry { server_end, .. } => {
-                puppet_realm
-                    .root
-                    .connect_request_to_protocol_at_exposed_dir(server_end)
-                    .expect("failed to connect to input registry");
-            }
-        }
-    }
-
-    Ok(())
 }
 
 async fn assemble_puppet_realm() -> RealmInstance {

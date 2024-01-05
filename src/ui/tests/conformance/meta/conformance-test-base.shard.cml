@@ -35,11 +35,6 @@
             to: "#context-factory",
         },
         {
-            protocol: [ "fuchsia.ui.test.context.Factory" ],
-            from: "#context-factory",
-            to: "#validator",
-        },
-        {
             protocol: [ "fuchsia.ui.test.context.RealmFactory" ],
             from: "#context-factory",
             to: "#validator",

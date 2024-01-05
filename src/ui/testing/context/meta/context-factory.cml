@@ -12,11 +12,7 @@
     },
     capabilities: [
         {
-            protocol: [
-                // TODO(b/315480571): remove after all tests migrated to test realm factory.
-                "fuchsia.ui.test.context.Factory",
-                "fuchsia.ui.test.context.RealmFactory",
-            ],
+            protocol: [ "fuchsia.ui.test.context.RealmFactory" ],
         },
     ],
     use: [
@@ -44,11 +40,7 @@
     ],
     expose: [
         {
-            protocol: [
-                // TODO(b/315480571): remove after all tests migrated to test realm factory.
-                "fuchsia.ui.test.context.Factory",
-                "fuchsia.ui.test.context.RealmFactory",
-            ],
+            protocol: [ "fuchsia.ui.test.context.RealmFactory" ],
             from: "self",
         },
     ],
