@@ -366,6 +366,7 @@ export FX_ENTRY_CMD="$command_name"
 declare -r cmd_and_args="$@"
 shift # Removes the command name.
 
+metrics-init
 if [[ "${command_name}" != "vendor" || $# -lt 2 ]]; then
   metric_name="${command_name}"
 else

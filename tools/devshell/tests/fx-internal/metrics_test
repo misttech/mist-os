@@ -46,12 +46,33 @@ BT_SET_UP() {
   btf::make_mock ${BT_TEMP_DIR}/${mock_py_path}
   echo "1234567890000000" > "${BT_TEMP_DIR}/${mock_py_path}.mock_stdout"
   metrics_log="${BT_TEMP_DIR}/metrics_log"
+  metrics_done="${BT_TEMP_DIR}/metrics_done"
+  metrics_fifo="${BT_TEMP_DIR}/metrics_fifo"
   BT_ASSERT_FILE_DOES_NOT_EXIST "${BT_TEMP_DIR}/.fx-metrics-config"
 
   source "${BT_TEMP_DIR}/tools/devshell/lib/vars.sh"
   source "${BT_TEMP_DIR}/tools/devshell/lib/metrics.sh"
   metrics-write-config 1 TESTUUID "${metrics_log}"
   metrics-read-config
+  mkfifo ${metrics_done}
+  mkfifo ${metrics_fifo}
+}
+
+# Special version of metrics_init that allows waiting for the analytics/metrics
+# Note: this can not be called from BT_SET_UP because somehow the TEST_xxx
+# function is executed in a subshell of BT_SET_UP function, and closing a file
+# descriptor in a subshell does not affect its parent. If metrics_init calls
+# were moved from each TEST_xxx function into BT_SET_UP, metrics_wait will wait
+# forever.
+metrics_init() {
+  (_metrics-service <"${metrics_fifo}"; : >"${metrics_done}") &
+  exec 10>&-
+  exec 10>"${metrics_fifo}"
+}
+
+metrics_wait(){
+  exec 10>&-
+  read <"${metrics_done}"
 }
 
 verify_execution_event() {
@@ -63,8 +84,12 @@ verify_execution_event() {
 TEST_metrics_no_arguments_tracking() {
   local cmd="build"
   local arg="something"
-  track-command-execution "${cmd}" "$arg"
-  track-command-finished "200" "0" "${cmd}" "$arg"
+  metrics_init
+  # Execute track-* command in subshell since they will close stdout and stderr
+  # which will confuse our bash test framework
+  (track-command-execution "${cmd}" "$arg")
+  (track-command-finished "200" "0" "${cmd}" "$arg")
+  metrics_wait
   verify_execution_event "${cmd}"
   # the "build" command does not track arguments:
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${metrics_log}" "\"args\":\"\""
@@ -74,8 +99,10 @@ TEST_metrics_track_specific_arguments() {
   local cmd="shell"
   local subcmd="uname"
   local arg="$subcmd blah"
-  track-command-execution "${cmd}" "$arg"
-  track-command-finished "200" "0" "${cmd}" "$arg"
+  metrics_init
+  (track-command-execution "${cmd}" "$arg")
+  (track-command-finished "200" "0" "${cmd}" "$arg")
+  metrics_wait
   verify_execution_event ${cmd}
   # The "shell" command tracks one subcommand, let's verify:
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${metrics_log}" "\"args\":\"${subcmd}\""
@@ -86,8 +113,10 @@ TEST_metrics_track_unknown_arguments() {
   local subcmd="\$mandragora"
   local replacement_text="\$unknown_subcommand"
   local arg="$subcmd blah"
-  track-command-execution "${cmd}" "$arg"
-  track-command-finished "200" "0" "${cmd}" "$arg"
+  metrics_init
+  (track-command-execution "${cmd}" "$arg")
+  (track-command-finished "200" "0" "${cmd}" "$arg")
+  metrics_wait
   verify_execution_event ${cmd}
   # The "shell" command tracks one subcommand, let's verify:
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${metrics_log}" "\"args\":\"${replacement_text}\""
@@ -98,9 +127,11 @@ TEST_metrics_custom_track() {
   local action="myaction"
   local label="mylabel"
 
-  track-command-execution "${cmd}" "$arg"
-  track-subcommand-custom-event "${cmd}" "${action}" "${label}"
-  track-command-finished "200" "0" "${cmd}" "$arg"
+  metrics_init
+  (track-command-execution "${cmd}" "$arg")
+  (track-subcommand-custom-event "${cmd}" "${action}" "${label}")
+  (track-command-finished "200" "0" "${cmd}" "$arg")
+  metrics_wait
   verify_execution_event ${cmd}
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${metrics_log}" "\"name\":\"custom\""
   BT_EXPECT_FILE_CONTAINS_SUBSTRING "${metrics_log}" "\"action\":\"${action}\""
@@ -112,9 +143,11 @@ TEST_metrics_no_custom_track() {
   local action="myaction"
   local label="mylabel"
 
-  track-command-execution "${cmd}" "$arg"
-  track-subcommand-custom-event "${cmd}" "${action}" "${label}"
-  track-command-finished "200" "0" "${cmd}" "$arg"
+  metrics_init
+  (track-command-execution "${cmd}" "$arg")
+  (track-subcommand-custom-event "${cmd}" "${action}" "${label}")
+  (track-command-finished "200" "0" "${cmd}" "$arg")
+  metrics_wait
   verify_execution_event ${cmd}
   BT_EXPECT_FILE_DOES_NOT_CONTAIN_SUBSTRING "${metrics_log}" "\"name\":\"custom\""
 }

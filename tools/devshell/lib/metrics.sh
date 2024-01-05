@@ -333,6 +333,8 @@ function metrics-maybe-log {
 #   - event action
 #   - (optional) event label
 function track-subcommand-custom-event {
+  exec 1>/dev/null
+  exec 2>/dev/null
   local subcommand="$1"
   local event_action="$2"
   shift 2
@@ -370,6 +372,8 @@ function track-subcommand-custom-event {
 #   - the name of the fx subcommand
 #   - args of the subcommand
 function track-command-execution {
+  exec 1>/dev/null
+  exec 2>/dev/null
   local subcommand="$1"
   shift
   local args="$*"
@@ -469,6 +473,8 @@ function _add-fx-set-hit {
 #   - the name of the fx subcommand
 #   - args of the subcommand
 function track-command-finished {
+  exec 1>/dev/null
+  exec 2>/dev/null
   timing=$1
   exit_status=$2
   subcommand=$3
@@ -511,7 +517,7 @@ function track-command-finished {
 #
 # Arguments:
 #   - analytics arguments, e.g. "t=event" "ec=fx" etc.
-function _add-to-analytics-batch {
+function __add-to-analytics-batch {
   if [[ $# -eq 0 ]]; then
     return 0
   fi
@@ -537,7 +543,7 @@ function _add-to-analytics-batch {
 
   (( hit_count += 1 ))
   if ((hit_count == BATCH_SIZE)); then
-    _send-analytics-batch
+    __send-analytics-batch
   fi
 }
 
@@ -555,7 +561,7 @@ function _get_ninja_persistent_mode {
 
 # Sends the current batch of hits to the Analytics server. As a side effect, clears
 # the hit count and batch data.
-function _send-analytics-batch {
+function __send-analytics-batch {
   if [[ $hit_count -eq 0 ]]; then
     return 0
   fi
@@ -598,6 +604,50 @@ function _send-analytics-batch {
   hit_count=0
   events=()
 }
+
+# Metrics/analytics are processed asynchronously by the following function.
+function _metrics-service {
+  # redirect stdout and stderr away from parent process so that parent
+  # stdout and stderr can be safely closed. Otherwise, dart will
+  # wait for stdout and stderr being closed, defeating the purpose of
+  # async analytics processing.
+  exec 1>/dev/null
+  exec 2>/dev/null
+  metrics-read-config
+  while read -r -d $'\0' args; do
+        local IFS=$'\n'
+        read -r -d $'\0' -a request <<< "$args"
+        if [[ ${#request[@]} -eq 0 ]]; then
+          __send-analytics-batch
+        else
+          __add-to-analytics-batch "${request[@]}"
+        fi
+  done <&0
+  __send-analytics-batch
+}
+
+# Init metrics service by redirecting file descriptor 10 to the process
+# substitution of metrics service.
+function metrics-init {
+  exec 10> >(_metrics-service)
+}
+
+# Calls __add-to-analytics-batch asynchronously, via metrics service
+function _add-to-analytics-batch {
+  if [[ $# -eq 0 ]]; then
+    return 0
+  fi
+
+  local IFS=$'\n'
+  printf "$*\0" >&10
+}
+
+# Calls __send-analytics-batch asynchronously, via metrics service
+function _send-analytics-batch {
+  printf "\0" >&10
+}
+
+
 
 function _os_data {
   if command -v uname >/dev/null 2>&1 ; then
