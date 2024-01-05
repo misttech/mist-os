@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display.types;
 
+using fuchsia.images2;
+
 /// Type of the internal value in [`fuchsia.hardware.display.types/LayerId`].
 alias LayerIdValue = uint64;
 
@@ -96,4 +98,67 @@ type ClientCompositionOp = struct {
     layer_id LayerId;
 
     opcode ClientCompositionOpcode;
+};
+
+type PrimaryLayer = struct {
+    image Image;
+
+    /// If `alpha_mode` is `AlphaMode.DISABLE`, the layer is opaque and
+    /// `alpha_layer_val` is ignored.
+    ///
+    /// If `alpha_mode` is `AlphaMode.PREMULTIPLIED` or `HW_MULTIPLY`, the
+    /// alpha used when blending is determined by the product of
+    /// `alpha_layer_val` and any per-pixel alpha.
+    ///
+    /// Additionally, if `alpha_mode` is `AlphaMode.PREMULTIPLIED`, then the
+    /// hardware must premultiply the color channel with `alpha_layer_val`
+    /// before blending.
+    ///
+    /// `alpha_layer_val` must be in the range [0, 1].
+    alpha_mode AlphaMode;
+    alpha_layer_val float32;
+
+    transform Transform;
+
+    /// The source frame, where (0,0) is the top-left corner of the image. The
+    /// client guarantees that src_frame lies entirely within the image.
+    src_frame Frame;
+
+    /// The destination frame, where (0,0) is the top-left corner of the
+    /// composed output. The client guarantees that dest_frame lies entirely
+    /// within the composed output.
+    dest_frame Frame;
+};
+
+type CursorLayer = struct {
+    image Image;
+
+    /// The position of the top-left corner of the cursor's image. When being
+    /// applied to a display, the cursor is guaranteed to have at least one
+    /// pixel of overlap with the display.
+    x_pos int32;
+    y_pos int32;
+};
+
+type ColorLayer = struct {
+    /// The format of `color` bytes.
+    format fuchsia.images2.PixelFormat;
+
+    /// The color to use for the layer. The color is little-endian, and is
+    /// guaranteed to be of the exact size of one pixel in `format`.
+    color vector<uint8>:MAX;
+};
+
+type LayerConfig = strict union {
+    1: primary PrimaryLayer;
+    2: cursor CursorLayer;
+    3: color ColorLayer;
+};
+
+type Layer = struct {
+    /// z_index of the layer. See
+    /// [`fuchsia.hardware.display.engine/Engine.CheckConfiguration`] and
+    /// [`fuchsia.hardware.display.engine/Engine.ApplyConfiguration`].
+    z_index uint32;
+    cfg LayerConfig;
 };
