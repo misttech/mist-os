@@ -29,10 +29,10 @@ pub struct CommandStats {
 impl std::fmt::Display for CommandStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self { success, command_duration, analytics_duration } = self;
-        write!(f, "success: {success}, command time: {}, ", command_duration.as_secs_f32())?;
+        write!(f, "Success: {success}, exec time: {:.4}, ", command_duration.as_secs_f32())?;
         match analytics_duration {
             Some(analytics_duration) => {
-                write!(f, "analytics time: {}", analytics_duration.as_secs_f32())
+                write!(f, "analytics time: {:.4}", analytics_duration.as_secs_f32())
             }
             None => write!(f, "analytics disabled"),
         }
@@ -72,7 +72,6 @@ impl MetricsSession {
         let command_done = Instant::now();
         let command_duration = command_done - self.session_start;
         let analytics_duration = if self.enabled {
-            tracing::debug!("Command completed. Success: {}", success);
             let timing_in_millis = command_duration.as_millis().to_string();
             let sanitized_args = sanitized_args.iter().map(AsRef::as_ref).join(" ");
 
@@ -100,7 +99,10 @@ impl MetricsSession {
             None
         };
         let stats = CommandStats { success, command_duration, analytics_duration };
-        tracing::info!("Command finished. {stats}",);
+        match success {
+            true => tracing::info!("{stats}",),
+            false => tracing::warn!("{stats}",),
+        }
         Ok(stats)
     }
 }

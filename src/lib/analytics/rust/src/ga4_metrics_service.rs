@@ -158,7 +158,7 @@ impl GA4MetricsService {
                     tracing::trace!(?chunk);
                 }
             }
-            Err(e) => tracing::warn!("Error posting GA 4 analytics: {}", e),
+            Err(e) => tracing::debug!("Error posting GA 4 analytics: {}", e),
         })
     }
 

@@ -156,7 +156,7 @@ impl MetricsService {
                     tracing::trace!(?chunk);
                 }
             }
-            Err(e) => tracing::warn!("Error posting UA analytics: {}", e),
+            Err(e) => tracing::debug!("Error posting UA analytics: {}", e),
         }
         Ok(())
     }
