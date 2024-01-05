@@ -4,6 +4,7 @@
 
 use anyhow::Error;
 use fidl;
+use fidl_fuchsia_testing_harness as harness;
 use fidl_fuchsia_ui_composition as flatland;
 use fidl_fuchsia_ui_test_context as ui_test_context;
 use flatland::PresentArgs;
@@ -18,29 +19,40 @@ const TRANSFORM_ID: flatland::TransformId = flatland::TransformId { value: 3 };
 /// The test leverages fuchsia.ui.test.context.Factory capability
 /// to connect with fuchsia.ui.composition.Flatland protocol.
 
-#[fuchsia::test]
-async fn test_flatland_connection_is_ok() -> Result<(), Error> {
-    let (context_proxy, context_server_end) =
-        fidl::endpoints::create_proxy::<ui_test_context::ContextMarker>()
-            .expect("create Context proxy and server_end");
-
-    let factory_proxy = client::connect_to_protocol::<ui_test_context::FactoryMarker>()
-        .expect("connect to FactoryProxy");
-
-    factory_proxy
-        .create(ui_test_context::FactoryCreateRequest {
-            context_server: Some(context_server_end),
+async fn connect_to_realm() -> Result<harness::RealmProxy_Proxy, Error> {
+    let (realm_proxy, realm_server) = fidl::endpoints::create_proxy::<harness::RealmProxy_Marker>()
+        .expect("create realm_proxy and realm_server");
+    let realm_factory_proxy = client::connect_to_protocol::<ui_test_context::RealmFactoryMarker>()
+        .expect("connect to realm factory proxy");
+    let _ = realm_factory_proxy
+        .create_realm(ui_test_context::RealmFactoryCreateRealmRequest {
+            realm_server: Some(realm_server),
             ..Default::default()
         })
-        .expect("create Context");
+        .await
+        .expect("create realm");
 
-    let (flatland_proxy, flatland_server_end) =
-        fidl::endpoints::create_proxy::<flatland::FlatlandMarker>()
-            .expect("create Flatland proxy and server_end");
+    Ok(realm_proxy)
+}
 
+async fn connect_to_protocol<T: fidl::endpoints::DiscoverableProtocolMarker>(
+    proxy: &harness::RealmProxy_Proxy,
+) -> Result<T::Proxy, Error> {
+    let (client, server) = fidl::endpoints::create_endpoints::<T>();
+    let _ = proxy
+        .connect_to_named_protocol(T::PROTOCOL_NAME, server.into_channel())
+        .await
+        .expect("connect_to");
+
+    Ok(client.into_proxy()?)
+}
+
+#[fuchsia::test]
+async fn test_flatland_connection_is_ok() -> Result<(), Error> {
+    let realm_proxy = connect_to_realm().await.expect("connect_to_realm");
+
+    let flatland_proxy = connect_to_protocol::<flatland::FlatlandMarker>(&realm_proxy).await?;
     let mut flatland_event_stream = flatland_proxy.take_event_stream();
-
-    context_proxy.connect_to_flatland(flatland_server_end).expect("connect to Flatland");
 
     flatland_proxy.create_transform(&TRANSFORM_ID).expect("create transform");
 

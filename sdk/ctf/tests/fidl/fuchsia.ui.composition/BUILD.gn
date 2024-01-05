@@ -9,6 +9,7 @@ rustc_test("fuchsia_ui_composition_flatland_test_bin") {
   source_root = "src/fuchsia_ui_composition_flatland_test.rs"
   sources = [ "src/fuchsia_ui_composition_flatland_test.rs" ]
   deps = [
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_rust",
     "//src/lib/fidl/rust/fidl",

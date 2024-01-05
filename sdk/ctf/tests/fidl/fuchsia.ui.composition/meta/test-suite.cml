@@ -11,6 +11,6 @@
         binary: "bin/fuchsia_ui_composition_flatland_test_bin",
     },
     use: [
-        { protocol: "fuchsia.ui.test.context.Factory" },
+        { protocol: "fuchsia.ui.test.context.RealmFactory" },
     ],
 }
