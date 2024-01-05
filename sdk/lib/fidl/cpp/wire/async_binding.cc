@@ -299,7 +299,7 @@ auto AsyncBinding::StartTeardownWithInfo(std::shared_ptr<AsyncBinding>&& calling
       ZX_DEBUG_ASSERT(binding);
       auto* binding_raw = binding.get();
       // |binding->keep_alive_| is at least another reference.
-      ZX_DEBUG_ASSERT(!binding.unique());
+      ZX_DEBUG_ASSERT(binding.use_count() > 1);
       binding.reset();
 
       // At this point, no other thread will touch the internal reference.
@@ -502,7 +502,7 @@ AsyncBinding::MaybeAnyTransport AsyncClientBinding::ExtractTransportIfUnique() {
       // If single threaded, by definition, this client cannot have concurrent sync calls due to
       // threading restriction.
       ScopedThreadGuard guard(thread_checker());
-      ZX_ASSERT(transport_.unique());
+      ZX_ASSERT(transport_.use_count() == 1);
       // Give up our |transport_|.
       return std::move(*std::exchange(transport_, nullptr));
     }

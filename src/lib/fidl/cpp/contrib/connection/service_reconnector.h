@@ -219,7 +219,7 @@ class ServiceReconnector : public std::enable_shared_from_this<ServiceReconnecto
 
   std::weak_ptr<ServiceReconnector> get_this() {
     std::shared_ptr<ServiceReconnector> this_ptr = this->shared_from_this();
-    FX_DCHECK(!this_ptr.unique());
+    FX_DCHECK(this_ptr.use_count() > 1);
     return this_ptr;
   }
 
