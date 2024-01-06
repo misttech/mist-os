@@ -738,7 +738,7 @@ impl<S: SpecSocketId> SocketMapAddrStateSpec for ListenerAddrState<S> {
             Self::ExclusiveBound(x) => id == x,
             Self::ExclusiveListener(x) => id == x,
             Self::Shared { listener, bound } => {
-                listener.as_ref().map_or(false, |x| id == x) || bound.contains(id)
+                listener.as_ref().is_some_and(|x| id == x) || bound.contains(id)
             }
         }
     }

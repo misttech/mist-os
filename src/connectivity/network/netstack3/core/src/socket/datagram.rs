@@ -4399,7 +4399,7 @@ pub(crate) fn set_multicast_membership<
         let interface = match interface {
             MulticastMembershipInterfaceSelector::Specified(selector) => match selector {
                 MulticastInterfaceSelector::Interface(device) => {
-                    if bound_device.as_ref().map_or(false, |d| d != &device) {
+                    if bound_device.as_ref().is_some_and(|d| d != &device) {
                         return Err(SetMulticastMembershipError::WrongDevice);
                     } else {
                         EitherDeviceId::Strong(device)

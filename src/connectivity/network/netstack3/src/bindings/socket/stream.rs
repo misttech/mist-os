@@ -1686,7 +1686,7 @@ mod tests {
 
     /// Fills up the ring buffer and zircon socket.
     fn fill(peer: &zx::Socket, sbuf: &mut SendBufferWithZirconSocket) {
-        while peer.write(&LARGE_PAYLOAD[..]).map_or(false, |l| l == LARGE_PAYLOAD.len()) {
+        while peer.write(&LARGE_PAYLOAD[..]).is_ok_and(|l| l == LARGE_PAYLOAD.len()) {
             sbuf.poll();
         }
     }

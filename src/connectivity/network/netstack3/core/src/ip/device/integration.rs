@@ -519,7 +519,7 @@ fn assignment_state_v4<
     addr: SpecifiedAddr<Ipv4Addr>,
 ) -> AddressStatus<Ipv4PresentAddressStatus> {
     if MulticastAddr::new(addr.get())
-        .map_or(false, |addr| GmpQueryHandler::gmp_is_in_group(core_ctx, device, addr))
+        .is_some_and(|addr| GmpQueryHandler::gmp_is_in_group(core_ctx, device, addr))
     {
         return AddressStatus::Present(Ipv4PresentAddressStatus::Multicast);
     }
@@ -551,7 +551,7 @@ fn assignment_state_v6<
     addr: SpecifiedAddr<Ipv6Addr>,
 ) -> AddressStatus<Ipv6PresentAddressStatus> {
     if MulticastAddr::new(addr.get())
-        .map_or(false, |addr| GmpQueryHandler::gmp_is_in_group(core_ctx, device, addr))
+        .is_some_and(|addr| GmpQueryHandler::gmp_is_in_group(core_ctx, device, addr))
     {
         return AddressStatus::Present(Ipv6PresentAddressStatus::Multicast);
     }

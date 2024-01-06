@@ -168,7 +168,7 @@ pub(crate) fn can_device_change<
     new_device: Option<&S>,
 ) -> bool {
     let must_have_zone =
-        local_ip.map_or(false, must_have_zone) || remote_ip.map_or(false, must_have_zone);
+        local_ip.is_some_and(must_have_zone) || remote_ip.is_some_and(must_have_zone);
 
     if !must_have_zone {
         return true;
@@ -178,7 +178,7 @@ pub(crate) fn can_device_change<
         panic!("local_ip={:?} or remote_ip={:?} must have zone", local_ip, remote_ip)
     });
 
-    new_device.as_ref().map_or(false, |new_device| old_device == new_device)
+    new_device.as_ref().is_some_and(|new_device| old_device == new_device)
 }
 
 /// Converts into a [`AddrAndZone<A, ()>`] if the address requires a zone.

@@ -1765,7 +1765,7 @@ mod tests {
         ) -> Result<O, ExistsError> {
             let FakeSlaacAddrs { slaac_addrs, non_slaac_addr, counters: _ } = self;
 
-            if non_slaac_addr.map_or(false, |a| a == add_addr_sub.addr()) {
+            if non_slaac_addr.is_some_and(|a| a == add_addr_sub.addr()) {
                 return Err(ExistsError);
             }
 

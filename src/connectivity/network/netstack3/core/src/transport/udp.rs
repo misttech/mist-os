@@ -223,7 +223,7 @@ fn check_posix_sharing<I: IpExt, D: WeakId>(
     // Having a value present at a shadowed address is disqualifying, unless
     // both the new and existing sockets allow port sharing.
     if dest.iter_shadows().any(|a| {
-        socketmap.get(&a).map_or(false, |bound| {
+        socketmap.get(&a).is_some_and(|bound| {
             !bound.tag(&a).to_sharing_options().is_shareable_with_new_state(new_sharing)
         })
     }) {

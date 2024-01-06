@@ -308,7 +308,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             if !subnet.contains(&address) {
                 return None;
             }
-            if local_device.map_or(false, |local_device| local_device != device) {
+            if local_device.is_some_and(|local_device| local_device != device) {
                 return None;
             }
 
