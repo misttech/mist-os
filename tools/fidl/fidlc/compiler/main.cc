@@ -497,8 +497,9 @@ int main(int argc, char* argv[]) {
     if (arg == "--files") {
       source_managers.emplace_back();
     } else {
-      if (!source_managers.back().CreateSource(arg.data())) {
-        Fail("Couldn't read in source data from %s\n", arg.data());
+      const char* reason;
+      if (!source_managers.back().CreateSource(arg, &reason)) {
+        Fail("Couldn't read in source data from %s: %s\n", arg.data(), reason);
       }
       source_list.emplace_back(arg.data());
     }

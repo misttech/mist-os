@@ -118,8 +118,9 @@ int main(int argc, char* argv[]) {
     source_manager.AddSourceFile(std::make_unique<fidl::SourceFile>("stdin", std::move(input)));
   } else {
     for (size_t i = pos; i < args.size(); i++) {
-      if (!source_manager.CreateSource(args[i])) {
-        Fail("Couldn't read in source data from %s\n", args[i].c_str());
+      const char* reason;
+      if (!source_manager.CreateSource(args[i], &reason)) {
+        Fail("Couldn't read in source data from %s: %s\n", args[i].c_str(), reason);
       }
     }
   }

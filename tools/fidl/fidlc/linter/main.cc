@@ -99,8 +99,9 @@ int main(int argc, char* argv[]) {
 
   // Process filenames.
   for (const auto& filepath : filepaths) {
-    if (!source_manager.CreateSource(filepath)) {
-      Fail("Couldn't read in source data from %s\n", filepath.c_str());
+    const char* reason;
+    if (!source_manager.CreateSource(filepath, &reason)) {
+      Fail("Couldn't read in source data from %s: %s\n", filepath.c_str(), reason);
     }
   }
 

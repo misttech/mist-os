@@ -55,6 +55,7 @@ source_set("fidl") {
   ]
   public_deps = [
     "//sdk/lib/fit",
+    "//src/lib/fxl",
     "//third_party/re2",
     "//zircon/system/ulib/cmdline",
     "//zircon/third_party/ulib/safemath",

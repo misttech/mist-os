@@ -16,7 +16,7 @@ namespace fidl {
 class SourceManager {
  public:
   // Returns whether the filename was successfully read.
-  bool CreateSource(std::string_view filename);
+  bool CreateSource(std::string_view filename, const char** failure_reason);
   void AddSourceFile(std::unique_ptr<SourceFile> file);
 
   const std::vector<std::unique_ptr<SourceFile>>& sources() const { return sources_; }
