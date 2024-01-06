@@ -1806,6 +1806,9 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
   DEBUG_ASSERT(parent_);
   DEBUG_ASSERT(page_request);
 
+  // Stash the paddr of the page that is going to be copied across loop iterations.
+  const paddr_t page_paddr = page->paddr();
+
   // To avoid the need for rollback logic on allocation failure, we start the forking
   // process from the root-most vmo and work our way towards the leaf vmo. This allows
   // us to maintain the hidden vmo invariants through the whole operation, so that we
@@ -1905,7 +1908,7 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       // remove write or unmap before copying the contents.
       vm_page_t* cover_page;
       alloc_status =
-          AllocateCopyPage(pmm_alloc_flags_, page->paddr(), alloc_list, page_request, &cover_page);
+          AllocateCopyPage(pmm_alloc_flags_, page_paddr, alloc_list, page_request, &cover_page);
       if (alloc_status != ZX_OK) {
         break;
       }
