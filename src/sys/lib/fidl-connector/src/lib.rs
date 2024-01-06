@@ -5,7 +5,7 @@
 use {
     fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy},
     fuchsia_component::client::connect_to_protocol_at_path,
-    parking_lot::RwLock,
+    fuchsia_sync::RwLock,
     std::sync::Arc,
 };
 
