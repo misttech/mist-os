@@ -3625,9 +3625,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     AssertHeld(content.page_owner->lock_ref());
     if (!slot && content.page_owner->is_hidden_locked()) {
       free_any_pages();
-      // TODO(https://fxbug.dev/60238): This could be more optimal since unlike a regular cow clone, we are
-      // not going to actually need to read the target page we are cloning, and hence it does not
-      // actually need to get converted.
+      // TODO(https://fxbug.dev/60238): This could be more optimal since unlike a regular cow clone,
+      // we are not going to actually need to read the target page we are cloning, and hence it does
+      // not actually need to get converted.
       if (content.page_or_marker->IsReference()) {
         zx_status_t result = content.page_owner->ReplaceReferenceWithPageLocked(
             content.page_or_marker, content.owner_offset, page_request);
@@ -6079,19 +6079,20 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
     } else if (ktl::holds_alternative<VmCompressor::FailTag>(compression_result)) {
       // Compression failed, but the page back in.
       old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
-      // TODO(https://fxbug.dev/60238): Placing in a queue and then moving it is inefficient, but avoids
-      // needing to reason about whether reclamation could be manually attempted on pages that might
-      // otherwise not end up in the reclaimable queues.
+      // TODO(https://fxbug.dev/60238): Placing in a queue and then moving it is inefficient, but
+      // avoids needing to reason about whether reclamation could be manually attempted on pages
+      // that might otherwise not end up in the reclaimable queues.
       SetNotPinnedLocked(page, offset);
-      // TODO(https://fxbug.dev/60238): Marking this page as failing reclamation will prevent it from ever
-      // being tried again. As compression might succeed if the contents changes, we should consider
-      // moving the page out of this queue if it is modified.
+      // TODO(https://fxbug.dev/60238): Marking this page as failing reclamation will prevent it
+      // from ever being tried again. As compression might succeed if the contents changes, we
+      // should consider moving the page out of this queue if it is modified.
       pmm_page_queues()->CompressFailed(page);
       // Page stays owned by the VMO.
       page = nullptr;
     } else {
       ASSERT(ktl::holds_alternative<VmCompressor::ZeroTag>(compression_result));
-      // TODO(https://fxbug.dev/60238): determine if we can decommit the slot instead of placing a marker.
+      // TODO(https://fxbug.dev/60238): determine if we can decommit the slot instead of placing a
+      // marker.
       old_ref = slot->ReleaseReference();
       *slot = VmPageOrMarker::Marker();
       reclamation_event_count_++;

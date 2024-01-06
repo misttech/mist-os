@@ -521,7 +521,8 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
   // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
-  // TODO(https://fxbug.dev/101641, https://fxbug.dev/60238): Determine if this should act on pages supplied by the parent.
+  // TODO(https://fxbug.dev/101641, https://fxbug.dev/60238): Determine if this should act on pages
+  // supplied by the parent.
   zx_status_t DecompressInRangeLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
       TA_REQ(lock());
 
@@ -777,8 +778,6 @@ class VmCowPages final : public VmHierarchyBase,
       return false;
     }
 
-    // TODO(sagebarreda@) Don't allow snapshots in unidirectional chain.
-
     // Unless we are the root VMO, we can't snapshot if has non-slice children, as it would create
     // an inconsistent hierarchy.
     if (!parent_) {
@@ -789,6 +788,12 @@ class VmCowPages final : public VmHierarchyBase,
       if (!child.is_slice_locked()) {
         return false;
       }
+    }
+
+    // Snapshot-modified is currently unsupported for at-least-on-write VMO chains of length >2.
+    AssertHeld(parent_->lock_ref());
+    if (parent_->parent_ && !is_parent_hidden_locked()) {
+      return false;
     }
 
     return true;

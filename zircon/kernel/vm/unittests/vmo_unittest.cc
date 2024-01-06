@@ -4170,6 +4170,29 @@ static bool vmo_snapshot_modified_test() {
   ASSERT_OK(status);
   anon_snapshot->set_user_id(0x51);
 
+  // Snapshot-modified shold not be allowed on a unidirectional chain of length > 2
+  fbl::RefPtr<VmObject> chain1;
+  status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                            PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &chain1);
+  ASSERT_OK(status);
+  chain1->set_user_id(0x52);
+  uint64_t data1 = 42;
+  EXPECT_OK(chain1->Write(&data1, 0, sizeof(data)));
+
+  fbl::RefPtr<VmObject> chain2;
+  status = chain1->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
+                               PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &chain2);
+  ASSERT_OK(status);
+  chain2->set_user_id(0x51);
+  uint64_t data2 = 43;
+  EXPECT_OK(chain2->Write(&data2, 0, sizeof(data)));
+
+  fbl::RefPtr<VmObject> chain_snap;
+  status =
+      chain2->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, PAGE_SIZE,
+                          true, AttributionObject::GetKernelAttribution(), &chain_snap);
+  ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "snapshot-modified unidirectional chain\n");
+
   END_TEST;
 }
 
