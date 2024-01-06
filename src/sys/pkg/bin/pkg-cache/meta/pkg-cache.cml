@@ -52,7 +52,7 @@
         {
             directory: "build-info",
             rights: [ "r*" ],
-            path: "/pkgfs/packages/build-info/0/data",
+            path: "/pkgfs/packages/build-info/0/meta/fuchsia.domain_config/data",
         },
         {
             directory: "shell-commands-bin",

@@ -37,8 +37,9 @@ impl DomainConfigPackage {
         // Find all the directory routes to expose.
         let mut exposes = vec![];
         for (directory, directory_config) in self.config.directories {
-            let subdir = cml::RelativePath::new(&directory)
-                .with_context(|| format!("Calculating relative path for {directory}"))?;
+            let subdir =
+                cml::RelativePath::new(&format!("meta/fuchsia.domain_config/{}", directory))
+                    .with_context(|| format!("Calculating relative path for {directory}"))?;
             let name = cml::Name::new(&directory)
                 .with_context(|| format!("Calculating name for {directory}"))?;
             exposes.push(cml::Expose {
@@ -53,25 +54,29 @@ impl DomainConfigPackage {
                 // Add an empty file to the directory to ensure the directory gets created.
                 let empty_file_name = "_ensure_directory_creation";
                 let empty_file_path = outdir.join(empty_file_name);
-                let destination = Utf8PathBuf::from(&directory).join(empty_file_name);
+                let destination = Utf8PathBuf::from("meta/fuchsia.domain_config")
+                    .join(&directory)
+                    .join(empty_file_name);
                 std::fs::write(&empty_file_path, "").context("writing empty file")?;
                 builder
-                    .add_file_as_blob(destination, &empty_file_path)
+                    .add_file_to_far(destination, &empty_file_path)
                     .with_context(|| format!("adding empty file {empty_file_path}"))?;
             }
 
             // Add the necessary config files to the directory.
             for (destination, entry) in directory_config.entries {
-                let destination = Utf8PathBuf::from(&directory).join(destination);
+                let destination = Utf8PathBuf::from("meta/fuchsia.domain_config")
+                    .join(&directory)
+                    .join(destination);
                 match entry {
                     FileOrContents::File(FileEntry { source, .. }) => {
                         builder
-                            .add_file_as_blob(destination, &source)
+                            .add_file_to_far(destination, &source)
                             .with_context(|| format!("adding config {source}"))?;
                     }
                     FileOrContents::Contents(contents) => {
                         builder
-                            .add_contents_as_blob(&destination, &contents, &outdir)
+                            .add_contents_to_far(&destination, &contents, &outdir)
                             .with_context(|| format!("adding config to {destination}"))?;
                     }
                 }
@@ -111,7 +116,6 @@ mod tests {
     use fidl::unpersist;
     use fidl_fuchsia_component_decl::Component;
     use fuchsia_archive::Utf8Reader;
-    use fuchsia_hash::Hash;
     use fuchsia_pkg::PackageName;
     use pretty_assertions::assert_eq;
     use std::fs::File;
@@ -152,17 +156,9 @@ mod tests {
         assert_eq!(manifest, loaded_manifest);
         assert_eq!(manifest.name(), &PackageName::from_str("for-test").unwrap());
         let blobs = manifest.into_blobs();
-        assert_eq!(blobs.len(), 2);
+        assert_eq!(blobs.len(), 1);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
         assert_eq!(blob.source_path, outdir.join("meta.far").to_string());
-        let blob = blobs.iter().find(|&b| &b.path == "config-dir/config.json").unwrap();
-        assert_eq!(blob.source_path, config_source.to_string());
-        assert_eq!(
-            blob.merkle,
-            Hash::from_str("ba2747adb0a7126408af2ea0071fa8ae85d70ee2ab171aa0d0073f28b3ebcfcb")
-                .unwrap()
-        );
-        assert_eq!(blob.size, 11);
 
         // Assert the contents of the package are correct.
         let far_path = outdir.join("meta.far");
@@ -185,14 +181,18 @@ mod tests {
         }) => {
             assert_eq!(source_name, &cml::Name::new("pkg").unwrap());
             assert_eq!(target_name, &cml::Name::new("config-dir").unwrap());
-            assert_eq!(subdir, &PathBuf::from("config-dir"));
+            assert_eq!(subdir, &PathBuf::from("meta/fuchsia.domain_config/config-dir"));
         });
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
         let expected_contents = "\
-            config-dir/config.json=ba2747adb0a7126408af2ea0071fa8ae85d70ee2ab171aa0d0073f28b3ebcfcb\n\
         "
         .to_string();
+        assert_eq!(expected_contents, contents);
+        let contents =
+            far_reader.read_file("meta/fuchsia.domain_config/config-dir/config.json").unwrap();
+        let contents = std::str::from_utf8(&contents).unwrap();
+        let expected_contents = "bleep bloop".to_string();
         assert_eq!(expected_contents, contents);
     }
 
@@ -229,17 +229,9 @@ mod tests {
         assert_eq!(manifest, loaded_manifest);
         assert_eq!(manifest.name(), &PackageName::from_str("for-test").unwrap());
         let blobs = manifest.into_blobs();
-        assert_eq!(blobs.len(), 2);
+        assert_eq!(blobs.len(), 1);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
         assert_eq!(blob.source_path, outdir.join("meta.far").to_string());
-        let blob = blobs.iter().find(|&b| &b.path == "config-dir/config.json").unwrap();
-        assert_eq!(blob.source_path, config_source.to_string());
-        assert_eq!(
-            blob.merkle,
-            Hash::from_str("ba2747adb0a7126408af2ea0071fa8ae85d70ee2ab171aa0d0073f28b3ebcfcb")
-                .unwrap()
-        );
-        assert_eq!(blob.size, 11);
 
         // Assert the contents of the package are correct.
         let far_path = outdir.join("meta.far");
@@ -249,9 +241,13 @@ mod tests {
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
         let expected_contents = "\
-            config-dir/config.json=ba2747adb0a7126408af2ea0071fa8ae85d70ee2ab171aa0d0073f28b3ebcfcb\n\
         "
         .to_string();
+        assert_eq!(expected_contents, contents);
+        let contents =
+            far_reader.read_file("meta/fuchsia.domain_config/config-dir/config.json").unwrap();
+        let contents = std::str::from_utf8(&contents).unwrap();
+        let expected_contents = "bleep bloop".to_string();
         assert_eq!(expected_contents, contents);
     }
 
@@ -318,12 +314,9 @@ mod tests {
         assert_eq!(manifest, loaded_manifest);
         assert_eq!(manifest.name(), &PackageName::from_str("for-test").unwrap());
         let blobs = manifest.into_blobs();
-        assert_eq!(blobs.len(), 2);
+        assert_eq!(blobs.len(), 1);
         let blob = blobs.iter().find(|&b| &b.path == "meta/").unwrap();
         assert_eq!(blob.source_path, outdir.join("meta.far").to_string());
-        let blob =
-            blobs.iter().find(|&b| &b.path == "config-dir/_ensure_directory_creation").unwrap();
-        assert_eq!(blob.source_path, outdir.join("_ensure_directory_creation").to_string());
 
         // Assert the contents of the package are correct.
         let far_path = outdir.join("meta.far");
@@ -346,14 +339,19 @@ mod tests {
         }) => {
             assert_eq!(source_name, &cml::Name::new("pkg").unwrap());
             assert_eq!(target_name, &cml::Name::new("config-dir").unwrap());
-            assert_eq!(subdir, &PathBuf::from("config-dir"));
+            assert_eq!(subdir, &PathBuf::from("meta/fuchsia.domain_config/config-dir"));
         });
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
         let expected_contents = "\
-            config-dir/_ensure_directory_creation=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
         "
         .to_string();
+        assert_eq!(expected_contents, contents);
+        let contents = far_reader
+            .read_file("meta/fuchsia.domain_config/config-dir/_ensure_directory_creation")
+            .unwrap();
+        let contents = std::str::from_utf8(&contents).unwrap();
+        let expected_contents = "".to_string();
         assert_eq!(expected_contents, contents);
     }
 }
