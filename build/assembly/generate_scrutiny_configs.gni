@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/compiled_action.gni")
 import("//build/python/python_action.gni")
 import("//build/testing/golden_files.gni")
 
@@ -24,6 +25,10 @@ import("//build/testing/golden_files.gni")
 #   kernel_cmdline_golden (required)
 #     [path] The kernel cmdline list source-of-truth.
 #
+#   assembly_build_type (optional)
+#     [string] When provided, the assembly artifacts for the given build type
+#     will be included. Valid options are "userdebug" and "user".
+#
 template("generate_scrutiny_configs") {
   assert(defined(invoker.assembly_input_bundles),
          "Need to define assembly_input_bundles")
@@ -38,14 +43,45 @@ template("generate_scrutiny_configs") {
   assert(defined(invoker.kernel_cmdline_golden),
          "Need to define kernel_cmdline_golden")
 
+  _assembly_build_type = false
+  if (defined(invoker.assembly_build_type)) {
+    assert(invoker.assembly_build_type == "userdebug" ||
+               invoker.assembly_build_type == "user",
+           "assembly_build_type must be either 'userdebug' or 'user'")
+    _assembly_build_type = invoker.assembly_build_type
+  }
+
   files = {
+    assembly_static_packages =
+        "${target_out_dir}/${target_name}/assembly_static_packages.txt"
+    assembly_bootfs_files =
+        "${target_out_dir}/${target_name}/assembly_bootfs_files.txt"
     static_packages = "${target_out_dir}/${target_name}/static_packages.txt"
     bootfs_packages = "${target_out_dir}/${target_name}/bootfs_packages.txt"
     bootfs_files = "${target_out_dir}/${target_name}/bootfs_files.txt"
     kernel_cmdline = "${target_out_dir}/${target_name}/kernel_cmdline.txt"
   }
   labels = {
+    generate_assembly = "${target_name}_generate_assembly"
     generate = "${target_name}_generate"
+  }
+
+  if (_assembly_build_type != false) {
+    compiled_action(labels.generate_assembly) {
+      tool = "//build/assembly/tools/generate_assembly_scrutiny_configs"
+      outputs = [
+        files.assembly_static_packages,
+        files.assembly_bootfs_files,
+      ]
+      args = [
+        "--packages",
+        rebase_path(files.assembly_static_packages, root_build_dir),
+        "--bootfs",
+        rebase_path(files.assembly_bootfs_files, root_build_dir),
+        "--build-type",
+        _assembly_build_type,
+      ]
+    }
   }
 
   python_action(labels.generate) {
@@ -80,6 +116,20 @@ template("generate_scrutiny_configs") {
     ]
     foreach(aib, invoker.assembly_input_bundles) {
       args += [ rebase_path(aib, root_build_dir) ]
+    }
+
+    if (_assembly_build_type != false) {
+      inputs += [
+        files.assembly_static_packages,
+        files.assembly_bootfs_files,
+      ]
+      args += [
+        "--static-packages-input",
+        rebase_path(files.assembly_static_packages, root_build_dir),
+        "--bootfs-files-input",
+        rebase_path(files.assembly_bootfs_files, root_build_dir),
+      ]
+      deps += [ ":${labels.generate_assembly}" ]
     }
   }
 
