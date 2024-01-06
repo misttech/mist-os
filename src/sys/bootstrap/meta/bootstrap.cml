@@ -1069,16 +1069,6 @@
             availability: "same_as_target",
         },
 
-        // Configuration
-        {
-            directory: "boot",
-            from: "parent",
-            as: "config-data",
-            to: "#archivist",
-            rights: [ "r*" ],
-            subdir: "config/archivist",
-        },
-
         // -- End Archivist offers --
         {
             protocol: "fuchsia.boot.Arguments",
