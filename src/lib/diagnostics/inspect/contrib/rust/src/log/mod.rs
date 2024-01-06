@@ -215,7 +215,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async as fasync;
     use fuchsia_inspect::Inspector;
-    use parking_lot::Mutex;
+    use fuchsia_sync::Mutex;
 
     #[fuchsia::test]
     fn test_inspect_log_basic() {

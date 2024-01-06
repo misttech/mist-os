@@ -39,9 +39,9 @@
 //! inspect and pass the results to `self_profiles_report::SelfProfilesReport`.
 
 use fuchsia_inspect::{Inspector, Node};
+use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Task as _};
 use once_cell::sync::Lazy;
-use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cell::RefCell,
     collections::BTreeMap,
@@ -187,7 +187,7 @@ struct ProfileDurationTree {
     queue_time: AtomicI64,
     page_fault_time: AtomicI64,
     lock_contention_time: AtomicI64,
-    children: RwLock<BTreeMap<&'static str, Arc<Self>>>,
+    children: Mutex<BTreeMap<&'static str, Arc<Self>>>,
 }
 
 impl ProfileDurationTree {
@@ -205,19 +205,11 @@ impl ProfileDurationTree {
     }
 
     fn child(&self, name: &'static str, location: &'static Location<'static>) -> Arc<Self> {
-        let children = self.children.upgradable_read();
-        if let Some(existing) = children.get(name) {
-            existing.clone()
-        } else {
-            let mut children = RwLockUpgradableReadGuard::upgrade(children);
-            let new = Arc::new(Self::new(location));
-            children.insert(name, new.clone());
-            new
-        }
+        self.children.lock().entry(name).or_insert_with(|| Arc::new(Self::new(location))).clone()
     }
 
     fn report(&self, node: &Node) {
-        let children = self.children.read();
+        let children = self.children.lock();
         node.record_string("location", self.location.to_string());
         node.record_uint("count", self.count.load(Ordering::Relaxed));
         node.record_int("wall_time", self.wall_time.load(Ordering::Relaxed));

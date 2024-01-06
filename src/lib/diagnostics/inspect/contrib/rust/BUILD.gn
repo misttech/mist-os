@@ -16,13 +16,13 @@ rustc_library("fuchsia-inspect-contrib") {
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
     "//src/lib/injectable-time",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:once_cell",
-    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tracing",
   ]
 
@@ -31,7 +31,6 @@ rustc_library("fuchsia-inspect-contrib") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:pin-utils",
   ]
 
