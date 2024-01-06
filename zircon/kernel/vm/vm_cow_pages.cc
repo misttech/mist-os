@@ -4426,7 +4426,6 @@ void VmCowPages::ReleaseCowParentPagesLocked(uint64_t start, uint64_t end,
       // End of our range does not see the sibling. First move up our start to ensure we are dealing
       // with a range that is 100% no sibling, and then keep on walking up.
       if (other_parent_end > our_parent_start && other_parent_end < our_parent_end) {
-        DEBUG_ASSERT(other_parent_end < our_parent_end);
         cur_start = CheckedAdd(cur_start, other_parent_end - our_parent_start);
         DEBUG_ASSERT(cur_start < cur_end);
       }
