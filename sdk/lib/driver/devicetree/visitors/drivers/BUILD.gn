@@ -4,6 +4,7 @@
 
 group("tests") {
   deps = [
+    "clock-controllers:tests",
     "gpio-controllers:tests",
     "i2c-controllers:tests",
     "interrupt-controllers:tests",
