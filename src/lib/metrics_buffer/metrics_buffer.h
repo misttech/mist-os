@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_METRICS_BUFFER_METRICS_BUFFER_H_
 #define SRC_LIB_METRICS_BUFFER_METRICS_BUFFER_H_
 
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/sys/cpp/service_directory.h>
@@ -13,9 +14,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "fidl/fuchsia.io/cpp/markers.h"
 #include "src/lib/metrics_buffer/metrics_impl.h"
-#include "third_party/cobalt/src/lib/client/cpp/buckets_config.h"
 
 namespace cobalt {
 
@@ -58,39 +57,42 @@ class StringMetricBuffer {
   uint32_t metric_id_ = 0;
 };
 
+struct ExponentialIntegerBuckets {
+  int64_t floor;
+  uint32_t num_buckets;
+  uint32_t initial_step;
+  uint32_t step_multiplier;
+};
+
+struct LinearIntegerBuckets {
+  int64_t floor;
+  uint32_t num_buckets;
+  uint32_t step_size;
+};
+
 struct HistogramInfo {
   uint32_t metric_id = 0;
-  std::unique_ptr<cobalt::config::IntegerBucketConfig> bucket_config;
+  std::variant<ExponentialIntegerBuckets, LinearIntegerBuckets> buckets;
 };
 
 // If metrics.cb.h codegen provides a non-macro way in future, switch to that.
-#define COBALT_EXPONENTIAL_HISTOGRAM_INFO(base_name)                                   \
-  [] {                                                                                 \
-    ::cobalt::HistogramInfo result;                                                    \
-    result.metric_id = base_name##MetricId;                                            \
-    ::cobalt::IntegerBuckets bucket_proto;                                             \
-    ::cobalt::ExponentialIntegerBuckets* exp = bucket_proto.mutable_exponential();     \
-    exp->set_floor(base_name##IntBucketsFloor);                                        \
-    exp->set_num_buckets(base_name##IntBucketsNumBuckets);                             \
-    exp->set_initial_step(base_name##IntBucketsInitialStep);                           \
-    exp->set_step_multiplier(base_name##IntBucketsStepMultiplier);                     \
-    result.bucket_config =                                                             \
-        cobalt::config::IntegerBucketConfig::CreateFromProto(std::move(bucket_proto)); \
-    return result;                                                                     \
+#define COBALT_EXPONENTIAL_HISTOGRAM_INFO(base_name)                                      \
+  [] {                                                                                    \
+    ::cobalt::ExponentialIntegerBuckets buckets;                                          \
+    buckets.floor = base_name##IntBucketsFloor;                                           \
+    buckets.num_buckets = base_name##IntBucketsNumBuckets;                                \
+    buckets.initial_step = base_name##IntBucketsInitialStep;                              \
+    buckets.step_multiplier = base_name##IntBucketsStepMultiplier;                        \
+    return ::cobalt::HistogramInfo{.metric_id = base_name##MetricId, .buckets = buckets}; \
   }()
 
-#define COBALT_LINEAR_HISTOGRAM_INFO(base_name)                                        \
-  [] {                                                                                 \
-    HistogramInfo result;                                                              \
-    result.metric_id = base_name##MetricId;                                            \
-    cobalt::IntegerBuckets bucket_proto;                                               \
-    cobalt::LinearIntegerBuckets* linear = bucket_proto.mutable_linear();              \
-    linear->set_floor(base_name##IntBucketsFloor);                                     \
-    linear->set_num_buckets(base_name##IntBucketsNumBuckets);                          \
-    linear->set_step_size(base_nameIntBucketsStepSize);                                \
-    result.bucket_config =                                                             \
-        cobalt::config::IntegerBucketConfig::CreateFromProto(std::move(bucket_proto)); \
-    return result;                                                                     \
+#define COBALT_LINEAR_HISTOGRAM_INFO(base_name)                                           \
+  [] {                                                                                    \
+    ::cobalt::LinearIntegerBuckets buckets;                                               \
+    buckets.floor = base_name##IntBucketsFloor;                                           \
+    buckets.num_buckets = base_name##IntBucketsNumBuckets;                                \
+    buckets.step_size = base_name##IntBucketsStepSize;                                    \
+    return ::cobalt::HistogramInfo{.metric_id = base_name##MetricId, .buckets = buckets}; \
   }()
 
 // This class is a convenience interface which remembers metric_id + bucket_config, and calculates
@@ -113,6 +115,10 @@ class HistogramMetricBuffer {
   HistogramMetricBuffer(std::shared_ptr<MetricsBuffer> parent, HistogramInfo histogram_info);
   std::shared_ptr<MetricsBuffer> parent_;
   HistogramInfo histogram_info_;
+
+  // This info corresponds to fields of cobalt IntegerBucketConfig. We can't depend on
+  // cobalt buckets_config from here because it depends on syslog.
+  std::vector<int64_t> floors_;
 };
 
 // The purpose of this class is to ensure the rate of messages to Cobalt stays reasonable, per
@@ -160,10 +166,6 @@ class MetricsBuffer final : public std::enable_shared_from_this<MetricsBuffer> {
   void LogString(uint32_t metric_id, std::vector<uint32_t> dimension_values,
                  std::string string_value);
 
-  // This computes which histogram bucket, and adds 1 to the tally of that bucket.
-  void LogHistogramValue(const HistogramInfo& histogram_info,
-                         std::vector<uint32_t> dimension_values, int64_t value);
-
   // Use sparingly, only when it's appropriate to force the counts to flush to Cobalt, which will
   // typically only be before orderly exit or in situations like driver suspend.  Over-use of this
   // method will break the purpose of using this class, which is to ensure the rate of messages to
@@ -175,6 +177,12 @@ class MetricsBuffer final : public std::enable_shared_from_this<MetricsBuffer> {
   HistogramMetricBuffer CreateHistogramMetricBuffer(HistogramInfo histogram_info);
 
  private:
+  friend class HistogramMetricBuffer;
+
+  // This computes which histogram bucket, and adds 1 to the tally of that bucket.
+  void LogHistogramValue(const HistogramInfo& histogram_info, std::vector<int64_t>& floors,
+                         std::vector<uint32_t> dimension_values, int64_t value);
+
   explicit MetricsBuffer(uint32_t project_id) __TA_EXCLUDES(lock_);
 
   MetricsBuffer(uint32_t project_id, std::shared_ptr<sys::ServiceDirectory> service_directory)
@@ -241,10 +249,9 @@ class MetricsBuffer final : public std::enable_shared_from_this<MetricsBuffer> {
 
   const uint32_t project_id_{};
 
-  // We have a separate async::Loop for each instance of cobalt::MetricsImpl, because MetricsImpl
-  // requires that no async tasks posted by MetricsImpl out-live the MetricsImpl.  The easiest way
-  // to achieve that is to give MetricsImpl its own async::Loop and Quit(), JoinThreads(),
-  // Shutdown() that async::Loop before destroying the MetricsImpl.
+  // For historical reasons, we have a separate async::Loop for each instance of
+  // cobalt::MetricsImpl. We only SetServiceDirectory() once in non-test scenarios, so outside tests
+  // we'll only ever create one async::Loop.
   std::unique_ptr<async::Loop> loop_;
 
   std::unique_ptr<cobalt::MetricsImpl> cobalt_logger_ __TA_GUARDED(lock_);

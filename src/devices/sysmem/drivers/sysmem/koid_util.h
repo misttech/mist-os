@@ -7,14 +7,28 @@
 
 #include <lib/fpromise/result.h>
 #include <lib/zx/channel.h>
+#include <zircon/assert.h>
 #include <zircon/types.h>
 
 #include <vector>
+
+#include "src/devices/sysmem/drivers/sysmem/macros.h"
 
 namespace sysmem_driver {
 
 zx_status_t get_handle_koids(const zx::object_base& this_end, zx_koid_t* this_end_koid,
                              zx_koid_t* that_end_koid, zx_obj_type_t type);
+
+template<class T>
+zx_koid_t get_koid(const zx::object<T>& object) {
+    zx_koid_t this_end_koid;
+    zx_koid_t that_end_koid;
+    zx_status_t result = get_handle_koids(object, &this_end_koid, &that_end_koid, T::TYPE);
+    if (result != ZX_OK) {
+        return ZX_KOID_INVALID;
+    }
+    return this_end_koid;
+}
 
 }  // namespace sysmem_driver
 

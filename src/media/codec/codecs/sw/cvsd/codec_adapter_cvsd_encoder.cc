@@ -71,8 +71,7 @@ CodecAdapterCvsdEncoder::InputLoopStatus CodecAdapterCvsdEncoder::ProcessFormatD
   }
 
   if (input_format.frames_per_second != kExpectedSamplingFreq) {
-    FX_LOGS(WARNING) << "Expected sampling frequency " << kExpectedSamplingFreq << " got "
-                     << input_format.frames_per_second;
+    LOG(WARNING, "Expected sampling frequency %u got %u", kExpectedSamplingFreq, input_format.frames_per_second);
   }
 
   InitCvsdParams(codec_params_);

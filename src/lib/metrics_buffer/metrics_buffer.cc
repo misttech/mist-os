@@ -25,6 +25,31 @@
 
 namespace cobalt {
 
+namespace {
+
+template<class T>
+constexpr bool sfinae_false_v = false;
+
+// This is essentially the same code as cobalt buckets_config BucketIndex.
+uint32_t BucketIndex(std::vector<int64_t>& floors, int64_t val) {
+  // 0 is the underflow bucket.
+  if (val < floors[0]) {
+    return 0;
+  }
+
+  // TODO(b/278918086): Maybe switch to binary search?
+  for (uint32_t i = 1; i < floors.size(); i++) {
+    if (val >= floors[i - 1] && val < floors[i]) {
+      return i;
+    }
+  }
+
+  // floors_.size() is the overflow bucket.
+  return static_cast<uint32_t>(floors.size());
+}
+
+} // namespace
+
 // static
 std::shared_ptr<MetricsBuffer> MetricsBuffer::Create(uint32_t project_id) {
   return std::shared_ptr<MetricsBuffer>(new MetricsBuffer(project_id));
@@ -50,14 +75,14 @@ MetricsBuffer::MetricsBuffer(uint32_t project_id,
 MetricsBuffer::~MetricsBuffer() { SetServiceDirectory(nullptr); }
 
 void MetricsBuffer::SetServiceDirectory(std::shared_ptr<sys::ServiceDirectory> service_directory) {
-  FX_LOGS(INFO) << "SetServiceDirectory is called";
+  LOG(INFO, "SetServiceDirectory is called");
   std::unique_ptr<cobalt::MetricsImpl> logger_to_delete_outside_lock;
   std::unique_ptr<async::Loop> loop_to_stop_outside_lock;
   {  // scope lock
     std::lock_guard<std::mutex> lock(lock_);
     ZX_DEBUG_ASSERT(!!loop_ == !!cobalt_logger_);
     if (cobalt_logger_) {
-      FX_LOGS(INFO) << "cobalt_logger already exists";
+      LOG(INFO, "cobalt_logger already exists");
       ZX_DEBUG_ASSERT(loop_);
       // Clean these up after we've released lock_, to avoid potential deadlock waiting on a thread
       // that may be trying to get lock_.
@@ -66,7 +91,7 @@ void MetricsBuffer::SetServiceDirectory(std::shared_ptr<sys::ServiceDirectory> s
     }
     ZX_DEBUG_ASSERT(!loop_ && !cobalt_logger_);
     if (service_directory) {
-      FX_LOGS(INFO) << "Creating new cobalt_logger";
+      LOG(INFO, "Creating new cobalt_logger");
       std::unique_ptr<cobalt::MetricsImpl> new_logger;
       fidl::ClientEnd<fuchsia_io::Directory> directory =
           fidl::HLCPPToNatural(service_directory->CloneChannel());
@@ -157,12 +182,13 @@ void MetricsBuffer::LogString(uint32_t metric_id, std::vector<uint32_t> dimensio
 }
 
 void MetricsBuffer::LogHistogramValue(const HistogramInfo& histogram_info,
+                                      std::vector<int64_t>& floors,
                                       std::vector<uint32_t> dimension_values, int64_t value) {
   std::lock_guard<std::mutex> lock(lock_);
   ZX_DEBUG_ASSERT(!!loop_ == !!cobalt_logger_);
   bool was_empty = pending_histograms_.empty();
   MetricKey key(histogram_info.metric_id, std::move(dimension_values));
-  uint32_t bucket_index = histogram_info.bucket_config->BucketIndex(value);
+  uint32_t bucket_index = BucketIndex(floors, value);
   pending_histograms_[key][bucket_index]++;
   if (was_empty) {
     TryPostFlushCountsLocked();
@@ -323,10 +349,30 @@ void StringMetricBuffer::LogString(std::vector<uint32_t> dimension_values,
 
 HistogramMetricBuffer::HistogramMetricBuffer(std::shared_ptr<MetricsBuffer> parent,
                                              HistogramInfo histogram_info)
-    : parent_(parent), histogram_info_(std::move(histogram_info)) {}
+    : parent_(parent), histogram_info_(std::move(histogram_info)) {
+  std::visit([this](auto&& info){
+    using InfoT = std::decay_t<decltype(info)>;
+    if constexpr (std::is_same_v<InfoT, LinearIntegerBuckets>) {
+      floors_.resize(info.num_buckets + 1);
+      for (int64_t i = 0; i < info.num_buckets + 1; i++) {
+        floors_[i] = info.floor + i * info.step_size;
+      }
+    } else if constexpr (std::is_same_v<InfoT, ExponentialIntegerBuckets>) {
+      floors_.resize(info.num_buckets + 1);
+      floors_[0] = info.floor;
+      int64_t offset = info.initial_step;
+      for (uint32_t i = 1; i < info.num_buckets + 1; i++) {
+        floors_[i] = info.floor + offset;
+        offset *= info.step_multiplier;
+      }
+    } else {
+      static_assert(sfinae_false_v<InfoT>, "non-exhaustive");
+    }
+  }, histogram_info_.buckets);
+}
 
 void HistogramMetricBuffer::LogValue(std::vector<uint32_t> dimension_values, int64_t value) {
-  parent_->LogHistogramValue(histogram_info_, std::move(dimension_values), value);
+  parent_->LogHistogramValue(histogram_info_, floors_, std::move(dimension_values), value);
 }
 
 }  // namespace cobalt

@@ -23,11 +23,13 @@ zx_status_t get_handle_koids(const zx::object_base& this_end, zx_koid_t* this_en
   zx_status_t get_info_status = this_end.get_info(ZX_INFO_HANDLE_BASIC, &basic_info,
                                                   sizeof(basic_info), &actual_count, &avail_count);
   if (get_info_status != ZX_OK) {
+    LOG(WARNING, "this_end.get_info failed: %d", get_info_status);
     return get_info_status;
   }
   ZX_DEBUG_ASSERT(actual_count == 1);
   ZX_DEBUG_ASSERT(avail_count == 1);
   if (basic_info.type != type) {
+    LOG(WARNING, "basic_info.type != type");
     return ZX_ERR_WRONG_TYPE;
   }
   ZX_DEBUG_ASSERT(basic_info.koid != 0);

@@ -6,7 +6,6 @@ import("//build/components.gni")
 
 source_set("metrics_buffer") {
   sources = [
-    "metrics.h",
     "metrics_buffer.cc",
     "metrics_buffer.h",
     "metrics_impl.cc",
@@ -17,17 +16,13 @@ source_set("metrics_buffer") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
-    "//src/lib/fidl/cpp/contrib/connection:service_hub_connector",
-    "//third_party/cobalt/src/lib/client/cpp:buckets_config",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/syslog",
 
     # Only for <ddk/debug.h>'s severity levels.
     "//src/lib/ddk",
   ]
 
-  # //src/lib/cobalt/cpp:cobalt_logger is deprecated, so no new users should be added to this list.
   visibility = [
     ":metrics_buffer_unittests",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",

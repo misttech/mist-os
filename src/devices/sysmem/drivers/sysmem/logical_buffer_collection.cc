@@ -42,7 +42,6 @@
 #include "macros.h"
 #include "node_properties.h"
 #include "orphaned_node.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/memory_barriers/memory_barriers.h"
 #include "usage_pixel_format_cost.h"
 
@@ -948,7 +947,7 @@ LogicalBufferCollection::LogicalBufferCollection(Device* parent_device)
   zx::event dummy_event;
   zx_status_t status = zx::event::create(0, &dummy_event);
   ZX_ASSERT(status == ZX_OK);
-  zx_koid_t koid = fsl::GetKoid(dummy_event.get());
+  zx_koid_t koid = get_koid(dummy_event);
   ZX_ASSERT(koid != ZX_KOID_INVALID);
   dummy_event.reset();
   buffer_collection_id_ = koid;
@@ -4783,9 +4782,9 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
     return;
   }
 
-  zx_koid_t strong_child_vmo_koid = fsl::GetKoid(strong_child_vmo.get());
+  zx_koid_t strong_child_vmo_koid = get_koid(strong_child_vmo);
   if (strong_child_vmo_koid == ZX_KOID_INVALID) {
-    logical_buffer_collection_->LogError(FROM_HERE, "fsl::GetKoid failed");
+    logical_buffer_collection_->LogError(FROM_HERE, "get_koid failed");
     error_ = ZX_ERR_INTERNAL;
     return;
   }

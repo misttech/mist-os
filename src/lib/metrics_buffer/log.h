@@ -6,8 +6,6 @@
 #define SRC_LIB_METRICS_BUFFER_LOG_H_
 
 #include <lib/ddk/debug.h>
-#include <lib/syslog/global.h>
-#include <lib/syslog/logger.h>
 
 #include <string_view>
 
@@ -26,11 +24,15 @@
     LOG(INFO, format, ##__VA_ARGS__); \
   } while (0)
 
-#define LOG(severity, format, ...)                              \
-  do {                                                          \
-    static_assert(true || DDK_LOG_##severity);                  \
-    static_assert(true || FX_LOG_##severity);                   \
-    FX_LOGF(severity, "metrics_buffer", format, ##__VA_ARGS__); \
+// Temporary solution for logging in driver and non-driver contexts by logging to stderr.
+// TODO(b/299990391): Replace with syslog logging interface that accommodates both driver and
+// non-driver contexts, when available.
+#define LOG(severity, format, ...)                             \
+  do {                                                         \
+    static_assert(true || DDK_LOG_##severity);                 \
+    if (DDK_LOG_##severity >= DDK_LOG_INFO) {                  \
+      fprintf(stderr, "metrics_buffer" format, ##__VA_ARGS__); \
+    }                                                          \
   } while (0)
 
 #endif  // SRC_LIB_METRICS_BUFFER_LOG_H_

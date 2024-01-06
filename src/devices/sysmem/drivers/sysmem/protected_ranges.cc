@@ -14,7 +14,6 @@
 
 #include "lib/zx/time.h"
 #include "macros.h"
-#include "src/lib/fxl/strings/string_printf.h"
 #include "utils.h"
 
 #define DLOG_ENABLED 0

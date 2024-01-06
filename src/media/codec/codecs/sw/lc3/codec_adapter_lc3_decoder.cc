@@ -73,7 +73,7 @@ std::optional<int> GetSamplingFrequencyHz(const std::vector<uint8_t>& raw_bytes)
     sr_hz = 48000;
   } else {
     // Any other values are not acceptable for LC3 codec.
-    FX_LOGS(DEBUG) << "Invalid Sampling_Frequency LTV value " << value;
+    LOG(DEBUG, "Invalid Sampling_Frequency LTV value %u", value);
     return std::nullopt;
   }
   return sr_hz;
@@ -91,7 +91,7 @@ std::optional<int> GetFrameDurationUs(const std::vector<uint8_t>& raw_bytes) {
   } else if (value == 0x01) {
     dt_us = 10000;
   } else {
-    FX_LOGS(DEBUG) << "Invalid Frame_Duration LTV value " << value;
+    LOG(DEBUG, "Invalid Frame_Duration LTV value %u", value);
     return std::nullopt;
   }
   return dt_us;
@@ -135,7 +135,7 @@ std::optional<std::vector<fuchsia::media::AudioChannelId>> GetAudioChannelMap(
   if ((value | ACCEPTABLE_MASK) != ACCEPTABLE_MASK) {
     // If the channel contains channel ID value that's not supported by fuchsia,
     // we shouldn't process.
-    FX_LOGS(DEBUG) << "Invalid Audio_Channel_Allocation LTV value " << value;
+    LOG(DEBUG, "Invalid Audio_Channel_Allocation LTV value %u", value);
     return std::nullopt;
   }
 
@@ -180,8 +180,7 @@ std::optional<int> GetNBytes(const std::vector<uint8_t>& raw_bytes) {
   uint16_t value = ntohs(*reinterpret_cast<const uint16_t*>(raw_bytes.data()));
 
   if (value < kMinExternalByteCount || value > kMaxExternalByteCount) {
-    FX_LOGS(DEBUG) << "Invalid Octets_Per_Codec_Frame " << value
-                   << ". Acceptable values are between [20 .. 400].";
+    LOG(DEBUG, "Invalid Octets_Per_Codec_Frame %u. Acceptable values are between [20 .. 400].", value);
     return std::nullopt;
   }
   return static_cast<int>(value);
@@ -352,8 +351,7 @@ CodecAdapterLc3Decoder::InputLoopStatus CodecAdapterLc3Decoder::ProcessFormatDet
       }
       default:
         // Don't care about other parameters.
-        FX_LOGS(DEBUG) << "Received Codec_Specific_Configuration LTV param with key " << p.first
-                       << ". Will be ignored.";
+        LOG(DEBUG, "Received Codec_Specific_Configuration LTV param with key %u. Will be ignored.", p.first);
         break;
     }
     idx += len;
