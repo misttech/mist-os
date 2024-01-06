@@ -13,12 +13,12 @@ use fuchsia_bluetooth::profile::find_service_classes;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_sync::Mutex;
 use futures::{
     channel::mpsc::{self, Receiver, Sender},
     select,
     stream::StreamExt,
 };
-use parking_lot::Mutex;
 use profile_client::{ProfileClient, ProfileEvent};
 use std::{collections::hash_map::Entry, matches, sync::Arc};
 use tracing::{debug, info};

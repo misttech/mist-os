@@ -203,8 +203,8 @@ mod tests {
             ControllerMarker, ControllerProxy, StreamSuspenderEvent, StreamSuspenderMarker,
             StreamSuspenderProxy,
         },
+        fuchsia_sync::Mutex,
         futures::channel::mpsc,
-        parking_lot::Mutex,
     };
 
     #[derive(Debug, PartialEq)]

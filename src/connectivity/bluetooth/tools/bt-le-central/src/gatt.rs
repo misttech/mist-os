@@ -13,9 +13,9 @@ use fidl_fuchsia_bluetooth_gatt2::{
 };
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::Uuid;
+use fuchsia_sync::RwLock;
 use futures::StreamExt;
 use num::Num;
-use parking_lot::RwLock;
 use std::{collections::HashMap, num::ParseIntError, str::FromStr, sync::Arc};
 
 use self::{commands::Cmd, types::Service};

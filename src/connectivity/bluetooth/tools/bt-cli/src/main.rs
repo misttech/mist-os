@@ -13,9 +13,9 @@ use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::io_capabilities::{InputCapability, OutputCapability};
 use fuchsia_bluetooth::types::{addresses_to_custom_string, HostId, HostInfo, Peer, PeerId};
 use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::Mutex;
 use futures::{channel::mpsc, select, FutureExt, Sink, SinkExt, Stream, StreamExt, TryFutureExt};
 use pairing_delegate;
-use parking_lot::Mutex;
 use pin_utils::pin_mut;
 use prettytable::{cell, format, row, Row, Table};
 use regex::Regex;
@@ -780,9 +780,9 @@ mod tests {
         fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_sys as fsys,
         fidl_fuchsia_bluetooth_sys::{InputCapability, OutputCapability},
         fuchsia_bluetooth::types::{Address, PeerId},
+        fuchsia_sync::Mutex,
         fuchsia_zircon::{Duration, DurationNum},
         futures::join,
-        parking_lot::Mutex,
         std::task::Poll,
     };
 

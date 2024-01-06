@@ -79,7 +79,7 @@ pub trait ObexServerHandler {
 pub(crate) mod test_utils {
     use super::*;
 
-    use parking_lot::Mutex;
+    use fuchsia_sync::Mutex;
     use std::sync::Arc;
 
     #[derive(Default)]

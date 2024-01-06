@@ -5,13 +5,13 @@
 use {
     anyhow::format_err,
     bt_avctp::{AvcCommandResponse, AvcCommandType, AvcResponseType, Error as AvctpError},
+    fuchsia_sync::RwLock,
     futures::{
         ready,
         stream::{FusedStream, StreamExt},
         Stream,
     },
     packet_encoding::{Decodable, Encodable},
-    parking_lot::RwLock,
     std::{
         convert::TryFrom,
         pin::Pin,

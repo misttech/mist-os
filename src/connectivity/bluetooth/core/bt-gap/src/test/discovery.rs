@@ -7,8 +7,8 @@ use {
     fidl_fuchsia_bluetooth_sys::AccessMarker,
     fuchsia_async as fasync,
     fuchsia_bluetooth::types::HostId,
+    fuchsia_sync::RwLock,
     futures::{future::join, stream::FuturesUnordered},
-    parking_lot::RwLock,
     proptest::prelude::*,
     std::{collections::HashMap, fmt::Debug, iter, pin::Pin, sync::Arc},
 };

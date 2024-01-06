@@ -11,8 +11,8 @@ use fidl_fuchsia_bluetooth_avdtp_test::{
 };
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::{detachable_map::DetachableWeak, types::PeerId};
+use fuchsia_sync::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
-use parking_lot::Mutex;
 use std::{collections::HashMap, convert::TryInto, sync::Arc};
 use tracing::{error, info, warn};
 

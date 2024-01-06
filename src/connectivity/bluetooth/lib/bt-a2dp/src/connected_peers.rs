@@ -15,6 +15,7 @@ use fuchsia_bluetooth::{
 };
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::{
     channel::{mpsc, oneshot},
@@ -22,7 +23,6 @@ use futures::{
     task::{Context, Poll},
     Future, FutureExt, TryFutureExt,
 };
-use parking_lot::Mutex;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     convert::TryInto,

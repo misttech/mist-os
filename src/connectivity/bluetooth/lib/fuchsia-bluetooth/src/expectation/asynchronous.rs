@@ -30,9 +30,9 @@
 use {
     anyhow::{format_err, Error},
     fuchsia_async::{DurationExt, TimeoutExt},
+    fuchsia_sync::{MappedRwLockWriteGuard, RwLock, RwLockWriteGuard},
     fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt},
-    parking_lot::{MappedRwLockWriteGuard, RwLock, RwLockWriteGuard},
     slab::Slab,
     std::{
         future::Future,

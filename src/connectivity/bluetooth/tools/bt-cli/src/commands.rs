@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use rustyline::{
     completion::Completer, error::ReadlineError, highlight::Highlighter, hint::Hinter, Helper,
 };

@@ -7,8 +7,8 @@ use {
     fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, fidl_fuchsia_bluetooth_bredr as bredr,
     fuchsia_bluetooth::types::{Channel, PeerId},
     fuchsia_inspect_derive::{AttachError, Inspect},
+    fuchsia_sync::RwLock,
     futures::{self, channel::oneshot},
-    parking_lot::RwLock,
     std::{collections::HashMap, sync::Arc},
 };
 

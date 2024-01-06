@@ -25,12 +25,12 @@ mod test {
             anyhow::format_err,
             assert_matches::assert_matches,
             fuchsia, fuchsia_async as fasync,
+            fuchsia_sync::Mutex,
             futures::{
                 channel::oneshot,
                 future::{self, BoxFuture},
                 pin_mut, FutureExt,
             },
-            parking_lot::Mutex,
             std::{sync::Arc, task::Poll},
             test_harness::{SharedState, TestHarness},
         };

@@ -12,8 +12,8 @@ use fidl_fuchsia_bluetooth_le::{
     CentralProxy, ConnectionMarker, ConnectionOptions, ScanResultWatcherProxy,
 };
 use fuchsia_bluetooth::types::{le::Peer, PeerId, Uuid};
+use fuchsia_sync::RwLock;
 use futures::{future::FutureExt, pin_mut, select};
-use parking_lot::RwLock;
 use std::{convert::TryFrom, sync::Arc};
 
 use crate::gatt::repl::start_gatt_loop;

@@ -4,9 +4,9 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
 use futures::{future, select, stream::TryStreamExt, Future, FutureExt};
-use parking_lot::Mutex;
 use pin_utils::pin_mut;
 use std::any::{Any, TypeId};
 use std::collections::{hash_map::Entry, HashMap};

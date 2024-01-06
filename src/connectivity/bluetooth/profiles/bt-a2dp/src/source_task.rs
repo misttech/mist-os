@@ -276,8 +276,8 @@ mod tests {
     use bt_avdtp::MediaCodecType;
     use fuchsia_bluetooth::types::Channel;
     use fuchsia_inspect as inspect;
+    use fuchsia_sync::Mutex;
     use futures::StreamExt;
-    use parking_lot::Mutex;
     use std::sync::{Arc, RwLock};
     use test_util::assert_gt;
 

@@ -18,6 +18,7 @@ use fuchsia_bluetooth::{
 };
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::{
     channel::mpsc,
@@ -27,7 +28,6 @@ use futures::{
     task::{Context, Poll, Waker},
     Future, FutureExt, StreamExt,
 };
-use parking_lot::Mutex;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryInto,

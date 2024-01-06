@@ -5,6 +5,7 @@
 use {
     fuchsia_async::{DurationExt, OnTimeout, TimeoutExt},
     fuchsia_bluetooth::types::Channel,
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx, Duration},
     futures::{
         future::{FusedFuture, MaybeDone},
@@ -14,7 +15,6 @@ use {
         Future, FutureExt, TryFutureExt,
     },
     packet_encoding::{Decodable, Encodable},
-    parking_lot::Mutex,
     slab::Slab,
     std::{
         collections::VecDeque,

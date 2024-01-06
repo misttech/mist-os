@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fidl::endpoints::Proxy, fidl_fuchsia_bluetooth_avrcp::*, futures::TryFutureExt,
-    parking_lot::Mutex, std::sync::Arc,
+    fidl::endpoints::Proxy, fidl_fuchsia_bluetooth_avrcp::*, fuchsia_sync::Mutex,
+    futures::TryFutureExt, std::sync::Arc,
 };
 
 use crate::types::PeerError as Error;

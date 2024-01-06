@@ -4,6 +4,7 @@
 
 use {
     fuchsia_bluetooth::types::Channel,
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::{
         ready,
@@ -11,7 +12,6 @@ use {
         task::{Context, Poll, Waker},
     },
     packet_encoding::{Decodable, Encodable},
-    parking_lot::Mutex,
     slab::Slab,
     std::{collections::VecDeque, convert::TryFrom, marker::Unpin, mem, pin::Pin, sync::Arc},
     tracing::{info, trace, warn},

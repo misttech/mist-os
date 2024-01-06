@@ -15,6 +15,7 @@ use {
     },
     fuchsia_inspect::{self as inspect, Property},
     fuchsia_inspect_derive::{AttachError, Inspect},
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{self, Sender},
@@ -23,7 +24,6 @@ use {
         stream::{empty, Empty},
         FutureExt, SinkExt, StreamExt,
     },
-    parking_lot::Mutex,
     profile_client::ProfileEvent,
     std::{convert::TryInto, fmt, sync::Arc},
     tracing::{error, info, warn},

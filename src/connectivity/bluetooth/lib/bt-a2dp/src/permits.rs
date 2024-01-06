@@ -19,6 +19,7 @@
 //! Permits taken or seized are not revokable.
 
 use anyhow::{format_err, Error};
+use fuchsia_sync::Mutex;
 use futures::{
     channel::oneshot,
     future::FusedFuture,
@@ -26,7 +27,6 @@ use futures::{
     task::{Context, Poll},
     Future, FutureExt,
 };
-use parking_lot::Mutex;
 use slab::Slab;
 use std::collections::VecDeque;
 use std::pin::Pin;

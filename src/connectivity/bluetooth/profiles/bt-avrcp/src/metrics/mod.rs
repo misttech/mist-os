@@ -6,7 +6,7 @@ use bt_metrics::MetricsLogger;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_derive::Inspect;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::{collections::HashMap, collections::HashSet, sync::Arc};
 
 use crate::packets::{BrowseLevel, MediaPlayerItem};

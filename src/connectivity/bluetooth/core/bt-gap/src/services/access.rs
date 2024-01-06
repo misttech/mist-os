@@ -7,9 +7,9 @@ use async_helpers::hanging_get::asynchronous as hanging_get;
 use fidl_fuchsia_bluetooth_sys::{self as sys, AccessRequest, AccessRequestStream};
 use fuchsia_bluetooth::types::pairing_options::{BondableMode, PairingOptions};
 use fuchsia_bluetooth::types::{Peer, PeerId, Technology};
+use fuchsia_sync::Mutex;
 use futures::future::{pending, BoxFuture};
 use futures::{select, FutureExt, Stream, StreamExt};
-use parking_lot::Mutex;
 use std::{collections::HashMap, mem, sync::Arc};
 use tracing::{info, trace, warn};
 

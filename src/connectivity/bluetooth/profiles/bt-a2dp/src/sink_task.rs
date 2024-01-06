@@ -363,9 +363,9 @@ mod tests {
         fuchsia_bluetooth::types::Channel,
         fuchsia_inspect as inspect,
         fuchsia_inspect_derive::WithInspect,
+        fuchsia_sync::Mutex,
         fuchsia_zircon::DurationNum,
         futures::{channel::mpsc, io::AsyncWriteExt, pin_mut, task::Poll, StreamExt},
-        parking_lot::Mutex,
         std::sync::{Arc, RwLock},
     };
 
@@ -399,7 +399,7 @@ mod tests {
         let (local, mut remote) = Channel::create();
         let local = Arc::new(RwLock::new(local));
         let stream =
-            MediaStream::new(Arc::new(parking_lot::Mutex::new(true)), Arc::downgrade(&local));
+            MediaStream::new(Arc::new(fuchsia_sync::Mutex::new(true)), Arc::downgrade(&local));
 
         let mut running_task = runner.start(stream).expect("task should start");
 
@@ -455,7 +455,7 @@ mod tests {
         let (local, _remote) = Channel::create();
         let local = Arc::new(RwLock::new(local));
         let stream =
-            MediaStream::new(Arc::new(parking_lot::Mutex::new(true)), Arc::downgrade(&local));
+            MediaStream::new(Arc::new(fuchsia_sync::Mutex::new(true)), Arc::downgrade(&local));
 
         let mut running_task = runner.start(stream).expect("media task should start");
 

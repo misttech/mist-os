@@ -10,9 +10,9 @@ rustc_library("test-harness") {
     "//src/connectivity/bluetooth/testing/test-harness-macro",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:pin-utils",
   ]
 

@@ -7,9 +7,9 @@ use fidl_fuchsia_bluetooth_avrcp::{
     AddressedPlayerId, AvcPanelCommand, Notification, TargetPassthroughError,
 };
 use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
 use fuchsia_zircon::Duration;
 use futures::{future::Either, pin_mut, Future, FutureExt};
-use parking_lot::Mutex;
 use std::collections::{
     hash_map::Entry::{Occupied, Vacant},
     HashMap, VecDeque,

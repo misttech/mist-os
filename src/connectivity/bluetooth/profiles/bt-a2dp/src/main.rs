@@ -29,9 +29,9 @@ use fuchsia_bluetooth::{
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::Inspect;
+use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::{Stream, StreamExt};
-use parking_lot::Mutex;
 use profile_client::{ProfileClient, ProfileEvent};
 use std::{collections::HashSet, convert::TryFrom, sync::Arc};
 use tracing::{debug, error, info, trace, warn};

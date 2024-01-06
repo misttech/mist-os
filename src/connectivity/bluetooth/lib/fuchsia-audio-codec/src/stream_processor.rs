@@ -8,6 +8,7 @@ use {
     fidl_fuchsia_mediacodec::*,
     fidl_fuchsia_sysmem::*,
     fuchsia_stream_processors::*,
+    fuchsia_sync::{Mutex, RwLock},
     futures::{
         future::{maybe_done, MaybeDone},
         io::{self, AsyncWrite},
@@ -16,7 +17,6 @@ use {
         task::{Context, Poll, Waker},
         Future, StreamExt,
     },
-    parking_lot::{Mutex, RwLock},
     std::{
         collections::{HashSet, VecDeque},
         convert::{TryFrom, TryInto},

@@ -5,7 +5,7 @@
 use fidl_fuchsia_bluetooth as btfidl;
 use fidl_fuchsia_bluetooth_sys as sys;
 use fuchsia_bluetooth::types::{Peer, PeerId};
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::{info, warn};

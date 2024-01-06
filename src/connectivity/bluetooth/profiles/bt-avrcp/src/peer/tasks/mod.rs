@@ -5,6 +5,7 @@
 use anyhow::format_err;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
+use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
 use futures::{
     future::FutureExt,
@@ -12,7 +13,6 @@ use futures::{
 };
 use notification_stream::NotificationStream;
 use packet_encoding::{Decodable, Encodable};
-use parking_lot::RwLock;
 use rand::Rng;
 use std::collections::HashSet;
 use std::{convert::TryInto, sync::Arc};

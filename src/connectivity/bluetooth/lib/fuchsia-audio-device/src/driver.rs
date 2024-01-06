@@ -10,9 +10,9 @@ use fidl_fuchsia_media;
 use fuchsia_async as fasync;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{IValue, Inspect};
+use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, DurationNum};
 use futures::{select, StreamExt};
-use parking_lot::Mutex;
 use std::sync::Arc;
 use tracing::{info, warn};
 

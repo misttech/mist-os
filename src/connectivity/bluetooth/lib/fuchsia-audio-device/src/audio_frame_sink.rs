@@ -4,12 +4,12 @@
 
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_sync::Mutex;
 use futures::{
     io,
     task::{Context, Poll},
     FutureExt,
 };
-use parking_lot::Mutex;
 use std::{pin::Pin, sync::Arc};
 use tracing::warn;
 

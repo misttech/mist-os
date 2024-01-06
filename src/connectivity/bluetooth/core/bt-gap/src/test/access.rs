@@ -12,8 +12,8 @@ use {
         pairing_options::{BondableMode, PairingOptions, SecurityLevel},
         HostId, PeerId, Technology,
     },
+    fuchsia_sync::RwLock,
     futures::{future, stream::TryStreamExt},
-    parking_lot::RwLock,
     std::sync::Arc,
 };
 

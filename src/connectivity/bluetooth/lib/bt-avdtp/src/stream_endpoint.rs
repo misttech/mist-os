@@ -5,9 +5,9 @@
 use {
     fuchsia_async::{DurationExt, Task, TimeoutExt},
     fuchsia_bluetooth::types::{A2dpDirection, Channel},
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{Duration, DurationNum, Status},
     futures::{io, stream::Stream, FutureExt},
-    parking_lot::Mutex,
     std::{
         convert::TryFrom,
         fmt,

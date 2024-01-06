@@ -10,10 +10,10 @@ use fuchsia_async as fasync;
 use fuchsia_bluetooth::{profile::Psm, types::Channel, types::PeerId};
 use fuchsia_inspect::Property;
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
 use futures::{channel::mpsc, stream::StreamExt, Future};
 use packet_encoding::{Decodable, Encodable};
-use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,

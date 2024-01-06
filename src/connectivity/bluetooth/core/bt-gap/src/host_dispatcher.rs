@@ -26,11 +26,11 @@ use fuchsia_bluetooth::types::{
 };
 use fuchsia_inspect::{self as inspect, unique_name, NumericProperty, Property};
 use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
+use fuchsia_sync::RwLock;
 use fuchsia_zircon::{self as zx, Duration};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
-use parking_lot::RwLock;
 use slab::Slab;
 use std::collections::HashMap;
 use std::convert::TryFrom;

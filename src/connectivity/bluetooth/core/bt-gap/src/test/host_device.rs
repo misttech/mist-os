@@ -10,8 +10,8 @@ use {
     fuchsia_bluetooth::types::{
         bonding_data::example, Address, BondingData, HostId, HostInfo, Peer, PeerId,
     },
+    fuchsia_sync::RwLock,
     futures::{future, join, stream::StreamExt},
-    parking_lot::RwLock,
     std::sync::Arc,
     test_util::assert_gt,
 };
