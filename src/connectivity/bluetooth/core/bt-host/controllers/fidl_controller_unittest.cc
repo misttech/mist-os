@@ -18,7 +18,7 @@ namespace bt::controllers {
 class FidlControllerTest : public ::gtest::TestLoopFixture {
  public:
   void SetUp() {
-    fuchsia::hardware::bluetooth::HciHandle hci;
+    fuchsia::hardware::bluetooth::FullHciHandle hci;
     fake_hci_server_.emplace(hci.NewRequest(), dispatcher());
     fidl_controller_.emplace(std::move(hci), dispatcher());
   }

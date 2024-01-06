@@ -20,9 +20,9 @@
 
 namespace bt::fidl::testing {
 
-class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_TestBase {
+class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::FullHci_TestBase {
  public:
-  FakeHciServer(::fidl::InterfaceRequest<fuchsia::hardware::bluetooth::Hci> request,
+  FakeHciServer(::fidl::InterfaceRequest<fuchsia::hardware::bluetooth::FullHci> request,
                 async_dispatcher_t* dispatcher)
       : dispatcher_(dispatcher) {
     binding_.Bind(std::move(request));
@@ -54,14 +54,16 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
   bool command_channel_valid() const { return command_channel_.is_valid(); }
 
  private:
-  void OpenCommandChannel(zx::channel channel) override {
+  void OpenCommandChannel(zx::channel channel, OpenCommandChannelCallback callback) override {
     command_channel_ = std::move(channel);
     InitializeWait(command_wait_, command_channel_);
+    callback(fpromise::ok());
   }
 
-  void OpenAclDataChannel(zx::channel channel) override {
+  void OpenAclDataChannel(zx::channel channel, OpenAclDataChannelCallback callback) override {
     acl_channel_ = std::move(channel);
     InitializeWait(acl_wait_, acl_channel_);
+    callback(fpromise::ok());
   }
 
   void NotImplemented_(const std::string& name) override { FAIL() << name << " not implemented"; }
@@ -113,7 +115,7 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
     command_wait_.Begin(dispatcher_);
   }
 
-  ::fidl::Binding<fuchsia::hardware::bluetooth::Hci> binding_{this};
+  ::fidl::Binding<fuchsia::hardware::bluetooth::FullHci> binding_{this};
 
   zx::channel command_channel_;
   std::vector<bt::DynamicByteBuffer> commands_received_;

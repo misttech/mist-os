@@ -17,7 +17,7 @@ namespace bthost {
 // Create FIDL channel to connects to the service directory at |device_path| relative to
 // component's namespace. Creates and returns an HciHandle using the client end of the channel if
 // successful, otherwise returns nullptr on failure.
-fuchsia::hardware::bluetooth::HciHandle CreateHciHandle(const std::string& device_path);
+fuchsia::hardware::bluetooth::FullHciHandle CreateHciHandle(const std::string& device_path);
 
 }  // namespace bthost
 

@@ -118,14 +118,42 @@ void BtHciBroadcom::DdkRelease() {
 void BtHciBroadcom::OpenCommandChannel(OpenCommandChannelRequestView request,
                                        OpenCommandChannelCompleter::Sync& completer) {
   bt_hci_open_command_channel(&hci_, request->channel.release());
+  completer.ReplySuccess();
 }
 void BtHciBroadcom::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                        OpenAclDataChannelCompleter::Sync& completer) {
   bt_hci_open_acl_data_channel(&hci_, request->channel.release());
+  completer.ReplySuccess();
+}
+void BtHciBroadcom::OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                                       OpenScoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void BtHciBroadcom::ConfigureSco(ConfigureScoRequestView request,
+                                 ConfigureScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void BtHciBroadcom::ResetSco(ResetScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void BtHciBroadcom::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                                       OpenIsoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 void BtHciBroadcom::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                                      OpenSnoopChannelCompleter::Sync& completer) {
   bt_hci_open_snoop_channel(&hci_, request->channel.release());
+  completer.ReplySuccess();
+}
+
+void BtHciBroadcom::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_PANIC("Unknown method in HCI request");
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)

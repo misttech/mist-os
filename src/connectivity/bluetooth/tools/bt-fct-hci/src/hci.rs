@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Error,
+    anyhow::{format_err, Context as _, Error},
     fuchsia_async as fasync,
     fuchsia_zircon::{Channel, MessageBuf},
+    futures::executor::block_on,
     futures::Stream,
     std::{
         convert::TryFrom as _,
@@ -177,11 +178,17 @@ impl fmt::Display for EventPacket {
 
 fn open_command_channel(device_path: &str) -> Result<Channel, Error> {
     let interface = fuchsia_component::client::connect_to_protocol_at_path::<
-        fidl_fuchsia_hardware_bluetooth::HciMarker,
+        fidl_fuchsia_hardware_bluetooth::FullHciMarker,
     >(device_path)?;
     let (ours, theirs) = Channel::create();
-    interface.open_command_channel(theirs)?;
-    Ok(ours)
+    let res = block_on(interface.open_command_channel(theirs))
+        .context("open command channel request")?
+        .map_err(|e| format_err!("Failed with error: {}", e));
+
+    match res {
+        Ok(()) => Ok(ours),
+        Err(e) => Err(format_err!("Failed to open command channel with error {}", e)),
+    }
 }
 
 pub fn open_default_device() -> Result<CommandChannel, Error> {

@@ -100,7 +100,7 @@ constexpr zx_protocol_device_t bt_hci_device_ops = {
     .message =
         [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
           logf(TRACE, "HciMessage\n");
-          fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
+          fidl::WireDispatch<fuchsia_hardware_bluetooth::FullHci>(
               DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
               ddk::FromDeviceFIDLTransaction(txn));
         },
@@ -584,22 +584,48 @@ void EmulatorDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
                                         OpenCommandChannelCompleter::Sync& completer) {
   if (zx_status_t status = OpenChan(Channel::COMMAND, request->channel.release());
       status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
 }
 
 void EmulatorDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                         OpenAclDataChannelCompleter::Sync& completer) {
   if (zx_status_t status = OpenChan(Channel::ACL, request->channel.release()); status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
+}
+
+void EmulatorDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                                        OpenScoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::ConfigureSco(ConfigureScoRequestView request,
+                                  ConfigureScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::ResetSco(ResetScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void EmulatorDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                                        OpenIsoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 void EmulatorDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                                       OpenSnoopChannelCompleter::Sync& completer) {
   if (zx_status_t status = OpenChan(Channel::SNOOP, request->channel.release()); status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
 }
 
 void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
@@ -607,6 +633,12 @@ void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& complete
       status != ZX_OK) {
     completer.Close(status);
   }
+}
+
+void EmulatorDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_PANIC("Unknown method in HCI request");
 }
 
 }  // namespace bt_hci_virtual

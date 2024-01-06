@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Error};
+use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopPacket as FidlSnoopPacket, Timestamp};
-use fidl_fuchsia_hardware_bluetooth::HciMarker as HardwareHciMarker;
+use fidl_fuchsia_hardware_bluetooth::FullHciMarker as HardwareHciMarker;
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Channel, MessageBuf};
+use futures::executor::block_on;
 use futures::Stream;
 use std::{
     marker::Unpin,
@@ -126,8 +127,14 @@ impl Snooper {
         .context("failed to open bt-hci device")?;
 
         let (ours, theirs) = Channel::create();
-        hci.open_snoop_channel(theirs)?;
-        Snooper::from_channel(ours, path)
+        let res = block_on(hci.open_snoop_channel(theirs))
+            .context("open snoop channel request")?
+            .map_err(|e| format_err!("Failed with error: {}", e));
+
+        match res {
+            Ok(()) => Snooper::from_channel(ours, path),
+            Err(e) => Err(format_err!("Failed to open snoop channel {}", e)),
+        }
     }
 
     /// Take a channel and wrap it in a `Snooper`.
