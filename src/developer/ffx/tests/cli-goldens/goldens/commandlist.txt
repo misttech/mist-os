@@ -20,7 +20,6 @@ process
 product
 profile
 repository
-schema
 scrutiny
 sdk
 session
