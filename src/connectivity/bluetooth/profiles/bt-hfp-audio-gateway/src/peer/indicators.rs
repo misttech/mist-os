@@ -351,6 +351,7 @@ impl Default for AgIndicatorsReporting {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
 /// An error representing an unsupported reporting status value.
 pub struct UnsupportedReportingStatus(i64);

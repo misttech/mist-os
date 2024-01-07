@@ -715,6 +715,7 @@ struct ScannedExtent {
     metrics: BlockMetrics,
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
 enum ScannedPayload {
     String { length: usize, link: BlockIndex },

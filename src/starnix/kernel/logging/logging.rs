@@ -33,6 +33,7 @@ mod enabled {
 
     #[derive(Clone)]
     pub struct Span(Arc<tracing::Span>);
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     pub struct SpanGuard<'a>(tracing::span::Entered<'a>);
 
     impl Span {

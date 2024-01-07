@@ -16,6 +16,7 @@ use {
     url::Url,
 };
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 enum ProviderStatus {
     Stopped,
     Launching(oneshot::Sender<()>),

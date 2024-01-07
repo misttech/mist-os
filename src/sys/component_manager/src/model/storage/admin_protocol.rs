@@ -115,6 +115,7 @@ enum DeletionErrorCause {
     Directory(ffs_dir::EnumerateError),
     /// The IPC to the I/O server succeeded, but the file operation
     /// returned an error.
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     File(i32),
     /// The IPC to the I/O server failed.
     FileRequest(fidl::Error),

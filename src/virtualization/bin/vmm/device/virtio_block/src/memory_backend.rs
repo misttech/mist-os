@@ -27,6 +27,7 @@ impl AsByteRange for Sector {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// The `Controller` provides a way for tests to interact with the state of the memory buffer
 /// without retaining a reference to the backend.
 pub struct Controller(Rc<RefCell<Vec<u8>>>);

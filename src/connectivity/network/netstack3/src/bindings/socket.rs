@@ -443,6 +443,7 @@ impl IpSockAddrExt for Ipv6 {
     type SocketAddress = fnet::Ipv6SocketAddress;
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 pub(crate) enum IpMulticastMembership {
     V4(psocket::IpMulticastMembership),
     V6(psocket::Ipv6MulticastMembership),

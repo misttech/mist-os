@@ -47,6 +47,7 @@ mod fuchsia_details {
     // i.e. we start at Unregistered, move to Finished, and for a time we may be Registered, or not.
     // The or not case happens when we get the receive_packet callback *before* we record the registration on
     // the WaitEnder instance.
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     enum Registration {
         // Wait registration not yet recorded.
         Unregistered,

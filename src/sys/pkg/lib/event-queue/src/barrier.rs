@@ -16,6 +16,7 @@ use {
 #[derive(Debug)]
 pub struct Barrier(mpsc::Receiver<Never>);
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// Any clone of a barrier block prevents the associated [`Barrier`] future from completing.
 #[derive(Debug, Clone)]
 pub struct BarrierBlock(mpsc::Sender<Never>);

@@ -60,6 +60,7 @@ impl Deref for ForwardedSocket {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// Container for a StreamSocketProxy that lets the user keep it around, thus
 /// keeping the represented socket alive, but doesn't make its internals usable,
 /// thus defending the API from unintended customers.

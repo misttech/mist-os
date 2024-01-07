@@ -1024,6 +1024,7 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     #[derive(Debug)]
     pub(crate) enum TestError {
         Constructor(LoadError),

@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 // Holding a reference to File so it lives as long as the associated socket. If the FD is closed
 // the socket closes with it. This way the process object can be dropped before the blocking socket.
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 pub struct BlockingSocket(Arc<File>, Arc<Socket>);
 
 impl Read for BlockingSocket {

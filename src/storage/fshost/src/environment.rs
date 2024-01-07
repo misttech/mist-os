@@ -866,6 +866,7 @@ impl Environment for FshostEnvironment {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
 struct ReformatRequired(Error);
 impl std::error::Error for ReformatRequired {}

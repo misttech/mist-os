@@ -157,6 +157,7 @@ impl<'a> LogFile<'a> {
 
 // FIXME(https://github.com/notify-rs/notify/pull/336) We can use Watcher as a trait object once
 // this PR lands. That would let us get rid of much of this duplication.
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 enum LogWatcher {
     Recommended(notify::RecommendedWatcher),
     Poll(notify::PollWatcher),

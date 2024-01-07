@@ -98,6 +98,7 @@ struct SchemaItems {
     items: Punctuated<SchemaItem, Token![;]>,
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 enum SchemaLiteral {
     Simple(Lit),
     Map(Punctuated<SchemaField<SchemaLiteral>, Token![,]>),

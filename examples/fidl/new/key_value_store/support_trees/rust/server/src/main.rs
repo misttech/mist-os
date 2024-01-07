@@ -27,6 +27,7 @@ lazy_static! {
 // [START diff_2]
 // A representation of a key-value store that can contain an arbitrarily deep nesting of other
 // key-value stores.
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 enum StoreNode {
     Leaf(Option<Vec<u8>>),
     Branch(Box<HashMap<String, StoreNode>>),

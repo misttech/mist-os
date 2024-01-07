@@ -597,6 +597,7 @@ mod tests {
 
         // Unfortunately `impl !Send for $Type` is unstable, so use Rc<()> to make sure WorkQueue
         // still works.
+        #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
         struct TestWork(Rc<()>);
         #[derive(Clone, Debug, PartialEq, Eq, Hash)]
         struct TestKey(Rc<()>);

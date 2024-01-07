@@ -2512,6 +2512,7 @@ struct LocalBinderObject {
     strong_ref_addr: UserAddress,
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// A binder thread's role (sender or receiver) in a synchronous transaction. Oneway transactions
 /// do not record roles, since they end as soon as they begin.
 #[derive(Debug)]

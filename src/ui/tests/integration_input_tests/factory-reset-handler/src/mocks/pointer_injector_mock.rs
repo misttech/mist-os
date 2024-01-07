@@ -28,6 +28,7 @@ impl PointerInjectorMock {
     }
 
     async fn serve_one_client(self, mut request_stream: SetupRequestStream) {
+        #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
         enum WatchState {
             WaitingFirstRequest(pointerinjector::Viewport),
             WaitingSecondRequest,

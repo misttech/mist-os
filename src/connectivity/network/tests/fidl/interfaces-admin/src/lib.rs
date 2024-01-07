@@ -472,6 +472,7 @@ async fn add_address_removal<N: Netstack>(
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     enum InterfaceOrTun<'a> {
         Interface(netemul::TestInterface<'a>),
         Tun(
@@ -1588,6 +1589,7 @@ async fn control_terminal_events<N: Netstack>(
         control
     };
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     enum KeepResource {
         Control(fidl_fuchsia_net_interfaces_ext::admin::Control),
         Port(fidl_fuchsia_net_tun::PortProxy),

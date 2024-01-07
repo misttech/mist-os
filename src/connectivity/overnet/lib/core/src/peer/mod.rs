@@ -164,6 +164,7 @@ impl std::fmt::Debug for Peer {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// Error from the run loops for a peer (client or server) - captures a little semantic detail
 /// to help direct reactions to this peer disappearing.
 #[derive(Debug)]

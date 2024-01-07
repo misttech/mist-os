@@ -102,6 +102,7 @@ impl From<Id> for u64 {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// `Arg` holds an argument to a tracing function, which can be one of many types.
 #[repr(transparent)]
 pub struct Arg<'a>(sys::trace_arg_t, PhantomData<&'a ()>);

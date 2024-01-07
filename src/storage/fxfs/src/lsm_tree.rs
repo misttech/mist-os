@@ -875,6 +875,7 @@ mod fuzz {
         }
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     #[derive(Arbitrary)]
     enum FuzzAction {
         Insert(Item<TestKey, u64>),

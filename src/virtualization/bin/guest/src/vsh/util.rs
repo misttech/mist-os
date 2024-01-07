@@ -76,6 +76,7 @@ mod test {
         Ok((s1, s2))
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     #[derive(Debug)]
     enum TestError {
         SendErr(anyhow::Error),

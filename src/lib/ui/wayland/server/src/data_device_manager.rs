@@ -60,6 +60,7 @@ impl RequestReceiver<WlDataSource> for DataSource {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 struct DataDevice(ObjectRef<Seat>);
 
 impl RequestReceiver<WlDataDevice> for DataDevice {

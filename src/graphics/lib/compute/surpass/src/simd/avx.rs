@@ -75,6 +75,7 @@ impl Default for m32x8 {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Clone, Copy, Debug)]
 pub struct u8x32(__m256i);
 

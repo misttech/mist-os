@@ -182,6 +182,7 @@ impl FsNodeOps for BlockDeviceDirectory {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 struct BlockDeviceQueueDirectory(KObjectHandle);
 
 impl BlockDeviceQueueDirectory {

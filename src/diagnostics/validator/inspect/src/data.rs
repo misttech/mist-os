@@ -80,6 +80,7 @@ pub struct Property {
     payload: Payload,
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug, Clone)]
 enum Payload {
     String(String),

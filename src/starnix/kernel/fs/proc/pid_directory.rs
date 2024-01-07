@@ -663,6 +663,7 @@ impl DynamicFileSource for CommFileSource {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// `IoFile` implements `proc/<pid>/io` file.
 #[derive(Clone)]
 pub struct IoFile(WeakRef<Task>);

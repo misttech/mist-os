@@ -39,6 +39,7 @@ const VIEWPORT_TRANSFORM_ID: TransformId = TransformId { value: 3 };
 const VIEWPORT_CONTENT_ID: ContentId = ContentId { value: 4 };
 const BACKGROUND_COLOR: ColorRgba = ColorRgba { red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0 };
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 struct ChildView(fasync::Task<()>);
 
 struct TestGraphicalPresenter {

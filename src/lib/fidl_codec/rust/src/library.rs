@@ -267,6 +267,7 @@ struct ValueBlock {
     value: String,
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
 enum ValueConvertError {
     FloatError(std::num::ParseFloatError),

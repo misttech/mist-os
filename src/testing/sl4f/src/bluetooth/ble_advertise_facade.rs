@@ -22,6 +22,7 @@ use tracing::{debug, error, info, warn};
 use crate::bluetooth::types::FacadeArg;
 use crate::common_utils::common::macros::with_line;
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
 struct Connection(ConnectionProxy, fasync::Task<()>);
 
