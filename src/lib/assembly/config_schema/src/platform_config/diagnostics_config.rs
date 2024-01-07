@@ -37,14 +37,6 @@ pub struct ArchivistPipeline {
     pub files: Vec<Utf8PathBuf>,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename = "snake_case")]
-pub enum ArchivistPipelineName {
-    Feedback,
-    Lowpan,
-    LegacyMetrics,
-}
-
 /// Diagnostics configuration options for the sampler configuration area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
