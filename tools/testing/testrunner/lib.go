@@ -551,7 +551,7 @@ func runTestOnce(
 	stdoutForParsing := new(bytes.Buffer)
 	stdio := new(stdioBuffer)
 
-	stdout, stderr, flush := botanist.NewStdioWritersWithTimestamp(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 	defer flush()
 	multistdout := io.MultiWriter(stdout, stdio, stdoutForParsing)
 	multistderr := io.MultiWriter(stderr, stdio)

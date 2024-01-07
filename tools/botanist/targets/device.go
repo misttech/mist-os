@@ -235,8 +235,6 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 	if err != nil {
 		return fmt.Errorf("cannot listen: %w", err)
 	}
-	stdout, _, flush := botanist.NewStdioWritersWithTimestamp(ctx)
-	defer flush()
 	go func() {
 		defer l.Close()
 		for atomic.LoadUint32(&t.stopping) == 0 {
@@ -244,9 +242,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			if err != nil {
 				continue
 			}
-			if _, err := stdout.Write([]byte(data)); err != nil {
-				logger.Warningf(ctx, "failed to write log to stdout: %s, data: %s", err, data)
-			}
+			fmt.Print(data)
 		}
 	}()
 
@@ -481,7 +477,7 @@ func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) err
 		return err
 	}
 	cmd := exec.CommandContext(ctx, fastboot.Path, "-s", t.config.FastbootSernum, "boot", combinedZBIVBMeta)
-	stdout, stderr, flush := botanist.NewStdioWritersWithTimestamp(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 	defer flush()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -523,7 +519,7 @@ func (t *Device) ramBoot(ctx context.Context, images []bootserver.Image, product
 		return errors.New("fastboot boot script not found")
 	}
 	cmd := exec.CommandContext(ctx, bootScript.Path, "-s", t.config.FastbootSernum)
-	stdout, stderr, flush := botanist.NewStdioWritersWithTimestamp(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 	defer flush()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -588,7 +584,7 @@ func (t *Device) flash(ctx context.Context, images []bootserver.Image, productBu
 	}
 
 	cmd := exec.CommandContext(ctx, flashScript.Path, flashArgs...)
-	stdout, stderr, flush := botanist.NewStdioWritersWithTimestamp(ctx)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 	defer flush()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

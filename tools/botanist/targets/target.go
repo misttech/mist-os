@@ -22,7 +22,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/repo"
 	"go.fuchsia.dev/fuchsia/tools/bootserver"
-	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
@@ -289,7 +288,6 @@ func (t *genericFuchsiaTarget) CaptureSerialLog(filename string) error {
 	if err != nil {
 		return err
 	}
-	serialLogWriter := botanist.NewTimestampWriter(serialLog)
 	conn, err := net.Dial("unix", t.serialSocket)
 	if err != nil {
 		return err
@@ -311,7 +309,7 @@ func (t *genericFuchsiaTarget) CaptureSerialLog(filename string) error {
 			}
 			return nil
 		}
-		if _, err := io.WriteString(serialLogWriter, line); err != nil {
+		if _, err := io.WriteString(serialLog, line); err != nil {
 			return fmt.Errorf("failed to write line to serial log: %w", err)
 		}
 	}
@@ -408,8 +406,7 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 	}
 	defer f.Close()
 
-	syslogWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(f))
-	errs := syslogger.Stream(t.targetCtx, syslogWriter)
+	errs := syslogger.Stream(t.targetCtx, f)
 	for range errs {
 		if !syslogger.IsRunning() {
 			return nil

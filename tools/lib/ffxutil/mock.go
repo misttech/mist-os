@@ -22,14 +22,6 @@ type MockFFXInstance struct {
 	TestOutcome string
 }
 
-func (f *MockFFXInstance) Stdout() io.Writer {
-	return os.Stdout
-}
-
-func (f *MockFFXInstance) Stderr() io.Writer {
-	return os.Stderr
-}
-
 func (f *MockFFXInstance) SetStdoutStderr(_, _ io.Writer) {
 }
 
