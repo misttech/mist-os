@@ -10,7 +10,6 @@ _goldens_dir =
 
 generate_scrutiny_configs("user") {
   assembly_input_bundles = user_platform_aib_files
-  assembly_build_type = "user"
   deps = user_platform_aib_labels
 
   static_packages_golden = "${_goldens_dir}/static_packages_user.txt"
@@ -21,7 +20,6 @@ generate_scrutiny_configs("user") {
 
 generate_scrutiny_configs("userdebug") {
   assembly_input_bundles = userdebug_platform_aib_files
-  assembly_build_type = "userdebug"
   deps = userdebug_platform_aib_labels
 
   static_packages_golden = "${_goldens_dir}/static_packages_userdebug.txt"

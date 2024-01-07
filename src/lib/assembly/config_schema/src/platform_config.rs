@@ -224,7 +224,7 @@ pub enum FeatureSupportLevel {
 /// These control security and behavioral settings within the platform, and can
 /// change the platform packages placed into the assembled product image.
 ///
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum BuildType {
     #[serde(rename = "eng")]
     Eng,
@@ -234,26 +234,4 @@ pub enum BuildType {
 
     #[serde(rename = "user")]
     User,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct ParseBuildTypeError;
-
-impl std::str::FromStr for BuildType {
-    type Err = ParseBuildTypeError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "eng" => Ok(Self::Eng),
-            "userdebug" => Ok(Self::UserDebug),
-            "user" => Ok(Self::User),
-            _ => Err(ParseBuildTypeError),
-        }
-    }
-}
-
-impl std::fmt::Display for ParseBuildTypeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BuildType cannot be parsed")
-    }
 }

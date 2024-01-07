@@ -14,7 +14,7 @@ from depfile import DepFile
 from serialization.serialization import json_load
 
 
-def collect_packages(aibs, static, bootfs, input_static):
+def collect_packages(aibs, static, bootfs):
     static_packages = set()
     bootfs_packages = set()
     for aib, _ in aibs:
@@ -35,17 +35,13 @@ def collect_packages(aibs, static, bootfs, input_static):
             name = base_driver.package.removeprefix("packages/base_drivers/")
             static_packages.add(name)
 
-    if input_static:
-        for line in input_static.readlines():
-            static_packages.add(line.strip())
-
     for line in sorted(static_packages):
         static.write("?" + line + "\n")
     for line in sorted(bootfs_packages):
         bootfs.write("?" + line + "\n")
 
 
-def collect_bootfs_files(aibs, bootfs_files, input_bootfs_files):
+def collect_bootfs_files(aibs, bootfs_files):
     files = set()
     deps = []
     for aib, aib_path in aibs:
@@ -59,10 +55,6 @@ def collect_bootfs_files(aibs, bootfs_files, input_bootfs_files):
                         continue
                     path = blob.path.removeprefix("bootfs/")
                     files.add(path)
-
-    if input_bootfs_files:
-        for line in input_bootfs_files.readlines():
-            files.add(line.strip())
 
     for line in sorted(files):
         bootfs_files.write("?" + line + "\n")
@@ -89,16 +81,6 @@ def main():
         nargs="+",
         type=argparse.FileType("r"),
         help="Path to an assembly input bundle config to search for artifacts",
-    )
-    parser.add_argument(
-        "--static-packages-input",
-        type=argparse.FileType("r"),
-        help="Optional static packages to merge in",
-    )
-    parser.add_argument(
-        "--bootfs-files-input",
-        type=argparse.FileType("r"),
-        help="Optional list of bootfs packages to merge in",
     )
     parser.add_argument(
         "--static-packages-output",
@@ -136,15 +118,10 @@ def main():
         aibs.append((json_load(AssemblyInputBundle, aib), aib_path))
 
     collect_packages(
-        aibs,
-        args.static_packages_output,
-        args.bootfs_packages_output,
-        args.static_packages_input,
+        aibs, args.static_packages_output, args.bootfs_packages_output
     )
     collect_kernel_cmdline(aibs, args.kernel_cmdline_output)
-    deps = collect_bootfs_files(
-        aibs, args.bootfs_files_output, args.bootfs_files_input
-    )
+    deps = collect_bootfs_files(aibs, args.bootfs_files_output)
 
     if args.depfile:
         DepFile.from_deps(args.static_packages_output.name, deps).write_to(
