@@ -15,7 +15,7 @@
 ?bt-rfcomm
 ?bt-snoop
 ?build-info
-build-info-service
+?build-info-service
 ?cache_manager
 ?camera_device
 ?camera_device_watcher
@@ -40,7 +40,7 @@ build-info-service
 ?fan-controller
 ?font-server
 ?fonts
-forensics
+?forensics
 ?full-resolver
 ?http-client
 ?httpsdate-time-source-pull
@@ -63,7 +63,7 @@ forensics
 ?network-tun
 ?omaha-client
 ?overnet-usb-package
-pkg-resolver
+?pkg-resolver
 ?pkgctl
 ?process-resolver
 ?radar-proxy-with-injector
@@ -88,8 +88,8 @@ pkg-resolver
 ?starnix_kernel
 ?start_sl4f
 ?stash
-sysmem_connector
-system-update-committer
+?sysmem_connector
+?system-update-committer
 ?system-update-configurator
 ?system-update-realm
 ?system-updater

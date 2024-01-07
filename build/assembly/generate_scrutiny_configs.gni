@@ -12,10 +12,6 @@ import("//build/testing/golden_files.gni")
 #   assembly_input_bundles (required)
 #     [list of paths] The paths to assembly input bundle config files.
 #
-#   required_assembly_input_bundles (optional; default=[])
-#     [list of paths] The paths to assembly input bundle config files that
-#     will always be present in the images.
-#
 #   static_packages_golden (required)
 #     [path] The static packages list source-of-truth.
 #     This lists base, cache, flexible, and base_driver packages.
@@ -53,11 +49,6 @@ template("generate_scrutiny_configs") {
                invoker.assembly_build_type == "user",
            "assembly_build_type must be either 'userdebug' or 'user'")
     _assembly_build_type = invoker.assembly_build_type
-  }
-
-  _required_aibs = []
-  if (defined(invoker.required_assembly_input_bundles)) {
-    _required_aibs = invoker.required_assembly_input_bundles
   }
 
   files = {
@@ -123,15 +114,8 @@ template("generate_scrutiny_configs") {
       rebase_path(depfile, root_build_dir),
       "--assembly-input-bundles",
     ]
-    foreach(aib, invoker.assembly_input_bundles - _required_aibs) {
+    foreach(aib, invoker.assembly_input_bundles) {
       args += [ rebase_path(aib, root_build_dir) ]
-    }
-
-    if (_required_aibs != []) {
-      args += [ "--required-assembly-input-bundles" ]
-      foreach(aib, _required_aibs) {
-        args += [ rebase_path(aib, root_build_dir) ]
-      }
     }
 
     if (_assembly_build_type != false) {

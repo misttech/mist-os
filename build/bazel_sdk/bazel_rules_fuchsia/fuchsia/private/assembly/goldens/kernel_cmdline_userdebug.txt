@@ -1,4 +1,4 @@
-blobfs.cache-eviction-policy=NEVER_EVICT
+?blobfs.cache-eviction-policy=NEVER_EVICT
 ?console.shell=false
 ?console.shell=true
 ?kernel.compression.at_memory_pressure=true
