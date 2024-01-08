@@ -2240,10 +2240,6 @@ fn listen_inner<
             try_pick_bound_address::<I, _, _, _>(addr, device, core_ctx, identifier)?;
         let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
 
-        // TODO(https://fxbug.dev/132092): Delete conversion once `ZonedAddr`
-        // holds `NonMappedAddr`.
-        let addr =
-            addr.map(SocketIpAddr::try_from).transpose().expect("ZonedAddr should be non-mapped");
         BoundStateHandler::<_, S, _>::try_insert_listener(
             bound,
             addr,
