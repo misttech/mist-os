@@ -35,7 +35,6 @@ fuchsia_driver("zxcrypt-driver") {
     "//sdk/banjo/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
@@ -44,6 +43,7 @@ fuchsia_driver("zxcrypt-driver") {
     "//src/security/lib/zxcrypt:zxcrypt-dev",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",
@@ -106,7 +106,6 @@ test("device-manager-test-bin") {
   sources = [ "device-manager-test.cc" ]
   deps = [
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/devices/block/drivers/ramdisk",
     "//src/devices/block/drivers/zxcrypt",
     "//src/devices/testing/driver-integration-test-shim",
@@ -116,6 +115,7 @@ test("device-manager-test-bin") {
     "//src/security/lib/zxcrypt:zxcrypt-client",
     "//src/security/lib/zxcrypt:zxcrypt-dev",
     "//src/storage/lib/ramdevice_client/cpp",
+    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zxtest",
   ]
 }

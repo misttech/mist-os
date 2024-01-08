@@ -23,12 +23,12 @@ source_set("common") {
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.nand:fuchsia.hardware.nand_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.rawnand:fuchsia.hardware.rawnand_banjo_cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/devices/lib/dev-operation",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
