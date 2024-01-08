@@ -5,11 +5,11 @@
 use {
     fidl::endpoints::{RequestStream, ServerEnd},
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
     fuchsia_zircon::Status,
     futures::future::BoxFuture,
     futures::future::FutureExt,
     futures::stream::StreamExt,
-    parking_lot::Mutex,
     std::{collections::HashMap, sync::Arc},
 };
 

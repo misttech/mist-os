@@ -22,6 +22,7 @@ use {
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_pkg_testing::make_packages_json,
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::{channel::mpsc, prelude::*},
     mock_installer::MockUpdateInstallerService,
@@ -29,7 +30,6 @@ use {
     mock_resolver::MockResolverService,
     mock_space::MockSpaceService,
     mock_verifier::MockVerifierService,
-    parking_lot::Mutex,
     pretty_assertions::assert_eq,
     std::sync::{
         atomic::{AtomicU32, Ordering},

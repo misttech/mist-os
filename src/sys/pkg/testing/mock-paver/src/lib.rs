@@ -9,10 +9,10 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_mem::Buffer,
     fidl_fuchsia_paver as paver, fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{Status, Vmo, VmoOptions},
     futures::lock::Mutex as AsyncMutex,
     futures::{channel::mpsc, prelude::*},
-    parking_lot::Mutex,
     std::{convert::TryInto, sync::Arc},
 };
 

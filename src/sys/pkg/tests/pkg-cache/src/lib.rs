@@ -21,6 +21,7 @@ use {
     fuchsia_inspect::reader::DiagnosticsHierarchy,
     fuchsia_merkle::Hash,
     fuchsia_pkg_testing::{get_inspect_hierarchy, BlobContents, Package},
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx, Status},
     futures::{future::BoxFuture, prelude::*},
     mock_boot_arguments::MockBootArgumentsService,
@@ -28,7 +29,6 @@ use {
     mock_paver::{MockPaverService, MockPaverServiceBuilder},
     mock_reboot::{MockRebootService, RebootReason},
     mock_verifier::MockVerifierService,
-    parking_lot::Mutex,
     std::{collections::HashMap, sync::Arc, time::Duration},
     vfs::directory::{entry::DirectoryEntry as _, helper::DirectlyMutable as _},
 };

@@ -14,6 +14,7 @@ use {
     fidl_fuchsia_update_installer_ext::{self as installer},
     fuchsia_async::{self as fasync, TimeoutExt as _},
     fuchsia_component::server::ServiceFs,
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx, EventPair, HandleBased, Peered},
     futures::{channel::mpsc, lock::Mutex as AsyncMutex, prelude::*},
     mock_installer::{
@@ -21,7 +22,6 @@ use {
     },
     mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent},
     mock_reboot::{MockRebootService, RebootReason},
-    parking_lot::Mutex,
     pretty_assertions::assert_eq,
     std::{sync::Arc, time::Duration},
 };

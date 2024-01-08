@@ -10,8 +10,8 @@ use {
     },
     fidl_fuchsia_update_installer_ext::{State, StateId},
     fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
     futures::{channel::mpsc, prelude::*},
-    parking_lot::Mutex,
     pretty_assertions::assert_eq,
     std::sync::Arc,
 };

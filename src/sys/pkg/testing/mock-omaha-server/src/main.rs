@@ -7,6 +7,7 @@ use {
     argh::FromArgs,
     async_net::{TcpListener, TcpStream},
     fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
     futures::prelude::*,
     hyper::{
         server::{accept::from_stream, Server},
@@ -15,7 +16,6 @@ use {
     mock_omaha_server::{
         handle_request, OmahaServerBuilder, PrivateKeyAndId, PrivateKeys, ResponseAndMetadata,
     },
-    parking_lot::Mutex,
     std::{
         collections::HashMap,
         convert::Infallible,

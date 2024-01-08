@@ -14,7 +14,7 @@ use {
     anyhow::anyhow,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
-    parking_lot::Mutex,
+    fuchsia_sync::Mutex,
     std::sync::Arc,
     tracing::{error, info},
 };

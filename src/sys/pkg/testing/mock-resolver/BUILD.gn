@@ -17,9 +17,9 @@ rustc_library("mock-resolver") {
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tempfile",
   ]
 

@@ -17,11 +17,11 @@ use {
     fidl_fuchsia_pkg_ext::{self as pkg, cache, BlobId, RepositoryConfig, RepositoryConfigs},
     fuchsia_inspect as inspect,
     fuchsia_pkg::PackageDirectory,
+    fuchsia_sync::{Mutex, RwLock},
     fuchsia_trace as ftrace,
     fuchsia_url::{AbsolutePackageUrl, RepositoryUrl},
     fuchsia_zircon::Status,
     futures::{future::LocalBoxFuture, lock::Mutex as AsyncMutex, prelude::*},
-    parking_lot::{Mutex, RwLock},
     std::{
         collections::{btree_set, hash_map::Entry, BTreeSet, HashMap},
         fs, io,

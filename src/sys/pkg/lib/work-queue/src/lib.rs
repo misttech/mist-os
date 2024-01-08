@@ -9,6 +9,7 @@
 //! Concurrent work queue helpers
 
 use {
+    fuchsia_sync::Mutex,
     futures::{
         channel::mpsc,
         future::Shared,
@@ -16,7 +17,6 @@ use {
         ready,
         stream::{FusedStream, FuturesUnordered},
     },
-    parking_lot::Mutex,
     pin_project::pin_project,
     std::{
         collections::HashMap,

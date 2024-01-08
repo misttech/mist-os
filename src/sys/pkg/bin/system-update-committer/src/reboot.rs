@@ -33,9 +33,9 @@ pub(super) async fn wait_and_reboot(timer: fasync::Timer, proxy: &PowerStateCont
 mod tests {
     use {
         super::*,
+        fuchsia_sync::Mutex,
         futures::{channel::oneshot, pin_mut, task::Poll},
         mock_reboot::MockRebootService,
-        parking_lot::Mutex,
         std::{sync::Arc, time::Duration},
     };
 

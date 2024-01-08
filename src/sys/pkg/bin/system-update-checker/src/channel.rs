@@ -12,8 +12,8 @@ use fidl_fuchsia_cobalt::{
 use fidl_fuchsia_pkg::RepositoryManagerMarker;
 use fidl_fuchsia_pkg_ext::RepositoryConfig;
 use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
 use fuchsia_url::AbsolutePackageUrl;
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
@@ -299,12 +299,12 @@ mod tests {
     use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
     use fuchsia_async::DurationExt;
     use fuchsia_component::server::ServiceFs;
+    use fuchsia_sync::Mutex;
     use fuchsia_url::RepositoryUrl;
     use fuchsia_zircon::DurationNum;
     use futures::prelude::*;
     use futures::task::Poll;
     use futures::{future::FutureExt, stream::StreamExt};
-    use parking_lot::Mutex;
     use std::sync::Arc;
 
     fn serve_ota_channel_arguments(

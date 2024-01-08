@@ -23,6 +23,7 @@ rustc_test("test_driver") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
+    "//src/lib/fuchsia-sync",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//src/sys/pkg/testing/mock-paver",
@@ -31,7 +32,6 @@ rustc_test("test_driver") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
   ]

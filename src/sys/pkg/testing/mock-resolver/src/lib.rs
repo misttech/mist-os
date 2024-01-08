@@ -11,8 +11,8 @@ use {
         PackageResolverResolveResponder,
     },
     fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
     futures::{channel::oneshot, prelude::*},
-    parking_lot::Mutex,
     std::{
         collections::HashMap,
         fs::{self, create_dir},

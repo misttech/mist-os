@@ -293,11 +293,11 @@ pub mod test_check_for_system_update_impl {
             PackageResolverResolveWithContextResult, PackageUrl,
         },
         fuchsia_async as fasync,
+        fuchsia_sync::Mutex,
         futures::{future, TryFutureExt, TryStreamExt},
         lazy_static::lazy_static,
         maplit::hashmap,
         mock_paver::MockPaverServiceBuilder,
-        parking_lot::Mutex,
         std::{collections::hash_map::HashMap, fs, sync::Arc},
     };
 

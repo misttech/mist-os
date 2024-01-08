@@ -27,6 +27,7 @@ use {
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     fuchsia_pkg_testing::{make_current_epoch_json, make_packages_json},
+    fuchsia_sync::Mutex,
     fuchsia_url::{PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl},
     fuchsia_zircon as zx,
     futures::{
@@ -47,7 +48,6 @@ use {
     omaha_client::cup_ecdsa::test_support::{
         make_default_private_key_for_test, RAW_PUBLIC_KEY_FOR_TEST,
     },
-    parking_lot::Mutex,
     serde_json::json,
     std::{
         collections::HashMap,

@@ -5,8 +5,8 @@
 use {
     fidl_fuchsia_metrics::{self as fidl, MetricEvent},
     fuchsia_async as fasync,
+    fuchsia_sync::Mutex,
     futures::TryStreamExt as _,
-    parking_lot::Mutex,
     std::{sync::Arc, time::Duration},
 };
 

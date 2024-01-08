@@ -11,13 +11,13 @@ use {
     fidl_fuchsia_pkg_ext::{self as pkg, BlobId, BlobInfo, MirrorConfig, RepositoryConfig},
     fuchsia_cobalt_builders::MetricEventExt as _,
     fuchsia_pkg::PackageDirectory,
+    fuchsia_sync::Mutex,
     fuchsia_trace as ftrace,
     fuchsia_url::AbsolutePackageUrl,
     fuchsia_zircon::Status,
     futures::{lock::Mutex as AsyncMutex, prelude::*, stream::FuturesUnordered},
     http_uri_ext::HttpUriExt as _,
     hyper::StatusCode,
-    parking_lot::Mutex,
     std::{
         sync::{
             atomic::{AtomicBool, AtomicU64, Ordering},

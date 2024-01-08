@@ -675,12 +675,12 @@ pub(crate) mod tests {
     use event_queue::{ClosedClient, Notify};
     use fidl_fuchsia_update_ext::AttemptOptions;
     use fuchsia_async::{DurationExt, TimeoutExt};
+    use fuchsia_sync::Mutex;
     use fuchsia_zircon::prelude::*;
     use futures::channel::mpsc::{channel, Receiver, Sender};
     use futures::channel::oneshot;
     use futures::future::BoxFuture;
     use futures::lock::Mutex as AsyncMutex;
-    use parking_lot::Mutex;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     pub const CALLBACK_CHANNEL_SIZE: usize = 20;

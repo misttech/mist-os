@@ -466,9 +466,9 @@ mod tests {
             RebootControllerRequest, State, UpdateInfo,
         },
         fuchsia_async as fasync,
+        fuchsia_sync::Mutex,
         futures::future::BoxFuture,
         omaha_client::protocol::response::{App, Manifest, Package, Packages, UpdateCheck},
-        parking_lot::Mutex,
         serde_json::Map,
         std::{convert::TryInto, sync::Arc, task::Poll},
     };

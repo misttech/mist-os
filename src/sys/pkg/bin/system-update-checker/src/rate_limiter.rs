@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {fuchsia_zircon as zx, parking_lot::Mutex};
+use {fuchsia_sync::Mutex, fuchsia_zircon as zx};
 
 pub(crate) trait Clock {
     fn now(&self) -> zx::Time;

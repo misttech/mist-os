@@ -94,9 +94,9 @@ mod tests {
     use {
         super::*,
         fidl_fuchsia_update::CommitStatusProviderRequest,
+        fuchsia_sync::Mutex,
         fuchsia_zircon::{DurationNum, EventPair, HandleBased, Peered},
         futures::{pin_mut, task::Poll},
-        parking_lot::Mutex,
     };
 
     struct TestObserver {

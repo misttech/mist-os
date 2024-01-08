@@ -22,6 +22,7 @@ use {
     fuchsia_pkg_testing::{
         make_current_epoch_json, make_epoch_json, make_packages_json, SOURCE_EPOCH,
     },
+    fuchsia_sync::Mutex,
     fuchsia_url::AbsoluteComponentUrl,
     fuchsia_zircon::Status,
     futures::prelude::*,
@@ -29,7 +30,6 @@ use {
     mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent},
     mock_reboot::{MockRebootService, RebootReason},
     mock_resolver::MockResolverService,
-    parking_lot::Mutex,
     pretty_assertions::assert_eq,
     serde_json::json,
     std::{

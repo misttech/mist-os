@@ -132,9 +132,9 @@ mod test {
     use event_queue::{ClosedClient, Event, Notify};
     use fidl_fuchsia_update_ext::random_version_available;
     use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
     use fuchsia_zircon as zx;
     use futures::{channel::mpsc, future::BoxFuture, pin_mut, task::Poll};
-    use parking_lot::Mutex;
     use proptest::prelude::*;
     use std::sync::Arc;
 

@@ -25,12 +25,12 @@ use {
     fidl_fuchsia_space as fidl_space, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_hyper_test_support::{handler::StaticResponse, TestServer},
+    fuchsia_sync::Mutex,
     fuchsia_url::RepositoryUrl,
     fuchsia_zircon as zx,
     fuchsia_zircon::Status,
     futures::prelude::*,
     http::Uri,
-    parking_lot::Mutex,
     shell_process::ProcessOutput,
     std::{
         convert::TryFrom,

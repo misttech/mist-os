@@ -6,12 +6,12 @@ use {
     anyhow::Error,
     derive_builder::Builder,
     fuchsia_merkle::Hash,
+    fuchsia_sync::Mutex,
     hyper::{body::Bytes, header, Body, Method, Request, Response, StatusCode},
     omaha_client::cup_ecdsa::{
         test_support::{make_default_private_key_for_test, make_default_public_key_id_for_test},
         PublicKeyId,
     },
-    parking_lot::Mutex,
     serde::Deserialize,
     serde_json::json,
     sha2::{Digest, Sha256},

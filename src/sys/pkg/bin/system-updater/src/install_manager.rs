@@ -532,8 +532,8 @@ mod tests {
             PrepareFailureReason, Progress, UpdateInfo, UpdateInfoAndProgress,
         },
         fuchsia_inspect::Inspector,
+        fuchsia_sync::Mutex,
         mpsc::{Receiver, Sender},
-        parking_lot::Mutex,
         std::{pin::Pin, sync::Arc, task::Poll},
     };
 

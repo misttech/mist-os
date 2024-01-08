@@ -16,6 +16,7 @@ rustc_test("driver") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
+    "//src/lib/fuchsia-sync",
     "//src/lib/fuchsia-url",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/lib/vfs/rust:vfs",
@@ -33,7 +34,6 @@ rustc_test("driver") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:http",
-    "//third_party/rust_crates:parking_lot",
   ]
 
   sources = [ "src/lib.rs" ]

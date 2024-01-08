@@ -6,13 +6,13 @@
 
 use {
     crate::serve::HttpResponder,
+    fuchsia_sync::Mutex,
     futures::{
         channel::{mpsc, oneshot},
         future::{pending, ready, BoxFuture, Shared},
         prelude::*,
     },
     hyper::{Body, Request, Response, StatusCode},
-    parking_lot::Mutex,
     std::{
         collections::HashSet,
         path::{Path, PathBuf},

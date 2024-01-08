@@ -32,12 +32,12 @@ use {
     },
     fuchsia_merkle::{Hash, MerkleTree},
     fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder},
+    fuchsia_sync::Mutex,
     fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
     fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _},
     futures::prelude::*,
     mock_boot_arguments::MockBootArgumentsService,
     mock_metrics::MockMetricEventLoggerFactory,
-    parking_lot::Mutex,
     serde::Serialize,
     std::{
         collections::HashMap,

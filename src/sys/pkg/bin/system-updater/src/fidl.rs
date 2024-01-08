@@ -15,8 +15,8 @@ use {
     },
     fidl_fuchsia_update_installer_ext::State,
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
+    fuchsia_sync::Mutex,
     futures::prelude::*,
-    parking_lot::Mutex,
     std::{convert::TryInto, sync::Arc},
     tracing::{error, info},
 };
