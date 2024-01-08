@@ -39,6 +39,32 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+bt_sherlock_env = {
+  dimensions = {
+    device_type = "Sherlock"
+    pool = "fuchsia.tests.bluetooth"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "bt_sherlock_sherlock"
+    env = bt_sherlock_env
+  },
+]
+
+bt_vim3_env = {
+  dimensions = {
+    device_type = "Vim3"
+    pool = "fuchsia.tests.bluetooth"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "bt_vim3_vim3"
+    env = bt_sherlock_env
+  },
+]
+
 linux_env = {
   dimensions = {
     os = "Linux"
