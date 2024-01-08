@@ -477,58 +477,17 @@ void LoopbackDevice::DdkRelease() {
 
 void LoopbackDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
                                         OpenCommandChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenCommandChannel(zx::channel(request->channel.release()));
-      status != ZX_OK) {
-    completer.ReplyError(status);
-  }
-  completer.ReplySuccess();
+  BtHciOpenCommandChannel(zx::channel(request->channel.release()));
 }
 
 void LoopbackDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                         OpenAclDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenAclDataChannel(zx::channel(request->channel.release()));
-      status != ZX_OK) {
-    completer.ReplyError(status);
-  }
-  completer.ReplySuccess();
-}
-
-void LoopbackDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                                        OpenScoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void LoopbackDevice::ConfigureSco(ConfigureScoRequestView request,
-                                  ConfigureScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void LoopbackDevice::ResetSco(ResetScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void LoopbackDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                                        OpenIsoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  BtHciOpenAclDataChannel(zx::channel(request->channel.release()));
 }
 
 void LoopbackDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                                       OpenSnoopChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenSnoopChannel(zx::channel(request->channel.release()));
-      status != ZX_OK) {
-    completer.ReplyError(status);
-  };
-  completer.ReplySuccess();
-}
-
-void LoopbackDevice::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
-  ZX_PANIC("Unknown method in HCI request");
+  BtHciOpenSnoopChannel(zx::channel(request->channel.release()));
 }
 
 zx_status_t LoopbackDevice::DdkGetProtocol(uint32_t proto_id, void* out_proto) {

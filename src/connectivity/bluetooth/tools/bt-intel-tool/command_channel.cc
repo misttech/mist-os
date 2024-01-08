@@ -21,8 +21,7 @@
 
 namespace {
 
-zx::channel GetCommandChannel(
-    const fidl::WireSyncClient<fuchsia_hardware_bluetooth::FullHci>& client) {
+zx::channel GetCommandChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci>& client) {
   zx::channel ours, theirs;
   if (zx_status_t status = zx::channel::create(0, &ours, &theirs); status != ZX_OK) {
     std::cerr << "CommandChannel: Failed to create channel: %s\n"
@@ -30,22 +29,16 @@ zx::channel GetCommandChannel(
     return ours;
   }
 
-  const auto result = client->OpenCommandChannel(std::move(theirs));
+  const fidl::OneWayStatus result = client->OpenCommandChannel(std::move(theirs));
   if (!result.ok()) {
-    std::cerr << "hci: Failed to obtain command channel handle, FIDL transport error: "
-              << result.status_string() << std::endl;
-    assert(!ours.is_valid());
-  }
-
-  if (result->is_error()) {
-    std::cerr << "hci: Failed to obtain command channel handle: "
-              << zx_status_get_string(result->error_value()) << std::endl;
+    std::cerr << "hci: Failed to obtain command channel handle: " << result.status_string()
+              << std::endl;
     assert(!ours.is_valid());
   }
   return ours;
 }
 
-zx::channel GetAclChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth::FullHci>& client) {
+zx::channel GetAclChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci>& client) {
   zx::channel ours, theirs;
   if (zx_status_t status = zx::channel::create(0, &ours, &theirs); status != ZX_OK) {
     std::cerr << "CommandChannel: Failed to create channel: %s\n"
@@ -53,16 +46,10 @@ zx::channel GetAclChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth:
     return ours;
   }
 
-  const auto result = client->OpenAclDataChannel(std::move(theirs));
+  const fidl::OneWayStatus result = client->OpenAclDataChannel(std::move(theirs));
   if (!result.ok()) {
-    std::cerr << "hci: Failed to obtain ACL channel handle, FIDL transport error: "
-              << result.status_string() << std::endl;
-    assert(!ours.is_valid());
-  }
-
-  if (!result->is_error()) {
-    std::cerr << "hci: Failed to obtain ACL channel handle: "
-              << zx_status_get_string(result->error_value()) << std::endl;
+    std::cerr << "hci: Failed to obtain ACL channel handle: " << result.status_string()
+              << std::endl;
     assert(!ours.is_valid());
   }
   return ours;
@@ -70,7 +57,7 @@ zx::channel GetAclChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth:
 
 }  // namespace
 
-CommandChannel::CommandChannel(fidl::ClientEnd<fuchsia_hardware_bluetooth::FullHci> device)
+CommandChannel::CommandChannel(fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> device)
     : valid_(false), event_callback_(nullptr), client_(std::move(device)) {
   cmd_channel_ = GetCommandChannel(client_);
   cmd_channel_wait_.set_object(cmd_channel_.get());
@@ -197,8 +184,9 @@ void CommandChannel::HandleChannelReady(const zx::channel& channel, async_dispat
     }
 
     if (read_size < sizeof(::bt::hci_spec::EventHeader)) {
-      std::cerr << "CommandChannel: Malformed event packet - " << "expected at least "
-                << sizeof(::bt::hci_spec::EventHeader) << " bytes, got " << read_size << std::endl;
+      std::cerr << "CommandChannel: Malformed event packet - "
+                << "expected at least " << sizeof(::bt::hci_spec::EventHeader) << " bytes, got "
+                << read_size << std::endl;
       continue;
     }
 
@@ -206,8 +194,8 @@ void CommandChannel::HandleChannelReady(const zx::channel& channel, async_dispat
     const size_t rx_payload_size = read_size - sizeof(::bt::hci_spec::EventHeader);
     const size_t size_from_header = packet->view().header().parameter_total_size;
     if (size_from_header != rx_payload_size) {
-      std::cerr << "CommandChannel: Malformed event packet - " << "payload size from header ("
-                << size_from_header << ")"
+      std::cerr << "CommandChannel: Malformed event packet - "
+                << "payload size from header (" << size_from_header << ")"
                 << " does not match received payload size: " << rx_payload_size << std::endl;
       continue;
     }

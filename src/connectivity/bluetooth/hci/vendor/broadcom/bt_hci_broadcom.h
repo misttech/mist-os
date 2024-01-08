@@ -22,7 +22,7 @@ namespace bt_hci_broadcom {
 class BtHciBroadcom;
 using BtHciBroadcomType =
     ddk::Device<BtHciBroadcom, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable,
-                ddk::Messageable<fuchsia_hardware_bluetooth::FullHci>::Mixin>;
+                ddk::Messageable<fuchsia_hardware_bluetooth::Hci>::Mixin>;
 
 class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtHciBroadcom> {
  public:
@@ -59,19 +59,8 @@ class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtH
                           OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
                           OpenAclDataChannelCompleter::Sync& completer) override;
-  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                          OpenScoDataChannelCompleter::Sync& completer) override;
-  void ConfigureSco(ConfigureScoRequestView request,
-                    ConfigureScoCompleter::Sync& completer) override;
-  void ResetSco(ResetScoCompleter::Sync& completer) override;
-  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                          OpenIsoDataChannelCompleter::Sync& completer) override;
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Truly private, internal helper methods:
 

@@ -13,7 +13,7 @@
 
 namespace bt::controllers {
 
-FidlController::FidlController(fuchsia::hardware::bluetooth::FullHciHandle hci,
+FidlController::FidlController(fuchsia::hardware::bluetooth::HciHandle hci,
                                async_dispatcher_t* dispatcher)
     : hci_handle_(std::move(hci)), dispatcher_(dispatcher) {
   BT_ASSERT(hci_handle_.is_valid());
@@ -43,14 +43,7 @@ void FidlController::Initialize(PwStatusCallback complete_callback,
     return;
   }
 
-  hci_->OpenCommandChannel(
-      std::move(their_command_chan),
-      [](fuchsia::hardware::bluetooth::FullHci_OpenCommandChannel_Result result) {
-        if (result.is_err()) {
-          bt_log(ERROR, "controllers", "Failed to open command channel: %s",
-                 zx_status_get_string(result.err()));
-        }
-      });
+  hci_->OpenCommandChannel(std::move(their_command_chan));
   InitializeWait(command_wait_, command_channel_);
 
   zx::channel their_acl_chan;
@@ -62,14 +55,7 @@ void FidlController::Initialize(PwStatusCallback complete_callback,
     return;
   }
 
-  hci_->OpenAclDataChannel(
-      std::move(their_acl_chan),
-      [](fuchsia::hardware::bluetooth::FullHci_OpenAclDataChannel_Result result) {
-        if (result.is_err()) {
-          bt_log(ERROR, "controllers", "Failed to open ACL data channel: %s",
-                 zx_status_get_string(result.err()));
-        }
-      });
+  hci_->OpenAclDataChannel(std::move(their_acl_chan));
   InitializeWait(acl_wait_, acl_channel_);
 
   complete_callback(PW_STATUS_OK);
