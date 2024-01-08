@@ -34,6 +34,9 @@ toc:
     path: /docs/development/build/ninja_fuchsia_improvements.md
   - title: "Hermetic actions check"
     path: /docs/development/build/hermetic_actions.md
+  - title: "Bazel concepts"
+    section:
+    - include: /docs/development/build/bazel_concepts/_toc.yaml
 - title: "Build system"
   section:
   - include: /docs/development/build/build_system/_toc.yaml
