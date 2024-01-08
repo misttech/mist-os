@@ -545,7 +545,10 @@ fn fill_buf_from_addr_range(
 ) -> Result<(), Errno> {
     #[allow(clippy::manual_saturating_arithmetic)]
     let len = range_end.ptr().checked_sub(range_start.ptr()).unwrap_or(0);
-    let buf = task.mm().read_memory_partial_to_vec(range_start, len)?;
+    // NB: If this is exercised in a hot-path, we can plumb the reading task
+    // here to perform a copy without going through the VMO when unified
+    // aspaces is enabled.
+    let buf = task.mm().vmo_read_memory_partial_to_vec(range_start, len)?;
     sink.write(&buf[..]);
     Ok(())
 }

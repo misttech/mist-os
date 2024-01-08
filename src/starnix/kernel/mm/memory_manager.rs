@@ -2116,6 +2116,23 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
+    /// Read up to `max_len` bytes from `addr` through a VMO, returning them as
+    /// a Vec.
+    ///
+    /// Useful when the address may not be mapped in the current address space.
+    fn vmo_read_memory_partial_to_vec(
+        &self,
+        addr: UserAddress,
+        max_len: usize,
+    ) -> Result<Vec<u8>, Errno> {
+        // SAFETY: `self.vmo_read_memory_partial` returns the bytes read.
+        unsafe {
+            read_to_vec(max_len, |buf| {
+                self.vmo_read_memory_partial(addr, buf).map(|bytes_read| bytes_read.len())
+            })
+        }
+    }
+
     /// Read up to `max_len` bytes from `addr`, returning them as a Vec.
     fn read_memory_partial_to_vec(
         &self,
