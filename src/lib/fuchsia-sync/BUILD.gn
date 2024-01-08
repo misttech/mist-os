@@ -13,18 +13,21 @@ rustc_library("fuchsia-sync") {
 
   deps = []
   non_rust_deps = []
+  test_deps = []
 
   if (is_fuchsia) {
     deps += [
       "//src/lib/zircon/rust:fuchsia-zircon",
       "//third_party/rust_crates:lock_api",
     ]
+    test_deps += [ "//third_party/rust_crates:crossbeam" ]
     non_rust_deps += [ "//zircon/system/ulib/sync" ]
   } else {
     deps += [ "//third_party/rust_crates:parking_lot" ]
   }
 
   sources = [
+    "src/condvar.rs",
     "src/lib.rs",
     "src/mutex.rs",
     "src/rwlock.rs",
