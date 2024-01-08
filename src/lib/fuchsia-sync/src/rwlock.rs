@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::sys;
+use fuchsia_zircon as zx;
 use std::sync::atomic::Ordering;
 
 pub struct RawSyncRwLock {
@@ -18,7 +18,7 @@ pub struct RawSyncRwLock {
     ///    establish a happens-before relationship with the next lock acquisition.
     ///  * Any load operation which may acquire the lock must use Ordering::Acquire on state to
     ///    establish a happens-before relationship with the previous lock release.
-    state: sys::zx_futex_t,
+    state: zx::Futex,
 
     /// The queue of writers waiting to obtain this lock.
     ///
@@ -30,7 +30,7 @@ pub struct RawSyncRwLock {
     ///
     ///  * Stores to writer_queue must be preceded by a store to state and use Ordering::Release.
     ///  * Loads from writer_queue must use Ordering::Acquire and be followed by a load of state.
-    writer_queue: sys::zx_futex_t,
+    writer_queue: zx::Futex,
 }
 
 const INITIAL_STATE: i32 = 0;
@@ -230,16 +230,6 @@ fn is_unlocked(state: i32) -> bool {
 
 impl RawSyncRwLock {
     #[inline]
-    fn state_ptr(&self) -> *const sys::zx_futex_t {
-        std::ptr::addr_of!(self.state)
-    }
-
-    #[inline]
-    fn writer_queue_ptr(&self) -> *const sys::zx_futex_t {
-        std::ptr::addr_of!(self.writer_queue)
-    }
-
-    #[inline]
     fn try_lock_shared_fast(&self) -> bool {
         let state = self.state.load(Ordering::Relaxed);
         if can_lock_shared(state) {
@@ -288,15 +278,14 @@ impl RawSyncRwLock {
                 }
             }
 
-            unsafe {
-                sys::zx_futex_wait(
-                    self.state_ptr(),
+            // Ignore spurious wakeups, the loop will retry.
+            self.state
+                .wait(
                     desired_sleep_state,
-                    sys::ZX_HANDLE_INVALID, // We don't integrate with priority inheritance yet.
-                    sys::ZX_TIME_INFINITE,
-                );
-            }
-
+                    None, // We don't integrate with priority inheritance yet.
+                    zx::Time::INFINITE,
+                )
+                .ok();
             state = self.state.load(Ordering::Relaxed);
         }
     }
@@ -356,14 +345,14 @@ impl RawSyncRwLock {
                 continue;
             }
 
-            unsafe {
-                sys::zx_futex_wait(
-                    self.writer_queue_ptr(),
+            // Ignore spurious wakeups here, the loop will retry.
+            self.writer_queue
+                .wait(
                     generation_number,
-                    sys::ZX_HANDLE_INVALID, // We don't integrate with priority inheritance yet.
-                    sys::ZX_TIME_INFINITE,
-                );
-            }
+                    None, // We don't integrate with priority inheritance yet.
+                    zx::Time::INFINITE,
+                )
+                .ok();
 
             state = self.state.load(Ordering::Relaxed);
         }
@@ -455,21 +444,17 @@ impl RawSyncRwLock {
     fn wake_writer(&self) {
         self.writer_queue.fetch_add(1, Ordering::Release);
         // TODO: Track which thread owns this futex for priority inheritance.
-        unsafe {
-            sys::zx_futex_wake(self.writer_queue_ptr(), 1);
-        }
+        self.writer_queue.wake(1);
     }
 
     fn wake_readers(&self) {
-        unsafe {
-            sys::zx_futex_wake(self.state_ptr(), u32::MAX);
-        }
+        self.state.wake_all();
     }
 }
 
 unsafe impl lock_api::RawRwLock for RawSyncRwLock {
     const INIT: RawSyncRwLock =
-        RawSyncRwLock { state: sys::zx_futex_t::new(0), writer_queue: sys::zx_futex_t::new(0) };
+        RawSyncRwLock { state: zx::Futex::new(0), writer_queue: zx::Futex::new(0) };
 
     // These operations do not need to happen on the same thread.
     type GuardMarker = lock_api::GuardSend;
@@ -600,37 +585,35 @@ mod test {
         assert_eq!(*guard2, 6);
     }
 
-    #[derive(Default)]
     struct State {
         value: RwLock<u32>,
-        gate: sys::zx_futex_t,
+        gate: zx::Futex,
         writer_count: AtomicUsize,
         reader_count: AtomicUsize,
     }
 
-    impl State {
-        fn gate_ptr(&self) -> *const sys::zx_futex_t {
-            std::ptr::addr_of!(self.gate)
+    impl Default for State {
+        fn default() -> Self {
+            Self {
+                value: Default::default(),
+                gate: zx::Futex::new(0),
+                writer_count: Default::default(),
+                reader_count: Default::default(),
+            }
         }
+    }
 
+    impl State {
         fn wait_for_gate(&self) {
             while self.gate.load(Ordering::Acquire) == 0 {
-                unsafe {
-                    sys::zx_futex_wait(
-                        self.gate_ptr(),
-                        0,
-                        sys::ZX_HANDLE_INVALID,
-                        sys::ZX_TIME_INFINITE,
-                    );
-                }
+                // Ignore failures, we'll retry anyways.
+                self.gate.wait(0, None, zx::Time::INFINITE).ok();
             }
         }
 
         fn open_gate(&self) {
             self.gate.fetch_add(1, Ordering::Release);
-            unsafe {
-                sys::zx_futex_wake(self.gate_ptr(), u32::MAX);
-            }
+            self.gate.wake_all();
         }
 
         fn spawn_writer(state: Arc<Self>, count: usize) -> std::thread::JoinHandle<()> {
