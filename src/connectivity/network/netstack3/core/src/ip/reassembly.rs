@@ -416,7 +416,7 @@ impl FragmentCacheData {
 
 /// A cache of inbound IP packet fragments.
 #[derive(Debug)]
-pub(crate) struct IpPacketFragmentCache<I: Ip, Instant> {
+pub struct IpPacketFragmentCache<I: Ip, Instant> {
     cache: HashMap<FragmentCacheKey<I::Addr>, FragmentCacheData>,
     size: usize,
     threshold: usize,

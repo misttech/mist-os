@@ -158,7 +158,7 @@ pub fn handle_timer<BC: BindingsContext>(
 #[cfg(test)]
 /// Timer-related counters.
 #[derive(Default)]
-pub(crate) struct TimerCounters {
+pub struct TimerCounters {
     /// Count of no-op timers handled.
     pub(crate) nop: crate::counters::Counter,
 }

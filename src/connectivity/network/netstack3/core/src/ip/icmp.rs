@@ -155,7 +155,7 @@ impl From<Icmpv6ErrorCode> for IcmpErrorCode {
     }
 }
 
-pub(crate) type SocketsState<I, D> = datagram::SocketsState<I, D, Icmp>;
+pub type SocketsState<I, D> = datagram::SocketsState<I, D, Icmp>;
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
@@ -858,7 +858,7 @@ pub(crate) trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, S
 }
 
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
-pub(crate) enum Icmp {}
+pub enum Icmp {}
 
 impl DatagramSocketSpec for Icmp {
     type AddrSpec = IcmpAddrSpec;
@@ -955,7 +955,7 @@ impl DatagramSocketSpec for Icmp {
 }
 
 /// Uninstantiatable type for implementing [`SocketMapAddrSpec`].
-pub(crate) enum IcmpAddrSpec {}
+pub enum IcmpAddrSpec {}
 
 impl SocketMapAddrSpec for IcmpAddrSpec {
     type RemoteIdentifier = ();
@@ -991,7 +991,7 @@ type LocalIdAllocator<I, D> = Option<PortAlloc<IcmpBoundSockets<I, D>>>;
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct BoundSockets<I: IpExt, D: WeakId> {
+pub struct BoundSockets<I: IpExt, D: WeakId> {
     socket_map: IcmpBoundSockets<I, D>,
     allocator: LocalIdAllocator<I, D>,
 }

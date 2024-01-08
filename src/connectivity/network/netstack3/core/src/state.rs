@@ -7,6 +7,8 @@
 use net_types::ip::{Ip, IpInvariant};
 
 use crate::{
+    api::CoreApi,
+    context::{ContextProvider, CtxPair},
     device::{arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState},
     ip::{
         self,
@@ -15,7 +17,7 @@ use crate::{
         IpCounters, Ipv4State, Ipv6State,
     },
     transport::{self, udp::UdpCounters, TransportLayerState},
-    BindingsContext, BindingsTypes,
+    BindingsContext, BindingsTypes, CoreCtx,
 };
 
 /// A builder for [`StackState`].
@@ -66,6 +68,14 @@ pub struct StackState<BT: BindingsTypes> {
 }
 
 impl<BT: BindingsTypes> StackState<BT> {
+    /// Gets access to the API from a mutable reference to the bindings context.
+    pub fn api<'a, BP: ContextProvider<Context = BT>>(
+        &'a self,
+        bindings_ctx: BP,
+    ) -> CoreApi<'a, BP> {
+        CoreApi::new(CtxPair { core_ctx: CoreCtx::new(self), bindings_ctx })
+    }
+
     pub(crate) fn ip_counters<I: Ip>(&self) -> &IpCounters<I> {
         I::map_ip(
             IpInvariant(self),

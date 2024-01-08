@@ -83,7 +83,7 @@ pub trait DeviceSocketBindingsContext<DeviceId>: DeviceSocketTypes {
 ///
 /// This type strongly owns the socket state.
 #[derive(Debug)]
-pub(crate) struct PrimaryId<S, D>(PrimaryRc<SocketState<S, D>>);
+pub struct PrimaryId<S, D>(PrimaryRc<SocketState<S, D>>);
 
 /// Reference to live socket state.
 ///
@@ -91,7 +91,7 @@ pub(crate) struct PrimaryId<S, D>(PrimaryRc<SocketState<S, D>>);
 /// backing socket.
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""))]
-pub(crate) struct StrongId<S, D>(StrongRc<SocketState<S, D>>);
+pub struct StrongId<S, D>(StrongRc<SocketState<S, D>>);
 
 impl<S, D> PartialEq for StrongId<S, D> {
     fn eq(&self, StrongId(other): &Self) -> bool {
@@ -137,11 +137,11 @@ pub(super) struct Sockets<Primary, Strong> {
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct AnyDeviceSockets<Id>(HashSet<Id>);
+pub struct AnyDeviceSockets<Id>(HashSet<Id>);
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct AllSockets<Id>(DenseMap<Id>);
+pub struct AllSockets<Id>(DenseMap<Id>);
 
 #[derive(Debug)]
 struct SocketState<S, D> {
@@ -1367,7 +1367,7 @@ mod tests {
     }
 
     /// Simplified trait that provides a blanket impl of [`DeviceIdContext`].
-    pub(crate) trait FakeDeviceIdContext {
+    pub trait FakeDeviceIdContext {
         type DeviceId: FakeStrongDeviceId;
         fn contains_id(&self, device_id: &Self::DeviceId) -> bool;
     }

@@ -192,7 +192,7 @@ impl<I: crate::Instant> PmtuCacheData<I> {
 /// A path MTU cache.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct PmtuCache<I: Ip, Instant> {
+pub struct PmtuCache<I: Ip, Instant> {
     cache: HashMap<PmtuCacheKey<I::Addr>, PmtuCacheData<Instant>>,
 }
 

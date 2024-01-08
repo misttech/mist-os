@@ -8,6 +8,7 @@ use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
 use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
+    marker::PhantomData,
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
@@ -34,7 +35,9 @@ use tracing::{debug, trace};
 pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
-    context::{CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext},
+    context::{
+        ContextPair, CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext,
+    },
     convert::BidirectionalConverter,
     counters::Counter,
     data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
@@ -127,13 +130,13 @@ impl<I: IpExt, NewIp: IpExt, D: WeakId> GenericOverIp<NewIp> for UdpBoundSocketM
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct BoundSockets<I: IpExt, D: WeakId> {
+pub struct BoundSockets<I: IpExt, D: WeakId> {
     bound_sockets: UdpBoundSocketMap<I, D>,
     /// lazy_port_alloc is lazy-initialized when it's used.
     lazy_port_alloc: Option<PortAlloc<UdpBoundSocketMap<I, D>>>,
 }
 
-pub(crate) type SocketsState<I, D> = DatagramSocketsState<I, D, Udp>;
+pub type SocketsState<I, D> = DatagramSocketsState<I, D, Udp>;
 
 /// A collection of UDP sockets.
 #[derive(Derivative)]
@@ -204,7 +207,7 @@ impl<BC: crate::BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>> for Co
 }
 
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
-pub(crate) enum Udp {}
+pub enum Udp {}
 
 /// Produces an iterator over eligible receiving socket addresses.
 #[cfg(test)]
@@ -526,7 +529,7 @@ where
 /// State held for IPv6 sockets related to dual-stack operation.
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-pub(crate) struct DualStackSocketState {
+pub struct DualStackSocketState {
     /// Whether dualstack operations are enabled on this socket.
     /// Match Linux's behavior by enabling dualstack operations by default.
     #[derivative(Default(value = "true"))]
@@ -537,7 +540,7 @@ pub(crate) struct DualStackSocketState {
 }
 
 /// Serialization errors for Udp Packets.
-pub(crate) enum UdpSerializeError {
+pub enum UdpSerializeError {
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
     RemotePortUnset,
@@ -623,7 +626,7 @@ struct SocketSelectorParams<I: Ip, A: AsRef<I::Addr>> {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) enum AddrState<T> {
+pub enum AddrState<T> {
     Exclusive(T),
     ReusePort(Vec<T>),
 }
@@ -644,7 +647,7 @@ impl<'a, A: IpAddress, LI, RI> From<&'a ConnIpAddr<A, LI, RI>> for SocketAddrTyp
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum Sharing {
+pub enum Sharing {
     Exclusive,
     ReusePort,
 }
@@ -674,7 +677,7 @@ impl Sharing {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct AddrVecTag {
+pub struct AddrVecTag {
     pub(crate) has_device: bool,
     pub(crate) addr_type: SocketAddrType,
     pub(crate) sharing: Sharing,
@@ -1065,7 +1068,7 @@ pub trait UdpBindingsContext<I: IcmpIpExt, D> {
 }
 
 /// The bindings context for UDP.
-pub(crate) trait UdpStateBindingsContext<I: IpExt, D>:
+pub trait UdpStateBindingsContext<I: IpExt, D>:
     InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>
 {
 }
@@ -1075,7 +1078,7 @@ impl<I: IpExt, BC: InstantContext + RngContext + TracingContext + UdpBindingsCon
 }
 
 /// An execution context for the UDP protocol which also provides access to state.
-pub(crate) trait BoundStateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
+pub trait BoundStateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice> + UdpStateContext
 {
     /// The core context passed to the callback provided to methods.
@@ -1128,7 +1131,7 @@ pub(crate) trait BoundStateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self
     ) -> O;
 }
 
-pub(crate) trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
+pub trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// The core context passed to the callback.
@@ -1171,7 +1174,7 @@ pub(crate) trait StateContext<I: IpExt, BC: UdpStateBindingsContext<I, Self::Dev
 /// in this crate. It can be safely implemented for any type.
 /// TODO(https://github.com/rust-lang/rust/issues/97811): Remove this once the
 /// coherence checker doesn't require it.
-pub(crate) trait UdpStateContext {}
+pub trait UdpStateContext {}
 
 /// An execution context for UDP dual-stack operations.
 pub(crate) trait DualStackBoundStateContext<
@@ -1678,6 +1681,33 @@ pub(crate) trait SocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         remote_port: UdpRemotePort,
         body: B,
     ) -> Result<(), Either<LocalAddressError, SendToError>>;
+}
+
+/// The UDP socket API.
+pub struct UdpApi<I, C>(C, PhantomData<I>);
+
+impl<I, C> UdpApi<I, C> {
+    pub(crate) fn new(ctx: C) -> Self {
+        Self(ctx, PhantomData)
+    }
+}
+
+impl<I, C> UdpApi<I, C>
+where
+    I: IpExt,
+    C: ContextPair,
+    C::CoreContext: StateContext<I, C::BindingsContext> + CounterContext<UdpCounters<I>>,
+    C::BindingsContext:
+        UdpStateBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+{
+    fn core_ctx(&mut self) -> &mut C::CoreContext {
+        let Self(pair, PhantomData) = self;
+        pair.core_ctx()
+    }
+
+    pub fn create(&mut self) -> SocketId<I> {
+        datagram::create(self.core_ctx())
+    }
 }
 
 impl<

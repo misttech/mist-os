@@ -26,6 +26,7 @@ extern crate fakestd as std;
 mod macros;
 
 mod algorithm;
+mod api;
 mod context;
 mod convert;
 mod counters;
@@ -306,11 +307,12 @@ pub mod udp {
     };
 }
 
+pub use api::CoreApi;
 pub use context::{
     BindingsContext, BindingsTypes, CoreCtx, EventContext, InstantBindingsTypes, InstantContext,
     ReferenceNotifiers, RngContext, SyncCtx, TimerContext, TracingContext, UnlockedCoreCtx,
 };
-pub use marker::IpExt;
+pub use marker::{CoreContext, IpExt};
 pub use state::StackState;
 pub use time::{handle_timer, Instant, TimerId};
 

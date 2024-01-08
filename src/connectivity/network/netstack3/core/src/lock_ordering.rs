@@ -109,81 +109,81 @@ use core::{convert::Infallible as Never, marker::PhantomData};
 use lock_order::{impl_lock_after, relation::LockAfter};
 use net_types::ip::{Ipv4, Ipv6};
 
-pub(crate) struct IcmpSocketsTable<I>(PhantomData<I>, Never);
-pub(crate) struct IcmpBoundMap<I>(PhantomData<I>, Never);
+pub struct IcmpSocketsTable<I>(PhantomData<I>, Never);
+pub struct IcmpBoundMap<I>(PhantomData<I>, Never);
 
-pub(crate) struct IcmpTokenBucket<I>(PhantomData<I>, Never);
-pub(crate) struct IcmpSendTimestampReply<I>(PhantomData<I>, Never);
+pub struct IcmpTokenBucket<I>(PhantomData<I>, Never);
+pub struct IcmpSendTimestampReply<I>(PhantomData<I>, Never);
 
-pub(crate) struct TcpAllSocketsSet<I>(PhantomData<I>, Never);
-pub(crate) struct TcpSocketState<I>(PhantomData<I>, Never);
-pub(crate) struct TcpDemux<I>(PhantomData<I>, Never);
-pub(crate) struct TcpIsnGenerator<I>(PhantomData<I>, Never);
+pub struct TcpAllSocketsSet<I>(PhantomData<I>, Never);
+pub struct TcpSocketState<I>(PhantomData<I>, Never);
+pub struct TcpDemux<I>(PhantomData<I>, Never);
+pub struct TcpIsnGenerator<I>(PhantomData<I>, Never);
 
-pub(crate) struct UdpSocketsTable<I>(PhantomData<I>, Never);
-pub(crate) struct UdpBoundMap<I>(PhantomData<I>, Never);
+pub struct UdpSocketsTable<I>(PhantomData<I>, Never);
+pub struct UdpBoundMap<I>(PhantomData<I>, Never);
 
-pub(crate) enum Ipv4StateNextPacketId {}
+pub enum Ipv4StateNextPacketId {}
 // Provides unlocked access of IpCounters.
-pub(crate) struct IpStateCounters<I>(PhantomData<I>, Never);
+pub struct IpStateCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of Ipv4Counters.
-pub(crate) enum Ipv4StateCounters {}
+pub enum Ipv4StateCounters {}
 // Provides unlocked access of Ipv6Counters.
-pub(crate) enum Ipv6StateCounters {}
+pub enum Ipv6StateCounters {}
 // Provides unlocked access of IcmpTxCounters.
-pub(crate) struct IcmpTxCounters<I>(PhantomData<I>, Never);
+pub struct IcmpTxCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of IcmpRxCounters.
-pub(crate) struct IcmpRxCounters<I>(PhantomData<I>, Never);
+pub struct IcmpRxCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of NdpCounters.
-pub(crate) enum NdpCounters {}
+pub enum NdpCounters {}
 // Provides unlocked access of TimerCounters.
 #[cfg(test)]
-pub(crate) enum TimerCounters {}
+pub enum TimerCounters {}
 // Provides unlocked access of DeviceCounters.
-pub(crate) enum DeviceCounters {}
+pub enum DeviceCounters {}
 // Provides unlocked access of ArpCounters.
-pub(crate) enum ArpCounters {}
+pub enum ArpCounters {}
 // Provides unlocked access of UdpCounters.
-pub(crate) struct UdpCounters<I>(PhantomData<I>, Never);
+pub struct UdpCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of SlaacCounters.
-pub(crate) enum SlaacCounters {}
+pub enum SlaacCounters {}
 
-pub(crate) struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
-pub(crate) struct IpDeviceGmp<I>(PhantomData<I>, Never);
-pub(crate) struct IpDeviceAddresses<I>(PhantomData<I>, Never);
-pub(crate) struct IpDeviceFlags<I>(PhantomData<I>, Never);
-pub(crate) struct IpDeviceDefaultHopLimit<I>(PhantomData<I>, Never);
+pub struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
+pub struct IpDeviceGmp<I>(PhantomData<I>, Never);
+pub struct IpDeviceAddresses<I>(PhantomData<I>, Never);
+pub struct IpDeviceFlags<I>(PhantomData<I>, Never);
+pub struct IpDeviceDefaultHopLimit<I>(PhantomData<I>, Never);
 
-pub(crate) enum Ipv4DeviceAddressState {}
+pub enum Ipv4DeviceAddressState {}
 
-pub(crate) enum Ipv6DeviceRouterSolicitations {}
-pub(crate) enum Ipv6DeviceRouteDiscovery {}
-pub(crate) enum Ipv6DeviceLearnedParams {}
-pub(crate) enum Ipv6DeviceAddressDad {}
-pub(crate) enum Ipv6DeviceAddressState {}
-pub(crate) struct NudConfig<I>(PhantomData<I>, Never);
+pub enum Ipv6DeviceRouterSolicitations {}
+pub enum Ipv6DeviceRouteDiscovery {}
+pub enum Ipv6DeviceLearnedParams {}
+pub enum Ipv6DeviceAddressDad {}
+pub enum Ipv6DeviceAddressState {}
+pub struct NudConfig<I>(PhantomData<I>, Never);
 
 // This is not a real lock level, but it is useful for writing bounds that
 // require "before IPv4" or "before IPv6".
-pub(crate) struct IpState<I>(PhantomData<I>, Never);
-pub(crate) struct IpStatePmtuCache<I>(PhantomData<I>, Never);
-pub(crate) struct IpStateFragmentCache<I>(PhantomData<I>, Never);
-pub(crate) struct IpStateRoutingTable<I>(PhantomData<I>, Never);
+pub struct IpState<I>(PhantomData<I>, Never);
+pub struct IpStatePmtuCache<I>(PhantomData<I>, Never);
+pub struct IpStateFragmentCache<I>(PhantomData<I>, Never);
+pub struct IpStateRoutingTable<I>(PhantomData<I>, Never);
 
-pub(crate) enum DeviceLayerStateOrigin {}
-pub(crate) enum DeviceLayerState {}
-pub(crate) enum AllDeviceSockets {}
-pub(crate) enum AnyDeviceSockets {}
-pub(crate) enum DeviceSocketState {}
-pub(crate) enum DeviceSockets {}
-pub(crate) struct EthernetDeviceIpState<I>(PhantomData<I>, Never);
-pub(crate) enum EthernetDeviceStaticState {}
-pub(crate) enum EthernetDeviceDynamicState {}
+pub enum DeviceLayerStateOrigin {}
+pub enum DeviceLayerState {}
+pub enum AllDeviceSockets {}
+pub enum AnyDeviceSockets {}
+pub enum DeviceSocketState {}
+pub enum DeviceSockets {}
+pub struct EthernetDeviceIpState<I>(PhantomData<I>, Never);
+pub enum EthernetDeviceStaticState {}
+pub enum EthernetDeviceDynamicState {}
 
-pub(crate) enum EthernetIpv4Arp {}
-pub(crate) enum EthernetIpv6Nud {}
-pub(crate) enum EthernetTxQueue {}
-pub(crate) enum EthernetTxDequeue {}
+pub enum EthernetIpv4Arp {}
+pub enum EthernetIpv6Nud {}
+pub enum EthernetTxQueue {}
+pub enum EthernetTxDequeue {}
 // We do not actually have a dedicated RX queue for ethernet, but we want to have a
 // clear separation between the ethernet layer and above (IP/ARP) without specifying
 // any specific protocol. To do this, we introduce this lock-level to show the
@@ -191,12 +191,12 @@ pub(crate) enum EthernetTxDequeue {}
 //
 // Note that if/when an RX queue is implemented for ethernet, this lock-level may be
 // trivially used.
-pub(crate) enum EthernetRxDequeue {}
+pub enum EthernetRxDequeue {}
 
-pub(crate) enum LoopbackRxQueue {}
-pub(crate) enum LoopbackRxDequeue {}
-pub(crate) enum LoopbackTxQueue {}
-pub(crate) enum LoopbackTxDequeue {}
+pub enum LoopbackRxQueue {}
+pub enum LoopbackRxDequeue {}
+pub enum LoopbackTxQueue {}
+pub enum LoopbackTxDequeue {}
 
 impl LockAfter<Unlocked> for LoopbackTxDequeue {}
 impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);

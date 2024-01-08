@@ -230,7 +230,7 @@ pub trait SendFrameContext<BC, Meta> {
 /// `CounterContext` exposes access to counters for observation and debugging.
 // TODO(https://fxbug.dev/134635): rename CounterContext once the deprecated
 // trait of that name is removed.
-pub(crate) trait CounterContext<T> {
+pub trait CounterContext<T> {
     /// Call the function with an immutable reference to counter type T.
     fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O;
 }
@@ -393,6 +393,94 @@ pub(crate) type CoreCtxAndResource<'a, BT, R, L> =
 pub type UnlockedCoreCtx<'a, BT> = CoreCtx<'a, BT, Unlocked>;
 
 pub(crate) use locked::Locked;
+
+/// A pair of core and bindings contexts.
+///
+/// This trait exists so implementers can be agnostic on the storage of the
+/// contexts, since all we need from a context pair is mutable references from
+/// both contexts.
+pub trait ContextPair {
+    type CoreContext;
+    type BindingsContext;
+
+    /// Gets a mutable reference to both contexts.
+    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext);
+
+    /// Gets a mutable reference to the core context.
+    fn core_ctx(&mut self) -> &mut Self::CoreContext {
+        let (core_ctx, _) = self.contexts();
+        core_ctx
+    }
+
+    /// Gets a mutable reference to the bindings context.
+    fn bindings_ctx(&mut self) -> &mut Self::BindingsContext {
+        let (_, bindings_ctx) = self.contexts();
+        bindings_ctx
+    }
+}
+
+/// A type that provides a context implementation.
+///
+/// This trait allows for [`CtxPair`] to hold context implementations
+/// agnostically of the storage method and how they're implemented. For example,
+/// tests usually create API structs with a mutable borrow to contexts, while
+/// the core context exposed to bindings is implemented on an owned [`CoreCtx`]
+/// type.
+///
+/// The shape of this trait is equivalent to [`core::ops::DerefMut`] but we
+/// decide against using that because of the automatic dereferencing semantics
+/// the compiler provides around implementers of `DerefMut`.
+pub trait ContextProvider {
+    /// The context provided by this `ContextProvider`.
+    type Context: Sized;
+
+    /// Gets a mutable borrow to this context.
+    fn context(&mut self) -> &mut Self::Context;
+}
+
+impl<'a, T: Sized> ContextProvider for &'a mut T {
+    type Context = T;
+
+    fn context(&mut self) -> &mut Self::Context {
+        &mut *self
+    }
+}
+
+impl<'a, BT, L> ContextProvider for CoreCtx<'a, BT, L>
+where
+    BT: BindingsTypes,
+{
+    type Context = Self;
+
+    fn context(&mut self) -> &mut Self::Context {
+        self
+    }
+}
+
+/// A concrete implementation of [`ContextPair`].
+///
+///
+/// `CtxPair` provides a [`ContextPair`] implementation when `CC` and `BC` are
+/// [`ContextProvider`] and using their respective targets as the `CoreContext`
+/// and `BindingsContext` associated types.
+pub struct CtxPair<CC, BC> {
+    pub(crate) core_ctx: CC,
+    pub(crate) bindings_ctx: BC,
+}
+
+impl<CC, BC> ContextPair for CtxPair<CC, BC>
+where
+    CC: ContextProvider,
+    BC: ContextProvider,
+{
+    type CoreContext = CC::Context;
+    type BindingsContext = BC::Context;
+
+    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
+        let Self { core_ctx, bindings_ctx } = self;
+        (core_ctx.context(), bindings_ctx.context())
+    }
+}
 
 /// Provides a crate-local wrapper for `[lock_order::Locked]`.
 ///

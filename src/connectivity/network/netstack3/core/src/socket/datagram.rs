@@ -58,7 +58,7 @@ pub(crate) type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 /// Storage of state for all datagram sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct SocketsState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
+pub struct SocketsState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
     DenseMap<SocketState<I, D, S>>,
 );
 
@@ -96,7 +96,7 @@ impl<I: crate::ip::IpExt + DualStackIpExt + crate::ip::icmp::IcmpIpExt> IpExt fo
 #[derive(Derivative, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum SocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+pub enum SocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     Unbound(UnboundSocketState<I, D, S>),
     Bound(BoundSocketState<I, D, S>),
 }
@@ -115,7 +115,7 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S
 /// State associated with a Bound Socket.
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) struct BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
+pub struct BoundSocketState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> {
     // The type of bound socket (e.g. Listener vs. Connected), and any
     // type-specific state.
     pub(crate) socket_type: BoundSocketStateType<I, D, S>,
@@ -238,7 +238,7 @@ pub(crate) enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateS
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"), Default(bound = ""))]
-pub(crate) struct UnboundSocketState<I: IpExt, D, S: DatagramSocketSpec> {
+pub struct UnboundSocketState<I: IpExt, D, S: DatagramSocketSpec> {
     device: Option<D>,
     sharing: S::SharingState,
     ip_options: IpOptions<I, D, S>,

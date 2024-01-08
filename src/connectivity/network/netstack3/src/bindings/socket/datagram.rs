@@ -247,7 +247,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type SendError: IntoErrno;
     type SendToError: IntoErrno;
 
-    fn create_unbound(ctx: &Ctx) -> Self::SocketId;
+    fn create_unbound(ctx: &mut Ctx) -> Self::SocketId;
 
     fn connect(
         ctx: &mut Ctx,
@@ -375,7 +375,12 @@ impl OptionFromU16 for NonZeroU16 {
     }
 }
 
-impl<I: IpExt> TransportState<I> for Udp {
+impl<I> TransportState<I> for Udp
+where
+    I: IpExt + SocketCollectionIpExt<Self>,
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
+{
     type ConnectError = ConnectError;
     type ListenError = Either<ExpectedUnboundError, LocalAddressError>;
     type DisconnectError = ExpectedConnError;
@@ -390,8 +395,8 @@ impl<I: IpExt> TransportState<I> for Udp {
     type SendError = Either<udp::SendError, fposix::Errno>;
     type SendToError = Either<LocalAddressError, udp::SendToError>;
 
-    fn create_unbound(ctx: &Ctx) -> Self::SocketId {
-        udp::create_udp(ctx.core_ctx())
+    fn create_unbound(ctx: &mut Ctx) -> Self::SocketId {
+        ctx.api().udp().create()
     }
 
     fn connect(
@@ -641,7 +646,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         core_socket::SendToError<packet_formats::error::ParseError>,
     >;
 
-    fn create_unbound(ctx: &Ctx) -> Self::SocketId {
+    fn create_unbound(ctx: &mut Ctx) -> Self::SocketId {
         icmp::new_socket(ctx.core_ctx())
     }
 

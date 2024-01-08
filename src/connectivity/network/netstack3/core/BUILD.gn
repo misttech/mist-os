@@ -11,6 +11,7 @@ import("//build/rust/rustc_test.gni")
 lib_sources = [
   "src/algorithm.rs",
   "src/algorithm/port_alloc.rs",
+  "src/api.rs",
   "src/benchmarks.rs",
   "src/context.rs",
   "src/convert.rs",

@@ -77,13 +77,13 @@ use crate::{
 pub trait Device: 'static {}
 
 /// Marker type for a generic device.
-pub(crate) enum AnyDevice {}
+pub enum AnyDevice {}
 
 impl Device for AnyDevice {}
 
 /// An execution context which provides device ID types type for various
 /// netstack internals to share.
-pub(crate) trait DeviceIdContext<D: Device> {
+pub trait DeviceIdContext<D: Device> {
     /// The type of device IDs.
     type DeviceId: StrongId<Weak = Self::WeakDeviceId> + 'static;
 
@@ -387,7 +387,7 @@ impl From<MulticastAddr<Mac>> for FrameDestination {
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct Devices<BT: DeviceLayerTypes> {
+pub struct Devices<BT: DeviceLayerTypes> {
     pub(super) ethernet: HashMap<EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
     pub(super) loopback: Option<LoopbackPrimaryDeviceId<BT>>,
 }
@@ -490,7 +490,7 @@ impl<BC: BindingsContext, L> CounterContext<DeviceCounters> for CoreCtx<'_, BC, 
 /// This is only enabled in debug builds; in non-debug builds, all
 /// `OriginTracker` instances are identical so all operations are no-ops.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct OriginTracker(#[cfg(debug_assertions)] u64);
+pub struct OriginTracker(#[cfg(debug_assertions)] u64);
 
 impl OriginTracker {
     /// Creates a new `OriginTracker` that isn't derived from any other
@@ -1303,7 +1303,7 @@ pub(crate) mod testutil {
     use crate::testutil::Ctx;
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-    pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
+    pub struct FakeWeakDeviceId<D>(pub(crate) D);
 
     impl<D: PartialEq> PartialEq<D> for FakeWeakDeviceId<D> {
         fn eq(&self, other: &D) -> bool {
@@ -1337,10 +1337,7 @@ pub(crate) mod testutil {
         }
     }
 
-    pub(crate) trait FakeStrongDeviceId:
-        StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord
-    {
-    }
+    pub trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord {}
 
     impl<D: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord> FakeStrongDeviceId for D {}
 

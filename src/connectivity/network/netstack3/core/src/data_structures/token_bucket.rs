@@ -38,7 +38,7 @@ const TOKEN_MULTIPLIER: u64 = 256;
 /// infrastructure is required to use it.
 ///
 /// [token bucket]: https://en.wikipedia.org/wiki/Token_bucket
-pub(crate) struct TokenBucket<I> {
+pub struct TokenBucket<I> {
     // The last time that the bucket was refilled, or `None` if the bucket has
     // never been refilled.
     last_refilled: Option<I>,

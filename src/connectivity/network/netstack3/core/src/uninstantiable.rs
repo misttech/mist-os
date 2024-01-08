@@ -73,7 +73,7 @@ impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, C, S: SocketMapStateSpec>
 /// implements the trait.
 // TODO(https://github.com/rust-lang/rust/issues/118212): Simplify the trait
 // implementations once Rust supports function delegation.
-pub(crate) struct UninstantiableWrapper<A>(Never, PhantomData<A>);
+pub struct UninstantiableWrapper<A>(Never, PhantomData<A>);
 
 impl<A> AsRef<Never> for UninstantiableWrapper<A> {
     fn as_ref(&self) -> &Never {

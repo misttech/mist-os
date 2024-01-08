@@ -162,6 +162,11 @@ mod ctx {
                 .map_err(DestructionError::BindingsCtxStillCloned)?;
             unwrap_and_drop_or_get_count(core_ctx).map_err(DestructionError::CoreCtxStillCloned)
         }
+
+        pub(crate) fn api(&mut self) -> netstack3_core::CoreApi<'_, &mut BindingsCtx> {
+            let Ctx { bindings_ctx, core_ctx } = self;
+            core_ctx.state.api(bindings_ctx)
+        }
     }
 
     impl Clone for Ctx {

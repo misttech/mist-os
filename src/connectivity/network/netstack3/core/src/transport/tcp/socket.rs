@@ -681,7 +681,7 @@ enum ListenerAddrState<S> {
 
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
-pub(crate) struct ListenerSharingState {
+pub struct ListenerSharingState {
     pub(crate) sharing: SharingState,
     pub(crate) listening: bool,
 }
@@ -702,7 +702,7 @@ impl<'a, S> Inserter<S> for ListenerAddrInserter<'a, S> {
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum BoundSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum BoundSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     Listener(
         (
             MaybeListener<I, D, BT>,
@@ -1011,7 +1011,7 @@ impl<S: SpecSocketId> SocketMapAddrStateUpdateSharingSpec for ListenerAddrState<
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) enum SharingState {
+pub enum SharingState {
     Exclusive,
     ReuseAddress,
 }
@@ -1158,7 +1158,7 @@ impl<S: SpecSocketId> SocketMapAddrStateSpec for ConnAddrState<S> {
 
 #[derive(Debug, Derivative, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
-pub(crate) struct Unbound<D, Extra> {
+pub struct Unbound<D, Extra> {
     bound_device: Option<D>,
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
@@ -1173,7 +1173,7 @@ type WeakRc<I, D, BT> = crate::sync::WeakRc<ReferenceState<I, D, BT>>;
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum TcpSocketSetEntry<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum TcpSocketSetEntry<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     /// The socket set is holding a primary reference.
     Primary(PrimaryRc<I, D, BT>),
     /// The socket set is holding a "dead on arrival" (DOA) entry for a strong
@@ -1192,7 +1192,7 @@ pub(crate) enum TcpSocketSetEntry<I: DualStackIpExt, D: device::WeakId, BT: TcpB
 /// sockets in the system.
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct TcpSocketSet<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
+pub struct TcpSocketSet<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes>(
     HashMap<TcpSocketId<I, D, BT>, TcpSocketSetEntry<I, D, BT>>,
 );
 
@@ -1244,7 +1244,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Drop for TcpSoc
     }
 }
 
-pub(crate) struct DemuxState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub struct DemuxState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     port_alloc: PortAlloc<BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>>,
     socketmap: BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>,
 }
@@ -1259,7 +1259,7 @@ pub(crate) struct Sockets<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsT
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
-pub(crate) enum TcpSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum TcpSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     Unbound(Unbound<D, BT::ListenerNotifierOrProvidedBuffers>),
     Bound(BoundSocketState<I, D, BT>),
 }
@@ -1396,7 +1396,7 @@ fn try_into_this_stack_conn_mut<
         Eq(bound = "BT::ReturnedBuffers: Eq, BT::ListenerNotifierOrProvidedBuffers: Eq"),
     )
 )]
-pub(crate) struct Listener<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub struct Listener<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     backlog: NonZeroUsize,
     accept_queue: AcceptQueue<
         TcpSocketId<I, D, BT>,
@@ -1422,7 +1422,7 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Listener<I, D, 
 
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
-pub(crate) struct BoundState<Extra> {
+pub struct BoundState<Extra> {
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     socket_extra: Extra,
@@ -1440,7 +1440,7 @@ pub(crate) struct BoundState<Extra> {
         )
     )
 )]
-pub(crate) enum MaybeListener<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub enum MaybeListener<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     Bound(BoundState<BT::ListenerNotifierOrProvidedBuffers>),
     Listener(Listener<I, D, BT>),
 }

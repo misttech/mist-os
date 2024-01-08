@@ -199,7 +199,7 @@ pub(super) trait SlaacContext<BC: SlaacBindingsContext<Self::DeviceId>>:
 
 /// Counters for SLAAC.
 #[derive(Default)]
-pub(crate) struct SlaacCounters {
+pub struct SlaacCounters {
     /// Count of already exists errors when adding a generated SLAAC address.
     pub(crate) generated_slaac_addr_exists: Counter,
 }

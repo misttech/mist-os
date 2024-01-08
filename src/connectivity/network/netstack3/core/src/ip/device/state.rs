@@ -672,7 +672,7 @@ pub(crate) struct DualStackIpDeviceState<I: Instant> {
 
 /// The various states DAD may be in for an address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Ipv6DadState {
+pub enum Ipv6DadState {
     /// The address is assigned to an interface and can be considered bound to
     /// it (all packets destined to the address will be accepted).
     Assigned,
@@ -764,7 +764,7 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv4DeviceAddressState> for Ipv
 }
 
 #[derive(Debug)]
-pub(crate) struct Ipv4AddressState<Instant> {
+pub struct Ipv4AddressState<Instant> {
     pub(crate) config: Ipv4AddrConfig<Instant>,
 }
 
@@ -908,7 +908,7 @@ pub(crate) struct Ipv6AddressFlags {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Ipv6AddressState<Instant> {
+pub struct Ipv6AddressState<Instant> {
     pub(crate) flags: Ipv6AddressFlags,
     pub(crate) config: Ipv6AddrConfig<Instant>,
 }
