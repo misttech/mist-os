@@ -161,7 +161,7 @@ pub fn process_completed_restricted_exit(
                 .read()
                 .ptrace
                 .as_ref()
-                .map_or(false, |ptrace| ptrace.stop_status == crate::task::PtraceStatus::Continuing)
+                .is_some_and(|ptrace| ptrace.stop_status == crate::task::PtraceStatus::Continuing)
                 && flags.contains(TaskFlags::SIGNALS_AVAILABLE)
                 && !current_task.is_exitted()
             {

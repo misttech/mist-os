@@ -72,7 +72,7 @@ fn send_signal_prio(
 ) -> Result<(), Errno> {
     let is_masked = task_state.signals.mask().has_signal(siginfo.signal);
     let was_masked =
-        task_state.signals.saved_mask().map_or(false, |mask| mask.has_signal(siginfo.signal));
+        task_state.signals.saved_mask().is_some_and(|mask| mask.has_signal(siginfo.signal));
     let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
     let action = action_for_signal(&siginfo, sigaction);
 

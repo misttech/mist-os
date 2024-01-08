@@ -412,7 +412,7 @@ impl Kernel {
     /// This is a temporary API, for use at call-sites which the SELinux
     /// implementation does not yet support.
     pub fn has_fake_selinux(&self) -> bool {
-        self.security_server.as_ref().map_or(false, |s| s.is_fake())
+        self.security_server.as_ref().is_some_and(|s| s.is_fake())
     }
 
     fn get_thread_groups_inspect(&self) -> fuchsia_inspect::Inspector {

@@ -1194,7 +1194,7 @@ impl MemoryManagerState {
         // does not fully cover the mapping range.
         let check_if_mapping_has_unauthorized_split =
             |mapping: Option<(&Range<UserAddress>, &Mapping)>| {
-                mapping.map_or(false, |(range, mapping)| {
+                mapping.is_some_and(|(range, mapping)| {
                     mapping.flags.contains(MappingFlags::DONT_SPLIT)
                         && (range.start < target_mapping.start || target_mapping.end < range.end)
                 })

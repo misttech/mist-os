@@ -394,7 +394,7 @@ fn ptrace_listen(tracee: &Task) -> Result<(), Errno> {
                 && ptrace
                     .last_signal
                     .as_ref()
-                    .map_or(false, |ls| ls.code >> 8 != PTRACE_EVENT_STOP as i32))
+                    .is_some_and(|ls| ls.code >> 8 != PTRACE_EVENT_STOP as i32))
         {
             return error!(EIO);
         }
@@ -840,7 +840,7 @@ pub fn ptrace_syscall_enter(current_task: &mut CurrentTask) {
             if state
                 .ptrace
                 .as_ref()
-                .map_or(false, |ptrace| ptrace.has_option(PtraceOptions::TRACESYSGOOD))
+                .is_some_and(|ptrace| ptrace.has_option(PtraceOptions::TRACESYSGOOD))
             {
                 sig.signal.set_ptrace_syscall_bit();
             }
@@ -865,7 +865,7 @@ pub fn ptrace_syscall_exit(current_task: &mut CurrentTask, is_error: bool) {
             if state
                 .ptrace
                 .as_ref()
-                .map_or(false, |ptrace| ptrace.has_option(PtraceOptions::TRACESYSGOOD))
+                .is_some_and(|ptrace| ptrace.has_option(PtraceOptions::TRACESYSGOOD))
             {
                 sig.signal.set_ptrace_syscall_bit();
             }

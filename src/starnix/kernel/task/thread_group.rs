@@ -985,7 +985,7 @@ impl ThreadGroup {
             if task_state
                 .ptrace
                 .as_ref()
-                .map_or(false, |ptrace| ptrace.is_waitable(task_ref.load_stopped(), options))
+                .is_some_and(|ptrace| ptrace.is_waitable(task_ref.load_stopped(), options))
             {
                 // We've identified a potential target.  Need to return either
                 // the process's information (if we are in group-stop) or the
@@ -1030,7 +1030,7 @@ impl ThreadGroup {
                         };
                         if let Some(mut siginfo) = siginfo {
                             if task_ref.thread_group.load_stopped() == StopState::GroupStopped
-                                && ptrace.as_ref().map_or(false, |ptrace| ptrace.is_seized())
+                                && ptrace.as_ref().is_some_and(|ptrace| ptrace.is_seized())
                             {
                                 siginfo.code |= (PTRACE_EVENT_STOP as i32) << 8;
                             }

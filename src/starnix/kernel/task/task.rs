@@ -401,11 +401,11 @@ impl TaskMutableState {
     }
 
     pub fn is_ptrace_listening(&self) -> bool {
-        self.ptrace.as_ref().map_or(false, |ptrace| ptrace.stop_status == PtraceStatus::Listening)
+        self.ptrace.as_ref().is_some_and(|ptrace| ptrace.stop_status == PtraceStatus::Listening)
     }
 
     pub fn ptrace_on_signal_consume(&mut self) -> bool {
-        self.ptrace.as_mut().map_or(false, |ptrace: &mut PtraceState| {
+        self.ptrace.as_mut().is_some_and(|ptrace: &mut PtraceState| {
             if ptrace.stop_status.is_continuing() {
                 ptrace.stop_status = PtraceStatus::Default;
                 false
