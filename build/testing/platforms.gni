@@ -184,6 +184,11 @@ test_platforms = [
   # https://fxbug.dev/9127
   {
     device_type = "GCE"
+    cpu = "arm64"
+  },
+  {
+    device_type = "GCE"
+    cpu = "x64"
   },
 
   # Testbeds with auxiliary devices for E2E tests

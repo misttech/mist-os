@@ -86,7 +86,12 @@ _boards = [
   ],
   [
     "gce_arm64",
-    gce_env,
+    {
+      dimensions = {
+        device_type = "GCE"
+        cpu = "arm64"
+      }
+    },
   ],
   [
     "nelson",
