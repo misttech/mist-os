@@ -34,13 +34,6 @@ pub async fn pb_lookup(
     if writer.is_machine() {
         writer.machine(&product)?;
     } else {
-        println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-        println!("@");
-        println!("@  The `lookup` subcommand is intended to be used by infra only.");
-        println!("@");
-        println!("@  If you are running this manually and not in an automated infra scenario, please use `ffx --machine json-pretty product list` instead.");
-        println!("@");
-        println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
         writeln!(writer, "{}", product.transfer_manifest_url)?;
     }
     Ok(())
