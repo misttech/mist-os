@@ -37,7 +37,7 @@ executable("fake_vulkan_loader_bin") {
   deps = [
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
     "//sdk/lib/sys/cpp",
-    "//src/lib/fxl",
+    "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
