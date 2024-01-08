@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use errors::FfxError;
 use ffx_command::{return_user_error, FfxCommandLine, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
@@ -371,7 +372,17 @@ impl TryFromEnv for ffx_fidl::FastbootProxy {
 #[async_trait(?Send)]
 impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.injector.remote_factory().await.user_message("Failed to create remote control proxy")
+        match env.injector.remote_factory().await {
+            Ok(p) => Ok(p),
+            Err(e) => {
+                if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
+                    let message = format!("{ffx_e} when creating remotecontrol proxy");
+                    Err(e).user_message(message)
+                } else {
+                    Err(e).user_message("Failed to create remote control proxy")
+                }
+            }
+        }
     }
 }
 
