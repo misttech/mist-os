@@ -157,9 +157,10 @@ def _target_exists(
 
         ffx.get_target_information()
         return True
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, errors.DeviceNotConnectedError):
         # If this raises a timeout exception, the target is unreachable and
-        # therefore doesn't exist.
+        # therefore doesn't exist. errors.DeviceNotConnectedError is also
+        # surfaced from a timeout, so should be treated the same.
         return False
     except Exception as err:  # pylint: disable=broad-except
         raise errors.FuchsiaDeviceError(
