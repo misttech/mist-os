@@ -23,9 +23,9 @@ use {
     fidl_fuchsia_virtualization_hardware::{
         StartInfo, VirtioDeviceReadyResponder, VirtioDeviceRequest, VirtioDeviceRequestStream,
     },
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx},
     futures::{task::AtomicWaker, Stream, TryFutureExt, TryStreamExt},
-    parking_lot::Mutex,
     std::{
         collections::{hash_map, HashMap},
         pin::Pin,

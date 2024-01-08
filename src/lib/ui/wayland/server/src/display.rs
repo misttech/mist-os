@@ -14,9 +14,9 @@ use {
     fidl_fuchsia_ui_scenic::{ScenicMarker, ScenicProxy},
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::channel::mpsc,
-    parking_lot::Mutex,
     std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,

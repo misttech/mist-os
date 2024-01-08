@@ -116,9 +116,9 @@ mod tests {
     use crate::test_protocol::{TestInterface, TestInterface2};
     use anyhow::Error;
     use fuchsia_async as fasync;
+    use fuchsia_sync::Mutex;
     use fuchsia_wayland_core::{Interface, IntoMessage};
     use fuchsia_zircon as zx;
-    use parking_lot::Mutex;
 
     use crate::client::Client;
     use crate::display::Display;

@@ -35,10 +35,10 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_scenic::flatland::{ViewBoundProtocols, ViewCreationTokenPair},
     fuchsia_scenic::ViewRefPair,
+    fuchsia_sync::Mutex,
     fuchsia_trace as ftrace, fuchsia_wayland_core as wl,
     fuchsia_wayland_core::Enum,
     futures::prelude::*,
-    parking_lot::Mutex,
     std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,

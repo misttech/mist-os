@@ -18,7 +18,7 @@ use {
         mem::{DeviceRange, DriverRange},
         ring,
     },
-    parking_lot::Mutex,
+    fuchsia_sync::Mutex,
     std::{
         convert::{TryFrom, TryInto},
         sync::atomic,

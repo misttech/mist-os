@@ -10,8 +10,8 @@ use {
         xdg_shell::*,
     },
     anyhow::{Error, Result},
+    fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
-    parking_lot::Mutex,
     std::io::Read,
     std::sync::Arc,
     wayland_server_protocol::{

@@ -25,7 +25,7 @@ use {
         ring::{self, DescAccess, VRING_DESC_F_INDIRECT},
         util::NotificationCounter,
     },
-    parking_lot::Mutex,
+    fuchsia_sync::Mutex,
     std::{
         alloc::{self, GlobalAlloc},
         collections::HashMap,
