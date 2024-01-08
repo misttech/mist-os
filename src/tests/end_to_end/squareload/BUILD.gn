@@ -20,6 +20,7 @@ executable("squareload_bin") {
   deps = [
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
+    "//src/tests/end_to_end/power:power_utils",
     "//third_party/googletest:gtest",
   ]
   sources = [ "main.cc" ]

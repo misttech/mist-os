@@ -12,3 +12,11 @@ python_library("power_test_utils") {
   ]
   library_deps = [ "//src/performance/lib/trace_processing" ]
 }
+
+source_set("power_utils") {
+  testonly = true
+  sources = [
+    "power_utils.cc",
+    "power_utils.h",
+  ]
+}
