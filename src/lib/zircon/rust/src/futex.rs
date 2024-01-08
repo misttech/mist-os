@@ -4,9 +4,9 @@
 
 use crate::{
     sys::{
-        zx_futex_get_owner, zx_futex_t, zx_futex_wait, zx_futex_wake,
-        zx_futex_wake_handle_close_thread_exit, zx_futex_wake_single_owner, ZX_HANDLE_INVALID,
-        ZX_KOID_INVALID, ZX_OK,
+        zx_futex_get_owner, zx_futex_requeue, zx_futex_requeue_single_owner, zx_futex_t,
+        zx_futex_wait, zx_futex_wake, zx_futex_wake_handle_close_thread_exit,
+        zx_futex_wake_single_owner, ZX_HANDLE_INVALID, ZX_KOID_INVALID, ZX_OK,
     },
     AsHandleRef, Handle, Koid, Status, Thread, Time,
 };
@@ -77,6 +77,50 @@ impl Futex {
             );
         }
         unreachable!("zx_futex_wake_handle_close_thread_exit() does not return.");
+    }
+
+    /// See https://fuchsia.dev/reference/syscalls/futex_requeue.
+    #[inline]
+    pub fn requeue(
+        &self,
+        wake_count: u32,
+        current_value: i32,
+        requeue_to: &Self,
+        requeue_count: u32,
+        new_requeue_owner: Option<&Thread>,
+    ) -> Result<(), Status> {
+        // SAFETY: Arguments for this system call do not have any liveness or validity requirements.
+        Status::ok(unsafe {
+            zx_futex_requeue(
+                self.value_ptr(),
+                wake_count,
+                current_value,
+                requeue_to.value_ptr(),
+                requeue_count,
+                new_requeue_owner.map(|o| o.raw_handle()).unwrap_or(ZX_HANDLE_INVALID),
+            )
+        })
+    }
+
+    /// See https://fuchsia.dev/reference/syscalls/futex_requeue_single_owner.
+    #[inline]
+    pub fn requeue_single_owner(
+        &self,
+        current_value: i32,
+        requeue_to: &Self,
+        requeue_count: u32,
+        new_requeue_owner: Option<&Thread>,
+    ) -> Result<(), Status> {
+        // SAFETY: Arguments for this system call do not have any liveness or validity requirements.
+        Status::ok(unsafe {
+            zx_futex_requeue_single_owner(
+                self.value_ptr(),
+                current_value,
+                requeue_to.value_ptr(),
+                requeue_count,
+                new_requeue_owner.map(|o| o.raw_handle()).unwrap_or(ZX_HANDLE_INVALID),
+            )
+        })
     }
 
     /// See https://fuchsia.dev/reference/syscalls/futex_wait.

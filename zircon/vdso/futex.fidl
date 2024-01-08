@@ -261,7 +261,7 @@ closed protocol Futexfuncs {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
         wake_count uint32;
-        current_value Futex;
+        current_value int32;
         @embedded_alias("zx/Futex")
         requeue_ptr experimental_pointer<Futex>;
         requeue_count uint32;
@@ -383,7 +383,7 @@ closed protocol Futexfuncs {
     strict FutexRequeueSingleOwner(resource struct {
         @embedded_alias("zx/Futex")
         value_ptr experimental_pointer<Futex>;
-        current_value Futex;
+        current_value int32;
         @embedded_alias("zx/Futex")
         requeue_ptr experimental_pointer<Futex>;
         requeue_count uint32;
