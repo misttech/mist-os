@@ -35,7 +35,9 @@ executable("touch-validator-bin") {
   output_name = "touch-validator"
   deps = [
     ":conformance-test-base",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
@@ -55,7 +57,10 @@ fuchsia_component("touch-validator") {
 fuchsia_package("touch-test-suite") {
   package_name = "touch-test-suite"
   testonly = true
-  deps = [ ":touch-validator" ]
+  deps = [
+    ":touch-validator",
+    "//src/ui/testing/puppet:ui-puppet-component",
+  ]
 }
 
 fuchsia_test_component("touch-conformance-test-component") {
@@ -93,7 +98,9 @@ executable("mouse-validator-bin") {
   output_name = "mouse-validator"
   deps = [
     ":conformance-test-base",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
@@ -112,7 +119,10 @@ fuchsia_component("mouse-validator") {
 fuchsia_package("mouse-test-suite") {
   package_name = "mouse-test-suite"
   testonly = true
-  deps = [ ":mouse-validator" ]
+  deps = [
+    ":mouse-validator",
+    "//src/ui/testing/puppet:ui-puppet-component",
+  ]
 }
 
 fuchsia_test_component("mouse-conformance-test-component") {

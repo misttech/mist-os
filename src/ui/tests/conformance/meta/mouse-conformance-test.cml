@@ -11,5 +11,15 @@
             name: "validator",
             url: "mouse-test-suite#meta/mouse-validator.cm",
         },
+        {
+            name: "puppet-under-test-factory",
+
+            // move to conformance-test.cml
+            url: "mouse-test-suite#meta/ui-puppet.cm",
+        },
+        {
+            name: "auxiliary-puppet-factory",
+            url: "mouse-test-suite#meta/ui-puppet.cm",
+        },
     ],
 }

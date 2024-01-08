@@ -10,7 +10,10 @@
     ],
     capabilities: [
         {
-            protocol: [ "fuchsia.test.Suite" ],
+            protocol: [
+                "fuchsia.test.Suite",
+                "fuchsia.ui.test.conformance.PuppetFactory",
+            ],
         },
     ],
     offer: [
@@ -21,7 +24,9 @@
             ],
             from: "parent",
             to: [
+                "#auxiliary-puppet-factory",
                 "#context-factory",
+                "#puppet-under-test-factory",
                 "#validator",
             ],
         },
@@ -43,6 +48,18 @@
             protocol: "fuchsia.inspect.InspectSink",
             from: "parent",
             to: [ "#context-factory" ],
+        },
+        {
+            protocol: [ "fuchsia.ui.test.conformance.PuppetFactory" ],
+            from: "#puppet-under-test-factory",
+            as: "puppet-under-test-factory-service",
+            to: [ "#validator" ],
+        },
+        {
+            protocol: [ "fuchsia.ui.test.conformance.PuppetFactory" ],
+            from: "#auxiliary-puppet-factory",
+            as: "auxiliary-puppet-factory-service",
+            to: [ "#validator" ],
         },
     ],
     expose: [

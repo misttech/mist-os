@@ -12,7 +12,6 @@ use {
     fidl_fuchsia_ui_composition::FlatlandMarker,
     fidl_fuchsia_ui_display_singleton::InfoMarker,
     fidl_fuchsia_ui_input3::KeyboardMarker,
-    fidl_fuchsia_ui_test_conformance as ui_conformance,
     fidl_fuchsia_ui_test_context as ui_test_context, fidl_fuchsia_ui_test_input as ui_input,
     fidl_fuchsia_ui_test_scene as test_scene,
     fidl_fuchsia_vulkan_loader::LoaderMarker,
@@ -26,12 +25,6 @@ use {
 // TODO(https://fxbug.dev/117852): Use subpackages here.
 const TEST_UI_STACK: &str = "ui";
 const TEST_UI_STACK_URL: &str = "#meta/test-ui-stack.cm";
-const PUPPET_UNDER_TEST_FACTORY: &str = "puppet-under-test-factory";
-const PUPPET_UNDER_TEST_FACTORY_URL: &str = "#meta/ui-puppet.cm";
-const PUPPET_UNDER_TEST_FACTORY_SERVICE: &str = "puppet-under-test-factory-service";
-const AUXILIARY_PUPPET_FACTORY: &str = "auxiliary-puppet-factory";
-const AUXILIARY_PUPPET_FACTORY_URL: &str = "#meta/ui-puppet.cm";
-const AUXILIARY_PUPPET_FACTORY_SERVICE: &str = "auxiliary-puppet-factory-service";
 
 /// All FIDL services that are exposed by this component's ServiceFs.
 enum Service {
@@ -95,18 +88,6 @@ async fn assemble_puppet_realm() -> RealmInstance {
         .await
         .expect("Failed to add UI realm.");
 
-    // Add factory for the puppet-under-test.
-    builder
-        .add_child(PUPPET_UNDER_TEST_FACTORY, PUPPET_UNDER_TEST_FACTORY_URL, ChildOptions::new())
-        .await
-        .expect("Failed to add puppet.");
-
-    // Add factory for auxiliary puppets.
-    builder
-        .add_child(AUXILIARY_PUPPET_FACTORY, AUXILIARY_PUPPET_FACTORY_URL, ChildOptions::new())
-        .await
-        .expect("Failed to add puppet.");
-
     // Route capabilities to the test UI stack.
     builder
         .add_route(
@@ -122,65 +103,13 @@ async fn assemble_puppet_realm() -> RealmInstance {
         .await
         .expect("Failed to route capabilities.");
 
-    // Route capabilities to puppet.
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<LogSinkMarker>())
-                .from(Ref::parent())
-                .to(Ref::child(PUPPET_UNDER_TEST_FACTORY))
-                .to(Ref::child(AUXILIARY_PUPPET_FACTORY)),
-        )
-        .await
-        .expect("Failed to route capabilities.");
-
-    // Route capabilities from the test UI stack to the puppet.
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<FlatlandMarker>())
-                .capability(Capability::protocol::<KeyboardMarker>())
-                .from(Ref::child(TEST_UI_STACK))
-                .to(Ref::child(PUPPET_UNDER_TEST_FACTORY))
-                .to(Ref::child(AUXILIARY_PUPPET_FACTORY)),
-        )
-        .await
-        .expect("Failed to route capabilities.");
-
-    // Expose the puppet-under-test factory service.
-    builder
-        .add_route(
-            Route::new()
-                .capability(
-                    Capability::protocol::<ui_conformance::PuppetFactoryMarker>()
-                        .as_(PUPPET_UNDER_TEST_FACTORY_SERVICE),
-                )
-                .from(Ref::child(PUPPET_UNDER_TEST_FACTORY))
-                .to(Ref::parent()),
-        )
-        .await
-        .expect("Failed to route capabilities.");
-
-    // Expose the puppet-under-test factory service.
-    builder
-        .add_route(
-            Route::new()
-                .capability(
-                    Capability::protocol::<ui_conformance::PuppetFactoryMarker>()
-                        .as_(AUXILIARY_PUPPET_FACTORY_SERVICE),
-                )
-                .from(Ref::child(AUXILIARY_PUPPET_FACTORY))
-                .to(Ref::parent()),
-        )
-        .await
-        .expect("Failed to route capabilities.");
-
     // Expose UI capabilities.
     builder
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<test_scene::ControllerMarker>())
                 .capability(Capability::protocol::<FlatlandMarker>())
+                .capability(Capability::protocol::<KeyboardMarker>())
                 .capability(Capability::protocol::<InfoMarker>())
                 .capability(Capability::protocol::<ui_input::RegistryMarker>())
                 .from(Ref::child(TEST_UI_STACK))

@@ -74,6 +74,16 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
             match request {
                 PuppetFactoryRequest::Create { payload, responder, .. } => {
                     info!("create puppet");
+                    let flatland = payload
+                        .flatland_client
+                        .expect("missing flatland client")
+                        .into_proxy()
+                        .expect("failed to generate proxy");
+                    let keyboard = payload
+                        .keyboard_client
+                        .expect("missing keyboard client")
+                        .into_proxy()
+                        .expect("failed to generate proxy");
                     let view_token =
                         payload.view_token.expect("missing puppet viewport creation token");
                     let puppet_server = payload.server_end.expect("missing puppet server endpoint");
@@ -97,6 +107,8 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                     };
 
                     let view = view::View::new(
+                        flatland,
+                        keyboard,
                         view_token,
                         touch_listener,
                         mouse_listener,

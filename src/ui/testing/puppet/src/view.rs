@@ -14,9 +14,7 @@ use {
         TouchResponse,
     },
     fidl_fuchsia_ui_test_conformance as ui_conformance, fidl_fuchsia_ui_test_input as test_input,
-    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol,
-    fuchsia_scenic as scenic,
+    fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync, fuchsia_scenic as scenic,
     futures::channel::{mpsc, oneshot},
     futures::StreamExt,
     once_cell::unsync::OnceCell,
@@ -26,20 +24,6 @@ use {
 };
 
 pub type FlatlandPtr = Rc<ui_comp::FlatlandProxy>;
-
-/// Helper function to open a connection to flatland and associate a presentation loop with it.
-fn connect_to_flatland_and_presenter() -> (FlatlandPtr, presentation_loop::PresentationSender) {
-    let flatland_proxy =
-        connect_to_protocol::<ui_comp::FlatlandMarker>().expect("failed to connect to flatland");
-    let flatland = Rc::new(flatland_proxy);
-    let (presentation_sender, presentation_receiver) = mpsc::unbounded();
-    presentation_loop::start_flatland_presentation_loop(
-        presentation_receiver,
-        Rc::downgrade(&flatland),
-    );
-
-    (flatland, presentation_sender)
-}
 
 /// Helper function to request to present a set of changes to flatland.
 async fn request_present(presentation_sender: &presentation_loop::PresentationSender) {
@@ -72,18 +56,15 @@ struct EmbeddedViewIds {
 /// Encapsulates capabilities and resources associated with a puppet's view.
 pub(super) struct View {
     /// Flatland connection scoped to our view.
-    #[allow(dead_code)]
     flatland: FlatlandPtr,
 
     /// Task to poll continuously for view events, and respond as necessary.
     view_event_listener: OnceCell<fasync::Task<()>>,
 
     /// Used to present changes to flatland.
-    #[allow(dead_code)]
     presentation_sender: presentation_loop::PresentationSender,
 
     /// Used to generate flatland transform and content IDs.
-    #[allow(dead_code)]
     id_generator: scenic::flatland::IdGenerator,
 
     /// Flatland `TransformId` that corresponds to our view's root transform.
@@ -130,12 +111,20 @@ pub(super) struct View {
 
 impl View {
     pub async fn new(
+        flatland: ui_comp::FlatlandProxy,
+        keyboard_client: ui_input3::KeyboardProxy,
         view_creation_token: ui_views::ViewCreationToken,
         touch_input_listener: Option<test_input::TouchInputListenerProxy>,
         mouse_input_listener: Option<test_input::MouseInputListenerProxy>,
         keyboard_input_listener: Option<test_input::KeyboardInputListenerProxy>,
     ) -> Rc<RefCell<Self>> {
-        let (flatland, presentation_sender) = connect_to_flatland_and_presenter();
+        let flatland = Rc::new(flatland);
+        let (presentation_sender, presentation_receiver) = mpsc::unbounded();
+        presentation_loop::start_flatland_presentation_loop(
+            presentation_receiver,
+            Rc::downgrade(&flatland),
+        );
+
         let mut id_generator = scenic::flatland::IdGenerator::new();
 
         // Create view parameters.
@@ -217,8 +206,11 @@ impl View {
             .set(mouse_task)
             .expect("set mouse watcher task more than once");
 
-        let keyboard_task =
-            fasync::Task::local(Self::listen_for_key_events(this.clone(), view_ref));
+        let keyboard_task = fasync::Task::local(Self::listen_for_key_events(
+            this.clone(),
+            keyboard_client,
+            view_ref,
+        ));
         this.borrow_mut()
             .keyboard_watched_task
             .set(keyboard_task)
@@ -261,12 +253,33 @@ impl View {
         loop {
             futures::select! {
                 parent_status = status_stream.select_next_some() => {
-                    info!("received parent status update");
-                    this.borrow_mut().update_parent_status(parent_status.expect("missing parent status"));
+                    match parent_status {
+                        Ok(status) => {
+                            info!("received parent status update");
+                            this.borrow_mut().update_parent_status(status);
+                        }
+                        // In CTF tests, test realm exit earlier than puppet so we don't panic here.
+                        Err(fidl::Error::ClientChannelClosed{..}) => {
+                            std::process::exit(0);
+                        }
+                        Err(e) => {
+                            panic!("get_status got unexpected error {:?}", e);
+                        }
+                    }
                 }
                 layout_info = layout_info_stream.select_next_some() => {
-                    let layout_info = layout_info.expect("missing layout info");
-                    this.borrow_mut().update_view_parameters(layout_info.logical_size, layout_info.device_pixel_ratio);
+                    match layout_info {
+                        Ok(layout_info) => {
+                            this.borrow_mut().update_view_parameters(layout_info.logical_size, layout_info.device_pixel_ratio);
+                        }
+                        // In CTF tests, test realm exit earlier than puppet so we don't panic here.
+                        Err(fidl::Error::ClientChannelClosed{..}) => {
+                            std::process::exit(0);
+                        }
+                        Err(e) => {
+                            panic!("get_layout got unexpected error {:?}", e);
+                        }
+                    }
                 }
             }
 
@@ -644,6 +657,17 @@ impl View {
 
     fn process_mouse_events(&mut self, events: Vec<MouseEvent>) {
         for mouse_event in events {
+            match &mouse_event {
+                &MouseEvent {
+                    stream_info:
+                        Some(ui_pointer::MouseEventStreamInfo {
+                            status: ui_pointer::MouseViewStatus::Exited,
+                            ..
+                        }),
+                    ..
+                } => return,
+                _ => {}
+            }
             if let Some(view_parameters) = mouse_event.view_parameters {
                 self.view_parameters = Some(view_parameters);
             }
@@ -681,7 +705,7 @@ impl View {
         &self,
         key_event: KeyEvent,
     ) -> Option<test_input::KeyboardInputListenerReportTextInputRequest> {
-        if key_event.type_ != Some(fidl_fuchsia_ui_input3::KeyEventType::Pressed) {
+        if key_event.type_ != Some(ui_input3::KeyEventType::Pressed) {
             return None;
         }
         let s = match key_event.key_meaning.unwrap() {
@@ -715,9 +739,11 @@ impl View {
         }
     }
 
-    async fn listen_for_key_events(this: Rc<RefCell<Self>>, view_ref: ui_views::ViewRef) {
-        let keyboard = connect_to_protocol::<fidl_fuchsia_ui_input3::KeyboardMarker>()
-            .expect("failed to connect to Keyboard service");
+    async fn listen_for_key_events(
+        this: Rc<RefCell<Self>>,
+        keyboard: ui_input3::KeyboardProxy,
+        view_ref: ui_views::ViewRef,
+    ) {
         let (keyboard_client, mut keyboard_stream) =
             create_request_stream::<ui_input3::KeyboardListenerMarker>()
                 .expect("failed to create keyboard source channel");
@@ -734,7 +760,7 @@ impl View {
                     responder,
                     ..
                 })) => {
-                    responder.send(fidl_fuchsia_ui_input3::KeyEventStatus::Handled).expect("send");
+                    responder.send(ui_input3::KeyEventStatus::Handled).expect("send");
                     this.borrow_mut().process_key_event(event);
                 }
                 _ => {

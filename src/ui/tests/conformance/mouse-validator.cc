@@ -105,15 +105,23 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest {
 
     {
       FX_LOGS(INFO) << "Create puppet under test";
-      auto puppet_factory = ConnectSyncIntoRealm<fuchsia::ui::test::conformance::PuppetFactory>(
-          PUPPET_UNDER_TEST_FACTORY_SERVICE);
+      fuchsia::ui::test::conformance::PuppetFactorySyncPtr puppet_factory;
+
+      ASSERT_EQ(LocalServiceDirectory()->Connect(puppet_factory.NewRequest(),
+                                                 PUPPET_UNDER_TEST_FACTORY_SERVICE),
+                ZX_OK);
 
       fuchsia::ui::test::conformance::PuppetFactoryCreateResponse resp;
+
+      auto flatland = ConnectSyncIntoRealm<fuchsia::ui::composition::Flatland>();
+      auto keyboard = ConnectSyncIntoRealm<fuchsia::ui::input3::Keyboard>();
 
       fuchsia::ui::test::conformance::PuppetCreationArgs creation_args;
       creation_args.set_server_end(puppet_.puppet_ptr.NewRequest());
       creation_args.set_view_token(std::move(root_view_token));
       creation_args.set_mouse_listener(puppet_.mouse_listener.NewBinding());
+      creation_args.set_flatland_client(std::move(flatland));
+      creation_args.set_keyboard_client(std::move(keyboard));
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);

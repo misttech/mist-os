@@ -12,8 +12,10 @@
     use: [
         {
             protocol: [
+                "auxiliary-puppet-factory-service",
                 "fuchsia.logger.LogSink",
                 "fuchsia.ui.test.context.RealmFactory",
+                "puppet-under-test-factory-service",
             ],
         },
     ],

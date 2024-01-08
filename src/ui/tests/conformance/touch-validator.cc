@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/display/singleton/cpp/fidl.h>
+#include <fuchsia/ui/input3/cpp/fidl.h>
 #include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <fuchsia/ui/test/conformance/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
@@ -14,6 +16,7 @@
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <zircon/errors.h>
 
+#include <algorithm>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -151,10 +154,15 @@ class SingleViewTouchConformanceTest : public TouchConformanceTest {
       root_view_token = std::move(view_token);
     }
 
+    auto flatland = ConnectSyncIntoRealm<fuchsia::ui::composition::Flatland>();
+    auto keyboard = ConnectSyncIntoRealm<fuchsia::ui::input3::Keyboard>();
     {
       FX_LOGS(INFO) << "Create puppet under test";
-      auto puppet_factory = ConnectSyncIntoRealm<fuchsia::ui::test::conformance::PuppetFactory>(
-          PUPPET_UNDER_TEST_FACTORY_SERVICE);
+      fuchsia::ui::test::conformance::PuppetFactorySyncPtr puppet_factory;
+
+      ASSERT_EQ(LocalServiceDirectory()->Connect(puppet_factory.NewRequest(),
+                                                 PUPPET_UNDER_TEST_FACTORY_SERVICE),
+                ZX_OK);
 
       fuchsia::ui::test::conformance::PuppetFactoryCreateResponse resp;
 
@@ -164,6 +172,8 @@ class SingleViewTouchConformanceTest : public TouchConformanceTest {
       creation_args.set_server_end(puppet_->puppet_ptr.NewRequest());
       creation_args.set_view_token(std::move(root_view_token));
       creation_args.set_touch_listener(puppet_->touch_listener.NewBinding());
+      creation_args.set_flatland_client(std::move(flatland));
+      creation_args.set_keyboard_client(std::move(keyboard));
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
@@ -225,52 +235,73 @@ class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
 
     {
       FX_LOGS(INFO) << "Create parent puppet";
-      auto puppet_factory = ConnectSyncIntoRealm<fuchsia::ui::test::conformance::PuppetFactory>(
-          AUXILIARY_PUPPET_FACTORY_SERVICE);
+
+      fuchsia::ui::test::conformance::PuppetFactorySyncPtr puppet_factory;
+
+      ASSERT_EQ(LocalServiceDirectory()->Connect(puppet_factory.NewRequest(),
+                                                 AUXILIARY_PUPPET_FACTORY_SERVICE),
+                ZX_OK);
 
       fuchsia::ui::test::conformance::PuppetFactoryCreateResponse resp;
 
       parent_puppet_ = std::make_unique<TouchPuppet>();
 
+      auto flatland = ConnectSyncIntoRealm<fuchsia::ui::composition::Flatland>();
+      auto keyboard = ConnectSyncIntoRealm<fuchsia::ui::input3::Keyboard>();
+
       fuchsia::ui::test::conformance::PuppetCreationArgs creation_args;
       creation_args.set_server_end(parent_puppet_->puppet_ptr.NewRequest());
       creation_args.set_view_token(std::move(root_view_token));
       creation_args.set_touch_listener(parent_puppet_->touch_listener.NewBinding());
+      creation_args.set_flatland_client(std::move(flatland));
+      creation_args.set_keyboard_client(std::move(keyboard));
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
     }
 
     // Create child viewport.
-    FX_LOGS(INFO) << "Creating child viewport";
-    fuchsia::ui::test::conformance::PuppetEmbedRemoteViewRequest embed_remote_view_request;
-    const uint64_t kChildViewportId = 1u;
-    embed_remote_view_request.set_id(kChildViewportId);
-    embed_remote_view_request.mutable_properties()->mutable_bounds()->set_size(
-        {.width = display_width_ / 2, .height = display_height_ / 2});
-    embed_remote_view_request.mutable_properties()->mutable_bounds()->set_origin(
-        {.x = display_width_as_int() / 2, .y = display_height_as_int() / 2});
     fuchsia::ui::test::conformance::PuppetEmbedRemoteViewResponse embed_remote_view_response;
-    this->parent_puppet_->puppet_ptr->EmbedRemoteView(std::move(embed_remote_view_request),
-                                                      &embed_remote_view_response);
+    {
+      FX_LOGS(INFO) << "Creating child viewport";
+      const uint64_t kChildViewportId = 1u;
+      fuchsia::ui::test::conformance::PuppetEmbedRemoteViewRequest embed_remote_view_request;
+      embed_remote_view_request.set_id(kChildViewportId);
+      embed_remote_view_request.mutable_properties()->mutable_bounds()->set_size(
+          {.width = display_width_ / 2, .height = display_height_ / 2});
+      embed_remote_view_request.mutable_properties()->mutable_bounds()->set_origin(
+          {.x = display_width_as_int() / 2, .y = display_height_as_int() / 2});
+      this->parent_puppet_->puppet_ptr->EmbedRemoteView(std::move(embed_remote_view_request),
+                                                        &embed_remote_view_response);
+    }
 
     // Create child view.
-    FX_LOGS(INFO) << "Creating child puppet";
-    auto puppet_factory = ConnectSyncIntoRealm<fuchsia::ui::test::conformance::PuppetFactory>(
-        PUPPET_UNDER_TEST_FACTORY_SERVICE);
+    {
+      FX_LOGS(INFO) << "Creating child puppet";
+      fuchsia::ui::test::conformance::PuppetFactorySyncPtr puppet_factory;
 
-    fuchsia::ui::test::conformance::PuppetFactoryCreateResponse resp;
+      ASSERT_EQ(LocalServiceDirectory()->Connect(puppet_factory.NewRequest(),
+                                                 PUPPET_UNDER_TEST_FACTORY_SERVICE),
+                ZX_OK);
 
-    child_puppet_ = std::make_unique<TouchPuppet>();
+      fuchsia::ui::test::conformance::PuppetFactoryCreateResponse resp;
 
-    fuchsia::ui::test::conformance::PuppetCreationArgs creation_args;
-    creation_args.set_server_end(child_puppet_->puppet_ptr.NewRequest());
-    creation_args.set_view_token(
-        std::move(*embed_remote_view_response.mutable_view_creation_token()));
-    creation_args.set_touch_listener(child_puppet_->touch_listener.NewBinding());
+      child_puppet_ = std::make_unique<TouchPuppet>();
 
-    ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
-    ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
+      auto flatland = ConnectSyncIntoRealm<fuchsia::ui::composition::Flatland>();
+      auto keyboard = ConnectSyncIntoRealm<fuchsia::ui::input3::Keyboard>();
+
+      fuchsia::ui::test::conformance::PuppetCreationArgs creation_args;
+      creation_args.set_server_end(child_puppet_->puppet_ptr.NewRequest());
+      creation_args.set_view_token(
+          std::move(*embed_remote_view_response.mutable_view_creation_token()));
+      creation_args.set_touch_listener(child_puppet_->touch_listener.NewBinding());
+      creation_args.set_flatland_client(std::move(flatland));
+      creation_args.set_keyboard_client(std::move(keyboard));
+
+      ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
+      ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
+    }
   }
 
  protected:

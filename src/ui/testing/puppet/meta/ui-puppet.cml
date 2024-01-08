@@ -15,15 +15,9 @@
     use: [
         {
             protocol: [
-                "fuchsia.element.GraphicalPresenter",
-
                 // From system
                 "fuchsia.logger.LogSink",
                 "fuchsia.tracing.provider.Registry",
-
-                // From UI stack
-                "fuchsia.ui.composition.Flatland",
-                "fuchsia.ui.input3.Keyboard",
             ],
         },
     ],

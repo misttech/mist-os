@@ -7,6 +7,8 @@ library fuchsia.ui.test.conformance;
 using fuchsia.math;
 using fuchsia.ui.test.input;
 using fuchsia.ui.views;
+using fuchsia.ui.composition;
+using fuchsia.ui.input3;
 
 /// Maximum number of filled rects a client can draw in a given image.
 const MAX_RECTS_PER_IMAGE uint32 = 1024;
@@ -201,6 +203,8 @@ type PuppetCreationArgs = resource table {
     3: touch_listener client_end:fuchsia.ui.test.input.TouchInputListener;
     4: mouse_listener client_end:fuchsia.ui.test.input.MouseInputListener;
     5: keyboard_listener client_end:fuchsia.ui.test.input.KeyboardInputListener;
+    6: flatland_client client_end:fuchsia.ui.composition.Flatland;
+    7: keyboard_client client_end:fuchsia.ui.input3.Keyboard;
 };
 
 /// A helper to spawn a puppet instance, which will own a view created with a specific

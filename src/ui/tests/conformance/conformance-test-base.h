@@ -8,6 +8,8 @@
 #include <fuchsia/testing/harness/cpp/fidl.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/fidl/cpp/synchronous_interface_ptr.h>
+#include <lib/sys/cpp/component_context.h>
+#include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/channel.h>
 
 #include <cstdlib>
@@ -25,6 +27,8 @@ class ConformanceTest : public gtest::RealLoopFixture {
 
   /// SetUp connect test realm so test can use realm_proxy_ to access.
   void SetUp() override;
+
+  const std::shared_ptr<sys::ServiceDirectory>& LocalServiceDirectory() const;
 
   /// Connect to the FIDL protocol which served from the realm proxy use default served path if no
   /// name passed in.
@@ -45,6 +49,7 @@ class ConformanceTest : public gtest::RealLoopFixture {
 
  private:
   fuchsia::testing::harness::RealmProxySyncPtr realm_proxy_;
+  std::unique_ptr<sys::ComponentContext> context_;
 };
 
 }  // namespace ui_conformance_test_base
