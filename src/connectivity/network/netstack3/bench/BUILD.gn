@@ -1,0 +1,41 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/testing/perf/test.gni")
+
+if (is_fuchsia) {
+  rustc_binary("netstack3-benchmarks") {
+    name = "netstack3_benchmarks"
+    testonly = true
+    edition = "2018"
+    sources = [ "main.rs" ]
+    source_root = "main.rs"
+    deps = [
+      "//src/connectivity/network/netstack3/core:netstack3-core-benchmarks",
+      "//src/developer/fuchsia-criterion",
+    ]
+    configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  }
+
+  fuchsia_package_with_single_component("netstack3_benchmarks") {
+    deps = [ ":netstack3-benchmarks" ]
+    testonly = true
+    manifest = "meta/netstack3-benchmarks.cml"
+  }
+}
+
+if (is_host) {
+  fuchsia_component_perf_test("netstack3_benchmarks_test") {
+    package = ":netstack3_benchmarks"
+    component_name = "netstack3_benchmarks"
+    expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.netstack3.core.txt"
+  }
+}
+
+group("bench") {
+  testonly = true
+  deps = [ ":netstack3_benchmarks_test($host_toolchain)" ]
+}
