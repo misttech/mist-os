@@ -40,7 +40,7 @@ use netstack3_core::{
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     udp::{self, UdpBindingsContext},
-    BindingsContext, IpExt, SyncCtx,
+    IpExt,
 };
 use packet::{Buf, BufferMut};
 use tracing::{error, trace, warn};
@@ -239,11 +239,13 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type SetIpTransparentError: IntoErrno;
     type LocalIdentifier: OptionFromU16 + Into<u16> + Send;
     type RemoteIdentifier: From<u16> + Into<u16> + Send;
-    type SocketInfo<C: BindingsContext>: IntoFidl<LocalAddress<I, WeakDeviceId<C>, Self::LocalIdentifier>>
+    type SocketInfo: IntoFidl<LocalAddress<I, WeakDeviceId<BindingsCtx>, Self::LocalIdentifier>>
         + TryIntoFidl<
-            RemoteAddress<I, WeakDeviceId<C>, Self::RemoteIdentifier>,
+            RemoteAddress<I, WeakDeviceId<BindingsCtx>, Self::RemoteIdentifier>,
             Error = fposix::Errno,
         >;
+    type SendError: IntoErrno;
+    type SendToError: IntoErrno;
 
     fn create_unbound(ctx: &Ctx) -> Self::SocketId;
 
@@ -271,7 +273,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
 
     fn get_shutdown(ctx: &Ctx, id: &Self::SocketId) -> Option<ShutdownType>;
 
-    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo<BindingsCtx>;
+    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo;
 
     fn close(ctx: &mut Ctx, id: Self::SocketId);
 
@@ -343,25 +345,17 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     ) -> Result<(), Self::SetIpTransparentError>;
 
     fn get_ip_transparent(ctx: &Ctx, id: &Self::SocketId) -> bool;
-}
 
-/// An abstraction over transport protocols that allows data to be sent via the Core.
-pub(crate) trait BufferTransportState<I: Ip, B: BufferMut>: TransportState<I> {
-    type SendError: IntoErrno;
-    type SendToError: IntoErrno;
-
-    fn send<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn send<B: BufferMut>(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         body: B,
     ) -> Result<(), Self::SendError>;
 
-    fn send_to<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn send_to<B: BufferMut>(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
-        remote: (Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>, Self::RemoteIdentifier),
+        remote: (Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>, Self::RemoteIdentifier),
         body: B,
     ) -> Result<(), Self::SendToError>;
 }
@@ -392,7 +386,9 @@ impl<I: IpExt> TransportState<I> for Udp {
     type SetIpTransparentError = Never;
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = udp::UdpRemotePort;
-    type SocketInfo<C: BindingsContext> = udp::SocketInfo<I::Addr, WeakDeviceId<C>>;
+    type SocketInfo = udp::SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
+    type SendError = Either<udp::SendError, fposix::Errno>;
+    type SendToError = Either<LocalAddressError, udp::SendToError>;
 
     fn create_unbound(ctx: &Ctx) -> Self::SocketId {
         udp::create_udp(ctx.core_ctx())
@@ -437,14 +433,14 @@ impl<I: IpExt> TransportState<I> for Udp {
         udp::get_shutdown(core_ctx, bindings_ctx, id)
     }
 
-    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo<BindingsCtx> {
+    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo {
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         udp::get_udp_info(core_ctx, bindings_ctx, id)
     }
 
     fn close(ctx: &mut Ctx, id: Self::SocketId) {
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let _: Self::SocketInfo<BindingsCtx> = udp::close(core_ctx, bindings_ctx, id);
+        let _: Self::SocketInfo = udp::close(core_ctx, bindings_ctx, id);
     }
 
     fn set_socket_device(
@@ -565,33 +561,28 @@ impl<I: IpExt> TransportState<I> for Udp {
     fn get_ip_transparent(ctx: &Ctx, id: &Self::SocketId) -> bool {
         udp::get_udp_transparent(ctx.core_ctx(), id)
     }
-}
 
-impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp {
-    type SendError = Either<udp::SendError, fposix::Errno>;
-    type SendToError = Either<LocalAddressError, udp::SendToError>;
-
-    fn send<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn send<B: BufferMut>(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         body: B,
     ) -> Result<(), Self::SendError> {
-        udp::send_udp(core_ctx, ctx, id, body)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::send_udp(core_ctx, bindings_ctx, id, body)
             .map_err(|e| e.map_right(|ExpectedConnError| fposix::Errno::Edestaddrreq))
     }
 
-    fn send_to<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
+    fn send_to<B: BufferMut>(
+        ctx: &mut Ctx,
         id: &Self::SocketId,
         (remote_ip, remote_port): (
-            Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
+            Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
             Self::RemoteIdentifier,
         ),
         body: B,
     ) -> Result<(), Self::SendToError> {
-        udp::send_udp_to(core_ctx, ctx, id, remote_ip, remote_port, body)
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        udp::send_udp_to(core_ctx, bindings_ctx, id, remote_ip, remote_port, body)
     }
 }
 
@@ -643,7 +634,12 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
     type SetIpTransparentError = NotSupportedError;
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = u16;
-    type SocketInfo<C: BindingsContext> = icmp::SocketInfo<I::Addr, WeakDeviceId<C>>;
+    type SocketInfo = icmp::SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
+    type SendError = core_socket::SendError<packet_formats::error::ParseError>;
+    type SendToError = either::Either<
+        LocalAddressError,
+        core_socket::SendToError<packet_formats::error::ParseError>,
+    >;
 
     fn create_unbound(ctx: &Ctx) -> Self::SocketId {
         icmp::new_socket(ctx.core_ctx())
@@ -688,7 +684,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         icmp::get_shutdown(core_ctx, bindings_ctx, id)
     }
 
-    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo<BindingsCtx> {
+    fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo {
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         icmp::get_info(core_ctx, bindings_ctx, id)
     }
@@ -842,6 +838,28 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
     fn get_ip_transparent(_ctx: &Ctx, _id: &Self::SocketId) -> bool {
         false
     }
+
+    fn send<B: BufferMut>(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        body: B,
+    ) -> Result<(), Self::SendError> {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        icmp::send(core_ctx, bindings_ctx, id, body)
+    }
+
+    fn send_to<B: BufferMut>(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        (remote_ip, _remote_id): (
+            Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
+            Self::RemoteIdentifier,
+        ),
+        body: B,
+    ) -> Result<(), Self::SendToError> {
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+        icmp::send_to(core_ctx, bindings_ctx, id, remote_ip, body)
+    }
 }
 
 impl<E> IntoErrno for core_socket::SendError<E> {
@@ -870,36 +888,6 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
             core_socket::SendToError::RemoteUnexpectedlyNonMapped => fposix::Errno::Eafnosupport,
             core_socket::SendToError::SerializeError(_e) => fposix::Errno::Einval,
         }
-    }
-}
-
-impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for IcmpEcho {
-    type SendError = core_socket::SendError<packet_formats::error::ParseError>;
-    type SendToError = either::Either<
-        LocalAddressError,
-        core_socket::SendToError<packet_formats::error::ParseError>,
-    >;
-
-    fn send<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-        body: B,
-    ) -> Result<(), Self::SendError> {
-        icmp::send(core_ctx, ctx, id, body)
-    }
-
-    fn send_to<C: BindingsContext>(
-        core_ctx: &SyncCtx<C>,
-        ctx: &mut C,
-        id: &Self::SocketId,
-        (remote_ip, _remote_id): (
-            Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
-            Self::RemoteIdentifier,
-        ),
-        body: B,
-    ) -> Result<(), Self::SendToError> {
-        icmp::send_to(core_ctx, ctx, id, remote_ip, body)
     }
 }
 
@@ -1090,7 +1078,6 @@ where
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
-    T: BufferTransportState<I, Buf<Vec<u8>>>,
     T: Send + Sync + 'static,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
@@ -1150,7 +1137,6 @@ where
     T: Transport<Ipv4>,
     T: Transport<Ipv6>,
     T: TransportState<I>,
-    T: BufferTransportState<I, Buf<Vec<u8>>>,
     T: Send + Sync + 'static,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
@@ -1904,11 +1890,10 @@ where
                     ip_receive_original_destination_address: _,
                 },
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let remote = remote_addr
             .map(|remote_addr| {
                 let (remote_addr, port) =
-                    TryFromFidlWithContext::try_from_fidl_with_ctx(&bindings_ctx, remote_addr)
+                    TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), remote_addr)
                         .map_err(IntoErrno::into_errno)?;
                 Ok((remote_addr, port.into()))
             })
@@ -1916,10 +1901,8 @@ where
         let len = data.len() as i64;
         let body = Buf::new(data, ..);
         match remote {
-            Some(remote) => {
-                T::send_to(core_ctx, bindings_ctx, id, remote, body).map_err(|e| e.into_errno())
-            }
-            None => T::send(core_ctx, bindings_ctx, id, body).map_err(|e| e.into_errno()),
+            Some(remote) => T::send_to(ctx, id, remote, body).map_err(|e| e.into_errno()),
+            None => T::send(ctx, id, body).map_err(|e| e.into_errno()),
         }
         .map(|()| len)
     }
