@@ -40,7 +40,7 @@ pub enum CallHoldAction {
 
 bitflags! {
     /// Bitmap defined in HFP v1.8, Section 4.35.1 for use with the "+BRSF" AT result code.
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AgFeatures: i64 {
         const THREE_WAY_CALLING            = 0b00_0000_0000_0001;
         const NR_EC                        = 0b00_0000_0000_0010;
@@ -60,7 +60,7 @@ bitflags! {
 }
 bitflags! {
     /// Bitmap defined in HFP v1.8, Section 4.35.1 for use with the "AT+BRSF" AT command.
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct HfFeatures: i64 {
         const NR_EC                        = 0b00_0000_0000_0001;
         const THREE_WAY_CALLING            = 0b00_0000_0000_0010;

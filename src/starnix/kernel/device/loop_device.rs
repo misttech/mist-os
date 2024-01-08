@@ -41,7 +41,7 @@ use std::{
 const MIN_BLOCK_SIZE: u32 = 512;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     struct LoopDeviceFlags: u32 {
         const READ_ONLY = LO_FLAGS_READ_ONLY;
         const AUTOCLEAR = LO_FLAGS_AUTOCLEAR;

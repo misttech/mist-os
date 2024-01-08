@@ -16,6 +16,7 @@ pub struct CodecSpecificConfigLTV {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AudioLocation: u32 {
         const FRONT_LEFT = 0x00000001;
         const FRONT_RIGHT = 0x00000002;

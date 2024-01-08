@@ -20,7 +20,7 @@ use {
 use fuchsia_zircon as zx;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct EmptyBits: u32 {
     }
 }
@@ -28,7 +28,7 @@ bitflags! {
 impl EmptyBits {
     #[inline(always)]
     pub fn from_bits_allow_unknown(bits: u32) -> Self {
-        unsafe { Self::from_bits_unchecked(bits) }
+        Self::from_bits_retain(bits)
     }
 
     #[inline(always)]
@@ -38,12 +38,12 @@ impl EmptyBits {
 
     #[inline(always)]
     pub fn get_unknown_bits(&self) -> u32 {
-        self.bits & !Self::all().bits
+        self.bits() & !Self::all().bits()
     }
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct FlexibleBits: u64 {
         const SMALLEST = 1;
         const BIGGEST = 9223372036854775808;
@@ -53,7 +53,7 @@ bitflags! {
 impl FlexibleBits {
     #[inline(always)]
     pub fn from_bits_allow_unknown(bits: u64) -> Self {
-        unsafe { Self::from_bits_unchecked(bits) }
+        Self::from_bits_retain(bits)
     }
 
     #[inline(always)]
@@ -63,12 +63,12 @@ impl FlexibleBits {
 
     #[inline(always)]
     pub fn get_unknown_bits(&self) -> u64 {
-        self.bits & !Self::all().bits
+        self.bits() & !Self::all().bits()
     }
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MyBits: u32 {
         const MY_FIRST_BIT = 1;
         const MY_OTHER_BIT = 2;
@@ -91,7 +91,7 @@ impl MyBits {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct StrictBits: u64 {
         const SMALLEST = 1;
         const BIGGEST = 9223372036854775808;
@@ -147,7 +147,7 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Self>(offset);
-            encoder.write_num(self.bits, offset);
+            encoder.write_num(self.bits(), offset);
             Ok(())
         }
     }
@@ -204,7 +204,7 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Self>(offset);
-            encoder.write_num(self.bits, offset);
+            encoder.write_num(self.bits(), offset);
             Ok(())
         }
     }
@@ -261,10 +261,10 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Self>(offset);
-            if self.bits & Self::all().bits != self.bits {
+            if self.bits() & Self::all().bits() != self.bits() {
                 return Err(fidl::Error::InvalidBitsValue);
             }
-            encoder.write_num(self.bits, offset);
+            encoder.write_num(self.bits(), offset);
             Ok(())
         }
     }
@@ -321,10 +321,10 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Self>(offset);
-            if self.bits & Self::all().bits != self.bits {
+            if self.bits() & Self::all().bits() != self.bits() {
                 return Err(fidl::Error::InvalidBitsValue);
             }
-            encoder.write_num(self.bits, offset);
+            encoder.write_num(self.bits(), offset);
             Ok(())
         }
     }

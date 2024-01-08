@@ -9,7 +9,7 @@ bitflags! {
     {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct {{ .Name }}: {{ .UnderlyingType }} {
         {{- range .Members }}
         {{- range .DocComments }}
@@ -36,8 +36,7 @@ impl {{ .Name }} {
     {{- else }}
     #[inline(always)]
     pub fn from_bits_allow_unknown(bits: {{ .UnderlyingType }}) -> Self {
-        {{- /* TODO(https://fxbug.dev/124335): Use `from_bits_retain` instead. */}}
-        unsafe { Self::from_bits_unchecked(bits) }
+        Self::from_bits_retain(bits)
     }
 
     #[inline(always)]
@@ -47,7 +46,7 @@ impl {{ .Name }} {
 
     #[inline(always)]
     pub fn get_unknown_bits(&self) -> {{ .UnderlyingType }} {
-        self.bits & !Self::all().bits
+        self.bits() & !Self::all().bits()
     }
     {{- end }}
 }
@@ -81,11 +80,11 @@ unsafe impl fidl::encoding::Encode<Self> for {{ .Name }} {
     unsafe fn encode(self, encoder: &mut fidl::encoding::Encoder<'_>, offset: usize, _depth: fidl::encoding::Depth) -> fidl::Result<()> {
         encoder.debug_check_bounds::<Self>(offset);
         {{- if .IsStrict }}
-        if self.bits & Self::all().bits != self.bits {
+        if self.bits() & Self::all().bits() != self.bits() {
             return Err(fidl::Error::InvalidBitsValue);
         }
         {{- end }}
-        encoder.write_num(self.bits, offset);
+        encoder.write_num(self.bits(), offset);
         Ok(())
     }
 }

@@ -983,6 +983,7 @@ bitflags! {
     /// Other flags are specific to each type.
     ///
     /// Matches C-reference `zbi_flags_t` which is `uint32_t`.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ZbiFlags: u32 {
         /// This flag is always required.
         const VERSION = ZBI_FLAGS_VERSION;

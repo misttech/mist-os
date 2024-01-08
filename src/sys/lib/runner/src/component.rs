@@ -735,9 +735,7 @@ mod tests {
                         res.handles.extend(handles.into_iter().map(|m| m.id).collect::<Vec<u32>>());
                     }
                     fproc::LauncherRequest::SetOptions { options, .. } => {
-                        // SAFETY: These options are passed directly to `zx_process_create`, which
-                        // will determine whether or not the options are valid.
-                        res.options = unsafe { zx::ProcessOptions::from_bits_unchecked(options) };
+                        res.options = zx::ProcessOptions::from_bits_retain(options);
                     }
                     fproc::LauncherRequest::CreateWithoutStarting { .. } => {}
                     fproc::LauncherRequest::Launch { .. } => {}

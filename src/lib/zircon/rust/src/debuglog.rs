@@ -19,6 +19,7 @@ impl_handle_based!(DebugLog);
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct DebugLogOpts: u32 {
         const READABLE = sys::ZX_LOG_FLAG_READABLE;
     }

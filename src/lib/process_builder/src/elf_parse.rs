@@ -333,6 +333,7 @@ pub enum SegmentType {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SegmentFlags: u32 {
         const EXECUTE = 0b0001;
         const WRITE   = 0b0010;
@@ -659,7 +660,7 @@ mod tests {
         let page_size = zx::system_get_page_size() as usize;
         let headers = [Elf64ProgramHeader {
             segment_type: SegmentType::Load as u32,
-            flags: (SegmentFlags::READ | SegmentFlags::EXECUTE).bits,
+            flags: (SegmentFlags::READ | SegmentFlags::EXECUTE).bits(),
             align: page_size as u64 + 1024,
             offset: 0x1000,
             vaddr: 0x1000,
@@ -680,7 +681,7 @@ mod tests {
         let page_size = zx::system_get_page_size() as usize;
         let headers = [Elf64ProgramHeader {
             segment_type: SegmentType::Load as u32,
-            flags: (SegmentFlags::READ | SegmentFlags::EXECUTE).bits,
+            flags: (SegmentFlags::READ | SegmentFlags::EXECUTE).bits(),
             align: page_size as u64,
             offset: 0x1001,
             vaddr: 0x1002,

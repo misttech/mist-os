@@ -16,6 +16,7 @@ use {
 };
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AvrcpTargetFeatures: u16 {
         const CATEGORY1         = 1 << 0;
         const CATEGORY2         = 1 << 1;
@@ -31,6 +32,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AvrcpControllerFeatures: u16 {
         const CATEGORY1         = 1 << 0;
         const CATEGORY2         = 1 << 1;

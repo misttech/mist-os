@@ -165,10 +165,10 @@ mod tests {
             peer: {
                 peer_id: AnyProperty,
                 controller_info: {
-                    "0": { "@time": AnyProperty, features: "CATEGORY1", version: "1.6" },
+                    "0": { "@time": AnyProperty, features: "AvrcpControllerFeatures(CATEGORY1)", version: "1.6" },
                 },
                 target_info: {
-                    "0": { "@time": AnyProperty, features: "PLAYERSETTINGS", version: "1.5" },
+                    "0": { "@time": AnyProperty, features: "AvrcpTargetFeatures(PLAYERSETTINGS)", version: "1.5" },
                 },
             }
         });

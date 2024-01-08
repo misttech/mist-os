@@ -11,11 +11,11 @@ pub struct SetupInfo {
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
     pub struct ConfigurationInterfaceFlags: u32 {
         const ETHERNET = 1 << 0;
         const WIFI = 1 << 1;
-        const DEFAULT = Self::WIFI.bits;
+        const DEFAULT = Self::WIFI.bits();
     }
 }
 

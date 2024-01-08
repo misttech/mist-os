@@ -642,7 +642,7 @@ mod test {
         let _ = player.next().await.expect("Polling player event");
 
         assert_data_tree!(inspector, root: {
-            test_player: {state: { player_capabilities: "ValidPlayerCapabilities { flags: PLAY | PAUSE }"}}
+            test_player: {state: { player_capabilities: "ValidPlayerCapabilities { flags: PlayerCapabilityFlags(PLAY | PAUSE) }"}}
         });
 
         Ok(())

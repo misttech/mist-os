@@ -25,6 +25,7 @@ const PROFILE_MAJOR_VERSION: u8 = 1;
 const PROFILE_MINOR_VERSION: u8 = 8;
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     struct AudioGatewayFeaturesSdpAttribute: u16 {
         const THREE_WAY_CALLING                     = 0b0000_0001;
         const ECHO_CANCELLATION_AND_NOISE_REDUCTION = 0b0000_0010;
@@ -36,7 +37,7 @@ bitflags! {
         const ENHANCED_VOICE_RECOGNITION_TEXT       = 0b1000_0000;
 
         /// Defined by HFP v1.8, Table 5.3: Service Record for the AG
-        const DEFAULT = Self::THREE_WAY_CALLING.bits | Self::IN_BAND_RING.bits;
+        const DEFAULT = Self::THREE_WAY_CALLING.bits() | Self::IN_BAND_RING.bits();
     }
 }
 

@@ -8,7 +8,7 @@ bitflags::bitflags! {
     /// Link Mode Config.
     /// Functional equivalent of [`otsys::otLinkModeConfig`](crate::otsys::otLinkModeConfig).
     #[repr(C)]
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct LinkModeConfig : u8 {
         /// Set if the sender is a Full Thread Device (FTD); clear if a Minimal Thread Device (MTD).
         ///

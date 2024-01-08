@@ -6,7 +6,7 @@ use crate::uapi;
 use bitflags::bitflags;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct PersonalityFlags: u32 {
         const UNAME26 = uapi::UNAME26;
         const ADDR_NO_RANDOMIZE = uapi::ADDR_NO_RANDOMIZE;

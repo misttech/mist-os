@@ -17,6 +17,7 @@ use starnix_uapi::{
 use std::sync::Arc;
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct FdFlags: u32 {
         const CLOEXEC = FD_CLOEXEC;
     }

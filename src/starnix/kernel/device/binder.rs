@@ -2208,6 +2208,7 @@ struct BinderObjectMutableState {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     struct BinderObjectFlags: u32 {
         /// Not implemented.
         const ACCEPTS_FDS = uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_ACCEPTS_FDS;

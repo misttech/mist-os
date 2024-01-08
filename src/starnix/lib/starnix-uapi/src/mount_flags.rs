@@ -6,7 +6,7 @@ use crate::uapi;
 use bitflags::bitflags;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MountFlags: u32 {
         // per-mountpoint flags
         const RDONLY = uapi::MS_RDONLY;
@@ -34,18 +34,18 @@ bitflags! {
         const PRIVATE = uapi::MS_PRIVATE;
 
         /// Flags stored in Mount state.
-        const STORED_ON_MOUNT = Self::RDONLY.bits | Self::NOEXEC.bits | Self::NOSUID.bits |
-            Self::NODEV.bits | Self::NOATIME.bits | Self::NODIRATIME.bits | Self::RELATIME.bits;
+        const STORED_ON_MOUNT = Self::RDONLY.bits() | Self::NOEXEC.bits() | Self::NOSUID.bits() |
+            Self::NODEV.bits() | Self::NOATIME.bits() | Self::NODIRATIME.bits() | Self::RELATIME.bits();
 
         /// Flags stored in FileSystem options.
-        const STORED_ON_FILESYSTEM = Self::RDONLY.bits | Self::DIRSYNC.bits | Self::LAZYTIME.bits |
-            Self::MANDLOCK.bits | Self::SILENT.bits | Self::SYNCHRONOUS.bits;
+        const STORED_ON_FILESYSTEM = Self::RDONLY.bits() | Self::DIRSYNC.bits() | Self::LAZYTIME.bits() |
+            Self::MANDLOCK.bits() | Self::SILENT.bits() | Self::SYNCHRONOUS.bits();
 
         /// Flags that change be changed with REMOUNT.
         ///
         /// MS_DIRSYNC and MS_SILENT cannot be changed with REMOUNT.
-        const CHANGEABLE_WITH_REMOUNT = Self::STORED_ON_MOUNT.bits | Self::STRICTATIME.bits |
-            Self::MANDLOCK.bits | Self::LAZYTIME.bits | Self::SYNCHRONOUS.bits;
+        const CHANGEABLE_WITH_REMOUNT = Self::STORED_ON_MOUNT.bits() | Self::STRICTATIME.bits() |
+            Self::MANDLOCK.bits() | Self::LAZYTIME.bits() | Self::SYNCHRONOUS.bits();
     }
 }
 

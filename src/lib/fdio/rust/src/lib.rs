@@ -263,6 +263,7 @@ pub fn pipe_half() -> Result<(File, zx::Socket), zx::Status> {
 bitflags! {
     /// Options to allow some or all of the environment of the running process
     /// to be shared with the process being spawned.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SpawnOptions: u32 {
         /// Provide the spawned process with the job in which the process was created.
         ///

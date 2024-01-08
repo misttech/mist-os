@@ -1357,7 +1357,7 @@ impl NativeIntoFidl<fdecl::ConfigType> for ConfigValueType {
 }
 
 bitflags::bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     // TODO(https://fxbug.dev/124335) uncomment once bitflags is updated
     // pub struct ConfigMutability: <fdecl::ConfigMutability as bitflags::BitFlags>::Bits {
@@ -1374,9 +1374,7 @@ impl NativeIntoFidl<fdecl::ConfigMutability> for ConfigMutability {
 
 impl FidlIntoNative<ConfigMutability> for fdecl::ConfigMutability {
     fn fidl_into_native(self) -> ConfigMutability {
-        // TODO(https://fxbug.dev/124335) remove unsafe once bitflags is updated
-        // SAFETY: this called from_bits_retain in newer versions of bitflags and is safe
-        unsafe { ConfigMutability::from_bits_unchecked(self.bits()) }
+        ConfigMutability::from_bits_retain(self.bits())
     }
 }
 

@@ -25,11 +25,11 @@ pub const EVENT_QUEUE_IDX: u16 = 2;
 // These flags are hints about future connection behavior. Note that these flags are permanent once
 // received, and subsequent packets without these flags do not clear these flags.
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct VirtioVsockFlags: u32 {
         const SHUTDOWN_RECIEVE = 0b01;
         const SHUTDOWN_SEND    = 0b10;
-        const SHUTDOWN_BOTH    = Self::SHUTDOWN_RECIEVE.bits | Self::SHUTDOWN_SEND.bits;
+        const SHUTDOWN_BOTH    = Self::SHUTDOWN_RECIEVE.bits() | Self::SHUTDOWN_SEND.bits();
     }
 }
 

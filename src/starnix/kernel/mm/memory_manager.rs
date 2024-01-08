@@ -128,6 +128,7 @@ pub unsafe fn zxio_maybe_faultable_copy_impl(
 pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64);
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MappingOptions: u32 {
       const SHARED = 1;
       const ANONYMOUS = 2;
@@ -142,6 +143,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ProtectionFlags: u32 {
       const READ = PROT_READ;
       const WRITE = PROT_WRITE;
@@ -180,6 +182,7 @@ impl ProtectionFlags {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[rustfmt::skip]  // Preserve column alignment.
     struct MappingFlags: u32 {
         const READ        = 1 <<  0;  // PROT_READ
@@ -227,6 +230,7 @@ impl MappingFlags {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MremapFlags: u32 {
         const MAYMOVE = MREMAP_MAYMOVE;
         const FIXED = MREMAP_FIXED;
@@ -640,9 +644,8 @@ fn map_in_vmar(
             (addr - base_addr, zx::VmarFlags::SPECIFIC)
         }
         DesiredAddress::FixedOverwrite(addr) => {
-            let specific_overwrite = unsafe {
-                zx::VmarFlags::from_bits_unchecked(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits())
-            };
+            let specific_overwrite =
+                zx::VmarFlags::from_bits_retain(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits());
             (addr - base_addr, specific_overwrite)
         }
     };

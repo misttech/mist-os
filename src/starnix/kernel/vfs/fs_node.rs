@@ -367,6 +367,7 @@ mod inner_flags {
     use super::{bitflags, uapi};
 
     bitflags! {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct StatxFlags: u32 {
             const AT_SYMLINK_NOFOLLOW = uapi::AT_SYMLINK_NOFOLLOW;
             const AT_EMPTY_PATH = uapi::AT_EMPTY_PATH;

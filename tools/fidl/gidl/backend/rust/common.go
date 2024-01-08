@@ -89,11 +89,11 @@ func visit(value ir.Value, decl mixer.Declaration) string {
 			if decl.IsFlexible() {
 				return fmt.Sprintf("%s::from_bits_allow_unknown(%v)", declName(decl), primitive)
 			}
-			// Use from_bits_unchecked so that encode_failure tests work. It's
+			// Use from_bits_retain so that encode_failure tests work. It's
 			// not worth the effort to make the test type available here and use
 			// from_bits(...).unwrap() in success cases, since all this would do
 			// is move validation from the bindings to GIDL.
-			return fmt.Sprintf("unsafe { %s::from_bits_unchecked(%v) }", declName(decl), primitive)
+			return fmt.Sprintf("%s::from_bits_retain(%v)", declName(decl), primitive)
 		case *mixer.EnumDecl:
 			primitive := visit(value, &decl.Underlying)
 			if decl.IsFlexible() {

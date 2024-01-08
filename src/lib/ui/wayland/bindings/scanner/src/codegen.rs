@@ -562,6 +562,10 @@ impl FromArgs for {name} {{
         if let Some(ref d) = e.description {
             self.codegen_description(d, "    ")?;
         }
+        writeln!(
+            self.w,
+            "    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]"
+        )?;
         writeln!(self.w, "    pub struct {}: u32 {{", e.rust_name())?;
         for entry in e.entries.iter() {
             if let Some(ref s) = entry.summary {

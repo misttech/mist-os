@@ -43,6 +43,7 @@ mod inner_signals {
 
     bitflags! {
         // These values should match the values in sdk/lib/zxio/include/lib/zxio/types.h
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct ZxioSignals : zxio_signals_t {
             const NONE            =      0;
             const READABLE        = 1 << 0;
@@ -62,6 +63,7 @@ pub use inner_signals::ZxioSignals;
 
 bitflags! {
     /// The flags for shutting down sockets.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ZxioShutdownFlags: u32 {
         /// Further transmissions will be disallowed.
         const WRITE = 1 << 0;
@@ -424,6 +426,7 @@ pub enum XattrSetMode {
 
 bitflags! {
     /// Describes the mode of operation when allocating disk space using Allocate.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AllocateMode: u32 {
         const KEEP_SIZE = 1 << 0;
         const UNSHARE_RANGE = 1 << 1;

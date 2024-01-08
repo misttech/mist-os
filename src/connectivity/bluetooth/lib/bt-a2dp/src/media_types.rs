@@ -12,12 +12,13 @@ bitflags! {
     /// 44100Hz and 48000Hz are mandatory for A2DP sink.
     /// A2DP source must support at least one of 44100Hz and 48000Hz.
     /// A2DP Sec. 4.3.2.1
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SbcSamplingFrequency:u8 {
         const FREQ16000HZ   = 0b1000;
         const FREQ32000HZ   = 0b0100;
         const FREQ44100HZ   = 0b0010;
         const FREQ48000HZ   = 0b0001;
-        const MANDATORY_SNK = Self::FREQ44100HZ.bits | Self::FREQ48000HZ.bits;
+        const MANDATORY_SNK = Self::FREQ44100HZ.bits() | Self::FREQ48000HZ.bits();
     }
 }
 
@@ -35,15 +36,16 @@ bitflags! {
     /// Mono and at least one of Dual Channel, Stereo, and Joint Stereo must be
     /// supported by A2DP source.
     /// A2DP Sec. 4.3.2.2
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SbcChannelMode:u8 {
         const MONO          = 0b1000;
         const DUAL_CHANNEL  = 0b0100;
         const STEREO        = 0b0010;
         const JOINT_STEREO  = 0b0001;
-        const MANDATORY_SNK = Self::MONO.bits
-            | Self::DUAL_CHANNEL.bits
-            | Self::STEREO.bits
-            | Self::JOINT_STEREO.bits;
+        const MANDATORY_SNK = Self::MONO.bits()
+            | Self::DUAL_CHANNEL.bits()
+            | Self::STEREO.bits()
+            | Self::JOINT_STEREO.bits();
     }
 }
 
@@ -58,19 +60,20 @@ bitflags! {
     /// The Block Length field for SBC (Octet 1; b4-7).
     /// Support for all block lengths is mandatory in both A2DP Sink and Source.
     /// A2DP Sec. 4.3.2.3
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SbcBlockCount:u8 {
         const FOUR          = 0b1000;
         const EIGHT         = 0b0100;
         const TWELVE        = 0b0010;
         const SIXTEEN       = 0b0001;
-        const MANDATORY_SNK = Self::FOUR.bits
-            | Self::EIGHT.bits
-            | Self::TWELVE.bits
-            | Self::SIXTEEN.bits;
-        const MANDATORY_SRC = Self::FOUR.bits
-            | Self::EIGHT.bits
-            | Self::TWELVE.bits
-            | Self::SIXTEEN.bits;
+        const MANDATORY_SNK = Self::FOUR.bits()
+            | Self::EIGHT.bits()
+            | Self::TWELVE.bits()
+            | Self::SIXTEEN.bits();
+        const MANDATORY_SRC = Self::FOUR.bits()
+            | Self::EIGHT.bits()
+            | Self::TWELVE.bits()
+            | Self::SIXTEEN.bits();
     }
 }
 
@@ -80,11 +83,12 @@ bitflags! {
     /// Support for only 8 subbands is mandatory in A2DP Source.
     /// 4 subbands is optional.
     /// A2DP Sec. 4.3.2.4
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SbcSubBands:u8 {
         const FOUR            = 0b0010;
         const EIGHT            = 0b0001;
-        const MANDATORY_SNK = Self::FOUR.bits | Self::EIGHT.bits;
-        const MANDATORY_SRC = Self::EIGHT.bits;
+        const MANDATORY_SNK = Self::FOUR.bits() | Self::EIGHT.bits();
+        const MANDATORY_SRC = Self::EIGHT.bits();
     }
 }
 
@@ -93,11 +97,12 @@ bitflags! {
     /// Support for both SNR and Loudness is mandatory in A2DP Sink.
     /// Support for at least Loudness is mandatory in A2DP Source. SNR is optional.
     /// A2DP Sec. 4.3.2.5
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SbcAllocation:u8 {
         const SNR           = 0b0010;
         const LOUDNESS      = 0b0001;
-        const MANDATORY_SNK = Self::SNR.bits | Self::LOUDNESS.bits;
-        const MANDATORY_SRC = Self::LOUDNESS.bits;
+        const MANDATORY_SNK = Self::SNR.bits() | Self::LOUDNESS.bits();
+        const MANDATORY_SRC = Self::LOUDNESS.bits();
     }
 }
 
@@ -308,13 +313,14 @@ bitflags! {
     /// Support for MPEG-2 AAC LC is mandatory in both A2DP Sink and Source.
     /// Bits 0 to 4 are RFA.
     /// A2DP Sec. 4.5.2.1
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AacObjectType:u8 {
         const MPEG2_AAC_LC       = 0b10000000;
         const MPEG4_AAC_LC       = 0b01000000;
         const MPEG4_AAC_LTP      = 0b00100000;
         const MPEG4_AAC_SCALABLE = 0b00010000;
-        const MANDATORY_SNK = Self::MPEG2_AAC_LC.bits;
-        const MANDATORY_SRC = Self::MPEG2_AAC_LC.bits;
+        const MANDATORY_SNK = Self::MPEG2_AAC_LC.bits();
+        const MANDATORY_SRC = Self::MPEG2_AAC_LC.bits();
     }
 }
 
@@ -323,6 +329,7 @@ bitflags! {
     /// Support for 44.1KHz & 48.0KHz is mandatory in A2DP Sink.
     /// Support for either 44.1KHz or 48.0KHz is mandatory in A2DP Source.
     /// A2DP Sec. 4.5.2.2
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AacSamplingFrequency:u16 {
         const FREQ8000HZ  = 0b100000000000;
         const FREQ11025HZ = 0b010000000000;
@@ -336,7 +343,7 @@ bitflags! {
         const FREQ64000HZ = 0b000000000100;
         const FREQ88200HZ = 0b000000000010;
         const FREQ96000HZ = 0b000000000001;
-        const MANDATORY_SNK = Self::FREQ44100HZ.bits | Self::FREQ48000HZ.bits;
+        const MANDATORY_SNK = Self::FREQ44100HZ.bits() | Self::FREQ48000HZ.bits();
     }
 }
 
@@ -353,10 +360,11 @@ bitflags! {
     /// Support for both 1 and 2 channels is mandatory in A2DP Sink.
     /// Support for either 1 or 2 channels is mandatory in A2DP Source.
     /// A2DP Sec 4.5.2.3
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AacChannels:u8 {
         const ONE = 0b10;
         const TWO = 0b01;
-        const MANDATORY_SNK = Self::ONE.bits | Self::TWO.bits;
+        const MANDATORY_SNK = Self::ONE.bits() | Self::TWO.bits();
     }
 }
 
@@ -371,9 +379,10 @@ bitflags! {
     /// Support of Variable Bit Rate (VBR) field for MPEG-2,4 AAC (Octet 3; b7).
     /// Support for VBR is mandatory in A2DP Sink.
     /// A2DP Sec 4.5.2.5
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     struct AacVariableBitRate: u8 {
         const VBR_SUPPORTED = 0b1;
-        const MANDATORY_SNK = Self::VBR_SUPPORTED.bits;
+        const MANDATORY_SNK = Self::VBR_SUPPORTED.bits();
     }
 }
 

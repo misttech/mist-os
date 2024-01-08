@@ -168,6 +168,7 @@ macro_rules! vmar_flags {
         bitflags! {
             /// Flags to VMAR routines which are considered safe.
             #[repr(transparent)]
+            #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub struct VmarFlags: sys::zx_vm_option_t {
                 $(
                     const $safe_name = sys::$safe_sys_name;
@@ -178,6 +179,7 @@ macro_rules! vmar_flags {
         bitflags! {
             /// Flags to all VMAR routines.
             #[repr(transparent)]
+            #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
             pub struct VmarFlagsExtended: sys::zx_vm_option_t {
                 $(
                     const $safe_name = sys::$safe_sys_name;

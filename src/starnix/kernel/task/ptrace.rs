@@ -78,7 +78,8 @@ pub enum PtraceAttachType {
 }
 
 bitflags! {
-     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    #[repr(transparent)]
     pub struct PtraceOptions: u32 {
         const EXITKILL =starnix_uapi::PTRACE_O_EXITKILL;
         const TRACECLONE =starnix_uapi::PTRACE_O_TRACECLONE;

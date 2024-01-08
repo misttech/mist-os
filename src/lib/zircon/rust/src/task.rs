@@ -10,6 +10,7 @@ use fuchsia_zircon_sys::{self as sys, zx_duration_t};
 bitflags! {
     /// Options that may be used with `Task::create_exception_channel`
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ExceptionChannelOptions: u32 {
         const DEBUGGER = sys::ZX_EXCEPTION_CHANNEL_DEBUGGER;
     }

@@ -26,7 +26,7 @@ pub const ADDED_AT_HEAD: bool = true;
 pub const CONST: u32 = 0;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Bits: u32 {
         const A = 1;
     }
@@ -35,7 +35,7 @@ bitflags! {
 impl Bits {
     #[inline(always)]
     pub fn from_bits_allow_unknown(bits: u32) -> Self {
-        unsafe { Self::from_bits_unchecked(bits) }
+        Self::from_bits_retain(bits)
     }
 
     #[inline(always)]
@@ -45,7 +45,7 @@ impl Bits {
 
     #[inline(always)]
     pub fn get_unknown_bits(&self) -> u32 {
-        self.bits & !Self::all().bits
+        self.bits() & !Self::all().bits()
     }
 }
 
@@ -830,7 +830,7 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Self>(offset);
-            encoder.write_num(self.bits, offset);
+            encoder.write_num(self.bits(), offset);
             Ok(())
         }
     }

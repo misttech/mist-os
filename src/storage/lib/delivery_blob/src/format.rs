@@ -34,11 +34,12 @@ const_assert_eq!(
 );
 
 bitflags! {
-  /// Type 1 delivery blob flags.
-  struct SerializedType1Flags : u32 {
-      const IS_COMPRESSED = 0x00000001;
-      const VALID_FLAGS_MASK = Self::IS_COMPRESSED.bits;
-  }
+    /// Type 1 delivery blob flags.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    struct SerializedType1Flags : u32 {
+        const IS_COMPRESSED = 0x00000001;
+        const VALID_FLAGS_MASK = Self::IS_COMPRESSED.bits();
+    }
 }
 
 impl From<&Type1Blob> for SerializedType1Flags {

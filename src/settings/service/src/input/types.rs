@@ -387,7 +387,7 @@ impl From<DeviceStateSource> for FidlDeviceStateSource {
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
     pub struct DeviceState : u64 {
         const AVAILABLE = 0b00000001;
         const ACTIVE = 0b00000010;
@@ -406,7 +406,7 @@ impl Default for DeviceState {
 impl DeviceState {
     pub(crate) fn new() -> Self {
         // Represents AVAILABLE as the default.
-        Self { bits: 1 }
+        Self::AVAILABLE
     }
 
     /// The flags that clients can manipulate by default.
@@ -446,7 +446,7 @@ impl From<FidlDeviceState> for DeviceState {
 impl From<DeviceState> for FidlDeviceState {
     fn from(device_state: DeviceState) -> Self {
         FidlDeviceState {
-            toggle_flags: FidlToggleFlags::from_bits(device_state.bits),
+            toggle_flags: FidlToggleFlags::from_bits(device_state.bits()),
             ..Default::default()
         }
     }

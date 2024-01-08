@@ -153,7 +153,7 @@ fn test_golden_enum_struct_v2_encode() {
 
 #[test]
 fn test_golden_bits_struct_v2_encode() {
-    let value = test_conformance::GoldenBitsStruct { v: unsafe { test_conformance::GoldenBits::from_bits_unchecked(1u16) } };
+    let value = test_conformance::GoldenBitsStruct { v: test_conformance::GoldenBits::from_bits_retain(1u16) };
     let mut bytes = Vec::new();
     let mut handle_dispositions = Vec::new();
     bytes.resize(65536, 0xcd); // fill with junk data
@@ -574,7 +574,7 @@ fn test_golden_bits_struct_v2_decode() {
     let mut handle_infos = Vec::new();
     let mut value = fidl::new_empty!(test_conformance::GoldenBitsStruct);
     Decoder::decode_with_context::<test_conformance::GoldenBitsStruct>(_V2_CONTEXT, bytes, &mut handle_infos, &mut value).unwrap();
-    assert_eq!(value, test_conformance::GoldenBitsStruct { v: unsafe { test_conformance::GoldenBits::from_bits_unchecked(1u16) } });
+    assert_eq!(value, test_conformance::GoldenBitsStruct { v: test_conformance::GoldenBits::from_bits_retain(1u16) });
 
 }
 

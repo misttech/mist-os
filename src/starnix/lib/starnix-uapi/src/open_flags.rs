@@ -16,6 +16,7 @@ mod inner_flags {
     use super::{bitflags, uapi};
 
     bitflags! {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct OpenFlags: u32 {
         const ACCESS_MASK = 0x3;
 

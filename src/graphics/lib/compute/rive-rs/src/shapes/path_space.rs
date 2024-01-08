@@ -5,7 +5,7 @@
 use bitflags::bitflags;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct PathSpace: u8 {
         const LOCAL = 0b0001;
         const WORLD = 0b0010;

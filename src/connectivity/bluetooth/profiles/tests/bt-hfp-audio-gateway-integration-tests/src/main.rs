@@ -63,6 +63,7 @@ const ATTR_ID_HFP_SUPPORTED_FEATURES: u16 = 0x0311;
 
 bitflags! {
     /// Defined in HFP v1.8, Table 5.2
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     struct HandsFreeFeaturesSdpAttribute: u16 {
         const ECHO_CANCELATION_AND_NOISE_REDUCTION = 0b0000_0001;
         const THREE_WAY_CALLING                    = 0b0000_0010;

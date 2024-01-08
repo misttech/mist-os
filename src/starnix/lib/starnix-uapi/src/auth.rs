@@ -221,6 +221,7 @@ pub const CAP_CHECKPOINT_RESTORE: Capabilities =
     Capabilities { mask: 1u64 << uapi::CAP_CHECKPOINT_RESTORE };
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct PtraceAccessMode: u32 {
         const READ      = 1 << 0;
         const ATTACH    = 1 << 1;
@@ -325,6 +326,7 @@ pub struct Credentials {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SecureBits: u32 {
         const KEEP_CAPS = 1 << uapi::SECURE_KEEP_CAPS;
         const KEEP_CAPS_LOCKED = 1 <<  uapi::SECURE_KEEP_CAPS_LOCKED;

@@ -39,7 +39,7 @@ impl Default for ObjectClass {
 
 bitflags! {
     /// The set of rights that may be granted to sources accessing targets controlled by SELinux.
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct AccessVector: u32 {
         const READ = 1 << 0;
         const WRITE = 1 << 1;
@@ -49,8 +49,8 @@ bitflags! {
 }
 
 impl AccessVector {
-    pub const NONE: AccessVector = AccessVector { bits: 0 };
-    pub const ALL: AccessVector = AccessVector { bits: u32::MAX };
+    pub const NONE: AccessVector = AccessVector::from_bits_retain(0);
+    pub const ALL: AccessVector = AccessVector::from_bits_retain(u32::MAX);
 }
 
 impl Into<u32> for AccessVector {

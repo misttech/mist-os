@@ -24,7 +24,7 @@ pub type Alias = u32;
 pub const EXAMPLE_CONST: u32 = 0;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ExampleBits: u32 {
         const MEMBER = 1;
     }
@@ -458,10 +458,10 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Self>(offset);
-            if self.bits & Self::all().bits != self.bits {
+            if self.bits() & Self::all().bits() != self.bits() {
                 return Err(fidl::Error::InvalidBitsValue);
             }
-            encoder.write_num(self.bits, offset);
+            encoder.write_num(self.bits(), offset);
             Ok(())
         }
     }

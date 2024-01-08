@@ -27,6 +27,7 @@ pub const MIN_MAX_PACKET_SIZE: usize = 255;
 bitflags! {
     /// The flags used in a SetPath operation.
     /// Defined in OBEX 1.5 Section 3.4.6.1.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SetPathFlags: u8 {
         /// Backup a directory level before applying (e.g. `../` on some systems).
         const BACKUP = 0b0000_0001;

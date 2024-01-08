@@ -9,6 +9,7 @@ bitflags! {
     /// Gzip header flags.
     ///
     /// See RFC 1952 for detailed information about each flag.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Flags: u8 {
         /// An optional indication that the payload is "probably ASCII text".
         const TEXT = 0b0000_0001;

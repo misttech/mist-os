@@ -24,6 +24,7 @@ impl_handle_based!(Stream);
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct StreamOptions: u32 {
         const MODE_READ = sys::ZX_STREAM_MODE_READ;
         const MODE_WRITE = sys::ZX_STREAM_MODE_WRITE;
@@ -33,12 +34,14 @@ bitflags! {
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct StreamReadOptions: u32 {
     }
 }
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct StreamWriteOptions: u32 {
         const APPEND = sys::ZX_STREAM_APPEND;
     }

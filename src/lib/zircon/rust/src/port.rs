@@ -465,8 +465,9 @@ impl Port {
 }
 
 bitflags! {
-    #[repr(transparent)]
     /// Options for wait_async
+    #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct WaitAsyncOpts: u32 {
         /// When set, causes the system to capture a timestamp when the wait triggered.
         const TIMESTAMP = sys::ZX_WAIT_ASYNC_TIMESTAMP;

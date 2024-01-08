@@ -433,8 +433,8 @@ pub unsafe extern "C" fn ffx_object_signal(
     let ctx = unsafe { get_arc(ctx) };
     let (tx, rx) = mpsc::sync_channel(1);
     let handle = unsafe { fidl::Handle::from_raw(hdl) };
-    let clear_mask = unsafe { fidl::Signals::from_bits_unchecked(clear_mask) };
-    let set_mask = unsafe { fidl::Signals::from_bits_unchecked(set_mask) };
+    let clear_mask = fidl::Signals::from_bits_retain(clear_mask);
+    let set_mask = fidl::Signals::from_bits_retain(set_mask);
     ctx.run(LibraryCommand::ObjectSignal { handle, clear_mask, set_mask, responder: tx });
     rx.recv().unwrap()
 }
@@ -449,8 +449,8 @@ pub unsafe extern "C" fn ffx_object_signal_peer(
     let ctx = unsafe { get_arc(ctx) };
     let (tx, rx) = mpsc::sync_channel(1);
     let handle = unsafe { fidl::Handle::from_raw(hdl) };
-    let clear_mask = unsafe { fidl::Signals::from_bits_unchecked(clear_mask) };
-    let set_mask = unsafe { fidl::Signals::from_bits_unchecked(set_mask) };
+    let clear_mask = fidl::Signals::from_bits_retain(clear_mask);
+    let set_mask = fidl::Signals::from_bits_retain(set_mask);
     ctx.run(LibraryCommand::ObjectSignalPeer { handle, clear_mask, set_mask, responder: tx });
     rx.recv().unwrap()
 }
@@ -465,7 +465,7 @@ pub unsafe extern "C" fn ffx_object_signal_poll(
     let ctx = unsafe { get_arc(ctx) };
     let (tx, rx) = mpsc::sync_channel(1);
     let handle = unsafe { fidl::Handle::from_raw(hdl) };
-    let signals = unsafe { fidl::Signals::from_bits_unchecked(signals) };
+    let signals = fidl::Signals::from_bits_retain(signals);
     ctx.run(LibraryCommand::ObjectSignalPoll { lib: ctx.clone(), handle, signals, responder: tx });
     match rx.recv().unwrap() {
         Ok(sig) => safe_write(signals_out, sig.bits()),

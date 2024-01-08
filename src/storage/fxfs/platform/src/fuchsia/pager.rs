@@ -511,6 +511,7 @@ impl VmoDirtyRange {
 
 bitflags! {
     /// Options for `Pager::query_vmo_stats`.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[repr(transparent)]
     pub struct PagerVmoStatsOptions: u32 {
         /// Resets the stats at the of the `Pager::query_vmo_stats` call.

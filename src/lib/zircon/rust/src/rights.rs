@@ -15,6 +15,7 @@ bitflags! {
     ///
     /// See [rights](https://fuchsia.dev/fuchsia-src/concepts/kernel/rights) for more information.
     #[repr(C)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Rights: sys::zx_rights_t {
         const NONE            = sys::ZX_RIGHT_NONE;
         const DUPLICATE       = sys::ZX_RIGHT_DUPLICATE;
@@ -56,17 +57,5 @@ bitflags! {
                                 sys::ZX_RIGHT_WRITE | sys::ZX_RIGHT_SIGNAL |
                                 sys::ZX_RIGHT_SIGNAL_PEER;
         const VMO_DEFAULT     = Self::BASIC.bits() | Self::IO.bits() | Self::PROPERTY.bits() | Self::MAP.bits() | sys::ZX_RIGHT_SIGNAL;
-    }
-}
-
-impl Rights {
-    /// Same as from_bits() but a const fn.
-    #[inline]
-    pub const fn from_bits_const(bits: sys::zx_rights_t) -> Option<Rights> {
-        if (bits & !Rights::all().bits()) == 0 {
-            return Some(Rights { bits });
-        } else {
-            None
-        }
     }
 }

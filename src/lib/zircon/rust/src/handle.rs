@@ -546,7 +546,7 @@ impl HandleInfo {
         HandleInfo {
             handle: Handle::from_raw(raw.handle),
             object_type: ObjectType(raw.ty),
-            rights: Rights::from_bits_unchecked(raw.rights),
+            rights: Rights::from_bits_retain(raw.rights),
         }
     }
 }

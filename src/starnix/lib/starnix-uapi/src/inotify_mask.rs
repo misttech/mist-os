@@ -6,6 +6,7 @@ use crate::uapi;
 use bitflags::bitflags;
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct InotifyMask: u32 {
         // Events
         const ACCESS = uapi::IN_ACCESS;

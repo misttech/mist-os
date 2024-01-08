@@ -82,7 +82,7 @@ def main():
     expected_error = f"""
 └── fuchsia-pkg://fuchsia.com/{package_name}#meta/{component_name}.cm
       └── `asserted_by_scrutiny_test` has a different value ("{expected_value_in_policy}") than expected ("not the string that was packaged").
-      └── `verifier_fails_due_to_mutability_parent` has an expected value in the policy which could be overridden at runtime by PARENT."""
+      └── `verifier_fails_due_to_mutability_parent` has an expected value in the policy which could be overridden at runtime by ConfigMutability(PARENT)."""
     test.assertIn(
         expected_error, stderr, "error message must contain expected failures"
     )

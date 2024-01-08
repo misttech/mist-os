@@ -19,6 +19,7 @@ pub use syncio::ZxioShutdownFlags as SocketShutdownFlags;
 use super::NetlinkAddress;
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SocketMessageFlags: u32 {
         const PEEK = MSG_PEEK;
         const DONTROUTE = MSG_DONTROUTE;

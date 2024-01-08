@@ -1343,6 +1343,7 @@ impl FuseKernelMessage {
 }
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct FuseInitFlags : u32 {
         const BIG_WRITES = uapi::FUSE_BIG_WRITES;
         const DONT_MASK = uapi::FUSE_DONT_MASK;

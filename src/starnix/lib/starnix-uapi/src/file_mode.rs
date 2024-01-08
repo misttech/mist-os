@@ -159,6 +159,7 @@ mod inner_access {
     use super::OpenFlags;
 
     bitflags::bitflags! {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct Access: u32 {
             const EXIST = 0;
             const EXEC = 1;
@@ -187,7 +188,7 @@ mod inner_access {
         }
 
         pub fn rwx_bits(&self) -> u32 {
-            self.bits & 0o7
+            self.bits() & 0o7
         }
     }
 }

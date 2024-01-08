@@ -5,7 +5,7 @@
 use bitflags::bitflags;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ComponentDirt: u16 {
         const DEPENDENTS = 0b0000000001;
         /// General flag for components are dirty (if this is up, the update

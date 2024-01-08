@@ -30,6 +30,7 @@ mod inner_attr {
     use super::bitflags;
 
     bitflags! {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub(super) struct HandsFreeFeaturesSdpAttribute: u16 {
             const ECHO_CANCELLATION_AND_NOISE_REDUCTION = 0b0000_0001;
             const CALL_WAITING_OR_THREE_WAY_CALLING     = 0b0000_0010;

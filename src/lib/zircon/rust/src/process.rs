@@ -22,6 +22,7 @@ use std::mem::MaybeUninit;
 bitflags! {
     /// Options that may be used when creating a `Process`.
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ProcessOptions: u32 {
         const SHARED = sys::ZX_PROCESS_SHARED;
     }
@@ -35,6 +36,7 @@ impl Default for ProcessOptions {
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ProcessInfoFlags: u32 {
         const STARTED = sys::ZX_INFO_PROCESS_FLAG_STARTED;
         const EXITED = sys::ZX_INFO_PROCESS_FLAG_EXITED;

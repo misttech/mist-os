@@ -20,7 +20,7 @@ const BORDER_AGENT_SERVICE_PLACEHOLDER_PORT: u16 = 9;
 // [1]: https://github.com/openthread/ot-br-posix/blob/36db8891576a6ed571ad319afca734c5288c4cd9/src/border_agent/border_agent.cpp#L86
 bitflags::bitflags! {
 #[repr(C)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BorderAgentState : u32 {
     const CONNECTION_MODE_PSKC = 1;
     const CONNECTION_MODE_PSKD = 2;
@@ -66,7 +66,7 @@ where
     txt.push(("tv".to_string(), ot::get_thread_version_str().as_bytes().to_vec()));
 
     // `sb` - State bitmap
-    txt.push(("sb".to_string(), border_agent_state.bits.to_be_bytes().to_vec()));
+    txt.push(("sb".to_string(), border_agent_state.bits().to_be_bytes().to_vec()));
 
     // `nn` - Network Name
     if ot_instance.is_commissioned() {

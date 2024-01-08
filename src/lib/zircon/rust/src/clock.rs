@@ -26,6 +26,7 @@ impl_handle_based!(Clock);
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ClockOpts: u64 {
         /// When set, creates a clock object which is guaranteed to never run backwards. Monotonic
         /// clocks must always move forward.
@@ -34,7 +35,7 @@ bitflags! {
         /// When set, creates a clock which is guaranteed to never jump either forwards or
         /// backwards. Continuous clocks may only be maintained using frequency adjustments and are,
         /// by definition, also monotonic.
-        const CONTINUOUS = sys::ZX_CLOCK_OPT_CONTINUOUS | Self::MONOTONIC.bits;
+        const CONTINUOUS = sys::ZX_CLOCK_OPT_CONTINUOUS | Self::MONOTONIC.bits();
 
         /// When set, creates a clock that is automatically started and is initially a clone of
         /// clock monotonic. Users may still update the clock within the limits defined by the
@@ -175,13 +176,13 @@ impl Clock {
                 let args = sys::zx_clock_create_args_v1_t { backstop_time: backstop.into_nanos() };
                 unsafe {
                     sys::zx_clock_create(
-                        sys::ZX_CLOCK_ARGS_VERSION_1 | opts.bits,
+                        sys::ZX_CLOCK_ARGS_VERSION_1 | opts.bits(),
                         &args as *const _ as *const u8,
                         &mut out,
                     )
                 }
             }
-            None => unsafe { sys::zx_clock_create(opts.bits, ptr::null(), &mut out) },
+            None => unsafe { sys::zx_clock_create(opts.bits(), ptr::null(), &mut out) },
         };
         ok(status)?;
         unsafe { Ok(Self::from(Handle::from_raw(out))) }

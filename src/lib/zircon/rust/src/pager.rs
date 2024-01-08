@@ -22,12 +22,14 @@ impl_handle_based!(Pager);
 bitflags! {
     /// Options that may be used when creating a pager.
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct PagerOptions: u32 {
     }
 }
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct PagerWritebackBeginOptions: u64 {
         const DIRTY_RANGE_IS_ZERO = sys::ZX_VMO_DIRTY_RANGE_IS_ZERO;
     }

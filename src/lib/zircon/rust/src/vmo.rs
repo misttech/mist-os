@@ -281,6 +281,7 @@ impl Vmo {
 bitflags! {
     /// Options that may be used when creating a `Vmo`.
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct VmoOptions: u32 {
         const RESIZABLE = sys::ZX_VMO_RESIZABLE;
         const TRAP_DIRTY = sys::ZX_VMO_TRAP_DIRTY;
@@ -290,6 +291,7 @@ bitflags! {
 bitflags! {
     /// Flags that may be set when receiving info on a `Vmo`.
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct VmoInfoFlags: u32 {
         const RESIZABLE = sys::ZX_INFO_VMO_RESIZABLE;
         const IS_COW_CLONE = sys::ZX_INFO_VMO_IS_COW_CLONE;
@@ -301,6 +303,7 @@ bitflags! {
 bitflags! {
     /// Options that may be used when creating a `Vmo` child.
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct VmoChildOptions: u32 {
         const SNAPSHOT = sys::ZX_VMO_CHILD_SNAPSHOT;
         const SNAPSHOT_AT_LEAST_ON_WRITE = sys::ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE;
@@ -314,6 +317,7 @@ bitflags! {
 bitflags! {
     /// Options that may be used when transferring data between VMOs.
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct TransferDataOptions: u32 {
     }
 }

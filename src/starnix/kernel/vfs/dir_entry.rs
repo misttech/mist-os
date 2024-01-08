@@ -27,6 +27,7 @@ use std::{
 };
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct RenameFlags: u32 {
         // Exchange the entries.
         const EXCHANGE = RENAME_EXCHANGE;
@@ -42,7 +43,7 @@ bitflags! {
         const REPLACE_ANY = 0x80000000;
 
         // Internal flags that cannot be passed to `sys_rename()`
-        const INTERNAL = Self::REPLACE_ANY.bits;
+        const INTERNAL = Self::REPLACE_ANY.bits();
     }
 }
 

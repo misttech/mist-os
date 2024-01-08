@@ -243,6 +243,7 @@ impl CheckResponse for serde_cbor::Value {
 
 bitflags! {
     /// Retry configuration for ArchiveReader.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct RetryConfig: u8 {
         /// ArchiveReader will retry on empty responses.
         const EMPTY = 0b00000001;

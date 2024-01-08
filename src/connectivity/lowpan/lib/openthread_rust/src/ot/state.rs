@@ -17,7 +17,7 @@ use std::task::Waker;
 
 bitflags! {
 #[repr(C)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ChangedFlags : ::std::os::raw::c_uint {
     const IP6_ADDRESS_ADDED = OT_CHANGED_IP6_ADDRESS_ADDED;
     const IP6_ADDRESS_REMOVED = OT_CHANGED_IP6_ADDRESS_REMOVED;

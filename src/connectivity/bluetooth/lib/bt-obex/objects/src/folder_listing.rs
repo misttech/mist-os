@@ -37,6 +37,7 @@ const TYPE_ATTR: &str = "type";
 const XML_LANG_ATTR: &str = "xml:lang";
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Permission : u8 {
         const READ = 0x1;
         const WRITE = 0x2;

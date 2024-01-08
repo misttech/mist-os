@@ -17,6 +17,7 @@ bitflags! {
     /// [Objects and signals](https://fuchsia.dev/fuchsia-src/concepts/kernel/concepts#objects_and_signals)
     /// in the Zircon kernel documentation. Note: the names of signals are still in flux.
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Signals: zx_signals_t {
         const NONE          = ZX_SIGNAL_NONE;
         const OBJECT_ALL    = ZX_OBJECT_SIGNAL_ALL;

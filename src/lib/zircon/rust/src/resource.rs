@@ -204,6 +204,7 @@ unsafe impl ObjectQuery for ResourceInfo {
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ResourceKind: sys::zx_rsrc_kind_t {
        const MMIO       = sys::ZX_RSRC_KIND_MMIO;
        const IRQ        = sys::ZX_RSRC_KIND_IRQ;
@@ -216,6 +217,7 @@ bitflags! {
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ResourceFlag: sys::zx_rsrc_flags_t {
        const EXCLUSIVE = sys::ZX_RSRC_FLAG_EXCLUSIVE;
     }

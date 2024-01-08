@@ -181,7 +181,7 @@ impl Executor {
         // TODO(sadmac): Make sure the handle is guaranteed to remain open for the duration of the
         // wait, or document what effect that has on correctness.
         let object = std::mem::ManuallyDrop::new(Handle::from_raw(wait.object));
-        let trigger = Signals::from_bits_unchecked(wait.trigger);
+        let trigger = Signals::from_bits_retain(wait.trigger);
         let handler = wait.handler;
 
         fasync::Task::local(async move {

@@ -280,8 +280,8 @@ pub fn sys_personality(
     let mut state = current_task.task.thread_group.write();
     let previous_value = state.personality.bits();
     if persona != 0xffffffff {
-        // Use `from_bits_unchecked()` since we want to keep unknown flags.
-        state.personality = unsafe { PersonalityFlags::from_bits_unchecked(persona) };
+        // Use `from_bits_retain()` since we want to keep unknown flags.
+        state.personality = PersonalityFlags::from_bits_retain(persona);
     }
     Ok(previous_value.into())
 }

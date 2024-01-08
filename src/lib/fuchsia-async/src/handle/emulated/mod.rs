@@ -1375,6 +1375,7 @@ mod inner_signals {
         ///
         /// See [signals](https://fuchsia.dev/fuchsia-src/concepts/kernel/signals) for more information.
         #[repr(transparent)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct Signals : u32 {
             /// No signals
             const NONE = 0x00000000;
@@ -1486,6 +1487,7 @@ mod inner_signals {
         ///
         /// See [rights](https://fuchsia.dev/fuchsia-src/concepts/kernel/rights) for more information.
         #[repr(C)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct Rights: u32 {
             /// No rights.
             const NONE           = 0;
@@ -1563,18 +1565,6 @@ mod inner_signals {
                                 Rights::SIGNAL.bits();
         }
     }
-
-    impl Rights {
-        /// Same as from_bits() but a const fn.
-        #[inline]
-        pub const fn from_bits_const(bits: u32) -> Option<Rights> {
-            if (bits & !Rights::all().bits()) == 0 {
-                return Some(Rights { bits });
-            } else {
-                None
-            }
-        }
-    }
 }
 
 pub use inner_signals::{Rights, Signals};
@@ -1630,7 +1620,7 @@ impl HandleInfo {
         HandleInfo {
             handle: Handle::from_raw(raw.handle),
             object_type: ObjectType(raw.ty),
-            rights: Rights::from_bits_unchecked(raw.rights),
+            rights: Rights::from_bits_retain(raw.rights),
         }
     }
 }

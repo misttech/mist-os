@@ -150,9 +150,9 @@ impl ProcessLauncher {
                     state.handles.append(&mut handles);
                 }
                 fproc::LauncherRequest::SetOptions { options, .. } => {
-                    // SAFETY: These options are passed directly to `zx_process_create`, which
+                    // These options are passed directly to `zx_process_create`, which
                     // will determine whether or not the options are valid.
-                    state.options = unsafe { zx::ProcessOptions::from_bits_unchecked(options) };
+                    state.options = zx::ProcessOptions::from_bits_retain(options);
                 }
             }
         }

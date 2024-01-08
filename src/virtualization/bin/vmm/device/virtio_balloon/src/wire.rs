@@ -26,7 +26,7 @@ pub use zerocopy::byteorder::little_endian::{U16 as LE16, U32 as LE32, U64 as LE
 // VIRTIO_BALLOON_F_PAGE_REPORTING(5) The device has support for free page reporting. A virtqueue
 // for reporting free guest memory is present.
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct VirtioBalloonFeatureFlags: u32 {
         const VIRTIO_BALLOON_F_MUST_TELL_HOST    = 0b00000001;
         const VIRTIO_BALLOON_F_STATS_VQ          = 0b00000010;

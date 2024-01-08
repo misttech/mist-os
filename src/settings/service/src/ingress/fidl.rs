@@ -89,6 +89,7 @@ pub mod display {
         /// The Display interface covers a number of feature spaces, each handled by a different
         /// entity dependency. The flags below allow the scope of these features to be specified by
         /// the interface.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct InterfaceFlags: u64 {
             const BASE = 1 << 0;
             const LIGHT_SENSOR = 1 << 1;

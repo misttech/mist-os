@@ -68,7 +68,7 @@ pub const ENUM_TRUE: EnumType = EnumType::True_;
 pub const ENUM_VAL: EnumType = EnumType::Value;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct BitsType: u32 {
         const VALUE = 1;
         const TRUE_ = 2;
@@ -153,10 +153,10 @@ mod internal {
             _depth: fidl::encoding::Depth,
         ) -> fidl::Result<()> {
             encoder.debug_check_bounds::<Self>(offset);
-            if self.bits & Self::all().bits != self.bits {
+            if self.bits() & Self::all().bits() != self.bits() {
                 return Err(fidl::Error::InvalidBitsValue);
             }
-            encoder.write_num(self.bits, offset);
+            encoder.write_num(self.bits(), offset);
             Ok(())
         }
     }

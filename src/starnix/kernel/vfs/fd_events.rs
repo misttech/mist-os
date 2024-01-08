@@ -5,6 +5,7 @@
 use starnix_uapi::uapi;
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct FdEvents: u32 {
         const POLLIN = uapi::POLLIN;
         const POLLPRI = uapi::POLLPRI;

@@ -122,7 +122,7 @@ group("bitfield") {
 }
 
 group("bitflags") {
-  public_deps = [ ":bitflags-v1_3_2" ]
+  public_deps = [ ":bitflags-v2_4_1" ]
 }
 
 group("blocking") {
@@ -2380,6 +2380,38 @@ rust_library("bitflags-v1_3_2") {
   visibility += [ "//third_party/alacritty/alacritty_terminal:*" ]
 
   applicable_licenses = [ ":bitflags-v1_3_2.license" ]
+}
+
+license("bitflags-v2_4_1.license") {
+  public_package_name = "bitflags"
+  license_files = [
+    "//third_party/rust_crates/vendor/bitflags-2.4.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/bitflags-2.4.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("bitflags-v2_4_1") {
+  crate_name = "bitflags"
+  crate_root = "//third_party/rust_crates/vendor/bitflags-2.4.1/src/lib.rs"
+  output_name = "bitflags-2dca82e1c034ddb5"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":serde-v1_0_147" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=2dca82e1c034ddb5",
+    "-Cextra-filename=-2dca82e1c034ddb5",
+    "--cfg=feature=\"serde\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":bitflags-v2_4_1.license" ]
 }
 
 license("block-buffer-v0_10_4.license") {

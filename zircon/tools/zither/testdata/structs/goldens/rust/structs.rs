@@ -57,10 +57,14 @@ pub enum Enum {
     One = 1,
 }
 
+#[repr(C)]
+#[derive(
+    AsBytes, FromZeroes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
+pub struct Bits(u16);
+
 bitflags! {
-    #[repr(C)]
-    #[derive(AsBytes, FromZeroes, FromBytes)]
-    pub struct Bits : u16 {
+    impl Bits : u16 {
         const ONE = 1 << 0;
         const TWO = 1 << 1;
   }

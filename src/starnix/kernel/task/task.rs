@@ -266,6 +266,7 @@ impl StopState {
 }
 
 bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct TaskFlags: u8 {
         const EXITED = 0x1;
         const SIGNALS_AVAILABLE = 0x2;
@@ -287,14 +288,14 @@ impl AtomicTaskFlags {
 
     fn load(&self, ordering: Ordering) -> TaskFlags {
         let flags = self.flags.load(ordering);
-        // SAFETY: We only ever store values from a `TaskFlags`.
-        unsafe { TaskFlags::from_bits_unchecked(flags) }
+        // We only ever store values from a `TaskFlags`.
+        TaskFlags::from_bits_retain(flags)
     }
 
     fn swap(&self, flags: TaskFlags, ordering: Ordering) -> TaskFlags {
         let flags = self.flags.swap(flags.bits(), ordering);
-        // SAFETY: We only ever store values from a `TaskFlags`.
-        unsafe { TaskFlags::from_bits_unchecked(flags) }
+        // We only ever store values from a `TaskFlags`.
+        TaskFlags::from_bits_retain(flags)
     }
 }
 

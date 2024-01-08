@@ -323,6 +323,7 @@ impl Task for Job {}
 bitflags! {
     /// Options that may be used by `Job::set_critical`.
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct JobCriticalOptions: u32 {
         const RETCODE_NONZERO = sys::ZX_JOB_CRITICAL_PROCESS_RETCODE_NONZERO;
     }

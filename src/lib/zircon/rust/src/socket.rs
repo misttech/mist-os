@@ -26,6 +26,7 @@ impl Peered for Socket {}
 
 bitflags! {
     #[repr(transparent)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SocketOpts: u32 {
         const STREAM = 0 << 0;
         const DATAGRAM = 1 << 0;
@@ -34,7 +35,7 @@ bitflags! {
 
 bitflags! {
     #[repr(transparent)]
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SocketReadOpts: u32 {
         const PEEK = 1 << 3;
     }
@@ -42,7 +43,7 @@ bitflags! {
 
 bitflags! {
     #[repr(transparent)]
-    #[derive(Default)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct SocketWriteOpts: u32 {
     }
 }
