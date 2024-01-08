@@ -40,6 +40,12 @@ impl Channel {
         Ok(Channel(RWHandle::new(channel)))
     }
 
+    /// Available for soft migration of b/319131778.
+    // TODO(https://fxbug.dev/319131778) delete this function
+    pub fn try_from_channel(channel: zx::Channel) -> Result<Self, zx::Status> {
+        Self::from_channel(channel)
+    }
+
     /// Consumes `self` and returns the underlying `zx::Channel`.
     pub fn into_zx_channel(self) -> zx::Channel {
         self.0.into_inner()
