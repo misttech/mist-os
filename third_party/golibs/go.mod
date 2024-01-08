@@ -20,7 +20,6 @@ require (
 	github.com/spdx/tools-golang v0.3.1-0.20221108182156-8a01147e6342
 	github.com/spf13/pflag v1.0.5
 	github.com/theupdateframework/go-tuf v0.0.0-20211108161206-fc0190d925a5
-	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/goleak v1.2.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090
@@ -33,7 +32,7 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v2 v2.4.0
-	gvisor.dev/gvisor v0.0.0-20231123021541-3a1da430f081
+	gvisor.dev/gvisor v0.0.0-20240103195848-a9a6a6819b00
 )
 
 require (
@@ -53,8 +52,6 @@ require (
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/tent/canonical-json-go v0.0.0-20130607151641-96e4ba3a7613 // indirect
-	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
-	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/oauth2 v0.4.0 // indirect
 	golang.org/x/text v0.13.0 // indirect

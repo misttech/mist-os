@@ -671,46 +671,6 @@ go_library("github.com/tent/canonical-json-go") {
   sources = [ "encode.go" ]
 }
 
-go_library("github.com/xeipuuv/gojsonpointer") {
-  name = "github.com/xeipuuv/gojsonpointer"
-  source_dir = "vendor/github.com/xeipuuv/gojsonpointer"
-  sources = [ "pointer.go" ]
-}
-
-go_library("github.com/xeipuuv/gojsonreference") {
-  name = "github.com/xeipuuv/gojsonreference"
-  source_dir = "vendor/github.com/xeipuuv/gojsonreference"
-  sources = [ "reference.go" ]
-}
-
-go_library("github.com/xeipuuv/gojsonschema") {
-  name = "github.com/xeipuuv/gojsonschema"
-  source_dir = "vendor/github.com/xeipuuv/gojsonschema"
-  deps = [
-    ":github.com/xeipuuv/gojsonpointer",
-    ":github.com/xeipuuv/gojsonreference",
-  ]
-  sources = [
-    "draft.go",
-    "errors.go",
-    "format_checkers.go",
-    "internalLog.go",
-    "jsonContext.go",
-    "jsonLoader.go",
-    "locales.go",
-    "result.go",
-    "schema.go",
-    "schemaLoader.go",
-    "schemaPool.go",
-    "schemaReferencePool.go",
-    "schemaType.go",
-    "subSchema.go",
-    "types.go",
-    "utils.go",
-    "validation.go",
-  ]
-}
-
 ### go.opencensus.io/*
 # Actually aggregates the dependencies of other go.opencensus.io/*
 # packages as well. Use this as a convenience target for any such package.
@@ -2398,6 +2358,8 @@ go_library("gvisor.dev/gvisor") {
     "pkg/sync/runtime.go",
     "pkg/sync/runtime_amd64.go",
     "pkg/sync/runtime_constants.go",
+    "pkg/sync/runtime_exectracer1.go",
+    "pkg/sync/runtime_exectracer2.go",
     "pkg/sync/runtime_go121_unsafe.go",
     "pkg/sync/runtime_not_go121_unsafe.go",
     "pkg/sync/runtime_other.go",

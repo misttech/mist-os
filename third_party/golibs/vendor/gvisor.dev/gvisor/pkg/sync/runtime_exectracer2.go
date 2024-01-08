@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build goexperiment.exectracer2
+
 package sync
 
-// Values for the reason argument to gopark, from Go's src/runtime/runtime2.go.
+// TraceBlockReason constants, from Go's src/runtime/trace2runtime.go.
 const (
-	WaitReasonSelect      uint8 = 9  // +checkconst runtime waitReasonSelect
-	WaitReasonChanReceive uint8 = 14 // +checkconst runtime waitReasonChanReceive
-	WaitReasonSemacquire  uint8 = 18 // +checkconst runtime waitReasonSemacquire
+	TraceBlockSelect TraceBlockReason = 3 // +checkconst runtime traceBlockSelect
+	TraceBlockSync   TraceBlockReason = 5 // +checkconst runtime traceBlockSync
 )

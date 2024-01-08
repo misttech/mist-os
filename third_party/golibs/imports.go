@@ -29,7 +29,6 @@ import (
 	_ "github.com/theupdateframework/go-tuf"
 	_ "github.com/theupdateframework/go-tuf/data"
 	_ "github.com/theupdateframework/go-tuf/pkg/keys"
-	_ "github.com/xeipuuv/gojsonschema"
 	_ "golang.org/x/crypto/openpgp"
 	_ "golang.org/x/crypto/ssh"
 	_ "golang.org/x/exp/maps"
