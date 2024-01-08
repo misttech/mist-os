@@ -360,6 +360,16 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
         error!(EBADF)
     }
+
+    fn readahead(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _length: usize,
+    ) -> Result<(), Errno> {
+        error!(EINVAL)
+    }
 }
 
 pub fn default_eof_offset(file: &FileObject, current_task: &CurrentTask) -> Result<off_t, Errno> {
@@ -1401,6 +1411,19 @@ impl FileObject {
         if !self.flags().contains(OpenFlags::NOATIME) {
             self.name.update_atime();
         }
+    }
+
+    pub fn readahead(
+        &self,
+        current_task: &CurrentTask,
+        offset: usize,
+        length: usize,
+    ) -> Result<(), Errno> {
+        // readfile() fails with EBADF if the file was not open for read.
+        if !self.can_read() {
+            return error!(EBADF);
+        }
+        self.ops().readahead(self, current_task, offset, length)
     }
 }
 

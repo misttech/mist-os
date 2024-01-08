@@ -349,6 +349,17 @@ pub(crate) use fileops_impl_vmo;
 
 impl FileOps for VmoFileObject {
     fileops_impl_vmo!(self, &self.vmo);
+
+    fn readahead(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _length: usize,
+    ) -> Result<(), Errno> {
+        // TODO(b/42082608): Implement for paged VMO's once this feature is supported in Zircon.
+        Ok(())
+    }
 }
 
 pub fn new_memfd(

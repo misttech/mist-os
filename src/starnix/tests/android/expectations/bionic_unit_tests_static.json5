@@ -24,7 +24,6 @@
                 "fcntl.f_getlk64",
                 "fcntl.vmsplice",
                 "fcntl.tee",
-                "fcntl.readahead",
                 "fcntl.sync_file_range",
                 "fcntl.f_getlk_FOB64",
                 "glob.glob_GLOB_APPEND",

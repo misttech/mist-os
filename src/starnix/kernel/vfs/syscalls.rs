@@ -2483,6 +2483,23 @@ pub fn sys_splice(
     splice::splice(current_task, fd_in, off_in, fd_out, off_out, len, flags)
 }
 
+pub fn sys_readahead(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    offset: off_t,
+    length: usize,
+) -> Result<(), Errno> {
+    let file = current_task.files.get(fd)?;
+    if length > crate::vfs::MAX_LFS_FILESIZE {
+        return error!(EINVAL);
+    }
+    // Allow only non-negative values of `offset`. Some versions of Linux allow it to be negative,
+    // but GVisor tests require `readahead()` to fail in this case.
+    let offset: usize = offset.try_into().map_err(|_| errno!(EINVAL))?;
+    file.readahead(current_task, offset, length)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

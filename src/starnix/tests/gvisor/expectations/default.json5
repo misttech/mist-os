@@ -570,16 +570,6 @@
                 "RawSocketTest.ReceiveIPPacketInfo",
                 "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
 
-                // readahead_test
-                "ReadaheadTest.WriteOnly",
-                "ReadaheadTest.UnsupportedFile",
-                "ReadaheadTest.ValidOffset",
-                "ReadaheadTest.PastEnd",
-                "ReadaheadTest.InvalidOffset",
-                "ReadaheadTest.InvalidFD",
-                "ReadaheadTest.InvalidSize",
-                "ReadaheadTest.CrossesEnd",
-
                 // rlimits_test
                 "RlimitTest.RlimitNProc",
 

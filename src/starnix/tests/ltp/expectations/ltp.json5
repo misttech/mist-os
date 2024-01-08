@@ -178,7 +178,8 @@
                 "quotactl04",
                 "quotactl08",
                 "quotactl09",
-                "readahead01",
+
+                // Depends on IO stats in /proc/<pid>/io .
                 "readahead02",
                 "remap_file_pages02",
                 "request_key01",
