@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/125953): ffx_plugin template always adds anyhow as a dep.
-use anyhow as _;
-
 use async_trait::async_trait;
 use emulator_instance::{EmulatorInstanceData, EmulatorInstanceInfo, EngineState};
 use ffx_emulator_list_args::ListCommand;

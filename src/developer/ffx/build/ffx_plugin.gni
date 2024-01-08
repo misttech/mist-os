@@ -311,8 +311,6 @@ template("ffx_plugin") {
           deps += invoker.deps
         }
 
-        # for the #[ffx_plugin()] macro
-        deps += [ "//third_party/rust_crates:anyhow" ]
         if (defined(invoker.configs)) {
           configs += invoker.configs
         }

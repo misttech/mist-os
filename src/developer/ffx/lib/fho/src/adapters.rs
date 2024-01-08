@@ -12,30 +12,23 @@ macro_rules! embedded_plugin {
         pub async fn ffx_plugin_impl(
             injector: &::std::sync::Arc<dyn ffx_core::Injector>,
             cmd: <$tool as $crate::FfxTool>::Command,
-        ) -> ::anyhow::Result<()> {
-            // TODO(120283): anyhow is used directly here to keep using the
-            // global anyhow include in plugin libs. When enough plugins have
-            // migrated to make it worthwhile to remove the default include, this
-            // should switch back to pulling any anyhow-related types from
-            // $crate::macro_deps::anyhow.
-            use ::anyhow::Context;
+        ) -> $crate::Result<()> {
             #[allow(unused_imports)]
-            use $crate::macro_deps::{argh, global_env_context, FfxCommandLine};
+            use $crate::macro_deps::{argh, bug, global_env_context, return_bug, FfxCommandLine};
 
             let ffx = FfxCommandLine::from_env()?;
-            let context = global_env_context().context("Loading global environment context")?;
+            let context = if let Some(gc) = global_env_context() {
+                gc
+            } else {
+                $crate::macro_deps::return_bug!("global env context unavailable")
+            };
             let injector = injector.clone();
 
             let env = $crate::FhoEnvironment { ffx, context, injector };
 
             let writer = $crate::TryFromEnv::try_from_env(&env).await?;
             let tool = <$tool as $crate::FfxTool>::from_env(env, cmd).await?;
-            match $crate::FfxMain::main(tool, writer).await {
-                Ok(ok) => Ok(ok),
-                Err($crate::Error::User(err)) => Err(err),
-                Err($crate::Error::Unexpected(err)) => Err(err),
-                other => other.context("Running command (unexpected error type)"),
-            }
+            $crate::FfxMain::main(tool, writer).await
         }
 
         pub fn ffx_plugin_is_machine_supported() -> bool {
