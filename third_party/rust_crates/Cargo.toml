@@ -143,7 +143,6 @@ md-5 = "0.10.5"
 memchr = "2.0"
 memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
-# TODO(https://fxbug.dev/66092) limit to tests
 mockall = "0.9"
 netlink-packet-core = "0.7.0"
 netlink-packet-route = "0.17.0"
@@ -557,6 +556,9 @@ group_visibility = { import = "//third_party/rust_crates/visibility.gni", variab
 
 [gn.package.memchr."2.4.0"]
 rustflags = ["--cfg=memchr_runtime_simd", "--cfg=memchr_runtime_sse2", "--cfg=memchr_runtime_sse42", "--cfg=memchr_runtime_avx"]
+
+[gn.package.mockall."0.9.0"]
+deps = ["//build/validate:non_production_tag"]
 
 [gn.package.nix."0.26.2"]
 group_visibility = { import = "//src/lib/fuchsia_nix/nix_visibility.gni", variable = "nix_visibility" }

@@ -8289,7 +8289,7 @@ rust_library("mockall-v0_9_0") {
   deps += [ ":mockall_derive-v0_9_0($host_toolchain)" ]
   deps += [ ":predicates-v1_0_7" ]
   deps += [ ":predicates-tree-v1_0_2" ]
-
+  deps += [ "//build/validate:non_production_tag" ]
   rustenv = []
 
   rustflags = [
