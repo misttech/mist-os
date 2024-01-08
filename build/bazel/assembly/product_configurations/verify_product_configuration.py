@@ -44,6 +44,9 @@ def normalize_file_in_config(
     """Replace an `item` (in "foo.bar.baz" format) in the `configuration` with
     an item that contains the sha1 of the file referenced. The new item will be
     suffixed with '_sha1'
+
+    If an element of the path ends in [], such as "foo.bar[].baz", we assume
+    that we must enumerate each item in a list.
     '"""
     # Split the item's path into a list of elements
     path_elements = item.split(".")
@@ -51,26 +54,69 @@ def normalize_file_in_config(
     item_name = path_elements[-1]
 
     # Find the node (dict) that holds the item, or set it to None if not found.
-    config_node = configuration
+    config_nodes = [configuration]
     for element in node_path:
-        if element in config_node and config_node[element] is not None:
-            config_node = config_node[element]
-        else:
-            # It's not here, so exit early.
-            return
+        is_list = False
+        if element.endswith("[]"):
+            is_list = True
+            element = element.removesuffix("[]")
 
-    if item_name in config_node and config_node[item_name] is not None:
-        # External dependencies can be found by navigating into output_base.
-        item_value = config_node[item_name]
-        if item_value.startswith("external"):
-            item_value = "../output_base/" + item_value
+        new_config_nodes = []
+        for config_node in config_nodes:
+            if element in config_node and config_node[element] is not None:
+                if is_list:
+                    assert (
+                        isinstance(config_node[element], list),
+                        f"The element {element} is NOT a list, but [] was specified",
+                    )
+                    new_config_nodes += config_node[element]
+                else:
+                    assert (
+                        not isinstance(config_node[element], list),
+                        f"The element {element} is a list, but [] was NOT specified",
+                    )
+                    new_config_nodes.append(config_node[element])
+            else:
+                # It's not here, so exit early.
+                return
+        config_nodes = new_config_nodes
 
-        # We've found the item to replace.
-        # Rebase the path from the build root.
-        file_path = os.path.join(root_dir, item_value)
-        # Replace it with the hash of the file.
-        config_node[f"{item_name}_sha1"] = file_sha1(file_path)
-        config_node.pop(item_name)
+    for config_node in config_nodes:
+        is_list = False
+        if item_name.endswith("[]"):
+            is_list = True
+            item_name = item_name.removesuffix("[]")
+
+        if item_name in config_node and config_node[item_name] is not None:
+            # External dependencies can be found by navigating into output_base.
+            if is_list:
+                assert (
+                    isinstance(config_node[item_name], list),
+                    f"The element {item_name} is NOT a list, but [] was specified",
+                )
+                item_values = config_node[item_name]
+            else:
+                assert (
+                    not isinstance(config_node[item_name], list),
+                    f"The element {item_name} is a list, but [] was NOT specified",
+                )
+                item_values = [config_node[item_name]]
+            new_item_values = []
+            for item_value in item_values:
+                if item_value.startswith("external"):
+                    item_value = "../output_base/" + item_value
+
+                # We've found the item to replace.
+                # Rebase the path from the build root.
+                file_path = os.path.join(root_dir, item_value)
+                new_item_values.append(file_sha1(file_path))
+
+            # Replace it with the hash of the file.
+            if is_list:
+                config_node[f"{item_name}_sha1"] = new_item_values
+            else:
+                config_node[f"{item_name}_sha1"] = new_item_values[0]
+            config_node.pop(item_name)
 
 
 def normalize_files_in_config(
@@ -120,6 +166,7 @@ def normalize_platform(config, root_dir):
     files_to_normalize.append(
         "development_support.authorized_ssh_ca_certs_path"
     )
+    files_to_normalize.append("diagnostics.archivist_pipelines[].files[]")
     files_to_normalize.append("ui.sensor_config")
     files_to_normalize.append("forensics.cobalt.registry")
     files_to_normalize.append("connectivity.network.netcfg_config_path")

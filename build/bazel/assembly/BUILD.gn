@@ -105,6 +105,7 @@ if (is_host) {
     # Verifications tests depends on bazel_actions, which requires default
     # toolchain.
     deps = [ ":verifications($default_toolchain)" ]
+    deps += [ "product_configurations:host_tests" ]
 
     if (_should_compare_driver_lists) {
       # Driver lists comparison depends on GN assembly, which requires default

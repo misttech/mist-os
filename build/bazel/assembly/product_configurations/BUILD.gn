@@ -5,6 +5,7 @@
 import(
     "//build/bazel/assembly/product_configurations/verify_product_configuration.gni")
 import("//build/board.gni")
+import("//build/python/python_host_test.gni")
 
 verify_product_configuration("verify_zedboot_product_configuration") {
   gn_product_config_target = "//products/zedboot"
@@ -32,4 +33,16 @@ group("verifications") {
     ":verify_minimal_product_configuration",
     ":verify_zedboot_product_configuration",
   ]
+}
+
+if (is_host) {
+  python_host_test("test_verify_product_configuration") {
+    main_source = "test_verify_product_configuration.py"
+    sources = [ "verify_product_configuration.py" ]
+  }
+
+  group("host_tests") {
+    testonly = true
+    deps = [ ":test_verify_product_configuration" ]
+  }
 }
