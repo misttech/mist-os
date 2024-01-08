@@ -72,13 +72,21 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
 
   fbl::AutoLock lock(&lock_);
 
-  int rc = thrd_create_with_name(
-      &worker_thread_,
-      [](void* ctx) -> int { return reinterpret_cast<SdmmcBlockDevice*>(ctx)->WorkerThread(); },
-      this, "sdmmc-block-worker");
-  if (rc != thrd_success) {
-    FDF_LOGL(ERROR, logger(), "Failed to start worker thread, retcode = %d", st);
-    return thrd_status_to_zx_status(rc);
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "sdmmc-block-worker",
+      [&](fdf_dispatcher_t*) { worker_shutdown_completion_.Signal(); },
+      "fuchsia.devices.block.drivers.sdmmc.worker");
+  if (dispatcher.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to create dispatcher: %s",
+             zx_status_get_string(dispatcher.status_value()));
+    return dispatcher.status_value();
+  }
+  worker_dispatcher_ = *std::move(dispatcher);
+
+  st = async::PostTask(worker_dispatcher_.async_dispatcher(), [this] { WorkerLoop(); });
+  if (st != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to start worker thread: %s", zx_status_get_string(st));
+    return st;
   }
 
   auto inspect_sink = parent_->driver_incoming()->Connect<fuchsia_inspect::InspectSink>();
@@ -202,19 +210,19 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
   return ZX_OK;
 }
 
-void SdmmcBlockDevice::StopWorkerThread() {
-  dead_ = true;
-
-  if (worker_thread_) {
+void SdmmcBlockDevice::StopWorkerDispatcher(std::optional<fdf::PrepareStopCompleter> completer) {
+  if (worker_dispatcher_.get()) {
     {
       fbl::AutoLock lock(&lock_);
+      shutdown_ = true;
       worker_event_.Broadcast();
     }
 
-    thrd_join(worker_thread_, nullptr);
-    worker_thread_ = 0;
+    worker_dispatcher_.ShutdownAsync();
+    worker_shutdown_completion_.Wait();
   }
 
+  // TODO(hanbinyoon): Remove this in favour of `txn_list_.CompleteAll` below.
   // error out all pending requests
   fbl::AutoLock lock(&lock_);
   for (std::optional<BlockOperation> txn = txn_list_.pop(); txn; txn = txn_list_.pop()) {
@@ -225,6 +233,12 @@ void SdmmcBlockDevice::StopWorkerThread() {
     request.completer.ReplyError(ZX_ERR_BAD_STATE);
   }
   rpmb_list_.clear();
+
+  txn_list_.CompleteAll(ZX_ERR_INTERNAL);
+
+  if (completer.has_value()) {
+    completer.value()(zx::ok());
+  }
 }
 
 void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcPartition partition,
@@ -754,9 +768,7 @@ void SdmmcBlockDevice::HandleRpmbRequests(std::deque<RpmbRequestInfo>& rpmb_list
   }
 }
 
-// TODO(b/301004279): Apply the "fuchsia.devices.block.drivers.sdmmc.worker" role profile to the
-// dispatcher that this work is bound to.
-int SdmmcBlockDevice::WorkerThread() {
+void SdmmcBlockDevice::WorkerLoop() {
   for (;;) {
     TRACE_DURATION("sdmmc", "work loop");
 
@@ -765,11 +777,11 @@ int SdmmcBlockDevice::WorkerThread() {
 
     {
       fbl::AutoLock lock(&lock_);
-      while (txn_list_.is_empty() && rpmb_list_.empty() && !dead_) {
+      while (txn_list_.is_empty() && rpmb_list_.empty() && !shutdown_) {
         worker_event_.Wait(&lock_);
       }
 
-      if (dead_) {
+      if (shutdown_) {
         break;
       }
 
@@ -784,7 +796,6 @@ int SdmmcBlockDevice::WorkerThread() {
   }
 
   FDF_LOGL(DEBUG, logger(), "worker thread terminated successfully");
-  return thrd_success;
 }
 
 zx_status_t SdmmcBlockDevice::SuspendPower() {

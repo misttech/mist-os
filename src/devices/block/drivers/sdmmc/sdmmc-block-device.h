@@ -13,6 +13,7 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/operation/block.h>
 #include <lib/sdmmc/hw.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/trace/event.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <threads.h>
@@ -122,10 +123,6 @@ class SdmmcBlockDevice {
       : parent_(parent), sdmmc_(std::move(sdmmc)) {
     block_info_.max_transfer_size = static_cast<uint32_t>(sdmmc_->host_info().max_transfer_size);
   }
-  ~SdmmcBlockDevice() {
-    StopWorkerThread();
-    txn_list_.CompleteAll(ZX_ERR_INTERNAL);
-  }
 
   static zx_status_t Create(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc,
                             std::unique_ptr<SdmmcBlockDevice>* out_dev);
@@ -142,6 +139,9 @@ class SdmmcBlockDevice {
 
   zx_status_t AddDevice() TA_EXCL(lock_);
 
+  void StopWorkerDispatcher(std::optional<fdf::PrepareStopCompleter> completer = std::nullopt)
+      TA_EXCL(lock_);
+
   // TODO(b/309152899): Integrate with Power Framework.
   zx_status_t SuspendPower() TA_EXCL(power_lock_);
   zx_status_t ResumePower() TA_EXCL(power_lock_);
@@ -154,7 +154,6 @@ class SdmmcBlockDevice {
   SdmmcRootDevice* parent() { return parent_; }
 
   // Visible for testing.
-  void StopWorkerThread() TA_EXCL(lock_);
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);
   const inspect::Inspector& inspector() const { return inspector_; }
   const std::vector<std::unique_ptr<PartitionDevice>>& child_partition_devices() const {
@@ -186,7 +185,7 @@ class SdmmcBlockDevice {
   void HandleBlockOps(block::BorrowedOperationQueue<PartitionInfo>& txn_list);
   void HandleRpmbRequests(std::deque<RpmbRequestInfo>& rpmb_list);
 
-  int WorkerThread();
+  void WorkerLoop();
 
   zx_status_t WaitForTran();
 
@@ -210,7 +209,8 @@ class SdmmcBlockDevice {
   void BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status);
 
   SdmmcRootDevice* const parent_;
-  std::unique_ptr<SdmmcDevice> sdmmc_;  // Only accessed by ProbeSd, ProbeMmc, and WorkerThread.
+  // Only accessed by ProbeSd, ProbeMmc, SuspendPower, ResumePower, and WorkerLoop.
+  std::unique_ptr<SdmmcDevice> sdmmc_;
 
   sdmmc_bus_width_t bus_width_;
   sdmmc_timing_t timing_;
@@ -229,11 +229,14 @@ class SdmmcBlockDevice {
   block::BorrowedOperationQueue<PartitionInfo> txn_list_ TA_GUARDED(lock_);
   std::deque<RpmbRequestInfo> rpmb_list_ TA_GUARDED(lock_);
 
-  thrd_t worker_thread_ = 0;
+  // Dispatcher for processing queued block requests.
+  fdf::Dispatcher worker_dispatcher_;
+  // Signaled when worker_dispatcher_ is shut down.
+  libsync::Completion worker_shutdown_completion_;
 
   fbl::Mutex power_lock_;
   bool power_suspended_ TA_GUARDED(power_lock_) = false;
-  std::atomic<bool> dead_ = false;
+  bool shutdown_ TA_GUARDED(lock_) = false;
 
   block_info_t block_info_{};
 

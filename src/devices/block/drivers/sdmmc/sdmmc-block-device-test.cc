@@ -118,6 +118,14 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     });
   }
 
+  void TearDown() override {
+    if (block_device_) {
+      zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
+      EXPECT_OK(prepare_stop_result);
+      EXPECT_OK(dut_.Stop());
+    }
+  }
+
   zx_status_t StartDriverForMmc() { return StartDriver(/*is_sd=*/false); }
   zx_status_t StartDriverForSd() { return StartDriver(/*is_sd=*/true); }
 
@@ -894,8 +902,8 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactions) {
 
 TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnStop) {
   ASSERT_OK(StartDriverForMmc());
-  block_device_
-      ->StopWorkerThread();  // Stop the worker thread so queued requests don't get completed.
+  // Stop the worker dispatcher so queued requests don't get completed.
+  block_device_->StopWorkerDispatcher();
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
@@ -921,8 +929,9 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnStop) {
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
   zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
-  EXPECT_OK(prepare_stop_result.status_value());
+  EXPECT_OK(prepare_stop_result);
   EXPECT_OK(dut_.Stop());
+  block_device_ = nullptr;
 
   EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
 
@@ -1392,7 +1401,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbRequestLimit) {
 
   ASSERT_OK(StartDriverForMmc());
   BindRpmbClient();
-  block_device_->StopWorkerThread();
+  block_device_->StopWorkerDispatcher();
 
   zx::vmo tx_frames;
   ASSERT_OK(zx::vmo::create(512, 0, &tx_frames));

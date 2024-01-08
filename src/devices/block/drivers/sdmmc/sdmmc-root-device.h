@@ -24,6 +24,8 @@ class SdmmcRootDevice : public fdf::DriverBase {
 
   zx::result<> Start() override;
 
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+
   // Called by children (or grandchildren) of this device for invoking AddChild() or instantiating
   // compat::DeviceServer.
   fidl::WireSyncClient<fuchsia_driver_framework::Node>& root_node() { return root_node_; }

@@ -67,6 +67,16 @@ zx::result<> SdmmcRootDevice::Start() {
   return zx::ok();
 }
 
+void SdmmcRootDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
+  const auto* block_device = std::get_if<std::unique_ptr<SdmmcBlockDevice>>(&child_device_);
+  if (block_device) {
+    block_device->get()->StopWorkerDispatcher(std::move(completer));
+    return;
+  }
+
+  completer(zx::ok());
+}
+
 // Returns nullptr if device was successfully added. Returns the SdmmcDevice if the probe failed
 // (i.e., no eligible device present).
 template <class DeviceType>
