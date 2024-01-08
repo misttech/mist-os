@@ -114,30 +114,6 @@ where
     }
 }
 
-impl<T> Inspect for &parking_lot::Mutex<T>
-where
-    for<'a> &'a mut T: Inspect,
-{
-    fn iattach(self, parent: &Node, name: impl AsRef<str>) -> Result<(), AttachError> {
-        match self.try_lock() {
-            Some(mut inner) => inner.iattach(parent, name),
-            None => Err("could not get exclusive access to parking_lot::Mutex".into()),
-        }
-    }
-}
-
-impl<T> Inspect for &parking_lot::RwLock<T>
-where
-    for<'a> &'a mut T: Inspect,
-{
-    fn iattach(self, parent: &Node, name: impl AsRef<str>) -> Result<(), AttachError> {
-        match self.try_write() {
-            Some(mut inner) => inner.iattach(parent, name),
-            None => Err("could not get exclusive access to parking_lot::RwLock".into()),
-        }
-    }
-}
-
 impl<T> Inspect for &fuchsia_sync::Mutex<T>
 where
     for<'a> &'a mut T: Inspect,
