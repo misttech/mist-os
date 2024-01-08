@@ -4117,8 +4117,6 @@ mod tests {
         });
     }
 
-    // TODO(b/318035491) - Re-enable this test once flake has been resolved.
-    #[ignore]
     #[fuchsia::test]
     fn test_stat_cycles() {
         let (mut test_helper, mut test_fut) = setup_test();
