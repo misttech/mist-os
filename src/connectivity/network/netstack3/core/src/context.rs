@@ -47,7 +47,7 @@ use rand::{CryptoRng, RngCore};
 
 use crate::{
     device::{self, ethernet::EthernetLinkDevice, DeviceId, DeviceLayerTypes},
-    ip::{self, icmp::IcmpEchoBindingsContext},
+    ip::{self, icmp::socket::IcmpEchoBindingsContext},
     state::{StackState, StackStateBuilder},
     sync,
     transport::{tcp::socket::TcpBindingsTypes, udp::UdpBindingsContext},

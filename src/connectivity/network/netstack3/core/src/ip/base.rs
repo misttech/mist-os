@@ -1288,7 +1288,7 @@ where
     I: IpExt,
     BT: BindingsTypes,
 {
-    type Data = icmp::BoundSockets<I, WeakDeviceId<BT>>;
+    type Data = icmp::socket::BoundSockets<I, WeakDeviceId<BT>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -1296,7 +1296,7 @@ where
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         pub(super) struct Wrap<'l, I: IpExt, D: crate::device::WeakId>(
-            RwLockReadGuard<'l, icmp::BoundSockets<I, D>>,
+            RwLockReadGuard<'l, icmp::socket::BoundSockets<I, D>>,
         );
         let Wrap(guard) = I::map_ip(
             (),
@@ -1309,7 +1309,7 @@ where
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         pub(super) struct Wrap<'l, I: IpExt, D: crate::device::WeakId>(
-            RwLockWriteGuard<'l, icmp::BoundSockets<I, D>>,
+            RwLockWriteGuard<'l, icmp::socket::BoundSockets<I, D>>,
         );
         let Wrap(guard) = I::map_ip(
             (),
@@ -1325,7 +1325,7 @@ where
     I: crate::socket::datagram::DualStackIpExt,
     BT: BindingsTypes,
 {
-    type Data = icmp::SocketsState<I, WeakDeviceId<BT>>;
+    type Data = icmp::socket::SocketsState<I, WeakDeviceId<BT>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
@@ -1333,7 +1333,7 @@ where
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         pub(super) struct Wrap<'l, I: crate::socket::datagram::DualStackIpExt, D: crate::device::WeakId>(
-            RwLockReadGuard<'l, icmp::SocketsState<I, D>>,
+            RwLockReadGuard<'l, icmp::socket::SocketsState<I, D>>,
         );
         let Wrap(guard) = I::map_ip(
             (),
@@ -1346,7 +1346,7 @@ where
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         pub(super) struct Wrap<'l, I: crate::socket::datagram::DualStackIpExt, D: crate::device::WeakId>(
-            RwLockWriteGuard<'l, icmp::SocketsState<I, D>>,
+            RwLockWriteGuard<'l, icmp::socket::SocketsState<I, D>>,
         );
         let Wrap(guard) = I::map_ip(
             (),
@@ -3005,7 +3005,10 @@ impl<
         }
     }
 
-    fn with_icmp_sockets<O, F: FnOnce(&icmp::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O>(
+    fn with_icmp_sockets<
+        O,
+        F: FnOnce(&icmp::socket::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
@@ -3014,7 +3017,10 @@ impl<
 
     fn with_icmp_ctx_and_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut icmp::BoundSockets<Ipv4, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut icmp::socket::BoundSockets<Ipv4, Self::WeakDeviceId>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -3104,7 +3110,10 @@ impl<
         }
     }
 
-    fn with_icmp_sockets<O, F: FnOnce(&icmp::BoundSockets<Ipv6, Self::WeakDeviceId>) -> O>(
+    fn with_icmp_sockets<
+        O,
+        F: FnOnce(&icmp::socket::BoundSockets<Ipv6, Self::WeakDeviceId>) -> O,
+    >(
         &mut self,
         cb: F,
     ) -> O {
@@ -3113,7 +3122,10 @@ impl<
 
     fn with_icmp_ctx_and_sockets_mut<
         O,
-        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut icmp::BoundSockets<Ipv6, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::IpSocketsCtx<'_>,
+            &mut icmp::socket::BoundSockets<Ipv6, Self::WeakDeviceId>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -3138,13 +3150,16 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpDemux<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
-    > icmp::StateContext<Ipv6, BC> for CoreCtx<'_, BC, L>
+    > icmp::socket::StateContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
     type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketsTable<Ipv6>>;
 
     fn with_sockets_state<
         O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &icmp::SocketsState<Ipv6, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::SocketStateCtx<'_>,
+            &icmp::socket::SocketsState<Ipv6, Self::WeakDeviceId>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -3158,7 +3173,7 @@ impl<
         O,
         F: FnOnce(
             &mut Self::SocketStateCtx<'_>,
-            &mut icmp::SocketsState<Ipv6, Self::WeakDeviceId>,
+            &mut icmp::socket::SocketsState<Ipv6, Self::WeakDeviceId>,
         ) -> O,
     >(
         &mut self,
@@ -3182,13 +3197,16 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
-    > icmp::StateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
+    > icmp::socket::StateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
     type SocketStateCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::IcmpSocketsTable<Ipv4>>;
 
     fn with_sockets_state<
         O,
-        F: FnOnce(&mut Self::SocketStateCtx<'_>, &icmp::SocketsState<Ipv4, Self::WeakDeviceId>) -> O,
+        F: FnOnce(
+            &mut Self::SocketStateCtx<'_>,
+            &icmp::socket::SocketsState<Ipv4, Self::WeakDeviceId>,
+        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -3202,7 +3220,7 @@ impl<
         O,
         F: FnOnce(
             &mut Self::SocketStateCtx<'_>,
-            &mut icmp::SocketsState<Ipv4, Self::WeakDeviceId>,
+            &mut icmp::socket::SocketsState<Ipv4, Self::WeakDeviceId>,
         ) -> O,
     >(
         &mut self,

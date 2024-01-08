@@ -138,14 +138,14 @@ pub mod icmp {
     //
     // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
-    pub use crate::ip::icmp::{
+    pub use crate::ip::icmp::socket::{
         bind, close, connect, disconnect, get_bound_device, get_info, get_multicast_hop_limit,
         get_shutdown, get_unicast_hop_limit, new_socket, send, send_to, set_device,
         set_multicast_hop_limit, set_unicast_hop_limit, shutdown,
     };
 
     // Re-exported types.
-    pub use crate::ip::icmp::{IcmpEchoBindingsContext, SocketId, SocketInfo};
+    pub use crate::ip::icmp::socket::{IcmpEchoBindingsContext, SocketId, SocketInfo};
 }
 
 /// The Internet Protocol, versions 4 and 6.

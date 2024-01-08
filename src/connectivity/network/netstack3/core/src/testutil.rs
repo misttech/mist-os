@@ -66,7 +66,7 @@ use crate::{
             nud::{self, LinkResolutionContext, LinkResolutionNotifier},
             IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         },
-        icmp::{IcmpEchoBindingsContext, IcmpIpExt},
+        icmp::{socket::IcmpEchoBindingsContext, IcmpIpExt},
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
@@ -232,8 +232,8 @@ pub(crate) mod benchmarks {
 #[derive(Default)]
 /// Bindings context state held by [`FakeBindingsCtx`].
 pub struct FakeBindingsCtxState {
-    icmpv4_replies: HashMap<crate::ip::icmp::SocketId<Ipv4>, Vec<Vec<u8>>>,
-    icmpv6_replies: HashMap<crate::ip::icmp::SocketId<Ipv6>, Vec<Vec<u8>>>,
+    icmpv4_replies: HashMap<crate::ip::icmp::socket::SocketId<Ipv4>, Vec<Vec<u8>>>,
+    icmpv6_replies: HashMap<crate::ip::icmp::socket::SocketId<Ipv6>, Vec<Vec<u8>>>,
     udpv4_received: HashMap<crate::transport::udp::SocketId<Ipv4>, Vec<Vec<u8>>>,
     udpv6_received: HashMap<crate::transport::udp::SocketId<Ipv6>, Vec<Vec<u8>>>,
     pub(crate) rx_available: Vec<LoopbackDeviceId<FakeBindingsCtx>>,
@@ -383,7 +383,7 @@ impl FakeBindingsCtx {
     #[cfg(test)]
     pub(crate) fn take_icmp_replies<I: Ip>(
         &mut self,
-        conn: crate::ip::icmp::SocketId<I>,
+        conn: crate::ip::icmp::socket::SocketId<I>,
     ) -> Vec<Vec<u8>> {
         I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
             (IpInvariant(self), conn),
@@ -1177,7 +1177,7 @@ impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
 impl IcmpEchoBindingsContext<Ipv4, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: crate::ip::icmp::SocketId<Ipv4>,
+        conn: crate::ip::icmp::socket::SocketId<Ipv4>,
         _device: &DeviceId<Self>,
         _src_ip: Ipv4Addr,
         _dst_ip: Ipv4Addr,
@@ -1193,7 +1193,7 @@ impl IcmpEchoBindingsContext<Ipv4, DeviceId<Self>> for FakeBindingsCtx {
 impl IcmpEchoBindingsContext<Ipv6, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: crate::ip::icmp::SocketId<Ipv6>,
+        conn: crate::ip::icmp::socket::SocketId<Ipv6>,
         _device: &DeviceId<Self>,
         _src_ip: Ipv6Addr,
         _dst_ip: Ipv6Addr,
