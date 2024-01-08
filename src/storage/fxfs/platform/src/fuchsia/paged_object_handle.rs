@@ -723,6 +723,10 @@ impl PagedObjectHandle {
         let old_vmo_size = self.vmo.get_size()?;
 
         let vmo = self.vmo.temp_clone();
+        // This unblock is to break an executor ordering deadlock situation. Vmo::set_size() may
+        // trigger a blocking call back into fxfs on the same executor via the kernel. If all
+        // executor threads are busy, the reentrant call will queue up behind the blocking
+        // set_size() call and never complete.
         unblock(move || {
             if new_size > old_vmo_size {
                 vmo.set_size(new_size)
