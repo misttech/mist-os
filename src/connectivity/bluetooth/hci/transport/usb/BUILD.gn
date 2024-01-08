@@ -61,9 +61,6 @@ source_set("common") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
   ]
-
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 executable("tests_executable") {

@@ -640,10 +640,8 @@ void Device::SnoopChannelWriteLocked(uint8_t flags, const uint8_t* bytes, size_t
   }
 
   // We tack on a flags byte to the beginning of the payload.
-  uint8_t snoop_buffer[length + 1];
-  snoop_buffer[0] = flags;
-  memcpy(snoop_buffer + 1, bytes, length);
-  zx_status_t status = snoop_channel_.Write(snoop_buffer, static_cast<uint32_t>(length + 1));
+  zx_status_t status =
+      snoop_channel_.WriteMulti(&flags, sizeof(flags), bytes, static_cast<uint32_t>(length));
   if (status < 0) {
     if (status != ZX_ERR_PEER_CLOSED) {
       zxlogf(ERROR, "bt-transport-usb: failed to write to snoop channel: %s",

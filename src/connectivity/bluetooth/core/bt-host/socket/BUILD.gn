@@ -19,9 +19,6 @@ source_set("socket") {
     "//sdk/lib/fit",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 source_set("tests") {

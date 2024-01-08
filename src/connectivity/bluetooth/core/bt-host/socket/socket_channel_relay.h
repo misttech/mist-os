@@ -99,7 +99,7 @@ class SocketChannelRelay final {
   void OnSocketClosed(zx_status_t status);
 
   // Callbacks for ChannelT events.
-  void OnChannelDataReceived(ByteBufferPtr sdu);
+  void OnChannelDataReceived(ByteBufferPtr rx_data);
   void OnChannelClosed();
 
   // Copies any data currently available on |socket_| to |channel_|. Does not
@@ -144,13 +144,13 @@ class SocketChannelRelay final {
   async::Wait sock_close_waiter_;
 
   // Count of packets received from the peer on the channel.
-  uint32_t channel_rx_packet_count_;
+  uint32_t channel_rx_packet_count_ = 0u;
   // Count of packets sent to the peer on the channel.
-  uint32_t channel_tx_packet_count_;
+  uint32_t channel_tx_packet_count_ = 0u;
   // Count of packets sent to the socket (should match |channel_rx_packet_count_| normally)
-  uint32_t socket_packet_sent_count_;
+  uint32_t socket_packet_sent_count_ = 0u;
   // Count of packets received from the socket (should match |channel_Tx_packet_count_| normally)
-  uint32_t socket_packet_recv_count_;
+  uint32_t socket_packet_recv_count_ = 0u;
 
   // We use a std::deque here to minimize the number dynamic memory
   // allocations (cf. std::list, which would require allocation on each
@@ -159,6 +159,10 @@ class SocketChannelRelay final {
   //
   // TODO(https://fxbug.dev/709): We should set an upper bound on the size of this queue.
   std::deque<ByteBufferPtr> socket_write_queue_;
+
+  // Read buffer. This must be larger than the max_tx_sdu_size so that we can detect truncated
+  // datagrams.
+  DynamicByteBuffer read_buf_;
 
   WeakSelf<SocketChannelRelay> weak_self_;  // Keep last.
 
@@ -176,10 +180,9 @@ SocketChannelRelay<ChannelT>::SocketChannelRelay(zx::socket socket,
       dispatcher_(async_get_default_dispatcher()),
       deactivation_cb_(std::move(deactivation_cb)),
       socket_write_queue_max_frames_(socket_write_queue_max_frames),
-      channel_rx_packet_count_(0u),
-      channel_tx_packet_count_(0u),
-      socket_packet_sent_count_(0u),
-      socket_packet_recv_count_(0u),
+      // Subtle: we make the read buffer larger than the TX MTU, so that we can detect truncated
+      // datagrams.
+      read_buf_(channel_->max_tx_sdu_size() + 1),
       weak_self_(this) {
   BT_ASSERT(dispatcher_);
   BT_ASSERT(socket_);
@@ -376,24 +379,22 @@ void SocketChannelRelay<ChannelT>::OnChannelClosed() {
 
 template <typename ChannelT>
 bool SocketChannelRelay<ChannelT>::CopyFromSocketToChannel() {
-  // Subtle: we make the read buffer larger than the TX MTU, so that we can
-  // detect truncated datagrams.
-  const size_t read_buf_size = channel_->max_tx_sdu_size() + 1;
-
+  if (channel_->max_tx_sdu_size() > read_buf_.size()) {
+    read_buf_ = DynamicByteBuffer(channel_->max_tx_sdu_size() + 1);
+  }
   // TODO(https://fxbug.dev/735): Consider yielding occasionally. As-is, we run the risk of
   // starving other SocketChannelRelays on the same |dispatcher| (and anyone
   // else on |dispatcher|), if a misbehaving process spams its zx::socket. And
   // even if starvation isn't an issue, latency/jitter might be.
   zx_status_t read_res;
-  uint8_t read_buf[read_buf_size];
   do {
     size_t n_bytes_read = 0;
-    read_res = socket_.read(0, read_buf, read_buf_size, &n_bytes_read);
+    read_res = socket_.read(0, read_buf_.mutable_data(), read_buf_.size(), &n_bytes_read);
     BT_ASSERT_MSG(
         read_res == ZX_OK || read_res == ZX_ERR_SHOULD_WAIT || read_res == ZX_ERR_PEER_CLOSED, "%s",
         zx_status_get_string(read_res));
-    BT_ASSERT_MSG(n_bytes_read <= read_buf_size, "(n_bytes_read=%zu, read_buf_size=%zu)",
-                  n_bytes_read, read_buf_size);
+    BT_ASSERT_MSG(n_bytes_read <= read_buf_.size(), "(n_bytes_read=%zu, read_buf_size=%zu)",
+                  n_bytes_read, read_buf_.size());
     if (read_res == ZX_ERR_SHOULD_WAIT) {
       return true;
     }
@@ -415,7 +416,7 @@ bool SocketChannelRelay<ChannelT>::CopyFromSocketToChannel() {
     // TODO(https://fxbug.dev/734): For low latency and low jitter, IWBN to avoid allocating
     // dynamic memory on every read.
     bool write_success =
-        channel_->Send(std::make_unique<DynamicByteBuffer>(BufferView(read_buf, n_bytes_read)));
+        channel_->Send(std::make_unique<DynamicByteBuffer>(read_buf_.view(0, n_bytes_read)));
     if (!write_success) {
       bt_log(TRACE, "l2cap", "Failed to write %zu bytes to channel %u", n_bytes_read,
              channel_->id());

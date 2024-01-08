@@ -10,14 +10,12 @@
 #include <lib/async-loop/default.h>
 #include <lib/sync/completion.h>
 
-#include <mutex>
 #include <queue>
 
 #include <ddktl/device.h>
 #include <usb/usb.h>
 
 #include "packet_reassembler.h"
-#include "src/lib/listnode/listnode.h"
 
 namespace bt_transport_usb {
 
@@ -117,6 +115,17 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
 
     zx_status_t Write(const void* bytes, uint32_t num_bytes) {
       return channel_.write(/*flags=*/0, bytes, num_bytes, /*handles=*/nullptr, /*num_handles=*/0);
+    }
+
+    // Write multiple arrays at once, using the iovec option.
+    // Used to add a flag byte to write to the snoop channel.
+    zx_status_t WriteMulti(const void* bytes_first, uint32_t num_bytes_first,
+                           const void* bytes_second, uint32_t num_bytes_second) {
+      zx_channel_iovec_t vecs[2];
+      vecs[0] = {.buffer = bytes_first, .capacity = num_bytes_first, .reserved = 0};
+      vecs[1] = {.buffer = bytes_second, .capacity = num_bytes_second, .reserved = 0};
+      return channel_.write(ZX_CHANNEL_WRITE_USE_IOVEC, vecs, std::size(vecs), /*handles=*/nullptr,
+                            /*num_handles=*/0);
     }
 
     void set_channel(zx::channel channel) {
