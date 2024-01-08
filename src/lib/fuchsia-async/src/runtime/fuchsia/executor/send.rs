@@ -4,18 +4,18 @@
 
 use super::super::timer::TimerHeap;
 use super::common::{with_local_timer_heap, ExecutorTime, Inner};
+use fuchsia_sync::{Condvar, Mutex};
 use futures::{
     future::{self, FutureObj},
     FutureExt,
 };
-use parking_lot::{Condvar, Mutex};
 use std::{
     fmt,
     future::Future,
     mem,
     sync::{atomic::Ordering, Arc},
     thread,
-    time::{Duration, Instant},
+    time::Duration,
     usize,
 };
 
@@ -100,8 +100,7 @@ impl SendExecutor {
                 // This timeout is chosen to be quite high since it impacts all processes that have
                 // multi-threaded async executors, and it exists to workaround arguably misbehaving
                 // users (see the comment below).
-                const TIMEOUT: Duration = Duration::from_millis(250);
-                cvar.wait_until(&mut result, Instant::now() + TIMEOUT);
+                cvar.wait_for(&mut result, Duration::from_millis(250));
                 if result.is_some() {
                     break;
                 }

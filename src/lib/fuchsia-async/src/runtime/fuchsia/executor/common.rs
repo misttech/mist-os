@@ -10,12 +10,12 @@ use super::{
 };
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
+use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx};
 use futures::{
     future::{FutureObj, LocalFutureObj},
     task::{waker_ref, ArcWake},
 };
-use parking_lot::Mutex;
 use rustc_hash::FxHashMap as HashMap;
 use std::{
     any::Any,
@@ -138,7 +138,7 @@ impl Inner {
         loop {
             for _ in 0..16 {
                 let Some(task) = self.ready_tasks.pop() else {
-                    return PollReadyTasksResult::NoneReady
+                    return PollReadyTasksResult::NoneReady;
                 };
                 let complete = task.try_poll();
                 local_collector.task_polled(task.id, task.source, complete, self.ready_tasks.len());

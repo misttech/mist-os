@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
 use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types::{
     zx_handle_t, zx_packet_signal_t, zx_signals_t, zx_status_t, zx_time_t, ZX_ERR_NOT_SUPPORTED,
     ZX_OK,
 };
 use futures::channel::oneshot;
-use parking_lot::Mutex;
 use std::time::Duration;
 
 struct EPtr(*mut Executor);
@@ -127,7 +127,7 @@ impl Executor {
             *quit_tx = Some(tx);
             drop(quit_tx);
         } else {
-            // `parking_lot::Mutex` doesn't poison on panic, but dropping the
+            // `fuchsia_sync::Mutex` doesn't poison on panic, but dropping the
             // guard before panicking is good practice in case we migrate away
             // from it in the future.
             drop(quit_tx);
