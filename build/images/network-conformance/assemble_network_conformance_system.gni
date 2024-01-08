@@ -49,7 +49,6 @@ template("assemble_network_conformance_system") {
   product_assembly_configuration(labels.product_config) {
     platform = {
       build_type = "eng"
-      feature_set_level = "utility"
       storage = {
         configure_fshost = true
         filesystems = {
@@ -70,7 +69,6 @@ template("assemble_network_conformance_system") {
   product_assembly_configuration(labels.product_config_fxfs) {
     platform = {
       build_type = "eng"
-      feature_set_level = "utility"
       storage = {
         configure_fshost = true
         filesystems = {
@@ -95,12 +93,9 @@ template("assemble_network_conformance_system") {
     board_config_label = ":${labels.board_config}"
     allow_eng_platform_bundle_use = true
     base_packages = [
-      "//src/connectivity/network/mdns/bundles:services",
       "//src/connectivity/network/net-cli",
       "//src/connectivity/network/testing/network-test-realm/service:network-test-realm",
       "//src/connectivity/policy/netcfg:config-default",
-      "//src/security/bin/root_ssl_certificates",
-      "//src/sys/full-resolver:full-resolver-pkg",
     ]
     base_packages += invoker.additional_base_packages
 
