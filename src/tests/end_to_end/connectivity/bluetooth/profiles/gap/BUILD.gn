@@ -20,8 +20,8 @@ if (is_host) {
     params_source = "params.yaml"
     transport = "sl4f"
     environments = [
-      sherlock_env,
-      vim3_env,
+      bt_sherlock_env,
+      bt_vim3_env,
     ]
   }
 }
