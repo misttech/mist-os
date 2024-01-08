@@ -13,7 +13,10 @@ ffx_plugin("ffx_hang") {
 
   sources = [ "src/lib.rs" ]
 
-  deps = [ "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust" ]
+  deps = [
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//third_party/rust_crates:anyhow",
+  ]
 
   test_deps = [ "//src/lib/fuchsia-async" ]
 }

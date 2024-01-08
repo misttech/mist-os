@@ -14,6 +14,7 @@ ffx_plugin("ffx_scrutiny_structured_config") {
     "//src/security/lib/scrutiny/frontend",
     "//src/security/lib/scrutiny/plugins",
     "//src/security/lib/scrutiny/utils",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:serde_json",
   ]
 

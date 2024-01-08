@@ -11,6 +11,7 @@ ffx_plugin("ffx_package_build") {
   deps = [
     "//src/developer/ffx/lib/errors:lib",
     "//src/sys/pkg/lib/package-tool",
+    "//third_party/rust_crates:anyhow",
   ]
   args_deps = [ "//src/sys/pkg/lib/package-tool" ]
 

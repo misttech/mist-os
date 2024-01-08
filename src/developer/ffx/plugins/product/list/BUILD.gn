@@ -22,6 +22,7 @@ ffx_plugin("ffx_product_list") {
     "//src/lib/gcs",
     "//src/lib/structured_ui",
     "//src/sys/pkg/lib/version",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:serde",

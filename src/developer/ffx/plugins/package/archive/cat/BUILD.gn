@@ -12,6 +12,7 @@ ffx_plugin("ffx_package_archive_cat") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/package/archive:lib",
+    "//third_party/rust_crates:anyhow",
   ]
 
   test_deps = []

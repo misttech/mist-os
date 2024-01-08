@@ -11,7 +11,10 @@ ffx_plugin("ffx_package_far_cat") {
 
   args_deps = [ "//third_party/rust_crates:camino" ]
 
-  deps = [ "//src/sys/pkg/lib/far/rust:fuchsia-archive" ]
+  deps = [
+    "//src/sys/pkg/lib/far/rust:fuchsia-archive",
+    "//third_party/rust_crates:anyhow",
+  ]
 
   args_sources = [ "src/args.rs" ]
 

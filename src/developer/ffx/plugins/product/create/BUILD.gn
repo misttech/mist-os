@@ -25,6 +25,7 @@ ffx_plugin("ffx_product_create") {
     "//src/sys/pkg/lib/epoch",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/sys/pkg/lib/fuchsia-repo",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",

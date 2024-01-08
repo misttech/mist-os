@@ -11,6 +11,7 @@ ffx_plugin("ffx_package_far_create") {
 
   deps = [
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:walkdir",
   ]
 

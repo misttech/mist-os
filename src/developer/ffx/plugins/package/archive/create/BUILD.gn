@@ -12,6 +12,7 @@ ffx_plugin("ffx_package_archive_create") {
   deps = [
     "//src/developer/ffx/lib/errors:lib",
     "//src/sys/pkg/lib/package-tool",
+    "//third_party/rust_crates:anyhow",
   ]
 
   args_sources = [ "src/args.rs" ]

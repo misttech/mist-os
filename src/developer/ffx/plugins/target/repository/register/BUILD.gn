@@ -16,6 +16,7 @@ ffx_plugin("ffx_target_repository_register") {
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
     "//src/developer/ffx/lib/target:lib",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
   test_deps = [

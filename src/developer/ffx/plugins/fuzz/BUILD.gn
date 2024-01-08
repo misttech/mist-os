@@ -29,6 +29,7 @@ ffx_plugin("ffx_fuzz") {
     "//src/lib/fuchsia-async",
     "//src/sys/fuzzing/fidl:fuchsia.fuzzer_rust",
     "//src/sys/fuzzing/fuzzctl:lib",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",

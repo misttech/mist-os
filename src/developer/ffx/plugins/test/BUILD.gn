@@ -22,6 +22,7 @@ ffx_plugin("ffx_test") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/testing/test_list",
     "//src/sys/run_test_suite:lib",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:either",
     "//third_party/rust_crates:futures",

@@ -14,6 +14,7 @@ if (is_host) {
       "//src/developer/ffx/lib/fho:lib",
       "//src/developer/ffx/plugins/emulator/commands:ffx_emulator_commands",
       "//src/developer/ffx/plugins/emulator/configuration:ffx_emulator_config",
+      "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
     ]
     test_deps = [

@@ -16,6 +16,7 @@ ffx_plugin("ffx_agis") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target:lib",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",

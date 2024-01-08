@@ -18,6 +18,7 @@ ffx_plugin("ffx_repository_add") {
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/lib/fuchsia-url",
     "//src/sys/pkg/lib/fuchsia-repo",
+    "//third_party/rust_crates:anyhow",
   ]
 
   test_deps = [

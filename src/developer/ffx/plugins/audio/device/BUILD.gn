@@ -28,6 +28,7 @@ ffx_plugin("ffx_audio_device") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//src/media/audio/services/ffxdaemon:format-utils",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",

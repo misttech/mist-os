@@ -16,6 +16,7 @@ ffx_plugin("ffx_cpu_load") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/testing/metrics-logger/fuchsia.metricslogger.test:fuchsia.metricslogger.test_rust",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
   test_deps = [

@@ -12,6 +12,7 @@ ffx_plugin("ffx_session_launch") {
   deps = [
     "//sdk/fidl/fuchsia.session:fuchsia.session_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
   test_deps = [ "//src/lib/fuchsia-async" ]

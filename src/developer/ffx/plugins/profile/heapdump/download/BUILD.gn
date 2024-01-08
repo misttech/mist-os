@@ -16,6 +16,7 @@ ffx_plugin("ffx_profile_heapdump_download") {
     "//src/developer/ffx/plugins/profile/heapdump/common:ffx_profile_heapdump_common",
     "//src/lib/fidl/rust/fidl",
     "//src/performance/memory/heapdump/lib/heapdump_snapshot",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
 

@@ -25,6 +25,7 @@ ffx_plugin("ffx_net_test_realm") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/network/fidl_fuchsia_net_ext",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:tracing",
   ]

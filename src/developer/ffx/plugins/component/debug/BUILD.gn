@@ -16,6 +16,7 @@ ffx_plugin("ffx_component_debug") {
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/lib/zircon/rust:fuchsia-zircon-types",
     "//src/sys/lib/component_debug",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
 

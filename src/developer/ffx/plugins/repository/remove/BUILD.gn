@@ -11,6 +11,7 @@ ffx_plugin("ffx_repository_remove") {
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
+    "//third_party/rust_crates:anyhow",
   ]
   test_deps = [
     "//src/lib/fuchsia-async",

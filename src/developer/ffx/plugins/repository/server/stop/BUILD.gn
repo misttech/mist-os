@@ -17,6 +17,7 @@ ffx_plugin("ffx_repository_server_stop") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
+    "//third_party/rust_crates:anyhow",
   ]
   test_deps = [
     "//src/developer/ffx/config:lib",
