@@ -18,6 +18,7 @@ common_sources = [
   "src/eventpair.rs",
   "src/exception.rs",
   "src/fifo.rs",
+  "src/futex.rs",
   "src/guest.rs",
   "src/handle.rs",
   "src/info.rs",
