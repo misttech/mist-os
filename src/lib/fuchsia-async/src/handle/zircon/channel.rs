@@ -35,8 +35,9 @@ impl From<Channel> for zx::Channel {
 
 impl Channel {
     /// Creates a new `Channel` from a previously-created `zx::Channel`.
+    // TODO(https://fxbug.dev/319131778) this function should be infallible
     pub fn from_channel(channel: zx::Channel) -> Result<Self, zx::Status> {
-        Ok(Channel(RWHandle::new(channel)?))
+        Ok(Channel(RWHandle::new(channel)))
     }
 
     /// Consumes `self` and returns the underlying `zx::Channel`.

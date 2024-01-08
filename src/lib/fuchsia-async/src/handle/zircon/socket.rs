@@ -30,8 +30,9 @@ impl AsHandleRef for Socket {
 
 impl Socket {
     /// Create a new `Socket` from a previously-created `zx::Socket`.
+    // TODO(https://fxbug.dev/319131778) this function should be infallible
     pub fn from_socket(socket: zx::Socket) -> Result<Self, zx::Status> {
-        Ok(Socket(RWHandle::new(socket)?))
+        Ok(Socket(RWHandle::new(socket)))
     }
 
     /// Consumes `self` and returns the underlying `zx::Socket`.

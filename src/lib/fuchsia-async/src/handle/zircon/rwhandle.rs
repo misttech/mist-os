@@ -151,7 +151,7 @@ where
 {
     /// Creates a new `RWHandle` object which will receive notifications when
     /// the underlying handle becomes readable, writable, or closes.
-    pub fn new(handle: T) -> Result<Self, zx::Status> {
+    pub fn new(handle: T) -> Self {
         let ehandle = EHandle::local();
 
         let initial_signals = OBJECT_READABLE | OBJECT_WRITABLE;
@@ -167,7 +167,7 @@ where
             write_task: AtomicWaker::new(),
         }));
 
-        Ok(RWHandle { handle, receiver })
+        RWHandle { handle, receiver }
     }
 
     /// Returns a reference to the underlying handle.
@@ -297,7 +297,7 @@ mod tests {
     fn is_closed_immediately_after_close() {
         let mut exec = TestExecutor::new();
         let (tx, rx) = zx::Channel::create();
-        let rx_rw_handle = RWHandle::new(rx).unwrap();
+        let rx_rw_handle = RWHandle::new(rx);
         let mut noop_ctx = Context::from_waker(futures::task::noop_waker_ref());
         // Clear optimistic readable state
         rx_rw_handle.need_readable(&mut noop_ctx).unwrap();

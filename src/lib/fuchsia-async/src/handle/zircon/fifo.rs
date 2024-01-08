@@ -282,9 +282,10 @@ impl<R, W> From<Fifo<R, W>> for zx::Fifo {
 
 impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
     /// Creates a new `Fifo` from a previously-created `zx::Fifo`.
+    // TODO(https://fxbug.dev/319131778) this function should be infallible
     pub fn from_fifo(fifo: zx::Fifo) -> Result<Self, zx::Status> {
         Ok(Fifo {
-            handle: RWHandle::new(fifo)?,
+            handle: RWHandle::new(fifo),
             read_marker: PhantomData,
             write_marker: PhantomData,
         })
