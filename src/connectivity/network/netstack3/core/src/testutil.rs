@@ -100,6 +100,8 @@ pub mod context {
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
 /// A structure holding a core and a bindings context.
+// TODO(https://fxbug.dev/42083910): Remove this struct and alias
+// `crate::context::CtxPair` here instead.
 #[derive(Default)]
 pub struct ContextPair<CC, BT> {
     /// The core context.
@@ -123,6 +125,26 @@ impl<CC, BC> ContextPair<CC, BC> {
         BC: Default,
     {
         Self { core_ctx, bindings_ctx: BC::default() }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn as_mut(&mut self) -> ContextPair<&mut CC, &mut BC> {
+        let Self { core_ctx, bindings_ctx } = self;
+        ContextPair { core_ctx, bindings_ctx }
+    }
+}
+
+impl<CC, BC> crate::context::ContextPair for ContextPair<CC, BC>
+where
+    CC: crate::context::ContextProvider,
+    BC: crate::context::ContextProvider,
+{
+    type CoreContext = CC::Context;
+    type BindingsContext = BC::Context;
+
+    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
+        let Self { core_ctx, bindings_ctx } = self;
+        (core_ctx.context(), bindings_ctx.context())
     }
 }
 

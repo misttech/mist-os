@@ -22,8 +22,9 @@ use netstack3_core::{
     sync::Mutex,
     testutil::{
         ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-        FakeCtx, FakeEventDispatcherBuilder,
+        FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
     },
+    CoreApi,
 };
 use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
 use packet_formats::{
@@ -230,7 +231,11 @@ impl TestIpExt for Ipv6 {
 }
 
 #[ip_test]
-fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
+fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>()
+where
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, FakeBindingsCtx>:
+        netstack3_core::CoreContext<I, FakeBindingsCtx>,
+{
     // Per the loom docs [1], it can take a significant amount of time to
     // exhaustively check complex models. Rather than running a completely
     // exhaustive check, you can configure loom to skip executions that it deems
@@ -277,34 +282,27 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 
         // Bind a UDP socket to the device we added so we can trigger link
         // resolution by sending IP packets.
-        let socket = netstack3_core::udp::create_udp::<I, _>(&core_ctx);
-        netstack3_core::udp::listen_udp(
-            &core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            SpecifiedAddr::new(I::DEVICE_ADDR).map(|a| ZonedAddr::Unzoned(a).into()),
-            Some(LOCAL_PORT),
-        )
-        .unwrap();
-        netstack3_core::udp::set_udp_device(
-            &core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            Some(&device.clone().into()),
-        )
-        .unwrap();
+        let mut udp_api = CoreApi::with_contexts(&core_ctx, &mut bindings_ctx).udp::<I>();
+        let socket = udp_api.create();
+        udp_api
+            .listen(
+                &socket,
+                SpecifiedAddr::new(I::DEVICE_ADDR).map(|a| ZonedAddr::Unzoned(a).into()),
+                Some(LOCAL_PORT),
+            )
+            .unwrap();
+        udp_api.set_device(&socket, Some(&device.clone().into())).unwrap();
 
         // Trigger creation of an INCOMPLETE neighbor entry by queueing an
         // outgoing packet to that neighbor's IP address.
-        netstack3_core::udp::send_udp_to(
-            &core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
-            REMOTE_PORT.into(),
-            Buf::new([1], ..),
-        )
-        .unwrap();
+        udp_api
+            .send_to(
+                &socket,
+                Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
+                REMOTE_PORT.into(),
+                Buf::new([1], ..),
+            )
+            .unwrap();
 
         // Expect the netstack to send a neighbor probe to resolve the link
         // address of the neighbor.
@@ -335,16 +333,15 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         let thread_vars = (core_ctx.clone(), bindings_ctx.clone(), socket.clone());
         let queue_packet = loom::thread::spawn(move || {
             let (core_ctx, mut bindings_ctx, socket) = thread_vars;
-
-            netstack3_core::udp::send_udp_to(
-                &core_ctx,
-                &mut bindings_ctx,
-                &socket,
-                Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
-                REMOTE_PORT.into(),
-                Buf::new([2], ..),
-            )
-            .unwrap();
+            CoreApi::with_contexts(&core_ctx, &mut bindings_ctx)
+                .udp()
+                .send_to(
+                    &socket,
+                    Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
+                    REMOTE_PORT.into(),
+                    Buf::new([2], ..),
+                )
+                .unwrap();
         });
 
         resolve_neighbor.join().unwrap();
@@ -382,7 +379,11 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 }
 
 #[ip_test]
-fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
+fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>()
+where
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, FakeBindingsCtx>:
+        netstack3_core::CoreContext<I, FakeBindingsCtx>,
+{
     loom::model(move || {
         let mut builder = FakeEventDispatcherBuilder::default();
         let dev_index = builder.add_device_with_ip(
@@ -411,22 +412,16 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
 
         // Bind a UDP socket to the device we added so we can trigger link
         // resolution by sending IP packets.
-        let socket = netstack3_core::udp::create_udp::<I, _>(&core_ctx);
-        netstack3_core::udp::listen_udp(
-            &core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            SpecifiedAddr::new(I::DEVICE_ADDR).map(|a| ZonedAddr::Unzoned(a).into()),
-            Some(LOCAL_PORT),
-        )
-        .unwrap();
-        netstack3_core::udp::set_udp_device(
-            &core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            Some(&device.clone().into()),
-        )
-        .unwrap();
+        let mut udp_api = CoreApi::with_contexts(&core_ctx, &mut bindings_ctx).udp::<I>();
+        let socket = udp_api.create();
+        udp_api
+            .listen(
+                &socket,
+                SpecifiedAddr::new(I::DEVICE_ADDR).map(|a| ZonedAddr::Unzoned(a).into()),
+                Some(LOCAL_PORT),
+            )
+            .unwrap();
+        udp_api.set_device(&socket, Some(&device.clone().into())).unwrap();
 
         let core_ctx = Arc::new(core_ctx);
 
@@ -443,16 +438,15 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         let thread_vars = (core_ctx.clone(), bindings_ctx.clone(), socket.clone());
         let create_incomplete_neighbor = loom::thread::spawn(move || {
             let (core_ctx, mut bindings_ctx, socket) = thread_vars;
-
-            netstack3_core::udp::send_udp_to(
-                &core_ctx,
-                &mut bindings_ctx,
-                &socket,
-                Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
-                REMOTE_PORT.into(),
-                Buf::new([1], ..),
-            )
-            .unwrap();
+            CoreApi::with_contexts(&core_ctx, &mut bindings_ctx)
+                .udp()
+                .send_to(
+                    &socket,
+                    Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
+                    REMOTE_PORT.into(),
+                    Buf::new([1], ..),
+                )
+                .unwrap()
         });
 
         let thread_vars = (core_ctx.clone(), bindings_ctx.clone(), device.clone());

@@ -287,20 +287,6 @@ pub mod types {
 
 /// Methods for dealing with UDP sockets.
 pub mod udp {
-    // Re-exported functions
-    //
-    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
-    // objects.
-    pub use crate::transport::udp::{
-        close, connect, create_udp, disconnect_udp_connected, get_shutdown, get_udp_bound_device,
-        get_udp_dual_stack_enabled, get_udp_info, get_udp_multicast_hop_limit,
-        get_udp_posix_reuse_port, get_udp_transparent, get_udp_unicast_hop_limit, listen_udp,
-        send_udp, send_udp_to, set_udp_device, set_udp_dual_stack_enabled,
-        set_udp_multicast_hop_limit, set_udp_multicast_membership, set_udp_posix_reuse_port,
-        set_udp_transparent, set_udp_unicast_hop_limit, shutdown,
-    };
-
-    // Re-exported types.
     pub use crate::transport::udp::{
         ConnInfo, ListenerInfo, SendError, SendToError, SocketId, SocketInfo, UdpBindingsContext,
         UdpRemotePort,

@@ -9,7 +9,7 @@
 
 use crate::{
     context::{BindingsContext, CounterContext},
-    device::{AnyDevice, DeviceId, DeviceIdContext},
+    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
     transport::udp::{UdpCounters, UdpStateBindingsContext},
 };
 
@@ -39,7 +39,7 @@ impl<O> IpExt for O where
 pub trait CoreContext<I, BC>:
     crate::transport::udp::StateContext<I, BC>
     + CounterContext<UdpCounters<I>>
-    + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>>
+    + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
 where
     I: IpExt,
     BC: BindingsContext + UdpStateBindingsContext<I, Self::DeviceId>,
@@ -52,6 +52,6 @@ where
     BC: BindingsContext + UdpStateBindingsContext<I, O::DeviceId>,
     O: crate::transport::udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
-        + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>>,
+        + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>,
 {
 }
