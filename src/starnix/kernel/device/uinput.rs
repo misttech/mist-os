@@ -12,6 +12,8 @@ use crate::{
     vfs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
 };
 use bit_vec::BitVec;
+use fidl_fuchsia_ui_test_input::{self as futinput, RegistryRegisterKeyboardRequest};
+use fuchsia_zircon as zx;
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -46,9 +48,35 @@ pub fn create_uinput_device(
     Ok(Box::new(UinputDevice::new()))
 }
 
+#[allow(dead_code)]
+enum CreatedDevice {
+    None,
+    Keyboard(futinput::KeyboardSynchronousProxy),
+    Touchscreen,
+}
+
 struct UinputDeviceMutableState {
     enabled_evbits: BitVec,
     input_id: Option<uapi::input_id>,
+    created_device: CreatedDevice,
+}
+
+impl UinputDeviceMutableState {
+    fn get_id_and_device_type(&self) -> Option<(uapi::input_id, DeviceType)> {
+        let input_id = match self.input_id {
+            Some(input_id) => input_id,
+            None => return None,
+        };
+        // Currently only support Keyboard and Touchscreen, if evbits contains
+        // EV_ABS, consider it is Touchscreen. This need to be revisit when we
+        // want to support more device types.
+        let device_type = match self.enabled_evbits.clone().get(uapi::EV_ABS as usize) {
+            Some(true) => DeviceType::Touchscreen,
+            Some(false) | None => DeviceType::Keyboard,
+        };
+
+        Some((input_id, device_type))
+    }
 }
 
 struct UinputDevice {
@@ -61,6 +89,7 @@ impl UinputDevice {
             inner: Mutex::new(UinputDeviceMutableState {
                 enabled_evbits: BitVec::from_elem(uapi::EV_CNT as usize, false),
                 input_id: None,
+                created_device: CreatedDevice::None,
             }),
         })
     }
@@ -119,31 +148,82 @@ impl UinputDevice {
         Ok(SUCCESS)
     }
 
+    fn ui_dev_create(&self, current_task: &CurrentTask) -> Result<SyscallResult, Errno> {
+        // Only eng and userdebug builds include the `fuchsia.ui.test.input` service.
+        let registry = match fuchsia_component::client::connect_to_protocol_sync::<
+            futinput::RegistryMarker,
+        >() {
+            Ok(proxy) => Some(proxy),
+            Err(_) => {
+                log_warn!("Could not connect to fuchsia.ui.test.input/Registry");
+                None
+            }
+        };
+        self.ui_dev_create_inner(current_task, registry)
+    }
+
     /// UI_DEV_CREATE calls create the uinput device with given information
     /// from previous ioctl() calls.
-    fn ui_dev_create(&self, current_task: &CurrentTask) -> Result<SyscallResult, Errno> {
-        let (input_id, enabled_evbits) = {
-            let inner = self.inner.lock();
-            let input_id = match inner.input_id {
-                Some(input_id) => input_id,
-                None => return error!(EINVAL),
-            };
-            (input_id, inner.enabled_evbits.clone())
-        };
+    fn ui_dev_create_inner(
+        &self,
+        current_task: &CurrentTask,
+        // Takes `registry` arg so we can manually inject a mock registry in unit tests.
+        registry: Option<futinput::RegistrySynchronousProxy>,
+    ) -> Result<SyscallResult, Errno> {
+        match registry {
+            Some(proxy) => {
+                let mut inner = self.inner.lock();
+                let (input_id, device_type) = match inner.get_id_and_device_type() {
+                    Some((id, dev)) => (id, dev),
+                    None => return error!(EINVAL),
+                };
 
-        // Currently only support Keyboard and Touchscreen, if evbits contains
-        // EV_ABS, consider it is Touchscreen. This need to be revisit when we
-        // want to support more device types.
-        let device_type = match enabled_evbits.get(uapi::EV_ABS as usize) {
-            Some(true) => DeviceType::Touchscreen,
-            Some(false) | None => DeviceType::Keyboard,
-        };
+                let server = match device_type {
+                    DeviceType::Keyboard => {
+                        let (key_client, key_server) =
+                            fidl::endpoints::create_sync_proxy::<futinput::KeyboardMarker>();
+                        inner.created_device = CreatedDevice::Keyboard(key_client);
+                        key_server
+                    }
+                    DeviceType::Touchscreen => {
+                        // TODO(b/302172833): also support touchscreen here.
+                        return Ok(SUCCESS);
+                    }
+                };
 
-        add_and_register_input_device(current_task, VirtualDevice { input_id, device_type });
+                let device_type_clone = device_type.clone();
+                match device_type_clone {
+                    DeviceType::Keyboard => {
+                        // Register a keyboard
+                        let register_res = proxy.register_keyboard(
+                            RegistryRegisterKeyboardRequest {
+                                device: Some(server),
+                                ..Default::default()
+                            },
+                            zx::Time::INFINITE,
+                        );
+                        if register_res.is_err() {
+                            log_warn!("Uinput could not register Keyboard device to Registry");
+                        }
+                    }
+                    DeviceType::Touchscreen => {
+                        // TODO(b/302172833): also support touchscreen here.
+                    }
+                }
 
-        new_device();
+                add_and_register_input_device(
+                    current_task,
+                    VirtualDevice { input_id, device_type },
+                );
+                new_device();
 
-        Ok(SUCCESS)
+                Ok(SUCCESS)
+            }
+            None => {
+                log_warn!("No Registry available for Uinput.");
+                error!(EPERM)
+            }
+        }
     }
 
     fn ui_dev_destroy(&self) -> Result<SyscallResult, Errno> {
@@ -266,7 +346,11 @@ mod test {
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
         vfs::FileHandle,
     };
+    use fidl::endpoints::create_sync_proxy_and_stream;
+    use fuchsia_async as fasync;
+    use futures::{channel::mpsc, StreamExt};
     use starnix_uapi::user_address::UserAddress;
+    use std::thread;
     use test_case::test_case;
 
     fn make_kernel_objects(
@@ -468,5 +552,67 @@ mod test {
         let r =
             dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, SyscallArg::from(0 as u64));
         assert_eq!(r, error!(EFAULT));
+    }
+
+    #[::fuchsia::test]
+    async fn ui_dev_create_keyboard() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let _ = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+
+        let (req_sender, mut req_receiver) = mpsc::unbounded();
+        let (registry_proxy, mut stream) =
+            create_sync_proxy_and_stream::<futinput::RegistryMarker>()
+                .expect("create Registry proxy and stream");
+
+        let handle = thread::spawn(move || {
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                if let Some(request) = stream.next().await {
+                    match request {
+                        Ok(futinput::RegistryRequest::RegisterKeyboard {
+                            payload,
+                            responder,
+                            ..
+                        }) => {
+                            let _ = req_sender.unbounded_send(payload.device);
+                            let _ = responder.send();
+                        }
+                        _ => panic!("Registry handler received an unexpected request"),
+                    }
+                } else {
+                    panic!("Registry handler did not receive RegistryRequest")
+                }
+            })
+        });
+
+        let res = dev.ui_dev_create_inner(&current_task, Some(registry_proxy));
+        assert_eq!(res, Ok(SUCCESS));
+
+        handle.join().expect("stream panic");
+
+        let request = req_receiver.next().await;
+
+        // Verify that ui_dev_create sends RegisterKeyboard request to Registry
+        // and that the request includes some ServerEnd in `device`.
+        assert!(request.is_some());
+    }
+
+    #[::fuchsia::test]
+    async fn ui_dev_create_keyboard_fails_no_registry() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let _ = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        let res = dev.ui_dev_create_inner(&current_task, None);
+        assert_eq!(res, error!(EPERM))
     }
 }
