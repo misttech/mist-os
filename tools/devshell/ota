@@ -21,8 +21,6 @@
 ##
 ## A package server needs to be running and this command will fail if it is not.
 
-set -e
-
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/updates.sh || exit $?
 fx-config-read
@@ -55,7 +53,7 @@ function needs-update {
 }
 
 function target-using-omaha-client {
-  [[ "$(ffx component capability fuchsia.update.Manager)" == *"/core/system-update/omaha-client-service"* ]]
+  [[ "$(ffx component select capability fuchsia.update.Manager)" == *"/core/system-update/omaha-client-service"* ]]
 }
 
 function main {
