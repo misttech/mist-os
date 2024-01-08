@@ -280,6 +280,13 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		// Since we have some host tests which test OOM behavior which print this string,
 		// we only consider this to trigger a failure when it appears in serial logs.
 		&stringInLogCheck{String: "received kernel OOM signal", Type: serialLogType},
+		// For https://fxbug.dev/318087737.
+		&stringInLogCheck{
+			// LINT.IfChange(blob_header_timeout)
+			String: "timed out waiting for http response header while downloading blob",
+			// LINT.ThenChange(/src/sys/pkg/bin/pkg-resolver/src/cache.rs:blob_header_timeout)
+			Type: syslogType,
+		},
 	}
 
 	oopsExceptBlocks := []*logBlock{

@@ -923,7 +923,11 @@ pub enum FetchError {
     #[error("IO error while reading blob")]
     IoError(#[source] Status),
 
-    #[error("timed out waiting for http response header while downloading blob: {uri}")]
+    #[error(
+        // LINT.IfChange(blob_header_timeout)
+        "timed out waiting for http response header while downloading blob: {uri}"
+        // LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:blob_header_timeout)
+    )]
     BlobHeaderTimeout { uri: String },
 
     #[error(
