@@ -104,10 +104,10 @@ type Configuration = table {
 type ProofOfInterfaceAuthorization = resource struct {
     /// The ID of the interface this credential is authenticating.
     interface_id fuchsia.net.InterfaceId;
-    /// The EVENTPAIR providing authentication over this interface. The token
+    /// The EVENT providing authentication over this interface. The token
     /// only requires the `TRANSFER` right so that it can be sent to the
     /// Netstack.
-    token zx.Handle:<EVENTPAIR, zx.Rights.TRANSFER>;
+    token zx.Handle:<EVENT, zx.Rights.TRANSFER>;
 };
 
 /// Provides control over an interface.
@@ -242,12 +242,12 @@ closed protocol Control {
 
     /// Get an authentication credential for this interface.
     ///
-    /// The credential contains a [`zx::handle::EVENTPAIR`], whose entangled
+    /// The credential contains a [`zx::handle::EVENT`], whose entangled
     /// partner is held by the server. This credential can be converted into a
     /// [`ProofOfInterfaceAuthorization`] and then passed into `fuchsia.net.*`
-    /// API calls to prove ownership of this interface. The `EVENTPAIR` is
+    /// API calls to prove ownership of this interface. The `EVENT` is
     /// stable throughout the lifetime of the interface. Clients may duplicate
-    /// this `EVENTPAIR` to make multiple API calls, or transfer the `EVENTPAIR`
+    /// this `EVENT` to make multiple API calls, or transfer the `EVENT`
     /// to other clients.
     ///
     /// - response `credential` the authorization credential for this interface.
@@ -255,8 +255,8 @@ closed protocol Control {
         credential @generated_name("GrantForInterfaceAuthorization") resource struct {
             /// The ID of the interface this credential is authenticating.
             interface_id fuchsia.net.InterfaceId;
-            /// The EVENTPAIR providing authentication over this interface.
-            token zx.Handle:<EVENTPAIR, zx.Rights.TRANSFER | zx.Rights.DUPLICATE>;
+            /// The EVENT providing authentication over this interface.
+            token zx.Handle:<EVENT, zx.Rights.TRANSFER | zx.Rights.DUPLICATE>;
         };
     });
 

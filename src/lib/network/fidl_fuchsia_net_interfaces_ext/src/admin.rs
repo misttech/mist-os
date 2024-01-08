@@ -153,7 +153,7 @@ type ControlEventStreamFutureToReason =
 ///
 /// # Panics
 ///
-/// Panics when the EventPair handle does not have the DUPLICATE right. Callers
+/// Panics when the Event handle does not have the DUPLICATE right. Callers
 /// need not worry about this if providing a grant received from
 /// [`GetAuthorizationForInterface`].
 pub fn proof_from_grant(
@@ -711,14 +711,14 @@ mod test {
 
     #[test]
     fn convert_proof_to_grant() {
-        // The default EventPair has more Rights than the token within the Grant returned from
+        // The default Event has more Rights than the token within the Grant returned from
         // [`GetAuthorizationForInterface`], but can still be converted to be used in the
         // [`ProofOfInterfaceAuthorization`], since only `zx::Rights::DUPLICATE` and
         // `zx::Rights::TRANSFER` is required.
-        let (event_pair, _) = fidl::EventPair::create();
+        let event = fidl::Event::create();
         let grant = fnet_interfaces_admin::GrantForInterfaceAuthorization {
             interface_id: Default::default(),
-            token: event_pair,
+            token: event,
         };
 
         let fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token } =

@@ -2315,7 +2315,7 @@ mod tests {
                             fnet_interfaces_admin::ControlRequest::GetAuthorizationForInterface {
                                 responder,
                             } => {
-                                let (token, _) = fidl::EventPair::create();
+                                let token = fidl::Event::create();
                                 let grant = fnet_interfaces_admin::GrantForInterfaceAuthorization {
                                     interface_id: DEV1 as u64,
                                     token,
