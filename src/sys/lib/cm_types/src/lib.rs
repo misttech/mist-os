@@ -414,8 +414,11 @@ impl RelativePath {
         if p.len() > MAX_PATH_LENGTH {
             return Err(ParseError::TooLong);
         }
-        if !p.split('/').all(|part| !part.is_empty()) {
-            return Err(ParseError::InvalidValue);
+        for segment in p.split('/') {
+            if segment.is_empty() {
+                return Err(ParseError::InvalidValue);
+            }
+            name::validate_name(segment).map_err(|_| ParseError::InvalidSegment)?;
         }
         return Ok(Self(FlyStr::new(path)));
     }
@@ -483,7 +486,7 @@ impl<'de> de::Deserialize<'de> for RelativePath {
                 E: de::Error,
             {
                 s.parse().map_err(|err| match err {
-                    ParseError::InvalidValue => E::invalid_value(
+                    ParseError::InvalidValue | ParseError::InvalidSegment => E::invalid_value(
                         de::Unexpected::Str(s),
                         &"a path with no leading `/` and non-empty segments",
                     ),
@@ -948,7 +951,7 @@ mod tests {
     fn test_valid_relative_path() {
         expect_ok!(RelativePath, "foo");
         expect_ok!(RelativePath, "foo/bar");
-        expect_ok!(RelativePath, &format!("{}", repeat("x").take(4095).collect::<String>()));
+        expect_ok!(RelativePath, &format!("x{}", repeat("/x").take(2047).collect::<String>()));
     }
 
     #[test]
@@ -959,7 +962,8 @@ mod tests {
         expect_err!(RelativePath, "foo/");
         expect_err!(RelativePath, "/foo/");
         expect_err!(RelativePath, "foo//bar");
-        expect_err!(RelativePath, &format!("{}", repeat("x").take(4096).collect::<String>()));
+        expect_err!(RelativePath, "foo/..");
+        expect_err!(RelativePath, &format!("x{}", repeat("/x").take(2048).collect::<String>()));
     }
 
     #[test]
