@@ -1,12 +1,12 @@
 toc:
 - title: "Overview"
   path: /docs/development/sdk/index.md
-- title: "Get started with the Fuchsia SDK"
+- title: "Walkthrough of workflows using the Fuchsia SDK"
   path: /docs/get-started/sdk/index.md
 - title: "Navigating a Bazel-and-Fuchsia-SDK-based development environment"
   path: /docs/development/sdk/navigating-a-bazel-and-fuchsia-sdk-based-development-environment.md
 - heading: "Driver development"
-- title: "Get started with driver development"
+- title: "Walkthrough of driver development workflows using the Fuchsia SDK"
   path: /docs/get-started/sdk/get-started-with-driver.md
 - title: "Codelab: Build a driver"
   section:

@@ -1,26 +1,20 @@
-# Get started with the Fuchsia SDK
+# Walkthrough of workflows using the Fuchsia SDK
 
-**Read This First!**
-
-If you only want copies of Fuchsia's host tools, please
-visit [this download page][download-idk]. From there
-you can get the latest/newest builds of Fuchsia's host
-tools.
-
-**Note**
-
-These docs are stable and are using a copy of Fuchsia's SDK with Bazel
-from early 2023.
-
-This guide provides step-by-step instructions on setting up the Fuchsia SDK
-development environment on your host machine using a terminal or
-Visual Studio Code (VS Code). Then the guide walks through the basic workflows
-of building, running, debugging, and testing Fuchsia components using the
-[Fuchsia SDK][using-the-sdk].
+Caution: This walkthrough guide contains outdated workflows using the Fuchsia
+SDK released in early 2023.
 
 Important: The Fuchsia SDK is in active development. At the moment, Fuchsia does
 not support general public usage of the Fuchsia SDK. The APIs in the SDK are
 subject to change without notice.
+
+Note: If you only need the latest copies of Fuchsia's host tools
+(for instance, `ffx`), you can download the Fuchsia IDK from the
+[Download the Fuchsia IDK][download-idk] page to get the up-to-date builds
+of Fuchsia's host tools.
+
+This guide walks through the basic workflows of building, running, debugging,
+and testing Fuchsia components using a [Fuchsia SDK][using-the-sdk] setup on
+a terminal or Visual Studio Code (VS Code).
 
 Which development environment are you using for this guide?
 

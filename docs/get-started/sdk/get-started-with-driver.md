@@ -1,17 +1,23 @@
-# Get started with driver development
+# Walkthrough of driver development workflows using the Fuchsia SDK
 
-This guide provides step-by-step instructions on setting up the Fuchsia
-driver development environment on your host machine using a terminal or
-Visual Studio Code (VS Code). Then the guide walks through the basic
-workflows of building, running, debugging, and updating
-[drivers][driver-concepts] in a Fuchsia system using the
-[Fuchsia SDK][using-the-sdk].
+Caution: This walkthrough guide contains outdated workflows using the Fuchsia
+SDK released in mid 2023.
 
 Important: This guide is the driver equivalent of the
-[_Get started with the Fuchsia SDK_][get-started-sdk] guide. If you haven't
-already, it's strongly recommended that you complete _Get started with the
-Fuchsia SDK_ first to become familiar with the comprehensive set of
-Fuchsia SDK workflows.
+[_Walkthrough of workflows using the Fuchsia SDK_][get-started-sdk] guide.
+If you haven't already, it's strongly recommended that you complete
+_Walkthrough of workflows using the Fuchsia SDK_ first to become familiar with
+the comprehensive set of Fuchsia SDK workflows.
+
+Note: If you only need the latest copies of Fuchsia's host tools
+(for instance, `ffx`), you can download the Fuchsia IDK from the
+[Download the Fuchsia IDK][download-idk] page to get the up-to-date builds
+of Fuchsia's host tools.
+
+This guide walks through the basic workflows of building, running, debugging,
+and updating Fuchsia [drivers][driver-concepts] using a
+[Fuchsia SDK][using-the-sdk] setup on a terminal or Visual Studio Code
+(VS Code).
 
 Which development environment are you using for this guide?
 
@@ -275,3 +281,4 @@ killall pm
 [driver-concepts]: /docs/concepts/drivers/README.md
 [codelab-qemu-edu-driver]: /docs/get-started/sdk/learn/driver/introduction.md
 [vscode-install]: https://code.visualstudio.com/Download
+[download-idk]: /docs/development/idk/download.md
