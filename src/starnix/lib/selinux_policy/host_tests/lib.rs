@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use selinux_policy::{
-    metadata::HandleUnknown,
-    parser::{ByRef, ByValue},
-    Policy,
-};
+use selinux_policy::{metadata::HandleUnknown, parse_policy_by_reference, parse_policy_by_value};
 
 use serde::Deserialize;
 use std::io::Read as _;
@@ -63,10 +59,22 @@ fn known_policies() {
         let mut policy_bytes = vec![];
         policy_file.read_to_end(&mut policy_bytes).expect("read policy file");
 
-        let by_value = ByValue::new(policy_bytes);
+        // Test parse-by-value.
 
-        let policy =
-            Policy::parse(by_value).expect("parse policy").validate().expect("validate policy");
+        let (policy, returned_policy_bytes) =
+            parse_policy_by_value(policy_bytes.clone()).expect("parse policy");
+        let policy = policy.validate().expect("validate policy");
+
+        assert_eq!(expectations.expected_policy_version, policy.policy_version());
+        assert_eq!(&expectations.expected_handle_unknown, policy.handle_unknown());
+
+        // Returned policy bytes must be identical to input policy bytes.
+        assert_eq!(policy_bytes, returned_policy_bytes);
+
+        // Test parse-by-reference.
+
+        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let policy = policy.validate().expect("validate policy");
 
         assert_eq!(expectations.expected_policy_version, policy.policy_version());
         assert_eq!(&expectations.expected_handle_unknown, policy.handle_unknown());
@@ -78,7 +86,7 @@ fn explicit_allow_type_type() {
     let policy_path =
         format!("{}/{}/allow_a_t_b_t_class0_perm0_policy.pp", TESTDATA_DIR, MICRO_POLICIES_SUBDIR);
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
         .expect("parse policy")
         .validate()
         .expect("validate policy");
@@ -94,7 +102,7 @@ fn no_explicit_allow_type_type() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
         .expect("parse policy")
         .validate()
         .expect("validate policy");
@@ -110,7 +118,7 @@ fn explicit_allow_type_attr() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
         .expect("parse policy")
         .validate()
         .expect("validate policy");
@@ -126,7 +134,7 @@ fn no_explicit_allow_type_attr() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
         .expect("parse policy")
         .validate()
         .expect("validate policy");
@@ -142,7 +150,7 @@ fn explicit_allow_attr_attr() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
         .expect("parse policy")
         .validate()
         .expect("validate policy");
@@ -158,7 +166,7 @@ fn no_explicit_allow_attr_attr() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = Policy::parse(ByRef::new(policy_bytes.as_slice()))
+    let policy = parse_policy_by_reference(policy_bytes.as_slice())
         .expect("parse policy")
         .validate()
         .expect("validate policy");

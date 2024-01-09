@@ -31,6 +31,7 @@ use {
 
 use anyhow::Context as _;
 use once_cell::sync::Lazy;
+use parser::ByValue;
 use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData, ops::Deref};
 use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
@@ -73,6 +74,51 @@ pub(crate) static INITIAL_SIDS_IDENTIFIERS: Lazy<BTreeMap<u32, &'static [u8]>> =
         (27, b"devnull".as_slice()),
     ])
 });
+
+/// Parses `binary_policy` by value; that is, copies underlying binary data out in addition to
+/// building up parser output structures. This function returns
+/// `(unvalidated_parser_output, binary_policy)` on success, or an error if parsing failed. Note
+/// that the second component of the success case contains precisely the same bytes as the input.
+/// This function depends on a uniformity of interface between the "by value" and "by reference"
+/// strategies, but also requires an `unvalidated_parser_output` type that is independent of the
+/// `binary_policy` lifetime. Taken together, these requirements demand the "move-in + move-out"
+/// interface for `binary_policy`.
+///
+/// If the caller does not need access to the binary policy when parsing fails, but does need to
+/// retain both the parsed output and the binary policy when parsing succeeds, the code will look
+/// something like:
+///
+/// ```rust,ignore
+/// let (unvalidated_policy, binary_policy) = parse_policy_by_value(binary_policy)?;
+/// ```
+///
+/// If the caller does need access to the binary policy when parsing fails and needs to retain both
+/// parsed output and the binary policy when parsing succeeds, the code will look something like:
+///
+/// ```rust,ignore
+/// let (unvalidated_policy, _) = parse_policy_by_value(binary_policy.clone())?;
+/// ```
+///
+/// If the caller does not need to retain both the parsed output and the binary policy, then
+/// [`parse_policy_by_reference`] should be used instead.
+pub fn parse_policy_by_value(
+    binary_policy: Vec<u8>,
+) -> Result<(Unvalidated<ByValue<Vec<u8>>>, Vec<u8>), anyhow::Error> {
+    Policy::parse(ByValue::new(binary_policy))
+}
+
+/// Parses `binary_policy` by reference; that is, constructs parser output structures that contain
+/// _references_ to data in `binary_policy`. This function returns `unvalidated_parser_output` on
+/// success, or an error if parsing failed.
+///
+/// If the caller does needs to retain both the parsed output and the binary policy, then
+/// [`parse_policy_by_value`] should be used instead.
+pub fn parse_policy_by_reference<'a>(
+    binary_policy: &'a [u8],
+) -> Result<Unvalidated<ByRef<&'a [u8]>>, anyhow::Error> {
+    let (unvalidated_policy, _) = Policy::parse(ByRef::new(binary_policy))?;
+    Ok(unvalidated_policy)
+}
 
 /// A parsed binary policy.
 ///
@@ -136,14 +182,14 @@ where
 {
     /// Parses the binary policy stored in `bytes`. It is an error for `bytes` to have trailing
     /// bytes after policy parsing completes.
-    pub fn parse(bytes: PS) -> Result<Unvalidated<PS>, anyhow::Error> {
+    fn parse(bytes: PS) -> Result<(Unvalidated<PS>, PS::Input), anyhow::Error> {
         let (policy, tail) =
             <Policy<PS> as Parse<PS>>::parse(bytes).map_err(Into::<anyhow::Error>::into)?;
         let num_bytes = tail.len();
         if num_bytes > 0 {
             return Err(ParseError::TrailingBytes { num_bytes }.into());
         }
-        Ok(Unvalidated(policy))
+        Ok((Unvalidated(policy), tail.into_inner()))
     }
 
     /// The policy version stored in the underlying binary policy.

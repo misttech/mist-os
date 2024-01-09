@@ -9,7 +9,7 @@ use crate::{
 };
 
 use anyhow;
-use selinux_policy::{parser::ByRef, Policy};
+use selinux_policy::parse_policy_by_reference;
 use starnix_sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 
@@ -85,7 +85,7 @@ impl SecurityServer {
     pub fn load_policy(&self, binary_policy: Vec<u8>) -> Result<(), anyhow::Error> {
         // Parse the supplied policy, and reject the load operation if it is
         // malformed.
-        let policy = Policy::parse(ByRef::new(binary_policy.as_slice()))?;
+        let policy = parse_policy_by_reference(binary_policy.as_slice())?;
 
         // Reject the load of the parsed policy is invalid.
         policy.validate()?;

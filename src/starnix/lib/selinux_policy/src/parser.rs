@@ -26,7 +26,7 @@ trait ParseCursor: Sized {
     /// Seeks forward by `num_bytes`, returning a `Self::Error` if seeking fails.
     fn seek_forward(&mut self, num_bytes: usize) -> Result<(), Self::Error>;
 
-    /// Consumes self and returns the inner reprepresentation that owns the underlying data.
+    /// Consumes self and returns the inner representation of the complete parse input.
     fn into_inner(self) -> Self::Inner;
 }
 
@@ -67,6 +67,9 @@ impl<T: AsRef<[u8]>> ParseCursor for Cursor<T> {
 /// The above pattern allows [`ParseStrategy`] implementations to dictate how values are stored (by
 /// copied value, or reference to parser input data).
 pub trait ParseStrategy: Debug + PartialEq + Sized {
+    /// Type of input supported by this [`ParseStrategy`].
+    type Input;
+
     /// Type of successfully parsed output from `Self::parse()`.
     type Output<T: Debug + FromBytes + NoCell + PartialEq + Unaligned>: Debug + PartialEq;
 
@@ -100,6 +103,9 @@ pub trait ParseStrategy: Debug + PartialEq + Sized {
 
     /// Returns the number of bytes remaining to be parsed by this [`ParseStrategy`].
     fn len(&self) -> usize;
+
+    /// Returns the complete parse input being consumed by this strategy.
+    fn into_inner(self) -> Self::Input;
 }
 
 /// A [`ParseStrategy`] that produces [`Ref<B, T>`].
@@ -124,16 +130,20 @@ pub trait ParseStrategy: Debug + PartialEq + Sized {
 /// error[E0515]: cannot return value referencing local variable `bytes`
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-pub struct ByRef<B: ByteSlice>(B);
+pub struct ByRef<B: ByteSlice> {
+    input: B,
+    tail: B,
+}
 
-impl<B: ByteSlice> ByRef<B> {
+impl<B: ByteSlice + Clone> ByRef<B> {
     /// Returns a new [`ByRef`] that wraps `bytes_slice`.
     pub fn new(byte_slice: B) -> Self {
-        Self(byte_slice)
+        Self { input: byte_slice.clone(), tail: byte_slice }
     }
 }
 
 impl<B: Debug + ByteSlice + PartialEq> ParseStrategy for ByRef<B> {
+    type Input = B;
     type Output<T: Debug + FromBytes + NoCell + PartialEq + Unaligned> = Ref<B, T>;
     type Slice<T: Debug + FromBytes + NoCell + PartialEq + Unaligned> = Ref<B, [T]>;
 
@@ -142,8 +152,8 @@ impl<B: Debug + ByteSlice + PartialEq> ParseStrategy for ByRef<B> {
     fn parse<T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
         self,
     ) -> Option<(Self::Output<T>, Self)> {
-        let (output, tail) = Ref::new_unaligned_from_prefix(self.0)?;
-        Some((output, Self(tail)))
+        let (output, tail) = Ref::new_unaligned_from_prefix(self.tail)?;
+        Some((output, Self { input: self.input, tail }))
     }
 
     /// Returns a `Ref<B, [T]>` as the parsed output of the next bytes in the underlying
@@ -152,8 +162,8 @@ impl<B: Debug + ByteSlice + PartialEq> ParseStrategy for ByRef<B> {
         self,
         num: usize,
     ) -> Option<(Self::Slice<T>, Self)> {
-        let (slice, tail) = Ref::new_slice_unaligned_from_prefix(self.0, num)?;
-        Some((slice, Self(tail)))
+        let (slice, tail) = Ref::new_slice_unaligned_from_prefix(self.tail, num)?;
+        Some((slice, Self { input: self.input, tail }))
     }
 
     fn deref<'a, T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
@@ -169,7 +179,11 @@ impl<B: Debug + ByteSlice + PartialEq> ParseStrategy for ByRef<B> {
     }
 
     fn len(&self) -> usize {
-        self.0.len()
+        self.tail.len()
+    }
+
+    fn into_inner(self) -> Self::Input {
+        self.input
     }
 }
 
@@ -198,17 +212,13 @@ impl<T: AsRef<[u8]>> ByValue<T> {
     pub fn new(data: T) -> Self {
         Self(Cursor::new(data))
     }
-
-    /// Consumes this [`ByValue`] and returns the `T` that it wraps.
-    pub fn into_inner(self) -> T {
-        self.0.into_inner()
-    }
 }
 
 impl<T: AsRef<[u8]> + Debug + PartialEq> ParseStrategy for ByValue<T>
 where
     Cursor<T>: Debug + ParseCursor + PartialEq,
 {
+    type Input = T;
     type Output<O: Debug + FromBytes + NoCell + PartialEq + Unaligned> = O;
     type Slice<S: Debug + FromBytes + NoCell + PartialEq + Unaligned> = Vec<S>;
 
@@ -252,6 +262,10 @@ where
 
     fn len(&self) -> usize {
         self.0.len()
+    }
+
+    fn into_inner(self) -> Self::Input {
+        self.0.into_inner()
     }
 }
 
@@ -297,7 +311,7 @@ mod tests {
         let (some_numbers, parser) = parser.parse::<SomeNumbers>().expect("some numbers");
         assert_eq!(0, some_numbers.a);
         assert_eq!(7, some_numbers.d);
-        assert_eq!(0, parser.0.len());
+        assert_eq!(0, parser.tail.len());
     }
 
     #[test]
@@ -312,7 +326,7 @@ mod tests {
         assert_eq!(15, some_numbers[1].d);
         assert_eq!(16, some_numbers[2].a);
         assert_eq!(23, some_numbers[2].d);
-        assert_eq!(0, parser.0.len());
+        assert_eq!(0, parser.tail.len());
     }
 
     #[test]
