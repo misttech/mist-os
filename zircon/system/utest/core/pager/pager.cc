@@ -1770,9 +1770,7 @@ TEST(Pager, InvalidPagerSupplyPages) {
 
   // violations of conditions for taking pages from a vmo
   enum PagerViolation {
-    kIsClone = 0,
-    kFromPager,
-    kHasClone,
+    kFromPager = 0,
     kHasPinned,
     kViolationCount,
   };
@@ -1787,22 +1785,13 @@ TEST(Pager, InvalidPagerSupplyPages) {
     // The expected status of this test.
     zx_status_t expected_status = ZX_ERR_BAD_STATE;
 
-    if (i == kIsClone) {
-      ASSERT_EQ(zx::vmo::create(zx_system_get_page_size(), 0, &alt_vmo), ZX_OK);
-      ASSERT_EQ(alt_vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), &aux_vmo),
-                ZX_OK);
-    } else if (i == kFromPager) {
+    if (i == kFromPager) {
       ASSERT_EQ(zx_pager_create_vmo(pager.get(), 0, port.get(), 0, zx_system_get_page_size(),
                                     aux_vmo.reset_and_get_address()),
                 ZX_OK);
       expected_status = ZX_ERR_NOT_SUPPORTED;
     } else {
       ASSERT_EQ(zx::vmo::create(zx_system_get_page_size(), 0, &aux_vmo), ZX_OK);
-    }
-
-    if (i == kHasClone) {
-      ASSERT_EQ(aux_vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), &alt_vmo),
-                ZX_OK);
     }
 
     if (i == kFromPager) {

@@ -213,8 +213,14 @@ class VmCowPages final : public VmHierarchyBase,
       TA_REQ(lock());
 
   // See VmObject::TakePages
-  zx_status_t TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages)
-      TA_REQ(lock());
+  //
+  // May return ZX_ERR_SHOULD_WAIT if the |page_request| is filled out and needs waiting on. In this
+  // case |taken_len| might be populated with a value less than |len|.
+  //
+  // |taken_len| is always filled with the amount of |len| that has been processed to allow for
+  // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned.
+  zx_status_t TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
+                              uint64_t* taken_len, LazyPageRequest* page_request) TA_REQ(lock());
 
   // See VmObject::SupplyPages
   //
@@ -624,6 +630,11 @@ class VmCowPages final : public VmHierarchyBase,
   // allocated. The AllocChecker will reflect whether allocation was successful.
   template <class... Args>
   static fbl::RefPtr<VmCowPages> NewVmCowPages(fbl::AllocChecker* ac, Args&&... args);
+
+  // A private helper that takes pages if this VmCowPages has a parent.
+  zx_status_t TakePagesWithParentLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
+                                        uint64_t* taken_len, LazyPageRequest* page_request)
+      TA_REQ(lock());
 
   // fbl_recycle() does all the explicit cleanup, and the destructor does all the implicit cleanup.
   void fbl_recycle() override;

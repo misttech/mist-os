@@ -1400,6 +1400,16 @@ zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
       ktl::unique_ptr<VmPageListNode> pl =
           ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(node_offset));
       if (!ac.check()) {
+        // If the allocation failed, we need to free content.
+        if (content.IsPage()) {
+          vm_page_t* page = content.ReleasePage();
+          DEBUG_ASSERT(!list_in_list(&page->queue_node));
+          pmm_free_page(page);
+        } else if (content.IsReference()) {
+          VmCompression* compression = pmm_page_compression();
+          DEBUG_ASSERT(compression);
+          compression->Free(content.ReleaseReference());
+        }
         return ZX_ERR_NO_MEMORY;
       }
       LTRACEF("allocating new inner node for splice list: %p\n", pl.get());

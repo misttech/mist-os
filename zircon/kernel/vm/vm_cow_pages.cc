@@ -4843,34 +4843,158 @@ zx_status_t VmCowPages::LookupReadableLocked(uint64_t offset, uint64_t len,
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages) {
+zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
+                                                  VmPageSpliceList* pages, uint64_t* taken_len,
+                                                  LazyPageRequest* page_request) {
+  DEBUG_ASSERT(parent_);
+
+  // Set up a cursor that will help us take pages from the parent.
+  const uint64_t end = offset + len;
+  uint64_t position = offset;
+  auto cursor = GetLookupCursorLocked(offset, len);
+  if (cursor.is_error()) {
+    return cursor.error_value();
+  }
+  AssertHeld(cursor->lock_ref());
+
+  VmCompression* compression = pmm_page_compression();
+
+  // This loop attempts to take pages from the VMO one page at a time. For each page, it:
+  // 1. Allocates a zero page to replace the existing page.
+  // 2. Takes ownership of the page.
+  // 3. Replaces the existing page with the zero page.
+  // 4. Adds the existing page to the splice list.
+  // We perform this operation page-by-page to ensure that we can always make forward progress.
+  // For example, if we tried to take ownership of the entire range of pages but encounter a
+  // ZX_ERR_SHOULD_WAIT, we would need to drop the lock, wait on the page request, and then attempt
+  // to take ownership of all of the pages again. On highly contended VMOs, this could lead to a
+  // situation in which we get stuck in this loop and no forward progress is made.
+  zx_status_t status = ZX_OK;
+  uint64_t new_pages_len = 0;
+  while (position < end) {
+    // Allocate a zero page to replace the content at position.
+    // TODO(https://fxbug.dev/126153): Inserting a full zero page is inefficient. We should replace
+    // this logic with something a bit more efficient; this could mean using the same logic that
+    // `ZeroPages` uses and insert markers, or generalizing the concept of intervals and using
+    // those instead.
+    vm_page_t* p;
+    status =
+        AllocateCopyPage(pmm_alloc_flags_, vm_get_zero_page_paddr(), nullptr, page_request, &p);
+    if (status != ZX_OK) {
+      break;
+    }
+    VmPageOrMarker zeroed_out_page = VmPageOrMarker::Page(p);
+    VmPageOrMarker* zero_page_ptr = &zeroed_out_page;
+    auto free_zeroed_page = fit::defer([zero_page_ptr, this] {
+      // If the zeroed out page is not incorporated into this VMO, free it.
+      if (!zero_page_ptr->IsEmpty()) {
+        vm_page_t* p = zero_page_ptr->ReleasePage();
+        AssertHeld(lock_ref());
+        // The zero page is not part of any VMO at this point, so it should not be in a page queue.
+        FreePageLocked(p, false);
+      }
+    });
+
+    // Once we have a zero page ready to go, require an owned page at the current position.
+    auto result = cursor->RequireOwnedPage(true, static_cast<uint>((end - position) / PAGE_SIZE),
+                                           page_request);
+    if (result.is_error()) {
+      status = result.error_value();
+      break;
+    }
+
+    // Replace the content at `position` with the zeroed out page.
+    VmPageOrMarker content;
+    status = AddPageLocked(&zeroed_out_page, position, CanOverwriteContent::NonZero, &content,
+                           /*do_range_update=*/false);
+    // Absent bugs, AddPageLocked() can only return ZX_ERR_NO_MEMORY.
+    if (status != ZX_OK) {
+      DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+      break;
+    }
+    new_pages_len += PAGE_SIZE;
+    ASSERT(!content.IsInterval());
+
+    // Before adding the content to the splice list, we need to make sure that it:
+    // 1. Is not in any page queues if it is a page.
+    // 2. Is not a temporary reference.
+    if (content.IsPage()) {
+      DEBUG_ASSERT(content.Page()->object.pin_count == 0);
+      AssertHeld(lock_ref());
+      PQRemoveLocked(content.Page());
+    } else if (content.IsReference()) {
+      if (auto page = compression->MoveReference(content.Reference())) {
+        InitializeVmPage(*page);
+        AssertHeld(lock_ref());
+        // Don't insert the page in the page queues, since we're trying to remove the pages.
+        VmPageOrMarker::ReferenceValue ref = content.SwapReferenceForPage(*page);
+        ASSERT(compression->IsTempReference(ref));
+      }
+    }
+
+    // Add the content to the splice list.
+    status = pages->Append(ktl::move(content));
+    if (status == ZX_ERR_NO_MEMORY) {
+      break;
+    }
+    DEBUG_ASSERT(status == ZX_OK);
+    position += PAGE_SIZE;
+    *taken_len += PAGE_SIZE;
+  }
+
+  if (new_pages_len) {
+    RangeChangeUpdateLocked(offset, new_pages_len, RangeChangeOp::Unmap);
+  }
+
+  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+
+  // We need to finalize the splice page list as soon as we know that we will not be adding pages
+  // to it. This is true in any case that does not return ZX_ERR_SHOULD_WAIT.
+  if (status != ZX_ERR_SHOULD_WAIT) {
+    pages->Finalize();
+  }
+
+  return status;
+}
+
+zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
+                                        uint64_t* taken_len, LazyPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
 
   if (!InRange(offset, len, size_)) {
+    pages->Finalize();
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   if (page_source_) {
+    pages->Finalize();
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (AnyPagesPinnedLocked(offset, len) || parent_) {
+  if (AnyPagesPinnedLocked(offset, len)) {
+    pages->Finalize();
     return ZX_ERR_BAD_STATE;
   }
 
-  // TODO: Check that the region is locked once locking is implemented
-  if (children_list_len_) {
-    return ZX_ERR_BAD_STATE;
+  // If this is a child slice, propagate the operation to the parent.
+  if (is_slice_locked()) {
+    return slice_parent_locked().TakePagesLocked(offset + parent_offset_, len, pages, taken_len,
+                                                 page_request);
   }
 
   // Now that all early checks are done, increment the gen count since we're going to remove pages.
   IncrementHierarchyGenerationCountLocked();
 
-  VmCompression* compression = pmm_page_compression();
+  // If this is a child of any other kind, we need to handle it specially.
+  if (parent_) {
+    return TakePagesWithParentLocked(offset, len, pages, taken_len, page_request);
+  }
 
+  VmCompression* compression = pmm_page_compression();
   bool found_page = false;
   page_list_.ForEveryPageInRangeMutable(
       [&compression, &found_page, this](VmPageOrMarkerRef p, uint64_t off) {
@@ -4902,8 +5026,11 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   // sure we're not inside an interval; checking a single offset for membership should suffice.
   ASSERT(found_page || !page_list_.IsOffsetInZeroInterval(offset));
 
-  *pages = page_list_.TakePages(offset, len);
+  // The VmPageSpliceList should not have been modified by anything up to this point.
+  DEBUG_ASSERT(pages->IsEmpty());
 
+  *pages = page_list_.TakePages(offset, len);
+  *taken_len = len;
   RangeChangeUpdateLocked(offset, len, RangeChangeOp::Unmap);
 
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
@@ -4948,8 +5075,32 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
     return ZX_ERR_BAD_STATE;
   }
 
+  // If this is a child slice, propagate the operation to the parent.
+  if (is_slice_locked()) {
+    return slice_parent_locked().SupplyPagesLocked(offset + parent_offset_, len, pages, options,
+                                                   supplied_len, page_request);
+  }
+
+  // If this VMO has a parent, we need to make sure we take ownership of all of the pages in the
+  // input range.
+  // TODO(https://fxbug.dev/42076904): This is suboptimal, as we take ownership of a page just to
+  // free it immediately when we replace it with the supplied page.
   if (parent_) {
-    return ZX_ERR_BAD_STATE;
+    const uint64_t end = offset + len;
+    uint64_t position = offset;
+    auto cursor = GetLookupCursorLocked(offset, len);
+    if (cursor.is_error()) {
+      return cursor.error_value();
+    }
+    AssertHeld(cursor->lock_ref());
+    while (position < end) {
+      auto result = cursor->RequireOwnedPage(true, static_cast<uint>((end - position) / PAGE_SIZE),
+                                             page_request);
+      if (result.is_error()) {
+        return result.error_value();
+      }
+      position += PAGE_SIZE;
+    }
   }
 
   // It is possible that we fail to insert pages below and we increment the gen count needlessly,

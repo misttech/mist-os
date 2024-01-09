@@ -1771,16 +1771,44 @@ zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offse
 zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) {
   canary_.Assert();
 
-  Guard<CriticalMutex> src_guard{lock()};
-
   // TODO: Check that the region is locked once locking is implemented
   if (is_contiguous()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  if (children_list_len_) {
-    return ZX_ERR_BAD_STATE;
+
+  // Initialize the splice list to the right size.
+  *pages = VmPageSpliceList(offset, len, 0);
+
+  __UNINITIALIZED LazyPageRequest page_request;
+  while (len > 0) {
+    Guard<CriticalMutex> guard{lock()};
+
+    uint64_t taken_len = 0;
+    zx_status_t status =
+        cow_pages_locked()->TakePagesLocked(offset, len, pages, &taken_len, &page_request);
+    if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
+      return status;
+    }
+    // We would only have failed to take anything if status was not ZX_OK, which in this case
+    // would be ZX_ERR_SHOULD_WAIT as that is the only non-OK status we can reach here with.
+    DEBUG_ASSERT(taken_len > 0 || status == ZX_ERR_SHOULD_WAIT);
+    // We should have taken the entire range requested if the status was ZX_OK.
+    DEBUG_ASSERT(status != ZX_OK || taken_len == len);
+    // We should not have taken any more than the requested range.
+    DEBUG_ASSERT(taken_len <= len);
+
+    // Record the completed portion.
+    len -= taken_len;
+    offset += taken_len;
+
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      guard.CallUnlocked([&page_request, &status] { status = page_request->Wait(); });
+      if (status != ZX_OK) {
+        return status;
+      }
+    }
   }
-  return cow_pages_locked()->TakePagesLocked(offset, len, pages);
+  return ZX_OK;
 }
 
 zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
