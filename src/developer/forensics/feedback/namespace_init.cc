@@ -19,6 +19,18 @@ namespace forensics::feedback {
 namespace {
 
 // TODO: https://fxbug.dev/317256133 - Remove UTF8 validity checks.
+void PrintBytesIfInvalidUTF8(std::string_view name, const std::string& validate) {
+  if (const bool valid = utfutils_is_valid_utf8(validate.c_str(), validate.size()); !valid) {
+    std::string invalid_bytes;
+    for (const char& c : validate) {
+      invalid_bytes += fxl::StringPrintf("%02X", c);
+    }
+    FX_LOGS(ERROR) << fxl::Substitute("Invalid UTF8 string found in '$0': '$1'", name,
+                                      invalid_bytes);
+  }
+}
+
+// TODO: https://fxbug.dev/317256133 - Remove UTF8 validity checks.
 void MoveFile(const std::string& from, const std::string& to) {
   // Bail if the file doesn't exist.
   if (!files::IsFile(from)) {
@@ -104,6 +116,8 @@ void CreatePreviousLogsFile(cobalt::Logger* cobalt, const StorageSize max_decomp
 void MoveAndRecordBootId(const std::string& new_boot_id, const std::string& previous_boot_id_path,
                          const std::string& current_boot_id_path) {
   MoveFile(/*from=*/current_boot_id_path, /*to=*/previous_boot_id_path);
+
+  PrintBytesIfInvalidUTF8(/*name=*/"new_boot_id", /*validate=*/new_boot_id);
   files::WriteFile(current_boot_id_path, new_boot_id);
 }
 
@@ -111,6 +125,8 @@ void MoveAndRecordBuildVersion(const std::string& current_build_version,
                                const std::string& previous_build_version_path,
                                const std::string& current_build_version_path) {
   MoveFile(/*from=*/current_build_version_path, /*to=*/previous_build_version_path);
+
+  PrintBytesIfInvalidUTF8(/*name=*/"current_build_version", /*validate=*/current_build_version);
   files::WriteFile(current_build_version_path, current_build_version);
 }
 
