@@ -701,7 +701,7 @@ group("regex-syntax") {
 }
 
 group("ring") {
-  public_deps = [ ":ring-v0_16_16" ]
+  public_deps = [ ":ring-v0_16_17" ]
 }
 
 import("//build/icu/icu_rust_crates.gni")
@@ -12229,18 +12229,18 @@ rust_library("rfc6979-v0_3_1") {
   applicable_licenses = [ ":rfc6979-v0_3_1.license" ]
 }
 
-license("ring-v0_16_16.license") {
+license("ring-v0_16_17.license") {
   public_package_name = "ring"
   license_files = [
-    "//third_party/rust_crates/vendor/ring-0.16.16/LICENSE",
-    "//third_party/rust_crates/vendor/ring-0.16.16/third_party/fiat/LICENSE",
+    "//third_party/rust_crates/vendor/ring-0.16.17/LICENSE",
+    "//third_party/rust_crates/vendor/ring-0.16.17/third_party/fiat/LICENSE",
   ]
 }
 
-rust_library("ring-v0_16_16") {
+rust_library("ring-v0_16_17") {
   crate_name = "ring"
-  crate_root = "//third_party/rust_crates/vendor/ring-0.16.16/src/lib.rs"
-  output_name = "ring-b5f97fae0b1918bd"
+  crate_root = "//third_party/rust_crates/vendor/ring-0.16.17/src/lib.rs"
+  output_name = "ring-a5354e048775d22f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -12269,8 +12269,8 @@ rust_library("ring-v0_16_16") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=b5f97fae0b1918bd",
-    "-Cextra-filename=-b5f97fae0b1918bd",
+    "-Cmetadata=a5354e048775d22f",
+    "-Cextra-filename=-a5354e048775d22f",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"dev_urandom_fallback\"",
@@ -12285,7 +12285,7 @@ rust_library("ring-v0_16_16") {
   visibility += [ ":tuf-v0_3_0-beta11" ]
   visibility += [ ":webpki-v0_21_0" ]
 
-  applicable_licenses = [ ":ring-v0_16_16.license" ]
+  applicable_licenses = [ ":ring-v0_16_17.license" ]
 }
 
 license("rust_icu_common-v4_2_3.license") {
@@ -12739,7 +12739,7 @@ rust_library("rustls-v0_19_1") {
   deps = []
   deps += [ ":base64-v0_13_0" ]
   deps += [ ":log-v0_4_20" ]
-  deps += [ ":ring-v0_16_16" ]
+  deps += [ ":ring-v0_16_17" ]
   deps += [ ":sct-v0_6_0" ]
   deps += [ ":webpki-v0_21_0" ]
 
@@ -13249,7 +13249,7 @@ rust_library("sct-v0_6_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":ring-v0_16_16" ]
+  deps += [ ":ring-v0_16_17" ]
   deps += [ ":untrusted-v0_7_1" ]
 
   rustenv = []
@@ -16070,7 +16070,7 @@ rust_library("tuf-v0_3_0-beta11") {
   deps += [ ":itoa-v0_4_3" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":percent-encoding-v2_2_0" ]
-  deps += [ ":ring-v0_16_16" ]
+  deps += [ ":ring-v0_16_17" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":serde_derive-v1_0_147($host_toolchain)" ]
   deps += [ ":serde_json-v1_0_87" ]
@@ -17536,7 +17536,7 @@ rust_library("webpki-v0_21_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":ring-v0_16_16" ]
+  deps += [ ":ring-v0_16_17" ]
   deps += [ ":untrusted-v0_7_1" ]
 
   rustenv = []
