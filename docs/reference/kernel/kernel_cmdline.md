@@ -135,15 +135,15 @@ will perform a full hardware reset and reinitialize the hardware from scratch.
 This may eliminate display errors caused by bugs in the seamless takeover
 logic.
 
-## driver.sysmem.protected_memory_size=\<num>
+## driver.sysmem.contiguous_memory_size=\<num>
 
-Overrides the board-driver-specified size for sysmem's default protected memory
+Overrides the board-driver-specified size for sysmem's contiguous memory
 pool. Value is in bytes.
 
 ## driver.sysmem.protected_memory_size=\<num>
 
-Overrides the board-driver-specified size for sysmem's contiguous memory pool.
-Value is in bytes.
+Overrides the board-driver-specified size for sysmem's default protected memory
+pool. Value is in bytes.
 
 ## driver.tests.enable=\<bool>
 
