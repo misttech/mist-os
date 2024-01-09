@@ -13,6 +13,7 @@ use {
         handle::{AsyncChannel, HandleDisposition, MessageBufEtc},
         Error,
     },
+    fuchsia_sync::Mutex,
     fuchsia_zircon_status as zx_status,
     futures::{
         future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone},
@@ -20,7 +21,6 @@ use {
         stream::{FusedStream, Stream},
         task::{noop_waker, ArcWake, Context, Poll, Waker},
     },
-    parking_lot::Mutex,
     slab::Slab,
     std::{collections::VecDeque, marker::Unpin, mem, pin::Pin, sync::Arc},
 };
