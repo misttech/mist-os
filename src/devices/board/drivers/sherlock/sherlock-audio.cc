@@ -120,25 +120,6 @@ zx_status_t Sherlock::AudioInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('AUDI');
-  auto result = pbus_.buffer(arena)->GetBoardInfo();
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Audio(tdm_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Audio(tdm_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  auto& board_info = result->value()->info;
-
-  if (board_info.board_revision < BOARD_REV_EVT1 && board_info.board_revision != BOARD_REV_B72) {
-    // For audio we don't support boards revision lower than EVT with the exception of the B72
-    // board.
-    zxlogf(WARNING, "%s: Board revision unsupported, skipping audio initialization.", __FILE__);
-    return ZX_ERR_NOT_SUPPORTED;
-  }
 
   const char* product_name = "sherlock";
   constexpr size_t device_name_max_length = 32;
