@@ -5,7 +5,6 @@
 #include "src/devices/board/drivers/astro/astro.h"
 
 #include <assert.h>
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
@@ -30,28 +29,6 @@
 namespace astro {
 
 namespace fpbus = fuchsia_hardware_platform_bus;
-namespace fhgpio = fuchsia_hardware_gpio;
-
-uint32_t Astro::GetBoardRev() {
-  uint32_t board_rev;
-  uint8_t id0, id1, id2;
-
-  gpio_impl_.ConfigIn(GPIO_HW_ID0, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-  gpio_impl_.ConfigIn(GPIO_HW_ID1, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-  gpio_impl_.ConfigIn(GPIO_HW_ID2, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-  gpio_impl_.Read(GPIO_HW_ID0, &id0);
-  gpio_impl_.Read(GPIO_HW_ID1, &id1);
-  gpio_impl_.Read(GPIO_HW_ID2, &id2);
-  board_rev = id0 + (id1 << 1) + (id2 << 2);
-
-  if (board_rev >= MAX_SUPPORTED_REV) {
-    // We have detected a new board rev. Print this warning just in case the
-    // new board rev requires additional support that we were not aware of
-    zxlogf(INFO, "Unsupported board revision detected (%d)", board_rev);
-  }
-
-  return board_rev;
-}
 
 int Astro::Thread() {
   zx_status_t status;
@@ -102,29 +79,6 @@ int Astro::Thread() {
   if ((status = GpioInit()) != ZX_OK) {
     zxlogf(ERROR, "%s: GpioInit() failed: %d", __func__, status);
     return status;
-  }
-
-  // Once gpio is up and running, let's populate board revision
-  fpbus::BoardInfo info = {};
-  fidl::Arena<> fidl_arena;
-  info.board_revision() = GetBoardRev();
-  auto result = pbus_.buffer(fdf::Arena('ASTR'))->SetBoardInfo(fidl::ToWire(fidl_arena, info));
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: SetBoardInfo request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: SetBoardInfo failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  zxlogf(INFO, "Detected board rev 0x%x", info.board_revision().value());
-
-  if (*info.board_revision() != BOARD_REV_DVT && *info.board_revision() != BOARD_REV_PVT) {
-    zxlogf(ERROR, "Unsupported board revision %u. Booting will not continue",
-           *info.board_revision());
-    return -1;
   }
 
   if ((status = AddPostInitDevice()) != ZX_OK) {

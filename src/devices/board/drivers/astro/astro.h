@@ -55,18 +55,6 @@ enum {
   ASTRO_I2C_3,
 };
 
-// Astro Board Revs
-enum {
-  BOARD_REV_P1 = 0,
-  BOARD_REV_P2 = 1,
-  BOARD_REV_EVT_1 = 2,
-  BOARD_REV_EVT_2 = 3,
-  BOARD_REV_DVT = 4,
-  BOARD_REV_PVT = 5,
-
-  MAX_SUPPORTED_REV,  // This must be last entry
-};
-
 // Astro GPIO Pins used for board rev detection
 constexpr uint32_t GPIO_HW_ID0 = (S905D2_GPIOZ(7));
 constexpr uint32_t GPIO_HW_ID1 = (S905D2_GPIOZ(8));
@@ -139,7 +127,6 @@ class Astro : public AstroType {
   zx_status_t AddPostInitDevice();
   int Thread();
 
-  uint32_t GetBoardRev(void);
   zx_status_t EnableWifi32K(void);
   zx_status_t SdEmmcConfigurePortB(void);
 

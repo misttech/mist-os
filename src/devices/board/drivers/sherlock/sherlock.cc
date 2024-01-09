@@ -236,11 +236,6 @@ int Sherlock::Start() {
     return -1;
   }
 
-  if (BoardInit() != ZX_OK) {
-    zxlogf(ERROR, "BoardInit() failed");
-    return -1;
-  }
-
   if (CpuInit() != ZX_OK) {
     zxlogf(ERROR, "CpuInit() failed\n");
   }

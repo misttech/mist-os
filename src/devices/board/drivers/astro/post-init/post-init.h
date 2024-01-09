@@ -20,7 +20,20 @@ class PostInit : public fdf::DriverBase {
   void Start(fdf::StartCompleter completer) override;
 
  private:
+  // Astro Board Revs
+  enum AstroBoardBuild : uint8_t {
+    BOARD_REV_P1 = 0,
+    BOARD_REV_P2 = 1,
+    BOARD_REV_EVT_1 = 2,
+    BOARD_REV_EVT_2 = 3,
+    BOARD_REV_DVT = 4,
+    BOARD_REV_PVT = 5,
+
+    MAX_SUPPORTED_REV,  // This must be last entry
+  };
+
   zx::result<> InitBoardInfo();
+  zx::result<> SetBoardInfo();
 
   // Constructs a number using the value of each GPIO as one bit. The order of elements in
   // node_names determines the bits set in the result from LSB to MSB.
@@ -32,7 +45,7 @@ class PostInit : public fdf::DriverBase {
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> composite_manager_;
 
-  uint8_t board_build_{};
+  AstroBoardBuild board_build_{};
   uint8_t display_id_{};
 };
 

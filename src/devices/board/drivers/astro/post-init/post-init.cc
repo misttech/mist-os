@@ -58,6 +58,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
     return completer(result.take_error());
   }
 
+  if (zx::result result = SetBoardInfo(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   auto result = parent_->AddChild({std::move(args), std::move(controller_endpoints->server), {}});
   if (result.is_error()) {
     if (result.error_value().is_framework_error()) {
@@ -76,15 +80,40 @@ void PostInit::Start(fdf::StartCompleter completer) {
 
 zx::result<> PostInit::InitBoardInfo() {
   if (zx::result<uint8_t> board_build = ReadGpios(kBoardBuildNodeNames); board_build.is_ok()) {
-    board_build_ = *board_build;
+    board_build_ = static_cast<AstroBoardBuild>(*board_build);
   } else {
     return board_build.take_error();
+  }
+
+  if (board_build_ != BOARD_REV_DVT && board_build_ != BOARD_REV_PVT) {
+    FDF_LOG(ERROR, "Unsupported board revision %u", board_build_);
+  } else {
+    FDF_LOG(INFO, "Detected board rev 0x%x", board_build_);
   }
 
   if (zx::result<uint8_t> display_id = ReadGpios(kDisplayIdNodeNames); display_id.is_ok()) {
     display_id_ = *display_id;
   } else {
     return display_id.take_error();
+  }
+
+  return zx::ok();
+}
+
+zx::result<> PostInit::SetBoardInfo() {
+  fdf::Arena arena('PBUS');
+  auto board_info = fuchsia_hardware_platform_bus::wire::BoardInfo::Builder(arena)
+                        .board_revision(board_build_)
+                        .Build();
+
+  auto result = pbus_.buffer(arena)->SetBoardInfo(board_info);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Call to SetBoardInfo failed: %s", result.FormatDescription().c_str());
+    return zx::error(result.error().status());
+  }
+  if (result->is_error()) {
+    FDF_LOG(ERROR, "SetBoardInfo failed: %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
 
   return zx::ok();

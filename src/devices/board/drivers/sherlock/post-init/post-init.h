@@ -20,7 +20,18 @@ class PostInit : public fdf::DriverBase {
   void Start(fdf::StartCompleter completer) override;
 
  private:
+  enum SherlockBoardBuild : uint8_t {
+    // From the schematic.
+    BOARD_REV_B72 = 0x01,
+    BOARD_REV_P2 = 0x0B,
+    BOARD_REV_REWORK = 0x0C,
+    BOARD_REV_P21 = 0x0D,
+    BOARD_REV_EVT1 = 0x0E,
+    BOARD_REV_EVT2 = 0x0F,
+  };
+
   zx::result<> InitBoardInfo();
+  zx::result<> SetBoardInfo();
 
   // Constructs a number using the value of each GPIO as one bit. The order of elements in
   // node_names determines the bits set in the result from LSB to MSB.
@@ -31,7 +42,7 @@ class PostInit : public fdf::DriverBase {
 
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
 
-  uint8_t board_build_{};
+  SherlockBoardBuild board_build_{};
   uint8_t board_option_{};
   uint8_t display_vendor_{};
   uint8_t ddic_version_{};

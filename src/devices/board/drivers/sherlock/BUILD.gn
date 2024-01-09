@@ -189,7 +189,6 @@ template("sherlock_driver") {
       "sherlock-audio.cc",
       "sherlock-backlight.cc",
       "sherlock-bluetooth.cc",
-      "sherlock-board.cc",
       "sherlock-buttons.cc",
       "sherlock-camera.cc",
       "sherlock-canvas.cc",
