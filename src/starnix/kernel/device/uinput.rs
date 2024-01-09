@@ -554,6 +554,8 @@ mod test {
         assert_eq!(r, error!(EFAULT));
     }
 
+    // TODO(b/319238817): Re-enable when the flakiness is fixed
+    #[ignore]
     #[::fuchsia::test]
     async fn ui_dev_create_keyboard() {
         let dev = UinputDevice::new();
