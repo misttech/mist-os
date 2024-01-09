@@ -15,10 +15,6 @@ board_is_emu = true
 board_is_phys = false
 
 platform_enable_user_pci = true
-board_bootfs_labels += [
-  # Configs
-  "//src/power/power-manager:base_config",
-]
 
 partitions_config_label = "//boards/partitions:riscv64"
 
