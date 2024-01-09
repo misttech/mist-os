@@ -2959,7 +2959,7 @@ From //third_party/perfetto/gn/perfetto.gni:310
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:145
+From //src/power/power-manager/BUILD.gn:146
 
 ### enable_recovery_ui_v2
 
@@ -7893,7 +7893,7 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:15
+From //src/starnix/kernel/args.gni:7
 
 ### starnix_enable_alternate_anon_allocs
 
@@ -7901,7 +7901,7 @@ Whether to use an alternate strategy for anonymous memory allocations.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:37
+From //src/starnix/kernel/args.gni:29
 
 ### starnix_enable_trace_and_debug_logs_in_release
 
@@ -7911,7 +7911,7 @@ https://fuchsia-review.googlesource.com/c/fuchsia/+/929995.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:26
+From //src/starnix/kernel/args.gni:18
 
 ### starnix_enable_tracing
 
@@ -7919,7 +7919,7 @@ Whether or not tracing is enabled globally.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/BUILD.gn:18
+From //src/starnix/kernel/args.gni:10
 
 ### starnix_enable_tracing_firehose
 
@@ -7927,7 +7927,7 @@ Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:21
+From //src/starnix/kernel/args.gni:13
 
 ### starnix_syscall_stats
 
@@ -7935,7 +7935,7 @@ Whether or not syscall status inspect is enabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:29
+From //src/starnix/kernel/args.gni:21
 
 ### starnix_unified_aspace
 
@@ -7945,7 +7945,7 @@ support is available.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/BUILD.gn:34
+From //src/starnix/kernel/args.gni:26
 
 ### target_cpu
 
