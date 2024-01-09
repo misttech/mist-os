@@ -32,7 +32,7 @@ pub struct NdpConfiguration {
 pub struct DeviceConfiguration {
     /// ARP configurations.
     ///
-    /// Only present if the device supports NDP.
+    /// Only present if the device supports ARP.
     pub arp: Option<ArpConfiguration>,
     /// NDP configurations.
     ///
