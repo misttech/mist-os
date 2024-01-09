@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/syslog/cpp/macros.h>
 
 zx::result<MagmaDependencyInjection> MagmaDependencyInjection::Create(
     fidl::ClientEnd<fuchsia_memorypressure::Provider> provider) {
