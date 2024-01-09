@@ -14,7 +14,6 @@ use {
         volume::FxVolume,
     },
     anyhow::{anyhow, ensure, Context, Error},
-    async_trait::async_trait,
     fuchsia_merkle::{hash_block, MerkleTree},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
@@ -53,7 +52,7 @@ pub struct FxBlob {
     compressed_chunk_size: u64,   // zero if blob is not compressed.
     compressed_offsets: Vec<u64>, // unused if blob is not compressed.
     uncompressed_size: u64,       // always set.
-    pager_packet_receiver_registration: PagerPacketReceiverRegistration,
+    pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
 }
 
 impl FxBlob {
@@ -159,13 +158,12 @@ impl FxNode for FxBlob {
     }
 }
 
-#[async_trait]
 impl PagerBacked for FxBlob {
     fn pager(&self) -> &crate::pager::Pager {
         self.handle.owner().pager()
     }
 
-    fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
+    fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration<Self> {
         &self.pager_packet_receiver_registration
     }
 

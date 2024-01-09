@@ -8,7 +8,6 @@ use {
         errors::map_to_status,
     },
     anyhow::Error,
-    async_trait::async_trait,
     bitflags::bitflags,
     fuchsia_async as fasync,
     fuchsia_zircon::{
@@ -16,13 +15,13 @@ use {
         sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ},
         AsHandleRef, PacketContents, PagerPacket, SignalPacket,
     },
-    futures::Future,
     fxfs::{
         log::*,
         round::{round_down, round_up},
     },
     once_cell::sync::Lazy,
     std::{
+        future::Future,
         marker::{Send, Sync},
         mem::MaybeUninit,
         ops::Range,
@@ -32,7 +31,7 @@ use {
     vfs::execution_scope::ExecutionScope,
 };
 
-fn watch_for_zero_children(file: &dyn PagerBacked) -> Result<(), zx::Status> {
+fn watch_for_zero_children(file: &impl PagerBacked) -> Result<(), zx::Status> {
     file.vmo().as_handle_ref().wait_async_handle(
         file.pager().executor.port(),
         file.pager_packet_receiver_registration().key(),
@@ -41,17 +40,17 @@ fn watch_for_zero_children(file: &dyn PagerBacked) -> Result<(), zx::Status> {
     )
 }
 
-pub type PagerPacketReceiverRegistration = fasync::ReceiverRegistration<PagerPacketReceiver>;
+pub type PagerPacketReceiverRegistration<T> = fasync::ReceiverRegistration<PagerPacketReceiver<T>>;
 
 /// A `fuchsia_async::PacketReceiver` that handles pager packets and the `VMO_ZERO_CHILDREN` signal.
-pub struct PagerPacketReceiver {
+pub struct PagerPacketReceiver<T> {
     // The file should only ever be `None` for the brief period of time between `Pager::create_vmo`
     // and `Pager::register_file`. Nothing should be reading or writing to the vmo during that time
     // and `Pager::watch_for_zero_children` shouldn't be called either.
-    file: Mutex<FileHolder>,
+    file: Mutex<FileHolder<T>>,
 }
 
-impl PagerPacketReceiver {
+impl<T: PagerBacked> PagerPacketReceiver<T> {
     /// Drops the strong reference to the file that might be held if
     /// `Pager::watch_for_zero_children` was called. This should only be used when forcibly dropping
     /// the file object. Calls `on_zero_children` if the strong reference was held.
@@ -125,7 +124,7 @@ impl PagerPacketReceiver {
     }
 }
 
-impl fasync::PacketReceiver for PagerPacketReceiver {
+impl<T: PagerBacked> fasync::PacketReceiver for PagerPacketReceiver<T> {
     fn receive_packet(&self, packet: zx::Packet) {
         match packet.contents() {
             PacketContents::Pager(contents) => {
@@ -156,22 +155,10 @@ pub struct Pager {
 // child VMOs that have been shared, then we will have a strong reference which is required to keep
 // the file alive.  When we detect that there are no more children, we can downgrade to a weak
 // reference which will allow the file to be cleaned up if there are no other uses.
-enum FileHolder {
-    Strong(Arc<dyn PagerBacked>),
-    Weak(Weak<dyn PagerBacked>),
+enum FileHolder<T> {
+    Strong(Arc<T>),
+    Weak(Weak<T>),
     None,
-}
-
-impl From<Arc<dyn PagerBacked>> for FileHolder {
-    fn from(file: Arc<dyn PagerBacked>) -> FileHolder {
-        FileHolder::Strong(file)
-    }
-}
-
-impl From<Weak<dyn PagerBacked>> for FileHolder {
-    fn from(file: Weak<dyn PagerBacked>) -> FileHolder {
-        FileHolder::Weak(file)
-    }
 }
 
 /// Pager handles page requests. It is a per-volume object.
@@ -187,7 +174,7 @@ impl Pager {
     }
 
     /// Spawns a short term task for the pager that includes a guard that will prevent termination.
-    pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
+    fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
         let guard = self.scope.active_guard();
         self.executor.spawn_detached(async move {
             task.await;
@@ -197,10 +184,10 @@ impl Pager {
 
     /// Creates a new VMO to be used with the pager. `Pager::register_file` must be called before
     /// reading from, writing to, or creating children of the vmo.
-    pub fn create_vmo(
+    pub fn create_vmo<T: PagerBacked>(
         &self,
         initial_size: u64,
-    ) -> Result<(zx::Vmo, PagerPacketReceiverRegistration), Error> {
+    ) -> Result<(zx::Vmo, PagerPacketReceiverRegistration<T>), Error> {
         let registration = self.executor.register_receiver(Arc::new(PagerPacketReceiver {
             file: Mutex::new(FileHolder::None),
         }));
@@ -218,13 +205,13 @@ impl Pager {
     /// Registers a file with the pager.
     pub fn register_file(&self, file: &Arc<impl PagerBacked>) {
         *file.pager_packet_receiver_registration().file.lock().unwrap() =
-            FileHolder::Weak(Arc::downgrade(file) as Weak<dyn PagerBacked>);
+            FileHolder::Weak(Arc::downgrade(file));
     }
 
     /// Starts watching for the `VMO_ZERO_CHILDREN` signal on `file`'s vmo. Returns false if the
     /// signal is already being watched for. When the pager receives the `VMO_ZERO_CHILDREN` signal
     /// [`PagerBacked::on_zero_children`] will be called.
-    pub fn watch_for_zero_children(&self, file: &dyn PagerBacked) -> Result<bool, Error> {
+    pub fn watch_for_zero_children(&self, file: &impl PagerBacked) -> Result<bool, Error> {
         let mut file = file.pager_packet_receiver_registration().file.lock().unwrap();
 
         match &*file {
@@ -377,13 +364,12 @@ impl Pager {
 }
 
 /// This is a trait for objects (files/blobs) that expose a pager backed VMO.
-#[async_trait]
-pub trait PagerBacked: Sync + Send + 'static {
+pub trait PagerBacked: Sync + Send + Sized + 'static {
     /// The pager backing this VMO.
     fn pager(&self) -> &Pager;
 
     /// The receiver registration returned from [`Pager::create_vmo`].
-    fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration;
+    fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration<Self>;
 
     /// The pager backed VMO that this object is handling packets for. The VMO must be created with
     /// [`Pager::create_vmo`].
@@ -407,13 +393,12 @@ pub trait PagerBacked: Sync + Send + 'static {
     /// This may be larger than the system page size (e.g. for compressed chunks).
     fn read_alignment(&self) -> u64;
 
-    /// Reads one or more blocks into a buffer and returns it.
-    /// Note that |aligned_byte_range| *must* be aligned to a
-    /// multiple of |self.read_alignment()|.
-    async fn aligned_read(
+    /// Reads one or more blocks into a buffer and returns it. Note that |aligned_byte_range| *must*
+    /// be aligned to a multiple of |self.read_alignment()|.
+    fn aligned_read(
         &self,
-        _aligned_byte_range: std::ops::Range<u64>,
-    ) -> Result<(buffer::Buffer<'_>, usize), Error>;
+        aligned_byte_range: std::ops::Range<u64>,
+    ) -> impl Future<Output = Result<(buffer::Buffer<'_>, usize), Error>> + Send;
 }
 
 /// A generic page_in implementation that supplies pages using block-aligned reads.
@@ -539,7 +524,7 @@ mod tests {
 
     struct MockFile {
         vmo: zx::Vmo,
-        pager_packet_receiver_registration: PagerPacketReceiverRegistration,
+        pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
         pager: Arc<Pager>,
     }
 
@@ -551,13 +536,12 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl PagerBacked for MockFile {
         fn pager(&self) -> &Pager {
             &self.pager
         }
 
-        fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
+        fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration<Self> {
             &self.pager_packet_receiver_registration
         }
 
@@ -593,7 +577,7 @@ mod tests {
     struct OnZeroChildrenFile {
         pager: Arc<Pager>,
         vmo: zx::Vmo,
-        pager_packet_receiver_registration: PagerPacketReceiverRegistration,
+        pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
         sender: Mutex<mpsc::UnboundedSender<()>>,
     }
 
@@ -605,13 +589,12 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl PagerBacked for OnZeroChildrenFile {
         fn pager(&self) -> &Pager {
             &self.pager
         }
 
-        fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
+        fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration<Self> {
             &self.pager_packet_receiver_registration
         }
 
@@ -706,16 +689,15 @@ mod tests {
             vmo: zx::Vmo,
             pager: Arc<Pager>,
             status_code: Mutex<zx::Status>,
-            pager_packet_receiver_registration: PagerPacketReceiverRegistration,
+            pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
         }
 
-        #[async_trait]
         impl PagerBacked for StatusCodeFile {
             fn pager(&self) -> &Pager {
                 &self.pager
             }
 
-            fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
+            fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration<Self> {
                 &self.pager_packet_receiver_registration
             }
 

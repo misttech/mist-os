@@ -59,14 +59,19 @@ const PURGED: usize = 1 << (usize::BITS - 1);
 pub struct FxFile {
     handle: PagedObjectHandle,
     open_count: AtomicUsize,
+    pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
 }
 
 #[fxfs_trace::trace]
 impl FxFile {
     pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
+        let size = handle.get_size();
+        let (vmo, pager_packet_receiver_registration) =
+            handle.owner().pager().create_vmo(size).unwrap();
         let file = Arc::new(Self {
-            handle: PagedObjectHandle::new(handle),
+            handle: PagedObjectHandle::new(handle, vmo),
             open_count: AtomicUsize::new(0),
+            pager_packet_receiver_registration,
         });
 
         file.handle.owner().pager().register_file(&file);
@@ -235,7 +240,7 @@ impl FxNode for FxFile {
     }
 
     fn terminate(&self) {
-        self.handle.pager_packet_receiver_registration().stop_watching_for_zero_children();
+        self.pager_packet_receiver_registration.stop_watching_for_zero_children();
     }
 }
 
@@ -492,14 +497,13 @@ impl File for FxFile {
 }
 
 #[fxfs_trace::trace]
-#[async_trait]
 impl PagerBacked for FxFile {
     fn pager(&self) -> &crate::pager::Pager {
         self.handle.owner().pager()
     }
 
-    fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
-        &self.handle.pager_packet_receiver_registration()
+    fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration<Self> {
+        &self.pager_packet_receiver_registration
     }
 
     fn vmo(&self) -> &zx::Vmo {

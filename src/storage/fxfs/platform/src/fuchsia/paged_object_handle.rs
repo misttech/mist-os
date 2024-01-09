@@ -4,7 +4,7 @@
 
 use {
     crate::fuchsia::{
-        pager::{Pager, PagerPacketReceiverRegistration},
+        pager::Pager,
         pager::{PagerVmoStatsOptions, VmoDirtyRange},
         volume::FxVolume,
     },
@@ -54,7 +54,6 @@ pub struct PagedObjectHandle {
     inner: Mutex<Inner>,
     vmo: TempClonable<zx::Vmo>,
     handle: DataObjectHandle<FxVolume>,
-    pager_packet_receiver_registration: PagerPacketReceiverRegistration,
 }
 
 struct Inner {
@@ -205,11 +204,7 @@ impl Inner {
 }
 
 impl PagedObjectHandle {
-    pub fn new(handle: DataObjectHandle<FxVolume>) -> Self {
-        let size = handle.get_size();
-
-        let (vmo, pager_packet_receiver_registration) =
-            handle.owner().pager().create_vmo(size).unwrap();
+    pub fn new(handle: DataObjectHandle<FxVolume>, vmo: zx::Vmo) -> Self {
         Self {
             vmo: TempClonable::new(vmo),
             handle,
@@ -220,7 +215,6 @@ impl PagedObjectHandle {
                 spare: 0,
                 pending_shrink: PendingShrink::None,
             }),
-            pager_packet_receiver_registration,
         }
     }
 
@@ -238,10 +232,6 @@ impl PagedObjectHandle {
 
     pub fn pager(&self) -> &Pager {
         self.owner().pager()
-    }
-
-    pub fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
-        &self.pager_packet_receiver_registration
     }
 
     pub fn get_size(&self) -> u64 {
@@ -1083,13 +1073,13 @@ mod tests {
         super::*,
         crate::fuchsia::{
             directory::FxDirectory,
+            pager::PagerPacketReceiverRegistration,
             pager::{default_page_in, PagerBacked},
             testing::{close_dir_checked, close_file_checked, open_file_checked, TestFixture},
             volume::FxVolumeAndRoot,
         },
         anyhow::{bail, Context},
         assert_matches::assert_matches,
-        async_trait::async_trait,
         fidl::endpoints::{create_proxy, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::file,
@@ -2176,6 +2166,7 @@ mod tests {
             handle: PagedObjectHandle,
             unblocked_requests: Mutex<HashSet<u64>>,
             cvar: Condvar,
+            pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
         }
 
         impl File {
@@ -2185,14 +2176,13 @@ mod tests {
             }
         }
 
-        #[async_trait]
         impl PagerBacked for File {
             fn pager(&self) -> &crate::pager::Pager {
                 self.handle.owner().pager()
             }
 
-            fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
-                &self.handle.pager_packet_receiver_registration()
+            fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration<Self> {
+                &self.pager_packet_receiver_registration
             }
 
             fn vmo(&self) -> &zx::Vmo {
@@ -2277,11 +2267,14 @@ mod tests {
                 transaction.commit().await.unwrap();
                 let (notifications, mut receiver) = unbounded();
 
+                let (vmo, pager_packet_receiver_registration) =
+                    file.owner().pager().create_vmo(file.get_size()).unwrap();
                 let file = Arc::new(File {
                     notifications,
-                    handle: PagedObjectHandle::new(file),
+                    handle: PagedObjectHandle::new(file, vmo),
                     unblocked_requests: Mutex::new(HashSet::new()),
                     cvar: Condvar::new(),
+                    pager_packet_receiver_registration,
                 });
 
                 file.handle.owner().pager().register_file(&file);
