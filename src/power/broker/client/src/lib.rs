@@ -16,8 +16,8 @@ impl PowerElementContext {
     pub async fn new(
         topology: &fbroker::TopologyProxy,
         element_name: &str,
-        initial_current_level: &fbroker::PowerLevel,
-        default_level: &fbroker::PowerLevel,
+        initial_current_level: fbroker::PowerLevel,
+        minimum_level: fbroker::PowerLevel,
         dependencies: Vec<fbroker::LevelDependency>,
         mut dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
     ) -> Result<Self> {
@@ -32,7 +32,7 @@ impl PowerElementContext {
             .add_element(
                 element_name,
                 initial_current_level,
-                default_level,
+                minimum_level,
                 dependencies,
                 dependency_tokens_to_register,
             )

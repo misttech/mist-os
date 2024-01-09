@@ -45,6 +45,19 @@ impl BrokerSvc {
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 match request {
+                    StatusRequest::GetPowerLevel { responder } => {
+                        tracing::debug!("GetPowerLevel({:?})", &element_id);
+                        let current_level = {
+                            let mut broker = self.broker.lock().await;
+                            tracing::debug!("get_current_level({:?})", &element_id);
+                            broker.get_current_level(&element_id)
+                        };
+                        if let Some(current_level) = current_level {
+                            responder.send(Ok(current_level)).context("response failed")
+                        } else {
+                            responder.send(Err(fpb::StatusError::Unknown)).context("response failed")
+                        }
+                    }
                     StatusRequest::WatchPowerLevel { last_level, responder } => {
                         tracing::debug!("WatchPowerLevel({:?}, {:?})", &element_id, last_level);
                         let mut receiver = {
@@ -58,15 +71,13 @@ impl BrokerSvc {
                                 &power_level,
                                 &last_level
                             );
-                            if last_level.is_some() && last_level.clone().unwrap().as_ref() == &power_level {
-                                tracing::debug!(
-                                    "WatchPowerLevel: level has not changed, watching for next update...",
-                                );
-                                continue;
-                            } else {
+                            if last_level != power_level {
                                 tracing::debug!("responder.send({:?})", &power_level);
-                                return responder.send(&power_level).context("response failed");
+                                return responder.send(Ok(power_level)).context("response failed");
                             }
+                            tracing::debug!(
+                                "WatchPowerLevel: level has not changed, watching for next update...",
+                            );
                         }
                         Err(anyhow::anyhow!("Receiver closed, element is no longer available."))
                     }
@@ -320,6 +331,19 @@ impl BrokerSvc {
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 match request {
+                    LevelControlRequest::GetRequiredLevel { responder } => {
+                        tracing::debug!("GetRequiredLevel({:?})", &element_id);
+                        let required_level = {
+                            let mut broker = self.broker.lock().await;
+                            tracing::debug!("get_required_level({:?})", &element_id);
+                            broker.get_required_level(&element_id)
+                        };
+                        if let Some(required_level) = required_level {
+                            responder.send(Ok(required_level)).context("response failed")
+                        } else {
+                            responder.send(Err(fpb::RequiredLevelError::Unknown)).context("response failed")
+                        }
+                    }
                     LevelControlRequest::WatchRequiredLevel {
                         last_required_level,
                         responder,
@@ -341,13 +365,13 @@ impl BrokerSvc {
                             );
                             let Some(required_level) = next else {
                                 tracing::error!("element missing default required level");
-                                return responder.send(Err(fpb::WatchRequiredLevelError::Internal)).context("send failed");
+                                return responder.send(Err(fpb::RequiredLevelError::Internal)).context("send failed");
                             };
-                            if last_required_level.is_none() || **last_required_level.as_ref().unwrap() != required_level {
+                            if last_required_level != required_level {
                                 tracing::debug!(
                                     "WatchRequiredLevel: sending new level: {:?}", &required_level,
                                 );
-                                return responder.send(Ok(&required_level)).context("send failed");
+                                return responder.send(Ok(required_level)).context("send failed");
                             }
                             tracing::debug!(
                                 "WatchRequiredLevel: level has not changed, watching for next update...",

@@ -4,7 +4,7 @@
 
 use anyhow::{self, Context, Result};
 use async_utils::hanging_get::server::HangingGet;
-use fidl_fuchsia_power_broker::{self as fbroker, PowerLevel::UserDefined, UserDefinedPowerLevel};
+use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system as fsystem;
 use fuchsia_async as fasync;
@@ -35,15 +35,9 @@ impl SystemActivityGovernor {
             ..Default::default()
         };
 
-        let execution_state = PowerElementContext::new(
-            topology,
-            "execution_state",
-            &UserDefined(UserDefinedPowerLevel { level: 0 }),
-            &UserDefined(UserDefinedPowerLevel { level: 0 }),
-            Vec::new(),
-            Vec::new(),
-        )
-        .await?;
+        let execution_state =
+            PowerElementContext::new(topology, "execution_state", 0, 0, Vec::new(), Vec::new())
+                .await?;
 
         Ok(Rc::new(Self {
             execution_state,
@@ -69,13 +63,9 @@ impl SystemActivityGovernor {
 
     async fn watch_execution_state(self: Rc<Self>) {
         let stats_publisher = self.stats_hanging_get.borrow().new_publisher();
-        let mut last_required_level = UserDefined(UserDefinedPowerLevel { level: 0 });
+        let mut last_required_level = 0;
         loop {
-            match self
-                .execution_state
-                .level_control
-                .watch_required_level(Some(&last_required_level))
-                .await
+            match self.execution_state.level_control.watch_required_level(last_required_level).await
             {
                 Ok(Ok(required_level)) => {
                     tracing::debug!(
@@ -84,13 +74,13 @@ impl SystemActivityGovernor {
                     let res = self
                         .execution_state
                         .level_control
-                        .update_current_power_level(&required_level)
+                        .update_current_power_level(required_level)
                         .await;
                     if let Err(e) = res {
                         tracing::warn!("update_current_power_level failed: {e:?}");
                     }
 
-                    if required_level == UserDefined(UserDefinedPowerLevel { level: 0 }) {
+                    if required_level == 0 {
                         stats_publisher.update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
                             let stats = stats_opt.as_mut().expect("stats is uninitialized");
                             // TODO(mbrunson): Trigger suspend and check return value.

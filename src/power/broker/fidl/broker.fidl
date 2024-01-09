@@ -13,18 +13,13 @@ using zx;
 /// Used to describe the power level of an element.
 /// Could extend this further to support additional types of power
 /// levels, such as ACPI.
-type PowerLevel = strict union {
-    1: binary BinaryPowerLevel;
-    2: user_defined UserDefinedPowerLevel;
-};
+alias PowerLevel = uint8;
 
-type BinaryPowerLevel = strict enum : uint32 {
+/// BinaryPowerLevel is a well-known set of PowerLevels with only two
+/// states: OFF and ON.
+type BinaryPowerLevel = strict enum : PowerLevel {
     OFF = 0;
     ON = 1;
-};
-
-type UserDefinedPowerLevel = struct {
-    level uint8;
 };
 
 /// A token that represents the right to add a dependency upon another
@@ -158,19 +153,18 @@ type Permissions = strict bits : uint32 {
 /// and initiate power level changes of an element previously added via
 /// Topology.AddElement.
 open protocol LevelControl {
-    /// Request made by element owners on behalf of a single power element to
-    /// the Power Broker as a hanging GET:
-    /// If last_required_level does not match the current required power level
-    /// this will return immediately with the new required power level.
-    /// If last_required_level matches the current level, the call will
-    /// hang until the required level changes.
+    /// Returns the required power level for this element, non-blocking.
+    flexible GetRequiredLevel() -> (resource struct {
+        required_level PowerLevel;
+    }) error RequiredLevelError;
+
+    /// Returns the required power level for this element, blocking until
+    /// the required power level is different than last_required_level.
     flexible WatchRequiredLevel(resource struct {
-        /// Provided by the client with the last level received, or None if
-        /// this is the first call.
-        last_required_level PowerLevel:optional;
+        last_required_level PowerLevel;
     }) -> (resource struct {
         required_level PowerLevel;
-    }) error WatchRequiredLevelError;
+    }) error RequiredLevelError;
 
     /// Sent by the element on initial startup and whenever there is a change
     /// in power level.
@@ -179,9 +173,10 @@ open protocol LevelControl {
     }) -> () error UpdateCurrentPowerLevelError;
 };
 
-type WatchRequiredLevelError = flexible enum {
+type RequiredLevelError = flexible enum {
     INTERNAL = 1;
     NOT_AUTHORIZED = 2;
+    UNKNOWN = 3;
 };
 
 type UpdateCurrentPowerLevelError = flexible enum {
@@ -239,13 +234,20 @@ open protocol LeaseControl {
 /// ElementControl channel (and passed to other clients who need access
 /// to the element's current power level).
 open protocol Status {
-    /// Listen for changes to the element's current power level.
-    /// If last_level is passed, it will block until the current level is
-    /// different than last_level. Otherwise, it will return immediately
-    /// with the current level.
+    /// Returns the current power level for this element, non-blocking.
+    flexible GetPowerLevel() -> (resource struct {
+        current_level PowerLevel;
+    }) error StatusError;
+
+    /// Returns the current power level for this element, blocking until
+    /// the current power level is different than last_level.
     flexible WatchPowerLevel(resource struct {
-        last_level PowerLevel:optional;
+        last_level PowerLevel;
     }) -> (resource struct {
         current_level PowerLevel;
-    });
+    }) error StatusError;
+};
+
+type StatusError = flexible enum {
+    UNKNOWN = 1;
 };

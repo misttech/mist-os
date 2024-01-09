@@ -137,7 +137,6 @@ impl Broker {
         Ok(())
     }
 
-    #[cfg(test)]
     pub fn get_current_level(&mut self, element_id: &ElementID) -> Option<PowerLevel> {
         self.current.get(element_id)
     }
@@ -149,7 +148,6 @@ impl Broker {
         self.current.subscribe(element_id)
     }
 
-    #[cfg(test)]
     pub fn get_required_level(&mut self, element_id: &ElementID) -> Option<PowerLevel> {
         self.required.get(element_id)
     }
@@ -521,7 +519,7 @@ impl Catalog {
                     "calculate_required_level: no default level set for {:?}",
                     element_id
                 );
-                PowerLevel::Binary(BinaryPowerLevel::Off)
+                BinaryPowerLevel::Off.into_primitive()
             }
         }
     }
@@ -779,40 +777,25 @@ trait SatisfyPowerLevel {
 
 impl SatisfyPowerLevel for PowerLevel {
     fn satisfies(&self, required: PowerLevel) -> bool {
-        match self {
-            PowerLevel::Binary(self_binary) => match required {
-                PowerLevel::Binary(required_binary) => {
-                    required_binary == BinaryPowerLevel::Off || self_binary == &BinaryPowerLevel::On
-                }
-                _ => false,
-            },
-            PowerLevel::UserDefined(self_user_defined) => match required {
-                PowerLevel::UserDefined(required_level) => {
-                    self_user_defined.level >= required_level.level
-                }
-                _ => false,
-            },
-        }
+        self >= &required
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_power_broker::{
-        BinaryPowerLevel, DependencyToken, PowerLevel, UserDefinedPowerLevel,
-    };
+    use fidl_fuchsia_power_broker::{DependencyToken, PowerLevel};
     use fuchsia_zircon::{self as zx, HandleBased};
 
     #[fuchsia::test]
     fn test_binary_satisfy_power_level() {
         for (level, required, want) in [
-            (BinaryPowerLevel::Off, BinaryPowerLevel::On, false),
-            (BinaryPowerLevel::Off, BinaryPowerLevel::Off, true),
-            (BinaryPowerLevel::On, BinaryPowerLevel::Off, true),
-            (BinaryPowerLevel::On, BinaryPowerLevel::On, true),
+            (BinaryPowerLevel::Off.into_primitive(), BinaryPowerLevel::On.into_primitive(), false),
+            (BinaryPowerLevel::Off.into_primitive(), BinaryPowerLevel::Off.into_primitive(), true),
+            (BinaryPowerLevel::On.into_primitive(), BinaryPowerLevel::Off.into_primitive(), true),
+            (BinaryPowerLevel::On.into_primitive(), BinaryPowerLevel::On.into_primitive(), true),
         ] {
-            let got = PowerLevel::Binary(level).satisfies(PowerLevel::Binary(required));
+            let got = level.satisfies(required);
             assert_eq!(
                 got, want,
                 "{:?}.satisfies({:?}) = {:?}, want {:?}",
@@ -835,8 +818,7 @@ mod tests {
             (35, 36, false),
             (35, 35, true),
         ] {
-            let got = PowerLevel::UserDefined(UserDefinedPowerLevel { level })
-                .satisfies(PowerLevel::UserDefined(UserDefinedPowerLevel { level: required }));
+            let got = level.satisfies(required);
             assert_eq!(
                 got, want,
                 "{:?}.satisfies({:?}) = {:?}, want {:?}",
@@ -849,20 +831,17 @@ mod tests {
     fn test_levels() {
         let mut levels = SubscribeMap::<ElementID, PowerLevel>::new();
 
-        levels.update(&"A".into(), PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(levels.get(&"A".into()), Some(PowerLevel::Binary(BinaryPowerLevel::On)));
+        levels.update(&"A".into(), BinaryPowerLevel::On.into_primitive());
+        assert_eq!(levels.get(&"A".into()), Some(BinaryPowerLevel::On.into_primitive()));
         assert_eq!(levels.get(&"B".into()), None);
 
-        levels.update(&"A".into(), PowerLevel::Binary(BinaryPowerLevel::Off));
-        levels.update(&"B".into(), PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(levels.get(&"A".into()), Some(PowerLevel::Binary(BinaryPowerLevel::Off)));
-        assert_eq!(levels.get(&"B".into()), Some(PowerLevel::Binary(BinaryPowerLevel::On)));
+        levels.update(&"A".into(), BinaryPowerLevel::Off.into_primitive());
+        levels.update(&"B".into(), BinaryPowerLevel::On.into_primitive());
+        assert_eq!(levels.get(&"A".into()), Some(BinaryPowerLevel::Off.into_primitive()));
+        assert_eq!(levels.get(&"B".into()), Some(BinaryPowerLevel::On.into_primitive()));
 
-        levels.update(&"UD1".into(), PowerLevel::UserDefined(UserDefinedPowerLevel { level: 145 }));
-        assert_eq!(
-            levels.get(&"UD1".into()),
-            Some(PowerLevel::UserDefined(UserDefinedPowerLevel { level: 145 }))
-        );
+        levels.update(&"UD1".into(), 145);
+        assert_eq!(levels.get(&"UD1".into()), Some(145));
         assert_eq!(levels.get(&"UD2".into()), None);
     }
 
@@ -873,14 +852,14 @@ mod tests {
         let mut receiver_a = levels.subscribe(&"A".into());
         let mut receiver_b = levels.subscribe(&"B".into());
 
-        levels.update(&"A".into(), PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(levels.get(&"A".into()), Some(PowerLevel::Binary(BinaryPowerLevel::On)));
+        levels.update(&"A".into(), BinaryPowerLevel::On.into_primitive());
+        assert_eq!(levels.get(&"A".into()), Some(BinaryPowerLevel::On.into_primitive()));
         assert_eq!(levels.get(&"B".into()), None);
 
-        levels.update(&"A".into(), PowerLevel::Binary(BinaryPowerLevel::Off));
-        levels.update(&"B".into(), PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(levels.get(&"A".into()), Some(PowerLevel::Binary(BinaryPowerLevel::Off)));
-        assert_eq!(levels.get(&"B".into()), Some(PowerLevel::Binary(BinaryPowerLevel::On)));
+        levels.update(&"A".into(), BinaryPowerLevel::Off.into_primitive());
+        levels.update(&"B".into(), BinaryPowerLevel::On.into_primitive());
+        assert_eq!(levels.get(&"A".into()), Some(BinaryPowerLevel::Off.into_primitive()));
+        assert_eq!(levels.get(&"B".into()), Some(BinaryPowerLevel::On.into_primitive()));
 
         let mut received_a = Vec::new();
         while let Ok(Some(level)) = receiver_a.try_next() {
@@ -890,37 +869,24 @@ mod tests {
             received_a,
             vec![
                 None,
-                Some(PowerLevel::Binary(BinaryPowerLevel::On)),
-                Some(PowerLevel::Binary(BinaryPowerLevel::Off))
+                Some(BinaryPowerLevel::On.into_primitive()),
+                Some(BinaryPowerLevel::Off.into_primitive())
             ]
         );
         let mut received_b = Vec::new();
         while let Ok(Some(level)) = receiver_b.try_next() {
             received_b.push(level)
         }
-        assert_eq!(received_b, vec![None, Some(PowerLevel::Binary(BinaryPowerLevel::On))]);
+        assert_eq!(received_b, vec![None, Some(BinaryPowerLevel::On.into_primitive())]);
     }
 
     #[fuchsia::test]
     fn test_initialize_current_and_required_levels() {
         let mut broker = Broker::new();
-        let latinum = broker
-            .add_element(
-                "Latinum",
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 7 }),
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 2 }),
-                vec![],
-                vec![],
-            )
-            .expect("add_element failed");
-        assert_eq!(
-            broker.get_current_level(&latinum),
-            Some(PowerLevel::UserDefined(UserDefinedPowerLevel { level: 7 }))
-        );
-        assert_eq!(
-            broker.get_required_level(&latinum),
-            Some(PowerLevel::UserDefined(UserDefinedPowerLevel { level: 2 }))
-        );
+        let latinum =
+            broker.add_element("Latinum", 7, 2, vec![], vec![]).expect("add_element failed");
+        assert_eq!(broker.get_current_level(&latinum), Some(7));
+        assert_eq!(broker.get_required_level(&latinum), Some(2));
     }
 
     #[fuchsia::test]
@@ -931,8 +897,8 @@ mod tests {
         let mithril = broker
             .add_element(
                 "Mithril",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![],
                 vec![token_mithril
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -944,14 +910,14 @@ mod tests {
         // This should fail, because the token was never registered.
         let add_element_not_authorized_res = broker.add_element(
             "Silver",
-            PowerLevel::Binary(BinaryPowerLevel::Off),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
+            BinaryPowerLevel::Off.into_primitive(),
             vec![fpb::LevelDependency {
-                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                dependent_level: BinaryPowerLevel::On.into_primitive(),
                 requires_token: never_registered_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed"),
-                requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires_level: BinaryPowerLevel::On.into_primitive(),
             }],
             vec![],
         );
@@ -961,14 +927,14 @@ mod tests {
         broker
             .add_element(
                 "Silver",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![fpb::LevelDependency {
-                    dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
                 }],
                 vec![],
             )
@@ -985,14 +951,14 @@ mod tests {
         let add_element_not_authorized_res: Result<ElementID, AddElementError> = broker
             .add_element(
                 "Silver",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![fpb::LevelDependency {
-                    dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
                 }],
                 vec![],
             );
@@ -1005,8 +971,8 @@ mod tests {
         let unobtanium = broker
             .add_element(
                 "Unobtainium",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![],
                 vec![],
             )
@@ -1026,8 +992,8 @@ mod tests {
         let parent1: ElementID = broker
             .add_element(
                 "P1",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![],
                 vec![parent1_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1039,8 +1005,8 @@ mod tests {
         let parent2: ElementID = broker
             .add_element(
                 "P2",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![],
                 vec![parent2_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1051,22 +1017,22 @@ mod tests {
         let child = broker
             .add_element(
                 "C",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![
                     fpb::LevelDependency {
-                        dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: parent1_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                        requires_level: BinaryPowerLevel::On.into_primitive(),
                     },
                     fpb::LevelDependency {
-                        dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: parent2_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                        requires_level: BinaryPowerLevel::On.into_primitive(),
                     },
                 ],
                 vec![],
@@ -1074,28 +1040,28 @@ mod tests {
             .expect("add_element failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent1),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Parent 1 should start with required level OFF"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&parent2),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Parent 2 should start with required level OFF"
         );
 
         // Acquire the lease, which should result in two claims, one
         // for each dependency.
         let lease = broker
-            .acquire_lease(&child, PowerLevel::Binary(BinaryPowerLevel::On))
+            .acquire_lease(&child, BinaryPowerLevel::On.into_primitive())
             .expect("acquire failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent1),
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
             "Parent 1 should now have required level ON from direct claim"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&parent2),
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
             "Parent 2 should now have required level ON from direct claim"
         );
 
@@ -1103,12 +1069,12 @@ mod tests {
         broker.drop_lease(&lease.id).expect("drop failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent1),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Parent 1 should now have required level OFF from dropped claim"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&parent2),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Parent 2 should now have required level OFF from dropped claim"
         );
 
@@ -1127,8 +1093,8 @@ mod tests {
         let grandparent: ElementID = broker
             .add_element(
                 "GP",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![],
                 vec![grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1140,8 +1106,8 @@ mod tests {
         let parent: ElementID = broker
             .add_element(
                 "P",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![],
                 vec![parent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1152,14 +1118,14 @@ mod tests {
         let child = broker
             .add_element(
                 "C",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![fpb::LevelDependency {
-                    dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
                 }],
                 vec![],
             )
@@ -1167,22 +1133,22 @@ mod tests {
         broker
             .add_dependency(
                 &parent,
-                PowerLevel::Binary(BinaryPowerLevel::On),
+                BinaryPowerLevel::On.into_primitive(),
                 grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
+                BinaryPowerLevel::On.into_primitive(),
             )
             .expect("add_dependency failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Parent should start with required level OFF"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Grandparent should start with required level OFF"
         );
 
@@ -1190,31 +1156,31 @@ mod tests {
         // for the direct parent dependency, and one for the transitive
         // grandparent dependency.
         let lease = broker
-            .acquire_lease(&child, PowerLevel::Binary(BinaryPowerLevel::On))
+            .acquire_lease(&child, BinaryPowerLevel::On.into_primitive())
             .expect("acquire failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Parent should now have required level OFF, waiting on Grandparent to turn ON"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
             "Grandparent should now have required level ON because of no dependencies"
         );
 
         // Raise Grandparent power level to ON, now Parent claim should be active.
         broker
-            .update_current_level(&grandparent, PowerLevel::Binary(BinaryPowerLevel::On))
+            .update_current_level(&grandparent, BinaryPowerLevel::On.into_primitive())
             .expect("update_current_level failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
             "Parent should now have required level ON"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
             "Grandparent should now have required level ON"
         );
 
@@ -1223,29 +1189,29 @@ mod tests {
         broker.drop_lease(&lease.id).expect("drop failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Parent should now have required level OFF after lease drop"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
             "Grandparent should still have required level ON"
         );
 
         // Lower Parent power level to OFF, now Grandparent claim should be
         // dropped and should have required level OFF.
         broker
-            .update_current_level(&parent, PowerLevel::Binary(BinaryPowerLevel::Off))
+            .update_current_level(&parent, BinaryPowerLevel::Off.into_primitive())
             .expect("update_current_level failed");
         tracing::info!("catalog after update_current_level: {:?}", &broker.catalog);
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Parent should have required level OFF"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::Binary(BinaryPowerLevel::Off),
+            BinaryPowerLevel::Off.into_primitive(),
             "Grandparent should now have required level OFF"
         );
     }
@@ -1272,8 +1238,8 @@ mod tests {
         let grandparent: ElementID = broker
             .add_element(
                 "GP",
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
+                10,
+                10,
                 vec![],
                 vec![grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1285,30 +1251,22 @@ mod tests {
         let parent: ElementID = broker
             .add_element(
                 "P",
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+                0,
+                0,
                 vec![
                     fpb::LevelDependency {
-                        dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel {
-                            level: 50,
-                        }),
+                        dependent_level: 50,
                         requires_token: grandparent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: PowerLevel::UserDefined(UserDefinedPowerLevel {
-                            level: 200,
-                        }),
+                        requires_level: 200,
                     },
                     fpb::LevelDependency {
-                        dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel {
-                            level: 30,
-                        }),
+                        dependent_level: 30,
                         requires_token: grandparent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
-                        requires_level: PowerLevel::UserDefined(UserDefinedPowerLevel {
-                            level: 90,
-                        }),
+                        requires_level: 90,
                     },
                 ],
                 vec![parent_token
@@ -1320,14 +1278,14 @@ mod tests {
         let child1 = broker
             .add_element(
                 "C1",
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+                0,
+                0,
                 vec![fpb::LevelDependency {
-                    dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
+                    dependent_level: 5,
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
+                    requires_level: 50,
                 }],
                 vec![],
             )
@@ -1335,14 +1293,14 @@ mod tests {
         let child2 = broker
             .add_element(
                 "C2",
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+                0,
+                0,
                 vec![fpb::LevelDependency {
-                    dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
+                    dependent_level: 3,
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    requires_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
+                    requires_level: 30,
                 }],
                 vec![],
             )
@@ -1352,12 +1310,12 @@ mod tests {
         // and Parent should have a default required level of 0.
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+            0,
             "Parent should start with required level 0"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
+            10,
             "Grandparent should start with required level at its default of 10"
         );
 
@@ -1366,73 +1324,59 @@ mod tests {
         // because Child 1 has a dependency on Parent and Parent has a
         // dependency on Grandparent. Grandparent has no dependencies so its
         // level should be raised first.
-        let lease1 = broker
-            .acquire_lease(&child1, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }))
-            .expect("acquire failed");
+        let lease1 = broker.acquire_lease(&child1, 5).expect("acquire failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+            0,
             "Parent should now have required level 0, waiting on Grandparent to reach required level"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
+            200,
             "Grandparent should now have required level 100 because of parent dependency and it has no dependencies of its own"
         );
 
         // Raise Grandparent's current level to 200. Now Parent claim should
         // be active, because its dependency on Grandparent is unblocked
         // raising its required level to 50.
-        broker
-            .update_current_level(
-                &grandparent,
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
-            )
-            .expect("update_current_level failed");
+        broker.update_current_level(&grandparent, 200).expect("update_current_level failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
+            50,
             "Parent should now have required level 50"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
+            200,
             "Grandparent should still have required level 200"
         );
 
         // Update Parent's current level to 50.
         // Parent and Grandparent should have required levels of 50 and 200.
-        broker
-            .update_current_level(
-                &parent,
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
-            )
-            .expect("update_current_level failed");
+        broker.update_current_level(&parent, 50).expect("update_current_level failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
+            50,
             "Parent should now have required level 50"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
+            200,
             "Grandparent should still have required level 200"
         );
 
         // Acquire a lease for Child 2. Though Child 2 has nominal
         // requirements of Parent at 30 and Grandparent at 100, they are
         // superseded by Child 1's requirements of 50 and 200.
-        let lease2 = broker
-            .acquire_lease(&child2, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }))
-            .expect("acquire failed");
+        let lease2 = broker.acquire_lease(&child2, 3).expect("acquire failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
+            50,
             "Parent should still have required level 50"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
+            200,
             "Grandparent should still have required level 100"
         );
 
@@ -1441,31 +1385,26 @@ mod tests {
         broker.drop_lease(&lease1.id).expect("drop failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
+            30,
             "Parent should still have required level 2 from the second claim"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
+            200,
             "Grandparent should still have required level 100 from the second claim"
         );
 
         // Lower Parent's current level to 30. Now Grandparent's required level
         // should drop to 90.
-        broker
-            .update_current_level(
-                &parent,
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
-            )
-            .expect("update_current_level failed");
+        broker.update_current_level(&parent, 30).expect("update_current_level failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
+            30,
             "Parent should have required level 30"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 90 }),
+            90,
             "Grandparent should now have required level 90"
         );
 
@@ -1474,31 +1413,26 @@ mod tests {
         broker.drop_lease(&lease2.id).expect("drop failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+            0,
             "Parent should now have required level 0"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 90 }),
+            90,
             "Grandparent should still have required level 90"
         );
 
         // Lower Parent's current level to 0. Grandparent claim should now be
         // dropped and have its default required level of 10.
-        broker
-            .update_current_level(
-                &parent,
-                PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
-            )
-            .expect("update_current_level failed");
+        broker.update_current_level(&parent, 0).expect("update_current_level failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+            0,
             "Parent should have required level 0"
         );
         assert_eq!(
             broker.catalog.calculate_required_level(&grandparent),
-            PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
+            10,
             "Grandparent should now have required level 10"
         );
     }
@@ -1511,8 +1445,8 @@ mod tests {
         let adamantium = broker
             .add_element(
                 "Adamantium",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![],
                 vec![token_adamantium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1523,8 +1457,8 @@ mod tests {
         broker
             .add_element(
                 "Vibranium",
-                PowerLevel::Binary(BinaryPowerLevel::Off),
-                PowerLevel::Binary(BinaryPowerLevel::Off),
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
                 vec![],
                 vec![token_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1537,9 +1471,9 @@ mod tests {
         let unregistered_token = DependencyToken::create();
         let res_add_not_authorized = broker.add_dependency(
             &adamantium,
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
             unregistered_token.into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
         );
         assert!(matches!(res_add_not_authorized, Err(AddDependencyError::NotAuthorized)));
 
@@ -1547,12 +1481,12 @@ mod tests {
         broker
             .add_dependency(
                 &adamantium,
-                PowerLevel::Binary(BinaryPowerLevel::On),
+                BinaryPowerLevel::On.into_primitive(),
                 token_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
+                BinaryPowerLevel::On.into_primitive(),
             )
             .expect("add_dependency failed");
 
@@ -1560,9 +1494,9 @@ mod tests {
         let unregistered_token = DependencyToken::create();
         let res_remove_not_authorized = broker.remove_dependency(
             &adamantium,
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
             unregistered_token.into(),
-            PowerLevel::Binary(BinaryPowerLevel::On),
+            BinaryPowerLevel::On.into_primitive(),
         );
         assert!(matches!(res_remove_not_authorized, Err(RemoveDependencyError::NotAuthorized)));
 
@@ -1570,12 +1504,12 @@ mod tests {
         broker
             .remove_dependency(
                 &adamantium,
-                PowerLevel::Binary(BinaryPowerLevel::On),
+                BinaryPowerLevel::On.into_primitive(),
                 token_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
+                BinaryPowerLevel::On.into_primitive(),
             )
             .expect("remove_dependency failed");
     }

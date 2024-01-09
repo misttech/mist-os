@@ -4,9 +4,7 @@
 
 use anyhow::Result;
 use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_power_broker::{
-    self as fbroker, LeaseStatus, PowerLevel::UserDefined, UserDefinedPowerLevel,
-};
+use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system as fsystem;
 use fidl_test_systemactivitygovernor as ftest;
@@ -62,12 +60,12 @@ async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElemen
     let suspend_controller = PowerElementContext::new(
         &topology,
         "suspend_controller",
-        &UserDefined(UserDefinedPowerLevel { level: 0 }),
-        &UserDefined(UserDefinedPowerLevel { level: 0 }),
+        0,
+        0,
         vec![fbroker::LevelDependency {
-            dependent_level: UserDefined(UserDefinedPowerLevel { level: 1 }),
+            dependent_level: 1,
             requires_token: es_token,
-            requires_level: UserDefined(UserDefinedPowerLevel { level: 2 }),
+            requires_level: 2,
         }],
         Vec::new(),
     )
@@ -81,7 +79,7 @@ async fn cycle_execution_state_power_levels(
 ) -> Result<()> {
     let lease_control = suspend_controller
         .lessor
-        .lease(&UserDefined(UserDefinedPowerLevel { level: 1 }))
+        .lease(1)
         .await?
         .map_err(|e| anyhow::anyhow!("{e:?}"))?
         .into_proxy()?;
