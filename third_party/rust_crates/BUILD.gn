@@ -16993,14 +16993,14 @@ rust_library("uuid-v1_1_2") {
 license("valico-v2_4_2.license") {
   public_package_name = "valico"
   license_files = [
-    "//third_party/rust_crates/forks/valico/LICENSE",
-    "//third_party/rust_crates/forks/valico/tests/schema/JSON-Schema-Test-Suite/LICENSE",
+    "//third_party/rust_crates/vendor/valico-2.4.2/LICENSE",
+    "//third_party/rust_crates/vendor/valico-2.4.2/tests/schema/JSON-Schema-Test-Suite/LICENSE",
   ]
 }
 
 rust_library("valico-v2_4_2") {
   crate_name = "valico"
-  crate_root = "//third_party/rust_crates/forks/valico/src/lib.rs"
+  crate_root = "//third_party/rust_crates/vendor/valico-2.4.2/src/lib.rs"
   output_name = "valico-179ee54e44a59467"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
