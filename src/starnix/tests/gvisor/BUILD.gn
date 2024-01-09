@@ -633,5 +633,7 @@ foreach(benchmark_name, gvisor_benchmarks) {
 
 group("benchmarks") {
   testonly = true
-  deps = all_benchmark_targets
+  if (!is_asan) {
+    deps = all_benchmark_targets
+  }
 }

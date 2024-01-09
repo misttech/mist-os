@@ -20,7 +20,6 @@ group("terminal") {
 
     # General end to end dependencies.
     "//src/tests/end_to_end/bundles:end_to_end_deps",
-    "//src/tests/end_to_end/bundles:terminal_end_to_end_deps",
   ]
 }
 

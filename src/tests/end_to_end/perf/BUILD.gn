@@ -239,26 +239,32 @@ if (is_host) {
   }
 }
 
-group("package_deps") {
+_python_benchmarks += [
+  "//src/connectivity/network/drivers/network-device/device:benchmarks",
+  "//src/connectivity/network/netstack3:benchmarks",
+  "//src/connectivity/network/tests/benchmarks",
+  "//src/devices/bin/driver_runtime/microbenchmarks",
+  "//src/diagnostics:benchmarks",
+  "//src/lib/diagnostics:benchmarks",
+  "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
+  "//src/starnix:benchmarks",
+  "//src/tests/benchmarks/fidl/fidlc:benchmarks",
+  "//src/tests/microbenchmarks:benchmarks",
+]
+
+group("test") {
   testonly = true
-  public_deps = [
-    "//src/connectivity/network/drivers/network-device/device:benchmarks",
-    "//src/connectivity/network/netstack3:benchmarks",
-    "//src/devices/bin/driver_runtime/microbenchmarks",
-    "//src/diagnostics:benchmarks",
-    "//src/lib/diagnostics:benchmarks",
-    "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
-    "//src/starnix:benchmarks",
+
+  deps = _python_benchmarks
+
+  deps += [
     "//src/tests/benchmarks",
-    "//src/tests/benchmarks/fidl/fidlc:benchmarks",
-    "//src/tests/microbenchmarks:fuchsia_microbenchmarks_test",
     "//third_party/sbase:sbase-pkgs",
 
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
 
     # These are used by netstack benchmarks.
-    "//src/connectivity/network/tests/benchmarks",
     "//third_party/iperf:iperf3_pkg",
 
     # These are used by flatland_benchmarks and input_latency_benchmarks
@@ -272,25 +278,11 @@ group("package_deps") {
   ]
 
   if (!is_asan) {
-    public_deps += [
-      # This is used by starnix benchmarks.
-      "//src/starnix/tests/gvisor:starnix_gvisor_benchmarks",
-
+    deps += [
       # This is used by storage_starnix_benchmarks_test.
       "//src/storage/benchmarks/starnix:benchmarks",
     ]
-
-    if (host_os == "linux") {
-      public_deps +=
-          [ "//src/tests/microbenchmarks:starnix_microbenchmarks_test" ]
-    }
   }
-}
-
-group("test") {
-  testonly = true
-
-  deps = [ ":package_deps" ] + _python_benchmarks
 
   foreach(target_name, test_list) {
     deps += [ ":$target_name($host_toolchain)" ]

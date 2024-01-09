@@ -350,3 +350,11 @@ group("microbenchmarks") {
   testonly = true
   deps = [ ":tests" ]
 }
+
+group("benchmarks") {
+  testonly = true
+  deps = [ ":fuchsia_microbenchmarks_test" ]
+  if (!is_asan && host_os == "linux") {
+    deps += [ ":starnix_microbenchmarks_test" ]
+  }
+}
