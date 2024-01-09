@@ -9,7 +9,7 @@ use crate::{
 };
 
 use anyhow;
-use selinux_policy::parse_policy_by_reference;
+use selinux_policy::{parse_policy_by_value, parser::ByValue, Policy};
 use starnix_sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 
@@ -21,13 +21,21 @@ pub enum Mode {
     Fake,
 }
 
-pub struct SecurityServerState {
+struct LoadedPolicy {
+    /// Parsed policy structure.
+    _parsed: Policy<ByValue<Vec<u8>>>,
+
+    /// The binary policy that was previously passed to `load_policy()`.
+    binary: Vec<u8>,
+}
+
+struct SecurityServerState {
     // TODO(http://b/308175643): reference count SIDs, so that when the last SELinux object
     // referencing a SID gets destroyed, the entry is removed from the map.
     sids: HashMap<SecurityId, SecurityContext>,
 
-    // TODO(https://b/304734769): Replace this with the parsed policy state.
-    binary_policy: Vec<u8>,
+    /// Describes the currently active policy.
+    policy: Option<Arc<LoadedPolicy>>,
 }
 
 pub struct SecurityServer {
@@ -48,8 +56,7 @@ pub struct SecurityServer {
 impl SecurityServer {
     pub fn new(mode: Mode) -> Arc<SecurityServer> {
         let avc_manager = AvcManager::new();
-        let state =
-            Mutex::new(SecurityServerState { sids: HashMap::new(), binary_policy: Vec::new() });
+        let state = Mutex::new(SecurityServerState { sids: HashMap::new(), policy: None });
         let security_server = Arc::new(SecurityServer { mode, avc_manager, state });
 
         // TODO(http://b/304776236): Consider constructing shared owner of `AvcManager` and
@@ -84,21 +91,25 @@ impl SecurityServer {
     /// Applies the supplied policy to the security server.
     pub fn load_policy(&self, binary_policy: Vec<u8>) -> Result<(), anyhow::Error> {
         // Parse the supplied policy, and reject the load operation if it is
-        // malformed.
-        let policy = parse_policy_by_reference(binary_policy.as_slice())?;
+        // malformed or invalid.
+        let (parsed, binary) = parse_policy_by_value(binary_policy)?;
+        let _parsed = parsed.validate()?;
 
-        // Reject the load of the parsed policy is invalid.
-        policy.validate()?;
+        // Bundle the binary policy together with a parsed copy for the
+        // [`SecurityServer`] to use to answer queries. This will fail if the
+        // supplied policy cannot be parsed due to being malformed, or if the
+        // parsed policy is not valid.
+        let policy = Arc::new(LoadedPolicy { _parsed, binary });
 
-        // TODO(https://b/304734769): Stash the parsed policy alongside the
-        // binary version, and pre-create any required SIDs?
-        self.state.lock().binary_policy = binary_policy;
+        // Replace any existing policy.
+        // TODO(b/315531456): Update the policy load count for "status".
+        self.state.lock().policy = Some(policy);
         Ok(())
     }
 
     /// Returns the active policy in binary form.
     pub fn get_binary_policy(&self) -> Vec<u8> {
-        self.state.lock().binary_policy.clone()
+        self.state.lock().policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
     }
 
     pub fn compute_access_vector(
