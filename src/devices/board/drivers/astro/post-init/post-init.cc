@@ -4,7 +4,22 @@
 
 #include "src/devices/board/drivers/astro/post-init/post-init.h"
 
+#include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
+
+namespace {
+
+constexpr std::array<const char*, 3> kBoardBuildNodeNames = {
+    "hw-id-0",
+    "hw-id-1",
+    "hw-id-2",
+};
+
+constexpr std::array<const char*, 1> kDisplayIdNodeNames = {
+    "disp-soc-vid",
+};
+
+}  // namespace
 
 namespace astro {
 
@@ -39,6 +54,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
   }
   controller_.Bind(std::move(controller_endpoints->client));
 
+  if (zx::result result = InitBoardInfo(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   auto result = parent_->AddChild({std::move(args), std::move(controller_endpoints->server), {}});
   if (result.is_error()) {
     if (result.error_value().is_framework_error()) {
@@ -53,6 +72,103 @@ void PostInit::Start(fdf::StartCompleter completer) {
   }
 
   return completer(zx::ok());
+}
+
+zx::result<> PostInit::InitBoardInfo() {
+  if (zx::result<uint8_t> board_build = ReadGpios(kBoardBuildNodeNames); board_build.is_ok()) {
+    board_build_ = *board_build;
+  } else {
+    return board_build.take_error();
+  }
+
+  if (zx::result<uint8_t> display_id = ReadGpios(kDisplayIdNodeNames); display_id.is_ok()) {
+    display_id_ = *display_id;
+  } else {
+    return display_id.take_error();
+  }
+
+  return zx::ok();
+}
+
+zx::result<uint8_t> PostInit::ReadGpios(cpp20::span<const char* const> node_names) {
+  constexpr uint64_t kAmlogicAltFunctionGpio = 0;
+
+  uint8_t value = 0;
+
+  for (size_t i = 0; i < node_names.size(); i++) {
+    zx::result gpio = incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(node_names[i]);
+    if (gpio.is_error()) {
+      FDF_LOG(ERROR, "Failed to connect to GPIO node: %s", gpio.status_string());
+      return gpio.take_error();
+    }
+
+    fidl::SyncClient<fuchsia_hardware_gpio::Gpio> gpio_client(*std::move(gpio));
+
+    {
+      fidl::Result<fuchsia_hardware_gpio::Gpio::SetAltFunction> result =
+          gpio_client->SetAltFunction(kAmlogicAltFunctionGpio);
+      if (result.is_error()) {
+        if (result.error_value().is_framework_error()) {
+          FDF_LOG(ERROR, "Call to SetAltFunction failed: %s",
+                  result.error_value().framework_error().FormatDescription().c_str());
+          return zx::error(result.error_value().framework_error().status());
+        }
+        if (result.error_value().is_domain_error()) {
+          FDF_LOG(ERROR, "SetAltFunction failed: %s",
+                  zx_status_get_string(result.error_value().domain_error()));
+          return zx::error(result.error_value().domain_error());
+        }
+
+        FDF_LOG(ERROR, "Unknown error from call to SetAltFunction");
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+    }
+
+    {
+      fidl::Result<fuchsia_hardware_gpio::Gpio::ConfigIn> result =
+          gpio_client->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+      if (result.is_error()) {
+        if (result.error_value().is_framework_error()) {
+          FDF_LOG(ERROR, "Call to ConfigIn failed: %s",
+                  result.error_value().framework_error().FormatDescription().c_str());
+          return zx::error(result.error_value().framework_error().status());
+        }
+        if (result.error_value().is_domain_error()) {
+          FDF_LOG(ERROR, "ConfigIn failed: %s",
+                  zx_status_get_string(result.error_value().domain_error()));
+          return zx::error(result.error_value().domain_error());
+        }
+
+        FDF_LOG(ERROR, "Unknown error from call to ConfigIn");
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+    }
+
+    {
+      fidl::Result<fuchsia_hardware_gpio::Gpio::Read> result = gpio_client->Read();
+      if (result.is_error()) {
+        if (result.error_value().is_framework_error()) {
+          FDF_LOG(ERROR, "Call to Read failed: %s",
+                  result.error_value().framework_error().FormatDescription().c_str());
+          return zx::error(result.error_value().framework_error().status());
+        }
+        if (result.error_value().is_domain_error()) {
+          FDF_LOG(ERROR, "Read failed: %s",
+                  zx_status_get_string(result.error_value().domain_error()));
+          return zx::error(result.error_value().domain_error());
+        }
+
+        FDF_LOG(ERROR, "Unknown error from call to Read");
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+
+      if (result->value()) {
+        value |= 1 << i;
+      }
+    }
+  }
+
+  return zx::ok(value);
 }
 
 }  // namespace astro
