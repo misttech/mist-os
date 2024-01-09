@@ -486,7 +486,7 @@ static bool vmpl_append_to_splice_list_test() {
   BEGIN_TEST;
 
   const uint8_t kNumPages = 5;
-  VmPageSpliceList splice(0, kNumPages * PAGE_SIZE);
+  VmPageSpliceList splice(0, kNumPages * PAGE_SIZE, 0);
 
   // Append kNumPages to the splice list.
   vm_page_t* pages[kNumPages];

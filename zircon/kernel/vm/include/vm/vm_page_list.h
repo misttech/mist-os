@@ -738,7 +738,7 @@ class VMPLCursor {
 class VmPageSpliceList final {
  public:
   VmPageSpliceList();
-  VmPageSpliceList(uint64_t offset, uint64_t length);
+  VmPageSpliceList(uint64_t offset, uint64_t length, uint64_t list_skew);
   VmPageSpliceList(VmPageSpliceList&& other);
   VmPageSpliceList& operator=(VmPageSpliceList&& other_tree);
   ~VmPageSpliceList();
@@ -787,6 +787,7 @@ class VmPageSpliceList final {
   uint64_t offset_;
   uint64_t length_;
   uint64_t pos_ = 0;
+  uint64_t list_skew_ = 0;
   bool finalized_ = false;
 
   VmPageListNode head_ = VmPageListNode(0);

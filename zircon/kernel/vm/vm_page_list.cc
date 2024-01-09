@@ -1262,11 +1262,8 @@ void VmPageList::MergeOnto(VmPageList& other,
 }
 
 VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
-  VmPageSpliceList res(offset, length);
+  VmPageSpliceList res(offset, length, list_skew_);
   const uint64_t end = offset + length;
-
-  // Taking pages from children isn't supported, so list_skew_ should be 0.
-  DEBUG_ASSERT(list_skew_ == 0);
 
   // We should not be starting or ending partway inside an interval. Entire intervals that fall
   // completely inside the range will be checked for later while we're taking the pages below.
@@ -1275,16 +1272,16 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
 
   // If we can't take the whole node at the start of the range,
   // the shove the pages into the splice list head_ node.
-  while (offset_to_node_index(offset, 0) != 0 && offset < end) {
-    res.head_.Lookup(offset_to_node_index(offset, 0)) = RemoveContent(offset);
+  while (offset_to_node_index(offset, list_skew_) != 0 && offset < end) {
+    res.head_.Lookup(offset_to_node_index(offset, list_skew_)) = RemoveContent(offset);
     offset += PAGE_SIZE;
   }
   DEBUG_ASSERT(res.head_.HasNoIntervalSentinel());
 
   // As long as the current and end node offsets are different, we
   // can just move the whole node into the splice list.
-  while (offset_to_node_offset(offset, 0) != offset_to_node_offset(end, 0)) {
-    ktl::unique_ptr<VmPageListNode> node = list_.erase(offset_to_node_offset(offset, 0));
+  while (offset_to_node_offset(offset, list_skew_) != offset_to_node_offset(end, list_skew_)) {
+    ktl::unique_ptr<VmPageListNode> node = list_.erase(offset_to_node_offset(offset, list_skew_));
     if (node) {
       DEBUG_ASSERT(node->HasNoIntervalSentinel());
       res.middle_.insert(ktl::move(node));
@@ -1294,7 +1291,7 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
 
   // Move any remaining pages into the splice list tail_ node.
   while (offset < end) {
-    res.tail_.Lookup(offset_to_node_index(offset, 0)) = RemoveContent(offset);
+    res.tail_.Lookup(offset_to_node_index(offset, list_skew_)) = RemoveContent(offset);
     offset += PAGE_SIZE;
   }
   DEBUG_ASSERT(res.tail_.HasNoIntervalSentinel());
@@ -1302,15 +1299,16 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
   return res;
 }
 
-VmPageSpliceList::VmPageSpliceList() : VmPageSpliceList(0, 0) {}
+VmPageSpliceList::VmPageSpliceList() : VmPageSpliceList(0, 0, 0) {}
 
-VmPageSpliceList::VmPageSpliceList(uint64_t offset, uint64_t length)
-    : offset_(offset), length_(length) {}
+VmPageSpliceList::VmPageSpliceList(uint64_t offset, uint64_t length, uint64_t list_skew)
+    : offset_(offset), length_(length), list_skew_(list_skew) {}
 
 VmPageSpliceList::VmPageSpliceList(VmPageSpliceList&& other)
     : offset_(other.offset_),
       length_(other.length_),
       pos_(other.pos_),
+      list_skew_(other.list_skew_),
       finalized_(other.finalized_),
       middle_(ktl::move(other.middle_)) {
   move_vm_page_list_node(&head_, &other.head_);
@@ -1326,6 +1324,7 @@ VmPageSpliceList& VmPageSpliceList::operator=(VmPageSpliceList&& other) {
 
   offset_ = other.offset_;
   length_ = other.length_;
+  list_skew_ = other.list_skew_;
   pos_ = other.pos_;
   finalized_ = other.finalized_;
   move_vm_page_list_node(&head_, &other.head_);
@@ -1345,7 +1344,7 @@ VmPageSpliceList VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t 
   // TODO(https://fxbug.dev/88859): This method needs coverage in vmpl_unittests.
   DEBUG_ASSERT(pages);
   DEBUG_ASSERT(list_length(pages) == length / PAGE_SIZE);
-  VmPageSpliceList res(offset, length);
+  VmPageSpliceList res(offset, length, 0);
   DEBUG_ASSERT(list_is_empty(&res.raw_pages_));
   list_move(pages, &res.raw_pages_);
   res.Finalize();
@@ -1383,11 +1382,11 @@ zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
   ASSERT(list_is_empty(&raw_pages_));
 
   const uint64_t cur_offset = offset_ + pos_;
-  const uint64_t node_idx = offset_to_node_index(cur_offset, 0);
-  const uint64_t head_idx = offset_to_node_index(offset_, 0);
-  const uint64_t node_offset = offset_to_node_offset(cur_offset, 0);
-  const uint64_t head_offset = offset_to_node_offset(offset_, 0);
-  const uint64_t tail_offset = offset_to_node_offset(offset_ + length_, 0);
+  const uint64_t node_idx = offset_to_node_index(cur_offset, list_skew_);
+  const uint64_t head_idx = offset_to_node_index(offset_, list_skew_);
+  const uint64_t node_offset = offset_to_node_offset(cur_offset, list_skew_);
+  const uint64_t head_offset = offset_to_node_offset(offset_, list_skew_);
+  const uint64_t tail_offset = offset_to_node_offset(offset_ + length_, list_skew_);
 
   if (head_idx != 0 && node_offset == head_offset) {
     head_.Lookup(node_idx) = ktl::move(content);
@@ -1429,16 +1428,16 @@ VmPageOrMarkerRef VmPageSpliceList::PeekReference() {
   }
 
   const uint64_t cur_offset = offset_ + pos_;
-  const auto cur_node_idx = offset_to_node_index(cur_offset, 0);
-  const auto cur_node_offset = offset_to_node_offset(cur_offset, 0);
+  const auto cur_node_idx = offset_to_node_index(cur_offset, list_skew_);
+  const auto cur_node_offset = offset_to_node_offset(cur_offset, list_skew_);
 
   VmPageOrMarker* res = nullptr;
-  if (offset_to_node_index(offset_, 0) != 0 &&
-      offset_to_node_offset(offset_, 0) == cur_node_offset) {
+  if (offset_to_node_index(offset_, list_skew_) != 0 &&
+      offset_to_node_offset(offset_, list_skew_) == cur_node_offset) {
     // If the original offset means that pages were placed in head_
     // and the current offset points to the same node, look there.
     res = &head_.Lookup(cur_node_idx);
-  } else if (cur_node_offset != offset_to_node_offset(offset_ + length_, 0)) {
+  } else if (cur_node_offset != offset_to_node_offset(offset_ + length_, list_skew_)) {
     // If the current offset isn't pointing to the tail node,
     // look in the middle tree.
     auto middle_node = middle_.find(cur_node_offset);
@@ -1474,15 +1473,15 @@ VmPageOrMarker VmPageSpliceList::Pop() {
     res = VmPageOrMarker::Page(head);
   } else {
     const uint64_t cur_offset = offset_ + pos_;
-    const auto cur_node_idx = offset_to_node_index(cur_offset, 0);
-    const auto cur_node_offset = offset_to_node_offset(cur_offset, 0);
+    const auto cur_node_idx = offset_to_node_index(cur_offset, list_skew_);
+    const auto cur_node_offset = offset_to_node_offset(cur_offset, list_skew_);
 
-    if (offset_to_node_index(offset_, 0) != 0 &&
-        offset_to_node_offset(offset_, 0) == cur_node_offset) {
+    if (offset_to_node_index(offset_, list_skew_) != 0 &&
+        offset_to_node_offset(offset_, list_skew_) == cur_node_offset) {
       // If the original offset means that pages were placed in head_
       // and the current offset points to the same node, look there.
       res = ktl::move(head_.Lookup(cur_node_idx));
-    } else if (cur_node_offset != offset_to_node_offset(offset_ + length_, 0)) {
+    } else if (cur_node_offset != offset_to_node_offset(offset_ + length_, list_skew_)) {
       // If the current offset isn't pointing to the tail node,
       // look in the middle tree.
       auto middle_node = middle_.find(cur_node_offset);
