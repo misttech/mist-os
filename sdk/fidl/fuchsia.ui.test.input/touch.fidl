@@ -77,6 +77,11 @@ closed protocol TouchScreen {
 
         /// Number of move events in the pinch.
         3: move_event_count uint32;
+
+        /// Number of fingers, because `array<fuchsia.math.Vec, MAX_FINGERS>` is
+        /// fixed length, we use this field to know how many fingers in gesture.
+        @available(added=18)
+        4: finger_count uint32;
     }) -> ();
 
     /// Simulate a touch event by a touch input report.
