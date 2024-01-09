@@ -32,13 +32,6 @@ type ImageId = struct {
 
 const INVALID_ID uint64 = 0;
 
-/// A fallback structure to convey display information without an EDID.
-type DisplayParams = struct {
-    width uint32;
-    height uint32;
-    refresh_rate_e2 uint32;
-};
-
 type ColorConversion = strict bits : uint32 {
     /// If set, use the 0 vector for the color conversion preoffset
     PREOFFSET = 0x1;
@@ -94,27 +87,22 @@ type DisplayConfig = struct {
     layer vector<fuchsia.hardware.display.types.Layer>:MAX;
 };
 
+/// The capabilities of a display panel.
 type Panel = flexible resource union {
-    /// The i2c bus to use to read this display's EDID.
+    /// The I2C bus to use to read this display's EDID.
     1: i2c client_end:fuchsia.hardware.i2cimpl.Device;
-    /// The display's parameters if an EDID is not present.
-    2: params DisplayParams;
+
+    /// Hard-coded display configuration.
+    ///
+    /// Can be used when the device does not implement EDID,
+    /// or when the driver needs to override the EDID contents.
+    2: mode DisplayMode;
 };
 
 /// A structure containing information a connected display.
 type AddedDisplayArgs = resource struct {
     display_id uint64;
 
-    /// A flag indicating whether or not the display has a valid EDID.
-    ///
-    /// If true, the device should provide an I2C client in the `Panel` union.
-    ///
-    /// If no EDID is present, then the meaning of display_config's mode
-    /// structure is undefined, and drivers should ignore it in
-    /// `CheckConfiguration` and `ApplyConfiguration`.
-    ///
-    /// TODO(b/316607344): Remove edid_present when Banjo variant is gone.
-    edid_present bool;
     panel Panel;
 
     /// A list of pixel formats supported by the display. The first entry is the
