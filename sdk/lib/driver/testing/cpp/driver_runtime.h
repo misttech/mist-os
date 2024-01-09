@@ -73,6 +73,15 @@ class DriverRuntime {
   // an |async_patterns::TestDispatcherBound|.
   fdf::UnownedSynchronizedDispatcher StartBackgroundDispatcher();
 
+  // Shuts down all of the driver dispatchers that exist. This will return when all shutdowns
+  // have completed. If this has already been done returns immediately.
+  //
+  // |dut_initial_dispatcher| will be set as the current dispatcher context before this returns
+  // to help with synchronization_checkers inside of the driver during teardown afterwards.
+  // It should be the same dispatcher that the dut (driver under test) was created with.
+  // If a nullptr is given then there will not be a current dispatcher context after this returns.
+  void ShutdownAllDispatchers(fdf_dispatcher_t* dut_initial_dispatcher);
+
   // Runs the foreground dispatcher until it is quit.
   void Run();
 
@@ -208,6 +217,9 @@ class DriverRuntime {
 
   fdf_internal::TestSynchronizedDispatcher foreground_dispatcher_;
   std::list<fdf_internal::TestSynchronizedDispatcher> background_dispatchers_;
+
+  // We will use this prevent doing ShutdownAllDispatchers multiple times.
+  bool is_shutdown_ = false;
 };
 
 // Internal template implementation details

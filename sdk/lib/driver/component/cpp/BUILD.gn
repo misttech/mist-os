@@ -19,6 +19,7 @@ sdk_source_set("cpp") {
   public_configs = [ "//sdk/config" ]
 
   sources = [
+    "completer.cc",
     "composite_node_spec.h",
     "driver_base.cc",
     "driver_base.h",
@@ -29,7 +30,6 @@ sdk_source_set("cpp") {
     "node_add_args.cc",
     "node_add_args.h",
     "prepare_stop_completer.h",
-    "start_completer.cc",
     "start_completer.h",
   ]
 

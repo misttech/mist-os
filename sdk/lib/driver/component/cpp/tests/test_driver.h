@@ -86,6 +86,8 @@ class TestDriver : public fdf::DriverBase,
 
   std::optional<fdf::PrepareStopCompleter> stop_completer_;
   fidl::WireClient<fuchsia_driver_framework::NodeController> child_controller_;
+
+  std::optional<fdf::SynchronizedDispatcher> not_shutdown_manually_dispatcher_;
 };
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_TESTS_TEST_DRIVER_H_

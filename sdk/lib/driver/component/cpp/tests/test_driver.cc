@@ -12,6 +12,21 @@ void TestDriver::Start(fdf::StartCompleter completer) {
   async::PostDelayedTask(
       dispatcher(), [completer = std::move(completer)]() mutable { completer(zx::ok()); },
       zx::msec(100));
+
+  // Make a dispatcher that we purposely release to make sure the test framework can
+  // shut it down for us.
+  zx::result<fdf::SynchronizedDispatcher> unowned_dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "unowned_dispatcher", [](auto dispatcher) {});
+  ZX_ASSERT(unowned_dispatcher.is_ok());
+  unowned_dispatcher.value().release();
+
+  // Make a dispatcher that we purposely don't shutdown in our PrepareStop but keep ownership of
+  // to make sure the framework can shut it down for us.
+  zx::result<fdf::SynchronizedDispatcher> not_shutdown_manually_dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "not_shutdown_manually_dispatcher",
+                                          [](auto dispatcher) {});
+  ZX_ASSERT(not_shutdown_manually_dispatcher.is_ok());
+  not_shutdown_manually_dispatcher_.emplace(std::move(not_shutdown_manually_dispatcher.value()));
 }
 
 zx::result<> TestDriver::ExportDevfsNodeSync() {

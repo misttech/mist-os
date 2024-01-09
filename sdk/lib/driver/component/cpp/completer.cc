@@ -17,8 +17,9 @@ Completer::~Completer() {
 
 void Completer::operator()(zx::result<> result) {
   ZX_ASSERT_MSG(callback_ != std::nullopt, "Cannot call Completer more than once.");
-  callback_.value()(result);
+  auto callback = std::move(callback_.value());
   callback_.reset();
+  callback(result);
 }
 
 }  // namespace fdf

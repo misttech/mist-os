@@ -29,6 +29,10 @@ class TestSynchronizedDispatcher {
   // dispatcher fails to start, this constructor will throw an assert.
   explicit TestSynchronizedDispatcher(DispatcherType type);
 
+  // Don't allow moving since raw pointers to this are captured.
+  TestSynchronizedDispatcher(TestSynchronizedDispatcher&& other) = delete;
+  TestSynchronizedDispatcher& operator=(TestSynchronizedDispatcher&& other) = delete;
+
   // Initiates and waits for shutdown of the dispatcher.
   // When the destructor returns the shutdown has completed.
   ~TestSynchronizedDispatcher();

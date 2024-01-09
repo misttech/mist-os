@@ -4,10 +4,14 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/fdf/cpp/env.h>
 #include <lib/fdf/env.h>
 #include <lib/zx/clock.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
+
+#include <latch>
+#include <unordered_set>
 
 namespace fdf_testing {
 
@@ -25,7 +29,10 @@ DriverRuntimeEnv::DriverRuntimeEnv() {
                 zx_status_get_string(status));
 }
 
-DriverRuntimeEnv::~DriverRuntimeEnv() { fdf_env_reset(); }
+DriverRuntimeEnv::~DriverRuntimeEnv() {
+  fdf_env_destroy_all_dispatchers();
+  fdf_env_reset();
+}
 
 }  // namespace internal
 
@@ -39,6 +46,7 @@ DriverRuntime::DriverRuntime()
 
 DriverRuntime::~DriverRuntime() {
   AssertCurrentThreadIsInitialThread();
+  ShutdownAllDispatchers(nullptr);
   g_instance = nullptr;
 }
 
@@ -46,9 +54,45 @@ DriverRuntime* DriverRuntime::GetInstance() { return g_instance; }
 
 fdf::UnownedSynchronizedDispatcher DriverRuntime::StartBackgroundDispatcher() {
   AssertCurrentThreadIsInitialThread();
+  ZX_ASSERT_MSG(!is_shutdown_,
+                "Cannot start any more dispatchers after calling ShutdownAllDispatchers.");
+
   fdf_internal::TestSynchronizedDispatcher& dispatcher =
       background_dispatchers_.emplace_back(fdf_internal::kDispatcherManaged);
   return dispatcher.driver_dispatcher().borrow();
+}
+
+void DriverRuntime::ShutdownAllDispatchers(fdf_dispatcher_t* dut_initial_dispatcher) {
+  AssertCurrentThreadIsInitialThread();
+
+  if (is_shutdown_) {
+    fdf_testing_set_default_dispatcher(dut_initial_dispatcher);
+    return;
+  }
+
+  std::unordered_set<const void*> dispatcher_owners;
+  for (auto& owner : background_dispatchers_) {
+    dispatcher_owners.insert(&owner);
+  }
+  dispatcher_owners.insert(&foreground_dispatcher_);
+
+  std::latch latch(static_cast<int64_t>(dispatcher_owners.size()));
+  for (const void* owner : dispatcher_owners) {
+    auto shutdown = std::make_unique<fdf_env::DriverShutdown>();
+    auto shutdown_ptr = shutdown.get();
+    auto shutdown_callback = [shutdown = std::move(shutdown), &latch](const void* shutdown_driver) {
+      latch.count_down();
+    };
+    ZX_ASSERT(ZX_OK == shutdown_ptr->Begin(owner, std::move(shutdown_callback)));
+  }
+
+  while (!latch.try_wait()) {
+    RunUntilIdleInternal();
+    ResetQuit();
+  }
+
+  fdf_testing_set_default_dispatcher(dut_initial_dispatcher);
+  is_shutdown_ = true;
 }
 
 void DriverRuntime::Run() {
@@ -134,11 +178,13 @@ fit::closure DriverRuntime::QuitClosure() {
 
 zx_status_t DriverRuntime::RunUntilIdleInternal() {
   AssertCurrentThreadIsInitialThread();
+  ZX_ASSERT_MSG(!is_shutdown_, "Cannot Run after calling ShutdownAllDispatchers.");
   return fdf_testing_run_until_idle();
 }
 
 zx_status_t DriverRuntime::RunInternal(zx::time deadline, bool once) {
   AssertCurrentThreadIsInitialThread();
+  ZX_ASSERT_MSG(!is_shutdown_, "Cannot Run after calling ShutdownAllDispatchers.");
   return fdf_testing_run(deadline.get(), once);
 }
 

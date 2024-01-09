@@ -29,8 +29,9 @@ DriverUnderTestBase::~DriverUnderTestBase() {
 void DriverUnderTestBase::on_fidl_error(fidl::UnbindInfo error) {
   std::lock_guard guard(checker_);
   if (stop_completer_.has_value()) {
-    stop_completer_.value().complete_ok(zx::ok());
+    auto completer = std::move(stop_completer_.value());
     stop_completer_.reset();
+    completer.complete_ok(zx::ok());
   }
 }
 

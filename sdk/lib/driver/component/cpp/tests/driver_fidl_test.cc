@@ -98,6 +98,13 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     start_args_ = std::move(start_args->start_args);
   }
 
+  void TearDown() override {
+    test_environment_.reset();
+    node_server_.reset();
+    driver_proto_server_.reset();
+    zircon_proto_server_.reset();
+  }
+
   async_patterns::TestDispatcherBound<fdf_testing::TestNode>& node_server() { return node_server_; }
 
   fidl::ClientEnd<fuchsia_io::Directory> CreateDriverSvcClient() {
@@ -170,6 +177,11 @@ class TestIncomingAndOutgoingFidlsDefaultDriver : public TestIncomingAndOutgoing
   void TearDown() override {
     zx::result result = runtime().RunToCompletion(driver_.PrepareStop());
     ASSERT_EQ(ZX_OK, result.status_value());
+
+    // Tear down the environment after the driver goes through PrepareStop.
+    TestIncomingAndOutgoingFidlsBase::TearDown();
+
+    runtime().ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
   }
 
   TestDriver* driver() { return *driver_; }
@@ -255,6 +267,11 @@ class TestIncomingAndOutgoingFidlsManagedDriver : public TestIncomingAndOutgoing
     zx::result result = runtime().RunToCompletion(
         driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::PrepareStop));
     ASSERT_EQ(ZX_OK, result.status_value());
+
+    // Tear down the environment after the driver goes through PrepareStop.
+    TestIncomingAndOutgoingFidlsBase::TearDown();
+
+    runtime().ShutdownAllDispatchers(driver_dispatcher_->get());
   }
 
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<TestDriver>>& driver() {

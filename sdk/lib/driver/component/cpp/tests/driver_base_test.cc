@@ -21,12 +21,14 @@ class TestForegroundDispatcher : public ::testing::Test {
  public:
   void SetUp() override {
     // Create start args
-    zx::result start_args = node_server_.CreateStartArgsAndServe();
+    node_server_.emplace("root");
+    zx::result start_args = node_server_->CreateStartArgsAndServe();
     EXPECT_EQ(ZX_OK, start_args.status_value());
 
     // Start the test environment
+    test_environment_.emplace();
     zx::result result =
-        test_environment_.Initialize(std::move(start_args->incoming_directory_server));
+        test_environment_->Initialize(std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, result.status_value());
 
     // Start driver
@@ -38,6 +40,11 @@ class TestForegroundDispatcher : public ::testing::Test {
   void TearDown() override {
     zx::result prepare_stop_result = runtime_.RunToCompletion(driver_.PrepareStop());
     EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
+
+    test_environment_.reset();
+    node_server_.reset();
+
+    runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
   }
 
   fdf_testing::DriverUnderTest<TestDriver>& driver() { return driver_; }
@@ -47,8 +54,8 @@ class TestForegroundDispatcher : public ::testing::Test {
   fdf_testing::DriverRuntime runtime_;
 
   // These will use the foreground dispatcher.
-  fdf_testing::TestNode node_server_{"root"};
-  fdf_testing::TestEnvironment test_environment_;
+  std::optional<fdf_testing::TestNode> node_server_;
+  std::optional<fdf_testing::TestEnvironment> test_environment_;
   fdf_testing::DriverUnderTest<TestDriver> driver_;
 };
 
@@ -85,6 +92,11 @@ class TestForegroundDriverBackgroundEnv : public ::testing::Test {
   void TearDown() override {
     zx::result stop_result = runtime_.RunToCompletion(driver_.PrepareStop());
     EXPECT_EQ(ZX_OK, stop_result.status_value());
+
+    test_environment_.reset();
+    node_server_.reset();
+
+    runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
   }
 
   fdf_testing::DriverUnderTest<TestDriver>& driver() { return driver_; }
