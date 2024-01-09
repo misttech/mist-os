@@ -350,6 +350,44 @@ def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
     return rust_lld  # already normalized by Path construction
 
 
+def _versioned_libclang_dir(
+    clang_path_rel: Path,
+) -> Path:
+    clang_root = clang_path_rel.parent.parent
+    libclang_root = clang_root / "lib" / "clang"
+    # Expect exactly one versioned libclang dir installed.
+    return next(libclang_root.glob("*"))
+
+
+def _clang_sanitizer_share_files(
+    versioned_share_dir: Path,
+    sanitizers: FrozenSet[str],
+) -> Iterable[Path]:
+    if "address" in sanitizers:
+        yield versioned_share_dir / "asan_ignorelist.txt"
+    if "hwaddress" in sanitizers:
+        yield versioned_share_dir / "hwasan_ignorelist.txt"
+    if "memory" in sanitizers:
+        yield versioned_share_dir / "msan_ignorelist.txt"
+
+
+def remote_clang_compiler_toolchain_inputs(
+    clang_path_rel: Path,
+    sanitizers: FrozenSet[str],
+) -> Iterable[Path]:
+    """List compiler support files.
+
+    Kludge: partially hardcode set of support files needed from the
+    toolchain for certain sanitizer modes.
+
+    Yields:
+      Paths to toolchain files needed for compiling.
+    """
+    libclang_versioned = _versioned_libclang_dir(clang_path_rel)
+    versioned_share_dir = libclang_versioned / "share"
+    yield from _clang_sanitizer_share_files(versioned_share_dir, sanitizers)
+
+
 def remote_clang_linker_toolchain_inputs(
     clang_path_rel: Path,
     target: str,
@@ -368,10 +406,7 @@ def remote_clang_linker_toolchain_inputs(
     Yields:
       Paths to libraries needed for linking.
     """
-    clang_root = clang_path_rel.parent.parent
-    libclang_root = clang_root / "lib" / "clang"
-    # Expect exactly one versioned libclang dir installed.
-    libclang_versioned = next(libclang_root.glob("*"))
+    libclang_versioned = _versioned_libclang_dir(clang_path_rel)
     target_libdir = clang_target_to_libdir(target)
     libclang_target_dir = libclang_versioned / "lib" / target_libdir
     if rtlib == "compiler-rt":
@@ -380,22 +415,19 @@ def remote_clang_linker_toolchain_inputs(
 
     yield libclang_target_dir / "libclang_rt.builtins.a"
 
+    versioned_share_dir = libclang_versioned / "share"
+    yield from _clang_sanitizer_share_files(versioned_share_dir, sanitizers)
+
     # Including both static and shared libraries, because one cannot
     # deduce from the command-line alone which will be needed.
     if "address" in sanitizers:
         yield from libclang_target_dir.glob("libclang_rt.asan*")
-        ignorelist = libclang_versioned / "share" / "asan_ignorelist.txt"
-        yield ignorelist
     if "hwaddress" in sanitizers:
         yield from libclang_target_dir.glob("libclang_rt.hwasan*")
-        ignorelist = libclang_versioned / "share" / "hwasan_ignorelist.txt"
-        yield ignorelist
     if "leak" in sanitizers:
         yield from libclang_target_dir.glob("libclang_rt.lsan*")
     if "memory" in sanitizers:
         yield from libclang_target_dir.glob("libclang_rt.msan*")
-        ignorelist = libclang_versioned / "share" / "msan_ignorelist.txt"
-        yield ignorelist
     if "fuzzer" in sanitizers or "fuzzer-no-link" in sanitizers:
         yield from libclang_target_dir.glob("libclang_rt.fuzzer*")
     if "thread" in sanitizers:
