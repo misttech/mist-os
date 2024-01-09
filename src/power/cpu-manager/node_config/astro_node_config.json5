@@ -1,0 +1,34 @@
+[
+  {
+    type: "CpuStatsHandler",
+    name: "cpu_stats"
+  },
+  {
+    type: "DeviceControlHandler",
+    name: "cpu_dev",
+    config: {
+      driver_path: "/dev/class/cpu-ctrl/000"
+    }
+  },
+  {
+    type: "CpuControlHandler",
+    name: "cpu_control",
+    config: {
+      sustainable_power: 0.952,
+      power_gain: 0.0096,
+      driver_path: "/dev/class/cpu-ctrl/000",
+      capacitance: 1.2E-10,
+      logical_cpu_numbers: [
+        0,
+        1,
+        2,
+        3
+      ],
+      min_cpu_clock_speed: 1000000000.0
+    },
+    dependencies: {
+      cpu_stats_handler_node: "cpu_stats",
+      cpu_dev_handler_node: "cpu_dev"
+    }
+  }
+]

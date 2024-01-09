@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::common_utils::result_debug_panic::ResultDebugPanic;
-use crate::error::PowerManagerError;
+use crate::error::CpuManagerError;
 use crate::message::{Message, MessageResult, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
@@ -22,7 +22,7 @@ use std::convert::TryInto as _;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-/// Node: CpuManager
+/// Node: CpuManagerMain
 ///
 /// Summary: Provides high-level management of all CPU domains in the system, coordinating both
 ///          driver- and kernel-level activity. Currently only administers CPU throttling, but in
@@ -41,7 +41,7 @@ use std::rc::Rc;
 ///
 /// FIDL dependencies: No direct dependencies
 
-// NOTE(https://fxbug.dev/85815): The thermal state configuration for Sherlock is generated using a process
+// NOTE(fxbug.dev/85815): The thermal state configuration for Sherlock is generated using a process
 // described in this bug.
 // TODO(fxbug/dev/85813): Move this comment to the sherlock node config.
 
@@ -81,7 +81,7 @@ struct CpuCluster {
     /// Name of the cluster, for logging purposes only.
     name: String,
 
-    /// This cluster's index in CpuManager's ordering of all clusters.
+    /// This cluster's index in CpuManagerMain's ordering of all clusters.
     cluster_index: usize,
 
     /// Handler that manages the corresponding CPU driver. Must respond to:
@@ -103,7 +103,7 @@ struct CpuCluster {
     /// Index of this cluster's current P-state. If an update to the P-state fails, we will assume
     /// that it is between the previous and desired states (inclusive), so that pessimistic guesses
     /// of the P-state may be used accordingly.
-    // TODO(https://fxbug.dev/84685): Look into richer specification of failure modes in the CPU device
+    // TODO(fxbug.dev/84685): Look into richer specification of failure modes in the CPU device
     // protocols.
     current_pstate: Cell<RangedValue<usize>>,
 }
@@ -139,7 +139,7 @@ impl CpuCluster {
         &self,
         syscall_handler: &Rc<dyn Node>,
         target_pstate: &PState,
-    ) -> Result<(), PowerManagerError> {
+    ) -> Result<(), CpuManagerError> {
         let performance_scale: sys::zx_cpu_performance_scale_t =
             self.performance_per_ghz.mul_scalar(target_pstate.frequency.0 / 1e9).try_into()?;
 
@@ -162,10 +162,10 @@ impl CpuCluster {
         &self,
         syscall_handler: &Rc<dyn Node>,
         index: usize,
-    ) -> Result<(), PowerManagerError> {
+    ) -> Result<(), CpuManagerError> {
         fuchsia_trace::counter!(
-            "power_manager",
-            "CpuManager P-state",
+            "cpu_manager",
+            "CpuManagerMain P-state",
             self.cluster_index as u64,
             &self.name => index as u32
         );
@@ -385,7 +385,7 @@ fn validate_thermal_states(states: &Vec<ThermalState>) -> Result<(), Error> {
     Ok(())
 }
 
-// Configuration structs for CpuManagerBuilder.
+// Configuration structs for CpuManagerMainBuilder.
 #[derive(Clone, Deserialize)]
 struct ClusterConfig {
     name: String,
@@ -424,8 +424,8 @@ struct JsonData {
     dependencies: Dependencies,
 }
 
-/// Builder for `CpuManager`
-pub struct CpuManagerBuilder<'a> {
+/// Builder for `CpuManagerMain`
+pub struct CpuManagerMainBuilder<'a> {
     sustainable_power: Watts,
     power_gain: Watts,
     cluster_configs: Vec<ClusterConfig>,
@@ -440,7 +440,7 @@ pub struct CpuManagerBuilder<'a> {
     inspect_root: Option<&'a inspect::Node>,
 }
 
-impl<'a> CpuManagerBuilder<'a> {
+impl<'a> CpuManagerMainBuilder<'a> {
     pub fn new_from_json(json_data: json::Value, nodes: &HashMap<String, Rc<dyn Node>>) -> Self {
         let data: JsonData = json::from_value(json_data).unwrap();
         assert_eq!(
@@ -491,12 +491,12 @@ impl<'a> CpuManagerBuilder<'a> {
         self
     }
 
-    pub fn build(self) -> Result<Rc<CpuManager>, Error> {
+    pub fn build(self) -> Result<Rc<CpuManagerMain>, Error> {
         // Optionally use the default inspect root node
         let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
 
         let cluster_names = self.cluster_configs.iter().map(|c| c.name.as_str()).collect();
-        let inspect = InspectData::new(inspect_root, "CpuManager", cluster_names);
+        let inspect = InspectData::new(inspect_root, "CpuManagerMain", cluster_names);
 
         let mutable_inner = MutableInner {
             num_cpus: 0,
@@ -508,7 +508,7 @@ impl<'a> CpuManagerBuilder<'a> {
             thermal_states: Vec::new(),
         };
 
-        Ok(Rc::new(CpuManager {
+        Ok(Rc::new(CpuManagerMain {
             sustainable_power: self.sustainable_power,
             power_gain: self.power_gain,
             init_done: AsyncEvent::new(),
@@ -520,14 +520,14 @@ impl<'a> CpuManagerBuilder<'a> {
     }
 
     #[cfg(test)]
-    pub async fn build_and_init(self) -> Rc<CpuManager> {
+    pub async fn build_and_init(self) -> Rc<CpuManagerMain> {
         let node = self.build().unwrap();
         node.init().await.unwrap();
         node
     }
 }
 
-pub struct CpuManager {
+pub struct CpuManagerMain {
     /// The available power when thermal load is 0.
     sustainable_power: Watts,
 
@@ -571,10 +571,10 @@ impl PerformanceModel {
     }
 }
 
-impl CpuManager {
+impl CpuManagerMain {
     // Returns a Vec of all CPU loads as fractional utilizations.
     async fn get_cpu_loads(&self) -> Result<Vec<f32>, Error> {
-        fuchsia_trace::duration!("power_manager", "CpuManager::get_cpu_loads");
+        fuchsia_trace::duration!("cpu_manager", "CpuManagerMain::get_cpu_loads");
 
         // Get load for all CPUs in the system
         match self.send_message(&self.cpu_stats_handler, &Message::GetCpuLoads).await {
@@ -621,10 +621,10 @@ impl CpuManager {
     }
 
     // Updates the current thermal state.
-    async fn update_thermal_state(&self, index: usize) -> Result<(), PowerManagerError> {
+    async fn update_thermal_state(&self, index: usize) -> Result<(), CpuManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "CpuManager::update_thermal_state",
+            "cpu_manager",
+            "CpuManagerMain::update_thermal_state",
             "index" => index as u32
         );
 
@@ -672,16 +672,16 @@ impl CpuManager {
         &self,
         thermal_load: ThermalLoad,
         sensor: &str,
-    ) -> Result<MessageReturn, PowerManagerError> {
+    ) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
-            "CpuManager::handle_update_thermal_load",
+            "cpu_manager",
+            "CpuManagerMain::handle_update_thermal_load",
             "thermal_load" => thermal_load.0,
             "sensor" => sensor
         );
 
         if thermal_load > ThermalLoad(fthermal::MAX_THERMAL_LOAD) {
-            return Err(PowerManagerError::InvalidArgument(format!(
+            return Err(CpuManagerError::InvalidArgument(format!(
                 "Thermal load {:?} exceeds max {}",
                 thermal_load,
                 fthermal::MAX_THERMAL_LOAD
@@ -690,8 +690,8 @@ impl CpuManager {
 
         let available_power = self.calculate_available_power(thermal_load);
         fuchsia_trace::counter!(
-            "power_manager",
-            "CpuManager available_power",
+            "cpu_manager",
+            "CpuManagerMain available_power",
             0,
             "available_power" => available_power.0
         );
@@ -703,8 +703,8 @@ impl CpuManager {
     /// Calculate available power based on thermal load.
     fn calculate_available_power(&self, thermal_load: ThermalLoad) -> Watts {
         fuchsia_trace::duration!(
-            "power_manager",
-            "CpuManager::calculate_available_power",
+            "cpu_manager",
+            "CpuManagerMain::calculate_available_power",
             "thermal_load" => thermal_load.0
         );
 
@@ -714,13 +714,13 @@ impl CpuManager {
         Watts(power_available)
     }
 
-    /// If an error is encountered in the execution of this method, CpuManager will keep itself in
+    /// If an error is encountered in the execution of this method, CpuManagerMain will keep itself in
     /// a usable state by using pessimistic estimates of any value that it cannot determine and then
     /// log the error.
     async fn set_max_power_consumption(&self, available_power: Watts) {
         fuchsia_trace::duration!(
-            "power_manager",
-            "CpuManager::set_max_power_consumption",
+            "cpu_manager",
+            "CpuManagerMain::set_max_power_consumption",
             "available_power" => available_power.0
         );
 
@@ -749,8 +749,8 @@ impl CpuManager {
             last_performance += performance;
 
             fuchsia_trace::counter!(
-                "power_manager",
-                "CpuManager cluster_load",
+                "cpu_manager",
+                "CpuManagerMain cluster_load",
                 cluster.cluster_index as u64,
                 &cluster.name => load as f64
             );
@@ -758,8 +758,8 @@ impl CpuManager {
         }
         self.inspect.last_performance.set(last_performance.0);
         fuchsia_trace::counter!(
-            "power_manager",
-            "CpuManager last_performance",
+            "cpu_manager",
+            "CpuManagerMain last_performance",
             0,
             "value (NormPerfs)" => last_performance.0
         );
@@ -774,8 +774,8 @@ impl CpuManager {
         let (new_thermal_state_index, estimate) =
             self.select_thermal_state(available_power, performance_model);
         fuchsia_trace::counter!(
-            "power_manager",
-            "CpuManager new_thermal_state_index",
+            "cpu_manager",
+            "CpuManagerMain new_thermal_state_index",
             0,
             "value" => new_thermal_state_index as u32
         );
@@ -787,16 +787,16 @@ impl CpuManager {
         }
 
         fuchsia_trace::counter!(
-            "power_manager",
-            "CpuManager projected_performance",
+            "cpu_manager",
+            "CpuManagerMain projected_performance",
             0,
             "value (NormPerfs)" => estimate.performance.0
         );
         self.inspect.projected_performance.set(estimate.performance.0);
 
         fuchsia_trace::counter!(
-            "power_manager",
-            "CpuManager projected_power",
+            "cpu_manager",
+            "CpuManagerMain projected_power",
             0,
             "value (W)" => estimate.power.0
         );
@@ -817,7 +817,7 @@ struct MutableInner {
     /// CPU cluster.
     cluster_handlers: Option<Vec<Rc<dyn Node>>>,
 
-    /// All CPU clusters governed by the `CpuManager`.
+    /// All CPU clusters governed by the `CpuManagerMain`.
     clusters: Vec<CpuCluster>,
 
     /// Thermal state configs as supplied in the node config. Wrapped in an Option because they are
@@ -833,14 +833,14 @@ struct MutableInner {
 }
 
 #[async_trait(?Send)]
-impl Node for CpuManager {
+impl Node for CpuManagerMain {
     fn name(&self) -> String {
-        "CpuManager".to_string()
+        "CpuManagerMain".to_string()
     }
 
     /// Initializes internal state.
     async fn init(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("power_manager", "CpuManager::init");
+        fuchsia_trace::duration!("cpu_manager", "CpuManagerMain::init");
 
         let cluster_configs =
             ok_or_default_err!(self.mutable_inner.borrow_mut().cluster_configs.take())
@@ -885,7 +885,7 @@ impl Node for CpuManager {
                 Err(e) => bail!("Error fetching performance states: {}", e),
             };
 
-            // The current P-state will be set when CpuManager's thermal state is initialized below,
+            // The current P-state will be set when CpuManagerMain's thermal state is initialized below,
             // so initialize it to a range of all possible values for now.
             let pstate_range = Range { lower: 0, upper: pstates.len() - 1 };
             let current_pstate = Cell::new(RangedValue::InRange(pstate_range));
@@ -948,12 +948,12 @@ impl Node for CpuManager {
             Message::UpdateThermalLoad(thermal_load, sensor) => {
                 self.handle_update_thermal_load(*thermal_load, sensor).await
             }
-            _ => Err(PowerManagerError::Unsupported),
+            _ => Err(CpuManagerError::Unsupported),
         }
     }
 }
 
-// TODO(https://fxbug.dev/84727): Determine whether it would be useful to track histories of any of these
+// TODO(fxbug.dev/84727): Determine whether it would be useful to track histories of any of these
 // signals.
 struct InspectData {
     root_node: inspect::Node,
@@ -1086,7 +1086,7 @@ mod tests {
         ]
     }
 
-    // Convenience struct to manage mocks of the handlers on which CpuManager depends.
+    // Convenience struct to manage mocks of the handlers on which CpuManagerMain depends.
     struct Handlers {
         big_cluster: Rc<MockNode>,
         little_cluster: Rc<MockNode>,
@@ -1129,7 +1129,7 @@ mod tests {
             let handlers =
                 Self { big_cluster, little_cluster, syscall, cpu_stats, _mock_maker: mock_maker };
 
-            // During initialization, CpuManager configures the highest-power thermal state, with
+            // During initialization, CpuManagerMain configures the highest-power thermal state, with
             // both clusters at their respective 0th P-states.
             handlers.expect_big_pstate(0);
             handlers.expect_little_pstate(0);
@@ -1195,7 +1195,7 @@ mod tests {
         nodes.insert("stats_handler_node".to_string(), handlers.cpu_stats.clone());
 
         let json_data = json::json!({
-            "type": "CpuManager",
+            "type": "CpuManagerMain",
             "name": "cpu_manager",
             "config": {
                 "sustainable_power": DEFUALT_SUSTAINABLE_POWER.0,
@@ -1235,14 +1235,14 @@ mod tests {
             }
         });
 
-        let builder = CpuManagerBuilder::new_from_json(json_data, &nodes);
+        let builder = CpuManagerMainBuilder::new_from_json(json_data, &nodes);
         builder.build_and_init().await;
     }
 
     // Verifies that thermal states are properly validated.
     #[fasync::run_singlethreaded(test)]
     async fn test_thermal_state_validation() {
-        // Since CpuManagerBuilder::build() exits early, we need a custom constructor for Handlers
+        // Since CpuManagerMainBuilder::build() exits early, we need a custom constructor for Handlers
         // that omits expectations for messages that are never sent.
         impl Handlers {
             fn new_for_failed_validation() -> Self {
@@ -1300,7 +1300,7 @@ mod tests {
                 dynamic_power_per_normperf_w: 1.1,
             },
         ];
-        let builder = CpuManagerBuilder::new(
+        let builder = CpuManagerMainBuilder::new(
             DEFUALT_SUSTAINABLE_POWER,
             DEFUALT_POWER_GAIN,
             cluster_configs.clone(),
@@ -1327,7 +1327,7 @@ mod tests {
                 dynamic_power_per_normperf_w: 0.8,
             },
         ];
-        let builder = CpuManagerBuilder::new(
+        let builder = CpuManagerMainBuilder::new(
             DEFUALT_SUSTAINABLE_POWER,
             DEFUALT_POWER_GAIN,
             cluster_configs.clone(),
@@ -1355,7 +1355,7 @@ mod tests {
                 dynamic_power_per_normperf_w: 0.8,
             },
         ];
-        let builder = CpuManagerBuilder::new(
+        let builder = CpuManagerMainBuilder::new(
             DEFUALT_SUSTAINABLE_POWER,
             DEFUALT_POWER_GAIN,
             cluster_configs.clone(),
@@ -1383,7 +1383,7 @@ mod tests {
                 dynamic_power_per_normperf_w: 0.8,
             },
         ];
-        let builder = CpuManagerBuilder::new(
+        let builder = CpuManagerMainBuilder::new(
             DEFUALT_SUSTAINABLE_POWER,
             DEFUALT_POWER_GAIN,
             cluster_configs.clone(),
@@ -1395,7 +1395,7 @@ mod tests {
         assert!(builder.build().unwrap().init().await.is_err());
     }
 
-    // Tests that CpuManagerBuilder requires that clusters are configured to exactly span the space
+    // Tests that CpuManagerMainBuilder requires that clusters are configured to exactly span the space
     // of all logical CPU numbers.
     #[fasync::run_singlethreaded(test)]
     async fn test_validate_all_cpus_spanned() {
@@ -1420,7 +1420,7 @@ mod tests {
             static_power_w: 2.0,
             dynamic_power_per_normperf_w: 1.0,
         }];
-        let builder = CpuManagerBuilder::new(
+        let builder = CpuManagerMainBuilder::new(
             DEFUALT_SUSTAINABLE_POWER,
             DEFUALT_POWER_GAIN,
             make_default_cluster_configs(),
@@ -1432,7 +1432,7 @@ mod tests {
         assert!(builder.build().unwrap().init().await.is_err());
     }
 
-    // Verify that CpuManager responds as expected to UpdateThermalLoad messages.
+    // Verify that CpuManagerMain responds as expected to UpdateThermalLoad messages.
     #[fasync::run_singlethreaded(test)]
     async fn test_update_thermal_load() {
         let handlers = Handlers::new();
@@ -1458,7 +1458,7 @@ mod tests {
             },
         ];
 
-        let node = CpuManagerBuilder::new(
+        let node = CpuManagerMainBuilder::new(
             DEFUALT_SUSTAINABLE_POWER,
             DEFUALT_POWER_GAIN,
             make_default_cluster_configs(),
@@ -1558,7 +1558,7 @@ mod tests {
             },
         ];
 
-        let node = CpuManagerBuilder::new(
+        let node = CpuManagerMainBuilder::new(
             DEFUALT_SUSTAINABLE_POWER,
             DEFUALT_POWER_GAIN,
             make_default_cluster_configs(),
@@ -1624,7 +1624,7 @@ mod tests {
         ];
 
         let inspector = inspect::Inspector::default();
-        let builder = CpuManagerBuilder::new(
+        let builder = CpuManagerMainBuilder::new(
             DEFUALT_SUSTAINABLE_POWER,
             DEFUALT_POWER_GAIN,
             make_default_cluster_configs(),
@@ -1652,7 +1652,7 @@ mod tests {
         assert_data_tree!(
             inspector,
             root: {
-                "CpuManager": {
+                "CpuManagerMain": {
                     "state": {
                         "thermal_state_index": "1",
                         "last_performance (NormPerfs)": 5.0,

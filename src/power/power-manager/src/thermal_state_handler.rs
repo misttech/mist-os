@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common_utils::result_debug_panic::ResultDebugPanic;
 use crate::error::PowerManagerError;
 use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
@@ -9,7 +10,6 @@ use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::platform_metrics::PlatformMetric;
 use crate::types::ThermalLoad;
-use crate::utils::result_debug_panic::ResultDebugPanic;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use async_utils::hanging_get::server as hanging_get;

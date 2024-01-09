@@ -4,14 +4,11 @@
 
 use crate::node::Node;
 use anyhow::{format_err, Context, Error};
+use cpu_manager_config_lib;
 use fuchsia_async as fasync;
-use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
+use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
-use futures::{
-    future::{join_all, LocalBoxFuture},
-    stream::{FuturesUnordered, StreamExt},
-};
-use power_manager_config_lib;
+use futures::{future::join_all, stream::StreamExt};
 use serde_json as json;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -19,26 +16,22 @@ use tracing::*;
 
 // nodes
 use crate::{
-    activity_handler, cpu_control_handler, cpu_device_handler, cpu_manager, cpu_stats_handler,
-    crash_report_handler, debug_service, dev_control_handler, input_settings_handler, lid_shutdown,
-    platform_metrics, shutdown_watcher, syscall_handler, system_power_mode_handler,
-    system_profile_handler, system_shutdown_handler, temperature_handler, thermal_load_driver,
-    thermal_policy, thermal_shutdown, thermal_state_handler,
+    cpu_control_handler, cpu_device_handler, cpu_manager_main, cpu_stats_handler,
+    dev_control_handler, syscall_handler,
 };
 
-pub struct PowerManager {
+pub struct CpuManager {
     nodes: HashMap<String, Rc<dyn Node>>,
 }
 
-impl PowerManager {
+impl CpuManager {
     pub fn new() -> Self {
         Self { nodes: HashMap::new() }
     }
 
-    /// Perform the node initialization and begin running the PowerManager.
+    /// Perform the node initialization and begin running the CpuManager.
     pub async fn run(&mut self) -> Result<(), Error> {
-        // Create a new ServiceFs to handle incoming service requests for the various services that
-        // the PowerManager hosts.
+        // Create a new ServiceFs to handle incoming service requests.
         let mut fs = ServiceFs::new_local();
 
         // Required call to serve the inspect tree
@@ -46,50 +39,33 @@ impl PowerManager {
         let _inspect_server_task =
             inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
-        let structured_config = power_manager_config_lib::Config::take_from_startup_handle();
+        let structured_config = cpu_manager_config_lib::Config::take_from_startup_handle();
         structured_config.record_inspect(fuchsia_inspect::component::inspector().root());
         log_config(&structured_config);
 
-        // Create the nodes according to the config file
-        let node_futures = FuturesUnordered::new();
-        self.create_nodes_from_config(&structured_config, &mut fs, &node_futures)
+        self.create_nodes_from_config(&structured_config)
             .await
             .context("Failed to create nodes from config")?;
-
-        if structured_config.enable_debug_service {
-            debug_service::publish_debug_service(fs.dir("svc"), self.nodes.clone());
-        }
 
         // Begin serving FIDL requests. It's important to do this after creating nodes but before
         // initializing them, since some nodes depend on incoming FIDL requests for their `init()`
         // process.
         fs.take_and_serve_directory_handle()?;
 
-        // Technically these two tasks could be merged into a single `fuchsia_async::Task`. However,
-        // without a clear benefit to do so, it reads nicer to keep the two buckets of futures
-        // separated. Looking forward, we may try to get rid of the concept of `node_futures` anyway
-        // (opting instead for nodes to own their own `fuchsia_async::Task` which polls any
-        // long-running futures they may require).
-        let node_futures_task = fasync::Task::local(node_futures.collect::<()>());
-        let service_fs_task = fasync::Task::local(fs.collect::<()>());
-
         self.init_nodes().await?;
 
         info!("Setup complete");
 
-        // Run the ServiceFs (handles incoming request streams) and node futures. This future never
-        // completes.
-        futures::join!(service_fs_task, node_futures_task);
+        // Run the ServiceFs futures. This future never completes.
+        fs.collect::<()>().await;
 
         Err(format_err!("Tasks completed unexpectedly"))
     }
 
     /// Create the nodes by reading and parsing the node config JSON file.
-    async fn create_nodes_from_config<'a, 'b, 'c>(
+    async fn create_nodes_from_config(
         &mut self,
-        structured_config: &power_manager_config_lib::Config,
-        service_fs: &'a mut ServiceFs<ServiceObjLocal<'b, ()>>,
-        node_futures: &FuturesUnordered<LocalBoxFuture<'c, ()>>,
+        structured_config: &cpu_manager_config_lib::Config,
     ) -> Result<(), Error> {
         let node_config_path = &structured_config.node_config_path;
         let contents = std::fs::read_to_string(node_config_path)?;
@@ -97,23 +73,17 @@ impl PowerManager {
             .context(format!("Failed to parse file {}", node_config_path))?;
 
         info!("Creating nodes from config file: {}", node_config_path);
-        self.create_nodes(structured_config, json_data, service_fs, node_futures).await
+        self.create_nodes(json_data).await
     }
 
     /// Creates the nodes using the specified JSON object, adding them to the `nodes` HashMap.
-    async fn create_nodes<'a, 'b, 'c>(
-        &mut self,
-        structured_config: &power_manager_config_lib::Config,
-        json_data: json::Value,
-        service_fs: &'a mut ServiceFs<ServiceObjLocal<'b, ()>>,
-        node_futures: &FuturesUnordered<LocalBoxFuture<'c, ()>>,
-    ) -> Result<(), Error> {
+    async fn create_nodes(&mut self, json_data: json::Value) -> Result<(), Error> {
         // Iterate through each object in the top-level array, which represents configuration for a
         // single node
         for node_config in json_data.as_array().unwrap().iter() {
             info!("Creating node {}", node_config["name"]);
             let node = self
-                .create_node(structured_config, node_config.clone(), service_fs, node_futures)
+                .create_node(node_config.clone())
                 .await
                 .with_context(|| format!("Failed creating node {}", node_config["name"]))?;
             self.nodes.insert(node_config["name"].as_str().unwrap().to_string(), node);
@@ -123,13 +93,7 @@ impl PowerManager {
 
     /// Uses the supplied `json_data` to construct a single node, where `json_data` is the JSON
     /// object corresponding to a single node configuration.
-    async fn create_node<'a, 'b, 'c>(
-        &mut self,
-        structured_config: &power_manager_config_lib::Config,
-        json_data: json::Value,
-        service_fs: &'a mut ServiceFs<ServiceObjLocal<'b, ()>>,
-        node_futures: &FuturesUnordered<LocalBoxFuture<'c, ()>>,
-    ) -> Result<Rc<dyn Node>, Error> {
+    async fn create_node(&mut self, json_data: json::Value) -> Result<Rc<dyn Node>, Error> {
         let node_name = json_data["name"].clone();
         let _log_warning_task = fasync::Task::local(async move {
             fasync::Timer::new(fasync::Duration::from_seconds(30)).await;
@@ -137,13 +101,6 @@ impl PowerManager {
         });
 
         Ok(match json_data["type"].as_str().unwrap() {
-            "ActivityHandler" => {
-                activity_handler::ActivityHandlerBuilder::new_from_json(json_data, &self.nodes)
-                    .build(node_futures)?
-            }
-            "CrashReportHandler" => {
-                crash_report_handler::CrashReportHandlerBuilder::new().build()?
-            }
             "CpuControlHandler" => {
                 cpu_control_handler::CpuControlHandlerBuilder::new_from_json(json_data, &self.nodes)
                     .build()?
@@ -152,11 +109,12 @@ impl PowerManager {
                 cpu_device_handler::CpuDeviceHandlerBuilder::new_from_json(json_data, &self.nodes)
                     .build()?
             }
-            "CpuManager" => {
-                cpu_manager::CpuManagerBuilder::new_from_json(json_data, &self.nodes).build()?
+            "CpuManagerMain" => {
+                cpu_manager_main::CpuManagerMainBuilder::new_from_json(json_data, &self.nodes)
+                    .build()?
             }
 
-            // TODO(https://fxbug.dev/111155): Remove async node creation
+            // TODO(fxbug.dev/111155): Remove async node creation
             "CpuStatsHandler" => {
                 cpu_stats_handler::CpuStatsHandlerBuilder::new_from_json(json_data, &self.nodes)
                     .build()
@@ -169,83 +127,10 @@ impl PowerManager {
                 )
                 .build()?
             }
-            "InputSettingsHandler" => {
-                input_settings_handler::InputSettingsHandlerBuilder::new_from_json(
-                    json_data,
-                    &self.nodes,
-                )
-                .build(node_futures)?
-            }
-            "LidShutdown" => {
-                lid_shutdown::LidShutdownBuilder::new_from_json(json_data, &self.nodes).build()?
-            }
-            "PlatformMetrics" => {
-                platform_metrics::PlatformMetricsBuilder::new_from_json(json_data, &self.nodes)
-                    .build(node_futures)?
-            }
 
-            // TODO(https://fxbug.dev/111155): Remove async node creation
+            // TODO(fxbug.dev/111155): Remove async node creation
             "SyscallHandler" => syscall_handler::SyscallHandlerBuilder::new().build().await?,
-            "SystemPowerModeHandler" => {
-                system_power_mode_handler::SystemPowerModeHandlerBuilder::new_from_json(
-                    json_data,
-                    &self.nodes,
-                    service_fs,
-                )
-                .build()?
-            }
-            "SystemProfileHandler" => {
-                system_profile_handler::SystemProfileHandlerBuilder::new_from_json(
-                    json_data,
-                    &self.nodes,
-                    service_fs,
-                )
-                .build()?
-            }
-            "SystemShutdownHandler" => {
-                system_shutdown_handler::SystemShutdownHandlerBuilder::new_from_json(
-                    json_data,
-                    &self.nodes,
-                    service_fs,
-                )
-                .build()?
-            }
-            "ShutdownWatcher" => shutdown_watcher::ShutdownWatcherBuilder::new_from_json(
-                json_data,
-                &self.nodes,
-                service_fs,
-            )
-            .build()?,
-            "TemperatureHandler" => temperature_handler::TemperatureHandlerBuilder::new_from_json(
-                json_data,
-                &self.nodes,
-            )
-            .build()?,
-            "ThermalLoadDriver" => thermal_load_driver::ThermalLoadDriverBuilder::new_from_json(
-                json_data,
-                &self.nodes,
-                &structured_config,
-            )
-            .build()?,
 
-            // TODO(https://fxbug.dev/111155): Remove async node creation
-            "ThermalPolicy" => {
-                thermal_policy::ThermalPolicyBuilder::new_from_json(json_data, &self.nodes)
-                    .build(node_futures)
-                    .await?
-            }
-            "ThermalShutdown" => {
-                thermal_shutdown::ThermalShutdownBuilder::new_from_json(json_data, &self.nodes)
-                    .build(node_futures)?
-            }
-            "ThermalStateHandler" => {
-                thermal_state_handler::ThermalStateHandlerBuilder::new_from_json(
-                    json_data,
-                    &self.nodes,
-                    service_fs,
-                )
-                .build()?
-            }
             unknown => panic!("Unknown node type: {}", unknown),
         })
     }
@@ -268,16 +153,9 @@ impl PowerManager {
     }
 }
 
-fn log_config(config: &power_manager_config_lib::Config) {
-    let power_manager_config_lib::Config {
-        enable_debug_service,
-        node_config_path,
-        disable_temperature_filter,
-    } = config;
-    info!(
-        "Configuration: enable_debug_service={} node_config_path={} disable_temperature_filter={}",
-        enable_debug_service, node_config_path, disable_temperature_filter
-    );
+fn log_config(config: &cpu_manager_config_lib::Config) {
+    let cpu_manager_config_lib::Config { node_config_path } = config;
+    info!("Configuration: node_config_path={}", node_config_path);
 }
 
 #[cfg(test)]
@@ -300,21 +178,8 @@ mod tests {
                 "name": "test_name"
             },
         ]);
-        let mut power_manager = PowerManager::new();
-        let node_futures = FuturesUnordered::new();
-        power_manager
-            .create_nodes(
-                &power_manager_config_lib::Config {
-                    enable_debug_service: false,
-                    node_config_path: String::new(),
-                    disable_temperature_filter: false,
-                },
-                json_data,
-                &mut ServiceFs::new_local(),
-                &node_futures,
-            )
-            .await
-            .unwrap();
+        let mut cpu_manager = CpuManager::new();
+        cpu_manager.create_nodes(json_data).await.unwrap();
     }
 
     /// Tests that all nodes in a given config file have a unique name.
@@ -429,13 +294,13 @@ mod tests {
         let success_node = Rc::new(InitSuccessNode {});
         let failure_node = Rc::new(InitFailureNode {});
 
-        let power_manager = PowerManager {
+        let cpu_manager = CpuManager {
             nodes: HashMap::from([
                 ("init_success_node".into(), success_node as Rc<dyn Node>),
                 ("init_failure_node".into(), failure_node as Rc<dyn Node>),
             ]),
         };
 
-        assert!(power_manager.init_nodes().await.is_err());
+        assert!(cpu_manager.init_nodes().await.is_err());
     }
 }

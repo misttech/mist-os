@@ -61,7 +61,7 @@ rustc_test("integration-test") {
     "src/thermal_model_test.rs",
   ]
 
-  sources += [ "../../src/types.rs" ]
+  sources += [ "//src/power/common/lib/types.rs" ]
 }
 
 fuchsia_unittest_package("power-manager-integration-test") {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::dev_control_handler;
-use crate::error::PowerManagerError;
+use crate::error::CpuManagerError;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
@@ -319,7 +319,7 @@ impl CpuControlHandler {
     /// Returns the total CPU load (averaged since the previous call)
     async fn get_load(&self) -> Result<f32, Error> {
         fuchsia_trace::duration!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler::get_load",
             "driver" => self.cpu_driver_path.as_str()
         );
@@ -344,7 +344,7 @@ impl CpuControlHandler {
     /// Returns the current CPU P-state index
     async fn get_current_p_state_index(&self) -> Result<usize, Error> {
         fuchsia_trace::duration!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler::get_current_p_state_index",
             "driver" => self.cpu_driver_path.as_str()
         );
@@ -362,16 +362,16 @@ impl CpuControlHandler {
         &self,
         thermal_load: ThermalLoad,
         sensor: &str,
-    ) -> Result<MessageReturn, PowerManagerError> {
+    ) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler::handle_update_thermal_load",
             "thermal_load" => thermal_load.0,
             "sensor" => sensor
         );
 
         if thermal_load > ThermalLoad(fthermal::MAX_THERMAL_LOAD) {
-            return Err(PowerManagerError::InvalidArgument(format!(
+            return Err(CpuManagerError::InvalidArgument(format!(
                 "Thermal load {:?} exceeds max {}",
                 thermal_load,
                 fthermal::MAX_THERMAL_LOAD
@@ -380,7 +380,7 @@ impl CpuControlHandler {
 
         let available_power = self.calculate_available_power(thermal_load);
         fuchsia_trace::counter!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler available_power",
             0,
             "available_power" => available_power.0
@@ -396,7 +396,7 @@ impl CpuControlHandler {
     /// Calculate available power based on thermal load.
     fn calculate_available_power(&self, thermal_load: ThermalLoad) -> Watts {
         fuchsia_trace::duration!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler::calculate_available_power",
             "thermal_load" => thermal_load.0
         );
@@ -415,7 +415,7 @@ impl CpuControlHandler {
     /// for a P-state under consideration.
     async fn set_max_power_consumption(&self, max_power: &Watts) -> Result<(), Error> {
         fuchsia_trace::duration!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler::set_max_power_consumption",
             "driver" => self.cpu_driver_path.as_str(),
             "max_power" => max_power.0
@@ -438,7 +438,7 @@ impl CpuControlHandler {
             let last_load = self.get_load().await? as f64;
             self.inspect.last_load.set(last_load);
             fuchsia_trace::counter!(
-                "power_manager",
+                "cpu_manager",
                 "CpuControlHandler last_load",
                 self.trace_counter_id,
                 self.cpu_driver_path.as_str() => last_load
@@ -451,7 +451,7 @@ impl CpuControlHandler {
 
         self.inspect.last_op_rate.set(last_op_rate.0);
         fuchsia_trace::instant!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler::set_max_power_consumption_data",
             fuchsia_trace::Scope::Thread,
             "driver" => self.cpu_driver_path.as_str(),
@@ -494,7 +494,7 @@ impl CpuControlHandler {
         }
 
         fuchsia_trace::counter!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler estimated_power",
             0,
             "value (W)" => estimated_power.0
@@ -502,7 +502,7 @@ impl CpuControlHandler {
 
         if p_state_index != current_p_state_index {
             fuchsia_trace::instant!(
-                "power_manager",
+                "cpu_manager",
                 "CpuControlHandler::updated_p_state_index",
                 fuchsia_trace::Scope::Thread,
                 "driver" => self.cpu_driver_path.as_str(),
@@ -523,7 +523,7 @@ impl CpuControlHandler {
         }
 
         fuchsia_trace::counter!(
-            "power_manager",
+            "cpu_manager",
             "CpuControlHandler p_state",
             self.trace_counter_id,
             self.cpu_driver_path.as_str() => p_state_index as u32
@@ -553,7 +553,7 @@ impl Node for CpuControlHandler {
     ///
     /// Connects to the cpu-ctrl driver unless a proxy was already provided (in a test).
     async fn init(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("power_manager", "CpuControlHandler::init");
+        fuchsia_trace::duration!("cpu_manager", "CpuControlHandler::init");
 
         // Connect to the cpu-ctrl driver. Typically this is None, but it may be set by tests.
         let cpu_ctrl_proxy = match &self.mutable_inner.borrow().cpu_ctrl_proxy {
@@ -611,12 +611,12 @@ impl Node for CpuControlHandler {
         Ok(())
     }
 
-    async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, PowerManagerError> {
+    async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, CpuManagerError> {
         match msg {
             Message::UpdateThermalLoad(thermal_load, sensor) => {
                 self.handle_update_thermal_load(*thermal_load, sensor).await
             }
-            _ => Err(PowerManagerError::Unsupported),
+            _ => Err(CpuManagerError::Unsupported),
         }
     }
 }
@@ -674,7 +674,7 @@ async fn get_p_states(
     min_cpu_clock_speed: Hertz,
 ) -> Result<Vec<PState>, Error> {
     fuchsia_trace::duration!(
-        "power_manager",
+        "cpu_manager",
         "cpu_control_handler::get_p_states",
         "driver" => cpu_driver_path
     );
@@ -701,7 +701,7 @@ async fn get_p_states(
     }
 
     fuchsia_trace::instant!(
-        "power_manager",
+        "cpu_manager",
         "cpu_control_handler::received_cpu_p_states",
         fuchsia_trace::Scope::Thread,
         "driver" => cpu_driver_path,
@@ -786,8 +786,8 @@ pub mod tests {
             .await;
 
         assert_matches!(
-            cpu_ctrl_node.handle_message(&Message::ReadTemperature).await,
-            Err(PowerManagerError::Unsupported)
+            cpu_ctrl_node.handle_message(&Message::GetCpuLoads).await,
+            Err(CpuManagerError::Unsupported)
         );
     }
 

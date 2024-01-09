@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common_utils::get_current_timestamp;
 use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
@@ -9,7 +10,6 @@ use crate::platform_metrics::PlatformMetric;
 use crate::shutdown_request::{RebootReason, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::types::{Celsius, Seconds, ThermalLoad};
-use crate::utils::get_current_timestamp;
 use anyhow::{format_err, Error, Result};
 use async_trait::async_trait;
 use fuchsia_async as fasync;
@@ -394,7 +394,7 @@ mod tests {
     /// test_each_node_config_file_dependency_ordering).
     #[test]
     pub fn test_config_files() -> Result<(), anyhow::Error> {
-        crate::utils::test_each_node_config_file(|config_file| {
+        crate::common_utils::test_each_node_config_file(|config_file| {
             let thermal_load_driver_nodes =
                 config_file.iter().filter(|n| n["type"] == "ThermalLoadDriver");
 

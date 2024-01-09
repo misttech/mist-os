@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common_utils::get_current_timestamp;
 use crate::error::PowerManagerError;
 use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
@@ -10,7 +11,6 @@ use crate::platform_metrics::PlatformMetric;
 use crate::shutdown_request::{RebootReason, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::types::{Celsius, Seconds};
-use crate::utils::get_current_timestamp;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fuchsia_async as fasync;

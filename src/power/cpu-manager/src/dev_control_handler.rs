@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::common_utils::result_debug_panic::ResultDebugPanic;
-use crate::error::PowerManagerError;
+use crate::error::CpuManagerError;
 use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
@@ -22,7 +22,8 @@ use std::rc::Rc;
 
 /// Node: DeviceControlHandler
 ///
-/// Summary: Provides an interface to control the performance state of a devhost device
+/// Summary: Provides an interface to control the power, performance, and sleep states of a devhost
+///          device
 ///
 /// Handles Messages:
 ///     - GetPerformanceState
@@ -120,9 +121,9 @@ pub struct DeviceControlHandler {
 }
 
 impl DeviceControlHandler {
-    async fn handle_get_performance_state(&self) -> Result<MessageReturn, PowerManagerError> {
+    async fn handle_get_performance_state(&self) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
+            "cpu_manager",
             "DeviceControlHandler::handle_get_performance_state",
             "driver" => self.driver_path.as_str()
         );
@@ -132,7 +133,7 @@ impl DeviceControlHandler {
         let result = self.get_performance_state().await;
         log_if_err!(result, "Failed to get performance state");
         fuchsia_trace::instant!(
-            "power_manager",
+            "cpu_manager",
             "DeviceControlHandler::get_performance_state_result",
             fuchsia_trace::Scope::Thread,
             "driver" => self.driver_path.as_str(),
@@ -143,7 +144,7 @@ impl DeviceControlHandler {
             Ok(state) => Ok(MessageReturn::GetPerformanceState(state)),
             Err(e) => {
                 self.inspect.get_performance_state_errors.add(1);
-                Err(PowerManagerError::GenericError(e))
+                Err(CpuManagerError::GenericError(e))
             }
         }
     }
@@ -163,9 +164,9 @@ impl DeviceControlHandler {
     async fn handle_set_performance_state(
         &self,
         in_state: u32,
-    ) -> Result<MessageReturn, PowerManagerError> {
+    ) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
-            "power_manager",
+            "cpu_manager",
             "DeviceControlHandler::handle_set_performance_state",
             "driver" => self.driver_path.as_str(),
             "state" => in_state
@@ -176,7 +177,7 @@ impl DeviceControlHandler {
         let result = self.set_performance_state(in_state).await;
         log_if_err!(result, "Failed to set performance state");
         fuchsia_trace::instant!(
-            "power_manager",
+            "cpu_manager",
             "DeviceControlHandler::set_performance_state_result",
             fuchsia_trace::Scope::Thread,
             "driver" => self.driver_path.as_str(),
@@ -191,7 +192,7 @@ impl DeviceControlHandler {
             Err(e) => {
                 self.inspect.set_performance_state_errors.add(1);
                 self.inspect.last_set_performance_state_error.set(format!("{}", e).as_str());
-                Err(PowerManagerError::GenericError(e))
+                Err(CpuManagerError::GenericError(e))
             }
         }
     }
@@ -225,7 +226,7 @@ impl Node for DeviceControlHandler {
     ///
     /// Connects to the temperature driver unless a proxy was already provided (in a test).
     async fn init(&self) -> Result<(), Error> {
-        fuchsia_trace::duration!("power_manager", "DeviceControlHandler::init");
+        fuchsia_trace::duration!("cpu_manager", "DeviceControlHandler::init");
 
         // Connect to the driver. Typically this is None, but it may be set by tests.
         let mut option = self.driver_proxy.borrow_mut();
@@ -257,11 +258,11 @@ impl Node for DeviceControlHandler {
         Ok(())
     }
 
-    async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, PowerManagerError> {
+    async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, CpuManagerError> {
         match msg {
             Message::GetPerformanceState => self.handle_get_performance_state().await,
             Message::SetPerformanceState(state) => self.handle_set_performance_state(*state).await,
-            _ => Err(PowerManagerError::Unsupported),
+            _ => Err(CpuManagerError::Unsupported),
         }
     }
 }
@@ -351,8 +352,8 @@ pub mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_unsupported_msg() {
         let node = setup_simple_test_node().await;
-        match node.handle_message(&Message::ReadTemperature).await {
-            Err(PowerManagerError::Unsupported) => {}
+        match node.handle_message(&Message::GetCpuLoads).await {
+            Err(CpuManagerError::Unsupported) => {}
             e => panic!("Unexpected return value: {:?}", e),
         }
     }

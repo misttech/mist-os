@@ -1,12 +1,12 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::common_utils::result_debug_panic::ResultDebugPanic;
 use crate::error::PowerManagerError;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::shutdown_request::ShutdownRequest;
-use crate::utils::result_debug_panic::ResultDebugPanic;
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_input::{ControllerMarker, DeviceMarker, DeviceProxy};

@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::common_utils::get_current_timestamp;
 use crate::error::PowerManagerError;
 use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::types::{Celsius, Seconds, ThermalLoad};
-use crate::utils::{get_current_timestamp, CobaltIntHistogram, CobaltIntHistogramConfig};
+use crate::utils::{CobaltIntHistogram, CobaltIntHistogramConfig};
 use anyhow::{format_err, Context, Error, Result};
 use async_trait::async_trait;
 use fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector};

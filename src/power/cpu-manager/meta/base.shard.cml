@@ -1,0 +1,44 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    use: [
+        {
+            directory: "dev-topological",
+            rights: [ "r*" ],
+            path: "/dev",
+        },
+        {
+            directory: "config",
+            rights: [ "r*" ],
+            path: "/config",
+        },
+        {
+            protocol: [
+                "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.Stats",
+            ],
+        },
+        {
+            protocol: [
+                // Trace manager may be excluded from builds where tracing is not expected to be
+                // used for observability, such as in the bringup product and non-eng builds of any
+                // product.
+                "fuchsia.tracing.provider.Registry",
+            ],
+            availability: "optional",
+        },
+    ],
+    config: {
+        // Path to a node config file for the CPU Manager to use. Typically set as a default
+        // value, but can be overridden for integration tests.
+        node_config_path: {
+            type: "string",
+            max_size: 128,
+        },
+    },
+}

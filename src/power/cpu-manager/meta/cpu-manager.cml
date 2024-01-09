@@ -1,0 +1,11 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "//src/power/cpu-manager/meta/base.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/cpu_manager",
+        main_process_critical: "true",
+    },
+}
