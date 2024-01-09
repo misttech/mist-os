@@ -2,17 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("common/x64-common.gni")
-
-# Board configuration for Product Assembly
-board_configuration_label = "//boards/qemu-x64"
-
-board_name = "qemu-x64"
-
-# Supports only virtual devices.
-board_is_emu = true
-board_is_phys = false
-
-partitions_config_label = "//boards/partitions:qemu-x64"
-
-bazel_product_bundle_board = "qemu-x64"
+# The qemu-x64 board was originally intended to be different than x64 by
+# including virtualization drivers. We later added those drivers to the x64
+# board anyway, obviating the need for a special qemu-x64 board. Keeping the
+# qemu-x64 board around added maintenance burden, so we got rid of it
+# (https://fxbug.dev/293640613). However, we left this board file around as an
+# alias to avoid breaking developer flows.
+import("x64.gni")
