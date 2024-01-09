@@ -96,7 +96,7 @@ type DisplayConfig = struct {
 
 type Panel = flexible resource union {
     /// The i2c bus to use to read this display's EDID.
-    1: i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
+    1: i2c client_end:fuchsia.hardware.i2cimpl.Device;
     /// The display's parameters if an EDID is not present.
     2: params DisplayParams;
 };
@@ -107,8 +107,7 @@ type AddedDisplayArgs = resource struct {
 
     /// A flag indicating whether or not the display has a valid EDID.
     ///
-    /// If true, the device should provide a fuchsia.hardware.i2cimpl.I2cImpl
-    /// client in the `Panel` union.
+    /// If true, the device should provide an I2C client in the `Panel` union.
     ///
     /// If no EDID is present, then the meaning of display_config's mode
     /// structure is undefined, and drivers should ignore it in
