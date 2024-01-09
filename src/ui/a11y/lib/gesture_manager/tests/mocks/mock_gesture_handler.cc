@@ -4,6 +4,8 @@
 
 #include "src/ui/a11y/lib/gesture_manager/tests/mocks/mock_gesture_handler.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 namespace accessibility_test {
 
 bool MockGestureHandler::BindMFingerNTapAction(uint32_t num_fingers, uint32_t num_taps,

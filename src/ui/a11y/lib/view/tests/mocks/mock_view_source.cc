@@ -4,6 +4,8 @@
 
 #include "src/ui/a11y/lib/view/tests/mocks/mock_view_source.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 #include "src/ui/a11y/lib/view/tests/mocks/mock_view_semantics.h"
 
 namespace accessibility_test {

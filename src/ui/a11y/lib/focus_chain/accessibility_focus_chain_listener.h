@@ -5,6 +5,8 @@
 #ifndef SRC_UI_A11Y_LIB_FOCUS_CHAIN_ACCESSIBILITY_FOCUS_CHAIN_LISTENER_H_
 #define SRC_UI_A11Y_LIB_FOCUS_CHAIN_ACCESSIBILITY_FOCUS_CHAIN_LISTENER_H_
 
+#include <lib/syslog/cpp/macros.h>
+
 #include "src/lib/fxl/memory/weak_ptr.h"
 
 namespace a11y {

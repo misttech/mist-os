@@ -4,6 +4,8 @@
 
 #include "src/ui/a11y/testing/fake_a11y_manager.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 #include "fuchsia/ui/pointer/cpp/fidl.h"
 
 namespace a11y_testing {

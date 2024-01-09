@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/stdcompat/source_location.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
