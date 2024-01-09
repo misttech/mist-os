@@ -57,7 +57,7 @@
             },
             "17": {
                 "abi_revision": "0x30FA7BA4F2FF24E0",
-                "status": "in-development"
+                "status": "supported"
             }
         }
     },
