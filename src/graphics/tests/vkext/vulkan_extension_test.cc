@@ -121,7 +121,8 @@ bool VulkanExtensionTest::InitVulkan() {
   }
 
   std::vector<const char *> enabled_device_extensions{VK_FUCHSIA_EXTERNAL_MEMORY_EXTENSION_NAME,
-                                                      VK_FUCHSIA_BUFFER_COLLECTION_EXTENSION_NAME};
+                                                      VK_FUCHSIA_BUFFER_COLLECTION_EXTENSION_NAME,
+                                                      VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME};
   vk::DeviceCreateInfo device_info;
   device_info.pNext = device_supports_protected_memory_ ? &protected_memory : nullptr;
 
