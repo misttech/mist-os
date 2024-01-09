@@ -142,7 +142,7 @@ fn match_peer<'a>(pattern: &'a str, peer: &Peer) -> bool {
     let pattern_upper = &pattern.to_uppercase();
     peer.id.to_string().to_uppercase().contains(pattern_upper)
         || peer.address.to_string().to_uppercase().contains(pattern_upper)
-        || peer.name.as_ref().map_or(false, |p| p.contains(pattern))
+        || peer.name.as_ref().is_some_and(|p| p.contains(pattern))
 }
 
 /// Order connected peers as greater than unconnected peers and bonded peers greater than unbonded
@@ -495,8 +495,8 @@ fn print_peer_state_updates(state: &State, peer: &Peer) {
 
 fn peer_state_updates(state: &State, peer: &Peer) -> Option<String> {
     let previous = state.peers.get(&peer.id);
-    let was_connected = previous.map_or(false, |p| p.connected);
-    let was_bonded = previous.map_or(false, |p| p.bonded);
+    let was_connected = previous.is_some_and(|p| p.connected);
+    let was_bonded = previous.is_some_and(|p| p.bonded);
 
     let conn_str = match (was_connected, peer.connected) {
         (false, true) => Some("[connected]"),

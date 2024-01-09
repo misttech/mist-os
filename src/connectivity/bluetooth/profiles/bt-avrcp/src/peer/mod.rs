@@ -608,11 +608,11 @@ impl RemotePeer {
     }
 
     fn supports_target_browsing(&self) -> bool {
-        self.target_descriptor.map_or(false, |desc| desc.supports_browsing())
+        self.target_descriptor.is_some_and(|desc| desc.supports_browsing())
     }
 
     fn supports_controller_browsing(&self) -> bool {
-        self.controller_descriptor.map_or(false, |desc| desc.supports_browsing())
+        self.controller_descriptor.is_some_and(|desc| desc.supports_browsing())
     }
 
     fn set_metrics_node(&mut self, node: MetricsNode) {

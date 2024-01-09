@@ -324,7 +324,7 @@ pub mod expectation {
                     .advertising_state_changes
                     .last()
                     .and_then(|s| s.type_)
-                    .map_or(false, |t| t == type_)
+                    .is_some_and(|t| t == type_)
             },
             &descr,
         )
@@ -342,7 +342,7 @@ pub mod expectation {
                     .advertising_state_changes
                     .last()
                     .and_then(|s| s.advertising_data.as_ref())
-                    .map_or(false, |a| *a == data)
+                    .is_some_and(|a| *a == data)
             },
             &descr,
         )
@@ -360,7 +360,7 @@ pub mod expectation {
                     .advertising_state_changes
                     .last()
                     .and_then(|s| s.scan_response.as_ref())
-                    .map_or(false, |s| *s == data)
+                    .is_some_and(|s| *s == data)
             },
             &descr,
         )
@@ -383,7 +383,7 @@ pub mod expectation {
                     .advertising_state_changes
                     .last()
                     .and_then(|s| s.interval_max)
-                    .map_or(false, |i| i == to_slices(interval_ms))
+                    .is_some_and(|i| i == to_slices(interval_ms))
             },
             &descr,
         )
@@ -396,7 +396,7 @@ pub mod expectation {
         let descr = format!("emulated peer connection state was: {:?}", state);
         Predicate::predicate(
             move |s: &S| -> bool {
-                s.as_ref().connection_states.get(&address).map_or(false, |s| s.contains(&state))
+                s.as_ref().connection_states.get(&address).is_some_and(|s| s.contains(&state))
             },
             &descr,
         )
@@ -409,10 +409,7 @@ pub mod expectation {
         let descr = format!("emulated peer connection state is: {:?}", state);
         Predicate::predicate(
             move |s: &S| -> bool {
-                s.as_ref()
-                    .connection_states
-                    .get(&address)
-                    .map_or(false, |s| s.last() == Some(&state))
+                s.as_ref().connection_states.get(&address).is_some_and(|s| s.last() == Some(&state))
             },
             &descr,
         )

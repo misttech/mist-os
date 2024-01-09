@@ -277,7 +277,7 @@ impl ObexServer {
     /// Potentially initializes a new multi-step operation.
     /// Returns true if a new operation was initialized, false otherwise.
     fn maybe_start_new_operation(&mut self, code: &OpCode) -> bool {
-        if self.active_operation.as_ref().map_or(false, |o| !o.is_complete()) {
+        if self.active_operation.as_ref().is_some_and(|o| !o.is_complete()) {
             return false;
         }
 

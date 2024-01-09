@@ -219,7 +219,7 @@ impl SessionMultiplexer {
 
     /// Returns true if the parameters have been negotiated for the provided `dlci`.
     pub fn dlc_parameters_negotiated(&self, dlci: &DLCI) -> bool {
-        self.channels.get(dlci).map_or(false, |c| c.parameters_negotiated())
+        self.channels.get(dlci).is_some_and(|c| c.parameters_negotiated())
     }
 
     /// Sets the flow control mode of the RFCOMM channel associated with the `dlci` to use

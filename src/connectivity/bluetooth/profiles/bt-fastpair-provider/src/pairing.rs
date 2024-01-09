@@ -309,7 +309,11 @@ impl PairingManagerInspect {
     /// Saves the active pairing procedure to the inspect hierarchy.
     pub fn record_finished_procedure(&mut self, id: PeerId, at: fasync::Time) {
         let Some(bounded_list_node) = self.finished_procedures.as_mut() else { return };
-        let Some(ActiveProcedureInspect { start_time, inspect_node }) = self.active_procedures.remove(&id) else { return };
+        let Some(ActiveProcedureInspect { start_time, inspect_node }) =
+            self.active_procedures.remove(&id)
+        else {
+            return;
+        };
         let pairing_time_seconds = (at - start_time).into_seconds().try_into().unwrap_or(0);
         inspect_node.record_uint("pairing_time_seconds", pairing_time_seconds);
         let _ = bounded_list_node.add_entry(|node| {
@@ -587,7 +591,7 @@ impl PairingManager {
     /// upstream client.
     /// Returns Error if there is no such finished procedure or if the pairing handoff failed.
     pub fn complete_pairing_procedure(&mut self, le_id: PeerId) -> Result<(), Error> {
-        if !self.procedures.inner().get(&le_id).map_or(false, |p| p.is_complete()) {
+        if !self.procedures.inner().get(&le_id).is_some_and(|p| p.is_complete()) {
             return Err(Error::internal(&format!(
                 "Procedure with {le_id} is not in the correct state"
             )));

@@ -114,7 +114,7 @@ impl NotificationData {
                 let flag = self.current_value.pos != new_value.pos
                     || self.current_value.status != new_value.status
                     || self.current_value.media_info != new_value.media_info
-                    || self.expected_response_time.map_or(false, |t| fasync::Time::now() >= t);
+                    || self.expected_response_time.is_some_and(|t| fasync::Time::now() >= t);
                 Ok(flag)
             }
             fidl_avrcp::NotificationEvent::BattStatusChanged => {

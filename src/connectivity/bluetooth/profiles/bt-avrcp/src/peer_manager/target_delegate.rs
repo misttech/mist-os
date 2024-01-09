@@ -39,7 +39,7 @@ impl TargetDelegate {
     // Retrieves a clone of the current volume handler, if there is one, otherwise returns None.
     fn absolute_volume_handler(&self) -> Option<AbsoluteVolumeHandlerProxy> {
         let mut guard = self.inner.lock();
-        if guard.absolute_volume_handler.as_ref().map_or(false, Proxy::is_closed) {
+        if guard.absolute_volume_handler.as_ref().is_some_and(Proxy::is_closed) {
             guard.absolute_volume_handler = None;
         }
         guard.absolute_volume_handler.clone()
@@ -48,7 +48,7 @@ impl TargetDelegate {
     // Retrieves a clone of the current target handler, if there is one, otherwise returns None.
     fn target_handler(&self) -> Option<TargetHandlerProxy> {
         let mut guard = self.inner.lock();
-        if guard.target_handler.as_ref().map_or(false, Proxy::is_closed) {
+        if guard.target_handler.as_ref().is_some_and(Proxy::is_closed) {
             guard.target_handler = None;
         }
         guard.target_handler.clone()
@@ -58,7 +58,7 @@ impl TargetDelegate {
     /// If the delegate is already set, returns an Error.
     pub fn set_target_handler(&self, target_handler: TargetHandlerProxy) -> Result<(), Error> {
         let mut guard = self.inner.lock();
-        if guard.target_handler.as_ref().map_or(false, |p| !p.is_closed()) {
+        if guard.target_handler.as_ref().is_some_and(|p| !p.is_closed()) {
             return Err(Error::TargetBound);
         }
         guard.target_handler = Some(target_handler);
@@ -71,7 +71,7 @@ impl TargetDelegate {
         absolute_volume_handler: AbsoluteVolumeHandlerProxy,
     ) -> Result<(), Error> {
         let mut guard = self.inner.lock();
-        if guard.absolute_volume_handler.as_ref().map_or(false, |p| !p.is_closed()) {
+        if guard.absolute_volume_handler.as_ref().is_some_and(|p| !p.is_closed()) {
             return Err(Error::TargetBound);
         }
 

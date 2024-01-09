@@ -35,7 +35,7 @@ impl FastPairConnectionManager {
     }
 
     pub fn is_enabled(&self) -> bool {
-        self.watcher.as_ref().map_or(false, |h| !h.is_closed())
+        self.watcher.as_ref().is_some_and(|h| !h.is_closed())
     }
 
     pub fn set(&mut self, watcher: ProviderWatcherProxy) -> Result<(), Error> {

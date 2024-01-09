@@ -278,7 +278,7 @@ impl Peer {
         &self,
     ) -> impl Future<Output = avdtp::Result<Vec<avdtp::StreamEndpoint>>> {
         let avdtp = self.avdtp();
-        let get_all = self.descriptor.lock().map_or(false, a2dp_version_check);
+        let get_all = self.descriptor.lock().is_some_and(a2dp_version_check);
         let inner = self.inner.clone();
         let metrics = self.metrics.clone();
         let peer_id = self.id;
@@ -800,7 +800,7 @@ impl PeerInner {
         let stream = self.get_mut(&local_id).map_err(|e| avdtp::Error::RequestInvalid(e))?;
         // The streaming permit can be revoked while stream setup is in progress. If so, return
         // without starting the local stream.
-        if permit.as_ref().map_or(false, |p| !p.is_held()) {
+        if permit.as_ref().is_some_and(|p| !p.is_held()) {
             return Err(avdtp::Error::Other(anyhow::format_err!(
                 "streaming permit revoked during setup"
             )));

@@ -410,7 +410,7 @@ impl ServiceLevelConnection {
 
     /// Cleans up the `procedure` and returns true if it has completed.
     fn check_and_cleanup_procedure(&mut self, procedure: &ProcedureMarker) -> bool {
-        let is_terminated = self.procedures.get(procedure).map_or(false, |p| p.is_terminated());
+        let is_terminated = self.procedures.get(procedure).is_some_and(|p| p.is_terminated());
 
         if is_terminated {
             let mut finished_procedure =

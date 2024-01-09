@@ -61,7 +61,7 @@ impl RfcommSession {
     }
 
     fn is_active(&self, server_channel: &ServerChannel) -> bool {
-        self.active_channels.get(server_channel).map_or(false, |s| !s.is_closed())
+        self.active_channels.get(server_channel).is_some_and(|s| !s.is_closed())
     }
 
     fn close_rfcomm_channel(&mut self, server_channel: &ServerChannel) -> bool {

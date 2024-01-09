@@ -154,7 +154,7 @@ impl RfcommServer {
     /// active.
     /// An RFCOMM Session is active if there is a currently running processing task.
     pub fn is_active_session(&mut self, id: &PeerId) -> bool {
-        self.sessions.get(id).map_or(false, |session| session.upgrade().is_some())
+        self.sessions.get(id).is_some_and(|session| session.upgrade().is_some())
     }
 
     /// Returns the number of available server channels in this server.

@@ -38,19 +38,19 @@ struct BatteryClient {
 }
 
 fn is_battery_service(info: &gatt::ServiceInfo) -> bool {
-    info.type_.map_or(false, |t| t == BATTERY_SERVICE_UUID.into())
+    info.type_.is_some_and(|t| t == BATTERY_SERVICE_UUID.into())
 }
 
 fn is_battery_level(char: &gatt::Characteristic) -> bool {
-    char.type_.map_or(false, |t| t == BATTERY_LEVEL_UUID.into())
+    char.type_.is_some_and(|t| t == BATTERY_LEVEL_UUID.into())
 }
 
 fn is_readable(char: &gatt::Characteristic) -> bool {
-    char.properties.map_or(false, |p| p.contains(gatt::CharacteristicPropertyBits::READ))
+    char.properties.is_some_and(|p| p.contains(gatt::CharacteristicPropertyBits::READ))
 }
 
 fn is_notifiable(char: &gatt::Characteristic) -> bool {
-    char.properties.map_or(false, |p| p.contains(gatt::CharacteristicPropertyBits::NOTIFY))
+    char.properties.is_some_and(|p| p.contains(gatt::CharacteristicPropertyBits::NOTIFY))
 }
 
 /// Attempts to parse the GATT Read `result` and return a battery value in the range [0, 100].
@@ -91,7 +91,11 @@ fn read_services(services: Vec<gatt::ServiceInfo>) -> Result<gatt::ServiceHandle
 async fn watch_battery_level(id: PeerId, mut stream: gatt::CharacteristicNotifierRequestStream) {
     while let Some(notification) = stream.next().await {
         // `OnNotification` is the only request type in this protocol.
-        let Ok((notif, responder)) = notification.map(|n| n.into_on_notification().expect("only request")) else { continue };
+        let Ok((notif, responder)) =
+            notification.map(|n| n.into_on_notification().expect("only request"))
+        else {
+            continue;
+        };
         let _ = responder.send();
         match read_battery_level(notif) {
             Ok(battery_percent) => info!(%id, "Battery level: {battery_percent}"),
