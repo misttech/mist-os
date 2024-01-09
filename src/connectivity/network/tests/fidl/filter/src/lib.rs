@@ -10,6 +10,7 @@ use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _};
+use itertools::Itertools as _;
 use netstack_testing_common::{
     realms::{Netstack3, TestSandboxExt as _},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
@@ -421,4 +422,118 @@ async fn on_id_assigned(name: &str) {
 
     let controller = open_new_controller().await;
     assert_eq!(controller.id(), &controller_id);
+}
+
+#[netstack_test]
+async fn drop_controller_removes_resources(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let controller_id = fnet_filter_ext::ControllerId(String::from("test"));
+    let mut controller = fnet_filter_ext::Controller::new(&control, &controller_id)
+        .await
+        .expect("create controller");
+
+    // Create some resources with the controller.
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine::test_value()),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule::test_value()),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+
+    // Observe existing resources and ensure we see what was added.
+    let observed: HashMap<_, _> =
+        fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get existing");
+    assert_eq!(
+        observed,
+        HashMap::from([(
+            controller.id().clone(),
+            resources
+                .iter()
+                .cloned()
+                .map(|resource| (resource.id(), resource))
+                .collect::<HashMap<_, _>>(),
+        )])
+    );
+
+    // Drop the controller and ensure that the resources it owned are removed.
+    drop(controller);
+
+    let mut resources =
+        resources.into_iter().map(|resource| (resource.id(), resource)).collect::<HashMap<_, _>>();
+    while !resources.is_empty() {
+        let (id, resource) = assert_matches!(
+            stream.next().await,
+            Some(Ok(fnet_filter_ext::Event::Removed(id, resource))) => (id, resource),
+            "resource lifetime should be scoped to controller handle"
+        );
+        assert_eq!(id, controller_id);
+        assert_matches!(resources.remove(&resource), Some(_));
+    }
+    assert_matches!(
+        stream.next().await,
+        Some(Ok(fnet_filter_ext::Event::EndOfUpdate)),
+        "transactional updates should be demarcated with EndOfUpdate event"
+    );
+}
+
+#[netstack_test]
+async fn too_many_changes(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    let mut controller = fnet_filter_ext::Controller::new(
+        &control,
+        &fnet_filter_ext::ControllerId(String::from("test")),
+    )
+    .await
+    .expect("create controller");
+
+    let changes = [
+        fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::test_value()),
+        fnet_filter_ext::Change::Remove(fnet_filter_ext::ResourceId::test_value()),
+    ]
+    .into_iter()
+    .cycle();
+
+    // Commit a change of the maximum size.
+    for batch in &changes
+        .clone()
+        .take(fnet_filter::MAX_COMMIT_SIZE.into())
+        .chunks(fnet_filter::MAX_BATCH_SIZE.into())
+    {
+        controller.push_changes(batch.collect()).await.expect("push changes");
+    }
+    controller.commit().await.expect("commit changes");
+
+    // Push one more change than `MAX_COMMIT_SIZE` and ensure we get the
+    // expected error.
+    for batch in &changes
+        .clone()
+        .take(fnet_filter::MAX_COMMIT_SIZE.into())
+        .chunks(fnet_filter::MAX_BATCH_SIZE.into())
+    {
+        controller.push_changes(batch.collect()).await.expect("push changes");
+    }
+    assert_matches!(
+        controller.push_changes(changes.take(1).collect()).await,
+        Err(fnet_filter_ext::PushChangesError::TooManyChanges)
+    );
+    // Committing should still succeed because the final change was not pushed
+    // to the server.
+    controller.commit().await.expect("commit changes");
 }
