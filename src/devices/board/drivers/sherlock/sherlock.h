@@ -95,7 +95,6 @@ class Sherlock : public SherlockType {
   zx_status_t ButtonsInit();
   zx_status_t AudioInit();
   zx_status_t ThermalInit();
-  zx_status_t TouchInit();
   zx_status_t LightInit();
   zx_status_t OtRadioInit();
   zx_status_t BacklightInit();

@@ -107,10 +107,6 @@ int Astro::Thread() {
     zxlogf(ERROR, "UsbInit failed: %d", status);
   }
 
-  if ((status = TouchInit()) != ZX_OK) {
-    zxlogf(ERROR, "TouchInit failed: %d", status);
-  }
-
   if ((status = DsiInit()) != ZX_OK) {
     zxlogf(ERROR, "DsiInit failed: %d", status);
   }

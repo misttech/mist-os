@@ -22,6 +22,7 @@ fuchsia_driver("post-init-driver") {
   sources = [
     "display.cc",
     "post-init.cc",
+    "touch.cc",
   ]
   deps = [
     ":sherlock-post-init-bind",
@@ -37,9 +38,12 @@ fuchsia_driver("post-init-driver") {
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.t931:fuchsia.amlogic.platform.t931_cpp",
     "//src/devices/bind/fuchsia.display.dsi:fuchsia.display.dsi_cpp",
+    "//src/devices/bind/fuchsia.focaltech.platform:fuchsia.focaltech.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
+    "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/lib/amlogic",
+    "//src/devices/lib/focaltech",
     "//src/graphics/display/lib/device-protocol-display",
     "//src/lib/ddk:ddk-metadata-headers",
     "//zircon/system/ulib/ddk-platform-defs",

@@ -3,29 +3,19 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/binding.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/focaltech/focaltech.h>
-#include <limits.h>
-#include <unistd.h>
 
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/focaltech/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
-#include <bind/fuchsia/ti/platform/cpp/bind.h>
-#include <fbl/algorithm.h>
-#include <soc/aml-t931/t931-gpio.h>
-#include <soc/aml-t931/t931-hw.h>
 
-#include "sherlock-gpios.h"
-#include "sherlock.h"
+#include "src/devices/board/drivers/sherlock/post-init/post-init.h"
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -33,7 +23,7 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 const std::vector kI2cRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(SHERLOCK_I2C_2)),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                             bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
@@ -67,12 +57,12 @@ const std::vector kResetProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
 };
 
-zx_status_t Sherlock::TouchInit() {
+zx::result<> PostInit::InitTouch() {
   static const FocaltechMetadata device_info = {
       .device_id = FOCALTECH_DEVICE_FT5726,
       .needs_firmware = true,
-      .display_vendor = GetDisplayVendor(),
-      .ddic_version = GetDdicVersion(),
+      .display_vendor = static_cast<uint8_t>(display_vendor_),
+      .ddic_version = static_cast<uint8_t>(ddic_version_),
   };
 
   fpbus::Node dev;
@@ -112,16 +102,16 @@ zx_status_t Sherlock::TouchInit() {
   fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev), fidl::ToWire(fidl_arena, composite_node_spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
-    return result.status();
+    FDF_LOG(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Failed to add composite node spec: %s",
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "Failed to add composite node spec: %s",
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace sherlock

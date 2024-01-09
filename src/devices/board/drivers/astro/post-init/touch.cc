@@ -4,16 +4,11 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/binding.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/focaltech/focaltech.h>
-#include <limits.h>
-#include <unistd.h>
 
 #include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -21,12 +16,8 @@
 #include <bind/fuchsia/goodix/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
-#include <fbl/algorithm.h>
-#include <soc/aml-s905d2/s905d2-gpio.h>
-#include <soc/aml-s905d2/s905d2-hw.h>
 
-#include "astro-gpios.h"
-#include "astro.h"
+#include "src/devices/board/drivers/astro/post-init/post-init.h"
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -68,44 +59,44 @@ const std::vector kFocaltechResetProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
 };
 
-const ddk::BindRule kGoodixI2cRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+const std::vector kGoodixI2cRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
-    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                             bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
-const device_bind_prop_t kGoodixI2cProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-    ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+const std::vector kGoodixI2cProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
                       bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
-const ddk::BindRule kGoodixInterruptRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+const std::vector kGoodixInterruptRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_4),
 };
 
-const device_bind_prop_t kGoodixInterruptProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
+const std::vector kGoodixInterruptProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
-const ddk::BindRule kGoodixResetRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+const std::vector kGoodixResetRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_9),
 };
 
-const device_bind_prop_t kGoodixResetProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
+const std::vector kGoodixResetProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
 };
 
-zx_status_t AddFocaltechTouch(
+zx::result<> AddFocaltechTouch(
     fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
   static const FocaltechMetadata device_info = {
       .device_id = FOCALTECH_DEVICE_FT3X27,
@@ -149,49 +140,58 @@ zx_status_t AddFocaltechTouch(
   fdf::WireUnownedResult result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev), fidl::ToWire(fidl_arena, composite_node_spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
-    return result.status();
+    FDF_LOG(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Failed to add composite node spec: %s",
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "Failed to add composite node spec: %s",
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Astro::TouchInit() {
-  // Check the display ID pin to determine which driver device to add
-  gpio_impl_.SetAltFunction(S905D2_GPIOH(5), 0);
-  gpio_impl_.ConfigIn(S905D2_GPIOH(5), GPIO_NO_PULL);
-  uint8_t gpio_state;
+zx::result<> PostInit::InitTouch() {
   /* Two variants of display are supported, one with BOE display panel and
         ft3x27 touch controller, the other with INX panel and Goodix touch
         controller.  This GPIO input is used to identify each.
         Logic 0 for BOE/ft3x27 combination
         Logic 1 for Innolux/Goodix combination
   */
-  gpio_impl_.Read(S905D2_GPIOH(5), &gpio_state);
 
-  if (gpio_state) {
-    auto status = DdkAddCompositeNodeSpec(
-        "gt92xx_touch", ddk::CompositeNodeSpec(kGoodixI2cRules, kGoodixI2cProperties)
-                            .AddParentSpec(kGoodixInterruptRules, kGoodixInterruptProperties)
-                            .AddParentSpec(kGoodixResetRules, kGoodixResetProperties));
-    if (status != ZX_OK) {
-      zxlogf(INFO, "gt92xx: DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));
-      return status;
+  if (display_id_) {
+    const std::vector<fuchsia_driver_framework::ParentSpec> goodix_parents{
+        {{kGoodixI2cRules, kGoodixI2cProperties}},
+        {{kGoodixInterruptRules, kGoodixInterruptProperties}},
+        {{kGoodixResetRules, kGoodixResetProperties}},
+    };
+
+    const fuchsia_driver_framework::CompositeNodeSpec goodix_node_spec{{
+        .name = "gt92xx_touch",
+        .parents = goodix_parents,
+    }};
+
+    if (auto result = composite_manager_->AddSpec(goodix_node_spec); result.is_error()) {
+      if (result.error_value().is_framework_error()) {
+        FDF_LOG(ERROR, "Call to AddSpec failed: %s",
+                result.error_value().framework_error().FormatDescription().c_str());
+        return zx::error(result.error_value().framework_error().status());
+      }
+      if (result.error_value().is_domain_error()) {
+        FDF_LOG(ERROR, "AddSpec failed");
+        return zx::error(ZX_ERR_INTERNAL);
+      }
     }
   } else {
     auto status = AddFocaltechTouch(pbus_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "ft3x27: DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));
+    if (!status.is_ok()) {
+      FDF_LOG(ERROR, "ft3x27: DdkAddCompositeNodeSpec failed: %s", status.status_string());
       return status;
     }
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace astro

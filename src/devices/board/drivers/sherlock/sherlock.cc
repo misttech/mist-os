@@ -285,11 +285,6 @@ int Sherlock::Start() {
     zxlogf(ERROR, "ButtonsInit() failed");
   }
 
-  if (TouchInit() != ZX_OK) {
-    zxlogf(ERROR, "TouchInit() failed");
-    return -1;
-  }
-
   if (OtRadioInit() != ZX_OK) {
     zxlogf(ERROR, "OtRadioInit() failed");
   }
