@@ -18,6 +18,8 @@
 
 #include <algorithm>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -33,14 +35,31 @@ constexpr double kEpsilon = 0.5f;
 
 // TODO(https://fxbug.dev/125831): Two coordinates (x/y) systems can differ in scale (size of pixels).
 void ExpectLocationAndPhase(
+    const std::string& scoped_message,
     const fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest& e, double expected_x,
-    double expected_y, fuchsia::ui::pointer::EventPhase expected_phase) {
+    double expected_y, fuchsia::ui::pointer::EventPhase expected_phase,
+    const uint32_t expected_pointer_id) {
+  SCOPED_TRACE(scoped_message);
   auto pixel_scale = e.has_device_pixel_ratio() ? e.device_pixel_ratio() : 1;
   auto actual_x = pixel_scale * e.local_x();
   auto actual_y = pixel_scale * e.local_y();
   EXPECT_NEAR(expected_x, actual_x, kEpsilon);
   EXPECT_NEAR(expected_y, actual_y, kEpsilon);
   EXPECT_EQ(expected_phase, e.phase());
+  EXPECT_EQ(expected_pointer_id, e.pointer_id());
+}
+
+// Input stack does not guarantee the order of pointer in 1 contact report.
+// So tests sort the request vector by pointer id and keep the order of
+// event time.
+void SortTouchInputRequestByTimeAndTimestampAndPointerId(
+    std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>& requests) {
+  std::sort(requests.begin(), requests.end(), [](const auto& a, const auto& b) {
+    if (a.time_received() != b.time_received()) {
+      return a.time_received() < b.time_received();
+    }
+    return a.pointer_id() < b.pointer_id();
+  });
 }
 
 class TouchListener : public fuchsia::ui::test::input::TouchInputListener {
@@ -61,6 +80,18 @@ class TouchListener : public fuchsia::ui::test::input::TouchInputListener {
   const std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>&
   events_received() {
     return events_received_;
+  }
+
+  std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>
+  cloned_events_received() {
+    auto res = std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>();
+    for (auto& req : events_received_) {
+      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest clone;
+      req.Clone(&clone);
+      res.push_back(std::move(clone));
+    }
+
+    return res;
   }
 
   bool LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase phase) {
@@ -207,9 +238,112 @@ TEST_F(SingleViewTouchConformanceTest, SimpleTap) {
   // pixel ratio is 1. Therefore, the puppet's logical coordinate space will
   // match the physical coordinate space, so we expect the puppet to report
   // the event at (kTapX, kTapY).
-  ExpectLocationAndPhase(events_received[0], kTapX, kTapY, fuchsia::ui::pointer::EventPhase::ADD);
-  ExpectLocationAndPhase(events_received[1], kTapX, kTapY,
-                         fuchsia::ui::pointer::EventPhase::REMOVE);
+  ExpectLocationAndPhase("[0]", events_received[0], kTapX, kTapY,
+                         fuchsia::ui::pointer::EventPhase::ADD, 1);
+  ExpectLocationAndPhase("[1]", events_received[1], kTapX, kTapY,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+}
+
+// Send input report contains 3 contacts and then release all of them to
+// simultate multi touch down on touchscreen. UI client expects 3 touch
+// add events, and 3 touch remove events.
+TEST_F(SingleViewTouchConformanceTest, MultiTap) {
+  const int kTap1X = 3 * display_width_as_int() / 4;
+  const int kTapY = display_height_as_int() / 4;
+  const int kTap0X = kTap1X - 5;
+  const int kTap2X = kTap1X + 5;
+
+  fuchsia::ui::test::input::TouchScreenSimulateMultiTapRequest multi_tap_req;
+  multi_tap_req.mutable_tap_locations()->push_back({.x = kTap0X, .y = kTapY});
+  multi_tap_req.mutable_tap_locations()->push_back({.x = kTap1X, .y = kTapY});
+  multi_tap_req.mutable_tap_locations()->push_back({.x = kTap2X, .y = kTapY});
+  FX_LOGS(INFO) << "Injecting tap at (" << kTap0X << ", " << kTapY << ") (" << kTap1X << ", "
+                << kTapY << ") (" << kTap2X << ", " << kTapY << ")";
+  fake_touch_screen_->SimulateMultiTap(std::move(multi_tap_req));
+
+  FX_LOGS(INFO) << "Waiting for touch event listener to receive response";
+
+  // There are 3 * touch down and 3 * touch remove, totally 6 events.
+  const size_t kExpectedEventCounts = 6;
+  RunLoopUntil([this]() {
+    return this->puppet_->touch_listener.events_received().size() >= kExpectedEventCounts;
+  });
+
+  auto events_received = this->puppet_->touch_listener.cloned_events_received();
+  ASSERT_EQ(events_received.size(), kExpectedEventCounts);
+
+  SortTouchInputRequestByTimeAndTimestampAndPointerId(events_received);
+
+  ExpectLocationAndPhase("add [0]", events_received[0], kTap0X, kTapY,
+                         fuchsia::ui::pointer::EventPhase::ADD, 0);
+  ExpectLocationAndPhase("add [1]", events_received[1], kTap1X, kTapY,
+                         fuchsia::ui::pointer::EventPhase::ADD, 1);
+  ExpectLocationAndPhase("add [2]", events_received[2], kTap2X, kTapY,
+                         fuchsia::ui::pointer::EventPhase::ADD, 2);
+
+  ExpectLocationAndPhase("remove [0]", events_received[3], kTap0X, kTapY,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 0);
+  ExpectLocationAndPhase("remove [1]", events_received[4], kTap1X, kTapY,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+  ExpectLocationAndPhase("remove [2]", events_received[5], kTap2X, kTapY,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 2);
+}
+
+// 2 finger contact then move apart horizontally to simulate pinch zoom.
+// UI Client expects touch add, touch change and touch remove for
+// 2 fingers.
+TEST_F(SingleViewTouchConformanceTest, Pinch) {
+  const int kTapX = 3 * display_width_as_int() / 4;
+  const int kTapY = display_height_as_int() / 4;
+
+  fuchsia::ui::test::input::TouchScreenSimulateMultiFingerGestureRequest pinch_req;
+  pinch_req.set_start_locations({fuchsia::math::Vec{.x = kTapX - 5, .y = kTapY},
+                                 fuchsia::math::Vec{.x = kTapX + 5, .y = kTapY}});
+  pinch_req.set_end_locations({fuchsia::math::Vec{.x = kTapX - 20, .y = kTapY},
+                               fuchsia::math::Vec{.x = kTapX + 20, .y = kTapY}});
+  pinch_req.set_move_event_count(3);
+  pinch_req.set_finger_count(2);
+  FX_LOGS(INFO) << "Injecting pinch from (" << pinch_req.start_locations()[0].x << ", "
+                << pinch_req.start_locations()[0].y << ") (" << pinch_req.start_locations()[1].x
+                << ", " << pinch_req.start_locations()[1].y << ") to ("
+                << pinch_req.end_locations()[0].x << ", " << pinch_req.end_locations()[0].y << ") ("
+                << pinch_req.end_locations()[1].x << ", " << pinch_req.end_locations()[1].y
+                << ") with move_event_count = " << pinch_req.move_event_count();
+  fake_touch_screen_->SimulateMultiFingerGesture(std::move(pinch_req));
+
+  FX_LOGS(INFO) << "Waiting for touch event listener to receive response";
+
+  // There are 2 * touch down + 4 * touch change + 2 * touch remove, totally 8 events.
+  const size_t kExpectedEventCounts = 8;
+
+  RunLoopUntil([this]() {
+    return this->puppet_->touch_listener.events_received().size() >= kExpectedEventCounts;
+  });
+
+  auto events_received = this->puppet_->touch_listener.cloned_events_received();
+  ASSERT_EQ(events_received.size(), kExpectedEventCounts);
+
+  SortTouchInputRequestByTimeAndTimestampAndPointerId(events_received);
+
+  ExpectLocationAndPhase("add [0]", events_received[0], kTapX - 5, kTapY,
+                         fuchsia::ui::pointer::EventPhase::ADD, 0);
+  ExpectLocationAndPhase("add [1]", events_received[1], kTapX + 5, kTapY,
+                         fuchsia::ui::pointer::EventPhase::ADD, 1);
+
+  ExpectLocationAndPhase("change [0] 1", events_received[2], kTapX - 10, kTapY,
+                         fuchsia::ui::pointer::EventPhase::CHANGE, 0);
+  ExpectLocationAndPhase("change [1] 1", events_received[3], kTapX + 10, kTapY,
+                         fuchsia::ui::pointer::EventPhase::CHANGE, 1);
+
+  ExpectLocationAndPhase("change [0] 2", events_received[4], kTapX - 15, kTapY,
+                         fuchsia::ui::pointer::EventPhase::CHANGE, 0);
+  ExpectLocationAndPhase("change [1] 2", events_received[5], kTapX + 15, kTapY,
+                         fuchsia::ui::pointer::EventPhase::CHANGE, 1);
+
+  ExpectLocationAndPhase("remove [1]", events_received[6], kTapX - 15, kTapY,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 0);
+  ExpectLocationAndPhase("remove [2]", events_received[7], kTapX + 15, kTapY,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
 }
 
 class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
@@ -335,10 +469,127 @@ TEST_F(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
   // in the child's local coordinate space.
   const double quarter_display_width = static_cast<double>(display_width_) / 4.f;
   const double quarter_display_height = static_cast<double>(display_height_) / 4.f;
-  ExpectLocationAndPhase(events_received[0], quarter_display_width, quarter_display_height,
-                         fuchsia::ui::pointer::EventPhase::ADD);
-  ExpectLocationAndPhase(events_received[1], quarter_display_width, quarter_display_height,
-                         fuchsia::ui::pointer::EventPhase::REMOVE);
+  ExpectLocationAndPhase("[0]", events_received[0], quarter_display_width, quarter_display_height,
+                         fuchsia::ui::pointer::EventPhase::ADD, 1);
+  ExpectLocationAndPhase("[1]", events_received[1], quarter_display_width, quarter_display_height,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+
+  // The parent should not have received any pointer events.
+  EXPECT_TRUE(this->parent_puppet_->touch_listener.events_received().empty());
+}
+
+// Send input report contains 3 contacts and then release all of them to
+// simultate multi touch down on touchscreen. Embedded view expects 3 touch
+// add events, and 3 touch remove events. And no events on parenet view.
+TEST_F(EmbeddedViewTouchConformanceTest, EmbeddedViewMultiTap) {
+  const int kTap1X = 3 * display_width_as_int() / 4;
+  const int kTapY = 3 * display_height_as_int() / 4;
+  const int kTap0X = kTap1X - 5;
+  const int kTap2X = kTap1X + 5;
+
+  fuchsia::ui::test::input::TouchScreenSimulateMultiTapRequest multi_tap_req;
+  multi_tap_req.mutable_tap_locations()->push_back({.x = kTap0X, .y = kTapY});
+  multi_tap_req.mutable_tap_locations()->push_back({.x = kTap1X, .y = kTapY});
+  multi_tap_req.mutable_tap_locations()->push_back({.x = kTap2X, .y = kTapY});
+  FX_LOGS(INFO) << "Injecting tap at (" << kTap0X << ", " << kTapY << ") (" << kTap1X << ", "
+                << kTapY << ") (" << kTap2X << ", " << kTapY << ")";
+  fake_touch_screen_->SimulateMultiTap(std::move(multi_tap_req));
+
+  FX_LOGS(INFO) << "Waiting for touch event listener to receive response";
+  // There are 3 * touch down and 3 * touch remove, totally 6 events.
+  const size_t kExpectedEventCounts = 6;
+
+  RunLoopUntil([this]() {
+    return this->child_puppet_->touch_listener.events_received().size() >= kExpectedEventCounts;
+  });
+
+  auto events_received = this->child_puppet_->touch_listener.cloned_events_received();
+  ASSERT_EQ(events_received.size(), kExpectedEventCounts);
+
+  const double kTap1XChildView = static_cast<double>(display_width_) / 4.f;
+  const double kTapYChildView = static_cast<double>(display_height_) / 4.f;
+  const double kTap0XChildView = kTap1XChildView - 5;
+  const double kTap2XChildView = kTap1XChildView + 5;
+
+  SortTouchInputRequestByTimeAndTimestampAndPointerId(events_received);
+
+  ExpectLocationAndPhase("add [0]", events_received[0], kTap0XChildView, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::ADD, 0);
+  ExpectLocationAndPhase("add [1]", events_received[1], kTap1XChildView, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::ADD, 1);
+  ExpectLocationAndPhase("add [2]", events_received[2], kTap2XChildView, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::ADD, 2);
+
+  ExpectLocationAndPhase("remove [1]", events_received[3], kTap0XChildView, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 0);
+  ExpectLocationAndPhase("remove [2]", events_received[4], kTap1XChildView, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+  ExpectLocationAndPhase("remove [3]", events_received[5], kTap2XChildView, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 2);
+
+  // The parent should not have received any pointer events.
+  EXPECT_TRUE(this->parent_puppet_->touch_listener.events_received().empty());
+}
+
+// 2 finger contact then move apart horizontally to simulate pinch zoom.
+// Embededd view expects touch add, touch change and touch remove for
+// 2 fingers.
+TEST_F(EmbeddedViewTouchConformanceTest, Pinch) {
+  const int kTapX = 3 * display_width_as_int() / 4;
+  const int kTapY = 3 * display_height_as_int() / 4;
+
+  fuchsia::ui::test::input::TouchScreenSimulateMultiFingerGestureRequest pinch_req;
+  pinch_req.set_start_locations({fuchsia::math::Vec{.x = kTapX - 5, .y = kTapY},
+                                 fuchsia::math::Vec{.x = kTapX + 5, .y = kTapY}});
+  pinch_req.set_end_locations({fuchsia::math::Vec{.x = kTapX - 20, .y = kTapY},
+                               fuchsia::math::Vec{.x = kTapX + 20, .y = kTapY}});
+  pinch_req.set_move_event_count(3);
+  pinch_req.set_finger_count(2);
+
+  FX_LOGS(INFO) << "Injecting pinch from (" << pinch_req.start_locations()[0].x << ", "
+                << pinch_req.start_locations()[0].y << ") (" << pinch_req.start_locations()[1].x
+                << ", " << pinch_req.start_locations()[1].y << ") to ("
+                << pinch_req.end_locations()[0].x << ", " << pinch_req.end_locations()[0].y << ") ("
+                << pinch_req.end_locations()[1].x << ", " << pinch_req.end_locations()[1].y
+                << ") with move_event_count = " << pinch_req.move_event_count();
+  fake_touch_screen_->SimulateMultiFingerGesture(std::move(pinch_req));
+
+  FX_LOGS(INFO) << "Waiting for touch event listener to receive response";
+
+  // There are 2 * touch down + 4 * touch change + 2 * touch remove, totally 8 events.
+  const size_t kExpectedEventCounts = 8;
+
+  RunLoopUntil([this]() {
+    return this->child_puppet_->touch_listener.events_received().size() >= kExpectedEventCounts;
+  });
+
+  auto events_received = this->child_puppet_->touch_listener.cloned_events_received();
+  ASSERT_EQ(events_received.size(), kExpectedEventCounts);
+
+  const int kTapXChildView = display_width_as_int() / 4;
+  const int kTapYChildView = display_height_as_int() / 4;
+
+  SortTouchInputRequestByTimeAndTimestampAndPointerId(events_received);
+
+  ExpectLocationAndPhase("add [0]", events_received[0], kTapXChildView - 5, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::ADD, 0);
+  ExpectLocationAndPhase("add [1]", events_received[1], kTapXChildView + 5, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::ADD, 1);
+
+  ExpectLocationAndPhase("change [0] 1", events_received[2], kTapXChildView - 10, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::CHANGE, 0);
+  ExpectLocationAndPhase("change [1] 1", events_received[3], kTapXChildView + 10, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::CHANGE, 1);
+
+  ExpectLocationAndPhase("change [0] 2", events_received[4], kTapXChildView - 15, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::CHANGE, 0);
+  ExpectLocationAndPhase("change [1] 2", events_received[5], kTapXChildView + 15, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::CHANGE, 1);
+
+  ExpectLocationAndPhase("remove [0]", events_received[6], kTapXChildView - 15, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 0);
+  ExpectLocationAndPhase("remove [1]", events_received[7], kTapXChildView + 15, kTapYChildView,
+                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
 
   // The parent should not have received any pointer events.
   EXPECT_TRUE(this->parent_puppet_->touch_listener.events_received().empty());

@@ -330,6 +330,7 @@ async fn handle_touchscreen_request_stream(
                 let start_location = payload.start_location.expect("missing start location");
                 let end_location = payload.end_location.expect("missing end location");
                 let move_event_count = payload.move_event_count.expect("missing move event count");
+                assert_ne!(move_event_count, 0);
 
                 let start_x_f = start_location.x as f64;
                 let start_y_f = start_location.y as f64;
@@ -361,11 +362,73 @@ async fn handle_touchscreen_request_stream(
 
                 responder.send().expect("Failed to send SimulateSwipe response");
             }
-            Ok(TouchScreenRequest::SimulateMultiTap { payload: _, responder: _ }) => {
-                todo!();
+            Ok(TouchScreenRequest::SimulateMultiTap { payload, responder }) => {
+                let tap_locations = payload.tap_locations.expect("missing tap locations");
+                touchscreen_device
+                    .send_input_report(input_report_for_touch_contacts(
+                        tap_locations
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, it)| (i as u32, it))
+                            .collect(),
+                    ))
+                    .expect("Failed to send tap input report");
+
+                // Send a report with an empty set of touch contacts, so that input
+                // pipeline generates a pointer event with phase == UP.
+                touchscreen_device
+                    .send_input_report(input_report_for_touch_contacts(vec![]))
+                    .expect("failed to send empty input report");
+                responder.send().expect("Failed to send SimulateMultiTap response");
             }
-            Ok(TouchScreenRequest::SimulateMultiFingerGesture { payload: _, responder: _ }) => {
-                todo!();
+            Ok(TouchScreenRequest::SimulateMultiFingerGesture { payload, responder }) => {
+                // Compute the x- and y- displacements between successive touch events.
+                let start_locations = payload.start_locations.expect("missing start locations");
+                let end_locations = payload.end_locations.expect("missing end locations");
+                let move_event_count = payload.move_event_count.expect("missing move event count");
+                let finger_count = payload.finger_count.expect("missing finger count") as usize;
+
+                let move_event_count_f = move_event_count as f32;
+
+                let mut steps: Vec<math::VecF> = vec![];
+
+                for finger in 0..finger_count {
+                    let start_x = start_locations[finger].x as f32;
+                    let start_y = start_locations[finger].y as f32;
+                    let end_x = end_locations[finger].x as f32;
+                    let end_y = end_locations[finger].y as f32;
+                    let step_x = (end_x - start_x) / move_event_count_f;
+                    let step_y = (end_y - start_y) / move_event_count_f;
+                    steps.push(math::VecF { x: step_x, y: step_y });
+                }
+
+                // Generate an event at `start_location`, followed by `move_event_count - 1`
+                // evenly-spaced events, followed by an event at `end_location`.
+                for i in 0..move_event_count {
+                    let i_f = i as f32;
+
+                    let mut contacts: Vec<(u32, math::Vec_)> = vec![];
+
+                    for finger in 0..finger_count {
+                        let start_x = start_locations[finger].x as f32;
+                        let start_y = start_locations[finger].y as f32;
+                        let event_x = (start_x + i_f * steps[finger].x) as i32;
+                        let event_y = (start_y + i_f * steps[finger].y) as i32;
+                        contacts.push((finger as u32, math::Vec_ { x: event_x, y: event_y }));
+                    }
+
+                    touchscreen_device
+                        .send_input_report(input_report_for_touch_contacts(contacts))
+                        .expect("Failed to send tap input report");
+                }
+
+                // Send a report with an empty set of touch contacts, so that input
+                // pipeline generates a pointer event with phase == UP.
+                touchscreen_device
+                    .send_input_report(input_report_for_touch_contacts(vec![]))
+                    .expect("failed to send empty input report");
+
+                responder.send().expect("Failed to send SimulateMultiFingerGesture response");
             }
             Ok(TouchScreenRequest::SimulateTouchEvent { report, responder }) => {
                 let input_report = InputReport {
