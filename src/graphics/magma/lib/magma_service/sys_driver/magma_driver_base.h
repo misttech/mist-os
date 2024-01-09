@@ -94,13 +94,13 @@ class MagmaDriverBase : public fdf::DriverBase,
     auto info_resource = incoming()->template Connect<fuchsia_kernel::InfoResource>();
 
     if (info_resource.is_error()) {
-      MAGMA_DMESSAGE("Error requesting info resource: %s", info_resource.status_string());
+      MAGMA_LOG(INFO, "Error requesting info resource: %s", info_resource.status_string());
       return info_resource.take_error();
     }
     auto info_resource_client = fidl::WireSyncClient(std::move(*info_resource));
     auto result = info_resource_client->Get();
     if (!result.ok()) {
-      MAGMA_DMESSAGE("Protocol error calling InfoResource.Get(): %s", result.status_string());
+      MAGMA_LOG(INFO, "Protocol error calling InfoResource.Get(): %s", result.status_string());
       return zx::error(result.error().status());
     }
     return zx::ok(std::move(result->resource));

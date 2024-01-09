@@ -33,10 +33,10 @@ class MaliDriver : public MagmaDriverBaseType {
 
   zx::result<> MagmaStart() override {
     zx::result info_resource = GetInfoResource();
-    if (!info_resource.is_ok()) {
-      return info_resource.take_error();
+    // Info resource may not be available on user builds.
+    if (info_resource.is_ok()) {
+      magma::PlatformBusMapper::SetInfoResource(std::move(*info_resource));
     }
-    magma::PlatformBusMapper::SetInfoResource(std::move(*info_resource));
 
     parent_device_ = ParentDeviceDFv2::Create(incoming());
     if (!parent_device_) {
