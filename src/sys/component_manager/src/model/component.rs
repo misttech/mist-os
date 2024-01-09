@@ -1971,9 +1971,6 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
 ///
 /// If the component instance has a program, it may also have a [`ProgramRuntime`].
 pub struct ComponentRuntime {
-    /// A client handle to the component instance's runtime directory hosted by the runner.
-    pub runtime_dir: Option<fio::DirectoryProxy>,
-
     /// If set, that means this component is associated with a running program.
     program: Option<ProgramRuntime>,
 
@@ -2058,14 +2055,12 @@ impl ProgramRuntime {
 
 impl ComponentRuntime {
     pub fn new(
-        runtime_dir: Option<fio::DirectoryProxy>,
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         ComponentRuntime {
-            runtime_dir,
             program: None,
             timestamp,
             binder_server_ends: vec![],
@@ -2079,6 +2074,12 @@ impl ComponentRuntime {
     /// representing its outgoing directory.
     pub fn outgoing_dir(&self) -> Option<&fio::DirectoryProxy> {
         self.program.as_ref().map(|program_runtime| program_runtime.program.outgoing())
+    }
+
+    /// If this component is associated with a running [Program], obtain a capability
+    /// representing its runtime directory.
+    pub fn runtime_dir(&self) -> Option<&fio::DirectoryProxy> {
+        self.program.as_ref().map(|program_runtime| program_runtime.program.runtime())
     }
 
     /// Associates the [ComponentRuntime] with a running [Program].

@@ -290,7 +290,7 @@ impl RuntimeInfo {
         let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
         Self {
             outgoing_dir: clone_dir(runtime.outgoing_dir()),
-            runtime_dir: clone_dir(runtime.runtime_dir.as_ref()),
+            runtime_dir: clone_dir(runtime.runtime_dir()),
             diagnostics_receiver,
             start_time: runtime.timestamp,
         }

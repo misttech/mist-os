@@ -42,6 +42,11 @@ pub struct Program {
     /// The outgoing directory of the program.
     outgoing_dir: fio::DirectoryProxy,
 
+    /// The directory that presents runtime information about the component. The
+    /// runner must either serve the server endpoint, or drop it to avoid
+    /// blocking any consumers indefinitely.
+    runtime_dir: fio::DirectoryProxy,
+
     /// Only here to keep the diagnostics task alive. Never read.
     _send_diagnostics: Task<()>,
 
@@ -72,8 +77,7 @@ impl Program {
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
     ) -> Result<Program, StartError> {
         let (controller, server_end) =
-            endpoints::create_proxy::<fcrunner::ComponentControllerMarker>()
-                .expect("creating FIDL proxy should not fail");
+            endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
         let koid = server_end
             .as_handle_ref()
             .basic_info()
@@ -82,10 +86,12 @@ impl Program {
         MONIKER_LOOKUP.add(koid, moniker);
 
         let (outgoing_dir, outgoing_server) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                .expect("creating FIDL proxy should not fail");
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        let (start_info, fut) = start_info.into_fidl(outgoing_server)?;
+        let (runtime_dir, runtime_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+        let (start_info, fut) = start_info.into_fidl(outgoing_server, runtime_server)?;
 
         runner.start(start_info, server_end);
         let mut controller = ComponentController::new(controller);
@@ -100,6 +106,7 @@ impl Program {
             controller,
             koid,
             outgoing_dir,
+            runtime_dir,
             _send_diagnostics: send_diagnostics,
             namespace_task: Mutex::new(Some(fasync::Task::spawn(fut))),
         })
@@ -108,6 +115,11 @@ impl Program {
     /// Gets the outgoing directory of the program.
     pub fn outgoing(&self) -> &fio::DirectoryProxy {
         &self.outgoing_dir
+    }
+
+    /// Gets the runtime directory of the program.
+    pub fn runtime(&self) -> &fio::DirectoryProxy {
+        &self.runtime_dir
     }
 
     /// Request to stop the program.
@@ -221,11 +233,14 @@ impl Program {
         let controller = ComponentController::new(controller.into_proxy().unwrap());
         let (outgoing_dir, _outgoing_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (runtime_dir, _runtime_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let send_diagnostics = Task::spawn(async {});
         Program {
             controller,
             koid,
             outgoing_dir,
+            runtime_dir,
             _send_diagnostics: send_diagnostics,
             namespace_task: Mutex::new(None),
         }
@@ -355,11 +370,6 @@ pub struct StartInfo {
     /// TODO(b/298106231): eventually this should become a sandbox and delivery map.
     pub namespace: NamespaceBuilder,
 
-    /// The directory served by the runner to present runtime information about
-    /// the component. The runner must either serve it, or drop it to avoid
-    /// blocking any consumers indefinitely.
-    pub runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
-
     /// The numbered handles that were passed to the component.
     ///
     /// If the component does not support numbered handles, the runner is expected
@@ -393,6 +403,7 @@ impl StartInfo {
     pub fn into_fidl(
         self,
         outgoing_server_end: ServerEnd<fio::DirectoryMarker>,
+        runtime_server_end: ServerEnd<fio::DirectoryMarker>,
     ) -> Result<(fcrunner::ComponentStartInfo, BoxFuture<'static, ()>), StartError> {
         let (ns, fut) = self.namespace.serve().map_err(StartError::ServeNamespace)?;
         Ok((
@@ -401,7 +412,7 @@ impl StartInfo {
                 program: Some(self.program),
                 ns: Some(ns.into()),
                 outgoing_dir: Some(outgoing_server_end),
-                runtime_dir: self.runtime_dir,
+                runtime_dir: Some(runtime_server_end),
                 numbered_handles: Some(self.numbered_handles),
                 encoded_config: self.encoded_config,
                 break_on_start: self.break_on_start,

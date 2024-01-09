@@ -197,7 +197,7 @@ async fn start_component(
     }
 
     let runtime_info = RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver);
-    let runtime_dir = pending_runtime.runtime_dir.clone();
+    let runtime_dir = pending_runtime.runtime_dir().cloned();
     let timestamp = pending_runtime.timestamp;
 
     execution.runtime = Some(pending_runtime);
@@ -433,15 +433,6 @@ async fn make_execution_runtime(
         None
     };
 
-    // Set up channels into/out of the new component. These are absent from non-executable
-    // components.
-    let (runtime_dir, runtime_dir_server) = if decl.get_runner().is_some() {
-        let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        (Some(proxy), Some(server_end))
-    } else {
-        (None, None)
-    };
-
     let encoded_config = match config {
         Some(mut config) => {
             if has_config_capabilities(decl) {
@@ -453,8 +444,7 @@ async fn make_execution_runtime(
         None => None,
     };
 
-    let runtime =
-        ComponentRuntime::new(runtime_dir, start_reason, execution_controller_task, logger);
+    let runtime = ComponentRuntime::new(start_reason, execution_controller_task, logger);
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
 
     let start_info = StartInfo {
@@ -465,7 +455,6 @@ async fn make_execution_runtime(
             .map(|p| p.info.clone())
             .unwrap_or_else(|| fdata::Dictionary::default()),
         namespace: namespace_builder,
-        runtime_dir: runtime_dir_server,
         numbered_handles,
         encoded_config,
         break_on_start: Some(break_on_start_left),
@@ -816,7 +805,7 @@ mod tests {
         // Check for already_started:
         {
             let mut es = ExecutionState::new();
-            es.runtime = Some(ComponentRuntime::new(None, StartReason::Debug, None, None));
+            es.runtime = Some(ComponentRuntime::new(StartReason::Debug, None, None));
             assert!(!es.is_shut_down());
             assert_matches!(
                 should_return_early(&InstanceState::New, &es, &m),
