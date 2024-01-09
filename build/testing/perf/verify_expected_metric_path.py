@@ -19,19 +19,20 @@ def main():
         "--expected-metric-names-filepath",
         help="Path to the expected metrics name file",
         required=True,
+        nargs="+",
     )
     parser.add_argument(
         "--output-file", help="Path to the verification file", required=True
     )
     args = parser.parse_args()
 
-    metric_names_filepath = args.expected_metric_names_filepath
-    dir_path = os.path.dirname(metric_names_filepath)
-    if not dir_path in ALLOWED_METRICS_DIR_PATHS:
-        raise Exception(
-            "Directory containing expected metric file must be one of: "
-            f'"{ALLOWED_METRICS_DIR_PATHS}": {metric_names_filepath}'
-        )
+    for metric_names_filepath in args.expected_metric_names_filepath:
+        dir_path = os.path.dirname(metric_names_filepath)
+        if not dir_path in ALLOWED_METRICS_DIR_PATHS:
+            raise Exception(
+                "Directory containing expected metric file must be one of: "
+                f'"{ALLOWED_METRICS_DIR_PATHS}": {metric_names_filepath}'
+            )
 
     with open(args.output_file, "w") as f:
         f.write("Verified!\n")

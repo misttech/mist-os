@@ -40,7 +40,7 @@ python_perf_test("power_squareload_test_fc") {
     "//src/tests/end_to_end/power:power_test_utils",
   ]
 
-  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.power.squareload_cpu.txt"
+  expected_metric_names_filepaths = [ "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.power.squareload_cpu.txt" ]
 
   params_source = "squareload_test_params.yaml"
   transport = "fuchsia-controller"

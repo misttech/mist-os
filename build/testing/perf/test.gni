@@ -17,8 +17,8 @@ import("//build/testing/host_test_data.gni")
 #     The entrypoint that contains the __main__ to execute the test.
 #     Type: path
 #
-#   expected_metric_names_filepath (optional)
-#     The absolute path to the file containing the expected metrics.
+#   expected_metric_names_filepaths (optional)
+#     The absolute paths to the files containing the expected metrics.
 #     Type: string
 #
 #   libraries (optional)
@@ -53,8 +53,15 @@ template("python_perf_test") {
         "${root_out_dir}/trace2json",
       ]
 
+      # TODO(https://fxbug.dev/305074008): Drop expected_metric_names_filepath and keep
+      # expected_metric_names_filepaths.
       if (defined(invoker.expected_metric_names_filepath)) {
-        sources += [ "${invoker.expected_metric_names_filepath}" ]
+        sources += [ invoker.expected_metric_names_filepath ]
+      }
+      if (defined(invoker.expected_metric_names_filepaths)) {
+        foreach(filepath, invoker.expected_metric_names_filepaths) {
+          sources += [ filepath ]
+        }
       }
       outputs = [ "${_runtime_deps_dir}/{{source_file_part}}" ]
       deps = [
@@ -63,23 +70,38 @@ template("python_perf_test") {
       ]
     }
 
-    if (defined(invoker.expected_metric_names_filepath)) {
+    if (defined(invoker.expected_metric_names_filepath) ||
+        defined(invoker.expected_metric_names_filepaths)) {
       # This action checks that expected_metric_names_filepath refers to a file
       # in an allowlisted directory. Ideally we would do this check directly in
       # GN.
+      filepaths = []
+      if (defined(invoker.expected_metric_names_filepath)) {
+        filepaths += [ invoker.expected_metric_names_filepath ]
+      }
+      if (defined(invoker.expected_metric_names_filepaths)) {
+        foreach(filepath, invoker.expected_metric_names_filepaths) {
+          filepaths += [ filepath ]
+        }
+      }
+
       python_action("${_test_target_name}_verify") {
         binary_label = "//build/testing/perf:verify_expected_metric_path"
 
         output_file = "$target_gen_dir/$target_name.verified"
 
-        inputs = [ invoker.expected_metric_names_filepath ]
+        inputs = filepaths
         outputs = [ output_file ]
         args = [
-          "--expected-metric-names-filepath",
-          invoker.expected_metric_names_filepath,
           "--output-file",
           rebase_path(output_file, root_build_dir),
         ]
+        foreach(filepath, filepaths) {
+          args += [
+            "--expected-metric-names-filepath",
+            filepath,
+          ]
+        }
       }
     }
 
@@ -124,7 +146,8 @@ template("python_perf_test") {
     testonly = true
     deps = [ ":${target_name}_test($host_toolchain)" ]
 
-    if (defined(invoker.expected_metric_names_filepath)) {
+    if (defined(invoker.expected_metric_names_filepath) ||
+        defined(invoker.expected_metric_names_filepaths)) {
       deps += [ ":${target_name}_test_verify($host_toolchain)" ]
     }
     if (defined(invoker.target_deps)) {
@@ -231,11 +254,12 @@ template("fuchsia_component_perf_test") {
   }
 
   python_perf_test(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "environments",
-                             "expected_metric_names_filepath",
-                           ])
+    forward_variables_from(invoker, [ "environments" ])
+
+    if (defined(invoker.expected_metric_names_filepath)) {
+      expected_metric_names_filepaths =
+          [ invoker.expected_metric_names_filepath ]
+    }
     main_source =
         "//src/performance/lib/perf_test/fuchsia_component_perf_test.py"
     params_source = _config_file
