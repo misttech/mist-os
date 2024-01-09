@@ -224,4 +224,28 @@ TEST_F(UinputTest, UiDevDestroy) {
   EXPECT_EQ(res, 0);
 }
 
+TEST_F(UinputTest, WriteEVKEY) {
+  /* timestamp values are ignored */
+  struct timeval t = {.tv_sec = 0, .tv_usec = 0};
+
+  // Key press
+  struct input_event press_e = {.time = t, .type = EV_KEY, .code = KEY_SPACE, .value = 1};
+  auto res = write(uinput_fd_.get(), &press_e, sizeof(press_e));
+  EXPECT_EQ(res, 24);
+
+  // Report the event
+  struct input_event sync_e = {.time = t, .type = EV_SYN, .code = SYN_REPORT, .value = 0};
+  res = write(uinput_fd_.get(), &sync_e, sizeof(sync_e));
+  EXPECT_EQ(res, 24);
+
+  // Key release
+  struct input_event release_e = {.time = t, .type = EV_KEY, .code = KEY_SPACE, .value = 0};
+  res = write(uinput_fd_.get(), &release_e, sizeof(press_e));
+  EXPECT_EQ(res, 24);
+
+  // Report the event
+  res = write(uinput_fd_.get(), &sync_e, sizeof(sync_e));
+  EXPECT_EQ(res, 24);
+}
+
 }  // namespace

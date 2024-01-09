@@ -14,7 +14,7 @@ use crate::{
 use bit_vec::BitVec;
 use fidl_fuchsia_ui_test_input::{self as futinput, RegistryRegisterKeyboardRequest};
 use fuchsia_zircon as zx;
-use starnix_logging::{log_info, log_warn};
+use starnix_logging::{log_info, log_trace, log_warn};
 use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -28,6 +28,7 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
     Arc,
 };
+use zerocopy::FromBytes;
 
 // Return the current uinput API version 5, it also told caller this uinput
 // supports UI_DEV_SETUP.
@@ -288,11 +289,16 @@ impl FileOps for Arc<UinputDevice> {
         _file: &crate::vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
-        _data: &mut dyn crate::vfs::buffers::InputBuffer,
+        data: &mut dyn crate::vfs::buffers::InputBuffer,
     ) -> Result<usize, Errno> {
-        // TODO(b/308160735): impl write() for uinput FD.
-        log_info!("write()");
-        Ok(0)
+        let content = data.read_all()?;
+        let event = uapi::input_event::read_from(&content)
+            .expect("UInput could not create input_event from InputBuffer data.");
+        log_trace!("event.type = {}", event.type_);
+        log_trace!("event.code = {}", event.code);
+        log_trace!("event.value = {}", event.value);
+
+        Ok(content.len())
     }
 
     fn read(
