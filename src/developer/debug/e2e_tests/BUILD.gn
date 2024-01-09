@@ -79,6 +79,9 @@ if (is_host && has_board) {
       environments -= [ emu_env ]
     }
 
+    # TODO(b/319276232): Reenable sherlock when the flake is fixed.
+    environments -= [ sherlock_env ]
+
     # TODO(https://fxbug.dev/319163754): This test doesn't pass on GCE.
     environments += [ gce_env ]
     environments -= [ gce_env ]
