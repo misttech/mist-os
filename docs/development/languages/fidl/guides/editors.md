@@ -28,14 +28,12 @@ To install, select **Sublime Text**, then **Preferences**, then
 ## Visual Studio Code {#visual-studio-code}
 
 There is a an extension,
-[Visual Studio Code extension available](https://marketplace.visualstudio.com/items?itemName=fuchsia-authors.language-fidl).
+[Visual Studio Code extension available](https://marketplace.visualstudio.com/items?itemName=fuchsia-authors.vscode-fuchsia).
 
 ## Contributing
 
-Contributions to the various plugins are welcome. Their respective code is in:
+Contributions to other plugins are welcome. Their respective code is in:
 
 * [IntelliJ](https://fuchsia.googlesource.com/intellij-language-fidl/)
 * [Sublime](/tools/fidl/editors/sublime)
 * [vim](/tools/fidl/editors/vim/)
-* [Visual Studio Code](https://fuchsia.googlesource.com/vscode-language-fidl/)
-
