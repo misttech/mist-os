@@ -4,11 +4,14 @@
 
 use crate::mm::{
     read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessor, MemoryAccessorExt,
-    MemoryManager,
+    MemoryManager, UNIFIED_ASPACES_ENABLED,
 };
 use smallvec::SmallVec;
 use starnix_uapi::{
-    errno, error, errors::Errno, user_address::UserAddress, user_buffer::UserBuffer,
+    errno, error,
+    errors::{Errno, ENOTSUP},
+    user_address::UserAddress,
+    user_buffer::UserBuffer,
 };
 use std::{
     mem::MaybeUninit,
@@ -105,19 +108,33 @@ pub trait Buffer: std::fmt::Debug {
     fn peek_all_segments_as_iovecs(&mut self) -> Result<IovecsRef<'_, syncio::zxio::iovec>, Errno> {
         IovecsRef::new(self)
     }
+}
 
-    /// Returns all the segments backing this `Buffer`.
-    ///
-    /// Note that we use `IovecsRef<'_>` so that while `IovecsRef` is held,
-    /// no other methods may be called on this `Buffer` since `IovecsRef`
-    /// holds onto the mutable reference for this `Buffer`.
-    ///
-    /// Each segment is safe to read from (if this is an `InputBuffer`) or write
-    /// to (if this is an `OutputBuffer`) without causing undefined behaviour.
-    fn peek_all_segments_as_zx_iovecs(
-        &mut self,
-    ) -> Result<IovecsRef<'_, syncio::zxio::zx_iovec>, Errno> {
-        IovecsRef::new(self)
+/// Attempts to perform some I/O with the iovec segments of `Buffer`.
+///
+/// Returns `None` if the I/O can not be performed with iovecs (when unified
+/// aspaces is disabled or the `Buffer` does not support I/O on its segments
+/// directly).
+///
+/// Each segment is safe to read from (if `B` is an `InputBuffer`) or write
+/// to (if `B` is an `OutputBuffer`) without causing undefined behaviour.
+pub fn with_iovec_segments<B: Buffer + ?Sized, I: Iovec, T>(
+    data: &mut B,
+    f: impl FnOnce(&mut [I]) -> Result<T, Errno>,
+) -> Option<Result<T, Errno>> {
+    if !UNIFIED_ASPACES_ENABLED {
+        return None;
+    }
+
+    match IovecsRef::new(data) {
+        Ok(mut o) => Some(f(&mut o)),
+        Err(e) => {
+            if e.code == ENOTSUP {
+                None
+            } else {
+                Some(Err(e))
+            }
+        }
     }
 }
 

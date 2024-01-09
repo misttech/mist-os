@@ -5,10 +5,10 @@
 use crate::{
     device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
     fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async},
-    mm::{ProtectionFlags, UNIFIED_ASPACES_ENABLED, VMEX_RESOURCE},
+    mm::{ProtectionFlags, VMEX_RESOURCE},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
     vfs::{
-        buffers::{InputBuffer, OutputBuffer},
+        buffers::{with_iovec_segments, InputBuffer, OutputBuffer},
         default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
         fileops_impl_seekable, fs_args, fs_node_impl_not_dir, fs_node_impl_symlink,
         fsverity::FsVerityState,
@@ -28,16 +28,9 @@ use starnix_logging::{impossible_error, log_warn, trace_category_starnix_mm, tra
 use starnix_sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    auth::FsCred,
-    device_type::DeviceType,
-    errno, error,
-    errors::{Errno, ENOTSUP},
-    file_mode::FileMode,
-    from_status_like_fdio, fsverity_descriptor, ino_t,
-    mount_flags::MountFlags,
-    off_t,
-    open_flags::OpenFlags,
-    statfs,
+    auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
+    from_status_like_fdio, fsverity_descriptor, ino_t, mount_flags::MountFlags, off_t,
+    open_flags::OpenFlags, statfs,
 };
 use std::sync::Arc;
 use syncio::{
@@ -1028,39 +1021,27 @@ fn zxio_read_inner(
     unified_read_fn: impl FnOnce(&[syncio::zxio::zx_iovec]) -> Result<usize, zx::Status>,
     vmo_read_fn: impl FnOnce(&mut [u8]) -> Result<usize, zx::Status>,
 ) -> Result<usize, Errno> {
-    let read_bytes = if UNIFIED_ASPACES_ENABLED {
-        match data.peek_all_segments_as_zx_iovecs() {
-            Ok(iovecs) => {
-                let actual = unified_read_fn(&iovecs).map_err(zxio_read_write_inner_map_error)?;
-                // SAFETY: we successfully read `actual` bytes
-                // directly to the user's buffer segments.
-                unsafe { data.advance(actual) }?;
-                Some(Ok(actual))
-            }
-            Err(e) => {
-                if e.code == ENOTSUP {
-                    // Fallback to the slower read with an intermediate buffer
-                    // when the output buffer doesn't support I/O directly to its
-                    // segments.
-                    None
-                } else {
-                    Some(Err(e))
-                }
-            }
-        }
-    } else {
-        // Fallback to the slower read with an intermediate buffer when unified
-        // aspaces is not enabled.
-        None
-    };
+    let read_bytes = with_iovec_segments(data, |iovecs| {
+        unified_read_fn(&iovecs).map_err(zxio_read_write_inner_map_error)
+    });
 
-    read_bytes.unwrap_or_else(|| {
-        // Perform the (slower) operation by using an intermediate buffer.
-        let total = data.available();
-        let mut bytes = vec![0u8; total];
-        let actual = vmo_read_fn(&mut bytes).map_err(|status| from_status_like_fdio!(status))?;
-        data.write_all(&bytes[0..actual])
-    })
+    match read_bytes {
+        Some(actual) => {
+            let actual = actual?;
+            // SAFETY: we successfully read `actual` bytes
+            // directly to the user's buffer segments.
+            unsafe { data.advance(actual) }?;
+            Ok(actual)
+        }
+        None => {
+            // Perform the (slower) operation by using an intermediate buffer.
+            let total = data.available();
+            let mut bytes = vec![0u8; total];
+            let actual =
+                vmo_read_fn(&mut bytes).map_err(|status| from_status_like_fdio!(status))?;
+            data.write_all(&bytes[0..actual])
+        }
+    }
 }
 
 fn zxio_read(zxio: &Zxio, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
@@ -1097,38 +1078,26 @@ fn zxio_write_inner(
     unified_write_fn: impl FnOnce(&[syncio::zxio::zx_iovec]) -> Result<usize, zx::Status>,
     vmo_write_fn: impl FnOnce(&[u8]) -> Result<usize, zx::Status>,
 ) -> Result<usize, Errno> {
-    let write_bytes = if UNIFIED_ASPACES_ENABLED {
-        match data.peek_all_segments_as_zx_iovecs() {
-            Ok(iovecs) => {
-                let actual = unified_write_fn(&iovecs).map_err(zxio_read_write_inner_map_error)?;
-                data.advance(actual)?;
-                Some(Ok(actual))
-            }
-            Err(e) => {
-                if e.code == ENOTSUP {
-                    // Fallback to the slower read with an intermediate buffer
-                    // when the output buffer doesn't support I/O directly to its
-                    // segments.
-                    None
-                } else {
-                    Some(Err(e))
-                }
-            }
-        }
-    } else {
-        // Fallback to the slower read with an intermediate buffer when unified
-        // aspaces is not enabled.
-        None
-    };
+    let write_bytes = with_iovec_segments(data, |iovecs| {
+        unified_write_fn(&iovecs).map_err(zxio_read_write_inner_map_error)
+    });
 
-    write_bytes.unwrap_or_else(|| {
-        // Perform the (slower) operation by using an intermediate buffer.
-        let bytes = data.peek_all()?;
-        let actual = vmo_write_fn(&bytes).map_err(|status| from_status_like_fdio!(status))?;
-        data.advance(actual)?;
-        Ok(actual)
-    })
+    match write_bytes {
+        Some(actual) => {
+            let actual = actual?;
+            data.advance(actual)?;
+            Ok(actual)
+        }
+        None => {
+            // Perform the (slower) operation by using an intermediate buffer.
+            let bytes = data.peek_all()?;
+            let actual = vmo_write_fn(&bytes).map_err(|status| from_status_like_fdio!(status))?;
+            data.advance(actual)?;
+            Ok(actual)
+        }
+    }
 }
+
 fn zxio_write(
     zxio: &Zxio,
     _current_task: &CurrentTask,
