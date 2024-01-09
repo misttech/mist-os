@@ -1174,35 +1174,27 @@ impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     }
 }
 
-impl IcmpEchoBindingsContext<Ipv4, DeviceId<Self>> for FakeBindingsCtx {
+impl<I: IcmpIpExt> IcmpEchoBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
-        conn: crate::ip::icmp::socket::SocketId<Ipv4>,
+        conn: crate::ip::icmp::socket::SocketId<I>,
         _device: &DeviceId<Self>,
-        _src_ip: Ipv4Addr,
-        _dst_ip: Ipv4Addr,
+        _src_ip: I::Addr,
+        _dst_ip: I::Addr,
         _id: u16,
         data: B,
     ) {
-        let mut state = self.state_mut();
-        let replies = state.icmpv4_replies.entry(conn).or_insert_with(Vec::default);
-        replies.push(data.as_ref().to_owned());
-    }
-}
-
-impl IcmpEchoBindingsContext<Ipv6, DeviceId<Self>> for FakeBindingsCtx {
-    fn receive_icmp_echo_reply<B: BufferMut>(
-        &mut self,
-        conn: crate::ip::icmp::socket::SocketId<Ipv6>,
-        _device: &DeviceId<Self>,
-        _src_ip: Ipv6Addr,
-        _dst_ip: Ipv6Addr,
-        _id: u16,
-        data: B,
-    ) {
-        let mut state = self.state_mut();
-        let replies = state.icmpv6_replies.entry(conn).or_insert_with(Vec::default);
-        replies.push(data.as_ref().to_owned())
+        I::map_ip(
+            (IpInvariant(self.state_mut()), conn),
+            |(IpInvariant(mut state), conn)| {
+                let replies = state.icmpv4_replies.entry(conn).or_insert_with(Vec::default);
+                replies.push(data.as_ref().to_owned());
+            },
+            |(IpInvariant(mut state), conn)| {
+                let replies = state.icmpv6_replies.entry(conn).or_insert_with(Vec::default);
+                replies.push(data.as_ref().to_owned());
+            },
+        )
     }
 }
 

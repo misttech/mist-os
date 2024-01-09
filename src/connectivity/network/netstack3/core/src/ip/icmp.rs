@@ -651,7 +651,7 @@ impl<
 
 /// A marker for all the contexts provided by bindings require by the ICMP
 /// module.
-pub(crate) trait IcmpBindingsContext<I: IcmpIpExt, D>:
+pub trait IcmpBindingsContext<I: IcmpIpExt, D>:
     InstantContext + IcmpEchoBindingsContext<I, D> + RngContext
 {
 }
@@ -667,14 +667,14 @@ impl<I: IcmpIpExt, BC: InstantContext + IcmpEchoBindingsContext<I, D> + RngConte
 /// in this crate. It can be safely implemented for any type.
 /// TODO(https://github.com/rust-lang/rust/issues/97811): Remove this once the
 /// coherence checker doesn't require it.
-pub(crate) trait IcmpStateContext {}
+pub trait IcmpStateContext {}
 
 /// The execution context shared by ICMP(v4) and ICMPv6 for the internal
 /// operations of the IP stack.
 ///
 /// Unlike [`IcmpEchoBindingsContext`], `InnerIcmpContext` is not exposed outside of
 /// this crate.
-pub(crate) trait InnerIcmpContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::DeviceId>>:
+pub trait InnerIcmpContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::DeviceId>>:
     IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice>
 {
     type DualStackContext: datagram::DualStackDatagramBoundStateContext<
@@ -2999,7 +2999,7 @@ mod tests {
             device::{
                 route_discovery::Ipv6DiscoveredRoute, state::IpDeviceStateIpExt, IpDeviceHandler,
             },
-            icmp::socket::{SocketHandler, SocketId, SocketsState, StateContext},
+            icmp::socket::{IcmpEchoSocketApi, SocketId, SocketsState, StateContext},
             path_mtu::testutil::FakePmtuState,
             receive_ip_packet,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
@@ -4135,26 +4135,25 @@ mod tests {
             crate::testutil::set_logger_for_test();
 
             let mut ctx: FakeIcmpCtx<Ipv4> = FakeIcmpCtx::default();
-            let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
+            let mut socket_api = IcmpEchoSocketApi::<Ipv4, _>::new(ctx.as_mut());
 
-            let conn = SocketHandler::<Ipv4, _>::create(core_ctx);
+            let conn = socket_api.create();
             // NOTE: This assertion is not a correctness requirement. It's just
             // that the rest of this test assumes that the new connection has ID
             // 0. If this assertion fails in the future, that isn't necessarily
             // evidence of a bug; we may just have to update this test to
             // accommodate whatever new ID allocation scheme is being used.
             assert_eq!(conn, SocketId::new(0));
-            SocketHandler::bind(core_ctx, bindings_ctx, &conn, None, NonZeroU16::new(ICMP_ID))
+            socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
+            socket_api
+                .connect(
+                    &conn,
+                    Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip))),
+                    REMOTE_ID,
+                )
                 .unwrap();
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
-                &conn,
-                Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip))),
-                REMOTE_ID,
-            )
-            .unwrap();
 
+            let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
             <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
                 &mut core_ctx.inner,
                 bindings_ctx,
@@ -4437,25 +4436,24 @@ mod tests {
             crate::testutil::set_logger_for_test();
 
             let mut ctx = FakeIcmpCtx::<Ipv6>::default();
-            let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
-            let conn = SocketHandler::<Ipv6, _>::create(core_ctx);
+            let mut socket_api = IcmpEchoSocketApi::<Ipv6, _>::new(ctx.as_mut());
+            let conn = socket_api.create();
             // NOTE: This assertion is not a correctness requirement. It's just
             // that the rest of this test assumes that the new connection has ID
             // 0. If this assertion fails in the future, that isn't necessarily
             // evidence of a bug; we may just have to update this test to
             // accommodate whatever new ID allocation scheme is being used.
             assert_eq!(conn, SocketId::new(0));
-            SocketHandler::bind(core_ctx, bindings_ctx, &conn, None, NonZeroU16::new(ICMP_ID))
+            socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
+            socket_api
+                .connect(
+                    &conn,
+                    Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip))),
+                    REMOTE_ID,
+                )
                 .unwrap();
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
-                &conn,
-                Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip))),
-                REMOTE_ID,
-            )
-            .unwrap();
 
+            let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
             <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
                 &mut core_ctx.inner,
                 bindings_ctx,

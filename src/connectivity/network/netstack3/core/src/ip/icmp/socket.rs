@@ -6,6 +6,7 @@
 
 use core::{
     fmt::Debug,
+    marker::PhantomData,
     num::{NonZeroU16, NonZeroU8},
 };
 
@@ -14,7 +15,7 @@ use derivative::Derivative;
 use either::Either;
 
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker},
+    ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker},
     SpecifiedAddr,
 };
 use packet::{BufferMut, Serializer};
@@ -25,9 +26,9 @@ use packet_formats::{
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
-    context::RngContext,
+    context::{ContextPair, RngContext},
     data_structures::socketmap::IterShadows as _,
-    device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakId},
+    device::{AnyDevice, DeviceIdContext, Id, WeakId},
     error::{LocalAddressError, SocketError},
     ip::{
         icmp::{IcmpAddr, IcmpBindingsContext, IcmpIpExt, IcmpStateContext, InnerIcmpContext},
@@ -45,7 +46,6 @@ use crate::{
         SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
     sync::RwLock,
-    BindingsContext, CoreCtx, SyncCtx,
 };
 
 pub type SocketsState<I, D> = datagram::SocketsState<I, D, Icmp>;
@@ -106,7 +106,7 @@ pub trait IcmpEchoBindingsContext<I: IcmpIpExt, D> {
 }
 
 /// A Context that provides access to the sockets' states.
-pub(crate) trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::DeviceId>>:
+pub trait StateContext<I: IcmpIpExt + IpExt, BC: IcmpBindingsContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     type SocketStateCtx<'a>: InnerIcmpContext<I, BC>
@@ -507,158 +507,82 @@ impl<I: Ip> EntryKey for SocketId<I> {
     }
 }
 
-/// A handler trait for ICMP sockets.
-pub(crate) trait SocketHandler<I: datagram::IpExt, BC>: DeviceIdContext<AnyDevice> {
-    /// Creates a new ICMP socket.
-    fn create(&mut self) -> SocketId<I>;
+/// The ICMP Echo sockets API.
+pub struct IcmpEchoSocketApi<I, C>(C, PhantomData<I>);
 
-    /// Connects an ICMP socket with a remote IP address.
-    fn connect(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
-        remote_id: u16,
-    ) -> Result<(), datagram::ConnectError>;
-
-    /// Binds an ICMP socket to a local IP address and a local ID to send/recv
-    /// ICMP echo replies on.
-    fn bind(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-        local_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
-        icmp_id: Option<NonZeroU16>,
-    ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>;
-
-    /// Gets the socket information of an ICMP socket.
-    fn get_info(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-    ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
-
-    fn set_device(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-        device_id: Option<&Self::DeviceId>,
-    ) -> Result<(), SocketError>;
-
-    fn get_bound_device(
-        &mut self,
-        bindings_ctx: &BC,
-        id: &SocketId<I>,
-    ) -> Option<Self::WeakDeviceId>;
-
-    /// Disconnects an ICMP socket.
-    fn disconnect(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-    ) -> Result<(), datagram::ExpectedConnError>;
-
-    /// Shuts down an ICMP socket.
-    fn shutdown(
-        &mut self,
-        bindings_ctx: &BC,
-        id: &SocketId<I>,
-        shutdown_type: ShutdownType,
-    ) -> Result<(), datagram::ExpectedConnError>;
-
-    /// Gets the current shutdown state of the ICMP socket.
-    fn get_shutdown(&mut self, bindings_ctx: &BC, id: &SocketId<I>) -> Option<ShutdownType>;
-
-    /// Closes the ICMP socket.
-    fn close(&mut self, bindings_ctx: &mut BC, id: SocketId<I>);
-
-    /// Gets the unicast hop limit.
-    fn get_unicast_hop_limit(&mut self, bindings_ctx: &BC, id: &SocketId<I>) -> NonZeroU8;
-
-    /// Gets the multicast hop limit.
-    fn get_multicast_hop_limit(&mut self, bindings_ctx: &BC, id: &SocketId<I>) -> NonZeroU8;
-
-    /// Sets the unicast hop limit.
-    fn set_unicast_hop_limit(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-        hop_limit: Option<NonZeroU8>,
-    );
-
-    /// Sets the multicast hop limit.
-    fn set_multicast_hop_limit(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-        hop_limit: Option<NonZeroU8>,
-    );
-
-    /// Send an ICMP echo reply on the socket.
-    fn send<B: BufferMut>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        conn: &SocketId<I>,
-        body: B,
-    ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>>;
-
-    /// Send an ICMP echo reply to a remote address without connecting.
-    fn send_to<B: BufferMut>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
-        body: B,
-    ) -> Result<
-        (),
-        either::Either<LocalAddressError, datagram::SendToError<packet_formats::error::ParseError>>,
-    >;
+impl<I, C> IcmpEchoSocketApi<I, C> {
+    pub(crate) fn new(ctx: C) -> Self {
+        Self(ctx, PhantomData)
+    }
 }
 
-impl<
-        I: datagram::IpExt,
-        BC: IcmpBindingsContext<I, Self::DeviceId>,
-        CC: StateContext<I, BC> + IcmpStateContext,
-    > SocketHandler<I, BC> for CC
+impl<I, C> IcmpEchoSocketApi<I, C>
+where
+    I: datagram::IpExt,
+    C: ContextPair,
+    C::CoreContext: StateContext<I, C::BindingsContext> + IcmpStateContext,
+    C::BindingsContext:
+        IcmpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
-    fn create(&mut self) -> SocketId<I> {
-        datagram::create(self)
+    fn core_ctx(&mut self) -> &mut C::CoreContext {
+        let Self(pair, PhantomData) = self;
+        pair.core_ctx()
     }
-    fn connect(
+
+    fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
+        let Self(pair, PhantomData) = self;
+        pair.contexts()
+    }
+
+    /// Creates a new unbound ICMP socket.
+    pub fn create(&mut self) -> SocketId<I> {
+        datagram::create(self.core_ctx())
+    }
+
+    /// Connects an ICMP socket to remote IP.
+    ///
+    /// If the socket is never bound, an local ID will be allocated.
+    pub fn connect(
         &mut self,
-        bindings_ctx: &mut BC,
         id: &SocketId<I>,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
+        remote_ip: Option<
+            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        >,
         remote_id: u16,
     ) -> Result<(), datagram::ConnectError> {
-        datagram::connect(self, bindings_ctx, id.clone(), remote_ip, (), remote_id)
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::connect(core_ctx, bindings_ctx, *id, remote_ip, (), remote_id)
     }
 
-    fn bind(
+    /// Binds an ICMP socket to a local IP address and a local ID.
+    ///
+    /// Both the IP and the ID are optional. When IP is missing, the "any" IP is
+    /// assumed; When the ID is missing, it will be allocated.
+    pub fn bind(
         &mut self,
-        bindings_ctx: &mut BC,
         id: &SocketId<I>,
-        local_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
+        local_ip: Option<
+            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        >,
         icmp_id: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-        datagram::listen(self, bindings_ctx, id.clone(), local_ip, icmp_id)
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::listen(core_ctx, bindings_ctx, *id, local_ip, icmp_id)
     }
 
-    fn get_info(
+    /// Gets the information about an ICMP socket.
+    pub fn get_info(
         &mut self,
-        _bindings_ctx: &mut BC,
         id: &SocketId<I>,
-    ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
-        self.with_sockets_state(|_core_ctx, state| {
+    ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
+        StateContext::with_sockets_state(self.core_ctx(), |_core_ctx, state| {
             match state.get(id.get_key_index()).expect("invalid socket ID") {
                 datagram::SocketState::Unbound(_) => SocketInfo::Unbound,
-                datagram::SocketState::Bound(
-                    datagram::BoundSocketState{socket_type, original_bound_addr: _}
-                ) => match socket_type {
-                    datagram::BoundSocketStateType::Listener {
-                        state,
-                        sharing: _,
-                    } => {
+                datagram::SocketState::Bound(datagram::BoundSocketState {
+                    socket_type,
+                    original_bound_addr: _,
+                }) => match socket_type {
+                    datagram::BoundSocketStateType::Listener { state, sharing: _ } => {
                         let datagram::ListenerState {
                             addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
                             ip_options: _,
@@ -669,14 +593,12 @@ impl<
                             device: device.clone(),
                         }
                     }
-                    datagram::BoundSocketStateType::Connected {
-                        state,
-                        sharing: _,
-                    } => {
+                    datagram::BoundSocketStateType::Connected { state, sharing: _ } => {
                         let datagram::ConnState {
                             addr:
                                 ConnAddr {
-                                    ip: ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) },
+                                    ip:
+                                        ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) },
                                     device,
                                 },
                             extra: remote_id,
@@ -690,220 +612,125 @@ impl<
                             remote_id: *remote_id,
                         }
                     }
-                }
+                },
             }
         })
     }
 
-    fn set_device(
+    /// Sets the bound device for a socket.
+    ///
+    /// Sets the device to be used for sending and receiving packets for a
+    /// socket. If the socket is not currently bound to a local address and
+    /// port, the device will be used when binding.
+    pub fn set_device(
         &mut self,
-        bindings_ctx: &mut BC,
         id: &SocketId<I>,
-        device_id: Option<&Self::DeviceId>,
+        device_id: Option<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SocketError> {
-        datagram::set_device(self, bindings_ctx, id.clone(), device_id)
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::set_device(core_ctx, bindings_ctx, *id, device_id)
     }
 
-    fn get_bound_device(
+    /// Gets the device the specified socket is bound to.
+    pub fn get_bound_device(
         &mut self,
-        bindings_ctx: &BC,
         id: &SocketId<I>,
-    ) -> Option<Self::WeakDeviceId> {
-        datagram::get_bound_device(self, bindings_ctx, id.clone())
+    ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::get_bound_device(core_ctx, bindings_ctx, *id)
     }
 
-    fn disconnect(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-    ) -> Result<(), datagram::ExpectedConnError> {
-        datagram::disconnect_connected(self, bindings_ctx, id.clone())
+    /// Disconnects an ICMP socket.
+    pub fn disconnect(&mut self, id: &SocketId<I>) -> Result<(), datagram::ExpectedConnError> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::disconnect_connected(core_ctx, bindings_ctx, *id)
     }
 
-    fn shutdown(
+    /// Shuts down an ICMP socket.
+    pub fn shutdown(
         &mut self,
-        bindings_ctx: &BC,
         id: &SocketId<I>,
         shutdown_type: ShutdownType,
     ) -> Result<(), datagram::ExpectedConnError> {
-        datagram::shutdown_connected(self, bindings_ctx, id.clone(), shutdown_type)
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::shutdown_connected(core_ctx, bindings_ctx, *id, shutdown_type)
     }
 
-    fn get_shutdown(&mut self, bindings_ctx: &BC, id: &SocketId<I>) -> Option<ShutdownType> {
-        datagram::get_shutdown_connected(self, bindings_ctx, id.clone())
+    /// Gets the current shutdown state of an ICMP socket.
+    pub fn get_shutdown(&mut self, id: &SocketId<I>) -> Option<ShutdownType> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::get_shutdown_connected(core_ctx, bindings_ctx, *id)
     }
 
-    fn close(&mut self, bindings_ctx: &mut BC, id: SocketId<I>) {
-        let _: datagram::SocketInfo<_, _, _> = datagram::close(self, bindings_ctx, id);
+    /// Closes an ICMP socket.
+    pub fn close(&mut self, id: SocketId<I>) {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let _: datagram::SocketInfo<_, _, _> = datagram::close(core_ctx, bindings_ctx, id);
     }
 
-    fn get_unicast_hop_limit(&mut self, bindings_ctx: &BC, id: &SocketId<I>) -> NonZeroU8 {
-        datagram::get_ip_hop_limits(self, bindings_ctx, id.clone()).unicast
+    /// Gets unicast IP hop limit for ICMP sockets.
+    pub fn get_unicast_hop_limit(&mut self, id: &SocketId<I>) -> NonZeroU8 {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::get_ip_hop_limits(core_ctx, bindings_ctx, *id).unicast
     }
 
-    fn get_multicast_hop_limit(&mut self, bindings_ctx: &BC, id: &SocketId<I>) -> NonZeroU8 {
-        datagram::get_ip_hop_limits(self, bindings_ctx, id.clone()).multicast
+    /// Gets multicast IP hop limit for ICMP sockets.
+    pub fn get_multicast_hop_limit(&mut self, id: &SocketId<I>) -> NonZeroU8 {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::get_ip_hop_limits(core_ctx, bindings_ctx, *id).multicast
     }
 
-    fn set_unicast_hop_limit(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-        hop_limit: Option<NonZeroU8>,
-    ) {
+    /// Sets unicast IP hop limit for ICMP sockets.
+    pub fn set_unicast_hop_limit(&mut self, id: &SocketId<I>, hop_limit: Option<NonZeroU8>) {
+        let (core_ctx, bindings_ctx) = self.contexts();
         datagram::update_ip_hop_limit(
-            self,
+            core_ctx,
             bindings_ctx,
-            id.clone(),
+            *id,
             SocketHopLimits::set_unicast(hop_limit),
         )
     }
 
-    fn set_multicast_hop_limit(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &SocketId<I>,
-        hop_limit: Option<NonZeroU8>,
-    ) {
+    /// Sets multicast IP hop limit for ICMP sockets.
+    pub fn set_multicast_hop_limit(&mut self, id: &SocketId<I>, hop_limit: Option<NonZeroU8>) {
+        let (core_ctx, bindings_ctx) = self.contexts();
         datagram::update_ip_hop_limit(
-            self,
+            core_ctx,
             bindings_ctx,
-            id.clone(),
+            *id,
             SocketHopLimits::set_multicast(hop_limit),
         )
     }
 
-    fn send<B: BufferMut>(
+    /// Sends an ICMP packet through a connection.
+    ///
+    /// The socket must be connected in order for the operation to succeed.
+    pub fn send<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut BC,
         id: &SocketId<I>,
         body: B,
     ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
-        datagram::send_conn::<_, _, _, Icmp, _>(self, bindings_ctx, id.clone(), body)
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::send_conn::<_, _, _, Icmp, _>(core_ctx, bindings_ctx, *id, body)
     }
 
-    fn send_to<B: BufferMut>(
+    /// Sends an ICMP packet with an remote address.
+    ///
+    /// The socket doesn't need to be connected.
+    pub fn send_to<B: BufferMut>(
         &mut self,
-        bindings_ctx: &mut BC,
         id: &SocketId<I>,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
+        remote_ip: Option<
+            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        >,
         body: B,
     ) -> Result<
         (),
         either::Either<LocalAddressError, datagram::SendToError<packet_formats::error::ParseError>>,
     > {
-        datagram::send_to::<_, _, _, Icmp, _>(self, bindings_ctx, id.clone(), remote_ip, (), body)
+        let (core_ctx, bindings_ctx) = self.contexts();
+        datagram::send_to::<_, _, _, Icmp, _>(core_ctx, bindings_ctx, *id, remote_ip, (), body)
     }
-}
-
-// TODO(https://fxbug.dev/42083910): The following freestanding functions are
-// boilerplates that become too much in all socket modules, we need to reduce
-// the need for them.
-
-/// Creates a new unbound ICMP socket.
-pub fn new_socket<I: Ip, BC: BindingsContext>(core_ctx: &SyncCtx<BC>) -> SocketId<I> {
-    net_types::map_ip_twice!(I, IpInvariant(core_ctx), |IpInvariant(core_ctx)| {
-        SocketHandler::<I, BC>::create(&mut CoreCtx::new_deprecated(core_ctx))
-    },)
-}
-
-/// Connects an ICMP socket to remote IP.
-///
-/// If the socket is never bound, an local ID will be allocated.
-pub fn connect<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
-    remote_id: u16,
-) -> Result<(), datagram::ConnectError> {
-    let IpInvariant(result) = net_types::map_ip_twice!(
-        I,
-        (IpInvariant((core_ctx, bindings_ctx, remote_id)), id, remote_ip),
-        |(IpInvariant((core_ctx, bindings_ctx, remote_id)), id, remote_ip)| {
-            IpInvariant(SocketHandler::<I, BC>::connect(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                id,
-                remote_ip,
-                remote_id,
-            ))
-        }
-    );
-    result
-}
-
-/// Binds an ICMP socket to a local IP address and a local ID.
-///
-/// Both the IP and the ID are optional. When IP is missing, the "any" IP is
-/// assumed; When the ID is missing, it will be allocated.
-pub fn bind<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-    local_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
-    icmp_id: Option<NonZeroU16>,
-) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-    let IpInvariant(result) = net_types::map_ip_twice!(
-        I,
-        (IpInvariant((core_ctx, bindings_ctx, icmp_id)), id, local_ip),
-        |(IpInvariant((core_ctx, bindings_ctx, icmp_id)), id, local_ip)| {
-            IpInvariant(SocketHandler::<I, _>::bind(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                id,
-                local_ip,
-                icmp_id,
-            ))
-        }
-    );
-    result
-}
-
-/// Sends an ICMP packet through a connection.
-///
-/// The socket must be connected in order for the operation to succeed.
-pub fn send<I: Ip, B: BufferMut, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-    body: B,
-) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
-    net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx, body)), id), |(
-        IpInvariant((core_ctx, bindings_ctx, body)),
-        id,
-    )| {
-        SocketHandler::<I, BC>::send(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx, id, body)
-    })
-}
-
-/// Sends an ICMP packet with an remote address.
-///
-/// The socket doesn't need to be connected.
-pub fn send_to<I: Ip, B: BufferMut, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
-    body: B,
-) -> Result<
-    (),
-    either::Either<LocalAddressError, datagram::SendToError<packet_formats::error::ParseError>>,
-> {
-    let IpInvariant(result) = net_types::map_ip_twice!(
-        I,
-        (IpInvariant((core_ctx, bindings_ctx, body)), (remote_ip, id)),
-        |(IpInvariant((core_ctx, bindings_ctx, body)), (remote_ip, id))| {
-            IpInvariant(SocketHandler::<I, BC>::send_to(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                id,
-                remote_ip,
-                body,
-            ))
-        }
-    );
-    result
 }
 
 /// Socket information about an ICMP socket.
@@ -937,212 +764,6 @@ pub enum SocketInfo<A: IpAddress, D> {
     },
 }
 
-/// Gets the information about an ICMP socket.
-pub fn get_info<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-) -> SocketInfo<I::Addr, crate::device::WeakDeviceId<BC>> {
-    net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx)), id), |(
-        IpInvariant((core_ctx, bindings_ctx)),
-        id,
-    )| {
-        SocketHandler::<I, BC>::get_info(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx, id)
-    })
-}
-
-/// Sets the bound device for a socket.
-///
-/// Sets the device to be used for sending and receiving packets for a socket.
-/// If the socket is not currently bound to a local address and port, the device
-/// will be used when binding.
-pub fn set_device<I: Ip, BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-    device_id: Option<&DeviceId<BC>>,
-) -> Result<(), SocketError> {
-    let IpInvariant(result) = net_types::map_ip_twice!(
-        I,
-        (IpInvariant((core_ctx, bindings_ctx, device_id)), id),
-        |(IpInvariant((core_ctx, bindings_ctx, device_id)), id)| {
-            IpInvariant(SocketHandler::<I, _>::set_device(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                id,
-                device_id,
-            ))
-        },
-    );
-    result
-}
-
-/// Gets the device the specified socket is bound to.
-pub fn get_bound_device<I: Ip, BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &BC,
-    id: &SocketId<I>,
-) -> Option<crate::device::WeakDeviceId<BC>> {
-    let IpInvariant(device) = net_types::map_ip_twice!(
-        I,
-        (IpInvariant((core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            IpInvariant(SocketHandler::<I, _>::get_bound_device(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                id,
-            ))
-        }
-    );
-    device
-}
-
-/// Disconnects an ICMP socket.
-pub fn disconnect<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-) -> Result<(), datagram::ExpectedConnError> {
-    net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx)), id), |(
-        IpInvariant((core_ctx, bindings_ctx)),
-        id,
-    )| {
-        SocketHandler::<I, BC>::disconnect(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx, id)
-    })
-}
-
-/// Shuts down an ICMP socket.
-pub fn shutdown<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &BC,
-    id: &SocketId<I>,
-    shutdown_type: ShutdownType,
-) -> Result<(), datagram::ExpectedConnError> {
-    net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx, shutdown_type)), id), |(
-        IpInvariant((core_ctx, bindings_ctx, shutdown_type)),
-        id,
-    )| {
-        SocketHandler::<I, BC>::shutdown(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            id,
-            shutdown_type,
-        )
-    })
-}
-
-/// Gets the current shutdown state of an ICMP socket.
-pub fn get_shutdown<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &BC,
-    id: &SocketId<I>,
-) -> Option<ShutdownType> {
-    net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx)), id), |(
-        IpInvariant((core_ctx, bindings_ctx)),
-        id,
-    )| {
-        SocketHandler::<I, BC>::get_shutdown(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            id,
-        )
-    })
-}
-
-/// closes an ICMP socket.
-pub fn close<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: SocketId<I>,
-) {
-    net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx)), id), |(
-        IpInvariant((core_ctx, bindings_ctx)),
-        id,
-    )| {
-        SocketHandler::<I, BC>::close(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx, id)
-    })
-}
-
-/// Sets unicast IP hop limit for ICMP sockets.
-pub fn set_unicast_hop_limit<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-    hop_limit: Option<NonZeroU8>,
-) {
-    net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx, hop_limit)), id), |(
-        IpInvariant((core_ctx, bindings_ctx, hop_limit)),
-        id,
-    )| {
-        SocketHandler::<I, BC>::set_unicast_hop_limit(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            id,
-            hop_limit,
-        )
-    })
-}
-
-/// Sets multicast IP hop limit for ICMP sockets.
-pub fn set_multicast_hop_limit<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &SocketId<I>,
-    hop_limit: Option<NonZeroU8>,
-) {
-    net_types::map_ip_twice!(I, (IpInvariant((core_ctx, bindings_ctx, hop_limit)), id), |(
-        IpInvariant((core_ctx, bindings_ctx, hop_limit)),
-        id,
-    )| {
-        SocketHandler::<I, BC>::set_multicast_hop_limit(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            id,
-            hop_limit,
-        )
-    })
-}
-
-/// Gets unicast IP hop limit for ICMP sockets.
-pub fn get_unicast_hop_limit<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &BC,
-    id: &SocketId<I>,
-) -> NonZeroU8 {
-    let IpInvariant(hop_limit) = net_types::map_ip_twice!(
-        I,
-        (IpInvariant((core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            IpInvariant(SocketHandler::<I, BC>::get_unicast_hop_limit(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                id,
-            ))
-        }
-    );
-    hop_limit
-}
-
-/// Gets multicast IP hop limit for ICMP sockets.
-pub fn get_multicast_hop_limit<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &BC,
-    id: &SocketId<I>,
-) -> NonZeroU8 {
-    let IpInvariant(hop_limit) = net_types::map_ip_twice!(
-        I,
-        (IpInvariant((core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            IpInvariant(SocketHandler::<I, BC>::get_multicast_hop_limit(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                id,
-            ))
-        }
-    );
-    hop_limit
-}
-
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
@@ -1161,8 +782,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::FakeCtxWithCoreCtx,
+        api::CoreApi,
+        context::UnlockedCoreCtx,
         ip::icmp::tests::FakeIcmpCtx,
+        marker::CoreContext,
         testutil::{handle_queued_rx_packets, Ctx, TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
@@ -1194,11 +817,14 @@ mod tests {
     #[test_case(IcmpConnectionType::Local, IcmpSendType::SendTo, false)]
     #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, false)]
     #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, false)]
-    fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt>(
+    fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + crate::marker::IpExt>(
         conn_type: IcmpConnectionType,
         send_type: IcmpSendType,
         bind_to_device: bool,
-    ) {
+    ) where
+        for<'a> UnlockedCoreCtx<'a, crate::testutil::FakeBindingsCtx>:
+            CoreContext<I, crate::testutil::FakeBindingsCtx>,
+    {
         crate::testutil::set_logger_for_test();
 
         let config = I::FAKE_CONFIG;
@@ -1247,36 +873,33 @@ mod tests {
             .into_inner();
         let conn = net.with_context(LOCAL_CTX_NAME, |Ctx { core_ctx, bindings_ctx }| {
             crate::device::testutil::enable_device(&&*core_ctx, bindings_ctx, &loopback_device_id);
-
-            let conn = new_socket::<I, _>(core_ctx);
+            let mut socket_api = CoreApi::with_contexts(core_ctx, bindings_ctx).icmp_echo::<I>();
+            let conn = socket_api.create();
             if bind_to_device {
                 let device = local_device_ids[0].clone().into();
-                set_device(core_ctx, bindings_ctx, &conn, Some(&device))
-                    .expect("failed to set SO_BINDTODEVICE");
+                socket_api.set_device(&conn, Some(&device)).expect("failed to set SO_BINDTODEVICE");
             }
             core::mem::drop((local_device_ids, remote_device_ids));
-            bind(core_ctx, bindings_ctx, &conn, None, NonZeroU16::new(icmp_id)).unwrap();
+            socket_api.bind(&conn, None, NonZeroU16::new(icmp_id)).unwrap();
             match send_type {
                 IcmpSendType::Send => {
-                    connect(
-                        core_ctx,
-                        bindings_ctx,
-                        &conn,
-                        Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
-                        REMOTE_ID,
-                    )
-                    .unwrap();
-                    send(core_ctx, bindings_ctx, &conn, buf).unwrap();
+                    socket_api
+                        .connect(
+                            &conn,
+                            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
+                            REMOTE_ID,
+                        )
+                        .unwrap();
+                    socket_api.send(&conn, buf).unwrap();
                 }
                 IcmpSendType::SendTo => {
-                    send_to(
-                        core_ctx,
-                        bindings_ctx,
-                        &conn,
-                        Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
-                        buf,
-                    )
-                    .unwrap();
+                    socket_api
+                        .send_to(
+                            &conn,
+                            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
+                            buf,
+                        )
+                        .unwrap();
                 }
             }
             handle_queued_rx_packets(core_ctx, bindings_ctx);
@@ -1311,17 +934,16 @@ mod tests {
             .into_inner();
         assert_matches!(&replies[..], [body] if *body == expected);
     }
+
     #[test]
     fn test_connect_dual_stack_fails() {
         // Verify that connecting to an ipv4-mapped-ipv6 address fails, as ICMP
         // sockets do not support dual-stack operations.
         let mut ctx = FakeIcmpCtx::<Ipv6>::default();
-        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
-        let conn = SocketHandler::<Ipv6, _>::create(core_ctx);
+        let mut api = IcmpEchoSocketApi::<Ipv6, _>::new(ctx.as_mut());
+        let conn = api.create();
         assert_eq!(
-            SocketHandler::<Ipv6, _>::connect(
-                core_ctx,
-                bindings_ctx,
+            api.connect(
                 &conn,
                 Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(
                     SpecifiedAddr::new(net_ip_v6!("::ffff:192.0.2.1")).unwrap(),
@@ -1335,11 +957,9 @@ mod tests {
     #[ip_test]
     fn send_invalid_icmp_echo<I: Ip + TestIpExt + datagram::IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
-        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
-        let conn = SocketHandler::<I, _>::create(core_ctx);
-        SocketHandler::<I, _>::connect(
-            core_ctx,
-            bindings_ctx,
+        let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
+        let conn = api.create();
+        api.connect(
             &conn,
             Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
             REMOTE_ID,
@@ -1357,7 +977,7 @@ mod tests {
             .unwrap()
             .into_inner();
         assert_matches!(
-            SocketHandler::<I, _>::send(core_ctx, bindings_ctx, &conn, buf,),
+            api.send(&conn, buf),
             Err(datagram::SendError::SerializeError(
                 packet_formats::error::ParseError::NotExpected
             ))
@@ -1367,31 +987,26 @@ mod tests {
     #[ip_test]
     fn get_info<I: Ip + TestIpExt + datagram::IpExt>() {
         let mut ctx = FakeIcmpCtx::<I>::default();
-        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(1));
 
-        let id = SocketHandler::<I, _>::create(core_ctx);
-        assert_eq!(
-            SocketHandler::<I, _>::get_info(core_ctx, bindings_ctx, &id),
-            SocketInfo::Unbound
-        );
+        let id = api.create();
+        assert_eq!(api.get_info(&id), SocketInfo::Unbound);
 
-        SocketHandler::<I, _>::bind(core_ctx, bindings_ctx, &id, None, Some(ICMP_ID)).unwrap();
+        api.bind(&id, None, Some(ICMP_ID)).unwrap();
         assert_eq!(
-            SocketHandler::<I, _>::get_info(core_ctx, bindings_ctx, &id),
+            api.get_info(&id),
             SocketInfo::Bound { local_ip: None, id: ICMP_ID, device: None }
         );
 
-        SocketHandler::<I, _>::connect(
-            core_ctx,
-            bindings_ctx,
+        api.connect(
             &id,
             Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
             REMOTE_ID,
         )
         .unwrap();
         assert_eq!(
-            SocketHandler::<I, _>::get_info(core_ctx, bindings_ctx, &id),
+            api.get_info(&id),
             SocketInfo::Connected {
                 local_ip: I::FAKE_CONFIG.local_ip,
                 remote_ip: I::FAKE_CONFIG.remote_ip,

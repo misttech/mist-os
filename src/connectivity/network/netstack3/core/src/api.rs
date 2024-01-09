@@ -8,6 +8,7 @@ use net_types::ip::Ip;
 
 use crate::{
     context::{BindingsTypes, ContextProvider, CoreCtx, CtxPair},
+    ip::icmp::socket::IcmpEchoSocketApi,
     transport::udp::UdpApi,
 };
 
@@ -32,6 +33,12 @@ where
     pub fn udp<I: Ip>(self) -> UdpApi<I, CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         UdpApi::new(ctx)
+    }
+
+    /// Gets access to the ICMP socket API for IP version `I`.
+    pub fn icmp_echo<I: Ip>(self) -> IcmpEchoSocketApi<I, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        IcmpEchoSocketApi::new(ctx)
     }
 }
 

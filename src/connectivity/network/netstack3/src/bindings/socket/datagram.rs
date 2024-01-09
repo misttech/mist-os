@@ -603,7 +603,12 @@ impl OptionFromU16 for u16 {
     }
 }
 
-impl<I: IpExt> TransportState<I> for IcmpEcho {
+impl<I> TransportState<I> for IcmpEcho
+where
+    I: IpExt + SocketCollectionIpExt<Self>,
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
+{
     type ConnectError = ConnectError;
     type ListenError = Either<ExpectedUnboundError, LocalAddressError>;
     type DisconnectError = ExpectedConnError;
@@ -622,7 +627,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
     >;
 
     fn create_unbound(ctx: &mut Ctx) -> Self::SocketId {
-        icmp::new_socket(ctx.core_ctx())
+        ctx.api().icmp_echo().create()
     }
 
     fn connect(
@@ -631,8 +636,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError> {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        icmp::connect(core_ctx, bindings_ctx, id, remote_ip, remote_id)
+        ctx.api().icmp_echo().connect(id, remote_ip, remote_id)
     }
 
     fn bind(
@@ -641,13 +645,11 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         addr: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
         port: Option<Self::LocalIdentifier>,
     ) -> Result<(), Self::ListenError> {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        icmp::bind(core_ctx, bindings_ctx, id, addr, port)
+        ctx.api().icmp_echo().bind(id, addr, port)
     }
 
     fn disconnect(ctx: &mut Ctx, id: &Self::SocketId) -> Result<(), Self::DisconnectError> {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        icmp::disconnect(core_ctx, bindings_ctx, id)
+        ctx.api().icmp_echo().disconnect(id)
     }
 
     fn shutdown(
@@ -655,23 +657,19 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         id: &Self::SocketId,
         which: ShutdownType,
     ) -> Result<(), Self::ShutdownError> {
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-        icmp::shutdown(core_ctx, bindings_ctx, id, which)
+        ctx.api().icmp_echo().shutdown(id, which)
     }
 
     fn get_shutdown(ctx: &mut Ctx, id: &Self::SocketId) -> Option<ShutdownType> {
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-        icmp::get_shutdown(core_ctx, bindings_ctx, id)
+        ctx.api().icmp_echo().get_shutdown(id)
     }
 
     fn get_socket_info(ctx: &mut Ctx, id: &Self::SocketId) -> Self::SocketInfo {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        icmp::get_info(core_ctx, bindings_ctx, id)
+        ctx.api().icmp_echo().get_info(id)
     }
 
     fn close(ctx: &mut Ctx, id: Self::SocketId) {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        icmp::close(core_ctx, bindings_ctx, id)
+        ctx.api().icmp_echo().close(id)
     }
 
     fn set_socket_device(
@@ -679,13 +677,11 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         id: &Self::SocketId,
         device: Option<&DeviceId<BindingsCtx>>,
     ) -> Result<(), Self::SetSocketDeviceError> {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        icmp::set_device(core_ctx, bindings_ctx, id, device)
+        ctx.api().icmp_echo().set_device(id, device)
     }
 
     fn get_bound_device(ctx: &mut Ctx, id: &Self::SocketId) -> Option<WeakDeviceId<BindingsCtx>> {
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-        icmp::get_bound_device(core_ctx, bindings_ctx, id)
+        ctx.api().icmp_echo().get_bound_device(id)
     }
 
     fn set_dual_stack_enabled(
@@ -751,8 +747,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         if I::VERSION != ip_version {
             return Err(NotDualStackCapableError);
         }
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        Ok(icmp::set_unicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit))
+        Ok(ctx.api().icmp_echo().set_unicast_hop_limit(id, hop_limit))
     }
 
     fn set_multicast_hop_limit(
@@ -769,8 +764,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         if I::VERSION != ip_version {
             return Err(NotDualStackCapableError);
         }
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        Ok(icmp::set_multicast_hop_limit(core_ctx, bindings_ctx, id, hop_limit))
+        Ok(ctx.api().icmp_echo().set_multicast_hop_limit(id, hop_limit))
     }
 
     fn get_unicast_hop_limit(
@@ -786,8 +780,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         if I::VERSION != ip_version {
             return Err(NotDualStackCapableError);
         }
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-        Ok(icmp::get_unicast_hop_limit(core_ctx, bindings_ctx, id))
+        Ok(ctx.api().icmp_echo().get_unicast_hop_limit(id))
     }
 
     fn get_multicast_hop_limit(
@@ -803,8 +796,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         if I::VERSION != ip_version {
             return Err(NotDualStackCapableError);
         }
-        let (core_ctx, bindings_ctx) = ctx.contexts();
-        Ok(icmp::get_multicast_hop_limit(core_ctx, bindings_ctx, id))
+        Ok(ctx.api().icmp_echo().get_multicast_hop_limit(id))
     }
 
     fn set_ip_transparent(
@@ -824,8 +816,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         id: &Self::SocketId,
         body: B,
     ) -> Result<(), Self::SendError> {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        icmp::send(core_ctx, bindings_ctx, id, body)
+        ctx.api().icmp_echo().send(id, body)
     }
 
     fn send_to<B: BufferMut>(
@@ -837,8 +828,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         ),
         body: B,
     ) -> Result<(), Self::SendToError> {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        icmp::send_to(core_ctx, bindings_ctx, id, remote_ip, body)
+        ctx.api().icmp_echo().send_to(id, remote_ip, body)
     }
 }
 
