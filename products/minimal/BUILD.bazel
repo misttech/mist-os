@@ -28,6 +28,14 @@ _PRODUCT_CONFIG_BASE_JSON = {
                 "netcfg_config_path": "LABEL(//src/connectivity/policy/netcfg/config:default.json)",
             },
         },
+        "diagnostics": {
+            "archivist_pipelines": [
+                {
+                    "name": "feedback",
+                    "files": [],
+                },
+            ],
+        },
         "fonts": {
             "enabled": False,
         },

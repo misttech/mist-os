@@ -29,6 +29,15 @@ _platform_configuration_base = {
     group1 = true
   }
 
+  diagnostics = {
+    archivist_pipelines = [
+      {
+        name = "feedback"
+        files = []
+      },
+    ]
+  }
+
   fonts = {
     # See base_packages below.
     font_collection = "small-open-fonts-collection"

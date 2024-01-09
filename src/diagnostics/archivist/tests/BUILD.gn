@@ -9,5 +9,6 @@ group("tests") {
   deps = [
     "integration:tests",
     "logs:tests",
+    "pipeline_test",
   ]
 }

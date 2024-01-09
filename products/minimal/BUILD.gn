@@ -21,6 +21,14 @@ product_assembly_configuration("minimal") {
                         root_build_dir)
       }
     }
+    diagnostics = {
+      archivist_pipelines = [
+        {
+          name = "feedback"
+          files = []
+        },
+      ]
+    }
     fonts = {
       # minimal is headless, so ostensibly does not need fonts.
       enabled = false

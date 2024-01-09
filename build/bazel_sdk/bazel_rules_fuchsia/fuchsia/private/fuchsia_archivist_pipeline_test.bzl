@@ -107,7 +107,7 @@ fuchsia_archivist_pipeline_test_manifest = rule(
         "inspect": attr.label_list(
             doc = "List of inspect files to test",
             mandatory = True,
-            allow_empty = False,
+            allow_empty = True,
             allow_files = True,
         ),
         "expect_disabled": attr.bool(
