@@ -205,6 +205,7 @@ type PuppetCreationArgs = resource table {
     5: keyboard_listener client_end:fuchsia.ui.test.input.KeyboardInputListener;
     6: flatland_client client_end:fuchsia.ui.composition.Flatland;
     7: keyboard_client client_end:fuchsia.ui.input3.Keyboard;
+    8: device_pixel_ratio float32;
 };
 
 /// A helper to spawn a puppet instance, which will own a view created with a specific
