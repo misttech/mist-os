@@ -671,13 +671,11 @@ impl CpuManagerMain {
     async fn handle_update_thermal_load(
         &self,
         thermal_load: ThermalLoad,
-        sensor: &str,
     ) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
             "cpu_manager",
             "CpuManagerMain::handle_update_thermal_load",
-            "thermal_load" => thermal_load.0,
-            "sensor" => sensor
+            "thermal_load" => thermal_load.0
         );
 
         if thermal_load > ThermalLoad(fthermal::MAX_THERMAL_LOAD) {
@@ -945,8 +943,8 @@ impl Node for CpuManagerMain {
 
     async fn handle_message(&self, msg: &Message) -> MessageResult {
         match msg {
-            Message::UpdateThermalLoad(thermal_load, sensor) => {
-                self.handle_update_thermal_load(*thermal_load, sensor).await
+            Message::UpdateThermalLoad(thermal_load) => {
+                self.handle_update_thermal_load(*thermal_load).await
             }
             _ => Err(CpuManagerError::Unsupported),
         }
@@ -1478,9 +1476,7 @@ mod tests {
         //   2W static + 0.5W dynamic = 2.5W
         // This is within the 2.985W budget, so there are no P-state changes.
         handlers.enqueue_cpu_loads(vec![0.1; 4]);
-        let result = node
-            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(52), "Sensor".to_string()))
-            .await;
+        let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(52))).await;
         result.unwrap();
 
         // The thermal load is 52, we have max power consumption of 2.985W.
@@ -1493,9 +1489,7 @@ mod tests {
         // So the new thermal state is 1, for which the little cluster changes to P-state 1.
         handlers.enqueue_cpu_loads(vec![0.25; 4]);
         handlers.expect_little_pstate(1);
-        let result = node
-            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(52), "Sensor".to_string()))
-            .await;
+        let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(52))).await;
         result.unwrap();
 
         // The thermal load is 61, we have max power consumption of 2.426W.
@@ -1504,9 +1498,7 @@ mod tests {
         handlers.enqueue_cpu_loads(vec![0.25; 4]);
         handlers.expect_big_pstate(1);
         handlers.expect_little_pstate(2);
-        let result = node
-            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(61), "Sensor".to_string()))
-            .await;
+        let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(61))).await;
         result.unwrap();
 
         // The thermal load is 77, we have max power consumption of 1.43W.
@@ -1516,9 +1508,7 @@ mod tests {
         handlers.enqueue_cpu_loads(vec![0.05; 4]);
         handlers.expect_big_pstate(0);
         handlers.expect_little_pstate(1);
-        let result = node
-            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(77), "Sensor".to_string()))
-            .await;
+        let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(77))).await;
         result.unwrap();
 
         // The thermal load is 84, we have max power consumption of 0.9948W.
@@ -1526,9 +1516,7 @@ mod tests {
         // thermal state 1 is inadmissible. This drives us to thermal state 0.
         handlers.enqueue_cpu_loads(vec![0.01; 4]);
         handlers.expect_little_pstate(0);
-        let result = node
-            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(84), "Sensor".to_string()))
-            .await;
+        let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(84))).await;
         result.unwrap();
     }
 
@@ -1574,9 +1562,7 @@ mod tests {
         handlers.enqueue_cpu_loads(vec![0.1; 4]);
         handlers.expect_big_pstate(2);
         handlers.expect_little_pstate(2);
-        let result = node
-            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(85), "Sensor".to_string()))
-            .await;
+        let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(85))).await;
         result.unwrap();
 
         // Now saturate the CPUs. This corresponds to 4.4 NormPerfs.
@@ -1597,9 +1583,7 @@ mod tests {
         //    saturation.
         handlers.expect_big_pstate(1);
         handlers.expect_little_pstate(1);
-        let result = node
-            .handle_message(&Message::UpdateThermalLoad(thermal_load, "Sensor".to_string()))
-            .await;
+        let result = node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
     }
 
@@ -1641,9 +1625,7 @@ mod tests {
         handlers.enqueue_cpu_loads(vec![1.0; 4]);
         handlers.expect_big_pstate(1);
         handlers.expect_little_pstate(2);
-        let result = node
-            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(84), "Sensor".to_string()))
-            .await;
+        let result = node.handle_message(&Message::UpdateThermalLoad(ThermalLoad(84))).await;
         assert_matches!(result, Ok(_));
 
         let estimate =

@@ -33,10 +33,8 @@ pub enum Message {
     /// dev_control_handler crate. An increasing value indicates a lower performance state.
     SetPerformanceState(u32),
 
-    /// Communicate a new thermal load value for the given sensor
-    /// Arg0: a ThermalLoad value which represents the severity of thermal load on the given sensor
-    /// Arg1: the topological path which uniquely identifies a specific temperature sensor
-    UpdateThermalLoad(ThermalLoad, String),
+    /// Communicate a thermal load value
+    UpdateThermalLoad(ThermalLoad),
 }
 
 /// Defines the return values for each of the Message types from above

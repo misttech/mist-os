@@ -361,13 +361,11 @@ impl CpuControlHandler {
     async fn handle_update_thermal_load(
         &self,
         thermal_load: ThermalLoad,
-        sensor: &str,
     ) -> Result<MessageReturn, CpuManagerError> {
         fuchsia_trace::duration!(
             "cpu_manager",
             "CpuControlHandler::handle_update_thermal_load",
-            "thermal_load" => thermal_load.0,
-            "sensor" => sensor
+            "thermal_load" => thermal_load.0
         );
 
         if thermal_load > ThermalLoad(fthermal::MAX_THERMAL_LOAD) {
@@ -613,8 +611,8 @@ impl Node for CpuControlHandler {
 
     async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, CpuManagerError> {
         match msg {
-            Message::UpdateThermalLoad(thermal_load, sensor) => {
-                self.handle_update_thermal_load(*thermal_load, sensor).await
+            Message::UpdateThermalLoad(thermal_load) => {
+                self.handle_update_thermal_load(*thermal_load).await
             }
             _ => Err(CpuManagerError::Unsupported),
         }
@@ -941,9 +939,7 @@ pub mod tests {
             ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
                 as u32,
         );
-        let result = cpu_ctrl_node
-            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
-            .await;
+        let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 0);
 
@@ -956,9 +952,7 @@ pub mod tests {
             ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
                 as u32,
         );
-        let result = cpu_ctrl_node
-            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
-            .await;
+        let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
 
@@ -971,9 +965,7 @@ pub mod tests {
             ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
                 as u32,
         );
-        let result = cpu_ctrl_node
-            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
-            .await;
+        let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
     }
@@ -1049,9 +1041,7 @@ pub mod tests {
             ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
                 as u32,
         );
-        let result = cpu_ctrl_node
-            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
-            .await;
+        let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 0);
 
@@ -1064,9 +1054,7 @@ pub mod tests {
             ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
                 as u32,
         );
-        let result = cpu_ctrl_node
-            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
-            .await;
+        let result = cpu_ctrl_node.handle_message(&Message::UpdateThermalLoad(thermal_load)).await;
         result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
     }
