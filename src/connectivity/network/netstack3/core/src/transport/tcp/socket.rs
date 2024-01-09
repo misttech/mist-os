@@ -42,6 +42,43 @@ use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 use tracing::{debug, error, trace};
 
+use crate::{
+    algorithm::{PortAlloc, PortAllocImpl},
+    context::{InstantBindingsTypes, TimerContext, TracingContext},
+    convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
+    data_structures::socketmap::{IterShadows as _, SocketMap},
+    device::{self, AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId, WeakId},
+    error::{ExistsError, LocalAddressError, ZonedAddressError},
+    ip::{
+        icmp::IcmpErrorCode,
+        socket::{
+            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
+        },
+        EitherDeviceId, TransportIpContext,
+    },
+    socket::{
+        address::{
+            dual_stack_remote_ip, AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackRemoteIp,
+            ListenerAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
+        },
+        AddrVec, Bound, BoundSocketMap, EitherStack, IncompatibleError, InsertError, Inserter,
+        ListenerAddrInfo, MaybeDualStack, RemoveResult, ShutdownType, SocketMapAddrSpec,
+        SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
+        SocketMapStateSpec, SocketMapUpdateSharingPolicy, UpdateSharingError,
+    },
+    sync::RwLock,
+    transport::tcp::{
+        buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
+        seqnum::SeqNum,
+        socket::{accept_queue::AcceptQueue, demux::tcp_serialize_segment, isn::IsnGenerator},
+        state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
+        BufferSizes, ConnectionError, Mss, OptionalBufferSizes, SocketOptions,
+    },
+    CoreCtx, SyncCtx,
+};
+
+pub use accept_queue::ListenerNotifier;
+
 /// We use this trait to turn [`DualStackIpExt::DemuxSocketId`]s into a TimerId.
 pub trait ToTimerId<D: device::WeakId, BT: TcpBindingsTypes> {
     fn to_timer_id(&self) -> TimerId<D, BT>;
@@ -143,43 +180,6 @@ impl DualStackIpExt for Ipv6 {
         id
     }
 }
-
-use crate::{
-    algorithm::{PortAlloc, PortAllocImpl},
-    context::{InstantBindingsTypes, TimerContext, TracingContext},
-    convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
-    data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{self, AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId, WeakId},
-    error::{ExistsError, LocalAddressError, ZonedAddressError},
-    ip::{
-        icmp::IcmpErrorCode,
-        socket::{
-            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSocketHandler,
-        },
-        EitherDeviceId, TransportIpContext,
-    },
-    socket::{
-        address::{
-            dual_stack_remote_ip, AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackRemoteIp,
-            ListenerAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
-        },
-        AddrVec, Bound, BoundSocketMap, EitherStack, IncompatibleError, InsertError, Inserter,
-        ListenerAddrInfo, MaybeDualStack, RemoveResult, ShutdownType, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy,
-        SocketMapStateSpec, SocketMapUpdateSharingPolicy, UpdateSharingError,
-    },
-    sync::RwLock,
-    transport::tcp::{
-        buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
-        seqnum::SeqNum,
-        socket::{accept_queue::AcceptQueue, demux::tcp_serialize_segment, isn::IsnGenerator},
-        state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
-        BufferSizes, ConnectionError, Mss, OptionalBufferSizes, SocketOptions,
-    },
-    CoreCtx, SyncCtx,
-};
-
-pub use accept_queue::ListenerNotifier;
 
 /// Timer ID for TCP connections.
 #[derive(Derivative, GenericOverIp)]
