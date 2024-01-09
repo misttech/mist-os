@@ -602,7 +602,7 @@ struct RefInner<T> {
     // This is close to a duplicate of the Arc strong_count, and could be replaced by it if this
     // module reimplemented all of Arc/Weak. This can be changed without changing the API if this
     // becomes a performance issue.
-    temp_refs_count: zx::sys::zx_futex_t,
+    temp_refs_count: zx::Futex,
 }
 
 impl<T> RefInner<T> {
@@ -610,7 +610,7 @@ impl<T> RefInner<T> {
         Self {
             value: value.into(),
             owned_refs_count: AtomicUsize::new(1),
-            temp_refs_count: 0.into(),
+            temp_refs_count: zx::Futex::new(0),
         }
     }
 
@@ -632,11 +632,7 @@ impl<T> RefInner<T> {
         let previous_count = self.temp_refs_count.fetch_sub(1, Ordering::Release);
         if previous_count == 1 {
             fence(Ordering::Acquire);
-            unsafe {
-                // SAFETY: This is a ffi call to a zircon syscall.
-                let result = zx::sys::zx_futex_wake(&self.temp_refs_count, 1);
-                debug_assert_eq!(result, zx::sys::ZX_OK);
-            }
+            self.temp_refs_count.wake_single_owner();
         }
         #[cfg(any(test, debug_assertions))]
         {
@@ -656,19 +652,11 @@ impl<T> RefInner<T> {
         }
         // Otherwise, wait on the futex that will be waken up when the number of temp_ref drops
         // to 0.
-        unsafe {
-            // SAFETY: This is a ffi call to a zircon syscall.
-            let result = zx::sys::zx_futex_wait(
-                &self.temp_refs_count,
-                current_value.into(),
-                zx::sys::ZX_HANDLE_INVALID,
-                zx::Time::INFINITE.into_nanos(),
-            );
-            debug_assert!(
-                result == zx::sys::ZX_OK || result == zx::sys::ZX_ERR_BAD_STATE,
-                "Unexpected result: {result}"
-            );
-        }
+        let result = self.temp_refs_count.wait(current_value, None, zx::Time::INFINITE);
+        debug_assert!(
+            result == Ok(()) || result == Err(zx::Status::BAD_STATE),
+            "Unexpected result: {result:?}"
+        );
     }
 }
 

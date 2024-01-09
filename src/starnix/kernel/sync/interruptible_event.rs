@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, sys};
+use fuchsia_zircon as zx;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -26,7 +26,7 @@ use std::sync::Arc;
 /// start blocking.
 #[derive(Debug)]
 pub struct InterruptibleEvent {
-    futex: sys::zx_futex_t,
+    futex: zx::Futex,
 }
 
 /// The initial state.
@@ -82,7 +82,7 @@ pub enum WakeReason {
 
 impl InterruptibleEvent {
     pub fn new() -> Arc<Self> {
-        Arc::new(InterruptibleEvent { futex: Default::default() })
+        Arc::new(InterruptibleEvent { futex: zx::Futex::new(0) })
     }
 
     /// Called to initiate a wait.
@@ -103,16 +103,7 @@ impl InterruptibleEvent {
         // We need to loop around the call to zx_futex_wake because we can receive spurious
         // wakeups.
         loop {
-            let status = unsafe {
-                sys::zx_futex_wait(
-                    self.futex_ptr(),
-                    WAITING,
-                    sys::ZX_HANDLE_INVALID,
-                    deadline.into_nanos(),
-                )
-            };
-
-            match zx::ok(status) {
+            match self.futex.wait(WAITING, None, deadline) {
                 // The deadline expired while we were sleeping.
                 Err(zx::Status::TIMED_OUT) => {
                     self.futex.store(READY, Ordering::Relaxed);
@@ -169,10 +160,6 @@ impl InterruptibleEvent {
         self.wake(INTERRUPTED);
     }
 
-    fn futex_ptr(&self) -> *const sys::zx_futex_t {
-        std::ptr::addr_of!(self.futex)
-    }
-
     fn wake(&self, state: i32) {
         // See <https://marabos.nl/atomics/hardware.html#failing-compare-exchange> for why we issue
         // this load before the `compare_exchange` below.
@@ -183,9 +170,7 @@ impl InterruptibleEvent {
                 .compare_exchange(WAITING, state, Ordering::Release, Ordering::Relaxed)
                 .is_ok()
         {
-            unsafe {
-                sys::zx_futex_wake(self.futex_ptr(), u32::MAX);
-            }
+            self.futex.wake_all();
         }
     }
 }

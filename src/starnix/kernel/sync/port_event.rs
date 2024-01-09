@@ -48,7 +48,7 @@ const ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE: Ordering = Ordering::Re
 pub struct PortEvent {
     /// The Futex used to wake up a thread when this waiter is waiting for
     /// events that don't depend on a `zx::Port`.
-    futex: zx::sys::zx_futex_t,
+    futex: zx::Futex,
     /// The underlying Zircon port that the waiter waits on when it is
     /// interested in events that cross process boundaries.
     ///
@@ -87,7 +87,7 @@ impl PortEvent {
     /// Returns a new `PortEvent`.
     pub fn new() -> Self {
         Self {
-            futex: zx::sys::zx_futex_t::new(FUTEX_WAITING),
+            futex: zx::Futex::new(FUTEX_WAITING),
             port: LazySync::new(zx::Port::create),
             has_pending_user_packet: Default::default(),
         }
@@ -98,27 +98,15 @@ impl PortEvent {
         let mut state = self.futex.load(ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE);
         loop {
             match state {
-                FUTEX_WAITING => {
-                    let status = unsafe {
-                        zx::sys::zx_futex_wait(
-                            &self.futex,
-                            FUTEX_WAITING,
-                            zx::sys::ZX_HANDLE_INVALID,
-                            deadline.into_nanos(),
-                        )
-                    };
-
-                    match zx::ok(status) {
-                        Ok(()) | Err(zx::Status::BAD_STATE) => {
-                            state =
-                                self.futex.load(ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE);
-                        }
-                        Err(zx::Status::TIMED_OUT) => {
-                            return PortWaitResult::TimedOut;
-                        }
-                        Err(e) => panic!("Unexpected error from zx_futex_wait: {e}"),
+                FUTEX_WAITING => match self.futex.wait(FUTEX_WAITING, None, deadline) {
+                    Ok(()) | Err(zx::Status::BAD_STATE) => {
+                        state = self.futex.load(ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE);
                     }
-                }
+                    Err(zx::Status::TIMED_OUT) => {
+                        return PortWaitResult::TimedOut;
+                    }
+                    Err(e) => panic!("Unexpected error from zx_futex_wait: {e}"),
+                },
                 FUTEX_NOTIFIED | FUTEX_INTERRUPTED => {
                     match self.futex.compare_exchange(
                         state,
@@ -199,7 +187,7 @@ impl PortEvent {
     ) -> Result<(), zx::Status> {
         match self.futex.swap(FUTEX_USE_PORT, ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE) {
             FUTEX_WAITING => {
-                assert_eq!(unsafe { zx::sys::zx_futex_wake(&self.futex, u32::MAX) }, zx::sys::ZX_OK)
+                self.futex.wake_all();
             }
             state @ (FUTEX_NOTIFIED | FUTEX_INTERRUPTED) => {
                 self.queue_user_packet_data(if state == FUTEX_INTERRUPTED {
@@ -260,10 +248,7 @@ impl PortEvent {
         ) {
             Ok(observed) => {
                 debug_assert_eq!(observed, FUTEX_WAITING);
-                assert_eq!(
-                    unsafe { zx::sys::zx_futex_wake(&self.futex, u32::MAX) },
-                    zx::sys::ZX_OK,
-                );
+                self.futex.wake_all();
             }
             Err(observed) => match observed {
                 FUTEX_WAITING => unreachable!("this should have passed"),
