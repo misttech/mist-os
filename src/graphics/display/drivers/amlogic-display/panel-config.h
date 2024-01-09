@@ -46,6 +46,11 @@ enum DsiOpcode : uint8_t {
   // Everything else is potentially a DSI command.
 };
 
+// The DSI operations are encoded as a sequence of variable-length operations.
+// The first byte in each operation is a `DsiOpcode` value, followed by the
+// opcode's arguments.
+using DsiOperationSequence = cpp20::span<const uint8_t>;
+
 enum PowerOpcode : uint8_t {
   // Drive a GPIO pin.
   kPowerOpGpio = 0,
@@ -64,10 +69,21 @@ struct PowerOp {
 };
 
 struct PanelConfig {
+  // Used for logging / debugging / inspection.
+  //
+  // Must be non-null.
   const char* name;
-  const cpp20::span<const uint8_t> dsi_on;
-  const cpp20::span<const uint8_t> dsi_off;
+
+  // A sequence of DSI operations used in the panel power on sequence.
+  const DsiOperationSequence dsi_on;
+
+  // A sequence of DSI operations used in the panel power off sequence.
+  const DsiOperationSequence dsi_off;
+
+  // Power operation sequence to power on the panel.
   const cpp20::span<const PowerOp> power_on;
+
+  // Power operation sequence to power off the panel.
   const cpp20::span<const PowerOp> power_off;
 };
 
