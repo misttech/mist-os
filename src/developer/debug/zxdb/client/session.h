@@ -245,7 +245,7 @@ class Session : public SettingStoreObserver {
 
   // Whether to automatically attach to processes found in Process Limbo upon a
   // successful connection.
-  bool auto_attach_limbo_ = true;
+  bool auto_attach_limbo_ = false;
 
   // Cache of koids that have been automatically attached from limbo during this session. If a koid
   // that has been cached crashes again, it will not be automatically attached to.

@@ -87,8 +87,8 @@ void SetupCommandLineOptions(const CommandLineOptions& options, Session* session
 
   if (options.debug_mode)
     system_settings.SetBool(ClientSettings::System::kDebugMode, true);
-  if (options.no_auto_attach_limbo)
-    system_settings.SetBool(ClientSettings::System::kAutoAttachLimbo, false);
+  if (options.auto_attach_limbo)
+    system_settings.SetBool(ClientSettings::System::kAutoAttachLimbo, true);
   if (options.symbol_cache)
     system_settings.SetString(ClientSettings::System::kSymbolCache, *options.symbol_cache);
   if (!options.symbol_index_files.empty())

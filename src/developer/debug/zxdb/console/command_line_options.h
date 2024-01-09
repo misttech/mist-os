@@ -39,7 +39,7 @@ struct CommandLineOptions {
   bool requested_version = false;
   bool enable_debug_adapter = false;
   uint16_t debug_adapter_port = 15678;
-  bool no_auto_attach_limbo = false;
+  bool auto_attach_limbo = false;
   pid_t signal_when_ready = 0;
   std::vector<std::string> stream_files;
 };

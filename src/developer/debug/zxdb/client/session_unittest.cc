@@ -382,8 +382,41 @@ TEST_F(SessionTest, StatusRequest) {
   EXPECT_EQ(status.processes[1].process_name, kProcessName2);
 }
 
+TEST_F(SessionTest, NoAutoAttachToLimboByDefault) {
+  constexpr uint64_t kProcessKoid = 0xc001cafe;
+  const std::string kProcessName = "process-1";
+
+  debug_ipc::ProcessRecord record;
+  record.process_koid = kProcessKoid;
+  record.process_name = kProcessName;
+
+  sink()->AppendLimboProcessRecord(record);
+
+  debug_ipc::NotifyProcessStarting notify;
+  notify.type = debug_ipc::NotifyProcessStarting::Type::kLimbo;
+  notify.koid = kProcessKoid;
+  notify.name = kProcessName;
+
+  session().DispatchNotifyProcessStarting(notify);
+
+  debug_ipc::StatusReply status;
+  sink()->Status(
+      {}, [&status](const Err& err, debug_ipc::StatusReply reply) { status = std::move(reply); });
+
+  // Check the processes are in limbo like we expect.
+  ASSERT_EQ(status.limbo.size(), 1u);
+  EXPECT_EQ(status.limbo[0].process_koid, kProcessKoid);
+  EXPECT_EQ(status.limbo[0].process_name, kProcessName);
+
+  // We shouldn't be attached to anything.
+  std::vector<Target*> targets = session().system().GetTargets();
+
+  ASSERT_EQ(targets.size(), 1u);
+  EXPECT_EQ(targets[0]->GetState(), Target::State::kNone);
+}
+
 // When a process crashes *after* zxdb is already launched and connected, we should automatically
-// attach to it via |DispatchNotifyProcessStarting|.
+// attach to it via |DispatchNotifyProcessStarting| when the setting is enabled.
 TEST_F(SessionTest, AutoAttachToLimboProcess) {
   constexpr uint64_t kProcessKoid = 0xc001cafe;
   const std::string kProcessName = "process-1";
@@ -393,6 +426,8 @@ TEST_F(SessionTest, AutoAttachToLimboProcess) {
   record.process_name = kProcessName;
 
   sink()->AppendLimboProcessRecord(record);
+
+  session().system().settings().SetBool(ClientSettings::System::kAutoAttachLimbo, true);
 
   debug_ipc::NotifyProcessStarting notify;
   notify.type = debug_ipc::NotifyProcessStarting::Type::kLimbo;

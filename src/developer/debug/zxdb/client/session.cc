@@ -632,10 +632,10 @@ void Session::DispatchNotifyProcessStarting(const debug_ipc::NotifyProcessStarti
     if (auto_attach_limbo_) {
       AttachToLimboProcessAndNotify(notify.koid, notify.name);
     } else {
-      LOGS(Warn) << "Process " << notify.name << "(" << notify.koid
-                 << ") crashed and is waiting to be attached.\n"
-                    "Not automatically attached due to user override.\n"
-                    "Type \"status\" for more information.";
+      LOGS(Info) << "Process " << notify.name << "(" << notify.koid
+                 << ") crashed and is being held in limbo.\n"
+                    "Use `attach "
+                 << notify.koid << "` to attach.";
     }
     return;
   }
@@ -847,8 +847,6 @@ void Session::SyncAgentStatus() {
             for (auto& process : reply.limbo) {
               AttachToLimboProcessAndNotify(process.process_koid, process.process_name);
             }
-          } else {
-            LOGS(Info) << "Not auto connecting to all processes in Limbo due to user override.";
           }
         }
 
@@ -891,10 +889,6 @@ void Session::ListenForSystemSettings() {
 
 void Session::AttachToLimboProcessAndNotify(uint64_t koid, const std::string& process_name) {
   if (koid_seen_in_limbo_.insert(koid).second) {
-    LOGS(Info) << "Process \"" << process_name << "\" (" << koid
-               << ") crashed and has been automatically attached.\n"
-                  "Type \"status\" for more information.";
-
     system().AttachToProcess(koid,
                              [](fxl::WeakPtr<Target> target, const Err&, uint64_t timestamp) {});
 
