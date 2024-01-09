@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common_utils::common::get_proxy_or_connect;
+use crate::common_utils::common::LazyProxy;
 use crate::weave::types::{PairingState, ResetConfig};
 use anyhow::Error;
 use fidl::endpoints::create_proxy;
@@ -10,7 +10,6 @@ use fidl_fuchsia_weave::{
     ErrorCode, FactoryDataManagerMarker, FactoryDataManagerProxy, PairingStateWatcherMarker,
     PairingStateWatcherProxy, ResetConfigFlags, StackMarker, StackProxy,
 };
-use parking_lot::RwLock;
 use serde_json::Value;
 use std::convert::From;
 
@@ -19,24 +18,24 @@ use std::convert::From;
 /// Note this object is shared among all threads created by server.
 #[derive(Debug)]
 pub struct WeaveFacade {
-    factory_data_manager: RwLock<Option<FactoryDataManagerProxy>>,
-    stack: RwLock<Option<StackProxy>>,
+    factory_data_manager: LazyProxy<FactoryDataManagerMarker>,
+    stack: LazyProxy<StackMarker>,
 }
 
 impl WeaveFacade {
     pub fn new() -> WeaveFacade {
-        WeaveFacade { factory_data_manager: RwLock::new(None), stack: RwLock::new(None) }
+        WeaveFacade { factory_data_manager: Default::default(), stack: Default::default() }
     }
 
     /// Returns the FactoryDataManager proxy provided on instantiation
     /// or establishes a new connection.
     fn factory_data_manager(&self) -> Result<FactoryDataManagerProxy, Error> {
-        get_proxy_or_connect::<FactoryDataManagerMarker>(&self.factory_data_manager)
+        self.factory_data_manager.get_or_connect()
     }
 
     /// Returns the Stack proxy provided on instantiation or establishes a new connection.
     fn stack(&self) -> Result<StackProxy, Error> {
-        get_proxy_or_connect::<StackMarker>(&self.stack)
+        self.stack.get_or_connect()
     }
 
     /// Returns the PairingStateWatcher proxy provided on instantiation.
@@ -197,13 +196,9 @@ mod tests {
                 }
                 assert_matches!(stream.next().await, None);
             };
-            (
-                WeaveFacade {
-                    stack: RwLock::new(Some(proxy)),
-                    factory_data_manager: RwLock::new(None),
-                },
-                fut,
-            )
+            let facade = WeaveFacade::new();
+            facade.stack.set(proxy).expect("just-created facade should have empty stack");
+            (facade, fut)
         }
         fn build_stack_and_pairing_state_watcher(self) -> (WeaveFacade, impl Future<Output = ()>) {
             let (proxy, mut stream) = create_proxy_and_stream::<StackMarker>().unwrap();
@@ -223,13 +218,9 @@ mod tests {
                     err => panic!("Error in request handler: {:?}", err),
                 }
             };
-            (
-                WeaveFacade {
-                    stack: RwLock::new(Some(proxy)),
-                    factory_data_manager: RwLock::new(None),
-                },
-                stream_fut,
-            )
+            let facade = WeaveFacade::new();
+            facade.stack.set(proxy).expect("just-created facade should have empty stack");
+            (facade, stream_fut)
         }
     }
 
@@ -268,13 +259,12 @@ mod tests {
                 }
                 assert_matches!(stream.next().await, None);
             };
-            (
-                WeaveFacade {
-                    stack: RwLock::new(None),
-                    factory_data_manager: RwLock::new(Some(proxy)),
-                },
-                fut,
-            )
+            let facade = WeaveFacade::new();
+            facade
+                .factory_data_manager
+                .set(proxy)
+                .expect("just-created facade should have empty fdm");
+            (facade, fut)
         }
     }
 

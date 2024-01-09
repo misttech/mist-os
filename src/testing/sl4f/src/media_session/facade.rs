@@ -11,8 +11,8 @@ use fidl_fuchsia_media_sessions2::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::RwLock;
 use futures::StreamExt;
-use parking_lot::RwLock;
 use std::sync::Arc;
 use tracing::info;
 

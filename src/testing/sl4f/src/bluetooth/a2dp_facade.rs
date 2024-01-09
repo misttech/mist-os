@@ -6,7 +6,7 @@ use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
 use anyhow::Error;
 use fidl_fuchsia_bluetooth_a2dp::{AudioModeMarker, AudioModeProxy, Role};
 use fuchsia_component::client;
-use parking_lot::Mutex;
+use fuchsia_sync::Mutex;
 use std::ops::DerefMut;
 use tracing::info;
 

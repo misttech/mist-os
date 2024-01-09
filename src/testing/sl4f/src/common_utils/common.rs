@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
+use fidl::endpoints::DiscoverableProtocolMarker;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{Status, Vmo};
-use parking_lot::{RwLock, RwLockUpgradableReadGuard};
+use once_cell::sync::OnceCell;
 use serde_json::Value;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
@@ -99,20 +100,28 @@ pub fn parse_write_value(args_raw: Value) -> Result<Vec<u8>, Error> {
     Ok(vector)
 }
 
-/// Given a RwLock of an optional FIDL service proxy, returns a cached connection to the service,
-/// or try to connect and cache the connection for later.
-pub fn get_proxy_or_connect<P>(lock: &RwLock<Option<P::Proxy>>) -> Result<P::Proxy, Error>
+#[derive(Debug)]
+pub struct LazyProxy<P: DiscoverableProtocolMarker>(OnceCell<P::Proxy>);
+
+impl<P: DiscoverableProtocolMarker> Default for LazyProxy<P> {
+    fn default() -> Self {
+        Self(OnceCell::default())
+    }
+}
+
+impl<P> LazyProxy<P>
 where
-    P: fidl::endpoints::DiscoverableProtocolMarker,
+    P: DiscoverableProtocolMarker,
     P::Proxy: Clone,
 {
-    let lock = lock.upgradable_read();
-    if let Some(proxy) = lock.as_ref() {
-        Ok(proxy.clone())
-    } else {
-        let proxy = connect_to_protocol::<P>()?;
-        *RwLockUpgradableReadGuard::upgrade(lock) = Some(proxy.clone());
-        Ok(proxy)
+    pub fn get_or_connect(&self) -> Result<P::Proxy, Error> {
+        let p: &P::Proxy = self.0.get_or_try_init(|| connect_to_protocol::<P>())?;
+        Ok(p.clone())
+    }
+
+    #[cfg(test)]
+    pub fn set(&self, proxy: P::Proxy) -> Result<(), P::Proxy> {
+        self.0.set(proxy)
     }
 }
 

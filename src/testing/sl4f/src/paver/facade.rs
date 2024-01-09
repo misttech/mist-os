@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common_utils::common::get_proxy_or_connect;
+use crate::common_utils::common::LazyProxy;
 use anyhow::{bail, Error};
 use fidl_fuchsia_paver::{PaverMarker, PaverProxy};
 use fuchsia_zircon::Status;
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use super::types::{Asset, Configuration, ConfigurationStatus};
@@ -14,24 +13,26 @@ use super::types::{Asset, Configuration, ConfigurationStatus};
 /// Facade providing access to paver service.
 #[derive(Debug)]
 pub struct PaverFacade {
-    proxy: RwLock<Option<PaverProxy>>,
+    proxy: LazyProxy<PaverMarker>,
 }
 
 impl PaverFacade {
     /// Creates a new [PaverFacade] with no active connection to the paver service.
     pub fn new() -> Self {
-        Self { proxy: RwLock::new(None) }
+        Self { proxy: Default::default() }
     }
 
     #[cfg(test)]
     fn new_with_proxy(proxy: PaverProxy) -> Self {
-        Self { proxy: RwLock::new(Some(proxy)) }
+        let new = Self::new();
+        new.proxy.set(proxy).expect("newly created facade should have empty proxy");
+        new
     }
 
     /// Return a cached connection to the paver service, or try to connect and cache the connection
     /// for later.
     fn proxy(&self) -> Result<PaverProxy, Error> {
-        get_proxy_or_connect::<PaverMarker>(&self.proxy)
+        self.proxy.get_or_connect()
     }
 
     /// Queries the active boot configuration, if the current bootloader supports it.

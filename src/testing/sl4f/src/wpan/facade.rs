@@ -9,7 +9,7 @@ use crate::common_utils::lowpan_context::LowpanContext;
 use anyhow::Error;
 use fidl_fuchsia_lowpan_device::{DeviceExtraProxy, DeviceProxy};
 use fidl_fuchsia_lowpan_test::DeviceTestProxy;
-use parking_lot::{RwLock, RwLockUpgradableReadGuard};
+use fuchsia_sync::RwLock;
 
 /// Perform Wpan FIDL operations.
 ///
@@ -40,12 +40,9 @@ impl WpanFacade {
             Ok(low_pan_context) => low_pan_context.get_default_device_proxies().await?,
             _ => bail!("Error retrieving default device proxies"),
         };
-        let device_rw = self.device.upgradable_read();
-        let device_extra_rw = self.device_extra.upgradable_read();
-        let device_test_rw = self.device_test.upgradable_read();
-        *RwLockUpgradableReadGuard::upgrade(device_rw) = Some(device.clone());
-        *RwLockUpgradableReadGuard::upgrade(device_extra_rw) = Some(device_extra.clone());
-        *RwLockUpgradableReadGuard::upgrade(device_test_rw) = Some(device_test.clone());
+        *self.device.write() = Some(device.clone());
+        *self.device_extra.write() = Some(device_extra.clone());
+        *self.device_test.write() = Some(device_test.clone());
         Ok(())
     }
 

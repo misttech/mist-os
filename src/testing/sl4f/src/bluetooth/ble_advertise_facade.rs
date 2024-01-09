@@ -11,8 +11,8 @@ use fidl_fuchsia_bluetooth_le::{
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component as app;
+use fuchsia_sync::RwLock;
 use futures::{pin_mut, select, FutureExt, StreamExt};
-use parking_lot::RwLock;
 use serde_json::Value;
 use std::convert::TryInto;
 use std::{collections::HashMap, sync::Arc};

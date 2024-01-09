@@ -12,9 +12,9 @@ use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
     fuchsia_async::{self as fasync, DurationExt as _},
     fuchsia_component::client::connect_to_protocol,
+    fuchsia_sync::RwLock,
     fuchsia_zircon as zx,
     futures::TryStreamExt,
-    parking_lot::RwLock,
     std::{
         cell::Cell,
         collections::HashSet,

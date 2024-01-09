@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common_utils::common::get_proxy_or_connect;
 use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
+use crate::common_utils::common::LazyProxy;
 use anyhow::Error;
 use fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy};
-use parking_lot::RwLock;
 use tracing::info;
 
 /// Perform factory reset fidl operations.
@@ -15,17 +14,17 @@ use tracing::info;
 ///
 #[derive(Debug)]
 pub struct FactoryResetFacade {
-    factory_reset_manager: RwLock<Option<FactoryResetProxy>>,
+    factory_reset_manager: LazyProxy<FactoryResetMarker>,
 }
 
 impl FactoryResetFacade {
     pub fn new() -> FactoryResetFacade {
-        FactoryResetFacade { factory_reset_manager: RwLock::new(None) }
+        FactoryResetFacade { factory_reset_manager: Default::default() }
     }
 
     /// Returns the proxy provided on instantiation or establishes a new connection.
     fn factory_reset_manager(&self) -> Result<FactoryResetProxy, Error> {
-        get_proxy_or_connect::<FactoryResetMarker>(&self.factory_reset_manager)
+        self.factory_reset_manager.get_or_connect()
     }
 
     /// Returns the pairing code from the FactoryDataManager proxy service.
@@ -58,7 +57,8 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_factory_reset() {
         let (proxy, mut stream) = create_proxy_and_stream::<FactoryResetMarker>().unwrap();
-        let facade = FactoryResetFacade { factory_reset_manager: RwLock::new(Some(proxy)) };
+        let facade = FactoryResetFacade::new();
+        facade.factory_reset_manager.set(proxy).unwrap();
         let facade_fut = async move {
             assert_eq!(facade.factory_reset().await.ok(), Some(()));
         };

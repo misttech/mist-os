@@ -6,7 +6,7 @@ use {
     anyhow::{format_err, Error},
     eui48, fidl_fuchsia_net, fidl_fuchsia_wlan_product_deprecatedconfiguration as fidl_deprecated,
     fuchsia_component::client::connect_to_protocol,
-    parking_lot::RwLock,
+    fuchsia_sync::RwLock,
     std::fmt::Debug,
 };
 

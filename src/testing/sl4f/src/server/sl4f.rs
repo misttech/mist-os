@@ -7,9 +7,9 @@ use fidl_fuchsia_testing_sl4f::{
     FacadeIteratorMarker, FacadeIteratorSynchronousProxy, FacadeProviderMarker, FacadeProviderProxy,
 };
 use fuchsia_component::client::connect_to_protocol;
+use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
 use maplit::{convert_args, hashmap};
-use parking_lot::RwLock;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

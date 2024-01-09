@@ -19,7 +19,7 @@ use fuchsia_component as component;
 use fuchsia_zircon::{self as zx, DurationNum};
 use tracing::{error, info};
 
-use parking_lot::RwLock;
+use fuchsia_sync::RwLock;
 use std::collections::HashMap;
 
 use crate::bluetooth::types::SerializablePeer;

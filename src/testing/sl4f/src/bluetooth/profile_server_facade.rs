@@ -15,11 +15,11 @@ use fidl_fuchsia_bluetooth_bredr::{
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_component as component;
+use fuchsia_sync::RwLock;
 use futures::channel::oneshot;
 use futures::select;
 use futures::stream::StreamExt;
 use futures::FutureExt;
-use parking_lot::RwLock;
 use serde_json::value::Value;
 use std::{collections::HashMap, convert::TryFrom};
 use tracing::*;

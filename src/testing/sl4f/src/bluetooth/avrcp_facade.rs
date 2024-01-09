@@ -14,7 +14,7 @@ use fidl_fuchsia_bluetooth_avrcp::{
     ControllerMarker, ControllerProxy, Notifications, PeerManagerMarker, PeerManagerProxy,
 };
 use fuchsia_component::client;
-use parking_lot::RwLock;
+use fuchsia_sync::RwLock;
 use tracing::info;
 /// AvrcpFacadeInner contains the proxies used by the AvrcpFacade.
 #[derive(Debug)]

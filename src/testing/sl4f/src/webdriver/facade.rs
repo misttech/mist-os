@@ -11,9 +11,9 @@ use fidl_fuchsia_web::{
     DevToolsPerContextListenerRequestStream,
 };
 use fuchsia_async as fasync;
+use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::prelude::*;
-use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::ops::DerefMut;

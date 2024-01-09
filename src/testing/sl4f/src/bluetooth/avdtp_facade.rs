@@ -10,8 +10,8 @@ use fidl_fuchsia_bluetooth_avdtp_test::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component::client;
+use fuchsia_sync::RwLock;
 use futures::stream::StreamExt;
-use parking_lot::RwLock;
 use std::sync::Arc;
 use std::{collections::hash_map::Entry, collections::HashMap};
 use tracing::*;

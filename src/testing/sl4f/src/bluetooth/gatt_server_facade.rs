@@ -14,8 +14,8 @@ use fidl_fuchsia_bluetooth_gatt2::{
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_component as app;
+use fuchsia_sync::RwLock;
 use futures::stream::TryStreamExt;
-use parking_lot::RwLock;
 use serde_json::value::Value;
 use std::{collections::HashMap, str::FromStr};
 use tracing::{error, info, warn};

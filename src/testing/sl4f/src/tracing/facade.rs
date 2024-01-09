@@ -13,9 +13,9 @@ use fidl_fuchsia_tracing_controller::{
 };
 use fuchsia_async;
 use fuchsia_component::{self as app};
+use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
 use futures::{future, io::AsyncReadExt, TryFutureExt};
-use parking_lot::RwLock;
 use serde_json::{self, from_value, to_value, Value};
 
 // This list should be kept in sync with defaultCategories in //src/performance/traceutil/actions.go

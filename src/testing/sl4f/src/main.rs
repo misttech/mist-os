@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
+use fuchsia_sync::RwLock;
 use futures::{FutureExt as _, TryStreamExt as _};
 use hyper::service::{make_service_fn, service_fn};
-use parking_lot::RwLock;
 use std::convert::Infallible;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
