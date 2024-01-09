@@ -96,7 +96,7 @@ Type: <code>int32</code>
 
 ## **BITS**
 
-### Bits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Bits}
+### Bits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Bits data-text="Bits"}
 Type: <code>uint32</code>
 
 *Defined in [test.constants/constants.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/constants.test.fidl;l=38)*
@@ -110,7 +110,7 @@ Type: <code>uint32</code>
         </tr>
 </table>
 
-### BitsType [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#BitsType}
+### BitsType [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#BitsType data-text="BitsType"}
 Type: <code>uint32</code>
 
 *Defined in [test.constants/constants.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/constants.test.fidl;l=23)*

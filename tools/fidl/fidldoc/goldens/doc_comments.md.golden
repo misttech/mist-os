@@ -180,7 +180,7 @@ Type: <code>uint32</code>
 
 ## **BITS**
 
-### MyFlexibleBits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#MyFlexibleBits}
+### MyFlexibleBits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#MyFlexibleBits data-text="MyFlexibleBits"}
 Type: <code>uint32</code>
 
 *Defined in [test.doccomments/doc_comments.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/doc_comments.test.fidl;l=23)*
@@ -205,7 +205,7 @@ Type: <code>uint32</code>
         </tr>
 </table>
 
-### MyStrictBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#MyStrictBits}
+### MyStrictBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#MyStrictBits data-text="MyStrictBits"}
 Type: <code>uint32</code>
 
 *Defined in [test.doccomments/doc_comments.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/doc_comments.test.fidl;l=9)*

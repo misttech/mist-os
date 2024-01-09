@@ -104,7 +104,7 @@ Type: <code>uint32</code>
 
 ## **BITS**
 
-### ExampleBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#ExampleBits}
+### ExampleBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#ExampleBits data-text="ExampleBits"}
 Type: <code>uint32</code>
 
 *Defined in [test.placementofattributes/example.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/placement_of_attributes/example.test.fidl;l=7)*

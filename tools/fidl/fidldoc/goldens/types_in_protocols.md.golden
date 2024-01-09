@@ -3877,7 +3877,7 @@ Type: <code>uint32</code>
 
 ## **BITS**
 
-### Bits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Bits}
+### Bits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Bits data-text="Bits"}
 Type: <code>uint32</code>
 
 *Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=8)*

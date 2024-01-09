@@ -12,7 +12,7 @@
 
 ## **BITS**
 
-### EmptyBits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#EmptyBits}
+### EmptyBits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#EmptyBits data-text="EmptyBits"}
 Type: <code>uint32</code>
 
 *Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=20)*
@@ -21,7 +21,7 @@ Type: <code>uint32</code>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>
 </table>
 
-### FlexibleBits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#FlexibleBits}
+### FlexibleBits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#FlexibleBits data-text="FlexibleBits"}
 Type: <code>uint64</code>
 
 *Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=15)*
@@ -40,7 +40,7 @@ Type: <code>uint64</code>
         </tr>
 </table>
 
-### MyBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#MyBits}
+### MyBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#MyBits data-text="MyBits"}
 Type: <code>uint32</code>
 
 *Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=3)*
@@ -64,7 +64,7 @@ Type: <code>uint32</code>
         </tr>
 </table>
 
-### StrictBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#StrictBits}
+### StrictBits [strict](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#StrictBits data-text="StrictBits"}
 Type: <code>uint64</code>
 
 *Defined in [test.bits/bits.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/bits.test.fidl;l=10)*

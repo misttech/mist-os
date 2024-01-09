@@ -306,7 +306,7 @@ Type: <code>uint32</code>
 
 ## **BITS**
 
-### BitsMember [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#BitsMember}
+### BitsMember [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#BitsMember data-text="BitsMember"}
 Type: <code>uint32</code>
 
 *Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=38)*
@@ -325,7 +325,7 @@ Type: <code>uint32</code>
         </tr>
 </table>
 
-### Flags [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Flags}
+### Flags [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Flags data-text="Flags"}
 Type: <code>uint16</code>
 
 *Defined in [test.anonymous/anonymous.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/anonymous.test.fidl;l=19)*
