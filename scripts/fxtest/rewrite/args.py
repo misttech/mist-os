@@ -5,8 +5,8 @@
 import argparse
 from dataclasses import dataclass
 import pathlib
-import typing
 import sys
+import typing
 
 import termout
 import util.arg_option as arg_option
@@ -109,8 +109,16 @@ class FlagError(Exception):
     """Raised if there was a problem parsing command line flags."""
 
 
-def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
+def parse_args(
+    cli_args: typing.List[str] | None = None, defaults: Flags | None = None
+) -> Flags:
     """Parse command line flags.
+
+    Args:
+        cli_args (List[str], optional): Arguments to parse. If
+            unset, read arguments from actual command line.
+        defaults (Flags, optional): Default set of flags. If set,
+            overrides the defaults from the command line.
 
     Returns:
         Flags: Typed representation of the command line for this program.
@@ -134,6 +142,7 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     parser = argparse.ArgumentParser(
         "fx test",
         description="Test Executor for Humans",
+        exit_on_error=False,
     )
     utility = parser.add_argument_group("Utility Options")
     utility.add_argument(
@@ -388,6 +397,23 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         default=None,
         help="If set, write ffx test output to this directory for post processing.",
     )
+
+    if defaults is not None:
+        actions = parser._actions.copy()
+        groups_to_process: typing.List[
+            argparse._ArgumentGroup
+        ] = parser._action_groups.copy()
+
+        # Recursively find all actions.
+        while groups_to_process:
+            group = groups_to_process.pop()
+            actions.extend(group._actions)
+            groups_to_process.extend(group._action_groups)
+
+        # Apply defaults for all identified actions from the given defaults.
+        for action in actions:
+            if hasattr(defaults, action.dest):
+                action.default = getattr(defaults, action.dest)
 
     flags: Flags = Flags(
         **vars(parser.parse_args(cli_args)), extra_args=extra_args

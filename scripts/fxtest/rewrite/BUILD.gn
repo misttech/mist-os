@@ -13,6 +13,7 @@ group("tests") {
 
   deps = [
     ":args_test($host_toolchain)",
+    ":config_test($host_toolchain)",
     ":console_test($host_toolchain)",
     ":environment_test($host_toolchain)",
     ":event_test($host_toolchain)",
@@ -32,6 +33,7 @@ group("tests") {
 if (is_host) {
   binary_sources = [
     "args.py",
+    "config.py",
     "console.py",
     "environment.py",
     "event.py",
@@ -63,6 +65,7 @@ if (is_host) {
 
   main_module_tests = [
     "args",
+    "config",
     "console",
     "environment",
     "event",

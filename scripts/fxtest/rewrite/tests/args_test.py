@@ -11,6 +11,7 @@ import unittest.mock as mock
 from parameterized import parameterized
 
 import args
+import config
 
 # We need a place to create a temporary file that is used to ensure
 # output directory checking works correctly. Place it here and then
@@ -92,3 +93,12 @@ class TestArgs(unittest.TestCase):
         flags.validate()
         self.assertEqual(flags.e2e, True)
         self.assertEqual(flags.only_e2e, True)
+
+    def test_default_merging(self):
+        config_file = config.ConfigFile(
+            "path", args.parse_args(["--parallel=10"])
+        )
+        flags = args.parse_args([], config_file.default_flags)
+        self.assertEqual(flags.parallel, 10)
+        flags = args.parse_args(["--parallel=1"], config_file.default_flags)
+        self.assertEqual(flags.parallel, 1)

@@ -18,6 +18,7 @@ import sys
 import typing
 
 import args
+import config
 import console
 import dataparse
 import environment
@@ -38,7 +39,11 @@ def main():
     # Main entrypoint.
     # Set up the event loop to catch termination signals (i.e. Ctrl+C), and
     # cancel the main task when they are received.
-    fut = asyncio.ensure_future(async_main_wrapper(args.parse_args()))
+    config_file = config.load_config()
+    real_flags = args.parse_args(defaults=config_file.default_flags)
+    fut = asyncio.ensure_future(
+        async_main_wrapper(real_flags, config_file=config_file)
+    )
     util.signals.register_on_terminate_signal(fut.cancel)
     try:
         loop = asyncio.get_event_loop()
@@ -50,7 +55,9 @@ def main():
 
 
 async def async_main_wrapper(
-    flags: args.Flags, recorder: event.EventRecorder | None = None
+    flags: args.Flags,
+    recorder: event.EventRecorder | None = None,
+    config_file: config.ConfigFile | None = None,
 ) -> int:
     """Wrapper for the main logic of fx test.
 
@@ -62,6 +69,8 @@ async def async_main_wrapper(
         flags (args.Flags): Flags to pass into the main function.
         recorder (event.EventRecorder | None, optional): If set,
             use this event recorder. Used for testing.
+        config_file (config.ConfigFile, optional): If set, record
+            that this configuration was loaded to set default flags.
 
     Returns:
         The return code of the program.
@@ -70,7 +79,7 @@ async def async_main_wrapper(
     if recorder is None:
         recorder = event.EventRecorder()
 
-    ret = await async_main(flags, tasks, recorder)
+    ret = await async_main(flags, tasks, recorder, config_file)
 
     try:
         await asyncio.wait_for(asyncio.wait(tasks), timeout=5)
@@ -86,6 +95,7 @@ async def async_main(
     flags: args.Flags,
     tasks: typing.List[asyncio.Task],
     recorder: event.EventRecorder,
+    config_file: config.ConfigFile | None = None,
 ) -> int:
     """Main logic of fx test.
 
@@ -93,6 +103,7 @@ async def async_main(
         flags (args.Flags): Flags controlling the behavior of fx test.
         tasks (List[asyncio.Tasks]): List to add tasks to that must be awaited before termination.
         recorder (event.Recorder): The recorder for events.
+        config_file (config.ConfigFile, optional): The loaded config, if one was set.
 
     Returns:
         The return code of the program.
@@ -121,6 +132,12 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     # Try to parse the flags. Emit one event before and another
     # after flag post processing.
     try:
+        if config_file is not None and config_file.is_loaded():
+            recorder.emit_load_config(
+                config_file.path or "UNKNOWN PATH",
+                config_file.default_flags.__dict__,
+                config_file.command_line,
+            )
         recorder.emit_parse_flags(flags.__dict__)
         flags.validate()
         recorder.emit_parse_flags(flags.__dict__)

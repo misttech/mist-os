@@ -270,6 +270,21 @@ class EnumerateTestCasesPayload:
 
 @dataparse
 @dataclass
+class LoadConfigPayload:
+    """A configuration file was loaded with flag defaults."""
+
+    # Path to config file.
+    path: str
+
+    # The flag defaults parsed from the config file.
+    flags: typing.Dict[str, typing.Any]
+
+    # The command line provided in the config file.
+    command_line: typing.List[str]
+
+
+@dataparse
+@dataclass
 class EventPayloadUnion:
     """Payload for event types.
 
@@ -298,6 +313,12 @@ class EventPayloadUnion:
     # time for the containing event to this UNIX timestamp must be used for all
     # time formatting.
     start_timestamp: float | None = None
+
+    # This event denotes loading a configuration file containing flag defaults.
+    #
+    # The payload contains the file path and the parsed command line flags that
+    # are used as defaults.
+    load_config: LoadConfigPayload | None = None
 
     # This event denotes parsing command line flags.
     #
@@ -658,6 +679,29 @@ class EventRecorder:
         )
         if id == GLOBAL_RUN_ID:
             self.end()
+
+    def emit_load_config(
+        self,
+        path: str,
+        flags: typing.Dict[str, typing.Any],
+        command_line: typing.List[str],
+    ):
+        """Emit a load_config event with details on the config.
+
+        Args:
+            path (str): The path to the loaded config file.
+            flags (typing.Dict[str, typing.Any]): The flags passed to this invocation.
+            command_line (typing.List[str]): The command line parsed from the config file.
+        """
+        self._emit(
+            Event(
+                GLOBAL_RUN_ID,
+                self._get_timestamp(),
+                payload=EventPayloadUnion(
+                    load_config=LoadConfigPayload(path, flags, command_line)
+                ),
+            )
+        )
 
     def emit_parse_flags(self, flags: typing.Dict[str, typing.Any]):
         """Emit a parse_flags event with details on the flags.

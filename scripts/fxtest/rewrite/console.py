@@ -667,6 +667,17 @@ async def _console_event_loop(
                     lines_to_print.append(
                         f" {statusinfo.dim(command, style=flags.style)}"
                     )
+            elif next_event.payload.load_config is not None:
+                load_config = next_event.payload.load_config
+                lines_to_print.extend(
+                    [
+                        statusinfo.highlight(
+                            f"Default flags loaded from {load_config.path}:",
+                            style=flags.style,
+                        ),
+                        statusinfo.dim(f"{str(load_config.command_line)}\n"),
+                    ]
+                )
 
         if next_event.error:
             # Highlight all errors.
