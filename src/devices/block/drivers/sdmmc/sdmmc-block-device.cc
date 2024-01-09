@@ -222,19 +222,14 @@ void SdmmcBlockDevice::StopWorkerDispatcher(std::optional<fdf::PrepareStopComple
     worker_shutdown_completion_.Wait();
   }
 
-  // TODO(hanbinyoon): Remove this in favour of `txn_list_.CompleteAll` below.
   // error out all pending requests
   fbl::AutoLock lock(&lock_);
-  for (std::optional<BlockOperation> txn = txn_list_.pop(); txn; txn = txn_list_.pop()) {
-    BlockComplete(*txn, ZX_ERR_BAD_STATE);
-  }
+  txn_list_.CompleteAll(ZX_ERR_CANCELED);
 
   for (auto& request : rpmb_list_) {
-    request.completer.ReplyError(ZX_ERR_BAD_STATE);
+    request.completer.ReplyError(ZX_ERR_CANCELED);
   }
   rpmb_list_.clear();
-
-  txn_list_.CompleteAll(ZX_ERR_INTERNAL);
 
   if (completer.has_value()) {
     completer.value()(zx::ok());
@@ -304,8 +299,9 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
     // Safe because btxns.size() <= kMaxPackedCommandsFor512ByteBlockSize.
     entry->packed_command_header_data->num_entries = safemath::checked_cast<uint8_t>(btxns.size());
 
-    // TODO(https://fxbug.dev/133112): Consider pre-registering the packed command header VMO with the SDMMC
-    // driver to avoid pinning and unpinning for each transfer. Also handle the cache ops here.
+    // TODO(https://fxbug.dev/133112): Consider pre-registering the packed command header VMO with
+    // the SDMMC driver to avoid pinning and unpinning for each transfer. Also handle the cache ops
+    // here.
     *buffer_region_ptr = {
         .buffer = {.vmo = entry->packed_command_header_vmo.get()},
         .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
@@ -693,8 +689,8 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
         uint64_t cum_transfer_bytes = (bop.rw.length * block_info_.block_size) +
                                       zx_system_get_page_size();  // +1 page for header block.
         while (btxns.size() < max_command_packing) {
-          // TODO(https://fxbug.dev/133112): It's inefficient to pop() here only to push() later in the case
-          // of packing ineligibility. Later on, we'll likely move away from using
+          // TODO(https://fxbug.dev/133112): It's inefficient to pop() here only to push() later in
+          // the case of packing ineligibility. Later on, we'll likely move away from using
           // block::BorrowedOperationQueue once we start using the FIDL driver transport arena (at
           // which point, use something like peek() instead).
           std::optional<BlockOperation> pack_candidate_txn = txn_list.pop();
