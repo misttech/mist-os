@@ -226,6 +226,10 @@ impl MessageQueue {
         })
     }
 
+    pub fn peek_queue(&self) -> &VecDeque<Message> {
+        &self.messages
+    }
+
     /// Peeks the next message in the buffer, if such a message exists.
     fn peek_message(&self) -> Option<&Message> {
         self.messages.front()

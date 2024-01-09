@@ -30,7 +30,7 @@ use starnix_uapi::{
     user_buffer::UserBuffer,
     FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };
-use std::{convert::TryInto, sync::Arc};
+use std::{cmp::Ordering, convert::TryInto, sync::Arc};
 
 const ATOMIC_IO_BYTES: u16 = 4096;
 
@@ -262,6 +262,54 @@ impl Pipe {
 
     fn notify_write(&self) {
         self.waiters.notify_fd_events(FdEvents::POLLIN);
+    }
+
+    /// Splice from the `from` pipe to the `to` pipe.
+    pub fn splice(from: &mut Pipe, to: &mut Pipe, len: usize) -> Result<usize, Errno> {
+        if len == 0 {
+            return Ok(0);
+        }
+        let len = std::cmp::min(
+            len,
+            std::cmp::min(from.messages.len(), to.messages.available_capacity()),
+        );
+        let mut left = len;
+        while let Some(mut message) = from.messages.read_message() {
+            if let Some(data) = message.data.split_off(left) {
+                // Some data is left in the message. Push it back.
+                from.messages.write_front(data.into());
+            }
+            left -= message.len();
+            to.messages.write_message(message);
+            if left == 0 {
+                from.notify_read();
+                to.notify_write();
+                return Ok(len);
+            }
+        }
+        panic!();
+    }
+
+    /// Tee from the `from` pipe to the `to` pipe.
+    pub fn tee(from: &mut Pipe, to: &mut Pipe, len: usize) -> Result<usize, Errno> {
+        if len == 0 {
+            return Ok(0);
+        }
+        let len = std::cmp::min(
+            len,
+            std::cmp::min(from.messages.len(), to.messages.available_capacity()),
+        );
+        let mut left = len;
+        for message in from.messages.peek_queue().iter() {
+            let message = message.clone_at_most(left);
+            left -= message.len();
+            to.messages.write_message(message);
+            if left == 0 {
+                to.notify_write();
+                return Ok(len);
+            }
+        }
+        panic!();
     }
 }
 
@@ -690,33 +738,10 @@ impl PipeFileObject {
             .map(|(_, l)| l)
     }
 
-    /// Splice from this pipe to the `to` pipe.
-    fn splice_to_pipe(from: &mut Pipe, to: &mut Pipe, len: usize) -> Result<usize, Errno> {
-        if len == 0 {
-            return Ok(0);
-        }
-        let len = std::cmp::min(
-            len,
-            std::cmp::min(from.messages.len(), to.messages.available_capacity()),
-        );
-        let mut left = len;
-        while let Some(mut message) = from.messages.read_message() {
-            if let Some(data) = message.data.split_off(left) {
-                // Some data is left in the message. Push it back.
-                from.messages.write_front(data.into());
-            }
-            left -= message.len();
-            to.messages.write_message(message);
-            if left == 0 {
-                from.notify_read();
-                to.notify_write();
-                return Ok(len);
-            }
-        }
-        panic!();
-    }
-
-    /// splice from the given file handle to this pipe.
+    /// Splice from the given file handle to this pipe.
+    ///
+    /// The given file handle must not be a pipe. If you wish to splice between two pipes, use
+    /// `lock_pipes` and `Pipe::splice`.
     pub fn splice_from(
         &self,
         current_task: &CurrentTask,
@@ -726,17 +751,8 @@ impl PipeFileObject {
         len: usize,
         non_blocking: bool,
     ) -> Result<usize, Errno> {
-        // If both ends are pipes, locks on pipes must be taken such that the lock on this object
-        // is always taken before the lock on the other.
-        if let Some(pipe_file_object) = from.downcast_file::<PipeFileObject>() {
-            let (mut write_pipe, mut read_pipe) = pipe_file_object.lock_pipe_for_reading_with(
-                current_task,
-                from,
-                || self.lock_pipe_for_writing(current_task, self_file, non_blocking, len),
-                non_blocking,
-            )?;
-            return Self::splice_to_pipe(&mut read_pipe, &mut write_pipe, len);
-        }
+        // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
+        assert!(from.downcast_file::<PipeFileObject>().is_none());
 
         let mut pipe = self.lock_pipe_for_writing(current_task, self_file, non_blocking, len)?;
         let len = std::cmp::min(len, pipe.messages.available_capacity());
@@ -744,6 +760,10 @@ impl PipeFileObject {
         from.read_raw(current_task, offset.unwrap_or(0), &mut buffer)
     }
 
+    /// Splice from this pipe to the given file handle.
+    ///
+    /// The given file handle must not be a pipe. If you wish to splice between two pipes, use
+    /// `lock_pipes` and `Pipe::splice`.
     pub fn splice_to(
         &self,
         current_task: &CurrentTask,
@@ -753,22 +773,59 @@ impl PipeFileObject {
         len: usize,
         non_blocking: bool,
     ) -> Result<usize, Errno> {
-        // If both ends are pipes, locks on pipes must be taken such that the lock on this object
-        // is always taken before the lock on the other.
-        if let Some(pipe_file_object) = to.downcast_file::<PipeFileObject>() {
-            let (mut read_pipe, mut write_pipe) = pipe_file_object.lock_pipe_for_writing_with(
-                current_task,
-                to,
-                || self.lock_pipe_for_reading(current_task, self_file, non_blocking),
-                non_blocking,
-                len,
-            )?;
-            return Self::splice_to_pipe(&mut read_pipe, &mut write_pipe, len);
-        }
-        let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
+        // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
+        assert!(to.downcast_file::<PipeFileObject>().is_none());
 
+        let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
         let len = std::cmp::min(len, pipe.messages.len());
         let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
         to.write_raw(current_task, offset.unwrap_or(0), &mut buffer)
     }
+
+    /// Obtain the pipe objects from the given file handles, if they are both pipes.
+    ///
+    /// Returns EINVAL if one (or both) of the given file handles is not a pipe.
+    ///
+    /// Obtains the locks on the pipes in the correct order to avoid deadlocks.
+    pub fn lock_pipes<'a, 'b>(
+        current_task: &CurrentTask,
+        file_in: &'a FileHandle,
+        file_out: &'b FileHandle,
+        len: usize,
+        non_blocking: bool,
+    ) -> Result<PipeOperands<'a, 'b>, Errno> {
+        let pipe_in = file_in.downcast_file::<PipeFileObject>().ok_or_else(|| errno!(EINVAL))?;
+        let pipe_out = file_out.downcast_file::<PipeFileObject>().ok_or_else(|| errno!(EINVAL))?;
+
+        let node_cmp =
+            Arc::as_ptr(&file_in.name.entry.node).cmp(&Arc::as_ptr(&file_out.name.entry.node));
+
+        match node_cmp {
+            Ordering::Equal => error!(EINVAL),
+            Ordering::Less => {
+                let (write, read) = pipe_in.lock_pipe_for_reading_with(
+                    current_task,
+                    file_in,
+                    || pipe_out.lock_pipe_for_writing(current_task, file_out, non_blocking, len),
+                    non_blocking,
+                )?;
+                Ok(PipeOperands { read, write })
+            }
+            Ordering::Greater => {
+                let (read, write) = pipe_out.lock_pipe_for_writing_with(
+                    current_task,
+                    file_out,
+                    || pipe_in.lock_pipe_for_reading(current_task, file_in, non_blocking),
+                    non_blocking,
+                    len,
+                )?;
+                Ok(PipeOperands { read, write })
+            }
+        }
+    }
+}
+
+pub struct PipeOperands<'a, 'b> {
+    pub read: MutexGuard<'a, Pipe>,
+    pub write: MutexGuard<'b, Pipe>,
 }

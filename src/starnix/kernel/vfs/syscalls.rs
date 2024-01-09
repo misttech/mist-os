@@ -2483,6 +2483,17 @@ pub fn sys_splice(
     splice::splice(current_task, fd_in, off_in, fd_out, off_out, len, flags)
 }
 
+pub fn sys_tee(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd_in: FdNumber,
+    fd_out: FdNumber,
+    len: usize,
+    flags: u32,
+) -> Result<usize, Errno> {
+    splice::tee(current_task, fd_in, fd_out, len, flags)
+}
+
 pub fn sys_readahead(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,

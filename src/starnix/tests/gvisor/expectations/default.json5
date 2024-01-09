@@ -717,13 +717,6 @@
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedCreds2/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedDifferingCreds/*",
 
-                // splice_test, tee() isn't implemented.
-                "TeeTest.SamePipe",
-                "TeeTest.TwoPipesPartialRead",
-                "TeeTest.RegularFile",
-                "TeeTest.NonBlocking",
-                "TeeTest.TwoPipesPartialWrite",
-
                 // stat_test
                 "StatTest.StatIgnoreNoAutomount",
 

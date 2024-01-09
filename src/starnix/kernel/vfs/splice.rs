@@ -7,7 +7,7 @@ use crate::{
     task::CurrentTask,
     vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
-        pipe::PipeFileObject,
+        pipe::{Pipe, PipeFileObject, PipeOperands},
         FdNumber, FileHandle,
     },
 };
@@ -22,7 +22,6 @@ use starnix_uapi::{
     user_address::{UserAddress, UserRef},
     user_buffer::MAX_RW_COUNT,
 };
-use std::{cmp::Ordering, sync::Arc, usize};
 
 pub fn sendfile(
     current_task: &CurrentTask,
@@ -192,13 +191,6 @@ pub fn splice(
         return error!(EINVAL);
     }
 
-    // The 2 fds cannot refer to the same pipe.
-    let node_cmp = Arc::as_ptr(&file_in.file.name.entry.node)
-        .cmp(&Arc::as_ptr(&file_out.file.name.entry.node));
-    if node_cmp == Ordering::Equal {
-        return error!(EINVAL);
-    }
-
     // Lock offsets.
     let (mut file_in_offset_guard, mut file_out_offset_guard) =
         ordered_lock(&file_in.file.offset, &file_out.file.offset);
@@ -206,16 +198,26 @@ pub fn splice(
     let spliced = match (file_in.maybe_as_pipe(), file_out.maybe_as_pipe()) {
         // Splice can only be used when one of the files is a pipe.
         (None, None) => error!(EINVAL),
-        (pipe_in, Some(pipe_out)) if pipe_in.is_none() || node_cmp == Ordering::Less => pipe_out
-            .splice_from(
+        // If both ends are pipes, use the symmetric `Pipe::splice` function.
+        (Some(_), Some(_)) => {
+            let PipeOperands { mut read, mut write } = PipeFileObject::lock_pipes(
                 current_task,
-                &file_out.file,
                 &file_in.file,
-                file_in.effective_offset(&file_in_offset_guard),
+                &file_out.file,
                 len,
                 non_blocking,
-            ),
-        (Some(pipe_in), _) => pipe_in.splice_to(
+            )?;
+            Pipe::splice(&mut read, &mut write, len)
+        }
+        (None, Some(pipe_out)) => pipe_out.splice_from(
+            current_task,
+            &file_out.file,
+            &file_in.file,
+            file_in.effective_offset(&file_in_offset_guard),
+            len,
+            non_blocking,
+        ),
+        (Some(pipe_in), None) => pipe_in.splice_to(
             current_task,
             &file_in.file,
             &file_out.file,
@@ -223,7 +225,6 @@ pub fn splice(
             len,
             non_blocking,
         ),
-        _ => unreachable!(),
     }?;
 
     // Update both file offset before returning in case of error writing back to
@@ -232,4 +233,29 @@ pub fn splice(
     file_out.update_offset(current_task, &mut file_out_offset_guard, spliced)?;
     update_offset_in?;
     Ok(spliced)
+}
+
+pub fn tee(
+    current_task: &CurrentTask,
+    fd_in: FdNumber,
+    fd_out: FdNumber,
+    len: usize,
+    flags: u32,
+) -> Result<usize, Errno> {
+    const KNOWN_FLAGS: u32 =
+        uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
+    if flags & !KNOWN_FLAGS != 0 {
+        log_warn!("Unexpected flag for tee: {:#x}", flags & !KNOWN_FLAGS);
+        return error!(EINVAL);
+    }
+
+    let non_blocking = flags & uapi::SPLICE_F_NONBLOCK != 0;
+
+    let file_in = current_task.files.get(fd_in)?;
+    let file_out = current_task.files.get(fd_out)?;
+
+    // tee requires that both files are pipes.
+    let PipeOperands { mut read, mut write } =
+        PipeFileObject::lock_pipes(current_task, &file_in, &file_out, len, non_blocking)?;
+    Pipe::tee(&mut read, &mut write, len)
 }

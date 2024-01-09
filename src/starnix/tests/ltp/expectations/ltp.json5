@@ -234,8 +234,6 @@
                 "sync_file_range01",
                 "syslog11",
                 "syslog12",
-                "tee01",
-                "tee02",
                 "time-schedule01",
 
                 // https://fxbug.dev/127682

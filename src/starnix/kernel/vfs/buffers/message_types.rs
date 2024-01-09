@@ -53,6 +53,16 @@ impl Message {
     pub fn len(&self) -> usize {
         self.data.len()
     }
+
+    pub fn clone_at_most(&self, limit: usize) -> Message {
+        Message {
+            data: MessageData {
+                bytes: self.data.bytes[0..std::cmp::min(self.len(), limit)].to_vec(),
+            },
+            address: self.address.clone(),
+            ancillary_data: self.ancillary_data.clone(),
+        }
+    }
 }
 
 impl From<MessageData> for Message {
