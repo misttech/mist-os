@@ -63,6 +63,8 @@ template("generate_scrutiny_configs") {
   files = {
     assembly_static_packages =
         "${target_out_dir}/${target_name}/assembly_static_packages.txt"
+    assembly_bootfs_packages =
+        "${target_out_dir}/${target_name}/assembly_bootfs_packages.txt"
     assembly_bootfs_files =
         "${target_out_dir}/${target_name}/assembly_bootfs_files.txt"
     static_packages = "${target_out_dir}/${target_name}/static_packages.txt"
@@ -80,12 +82,15 @@ template("generate_scrutiny_configs") {
       tool = "//build/assembly/tools/generate_assembly_scrutiny_configs"
       outputs = [
         files.assembly_static_packages,
+        files.assembly_bootfs_packages,
         files.assembly_bootfs_files,
       ]
       args = [
-        "--packages",
+        "--static-packages",
         rebase_path(files.assembly_static_packages, root_build_dir),
-        "--bootfs",
+        "--bootfs-packages",
+        rebase_path(files.assembly_bootfs_packages, root_build_dir),
+        "--bootfs-files",
         rebase_path(files.assembly_bootfs_files, root_build_dir),
         "--build-type",
         _assembly_build_type,
@@ -137,11 +142,14 @@ template("generate_scrutiny_configs") {
     if (_assembly_build_type != false) {
       inputs += [
         files.assembly_static_packages,
+        files.assembly_bootfs_packages,
         files.assembly_bootfs_files,
       ]
       args += [
         "--static-packages-input",
         rebase_path(files.assembly_static_packages, root_build_dir),
+        "--bootfs-packages-input",
+        rebase_path(files.assembly_bootfs_packages, root_build_dir),
         "--bootfs-files-input",
         rebase_path(files.assembly_bootfs_files, root_build_dir),
       ]

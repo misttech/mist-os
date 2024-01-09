@@ -100,6 +100,11 @@ def main():
         help="Optional static packages to merge in",
     )
     parser.add_argument(
+        "--bootfs-packages-input",
+        type=argparse.FileType("r"),
+        help="Optional bootfs packages to merge in",
+    )
+    parser.add_argument(
         "--bootfs-files-input",
         type=argparse.FileType("r"),
         help="Optional list of bootfs packages to merge in",
@@ -166,6 +171,8 @@ def main():
     # Merge in the optional input goldens.
     if args.static_packages_input:
         static_packages.add_optional(args.static_packages_input.readlines())
+    if args.bootfs_packages_input:
+        bootfs_packages.add_optional(args.bootfs_packages_input.readlines())
     if args.bootfs_files_input:
         bootfs_files.add_optional(args.bootfs_files_input.readlines())
 

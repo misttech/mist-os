@@ -4,7 +4,9 @@
 
 use argh::FromArgs;
 use assembly_config_schema::BuildType;
-use assembly_util::{BootfsDestination, CompiledPackageDestination, PackageDestination};
+use assembly_util::{
+    BootfsDestination, BootfsPackageDestination, CompiledPackageDestination, PackageDestination,
+};
 use camino::Utf8PathBuf;
 use strum::IntoEnumIterator;
 
@@ -13,11 +15,15 @@ use strum::IntoEnumIterator;
 struct Args {
     /// the path to the output packages allowlist.
     #[argh(option)]
-    packages: Utf8PathBuf,
+    static_packages: Utf8PathBuf,
+
+    /// the path to the output bootfs packages allowlist.
+    #[argh(option)]
+    bootfs_packages: Utf8PathBuf,
 
     /// the path to the output bootfs file allowlist.
     #[argh(option)]
-    bootfs: Utf8PathBuf,
+    bootfs_files: Utf8PathBuf,
 
     /// build type of the product.
     #[argh(option)]
@@ -27,8 +33,10 @@ struct Args {
 fn main() {
     let args: Args = argh::from_env();
 
-    let mut packages: Vec<String> = PackageDestination::iter()
+    let mut static_packages: Vec<String> = PackageDestination::iter()
         .filter_map(|v| match (v, args.build_type) {
+            // This script only returns assembly-generated files.
+            // Files from AIBs or the product are collected and merged in a separate process.
             (
                 PackageDestination::FromAIB(_)
                 | PackageDestination::FromProduct(_)
@@ -43,26 +51,44 @@ fn main() {
     let mut compiled_packages: Vec<String> = CompiledPackageDestination::iter()
         .filter_map(|v| match (v, args.build_type) {
             (
+                // We ignore fshost here, because it is repackaged into bootfs,
+                // not blobfs, and we collect those bootfs files below.
                 CompiledPackageDestination::Fshost
                 | CompiledPackageDestination::ForTest
                 | CompiledPackageDestination::ForTest2,
                 _,
             ) => None,
+            // Toolbox should not be included on user.
             (CompiledPackageDestination::Toolbox, BuildType::User) => None,
             (a @ CompiledPackageDestination::Toolbox, _) => Some(a.to_string()),
             (a @ _, _) => Some(a.to_string()),
         })
         .collect();
-    packages.append(&mut compiled_packages);
-    packages.sort();
-    std::fs::write(args.packages, packages.join("\n")).expect("Writing packages allowlist");
+    static_packages.append(&mut compiled_packages);
+    static_packages.sort();
+    std::fs::write(args.static_packages, static_packages.join("\n"))
+        .expect("Writing packages allowlist");
 
-    let mut bootfs: Vec<String> = BootfsDestination::iter()
+    let mut bootfs_packages: Vec<String> = BootfsPackageDestination::iter()
         .filter_map(|v| match v {
+            // This script only returns assembly-generated files.
+            // Files from AIBs are collected and merged in a separate process.
+            BootfsPackageDestination::FromAIB(_) | BootfsPackageDestination::ForTest => None,
+            a @ _ => Some(a.to_string()),
+        })
+        .collect();
+    bootfs_packages.sort();
+    std::fs::write(args.bootfs_packages, bootfs_packages.join("\n"))
+        .expect("Writing bootfs packages allowlist");
+
+    let mut bootfs_files: Vec<String> = BootfsDestination::iter()
+        .filter_map(|v| match v {
+            // This script only returns assembly-generated files.
+            // Files from AIBs are collected and merged in a separate process.
             BootfsDestination::FromAIB(_) | BootfsDestination::ForTest => None,
             a @ _ => Some(a.to_string()),
         })
         .collect();
-    bootfs.sort();
-    std::fs::write(args.bootfs, bootfs.join("\n")).expect("Writing bootfs allowlist");
+    bootfs_files.sort();
+    std::fs::write(args.bootfs_files, bootfs_files.join("\n")).expect("Writing bootfs allowlist");
 }

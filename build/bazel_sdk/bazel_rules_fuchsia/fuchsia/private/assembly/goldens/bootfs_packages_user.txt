@@ -1,5 +1,7 @@
 archivist
+?archivist-pipelines
 bootstrap
+?config
 console
 console-launcher
 devfs
