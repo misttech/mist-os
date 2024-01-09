@@ -1298,7 +1298,7 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
     offset += PAGE_SIZE;
   }
   DEBUG_ASSERT(res.tail_.HasNoIntervalSentinel());
-
+  res.Finalize();
   return res;
 }
 
@@ -1311,6 +1311,7 @@ VmPageSpliceList::VmPageSpliceList(VmPageSpliceList&& other)
     : offset_(other.offset_),
       length_(other.length_),
       pos_(other.pos_),
+      finalized_(other.finalized_),
       middle_(ktl::move(other.middle_)) {
   move_vm_page_list_node(&head_, &other.head_);
   move_vm_page_list_node(&tail_, &other.tail_);
@@ -1319,11 +1320,14 @@ VmPageSpliceList::VmPageSpliceList(VmPageSpliceList&& other)
 }
 
 VmPageSpliceList& VmPageSpliceList::operator=(VmPageSpliceList&& other) {
+  // FreeAllPages expects this splice list to be finalized, so do so here.
+  Finalize();
   FreeAllPages();
 
   offset_ = other.offset_;
   length_ = other.length_;
   pos_ = other.pos_;
+  finalized_ = other.finalized_;
   move_vm_page_list_node(&head_, &other.head_);
   move_vm_page_list_node(&tail_, &other.tail_);
   middle_ = ktl::move(other.middle_);
@@ -1344,12 +1348,13 @@ VmPageSpliceList VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t 
   VmPageSpliceList res(offset, length);
   DEBUG_ASSERT(list_is_empty(&res.raw_pages_));
   list_move(pages, &res.raw_pages_);
+  res.Finalize();
   return res;
 }
 
 void VmPageSpliceList::FreeAllPages() {
   // Free any pages owned by the splice list.
-  while (!IsDone()) {
+  while (!IsProcessed()) {
     VmPageOrMarker page = Pop();
     if (page.IsPage()) {
       pmm_free_page(page.ReleasePage());
@@ -1361,9 +1366,62 @@ void VmPageSpliceList::FreeAllPages() {
   }
 }
 
+void VmPageSpliceList::Finalize() {
+  DEBUG_ASSERT(!finalized_);
+  pos_ = 0;
+  finalized_ = true;
+}
+
+bool VmPageSpliceList::IsEmpty() const {
+  return head_.IsEmpty() && tail_.IsEmpty() && middle_.is_empty() && list_is_empty(&raw_pages_);
+}
+
+zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
+  ASSERT(pos_ < length_);
+  ASSERT(!IsFinalized());
+  ASSERT(!content.IsInterval());
+  ASSERT(list_is_empty(&raw_pages_));
+
+  const uint64_t cur_offset = offset_ + pos_;
+  const uint64_t node_idx = offset_to_node_index(cur_offset, 0);
+  const uint64_t head_idx = offset_to_node_index(offset_, 0);
+  const uint64_t node_offset = offset_to_node_offset(cur_offset, 0);
+  const uint64_t head_offset = offset_to_node_offset(offset_, 0);
+  const uint64_t tail_offset = offset_to_node_offset(offset_ + length_, 0);
+
+  if (head_idx != 0 && node_offset == head_offset) {
+    head_.Lookup(node_idx) = ktl::move(content);
+  } else if (node_offset != tail_offset) {
+    auto middle_node = middle_.find(node_offset);
+    if (middle_node.IsValid()) {
+      middle_node->Lookup(node_idx) = ktl::move(content);
+    } else {
+      // Allocate a node and then insert the content.
+      fbl::AllocChecker ac;
+      ktl::unique_ptr<VmPageListNode> pl =
+          ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(node_offset));
+      if (!ac.check()) {
+        return ZX_ERR_NO_MEMORY;
+      }
+      LTRACEF("allocating new inner node for splice list: %p\n", pl.get());
+      pl->Lookup(node_idx) = ktl::move(content);
+      middle_.insert(ktl::move(pl));
+    }
+  } else {
+    tail_.Lookup(node_idx) = ktl::move(content);
+  }
+
+  pos_ += PAGE_SIZE;
+  return ZX_OK;
+}
+
 VmPageOrMarkerRef VmPageSpliceList::PeekReference() {
-  if (IsDone()) {
-    DEBUG_ASSERT_MSG(false, "peeked at empty splice list");
+  if (!IsFinalized()) {
+    DEBUG_ASSERT_MSG(false, "attempted to PeekReference on a non-finalized splice list\n");
+    return VmPageOrMarkerRef(nullptr);
+  }
+  if (IsProcessed()) {
+    DEBUG_ASSERT_MSG(false, "peeked at fully processed splice list");
     return VmPageOrMarkerRef(nullptr);
   }
   if (!list_is_empty(&raw_pages_)) {
@@ -1399,14 +1457,19 @@ VmPageOrMarkerRef VmPageSpliceList::PeekReference() {
 }
 
 VmPageOrMarker VmPageSpliceList::Pop() {
-  if (IsDone()) {
-    DEBUG_ASSERT_MSG(false, "Popped from empty splice list");
+  if (!IsFinalized()) {
+    DEBUG_ASSERT_MSG(false, "attempted to Pop from a non-finalized splice list\n");
+    return VmPageOrMarker::Empty();
+  }
+  if (IsProcessed()) {
+    DEBUG_ASSERT_MSG(false, "Popped from fully processed splice list");
     return VmPageOrMarker::Empty();
   }
 
   VmPageOrMarker res;
   if (!list_is_empty(&raw_pages_)) {
-    // TODO(https://fxbug.dev/88859): This path and CreateFromPageList() need coverage in vmpl_unittests.
+    // TODO(https://fxbug.dev/88859): This path and CreateFromPageList() need coverage in
+    // vmpl_unittests.
     vm_page_t* head = list_remove_head_type(&raw_pages_, vm_page, queue_node);
     res = VmPageOrMarker::Page(head);
   } else {

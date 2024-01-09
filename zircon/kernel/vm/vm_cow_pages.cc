@@ -4971,7 +4971,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
   uint64_t new_pages_len = 0;
   zx_status_t status = ZX_OK;
   [[maybe_unused]] uint64_t initial_list_position = pages->Position();
-  while (!pages->IsDone()) {
+  while (!pages->IsProcessed()) {
     // With a PageSource only Pages are supported, so convert any refs to real pages.
     // We do this without popping a page from the splice list as `MakePageFromReference` may return
     // ZX_ERR_SHOULD_WAIT. This could lead the caller to wait on the page request and call

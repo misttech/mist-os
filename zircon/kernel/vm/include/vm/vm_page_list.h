@@ -728,25 +728,53 @@ class VMPLCursor {
 
 // Class which holds the list of vm_page structs removed from a VmPageList
 // by TakePages. The list include information about uncommitted pages and markers.
+// Every splice list is expected to go through the following series of states:
+// 1. The splice list is created.
+// 2. Pages are added to the splice list.
+// 3. The list is `Finalize`d, meaning that it can no longer be modified by `Append`.
+// 4. Pages are then `Pop`d from the list. Once all the pages are popped, the list is considered
+//    "processed".
+// 5. The list is then considered `Processed` and can be destroyed.
 class VmPageSpliceList final {
  public:
   VmPageSpliceList();
+  VmPageSpliceList(uint64_t offset, uint64_t length);
   VmPageSpliceList(VmPageSpliceList&& other);
   VmPageSpliceList& operator=(VmPageSpliceList&& other_tree);
   ~VmPageSpliceList();
 
-  // For use by PhysicalPageProvider.  The user-pager path doesn't use this.
+  // For use by PhysicalPageProvider.  The user-pager path doesn't use this. This returns a
+  // finalized list.
   static VmPageSpliceList CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages);
 
-  // Pops the next page off of the splice.
+  // Pops the next page off of the splice list. It is invalid to pop a page from a non-finalized
+  // splice list.
   VmPageOrMarker Pop();
 
   // Peeks at the head of the splice list and returns a non-null VmPageOrMarkerRef pointing to it
-  // if and only if it is a reference.
+  // if and only if it is a reference. It is invalid to peek at a non-finalized splice list.
   VmPageOrMarkerRef PeekReference();
 
+  // Appends `content` to the end of the splice list.
+  // The splice list takes ownership of `content` after this call.
+  // Note that this method does not work when raw_pages_ is in use.
+  // It is invalid to append to a finalized splice list.
+  zx_status_t Append(VmPageOrMarker content);
+
   // Returns true after the whole collection has been processed by Pop.
-  bool IsDone() const { return pos_ >= length_; }
+  bool IsProcessed() const { return pos_ >= length_; }
+
+  // Returns true if this list is empty.
+  bool IsEmpty() const;
+
+  // Marks the list as finalized.
+  // See the comment at `VmPageSpliceList`'s declaration for more info on what this means and when
+  // to call it. Note that it is invalid to call `Finalize` twice on the same list.
+  void Finalize();
+
+  // Returns true if the splice list is finalized.
+  // See the comment at `VmPageSpliceList`'s declaration for more info on what this means.
+  bool IsFinalized() const { return finalized_; }
 
   // Returns the current position in the list.
   uint64_t Position() const { return pos_; }
@@ -754,12 +782,12 @@ class VmPageSpliceList final {
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(VmPageSpliceList);
 
  private:
-  VmPageSpliceList(uint64_t offset, uint64_t length);
   void FreeAllPages();
 
   uint64_t offset_;
   uint64_t length_;
   uint64_t pos_ = 0;
+  bool finalized_ = false;
 
   VmPageListNode head_ = VmPageListNode(0);
   fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>> middle_;
@@ -1020,6 +1048,8 @@ class VmPageList final {
   void MergeOnto(VmPageList& other, fit::inline_function<void(VmPageOrMarker&&)> release_fn);
 
   // Takes the pages, references and markers in the range [offset, length) out of this page list.
+  // This method calls `Finalize` on the splice list prior to returning it, meaning that no more
+  // pages, references, or markers can be added to it.
   VmPageSpliceList TakePages(uint64_t offset, uint64_t length);
 
   uint64_t HeapAllocationBytes() const { return list_.size() * sizeof(VmPageListNode); }

@@ -308,7 +308,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
       // This also fails any current requests that overlap any part of this range.  Any page that
       // wasn't consumed by SupplyPages() can be re-loaned to keep the invariant that absent pages
       // in cow_pages_ are loaned.
-      while (!splice_list.IsDone()) {
+      while (!splice_list.IsProcessed()) {
         VmPageOrMarker page_or_marker = splice_list.Pop();
         DEBUG_ASSERT(page_or_marker.IsPage());
         vm_page_t* p = page_or_marker.ReleasePage();
