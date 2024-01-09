@@ -148,6 +148,7 @@ class SoftmacBinding : public DeviceInterface,
   // The FIDL client to communicate with iwlwifi
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
+  fdf::Dispatcher softmac_ifc_server_dispatcher_;
   std::unique_ptr<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>
       softmac_ifc_server_binding_;
 

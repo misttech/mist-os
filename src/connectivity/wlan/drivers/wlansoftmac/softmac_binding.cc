@@ -53,25 +53,51 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
 
-  // Create a dispatcher for Wlansoftmac device as a FIDL client.
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac_client",
-      [&](fdf_dispatcher_t* client_dispatcher) {
-        async::PostTask(main_driver_dispatcher_->async_dispatcher(), [&]() {
-          softmac_ifc_server_binding_.reset();
-          device_unbind_reply(child_device_);
-        });
-        // Explicitly call destroy since Unbind() calls releases this dispatcher before
-        // calling ShutdownAsync().
-        fdf_dispatcher_destroy(client_dispatcher);
-      });
+  // Create a dispatcher to serve the WlanSoftmacIfc protocol.
+  {
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                            "wlansoftmacifc_server", [](fdf_dispatcher_t*) {});
 
-  if (dispatcher.is_error()) {
-    ZX_ASSERT_MSG(false, "Creating client dispatcher error: %s",
-                  zx_status_get_string(dispatcher.status_value()));
+    if (dispatcher.is_error()) {
+      ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
+                    zx_status_get_string(dispatcher.status_value()));
+    }
+
+    softmac_ifc_server_dispatcher_ = *std::move(dispatcher);
   }
 
-  client_dispatcher_ = *std::move(dispatcher);
+  // Create a dispatcher for WlanSoftmac method calls to the parent device.
+  //
+  // The Unbind hook relies on client_dispatcher_ implementing a shutdown
+  // handler that performs the following steps in sequence.
+  //
+  //   - Asynchronously shutdown softmac_ifc_server_binding_
+  //   - Asynchronously call device_unbind_reply()
+  //
+  // Each step of the sequence must occur on its respective dispatcher
+  // to allow all queued task to complete.
+  {
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac_client",
+        [&](fdf_dispatcher_t* client_dispatcher) {
+          // Every fidl::ServerBinding must be destroyed on the
+          // dispatcher its bound too.
+          async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(), [&]() {
+            softmac_ifc_server_binding_.reset();
+            device_unbind_reply(child_device_);
+          });
+          // Explicitly call destroy since Unbind() calls releases this dispatcher before
+          // calling ShutdownAsync().
+          fdf_dispatcher_destroy(client_dispatcher);
+        });
+
+    if (dispatcher.is_error()) {
+      ZX_ASSERT_MSG(false, "Creating client dispatcher error: %s",
+                    zx_status_get_string(dispatcher.status_value()));
+    }
+    client_dispatcher_ = *std::move(dispatcher);
+  }
 }
 
 // Disable thread safety analysis, as this is a part of device initialization.
@@ -283,12 +309,12 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* i
     return endpoints.status_value();
   }
 
-  // Asynchronously bind the WlanSoftmacIfc server on the main driver dispatcher.
-  async::PostTask(main_driver_dispatcher_->async_dispatcher(),
+  // Asynchronously bind the WlanSoftmacIfc server
+  async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(),
                   [&, server_endpoint = std::move(endpoints->server)]() mutable {
                     softmac_ifc_server_binding_ =
                         std::make_unique<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>(
-                            main_driver_dispatcher_->get(), std::move(server_endpoint), this,
+                            fdf::Dispatcher::GetCurrent()->get(), std::move(server_endpoint), this,
                             [](fidl::UnbindInfo info) {
                               if (info.is_user_initiated()) {
                                 linfo("WlanSoftmacIfc server closed.");
