@@ -27,4 +27,11 @@ fuchsia_test_component("bt-inspect-integration-tests-component") {
 
 fuchsia_test_package("bt-inspect-integration-tests") {
   test_components = [ ":bt-inspect-integration-tests-component" ]
+
+  # TODO(https://fxbug.dev/317259066): remove when driver_manager doesn't ERROR
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

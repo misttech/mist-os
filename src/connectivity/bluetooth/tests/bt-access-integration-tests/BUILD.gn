@@ -34,5 +34,10 @@ fuchsia_test_package("bt-access-integration-tests") {
   test_specs = {
     # control the parallelism
     parallel = 1
+
+    # TODO(https://fxbug.dev/317259066) driver_manager ERROR logs
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
