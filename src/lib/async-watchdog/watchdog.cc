@@ -5,8 +5,9 @@
 #include "src/lib/async-watchdog/watchdog.h"
 
 #include <lib/async/cpp/time.h>
-#include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
 
+#include <iostream>
 #include <mutex>
 
 #include "src/lib/debug/backtrace-request.h"
@@ -24,7 +25,7 @@ WatchdogImpl::WatchdogImpl(std::string thread_name, uint64_t warning_interval_ms
       watched_thread_dispatcher_(watched_thread_dispatcher),
       run_update_fn_(std::move(run_update_fn)),
       check_update_fn_(std::move(check_update_fn)) {
-  FX_DCHECK(timeout_ms >= warning_interval_ms);
+  ZX_DEBUG_ASSERT(timeout_ms >= warning_interval_ms);
   for (size_t i = 0; i < kPollingNum; i++) {
     post_update_tasks_.push_back(std::make_unique<PostUpdateTaskClosureMethod>(this));
   }
@@ -33,19 +34,19 @@ WatchdogImpl::WatchdogImpl(std::string thread_name, uint64_t warning_interval_ms
 
 WatchdogImpl::~WatchdogImpl() {
   std::lock_guard<std::mutex> lock(mutex_);
-  FX_DCHECK(!initialized_ || finalized_);
+  ZX_DEBUG_ASSERT(!initialized_ || finalized_);
 }
 
 void WatchdogImpl::Initialize() {
   std::lock_guard<std::mutex> lock(mutex_);
-  FX_DCHECK(!initialized_ && !finalized_);
+  ZX_DEBUG_ASSERT(!initialized_ && !finalized_);
   initialized_ = true;
   PostTasks();
 }
 
 void WatchdogImpl::Finalize() {
   std::lock_guard<std::mutex> lock(mutex_);
-  FX_DCHECK(initialized_ && !finalized_);
+  ZX_DEBUG_ASSERT(initialized_ && !finalized_);
   finalized_ = true;
   for (auto& post_update_task : post_update_tasks_) {
     post_update_task->Cancel();
@@ -69,16 +70,16 @@ void WatchdogImpl::HandleTimer() {
     mutex_.unlock();
 
     backtrace_request_all_threads();
-
-    FX_LOGS(WARNING) << "The watched thread is not responsive for " << warning_interval_.to_msecs()
-                     << " ms. "
-                     << "It has been " << duration_since_last_response.to_msecs()
-                     << " ms since last response. "
-                     << "Please see klog for backtrace of all threads.";
+    // TODO(b/300157652): Change to structured logs when available
+    // for both drivers and applications or a workaround for this library is found.
+    std::cerr << "The watched thread is not responsive for " << warning_interval_.to_msecs()
+              << " ms. " << "It has been " << duration_since_last_response.to_msecs()
+              << " ms since last response. " << "Please see klog for backtrace of all threads.";
 
     if (duration_since_last_response >= timeout_) {
-      FX_CHECK(false) << "Fatal: Watchdog has detected timeout for more than "
-                      << timeout_.to_msecs() << " ms in " << thread_name_;
+      std::cerr << "Fatal: Watchdog has detected timeout for more than " << timeout_.to_msecs()
+                << " ms in " << thread_name_;
+      abort();
     }
   }
 
