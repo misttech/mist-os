@@ -228,7 +228,7 @@ impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I
 }
 
 /// The execution context provided by the IP layer to transport layer protocols.
-pub(crate) trait TransportIpContext<I: IpExt, BC>:
+pub trait TransportIpContext<I: IpExt, BC>:
     DeviceIdContext<AnyDevice> + IpSocketHandler<I, BC>
 {
     type DevicesWithAddrIter<'s>: Iterator<Item = Self::DeviceId>
@@ -355,7 +355,7 @@ impl<
 }
 
 #[derive(Copy, Clone)]
-pub(crate) enum EitherDeviceId<S, W> {
+pub enum EitherDeviceId<S, W> {
     Strong(S),
     Weak(W),
 }

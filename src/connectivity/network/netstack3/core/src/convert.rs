@@ -52,7 +52,7 @@ impl<I> BidirectionalConverter<I, I> for () {
 }
 
 /// A marker trait for [`BidirectionalConverter`] of owned or reference types.
-pub(crate) trait OwnedOrRefsBidirectionalConverter<Input, Output>:
+pub trait OwnedOrRefsBidirectionalConverter<Input, Output>:
     BidirectionalConverter<Input, Output>
     + for<'a> BidirectionalConverter<&'a Input, &'a Output>
     + for<'a> BidirectionalConverter<&'a mut Input, &'a mut Output>

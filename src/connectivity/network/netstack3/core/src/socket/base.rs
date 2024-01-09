@@ -79,7 +79,7 @@ pub enum EitherStack<T, O> {
 /// the same)! That lets the compiler optimize it out completely, creating no
 /// actual runtime overhead.
 #[derive(Debug)]
-pub(crate) enum MaybeDualStack<DS, NDS> {
+pub enum MaybeDualStack<DS, NDS> {
     DualStack(DS),
     NotDualStack(NDS),
 }

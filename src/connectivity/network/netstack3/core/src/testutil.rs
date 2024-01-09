@@ -148,6 +148,16 @@ where
     }
 }
 
+impl<'a, CC, BC> crate::context::ContextPair for &'a mut ContextPair<CC, BC> {
+    type CoreContext = CC;
+    type BindingsContext = BC;
+
+    fn contexts(&mut self) -> (&mut CC, &mut BC) {
+        let ContextPair { core_ctx, bindings_ctx } = self;
+        (core_ctx, bindings_ctx)
+    }
+}
+
 /// Context available during the execution of the netstack.
 pub type Ctx<BT> = ContextPair<SyncCtx<BT>, BT>;
 
@@ -162,6 +172,12 @@ impl<BC: crate::BindingsContext + Default> Ctx<BC> {
         let mut bindings_ctx = Default::default();
         let state = builder.build_with_ctx(&mut bindings_ctx);
         Self { core_ctx: SyncCtx { state }, bindings_ctx }
+    }
+
+    /// Retrieves a [`crate::api::CoreApi`] from this [`Ctx`].
+    pub fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
+        let Self { core_ctx, bindings_ctx } = self;
+        crate::api::CoreApi::with_contexts(core_ctx, bindings_ctx)
     }
 }
 

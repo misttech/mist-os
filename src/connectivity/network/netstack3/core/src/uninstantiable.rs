@@ -37,7 +37,7 @@ use crate::{
 };
 
 /// An uninstantiable type.
-pub(crate) struct Uninstantiable(Never);
+pub struct Uninstantiable(Never);
 
 impl AsRef<Never> for Uninstantiable {
     fn as_ref(&self) -> &Never {

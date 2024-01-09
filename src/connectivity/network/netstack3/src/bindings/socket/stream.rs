@@ -441,19 +441,20 @@ struct BindingData<I: IpExt> {
     send_task_abort: Option<futures::channel::oneshot::Sender<()>>,
 }
 
-impl<I: IpExt> BindingData<I> {
+impl<I> BindingData<I>
+where
+    I: IpExt,
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
+{
     fn new(ctx: &mut Ctx, properties: SocketWorkerProperties) -> Self {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let (local, peer) = zx::Socket::create_stream();
         let local = Arc::new(local);
         let SocketWorkerProperties {} = properties;
         let notifier = NeedsDataNotifier::default();
         let watcher = notifier.watcher();
-        let id = tcp::create_socket::<I, _>(
-            core_ctx,
-            bindings_ctx,
-            LocalZirconSocketAndNotifier(Arc::clone(&local), notifier),
-        );
+        let id =
+            ctx.api().tcp::<I>().create(LocalZirconSocketAndNotifier(Arc::clone(&local), notifier));
         Self { id, peer, local_socket_and_watcher: Some((local, watcher)), send_task_abort: None }
     }
 }
@@ -471,6 +472,8 @@ enum InitialSocketState {
 
 impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
 where
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
@@ -516,8 +519,7 @@ where
 
     fn close(self, ctx: &mut Ctx) {
         let Self { id, peer: _, local_socket_and_watcher: _, send_task_abort } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        tcp::close::<I, _>(core_ctx, bindings_ctx, id);
+        ctx.api().tcp().close(id);
         if let Some(send_task_abort) = send_task_abort {
             // Signal the task to stop but drop the canceled error. The data
             // notifier might have been closed in `close` or due to state
@@ -639,7 +641,11 @@ fn spawn_send_task<I: IpExt>(
     mut watcher: NeedsDataWatcher,
     id: TcpSocketId<I>,
     spawner: &worker::SocketScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
-) -> futures::channel::oneshot::Sender<()> {
+) -> futures::channel::oneshot::Sender<()>
+where
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
+{
     let (sender, abort) = futures::channel::oneshot::channel();
     let abort = abort.map(|r| r.expect("send task abort dropped without signaling"));
     let watch_fut = async move {
@@ -674,8 +680,7 @@ fn spawn_send_task<I: IpExt>(
                 Work::Watcher(None) => break,
                 Work::Signals(observed) => {
                     assert!(observed.contains(zx::Signals::SOCKET_READABLE));
-                    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-                    tcp::do_send::<I, _>(core_ctx, bindings_ctx, &id);
+                    ctx.api().tcp().do_send(&id);
                 }
             }
         }
@@ -696,6 +701,8 @@ struct RequestHandler<'a, I: IpExt> {
 
 impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I>
 where
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
@@ -705,11 +712,9 @@ where
             ctx,
         } = self;
         let addr = I::SocketAddress::from_sock_addr(addr)?;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let (addr, port) =
-            addr.try_into_core_with_ctx(bindings_ctx).map_err(IntoErrno::into_errno)?;
-        tcp::bind::<I, _>(core_ctx, bindings_ctx, id, addr, NonZeroU16::new(port))
-            .map_err(IntoErrno::into_errno)?;
+            addr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
+        ctx.api().tcp().bind(id, addr, NonZeroU16::new(port)).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
 
@@ -724,12 +729,10 @@ where
         } = self;
 
         let addr = I::SocketAddress::from_sock_addr(addr)?;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let (ip, remote_port) =
-            addr.try_into_core_with_ctx(&bindings_ctx).map_err(IntoErrno::into_errno)?;
+            addr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
-        tcp::connect::<I, _>(core_ctx, bindings_ctx, id, ip, port)
-            .map_err(IntoErrno::into_errno)?;
+        ctx.api().tcp().connect(id, ip, port).map_err(IntoErrno::into_errno)?;
         if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
             let sender = spawn_send_task::<I>(ctx.clone(), local, watcher, id.clone(), spawner);
             assert_matches::assert_matches!(send_task_abort.replace(sender), None);
@@ -744,7 +747,6 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let core_ctx = ctx.core_ctx();
         // The POSIX specification for `listen` [1] says
         //
         //   If listen() is called with a backlog argument value that is
@@ -767,7 +769,7 @@ where
             NonZeroUsize::min(MAXIMUM_BACKLOG_SIZE, NonZeroUsize::max(b, MINIMUM_BACKLOG_SIZE))
         });
 
-        tcp::listen::<I, _>(core_ctx, id, backlog).map_err(IntoErrno::into_errno)?;
+        ctx.api().tcp().listen(id, backlog).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
 
@@ -776,16 +778,15 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let fidl = match tcp::get_info::<I, _>(core_ctx, id) {
+        let fidl = match ctx.api().tcp().get_info(id) {
             SocketInfo::Unbound(UnboundInfo { device: _ }) => {
                 Ok(<<I as IpSockAddrExt>::SocketAddress as SockAddr>::UNSPECIFIED)
             }
             SocketInfo::Bound(BoundInfo { addr, port, device: _ }) => {
-                (addr, port).try_into_fidl_with_ctx(bindings_ctx)
+                (addr, port).try_into_fidl_with_ctx(ctx.bindings_ctx())
             }
             SocketInfo::Connection(ConnectionInfo { local_addr, remote_addr: _, device: _ }) => {
-                local_addr.try_into_fidl_with_ctx(bindings_ctx)
+                local_addr.try_into_fidl_with_ctx(ctx.bindings_ctx())
             }
         }
         .map_err(IntoErrno::into_errno)?;
@@ -797,12 +798,11 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        match tcp::get_info::<I, _>(core_ctx, id) {
+        match ctx.api().tcp().get_info(id) {
             SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(fposix::Errno::Enotconn),
             SocketInfo::Connection(info) => Ok({
                 info.remote_addr
-                    .try_into_fidl_with_ctx(bindings_ctx)
+                    .try_into_fidl_with_ctx(ctx.bindings_ctx())
                     .map_err(IntoErrno::into_errno)?
                     .into_sock_addr()
             }),
@@ -822,12 +822,10 @@ where
             ctx,
         } = self;
 
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let (accepted, addr, peer) =
-            tcp::accept::<I, _>(core_ctx, bindings_ctx, id).map_err(IntoErrno::into_errno)?;
+        let (accepted, addr, peer) = ctx.api().tcp().accept(id).map_err(IntoErrno::into_errno)?;
         let addr = addr
             .map_zone(AllowBindingIdFromWeak)
-            .try_into_fidl_with_ctx(bindings_ctx)
+            .try_into_fidl_with_ctx(ctx.bindings_ctx())
             .unwrap_or_else(|never| match never {})
             .into_sock_addr();
         let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
@@ -851,8 +849,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let core_ctx = ctx.core_ctx();
-        match tcp::get_socket_error(core_ctx, id) {
+        match ctx.api().tcp().get_socket_error(id) {
             Some(err) => Err(err.into_errno()),
             None => Ok(()),
         }
@@ -863,13 +860,11 @@ where
             data: BindingData { id, peer, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let shutdown_recv = mode.contains(fposix_socket::ShutdownMode::READ);
         let shutdown_send = mode.contains(fposix_socket::ShutdownMode::WRITE);
         let shutdown_type = ShutdownType::from_send_receive(shutdown_send, shutdown_recv)
             .ok_or(fposix::Errno::Einval)?;
-        let is_conn = tcp::shutdown::<I, _>(&core_ctx, bindings_ctx, id, shutdown_type)
-            .map_err(IntoErrno::into_errno)?;
+        let is_conn = ctx.api().tcp().shutdown(id, shutdown_type).map_err(IntoErrno::into_errno)?;
         if is_conn {
             let peer_disposition = shutdown_send.then_some(zx::SocketWriteDisposition::Disabled);
             let my_disposition = shutdown_recv.then_some(zx::SocketWriteDisposition::Disabled);
@@ -884,12 +879,13 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let device = device
-            .map(|name| bindings_ctx.devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev))
+            .map(|name| {
+                ctx.bindings_ctx().devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev)
+            })
             .transpose()?;
 
-        tcp::set_device(core_ctx, bindings_ctx, id, device).map_err(IntoErrno::into_errno)
+        ctx.api().tcp().set_device(id, device).map_err(IntoErrno::into_errno)
     }
 
     fn set_send_buffer_size(self, new_size: u64) {
@@ -897,10 +893,9 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        tcp::set_send_buffer_size(core_ctx, bindings_ctx, id, new_size);
+        ctx.api().tcp().set_send_buffer_size(id, new_size);
     }
 
     fn send_buffer_size(self) -> u64 {
@@ -908,8 +903,9 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        tcp::send_buffer_size(core_ctx, bindings_ctx, id)
+        ctx.api()
+            .tcp()
+            .send_buffer_size(id)
             // If the socket doesn't have a send buffer (e.g. because it was shut
             // down for writing and all the data was sent to the peer), return 0.
             .unwrap_or(0)
@@ -923,10 +919,9 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        tcp::set_receive_buffer_size(core_ctx, bindings_ctx, id, new_size);
+        ctx.api().tcp().set_receive_buffer_size(id, new_size);
     }
 
     fn receive_buffer_size(self) -> u64 {
@@ -934,8 +929,9 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        tcp::receive_buffer_size(core_ctx, bindings_ctx, id)
+        ctx.api()
+            .tcp()
+            .receive_buffer_size(id)
             // If the socket doesn't have a receive buffer (e.g. because the remote
             // end signalled FIN and all data was sent to the client), return 0.
             .unwrap_or(0)
@@ -949,8 +945,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let core_ctx = ctx.core_ctx();
-        tcp::set_reuseaddr(core_ctx, id, value).map_err(IntoErrno::into_errno)
+        ctx.api().tcp().set_reuseaddr(id, value).map_err(IntoErrno::into_errno)
     }
 
     fn reuse_address(self) -> bool {
@@ -958,8 +953,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let core_ctx = ctx.core_ctx();
-        tcp::reuseaddr(core_ctx, id)
+        ctx.api().tcp().reuseaddr(id)
     }
 
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
@@ -1542,8 +1536,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        tcp::with_socket_options_mut(core_ctx, bindings_ctx, id, f)
+        ctx.api().tcp().with_socket_options_mut(id, f)
     }
 
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(self, f: F) -> R {
@@ -1551,7 +1544,7 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        tcp::with_socket_options(ctx.core_ctx(), id, f)
+        ctx.api().tcp().with_socket_options(id, f)
     }
 }
 
@@ -1564,6 +1557,8 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     watcher: NeedsDataWatcher,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) where
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {

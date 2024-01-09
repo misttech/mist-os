@@ -2652,7 +2652,7 @@ mod tests {
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         transport::tcp,
-        CoreCtx, SyncCtx, UnlockedCoreCtx,
+        CoreContext, CoreCtx, SyncCtx, UnlockedCoreCtx,
     };
 
     struct FakeNudContext<I: Ip, D: LinkDevice> {
@@ -5503,7 +5503,7 @@ mod tests {
     }
 
     fn bind_and_connect_sockets<
-        I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt,
+        I: testutil::TestIpExt + crate::IpExt,
         L: FakeNetworkLinks<
             EthernetWeakDeviceId<testutil::FakeBindingsCtx>,
             EthernetDeviceId<testutil::FakeBindingsCtx>,
@@ -5516,49 +5516,48 @@ mod tests {
         I,
         WeakDeviceId<testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx,
-    > {
+    >
+    where
+        for<'a> UnlockedCoreCtx<'a, testutil::FakeBindingsCtx>:
+            CoreContext<I, testutil::FakeBindingsCtx>,
+    {
         const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
 
-        net.with_context("remote", |testutil::FakeCtx { core_ctx, bindings_ctx }| {
-            let socket = tcp::socket::create_socket::<I, _>(
-                core_ctx,
-                bindings_ctx,
-                tcp::buffer::testutil::ProvidedBuffers::default(),
-            );
-            tcp::socket::bind(
-                core_ctx,
-                bindings_ctx,
-                &socket,
-                Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
-                Some(REMOTE_PORT),
-            )
-            .unwrap();
-            tcp::socket::listen(core_ctx, &socket, NonZeroUsize::new(1).unwrap()).unwrap();
+        net.with_context("remote", |ctx| {
+            let mut tcp_api = ctx.core_api().tcp::<I>();
+            let socket = tcp_api.create(tcp::buffer::testutil::ProvidedBuffers::default());
+            tcp_api
+                .bind(
+                    &socket,
+                    Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                    Some(REMOTE_PORT),
+                )
+                .unwrap();
+            tcp_api.listen(&socket, NonZeroUsize::new(1).unwrap()).unwrap();
         });
 
-        net.with_context("local", |testutil::FakeCtx { core_ctx, bindings_ctx }| {
-            let socket = tcp::socket::create_socket::<I, _>(core_ctx, bindings_ctx, local_buffers);
-            tcp::socket::connect(
-                core_ctx,
-                bindings_ctx,
-                &socket,
-                Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
-                REMOTE_PORT,
-            )
-            .unwrap();
+        net.with_context("local", |ctx| {
+            let mut tcp_api = ctx.core_api().tcp::<I>();
+            let socket = tcp_api.create(local_buffers);
+            tcp_api
+                .connect(
+                    &socket,
+                    Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                    REMOTE_PORT,
+                )
+                .unwrap();
             socket
         })
     }
 
     #[ip_test]
-    fn upper_layer_confirmation_tcp_handshake<
-        I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt,
-    >()
+    fn upper_layer_confirmation_tcp_handshake<I: Ip + testutil::TestIpExt + crate::IpExt>()
     where
         for<'a> UnlockedCoreCtx<'a, testutil::FakeBindingsCtx>: DeviceIdContext<
                 EthernetLinkDevice,
                 DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
-            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
+            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>
+            + CoreContext<I, testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx: TimerContext<
             NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
         >,
@@ -5635,12 +5634,13 @@ mod tests {
     }
 
     #[ip_test]
-    fn upper_layer_confirmation_tcp_ack<I: Ip + testutil::TestIpExt + tcp::socket::DualStackIpExt>()
+    fn upper_layer_confirmation_tcp_ack<I: Ip + testutil::TestIpExt + crate::IpExt>()
     where
         for<'a> UnlockedCoreCtx<'a, testutil::FakeBindingsCtx>: DeviceIdContext<
                 EthernetLinkDevice,
                 DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
-            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
+            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>
+            + CoreContext<I, testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx: TimerContext<
             NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
         >,
@@ -5670,8 +5670,8 @@ mod tests {
         let tcp::buffer::testutil::ClientBuffers { send, receive: _ } =
             client_ends.0.as_ref().lock().take().unwrap();
         send.lock().extend_from_slice(b"hello");
-        net.with_context("local", |testutil::FakeCtx { core_ctx, bindings_ctx }| {
-            tcp::socket::do_send(core_ctx, bindings_ctx, &local_socket);
+        net.with_context("local", |ctx| {
+            ctx.core_api().tcp().do_send(&local_socket);
         });
         for _ in 0..2 {
             assert_eq!(

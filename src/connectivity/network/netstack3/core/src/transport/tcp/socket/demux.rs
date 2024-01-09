@@ -22,6 +22,7 @@ use packet_formats::{
 use thiserror::Error;
 
 use crate::{
+    context::CtxPair,
     convert::BidirectionalConverter as _,
     device,
     error::NotFoundError,
@@ -46,9 +47,9 @@ use crate::{
             do_send_inner, isn::IsnGenerator, make_connection, try_into_this_stack_conn_mut,
             BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler, DualStackIpExt,
             EitherStack, HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState,
-            MaybeDualStack, MaybeListener, PrimaryRc, SocketHandler, TcpBindingsContext,
-            TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpDualStackContext,
-            TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry, TcpSocketState,
+            MaybeDualStack, MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes,
+            TcpContext, TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec,
+            TcpSocketId, TcpSocketSetEntry, TcpSocketState,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
@@ -99,9 +100,7 @@ where
         let Some(original_dst_port) = NonZeroU16::new(flow_and_seqnum.dst_port()) else { return };
         let original_seqnum = SeqNum::new(flow_and_seqnum.sequence_num());
 
-        SocketHandler::<I, _>::on_icmp_error(
-            core_ctx,
-            bindings_ctx,
+        TcpApi::<I, _>::new(CtxPair { core_ctx, bindings_ctx }).on_icmp_error(
             original_src_ip,
             original_dst_ip,
             original_src_port,

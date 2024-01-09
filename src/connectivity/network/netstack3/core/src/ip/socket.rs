@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// An execution context defining a type of IP socket.
-pub(crate) trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Constructs a new [`IpSock`].
     ///
     /// `new_ip_socket` constructs a new `IpSock` to the given remote IP
@@ -225,7 +225,7 @@ pub enum IpSockCreateAndSendError {
 }
 
 #[derive(Debug)]
-pub(crate) enum SendOneShotIpPacketError<O, E> {
+pub enum SendOneShotIpPacketError<O, E> {
     CreateAndSendError { err: IpSockCreateAndSendError, options: O },
     SerializeError(E),
 }
@@ -291,7 +291,7 @@ pub(crate) enum MmsError {
 }
 
 /// Gets device related information of an IP socket.
-pub(crate) trait DeviceIpSocketHandler<I, BC>: DeviceIdContext<AnyDevice>
+pub trait DeviceIpSocketHandler<I, BC>: DeviceIdContext<AnyDevice>
 where
     I: IpLayerIpExt,
 {
@@ -318,7 +318,7 @@ pub enum IpSockCreationError {
 /// An IP socket.
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
-pub(crate) struct IpSock<I: IpExt, D, O> {
+pub struct IpSock<I: IpExt, D, O> {
     /// The definition of the socket.
     ///
     /// This does not change for the lifetime of the socket.

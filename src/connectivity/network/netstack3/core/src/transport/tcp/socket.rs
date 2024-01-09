@@ -44,10 +44,10 @@ use tracing::{debug, error, trace};
 
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
-    context::{InstantBindingsTypes, TimerContext, TracingContext},
+    context::{ContextPair, CtxPair, InstantBindingsTypes, TimerContext, TracingContext},
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{self, AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId, WeakId},
+    device::{self, AnyDevice, DeviceIdContext, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
         icmp::IcmpErrorCode,
@@ -74,7 +74,6 @@ use crate::{
         state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
         BufferSizes, ConnectionError, Mss, OptionalBufferSizes, SocketOptions,
     },
-    CoreCtx, SyncCtx,
 };
 
 pub use accept_queue::ListenerNotifier;
@@ -324,7 +323,7 @@ where
 {
 }
 
-pub(crate) trait TcpDemuxContext<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+pub trait TcpDemuxContext<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     /// Calls `f` with non-mutable access to the demux state.
     fn with_demux<O, F: FnOnce(&DemuxState<I, D, BT>) -> O>(&mut self, cb: F) -> O;
 
@@ -362,7 +361,7 @@ impl<'a, SS: 'a, DS: AsSingleStack<SS> + 'a, SC, DC>
 }
 
 /// Core context for TCP.
-pub(crate) trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
+pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     TcpDemuxContext<I, Self::WeakDeviceId, BC> + IpSocketHandler<I, BC>
 {
     /// The core context that will give access to this version of the IP layer.
@@ -536,7 +535,7 @@ pub(crate) trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
 }
 
 /// A provider of dualstack socket functionality required by TCP sockets.
-pub(crate) trait TcpDualStackContext<I: DualStackIpExt> {
+pub trait TcpDualStackContext<I: DualStackIpExt> {
     /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
     fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
         &self,
@@ -1565,152 +1564,51 @@ impl HandshakeStatus {
         }
     }
 }
-pub(crate) trait SocketHandler<I: DualStackIpExt, BC: TcpBindingsContext<Self::WeakDeviceId>>:
-    DeviceIdContext<AnyDevice>
-{
-    fn create_socket(
-        &mut self,
-        bindings_ctx: &mut BC,
-        socket_extra: BC::ListenerNotifierOrProvidedBuffers,
-    ) -> TcpSocketId<I, Self::WeakDeviceId, BC>;
+/// The TCP socket API.
+pub struct TcpApi<I, C>(C, PhantomData<I>);
 
-    fn bind(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        local_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
-        port: Option<NonZeroU16>,
-    ) -> Result<(), BindError>;
-
-    fn listen(
-        &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        backlog: NonZeroUsize,
-    ) -> Result<(), ListenError>;
-
-    fn accept(
-        &mut self,
-        _bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> Result<
-        (
-            TcpSocketId<I, Self::WeakDeviceId, BC>,
-            SocketAddr<I::Addr, Self::WeakDeviceId>,
-            BC::ReturnedBuffers,
-        ),
-        AcceptError,
-    >;
-
-    fn connect(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
-        remote_port: NonZeroU16,
-    ) -> Result<(), ConnectError>;
-
-    fn close(&mut self, bindings_ctx: &mut BC, id: TcpSocketId<I, Self::WeakDeviceId, BC>);
-
-    fn shutdown(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        shutdown: ShutdownType,
-    ) -> Result<bool, NoConnection>;
-
-    fn get_info(
-        &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
-
-    fn do_send(&mut self, bindings_ctx: &mut BC, conn_id: &TcpSocketId<I, Self::WeakDeviceId, BC>);
-
-    fn handle_timer(
-        &mut self,
-        bindings_ctx: &mut BC,
-        conn_id: WeakTcpSocketId<I, Self::WeakDeviceId, BC>,
-    );
-
-    fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        f: F,
-    ) -> R;
-    fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(
-        &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        f: F,
-    ) -> R;
-
-    fn set_device(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        device: Option<Self::DeviceId>,
-    ) -> Result<(), SetDeviceError>;
-
-    fn set_send_buffer_size(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        size: usize,
-    );
-    fn send_buffer_size(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> Option<usize>;
-    fn set_receive_buffer_size(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        size: usize,
-    );
-    fn receive_buffer_size(
-        &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> Option<usize>;
-
-    fn set_reuseaddr(
-        &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        reuse: bool,
-    ) -> Result<(), SetReuseAddrError>;
-    fn reuseaddr(&mut self, id: &TcpSocketId<I, Self::WeakDeviceId, BC>) -> bool;
-
-    /// Receives an ICMP error from the IP layer.
-    fn on_icmp_error(
-        &mut self,
-        bindings_ctx: &mut BC,
-        orig_src_ip: SpecifiedAddr<I::Addr>,
-        orig_dst_ip: SpecifiedAddr<I::Addr>,
-        orig_src_port: NonZeroU16,
-        orig_dst_port: NonZeroU16,
-        seq: SeqNum,
-        error: IcmpErrorCode,
-    );
-
-    fn get_socket_error(
-        &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> Option<ConnectionError>;
-
-    fn with_info<V: InfoVisitor<I, Self::WeakDeviceId>>(&mut self, cb: &mut V);
+impl<I, C> TcpApi<I, C> {
+    pub(crate) fn new(ctx: C) -> Self {
+        Self(ctx, PhantomData)
+    }
 }
 
-impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext<I, BC>>
-    SocketHandler<I, BC> for CC
+/// A local alias for [`TcpSocketId`] for use in [`TcpApi`].
+///
+/// TODO(https://github.com/rust-lang/rust/issues/8995): Make this an inherent
+/// associated type.
+type TcpApiSocketId<I, C> = TcpSocketId<
+    I,
+    <<C as ContextPair>::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+    <C as ContextPair>::BindingsContext,
+>;
+
+impl<I, C> TcpApi<I, C>
+where
+    I: DualStackIpExt,
+    C: ContextPair,
+    C::CoreContext: TcpContext<I, C::BindingsContext>,
+    C::BindingsContext:
+        TcpBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
 {
-    fn create_socket(
+    fn core_ctx(&mut self) -> &mut C::CoreContext {
+        let Self(pair, PhantomData) = self;
+        pair.core_ctx()
+    }
+
+    fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
+        let Self(pair, PhantomData) = self;
+        pair.contexts()
+    }
+
+    /// Creates a new socket in unbound state.
+    pub fn create(
         &mut self,
-        _bindings_ctx: &mut BC,
-        socket_extra: BC::ListenerNotifierOrProvidedBuffers,
-    ) -> TcpSocketId<I, Self::WeakDeviceId, BC> {
-        self.with_all_sockets_mut(|all_sockets| {
+        socket_extra: <C::BindingsContext as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
+    ) -> TcpApiSocketId<I, C> {
+        self.core_ctx().with_all_sockets_mut(|all_sockets| {
             let (sock, primary) = TcpSocketId::new(TcpSocketState::Unbound(Unbound {
-                buffer_sizes: BC::default_buffer_sizes(),
+                buffer_sizes: C::BindingsContext::default_buffer_sizes(),
                 bound_device: Default::default(),
                 sharing: Default::default(),
                 socket_options: Default::default(),
@@ -1724,11 +1622,18 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         })
     }
 
-    fn bind(
+    /// Binds an unbound socket to a local socket address.
+    ///
+    /// Requests that the given socket be bound to the local address, if one is
+    /// provided; otherwise to all addresses. If `port` is specified (is
+    /// `Some`), the socket will be bound to that port. Otherwise a port will be
+    /// selected to not conflict with existing bound or connected sockets.
+    pub fn bind(
         &mut self,
-        _bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        addr: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
+        id: &TcpApiSocketId<I, C>,
+        addr: Option<
+            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        >,
         port: Option<NonZeroU16>,
     ) -> Result<(), BindError> {
         debug!("bind {id:?} to {addr:?}:{port:?}");
@@ -1748,7 +1653,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
             };
 
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
-        self.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
+        self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let Unbound { bound_device, buffer_sizes, socket_options, sharing, socket_extra } =
                 match socket_state {
                     TcpSocketState::Unbound(u) => u,
@@ -1774,11 +1679,11 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                         )
                         .map_err(LocalAddressError::Zone)?;
 
-                    let mut assigned_to = <<CC as TcpContext<I, _>>::SingleStackIpTransportAndDemuxCtx<'_> as TransportIpContext<
-                        I,
-                        _,
-                    >>::get_devices_with_assigned_addr(
-                        core_ctx, addr.clone().into()
+                    let mut assigned_to = <
+                        <C::CoreContext as TcpContext<I, _>>
+                            ::SingleStackIpTransportAndDemuxCtx<'_> as TransportIpContext<I,_,>>
+                                ::get_devices_with_assigned_addr(
+                                    core_ctx, addr.clone().into()
                     );
                     if !assigned_to.any(|d| {
                         required_device
@@ -1797,16 +1702,14 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
             let (addr, sharing) =
                 core_ctx.with_demux_mut(move |DemuxState { socketmap, port_alloc }| {
                     let port = match port {
-                        None => {
-                            match port_alloc.try_alloc(&local_ip, &socketmap) {
-                                Some(port) => {
-                                    NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
-                                }
-                                None => {
-                                    return Err(LocalAddressError::FailedToAllocateLocalPort);
-                                }
+                        None => match port_alloc.try_alloc(&local_ip, &socketmap) {
+                            Some(port) => {
+                                NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
                             }
-                        }
+                            None => {
+                                return Err(LocalAddressError::FailedToAllocateLocalPort);
+                            }
+                        },
                         Some(port) => port,
                     };
 
@@ -1835,13 +1738,14 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         })
     }
 
-    fn listen(
+    /// Listens on an already bound socket.
+    pub fn listen(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
+        id: &TcpApiSocketId<I, C>,
         backlog: NonZeroUsize,
     ) -> Result<(), ListenError> {
         debug!("listen on {id:?} with backlog {backlog}");
-        self.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
+        self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let (listener, listener_sharing, addr) = match socket_state {
                 TcpSocketState::Bound(BoundSocketState::Listener((l, sharing, addr))) => match l {
                     MaybeListener::Listener(_) => return Err(ListenError::NotSupported),
@@ -1886,19 +1790,19 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         })
     }
 
-    fn accept(
+    /// Accepts an established socket from the queue of a listener socket.
+    pub fn accept(
         &mut self,
-        _bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
+        id: &TcpApiSocketId<I, C>,
     ) -> Result<
         (
-            TcpSocketId<I, Self::WeakDeviceId, BC>,
-            SocketAddr<I::Addr, Self::WeakDeviceId>,
-            BC::ReturnedBuffers,
+            TcpApiSocketId<I, C>,
+            SocketAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            <C::BindingsContext as TcpBindingsTypes>::ReturnedBuffers,
         ),
         AcceptError,
     > {
-        let (conn_id, client_buffers) = self.with_socket_mut(id, |socket_state| {
+        let (conn_id, client_buffers) = self.core_ctx().with_socket_mut(id, |socket_state| {
             debug!("accept on {id:?}");
             let Listener { backlog: _, buffer_sizes: _, socket_options: _, accept_queue } =
                 match socket_state {
@@ -1921,10 +1825,10 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
             Ok::<_, AcceptError>((conn_id, client_buffers))
         })?;
 
-        let addr = self.with_socket_mut_and_converter(&conn_id, |socket_state, converter| {
+        let addr = self.core_ctx().with_socket_mut_and_converter(&conn_id, |socket_state, converter| {
             let (conn, conn_addr) = assert_matches!(
                 socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, BC, CC>(conn, &converter).expect("TODO(https://fxbug.dev/136316): dual stack listener not supported yet"),
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, _, C::CoreContext>(conn, &converter).expect("TODO(https://fxbug.dev/136316): dual stack listener not supported yet"),
                 "invalid socket ID"
             );
             conn.accept_queue = None;
@@ -1936,14 +1840,22 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         Ok((conn_id, addr, client_buffers))
     }
 
-    fn connect(
+    /// Connects a socket to a remote address.
+    ///
+    /// When the method returns, the connection is not guaranteed to be
+    /// established. It is up to the caller (Bindings) to determine when the
+    /// connection has been established. Bindings are free to use anything
+    /// available on the platform to check, for instance, signals.
+    pub fn connect(
         &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
+        id: &TcpApiSocketId<I, C>,
+        remote_ip: Option<
+            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        >,
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectError> {
-        self.with_socket_mut_isn_transport_demux(id, |core_ctx, socket_state, isn| {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.with_socket_mut_isn_transport_demux(id, |core_ctx, socket_state, isn| {
             debug!("connect on {id:?} to {remote_ip:?}:{remote_port}");
             let (
                 local_ip,
@@ -2118,134 +2030,150 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         })
     }
 
-    fn close(&mut self, bindings_ctx: &mut BC, id: TcpSocketId<I, Self::WeakDeviceId, BC>) {
-        let (destroy, pending) = self.with_socket_mut_transport_demux(
-            &id,
-            |core_ctx, socket_state| match socket_state {
-                TcpSocketState::Unbound(_) => (true, None),
-                TcpSocketState::Bound(BoundSocketState::Listener((
-                    MaybeListener::Bound(_),
-                    _sharing,
-                    addr,
-                ))) => {
-                    let (core_ctx, _converter) = core_ctx.into_single_stack();
-                    core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-                        assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
-                    });
-                    (true, None)
-                }
-                TcpSocketState::Bound(BoundSocketState::Listener((
-                    MaybeListener::Listener(Listener {
-                        accept_queue,
-                        backlog: _,
-                        buffer_sizes: _,
-                        socket_options: _,
-                    }),
-                    _sharing,
-                    addr,
-                ))) => {
-                    let (core_ctx, _converter) = core_ctx.into_single_stack();
-                    core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-                        assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
-                    });
-
-                    let (pending, _socket_extra) = accept_queue.close();
-                    (true, Some(pending))
-                }
-                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                    fn do_close<SockI, WireI, CC, BC>(
-                        core_ctx: &mut CC,
-                        bindings_ctx: &mut BC,
-                        id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
-                        demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
-                        conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
-                        addr: &ConnAddr<
-                            ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                            CC::WeakDeviceId,
-                        >,
-                    ) -> bool
-                    where
-                        SockI: DualStackIpExt,
-                        WireI: DualStackIpExt,
-                        BC: TcpBindingsContext<CC::WeakDeviceId>,
-                        CC: TransportIpContext<WireI, BC>
-                            + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
-                    {
-                        conn.defunct = true;
-                        let already_closed = match conn.state.close(
-                            CloseReason::Close { now: bindings_ctx.now() },
-                            &conn.socket_options,
-                        ) {
-                            Err(CloseError::NoConnection) => true,
-                            Err(CloseError::Closing) => false,
-                            Ok(()) => matches!(conn.state, State::Closed(_)),
-                        };
-                        if already_closed {
-                            core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-                                assert_matches!(
-                                    socketmap.conns_mut().remove(demux_id, addr),
-                                    Ok(())
-                                );
-                            });
-                            let _: Option<_> = bindings_ctx.cancel_timer(id.downgrade().into());
-                        } else {
-                            do_send_inner(&id, conn, &addr, core_ctx, bindings_ctx);
-                        };
-                        already_closed
+    /// Closes a socket.
+    pub fn close(&mut self, id: TcpApiSocketId<I, C>) {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let (destroy, pending) =
+            core_ctx.with_socket_mut_transport_demux(&id, |core_ctx, socket_state| {
+                match socket_state {
+                    TcpSocketState::Unbound(_) => (true, None),
+                    TcpSocketState::Bound(BoundSocketState::Listener((
+                        MaybeListener::Bound(_),
+                        _sharing,
+                        addr,
+                    ))) => {
+                        let (core_ctx, _converter) = core_ctx.into_single_stack();
+                        core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                            assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                        });
+                        (true, None)
                     }
-                    let already_closed = match core_ctx {
-                        MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                            let (conn, addr) = converter.convert(conn);
-                            do_close(
-                                core_ctx,
-                                bindings_ctx,
-                                &id,
-                                &I::into_demux_socket_id(id.clone()),
-                                conn,
-                                addr,
-                            )
+                    TcpSocketState::Bound(BoundSocketState::Listener((
+                        MaybeListener::Listener(Listener {
+                            accept_queue,
+                            backlog: _,
+                            buffer_sizes: _,
+                            socket_options: _,
+                        }),
+                        _sharing,
+                        addr,
+                    ))) => {
+                        let (core_ctx, _converter) = core_ctx.into_single_stack();
+                        core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                            assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                        });
+
+                        let (pending, _socket_extra) = accept_queue.close();
+                        (true, Some(pending))
+                    }
+                    TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
+                        fn do_close<SockI, WireI, CC, BC>(
+                            core_ctx: &mut CC,
+                            bindings_ctx: &mut BC,
+                            id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                            demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+                            conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+                            addr: &ConnAddr<
+                                ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
+                                CC::WeakDeviceId,
+                            >,
+                        ) -> bool
+                        where
+                            SockI: DualStackIpExt,
+                            WireI: DualStackIpExt,
+                            BC: TcpBindingsContext<CC::WeakDeviceId>,
+                            CC: TransportIpContext<WireI, BC>
+                                + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
+                        {
+                            conn.defunct = true;
+                            let already_closed = match conn.state.close(
+                                CloseReason::Close { now: bindings_ctx.now() },
+                                &conn.socket_options,
+                            ) {
+                                Err(CloseError::NoConnection) => true,
+                                Err(CloseError::Closing) => false,
+                                Ok(()) => matches!(conn.state, State::Closed(_)),
+                            };
+                            if already_closed {
+                                core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                                    assert_matches!(
+                                        socketmap.conns_mut().remove(demux_id, addr),
+                                        Ok(())
+                                    );
+                                });
+                                let _: Option<_> = bindings_ctx.cancel_timer(id.downgrade().into());
+                            } else {
+                                do_send_inner(&id, conn, &addr, core_ctx, bindings_ctx);
+                            };
+                            already_closed
                         }
-                        MaybeDualStack::DualStack((core_ctx, converter)) => {
-                            match converter.convert(conn) {
-                                EitherStack::ThisStack((conn, addr)) => do_close(
+                        let already_closed = match core_ctx {
+                            MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                                let (conn, addr) = converter.convert(conn);
+                                do_close(
                                     core_ctx,
                                     bindings_ctx,
                                     &id,
                                     &I::into_demux_socket_id(id.clone()),
                                     conn,
                                     addr,
-                                ),
-                                EitherStack::OtherStack((conn, addr)) => do_close(
-                                    core_ctx,
-                                    bindings_ctx,
-                                    &id,
-                                    &core_ctx.into_other_demux_socket_id(id.clone()),
-                                    conn,
-                                    addr,
-                                ),
+                                )
                             }
-                        }
-                    };
-                    (already_closed, None)
+                            MaybeDualStack::DualStack((core_ctx, converter)) => {
+                                match converter.convert(conn) {
+                                    EitherStack::ThisStack((conn, addr)) => do_close(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        &id,
+                                        &I::into_demux_socket_id(id.clone()),
+                                        conn,
+                                        addr,
+                                    ),
+                                    EitherStack::OtherStack((conn, addr)) => do_close(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        &id,
+                                        &core_ctx.into_other_demux_socket_id(id.clone()),
+                                        conn,
+                                        addr,
+                                    ),
+                                }
+                            }
+                        };
+                        (already_closed, None)
+                    }
                 }
-            },
-        );
+            });
 
-        close_pending_sockets(self, bindings_ctx, pending.into_iter().flatten());
+        close_pending_sockets(core_ctx, bindings_ctx, pending.into_iter().flatten());
 
         if destroy {
-            destroy_socket(self, bindings_ctx, id);
+            destroy_socket(core_ctx, bindings_ctx, id);
         }
     }
 
-    fn shutdown(
+    /// Shuts down a socket.
+    ///
+    /// For a connection, calling this function signals the other side of the
+    /// connection that we will not be sending anything over the connection; The
+    /// connection will still stay in the socketmap even after reaching `Closed`
+    /// state.
+    ///
+    /// For a Listener, calling this function brings it back to bound state and
+    /// shutdowns all the connection that is currently ready to be accepted.
+    ///
+    /// Returns Err(NoConnection) if the shutdown option does not apply.
+    /// Otherwise, Whether a connection has been shutdown is returned, i.e., if
+    /// the socket was a listener, the operation will succeed but false will be
+    /// returned.
+    pub fn shutdown(
         &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
+        id: &TcpApiSocketId<I, C>,
         shutdown: ShutdownType,
     ) -> Result<bool, NoConnection> {
+        let (core_ctx, bindings_ctx) = self.contexts();
         let (shutdown_send, shutdown_receive) = shutdown.to_send_receive();
-        let (result, pending) = self.with_socket_mut_transport_demux(
+        let (result, pending) = core_ctx.with_socket_mut_transport_demux(
             id,
             |core_ctx, socket_state| {
                 match socket_state {
@@ -2348,19 +2276,22 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
             },
         )?;
 
-        close_pending_sockets(self, bindings_ctx, pending.into_iter().flatten());
+        close_pending_sockets(core_ctx, bindings_ctx, pending.into_iter().flatten());
 
         Ok(result)
     }
 
-    fn set_device(
+    /// Sets the device on a socket.
+    ///
+    /// Passing `None` clears the bound device.
+    pub fn set_device(
         &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        new_device: Option<Self::DeviceId>,
+        id: &TcpApiSocketId<I, C>,
+        new_device: Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     ) -> Result<(), SetDeviceError> {
-        let weak_device = new_device.as_ref().map(|d| self.downgrade_device_id(d));
-        self.with_socket_mut_transport_demux(id, move |core_ctx, socket_state| {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let weak_device = new_device.as_ref().map(|d| core_ctx.downgrade_device_id(d));
+        core_ctx.with_socket_mut_transport_demux(id, move |core_ctx, socket_state| {
             debug!("set device on {id:?} to {new_device:?}");
             let (core_ctx, converter) = core_ctx.into_single_stack();
             match socket_state {
@@ -2369,8 +2300,9 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                     Ok(())
                 }
                 TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                    let (conn, addr) = try_into_this_stack_conn_mut::<I, BC, CC>(conn, &converter)
-                        .ok_or(SetDeviceError::DualStackNotSupported)?;
+                    let (conn, addr) =
+                        try_into_this_stack_conn_mut::<I, _, C::CoreContext>(conn, &converter)
+                            .ok_or(SetDeviceError::DualStackNotSupported)?;
                     let ConnAddr {
                         device: old_device,
                         ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
@@ -2454,11 +2386,13 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         })
     }
 
-    fn get_info(
+    /// Get information for a TCP socket.
+    pub fn get_info(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> SocketInfo<I::Addr, CC::WeakDeviceId> {
-        self.with_socket_and_converter(id, |socket_state, _converter| match socket_state {
+        id: &TcpApiSocketId<I, C>,
+    ) -> SocketInfo<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
+        self.core_ctx().with_socket_and_converter(id, |socket_state, _converter| match socket_state
+        {
             TcpSocketState::Unbound(unbound) => SocketInfo::Unbound(unbound.into()),
             TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
                 #[derive(GenericOverIp)]
@@ -2508,8 +2442,15 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         })
     }
 
-    fn do_send(&mut self, bindings_ctx: &mut BC, conn_id: &TcpSocketId<I, Self::WeakDeviceId, BC>) {
-        self.with_socket_mut_transport_demux(conn_id, |core_ctx, socket_state| {
+    /// Call this function whenever a socket can push out more data. That means
+    /// either:
+    ///
+    /// - A retransmission timer fires.
+    /// - An ack received from peer so that our send window is enlarged.
+    /// - The user puts data into the buffer and we are notified.
+    pub fn do_send(&mut self, conn_id: &TcpApiSocketId<I, C>) {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.with_socket_mut_transport_demux(conn_id, |core_ctx, socket_state| {
             let (conn, _sharing) = assert_matches!(
                 socket_state,
                 TcpSocketState::Bound(BoundSocketState::Connected(c)) => c
@@ -2533,100 +2474,109 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
 
     fn handle_timer(
         &mut self,
-        bindings_ctx: &mut BC,
-        weak_id: WeakTcpSocketId<I, Self::WeakDeviceId, BC>,
+        weak_id: WeakTcpSocketId<
+            I,
+            <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+            C::BindingsContext,
+        >,
     ) {
         let id = match weak_id.upgrade() {
             Some(c) => c,
             None => return,
         };
+        let (core_ctx, bindings_ctx) = self.contexts();
         // Alias refs so we can move weak_id to the closure.
         let id_alias = &id;
-        let ctx_alias = &mut *bindings_ctx;
-        let defunct = self.with_socket_mut_transport_demux(&id, move |core_ctx, socket_state| {
-            let id = id_alias;
-            let ctx = ctx_alias;
-            let (conn, _sharing) = assert_matches!(
-                socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected(conn)) => conn
-            );
-            fn do_handle_timer<SockI, WireI, CC, BC>(
-                core_ctx: &mut CC,
-                bindings_ctx: &mut BC,
-                weak_id: WeakTcpSocketId<SockI, CC::WeakDeviceId, BC>,
-                id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
-                demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
-                conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
-                addr: &ConnAddr<
-                    ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                    CC::WeakDeviceId,
-                >,
-            ) -> bool
-            where
-                SockI: DualStackIpExt,
-                WireI: DualStackIpExt,
-                BC: TcpBindingsContext<CC::WeakDeviceId>,
-                CC: TransportIpContext<WireI, BC> + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
-            {
-                do_send_inner(id, conn, addr, core_ctx, bindings_ctx);
-                if conn.defunct && matches!(conn.state, State::Closed(_)) {
-                    core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-                        assert_matches!(socketmap.conns_mut().remove(demux_id, addr), Ok(()));
-                    });
-                    let _: Option<_> = bindings_ctx.cancel_timer(weak_id.into());
-                    true
-                } else {
-                    false
+        let bindings_ctx_alias = &mut *bindings_ctx;
+        let defunct =
+            core_ctx.with_socket_mut_transport_demux(&id, move |core_ctx, socket_state| {
+                let id = id_alias;
+                let bindings_ctx = bindings_ctx_alias;
+                let (conn, _sharing) = assert_matches!(
+                    socket_state,
+                    TcpSocketState::Bound(BoundSocketState::Connected(conn)) => conn
+                );
+                fn do_handle_timer<SockI, WireI, CC, BC>(
+                    core_ctx: &mut CC,
+                    bindings_ctx: &mut BC,
+                    weak_id: WeakTcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                    id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                    demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+                    conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+                    addr: &ConnAddr<
+                        ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
+                        CC::WeakDeviceId,
+                    >,
+                ) -> bool
+                where
+                    SockI: DualStackIpExt,
+                    WireI: DualStackIpExt,
+                    BC: TcpBindingsContext<CC::WeakDeviceId>,
+                    CC: TransportIpContext<WireI, BC>
+                        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
+                {
+                    do_send_inner(id, conn, addr, core_ctx, bindings_ctx);
+                    if conn.defunct && matches!(conn.state, State::Closed(_)) {
+                        core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                            assert_matches!(socketmap.conns_mut().remove(demux_id, addr), Ok(()));
+                        });
+                        let _: Option<_> = bindings_ctx.cancel_timer(weak_id.into());
+                        true
+                    } else {
+                        false
+                    }
                 }
-            }
-            match core_ctx {
-                MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                    let (conn, addr) = converter.convert(conn);
-                    do_handle_timer(
-                        core_ctx,
-                        ctx,
-                        weak_id,
-                        id,
-                        &I::into_demux_socket_id(id.clone()),
-                        conn,
-                        addr,
-                    )
+                match core_ctx {
+                    MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                        let (conn, addr) = converter.convert(conn);
+                        do_handle_timer(
+                            core_ctx,
+                            bindings_ctx,
+                            weak_id,
+                            id,
+                            &I::into_demux_socket_id(id.clone()),
+                            conn,
+                            addr,
+                        )
+                    }
+                    MaybeDualStack::DualStack((core_ctx, converter)) => {
+                        match converter.convert(conn) {
+                            EitherStack::ThisStack((conn, addr)) => do_handle_timer(
+                                core_ctx,
+                                bindings_ctx,
+                                weak_id,
+                                id,
+                                &I::into_demux_socket_id(id.clone()),
+                                conn,
+                                addr,
+                            ),
+                            EitherStack::OtherStack((conn, addr)) => do_handle_timer(
+                                core_ctx,
+                                bindings_ctx,
+                                weak_id,
+                                id,
+                                &core_ctx.into_other_demux_socket_id(id.clone()),
+                                conn,
+                                addr,
+                            ),
+                        }
+                    }
                 }
-                MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(conn) {
-                    EitherStack::ThisStack((conn, addr)) => do_handle_timer(
-                        core_ctx,
-                        ctx,
-                        weak_id,
-                        id,
-                        &I::into_demux_socket_id(id.clone()),
-                        conn,
-                        addr,
-                    ),
-                    EitherStack::OtherStack((conn, addr)) => do_handle_timer(
-                        core_ctx,
-                        ctx,
-                        weak_id,
-                        id,
-                        &core_ctx.into_other_demux_socket_id(id.clone()),
-                        conn,
-                        addr,
-                    ),
-                },
-            }
-        });
+            });
         if defunct {
             // Remove the entry from the primary map and drop primary.
-            destroy_socket(self, bindings_ctx, id);
+            destroy_socket(core_ctx, bindings_ctx, id);
         }
     }
 
-    fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(
+    /// Access options mutably for a TCP socket.
+    pub fn with_socket_options_mut<R, F: FnOnce(&mut SocketOptions) -> R>(
         &mut self,
-        bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
+        id: &TcpApiSocketId<I, C>,
         f: F,
     ) -> R {
-        self.with_socket_mut_transport_demux(id, |core_ctx, socket_state| match socket_state {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.with_socket_mut_transport_demux(id, |core_ctx, socket_state| match socket_state {
             TcpSocketState::Unbound(unbound) => f(&mut unbound.socket_options),
             TcpSocketState::Bound(BoundSocketState::Listener((
                 MaybeListener::Bound(bound),
@@ -2670,83 +2620,78 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         })
     }
 
-    fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(
+    /// Access socket options immutably for a TCP socket
+    pub fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
+        id: &TcpApiSocketId<I, C>,
         f: F,
     ) -> R {
-        self.with_socket_and_converter(id, |socket_state, converter| match socket_state {
-            TcpSocketState::Unbound(unbound) => f(&unbound.socket_options),
-            TcpSocketState::Bound(BoundSocketState::Listener((
-                MaybeListener::Bound(bound),
-                _,
-                _,
-            ))) => f(&bound.socket_options),
-            TcpSocketState::Bound(BoundSocketState::Listener((
-                MaybeListener::Listener(listener),
-                _,
-                _,
-            ))) => f(&listener.socket_options),
-            TcpSocketState::Bound(BoundSocketState::Connected((conn, _))) => {
-                let socket_options = match converter {
-                    MaybeDualStack::NotDualStack(converter) => {
-                        let (conn, _addr) = converter.convert(conn);
-                        &conn.socket_options
-                    }
-                    MaybeDualStack::DualStack(converter) => match converter.convert(conn) {
-                        EitherStack::ThisStack((conn, _addr)) => &conn.socket_options,
-                        EitherStack::OtherStack((conn, _addr)) => &conn.socket_options,
-                    },
-                };
-                f(socket_options)
-            }
-        })
+        self.core_ctx().with_socket_and_converter(
+            id,
+            |socket_state, converter| match socket_state {
+                TcpSocketState::Unbound(unbound) => f(&unbound.socket_options),
+                TcpSocketState::Bound(BoundSocketState::Listener((
+                    MaybeListener::Bound(bound),
+                    _,
+                    _,
+                ))) => f(&bound.socket_options),
+                TcpSocketState::Bound(BoundSocketState::Listener((
+                    MaybeListener::Listener(listener),
+                    _,
+                    _,
+                ))) => f(&listener.socket_options),
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _))) => {
+                    let socket_options = match converter {
+                        MaybeDualStack::NotDualStack(converter) => {
+                            let (conn, _addr) = converter.convert(conn);
+                            &conn.socket_options
+                        }
+                        MaybeDualStack::DualStack(converter) => match converter.convert(conn) {
+                            EitherStack::ThisStack((conn, _addr)) => &conn.socket_options,
+                            EitherStack::OtherStack((conn, _addr)) => &conn.socket_options,
+                        },
+                    };
+                    f(socket_options)
+                }
+            },
+        )
     }
 
-    fn set_send_buffer_size(
-        &mut self,
-        _bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        size: usize,
-    ) {
-        set_buffer_size::<SendBufferSize, I, BC, CC>(self, id, size)
+    /// Set the size of the send buffer for this socket and future derived
+    /// sockets.
+    pub fn set_send_buffer_size(&mut self, id: &TcpApiSocketId<I, C>, size: usize) {
+        set_buffer_size::<SendBufferSize, I, _, _>(self.core_ctx(), id, size)
     }
 
-    fn send_buffer_size(
-        &mut self,
-        _bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> Option<usize> {
-        get_buffer_size::<SendBufferSize, I, BC, CC>(self, id)
+    /// Get the size of the send buffer for this socket and future derived
+    /// sockets.
+    pub fn send_buffer_size(&mut self, id: &TcpApiSocketId<I, C>) -> Option<usize> {
+        get_buffer_size::<SendBufferSize, I, _, _>(self.core_ctx(), id)
     }
 
-    fn set_receive_buffer_size(
-        &mut self,
-        _bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-        size: usize,
-    ) {
-        set_buffer_size::<ReceiveBufferSize, I, BC, CC>(self, id, size)
+    /// Set the size of the send buffer for this socket and future derived
+    /// sockets.
+    pub fn set_receive_buffer_size(&mut self, id: &TcpApiSocketId<I, C>, size: usize) {
+        set_buffer_size::<ReceiveBufferSize, I, _, _>(self.core_ctx(), id, size)
     }
 
-    fn receive_buffer_size(
-        &mut self,
-        _bindings_ctx: &mut BC,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> Option<usize> {
-        get_buffer_size::<ReceiveBufferSize, I, BC, CC>(self, id)
+    /// Get the size of the receive buffer for this socket and future derived
+    /// sockets.
+    pub fn receive_buffer_size(&mut self, id: &TcpApiSocketId<I, C>) -> Option<usize> {
+        get_buffer_size::<ReceiveBufferSize, I, _, _>(self.core_ctx(), id)
     }
 
-    fn set_reuseaddr(
+    /// Sets the POSIX SO_REUSEADDR socket option on a socket.
+    pub fn set_reuseaddr(
         &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
+        id: &TcpApiSocketId<I, C>,
         reuse: bool,
     ) -> Result<(), SetReuseAddrError> {
         let new_sharing = match reuse {
             true => SharingState::ReuseAddress,
             false => SharingState::Exclusive,
         };
-        self.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
+        self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let (core_ctx, _converter) = core_ctx.into_single_stack();
             match socket_state {
                 TcpSocketState::Unbound(unbound) => {
@@ -2782,13 +2727,22 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         })
     }
 
-    fn reuseaddr(&mut self, id: &TcpSocketId<I, Self::WeakDeviceId, BC>) -> bool {
-        get_reuseaddr(self, id)
+    /// Gets the POSIX SO_REUSEADDR socket option on a socket.
+    pub fn reuseaddr(&mut self, id: &TcpApiSocketId<I, C>) -> bool {
+        self.core_ctx().with_socket(id, |socket_state| match socket_state {
+            TcpSocketState::Unbound(Unbound { sharing, .. })
+            | TcpSocketState::Bound(
+                BoundSocketState::Connected((_, sharing))
+                | BoundSocketState::Listener((_, ListenerSharingState { sharing, .. }, _)),
+            ) => match sharing {
+                SharingState::Exclusive => false,
+                SharingState::ReuseAddress => true,
+            },
+        })
     }
 
     fn on_icmp_error(
         &mut self,
-        bindings_ctx: &mut BC,
         orig_src_ip: SpecifiedAddr<I::Addr>,
         orig_dst_ip: SpecifiedAddr<I::Addr>,
         orig_src_port: NonZeroU16,
@@ -2796,7 +2750,8 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         seq: SeqNum,
         error: IcmpErrorCode,
     ) {
-        let id = self.with_demux(|DemuxState { socketmap, .. }| {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let id = core_ctx.with_demux(|DemuxState { socketmap, .. }| {
             // TODO(https://fxbug.dev/132092): Remove panic opportunities once
             // `SocketHandler` functions take `SocketIpAddr`.
             let orig_src_ip = SocketIpAddr::new_from_specified_or_panic(orig_src_ip);
@@ -2824,7 +2779,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
             // stack.
             EitherStack::OtherStack(_) => return,
         };
-        let destroy = self.with_socket_mut_transport_demux(&id, |core_ctx, socket_state| {
+        let destroy = core_ctx.with_socket_mut_transport_demux(&id, |core_ctx, socket_state| {
             let (core_ctx, converter) = core_ctx.into_single_stack();
             let Some((
                 Connection {
@@ -2839,7 +2794,7 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
                 addr,
             )) = assert_matches!(
                 socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, BC, CC>(conn, &converter),
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, _, C::CoreContext>(conn, &converter),
                 "invalid socket ID"
             ) else {
                 // TODO(https://fxbug.dev/136316): Destroy the other stack
@@ -2875,45 +2830,50 @@ impl<I: DualStackIpExt, BC: TcpBindingsContext<CC::WeakDeviceId>, CC: TcpContext
         });
 
         if destroy {
-            destroy_socket(self, bindings_ctx, id);
+            destroy_socket(core_ctx, bindings_ctx, id);
         }
     }
 
-    fn get_socket_error(
-        &mut self,
-        id: &TcpSocketId<I, Self::WeakDeviceId, BC>,
-    ) -> Option<ConnectionError> {
-        self.with_socket_mut_and_converter(id, |socket_state, converter| match socket_state {
-            TcpSocketState::Unbound(_) | TcpSocketState::Bound(BoundSocketState::Listener(_)) => {
-                None
-            }
-            TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                let (state, soft_error) = match converter {
-                    MaybeDualStack::NotDualStack(converter) => {
-                        let (conn, _addr) = converter.convert(conn);
-                        (&conn.state, &mut conn.soft_error)
-                    }
-                    MaybeDualStack::DualStack(converter) => match converter.convert(conn) {
-                        EitherStack::ThisStack((conn, _addr)) => {
+    /// Gets the last error on the connection.
+    pub fn get_socket_error(&mut self, id: &TcpApiSocketId<I, C>) -> Option<ConnectionError> {
+        self.core_ctx().with_socket_mut_and_converter(id, |socket_state, converter| {
+            match socket_state {
+                TcpSocketState::Unbound(_)
+                | TcpSocketState::Bound(BoundSocketState::Listener(_)) => None,
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
+                    let (state, soft_error) = match converter {
+                        MaybeDualStack::NotDualStack(converter) => {
+                            let (conn, _addr) = converter.convert(conn);
                             (&conn.state, &mut conn.soft_error)
                         }
-                        EitherStack::OtherStack((conn, _addr)) => {
-                            (&conn.state, &mut conn.soft_error)
-                        }
-                    },
-                };
-                let hard_error = if let State::Closed(Closed { reason: hard_error }) = state {
-                    hard_error.clone()
-                } else {
-                    None
-                };
-                hard_error.or_else(|| soft_error.take())
+                        MaybeDualStack::DualStack(converter) => match converter.convert(conn) {
+                            EitherStack::ThisStack((conn, _addr)) => {
+                                (&conn.state, &mut conn.soft_error)
+                            }
+                            EitherStack::OtherStack((conn, _addr)) => {
+                                (&conn.state, &mut conn.soft_error)
+                            }
+                        },
+                    };
+                    let hard_error = if let State::Closed(Closed { reason: hard_error }) = state {
+                        hard_error.clone()
+                    } else {
+                        None
+                    };
+                    hard_error.or_else(|| soft_error.take())
+                }
             }
         })
     }
 
-    fn with_info<V: InfoVisitor<I, Self::WeakDeviceId>>(&mut self, visitor: &mut V) {
-        self.for_each_socket(|socket_state, converter| {
+    /// Provides access to shared and per-socket TCP stats via a visitor.
+    pub fn with_info<
+        V: InfoVisitor<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    >(
+        &mut self,
+        visitor: &mut V,
+    ) {
+        self.core_ctx().for_each_socket(|socket_state, converter| {
             let stats: Option<SocketStats<I, _>> = match socket_state {
                 TcpSocketState::Unbound(_) => Some(SocketStats { local: None, remote: None }),
                 TcpSocketState::Bound(BoundSocketState::Listener((_state, _sharing, addr))) => {
@@ -3051,26 +3011,6 @@ fn destroy_socket<
         // correct behavior.
         core_ctx.socket_destruction_deferred(deferred);
     }
-}
-
-fn get_reuseaddr<
-    I: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
-    CC: TcpContext<I, BC>,
->(
-    core_ctx: &mut CC,
-    id: &TcpSocketId<I, CC::WeakDeviceId, BC>,
-) -> bool {
-    core_ctx.with_socket(id, |socket_state| match socket_state {
-        TcpSocketState::Unbound(Unbound { sharing, .. })
-        | TcpSocketState::Bound(
-            BoundSocketState::Connected((_, sharing))
-            | BoundSocketState::Listener((_, ListenerSharingState { sharing, .. }, _)),
-        ) => match sharing {
-            SharingState::Exclusive => false,
-            SharingState::ReuseAddress => true,
-        },
-    })
 }
 
 /// Closes all sockets in `pending`.
@@ -3300,28 +3240,6 @@ fn get_buffer_size<
     })
 }
 
-/// Creates a new socket in unbound state.
-pub fn create_socket<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    socket_extra: BC::ListenerNotifierOrProvidedBuffers,
-) -> TcpSocketId<I, WeakDeviceId<BC>, BC>
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        IpInvariant((&mut core_ctx, bindings_ctx, socket_extra)),
-        |IpInvariant((core_ctx, bindings_ctx, socket_extra))| {
-            SocketHandler::create_socket(core_ctx, bindings_ctx, socket_extra)
-        },
-        |IpInvariant((core_ctx, bindings_ctx, socket_extra))| {
-            SocketHandler::create_socket(core_ctx, bindings_ctx, socket_extra)
-        },
-    )
-}
-
 /// Error returned when failing to set the bound device for a socket.
 #[derive(Debug, GenericOverIp)]
 #[generic_over_ip()]
@@ -3335,78 +3253,6 @@ pub enum SetDeviceError {
     // TODO(https://fxbug.dev/136316): Remove this variant.
     /// Setting device not supported for dual stack.
     DualStackNotSupported,
-}
-
-/// Sets the device on a socket.
-///
-/// Passing `None` clears the bound device.
-pub fn set_device<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    device: Option<DeviceId<BC>>,
-) -> Result<(), SetDeviceError>
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, device)), id),
-        |(IpInvariant((core_ctx, bindings_ctx, device)), id)| {
-            SocketHandler::set_device(core_ctx, bindings_ctx, id, device)
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, device)), id)| {
-            SocketHandler::set_device(core_ctx, bindings_ctx, id, device)
-        },
-    )
-}
-
-/// Binds an unbound socket to a local socket address.
-///
-/// Requests that the given socket be bound to the local address, if one is
-/// provided; otherwise to all addresses. If `port` is specified (is `Some`),
-/// the socket will be bound to that port. Otherwise a port will be selected to
-/// not conflict with existing bound or connected sockets.
-pub fn bind<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    local_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
-    port: Option<NonZeroU16>,
-) -> Result<(), BindError>
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, port)), id, local_ip),
-        |(IpInvariant((core_ctx, bindings_ctx, port)), id, local_ip)| {
-            SocketHandler::bind(core_ctx, bindings_ctx, id, local_ip, port)
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, port)), id, local_ip)| {
-            SocketHandler::bind(core_ctx, bindings_ctx, id, local_ip, port)
-        },
-    )
-}
-
-/// Listens on an already bound socket.
-pub fn listen<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    backlog: NonZeroUsize,
-) -> Result<(), ListenError>
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, backlog)), id),
-        |(IpInvariant((core_ctx, backlog)), id)| SocketHandler::listen(core_ctx, id, backlog),
-        |(IpInvariant((core_ctx, backlog)), id)| SocketHandler::listen(core_ctx, id, backlog),
-    )
 }
 
 /// Possible errors for accept operation.
@@ -3443,37 +3289,6 @@ pub enum SetReuseAddrError {
     AddrInUse,
     /// Cannot set ReuseAddr on a connected socket.
     NotSupported,
-}
-
-/// Accepts an established socket from the queue of a listener socket.
-pub fn accept<I: DualStackIpExt, BC>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-) -> Result<
-    (
-        TcpSocketId<I, WeakDeviceId<BC>, BC>,
-        SocketAddr<I::Addr, WeakDeviceId<BC>>,
-        BC::ReturnedBuffers,
-    ),
-    AcceptError,
->
-where
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip::<_, Result<_, _>>(
-        (IpInvariant((&mut core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            SocketHandler::accept(core_ctx, bindings_ctx, id)
-                .map(|(a, b, c)| (a, b, IpInvariant(c)))
-        },
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            SocketHandler::accept(core_ctx, bindings_ctx, id)
-                .map(|(a, b, c)| (a, b, IpInvariant(c)))
-        },
-    )
-    .map(|(a, b, IpInvariant(c))| (a, b, c))
 }
 
 /// Possible errors when connecting a socket.
@@ -3517,35 +3332,6 @@ pub enum BindError {
     /// The socekt cannot bind to the local address.
     #[error(transparent)]
     LocalAddressError(#[from] LocalAddressError),
-}
-
-/// Connects a socket to a remote address.
-///
-/// When the method returns, the connection is not guaranteed to be established.
-/// It is up to the caller (Bindings) to determine when the connection has been
-/// established. Bindings are free to use anything available on the platform to
-/// check, for instance, signals.
-pub fn connect<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BC>>>,
-    remote_port: NonZeroU16,
-) -> Result<(), ConnectError>
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, remote_port)), id, remote_ip),
-        |(IpInvariant((core_ctx, bindings_ctx, remote_port)), id, remote_ip)| {
-            SocketHandler::connect(core_ctx, bindings_ctx, id, remote_ip, remote_port)
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, remote_port)), id, remote_ip)| {
-            SocketHandler::connect(core_ctx, bindings_ctx, id, remote_ip, remote_port)
-        },
-    )
 }
 
 fn connect_inner<CC, BC, SockI, WireI>(
@@ -3691,94 +3477,6 @@ where
     ))
 }
 
-/// Shuts down a socket.
-///
-/// For a connection, calling this function signals the other side of the
-/// connection that we will not be sending anything over the connection; The
-/// connection will still stay in the socketmap even after reaching `Closed`
-/// state.
-///
-/// For a Listener, calling this function brings it back to bound state and
-/// shutdowns all the connection that is currently ready to be accepted.
-///
-/// Returns Err(NoConnection) if the shutdown option does not apply. Otherwise,
-/// Whether a connection has been shutdown is returned, i.e., if the socket was
-/// a listener, the operation will succeed but false will be returned.
-pub fn shutdown<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    shutdown: ShutdownType,
-) -> Result<bool, NoConnection>
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, shutdown)), id),
-        |(IpInvariant((core_ctx, bindings_ctx, shutdown)), id)| {
-            SocketHandler::shutdown(core_ctx, bindings_ctx, id, shutdown)
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, shutdown)), id)| {
-            SocketHandler::shutdown(core_ctx, bindings_ctx, id, shutdown)
-        },
-    )
-}
-
-/// Closes a socket.
-pub fn close<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: TcpSocketId<I, WeakDeviceId<BC>, BC>,
-) where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            SocketHandler::close(core_ctx, bindings_ctx, id)
-        },
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            SocketHandler::close(core_ctx, bindings_ctx, id)
-        },
-    )
-}
-
-/// Sets the POSIX SO_REUSEADDR socket option on a socket.
-pub fn set_reuseaddr<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    reuse: bool,
-) -> Result<(), SetReuseAddrError>
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, reuse)), id),
-        |(IpInvariant((core_ctx, reuse)), id)| SocketHandler::set_reuseaddr(core_ctx, id, reuse),
-        |(IpInvariant((core_ctx, reuse)), id)| SocketHandler::set_reuseaddr(core_ctx, id, reuse),
-    )
-}
-
-/// Gets the POSIX SO_REUSEADDR socket option on a socket.
-pub fn reuseaddr<I, BC>(core_ctx: &SyncCtx<BC>, id: &TcpSocketId<I, WeakDeviceId<BC>, BC>) -> bool
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant(&mut core_ctx), id),
-        |(IpInvariant(core_ctx), id)| SocketHandler::reuseaddr(core_ctx, id),
-        |(IpInvariant(core_ctx), id)| SocketHandler::reuseaddr(core_ctx, id),
-    )
-}
-
 /// Statistics about an individual socket.
 pub struct SocketStats<I: Ip, D> {
     /// The local address of the socket.
@@ -3791,28 +3489,6 @@ pub struct SocketStats<I: Ip, D> {
 pub trait InfoVisitor<I: Ip, D> {
     /// Called once for each TCP socket in the system.
     fn visit(&mut self, state: SocketStats<I, D>);
-}
-
-/// Provides access to shared and per-socket TCP stats via a visitor.
-pub fn with_info<I, BC, V>(core_ctx: &SyncCtx<BC>, cb: &mut V)
-where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-    V: InfoVisitor<I, device::WeakDeviceId<BC>>
-        + InfoVisitor<Ipv4, device::WeakDeviceId<BC>>
-        + InfoVisitor<Ipv6, device::WeakDeviceId<BC>>,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let IpInvariant(r) = I::map_ip(
-        IpInvariant((&mut core_ctx, cb)),
-        |IpInvariant((core_ctx, cb))| {
-            IpInvariant(SocketHandler::<Ipv4, _>::with_info(core_ctx, cb))
-        },
-        |IpInvariant((core_ctx, cb))| {
-            IpInvariant(SocketHandler::<Ipv6, _>::with_info(core_ctx, cb))
-        },
-    );
-    r
 }
 
 /// Information about a socket.
@@ -3908,184 +3584,6 @@ impl<A: IpAddress, D: Clone> From<ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>
     }
 }
 
-/// Get information for a TCP socket.
-pub fn get_info<I: DualStackIpExt, BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-) -> SocketInfo<I::Addr, WeakDeviceId<BC>> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant(&mut core_ctx), id),
-        |(IpInvariant(core_ctx), id)| SocketHandler::get_info(core_ctx, id),
-        |(IpInvariant(core_ctx), id)| SocketHandler::get_info(core_ctx, id),
-    )
-}
-
-/// Access options mutably for a TCP socket.
-pub fn with_socket_options_mut<
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-    R,
-    F: FnOnce(&mut SocketOptions) -> R,
->(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    f: F,
-) -> R {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let IpInvariant(r) = I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, f)), id),
-        |(IpInvariant((core_ctx, bindings_ctx, f)), id)| {
-            IpInvariant(SocketHandler::with_socket_options_mut(core_ctx, bindings_ctx, id, f))
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, f)), id)| {
-            IpInvariant(SocketHandler::with_socket_options_mut(core_ctx, bindings_ctx, id, f))
-        },
-    );
-    r
-}
-
-/// Access socket options immutably for a TCP socket.
-pub fn with_socket_options<
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-    R,
-    F: FnOnce(&SocketOptions) -> R,
->(
-    core_ctx: &SyncCtx<BC>,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    f: F,
-) -> R {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let IpInvariant(r) = I::map_ip(
-        (IpInvariant((&mut core_ctx, f)), id),
-        |(IpInvariant((core_ctx, f)), id)| {
-            IpInvariant(SocketHandler::with_socket_options(core_ctx, id, f))
-        },
-        |(IpInvariant((core_ctx, f)), id)| {
-            IpInvariant(SocketHandler::with_socket_options(core_ctx, id, f))
-        },
-    );
-    r
-}
-
-/// Set the size of the send buffer for this socket and future derived sockets.
-pub fn set_send_buffer_size<I: DualStackIpExt, BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    size: usize,
-) {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, size)), id),
-        |(IpInvariant((core_ctx, bindings_ctx, size)), id)| {
-            SocketHandler::set_send_buffer_size(core_ctx, bindings_ctx, id, size)
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, size)), id)| {
-            SocketHandler::set_send_buffer_size(core_ctx, bindings_ctx, id, size)
-        },
-    )
-}
-
-/// Get the size of the send buffer for this socket and future derived sockets.
-pub fn send_buffer_size<I: DualStackIpExt, BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-) -> Option<usize> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let IpInvariant(size) = I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            IpInvariant(SocketHandler::send_buffer_size(core_ctx, bindings_ctx, id))
-        },
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            IpInvariant(SocketHandler::send_buffer_size(core_ctx, bindings_ctx, id))
-        },
-    );
-    size
-}
-
-/// Set the size of the send buffer for this socket and future derived sockets.
-pub fn set_receive_buffer_size<I: DualStackIpExt, BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-    size: usize,
-) {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx, size)), id),
-        |(IpInvariant((core_ctx, bindings_ctx, size)), id)| {
-            SocketHandler::set_receive_buffer_size(core_ctx, bindings_ctx, id, size)
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, size)), id)| {
-            SocketHandler::set_receive_buffer_size(core_ctx, bindings_ctx, id, size)
-        },
-    )
-}
-
-/// Get the size of the receive buffer for this socket and future derived
-/// sockets.
-pub fn receive_buffer_size<I: DualStackIpExt, BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-) -> Option<usize> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let IpInvariant(size) = I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx)), id),
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            IpInvariant(SocketHandler::receive_buffer_size(core_ctx, bindings_ctx, id))
-        },
-        |(IpInvariant((core_ctx, bindings_ctx)), id)| {
-            IpInvariant(SocketHandler::receive_buffer_size(core_ctx, bindings_ctx, id))
-        },
-    );
-    size
-}
-
-/// Gets the last error on the connection.
-pub fn get_socket_error<I: DualStackIpExt, BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-) -> Option<ConnectionError> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let IpInvariant(err) = I::map_ip(
-        (IpInvariant(&mut core_ctx), id),
-        |(IpInvariant(core_ctx), id)| IpInvariant(SocketHandler::get_socket_error(core_ctx, id)),
-        |(IpInvariant(core_ctx), id)| IpInvariant(SocketHandler::get_socket_error(core_ctx, id)),
-    );
-    err
-}
-
-/// Call this function whenever a socket can push out more data. That means either:
-///
-/// - A retransmission timer fires.
-/// - An ack received from peer so that our send window is enlarged.
-/// - The user puts data into the buffer and we are notified.
-pub fn do_send<I, BC>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    conn_id: &TcpSocketId<I, WeakDeviceId<BC>, BC>,
-) where
-    I: DualStackIpExt,
-    BC: crate::BindingsContext,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    I::map_ip(
-        (IpInvariant((&mut core_ctx, bindings_ctx)), conn_id),
-        |(IpInvariant((core_ctx, bindings_ctx)), conn_id)| {
-            SocketHandler::do_send(core_ctx, bindings_ctx, conn_id)
-        },
-        |(IpInvariant((core_ctx, bindings_ctx)), conn_id)| {
-            SocketHandler::do_send(core_ctx, bindings_ctx, conn_id)
-        },
-    )
-}
-
 pub(crate) fn handle_timer<CC, BC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -4094,13 +3592,10 @@ pub(crate) fn handle_timer<CC, BC>(
     BC: TcpBindingsContext<CC::WeakDeviceId>,
     CC: TcpContext<Ipv4, BC> + TcpContext<Ipv6, BC>,
 {
+    let ctx_pair = CtxPair { core_ctx, bindings_ctx };
     match timer_id {
-        TimerId::V4(conn_id) => {
-            SocketHandler::<Ipv4, _>::handle_timer(core_ctx, bindings_ctx, conn_id)
-        }
-        TimerId::V6(conn_id) => {
-            SocketHandler::<Ipv6, _>::handle_timer(core_ctx, bindings_ctx, conn_id)
-        }
+        TimerId::V4(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
+        TimerId::V6(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
     }
 }
 
@@ -4909,13 +4404,13 @@ mod tests {
     }
 
     fn handle_timer<D: FakeStrongDeviceId>(
-        TcpCtx { core_ctx, bindings_ctx }: &mut TcpCtx<D>,
+        ctx: &mut TcpCtx<D>,
         _: &mut (),
         timer_id: TimerId<D::Weak, TcpBindingsCtx<D>>,
     ) {
         match timer_id {
-            TimerId::V4(id) => SocketHandler::<Ipv4, _>::handle_timer(core_ctx, bindings_ctx, id),
-            TimerId::V6(id) => SocketHandler::<Ipv6, _>::handle_timer(core_ctx, bindings_ctx, id),
+            TimerId::V4(id) => ctx.tcp_api().handle_timer(id),
+            TimerId::V6(id) => ctx.tcp_api().handle_timer(id),
         }
     }
 
@@ -4938,6 +4433,15 @@ mod tests {
             }
         }
     }
+
+    /// A trait providing a shortcut to instantiate a [`TcpApi`] from a context.
+    trait TcpApiExt: crate::context::ContextPair + Sized {
+        fn tcp_api<I>(self) -> TcpApi<I, Self> {
+            TcpApi::new(self)
+        }
+    }
+
+    impl<O> TcpApiExt for O where O: crate::context::ContextPair + Sized {}
 
     /// How to bind the client socket in `bind_listen_connect_accept_inner`.
     struct BindConfig {
@@ -4996,44 +4500,35 @@ mod tests {
             };
 
         let backlog = NonZeroUsize::new(1).unwrap();
-        let server = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let server =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
+        let server = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let server = api.create(Default::default());
+            api.bind(
                 &server,
                 SpecifiedAddr::new(listen_addr).map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(server_port),
             )
             .expect("failed to bind the server socket");
-            SocketHandler::listen(core_ctx, &server, backlog).expect("can listen");
+            api.listen(&server, backlog).expect("can listen");
             server
         });
 
         let client_ends = WriteBackClientBuffers::default();
-        let client = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket = SocketHandler::<I, _>::create_socket(
-                core_ctx,
-                bindings_ctx,
-                ProvidedBuffers::Buffers(client_ends.clone()),
-            );
+        let client = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(ProvidedBuffers::Buffers(client_ends.clone()));
             if client_reuse_addr {
-                SocketHandler::set_reuseaddr(core_ctx, &socket, true).expect("can set");
+                api.set_reuseaddr(&socket, true).expect("can set");
             }
             if let Some(port) = client_port {
-                SocketHandler::bind(
-                    core_ctx,
-                    bindings_ctx,
+                api.bind(
                     &socket,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                     Some(port),
                 )
                 .expect("failed to bind the client socket")
             }
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
+            api.connect(
                 &socket,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                 server_port,
@@ -5059,20 +4554,17 @@ mod tests {
                 }
             );
             // The handshake is not done, calling accept here should not succeed.
-            net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-                assert_matches!(
-                    SocketHandler::accept(core_ctx, bindings_ctx, &server),
-                    Err(AcceptError::WouldBlock)
-                );
+            net.with_context(REMOTE, |ctx| {
+                let mut api = ctx.tcp_api::<I>();
+                assert_matches!(api.accept(&server), Err(AcceptError::WouldBlock));
             });
         }
 
         // Step the test network until the handshake is done.
         net.run_until_idle(&mut maybe_drop_frame, handle_timer);
-        let (accepted, addr, accepted_ends) =
-            net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-                SocketHandler::accept(core_ctx, bindings_ctx, &server).expect("failed to accept")
-            });
+        let (accepted, addr, accepted_ends) = net.with_context(REMOTE, |ctx| {
+            ctx.tcp_api::<I>().accept(&server).expect("failed to accept")
+        });
         if let Some(port) = client_port {
             assert_eq!(
                 addr,
@@ -5082,11 +4574,10 @@ mod tests {
             assert_eq!(addr.ip, ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into());
         }
 
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                api.connect(
                     &client,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                     server_port,
@@ -5127,9 +4618,7 @@ mod tests {
         }
 
         for (c, id) in [(LOCAL, &client), (REMOTE, &accepted)] {
-            net.with_context(c, |TcpCtx { core_ctx, bindings_ctx }| {
-                SocketHandler::<I, _>::do_send(core_ctx, bindings_ctx, id)
-            })
+            net.with_context(c, |ctx| ctx.tcp_api::<I>().do_send(id))
         }
         net.run_until_idle(&mut maybe_drop_frame, handle_timer);
 
@@ -5157,12 +4646,10 @@ mod tests {
             }
         );
 
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            assert_eq!(
-                SocketHandler::shutdown(core_ctx, bindings_ctx, &server, ShutdownType::Receive),
-                Ok(false)
-            );
-            SocketHandler::close(core_ctx, bindings_ctx, server);
+        net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            assert_eq!(api.shutdown(&server, ShutdownType::Receive), Ok(false));
+            api.close(server);
         });
 
         (net, client, client_snd_end, accepted)
@@ -5248,44 +4735,26 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         set_logger_for_test();
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let s1 = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        let s2 = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+        let s1 = api.create(Default::default());
+        let s2 = api.create(Default::default());
 
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &s1,
-            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
-            Some(PORT_1),
-        )
-        .expect("first bind should succeed");
+        api.bind(&s1, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), Some(PORT_1))
+            .expect("first bind should succeed");
         assert_matches!(
-            SocketHandler::bind(
-                &mut core_ctx,
-                &mut bindings_ctx,
+            api.bind(
                 &s2,
                 SpecifiedAddr::new(conflict_addr).map(|a| ZonedAddr::Unzoned(a).into()),
                 Some(PORT_1)
             ),
             Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
         );
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
+        api.bind(
             &s2,
             SpecifiedAddr::new(conflict_addr).map(|a| ZonedAddr::Unzoned(a).into()),
             Some(PORT_2),
@@ -5304,44 +4773,32 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
         for port in 1..=u16::MAX {
             let port = NonZeroU16::new(port).unwrap();
             if port == available_port {
                 continue;
             }
-            let socket =
-                SocketHandler::create_socket(&mut core_ctx, &mut bindings_ctx, Default::default());
+            let socket = api.create(Default::default());
 
-            SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, Some(port))
-                .expect("uncontested bind");
-            SocketHandler::listen(
-                &mut core_ctx,
-                &socket,
-                const_unwrap_option(NonZeroUsize::new(1)),
-            )
-            .expect("can listen");
+            api.bind(&socket, None, Some(port)).expect("uncontested bind");
+            api.listen(&socket, const_unwrap_option(NonZeroUsize::new(1))).expect("can listen");
         }
 
         // Now that all but the LOCAL_PORT are occupied, ask the stack to
         // select a port.
-        let socket = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        let result = SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, None)
-            .map(|()| {
-                assert_matches!(
-                    SocketHandler::get_info(&mut core_ctx, &socket),
-                    SocketInfo::Bound(bound) => bound.port
-                )
-            });
+        let socket = api.create(Default::default());
+        let result = api.bind(&socket, None, None).map(|()| {
+            assert_matches!(
+                api.get_info(&socket),
+                SocketInfo::Bound(bound) => bound.port
+            )
+        });
         assert_eq!(result, expected_result.map_err(From::from));
     }
 
@@ -5351,25 +4808,15 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let unbound = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+        let unbound = api.create(Default::default());
         assert_matches!(
-            SocketHandler::bind(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &unbound,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
-                None
-            ),
+            api.bind(&unbound, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()), None),
             Err(BindError::LocalAddressError(LocalAddressError::AddressMismatch))
         );
 
@@ -5380,25 +4827,15 @@ mod tests {
     fn bind_addr_requires_zone() {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
 
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-                Ipv6::FAKE_CONFIG.local_ip,
-                Ipv6::FAKE_CONFIG.remote_ip,
-                Ipv6::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let unbound = SocketHandler::<Ipv6, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
+            Ipv6::FAKE_CONFIG.local_ip,
+            Ipv6::FAKE_CONFIG.remote_ip,
+            Ipv6::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<Ipv6>();
+        let unbound = api.create(Default::default());
         assert_matches!(
-            SocketHandler::bind(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &unbound,
-                Some(ZonedAddr::Unzoned(local_ip).into()),
-                None
-            ),
+            api.bind(&unbound, Some(ZonedAddr::Unzoned(local_ip).into()), None),
             Err(BindError::LocalAddressError(LocalAddressError::Zone(
                 ZonedAddressError::RequiredZoneNotProvided
             )))
@@ -5411,27 +4848,16 @@ mod tests {
     fn connect_bound_requires_zone() {
         let ll_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
 
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-                Ipv6::FAKE_CONFIG.local_ip,
-                Ipv6::FAKE_CONFIG.remote_ip,
-                Ipv6::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let socket = SocketHandler::<Ipv6, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, None)
-            .expect("bind succeeds");
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
+            Ipv6::FAKE_CONFIG.local_ip,
+            Ipv6::FAKE_CONFIG.remote_ip,
+            Ipv6::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<Ipv6>();
+        let socket = api.create(Default::default());
+        api.bind(&socket, None, None).expect("bind succeeds");
         assert_matches!(
-            SocketHandler::connect(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &socket,
-                Some(ZonedAddr::Unzoned(ll_ip).into()),
-                PORT_1,
-            ),
+            api.connect(&socket, Some(ZonedAddr::Unzoned(ll_ip).into()), PORT_1,),
             Err(ConnectError::Zone(ZonedAddressError::RequiredZoneNotProvided))
         );
 
@@ -5457,45 +4883,32 @@ mod tests {
             },
         );
         const PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
-        let client_connection = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket: TcpSocketId<Ipv6, _, _> =
-                SocketHandler::<Ipv6, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
-                &socket,
-                Some(ZonedAddr::Unzoned(server_ip).into()),
-                PORT,
-            )
-            .expect("can connect");
+        let client_connection = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api();
+            let socket: TcpSocketId<Ipv6, _, _> = api.create(Default::default());
+            api.connect(&socket, Some(ZonedAddr::Unzoned(server_ip).into()), PORT)
+                .expect("can connect");
             socket
         });
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket =
-                SocketHandler::<Ipv6, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(core_ctx, bindings_ctx, &socket, None, Some(PORT))
-                .expect("failed to bind the client socket");
-            let _listener =
-                SocketHandler::listen(core_ctx, &socket, NonZeroUsize::MIN).expect("can listen");
+        net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<Ipv6>();
+            let socket = api.create(Default::default());
+            api.bind(&socket, None, Some(PORT)).expect("failed to bind the client socket");
+            let _listener = api.listen(&socket, NonZeroUsize::MIN).expect("can listen");
         });
 
         // Advance until the connection is established.
         net.run_until_idle(handle_frame, handle_timer);
 
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api();
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
-                    &client_connection,
-                    Some(ZonedAddr::Unzoned(server_ip).into()),
-                    PORT
-                ),
+                api.connect(&client_connection, Some(ZonedAddr::Unzoned(server_ip).into()), PORT),
                 Ok(())
             );
 
             let info = assert_matches!(
-                SocketHandler::get_info(core_ctx, &client_connection),
+                api.get_info(&client_connection),
                 SocketInfo::Connection(info) => info
             );
             // The local address picked for the connection is link-local, which
@@ -5520,7 +4933,7 @@ mod tests {
             // Double-check that the bound device can't be changed after being set
             // implicitly.
             assert_matches!(
-                SocketHandler::set_device(core_ctx, bindings_ctx, &client_connection, None),
+                api.set_device(&client_connection, None),
                 Err(SetDeviceError::ZoneChange)
             );
         });
@@ -5545,20 +4958,17 @@ mod tests {
             },
         );
         const PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
-        let server_listener = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket: TcpSocketId<Ipv6, _, _> =
-                SocketHandler::<Ipv6, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(core_ctx, bindings_ctx, &socket, None, Some(PORT))
-                .expect("failed to bind the client socket");
-            SocketHandler::listen(core_ctx, &socket, NonZeroUsize::MIN).expect("can listen");
+        let server_listener = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<Ipv6>();
+            let socket: TcpSocketId<Ipv6, _, _> = api.create(Default::default());
+            api.bind(&socket, None, Some(PORT)).expect("failed to bind the client socket");
+            api.listen(&socket, NonZeroUsize::MIN).expect("can listen");
             socket
         });
-        let client_connection = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket =
-                SocketHandler::<Ipv6, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
+        let client_connection = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<Ipv6>();
+            let socket = api.create(Default::default());
+            api.connect(
                 &socket,
                 Some(ZonedAddr::Zoned(AddrAndZone::new(server_ip, FakeDeviceId).unwrap()).into()),
                 PORT,
@@ -5570,13 +4980,13 @@ mod tests {
         // Advance until the connection is established.
         net.run_until_idle(handle_frame, handle_timer);
 
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api();
             let (server_connection, _addr, _buffers) =
-                SocketHandler::accept(core_ctx, bindings_ctx, &server_listener)
-                    .expect("connection is waiting");
+                api.accept(&server_listener).expect("connection is waiting");
 
             let info = assert_matches!(
-                SocketHandler::get_info(core_ctx, &server_connection),
+                api.get_info(&server_connection),
                 SocketInfo::Connection(info) => info
             );
             // The local address picked for the connection is link-local, which
@@ -5601,15 +5011,13 @@ mod tests {
             // Double-check that the bound device can't be changed after being set
             // implicitly.
             assert_matches!(
-                SocketHandler::set_device(core_ctx, bindings_ctx, &server_connection, None),
+                api.set_device(&server_connection, None),
                 Err(SetDeviceError::ZoneChange)
             );
         });
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(REMOTE, |ctx| {
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                ctx.tcp_api().connect(
                     &client_connection,
                     Some(
                         ZonedAddr::Zoned(AddrAndZone::new(server_ip, FakeDeviceId).unwrap()).into()
@@ -5636,25 +5044,13 @@ mod tests {
         set_logger_for_test();
         let mut net = new_test_net::<I>();
 
-        let client = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let conn =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
-                &conn,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
-                Some(PORT_1),
-            )
-            .expect("failed to bind the client socket");
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
-                &conn,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
-                PORT_1,
-            )
-            .expect("failed to connect");
+        let client = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let conn = api.create(Default::default());
+            api.bind(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), Some(PORT_1))
+                .expect("failed to bind the client socket");
+            api.connect(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()), PORT_1)
+                .expect("failed to connect");
             conn
         });
 
@@ -5711,11 +5107,9 @@ mod tests {
                     }
                 );
             });
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(LOCAL, |ctx| {
             assert_matches!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                ctx.tcp_api().connect(
                     &client,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                     PORT_1
@@ -5755,53 +5149,25 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<MultipleDevicesId>>,
     {
         set_logger_for_test();
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new_multiple_devices());
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new_multiple_devices());
+        let mut api = ctx.tcp_api::<I>();
+        let sock_a = api.create(Default::default());
+        assert_matches!(api.set_device(&sock_a, Some(MultipleDevicesId::A),), Ok(()));
+        api.bind(&sock_a, None, Some(LOCAL_PORT)).expect("bind should succeed");
+        api.listen(&sock_a, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
 
-        let sock_a = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        assert_matches!(
-            SocketHandler::set_device(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &sock_a,
-                Some(MultipleDevicesId::A),
-            ),
-            Ok(())
-        );
-        SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &sock_a, None, Some(LOCAL_PORT))
-            .expect("bind should succeed");
-        SocketHandler::listen(&mut core_ctx, &sock_a, const_unwrap_option(NonZeroUsize::new(10)))
-            .expect("can listen");
-
-        let socket = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
+        let socket = api.create(Default::default());
         // Binding `socket` to the unspecified address should fail since the address
         // is shadowed by `sock_a`.
         assert_matches!(
-            SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, Some(LOCAL_PORT)),
+            api.bind(&socket, None, Some(LOCAL_PORT)),
             Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
         );
 
         // Once `socket` is bound to a different device, though, it no longer
         // conflicts.
-        assert_matches!(
-            SocketHandler::set_device(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &socket,
-                Some(MultipleDevicesId::B),
-            ),
-            Ok(())
-        );
-        SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, Some(LOCAL_PORT))
-            .expect("no conflict");
+        assert_matches!(api.set_device(&socket, Some(MultipleDevicesId::B),), Ok(()));
+        api.bind(&socket, None, Some(LOCAL_PORT)).expect("no conflict");
     }
 
     #[test_case(None)]
@@ -5810,26 +5176,19 @@ mod tests {
         set_logger_for_test();
         let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
 
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
-                    FakeDeviceConfig {
-                        device,
-                        local_ips: vec![ll_addr.into_specified()],
-                        remote_ips: vec![ll_addr.into_specified()],
-                    }
-                })),
-                Default::default(),
-            ));
-
-        let socket = SocketHandler::<Ipv6, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
+            FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
+                FakeDeviceConfig {
+                    device,
+                    local_ips: vec![ll_addr.into_specified()],
+                    remote_ips: vec![ll_addr.into_specified()],
+                }
+            })),
             Default::default(),
-        );
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
+        ));
+        let mut api = ctx.tcp_api::<Ipv6>();
+        let socket = api.create(Default::default());
+        api.bind(
             &socket,
             Some(
                 ZonedAddr::Zoned(
@@ -5841,10 +5200,7 @@ mod tests {
         )
         .expect("bind should succeed");
 
-        assert_matches!(
-            SocketHandler::set_device(&mut core_ctx, &mut bindings_ctx, &socket, set_device),
-            Err(SetDeviceError::ZoneChange)
-        );
+        assert_matches!(api.set_device(&socket, set_device), Err(SetDeviceError::ZoneChange));
     }
 
     #[test_case(None)]
@@ -5853,26 +5209,19 @@ mod tests {
         set_logger_for_test();
         let ll_addr = LinkLocalAddr::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network()).unwrap();
 
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
-                    FakeDeviceConfig {
-                        device,
-                        local_ips: vec![ll_addr.into_specified()],
-                        remote_ips: vec![ll_addr.into_specified()],
-                    }
-                })),
-                Default::default(),
-            ));
-
-        let socket = SocketHandler::<Ipv6, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
+            FakeDualStackIpSocketCtx::new(MultipleDevicesId::all().into_iter().map(|device| {
+                FakeDeviceConfig {
+                    device,
+                    local_ips: vec![ll_addr.into_specified()],
+                    remote_ips: vec![ll_addr.into_specified()],
+                }
+            })),
             Default::default(),
-        );
-        SocketHandler::connect(
-            &mut core_ctx,
-            &mut bindings_ctx,
+        ));
+        let mut api = ctx.tcp_api::<Ipv6>();
+        let socket = api.create(Default::default());
+        api.connect(
             &socket,
             Some(
                 ZonedAddr::Zoned(
@@ -5884,10 +5233,7 @@ mod tests {
         )
         .expect("connect should succeed");
 
-        assert_matches!(
-            SocketHandler::set_device(&mut core_ctx, &mut bindings_ctx, &socket, set_device),
-            Err(SetDeviceError::ZoneChange)
-        );
+        assert_matches!(api.set_device(&socket, set_device), Err(SetDeviceError::ZoneChange));
     }
 
     #[ip_test]
@@ -5900,32 +5246,22 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let socket = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+        let socket = api.create(Default::default());
 
         let (addr, port) =
             (SpecifiedAddr::new(ip_addr).map(|a| ZonedAddr::Unzoned(a).into()), PORT_1);
 
-        SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, addr, Some(port))
-            .expect("bind should succeed");
+        api.bind(&socket, addr, Some(port)).expect("bind should succeed");
         if listen {
-            SocketHandler::listen(
-                &mut core_ctx,
-                &socket,
-                const_unwrap_option(NonZeroUsize::new(25)),
-            )
-            .expect("can listen");
+            api.listen(&socket, const_unwrap_option(NonZeroUsize::new(25))).expect("can listen");
         }
-        let info = SocketHandler::get_info(&mut core_ctx, &socket);
+        let info = api.get_info(&socket);
         assert_eq!(
             info,
             SocketInfo::Bound(BoundInfo {
@@ -5942,42 +5278,24 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
         let local =
             SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(), port: PORT_1 };
         let remote =
             SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(), port: PORT_2 };
 
-        let socket = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            Some(local.ip),
-            Some(local.port),
-        )
-        .expect("bind should succeed");
+        let socket = api.create(Default::default());
+        api.bind(&socket, Some(local.ip), Some(local.port)).expect("bind should succeed");
 
-        SocketHandler::connect(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            Some(remote.ip),
-            remote.port,
-        )
-        .expect("connect should succeed");
+        api.connect(&socket, Some(remote.ip), remote.port).expect("connect should succeed");
 
         assert_eq!(
-            SocketHandler::get_info(&mut core_ctx, &socket),
+            api.get_info(&socket),
             SocketInfo::Connection(ConnectionInfo {
                 local_addr: local.map_zone(FakeWeakDeviceId),
                 remote_addr: remote.map_zone(FakeWeakDeviceId),
@@ -6020,9 +5338,9 @@ mod tests {
             },
         );
 
-        let local_server = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket =
-                SocketHandler::<Ipv6, _>::create_socket(core_ctx, bindings_ctx, Default::default());
+        let local_server = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<Ipv6>();
+            let socket = api.create(Default::default());
             let device = FakeDeviceId;
             let bind_addr = match listen_any {
                 true => None,
@@ -6031,20 +5349,16 @@ mod tests {
                 }
             };
 
-            SocketHandler::bind(core_ctx, bindings_ctx, &socket, bind_addr, Some(PORT_1))
-                .expect("failed to bind the client socket");
-            SocketHandler::listen(core_ctx, &socket, const_unwrap_option(NonZeroUsize::new(1)))
-                .expect("can listen");
+            api.bind(&socket, bind_addr, Some(PORT_1)).expect("failed to bind the client socket");
+            api.listen(&socket, const_unwrap_option(NonZeroUsize::new(1))).expect("can listen");
             socket
         });
 
-        let _remote_client = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket =
-                SocketHandler::<Ipv6, _>::create_socket(core_ctx, bindings_ctx, Default::default());
+        let _remote_client = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<Ipv6>();
+            let socket = api.create(Default::default());
             let device = FakeDeviceId;
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
+            api.connect(
                 &socket,
                 Some(ZonedAddr::Zoned(AddrAndZone::new(server_ip, device).unwrap()).into()),
                 PORT_1,
@@ -6055,16 +5369,15 @@ mod tests {
 
         net.run_until_idle(handle_frame, handle_timer);
 
-        let ConnectionInfo { remote_addr, local_addr, device } =
-            net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-                let (server_conn, _addr, _buffers) =
-                    SocketHandler::accept(core_ctx, bindings_ctx, &local_server)
-                        .expect("connection is available");
-                assert_matches!(
-                    SocketHandler::get_info(core_ctx, &server_conn),
-                    SocketInfo::Connection(info) => info
-                )
-            });
+        let ConnectionInfo { remote_addr, local_addr, device } = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api();
+            let (server_conn, _addr, _buffers) =
+                api.accept(&local_server).expect("connection is available");
+            assert_matches!(
+                api.get_info(&server_conn),
+                SocketInfo::Connection(info) => info
+            )
+        });
 
         let device = assert_matches!(device, Some(device) => device);
         assert_eq!(
@@ -6085,12 +5398,11 @@ mod tests {
     fn bound_connection_info_zoned_addrs() {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
         let remote_ip = LinkLocalAddr::new(net_ip_v6!("fe80::2")).unwrap().into_specified();
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-                local_ip,
-                remote_ip,
-                Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
+            local_ip,
+            remote_ip,
+            Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
+        ));
 
         let local_addr = SocketAddr {
             ip: ZonedAddr::Zoned(AddrAndZone::new(local_ip, FakeDeviceId).unwrap()).into(),
@@ -6100,23 +5412,13 @@ mod tests {
             ip: ZonedAddr::Zoned(AddrAndZone::new(remote_ip, FakeDeviceId).unwrap()).into(),
             port: PORT_2,
         };
+        let mut api = ctx.tcp_api::<Ipv6>();
 
-        let socket = SocketHandler::<Ipv6, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            Some(local_addr.ip),
-            Some(local_addr.port),
-        )
-        .expect("bind should succeed");
+        let socket = api.create(Default::default());
+        api.bind(&socket, Some(local_addr.ip), Some(local_addr.port)).expect("bind should succeed");
 
         assert_eq!(
-            SocketHandler::get_info(&mut core_ctx, &socket),
+            api.get_info(&socket),
             SocketInfo::Bound(BoundInfo {
                 addr: Some(local_addr.ip.into_inner().map_zone(FakeWeakDeviceId).into()),
                 port: local_addr.port,
@@ -6124,17 +5426,11 @@ mod tests {
             })
         );
 
-        SocketHandler::connect(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            Some(remote_addr.ip),
-            remote_addr.port,
-        )
-        .expect("connect should succeed");
+        api.connect(&socket, Some(remote_addr.ip), remote_addr.port)
+            .expect("connect should succeed");
 
         assert_eq!(
-            SocketHandler::get_info(&mut core_ctx, &socket),
+            api.get_info(&socket),
             SocketInfo::Connection(ConnectionInfo {
                 local_addr: local_addr.map_zone(FakeWeakDeviceId),
                 remote_addr: remote_addr.map_zone(FakeWeakDeviceId),
@@ -6171,9 +5467,9 @@ mod tests {
         );
 
         let weak_local = local.downgrade();
-        let close_called = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            SocketHandler::close(core_ctx, bindings_ctx, local);
-            bindings_ctx.now()
+        let close_called = net.with_context(LOCAL, |ctx| {
+            ctx.tcp_api().close(local);
+            ctx.bindings_ctx.now()
         });
 
         while {
@@ -6202,8 +5498,8 @@ mod tests {
 
         let weak_remote = remote.downgrade();
         if peer_calls_close {
-            net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-                SocketHandler::close(core_ctx, bindings_ctx, remote);
+            net.with_context(REMOTE, |ctx| {
+                ctx.tcp_api().close(remote);
             });
         }
 
@@ -6235,11 +5531,8 @@ mod tests {
             0,
             0.0,
         );
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            assert_eq!(
-                SocketHandler::shutdown(core_ctx, bindings_ctx, &local, ShutdownType::Send),
-                Ok(true)
-            );
+        net.with_context(LOCAL, |ctx| {
+            assert_eq!(ctx.tcp_api().shutdown(&local, ShutdownType::Send), Ok(true));
         });
         loop {
             assert!(!net.step(handle_frame, handle_timer).is_idle());
@@ -6264,8 +5557,8 @@ mod tests {
         }
 
         let weak_local = local.downgrade();
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            SocketHandler::close(core_ctx, bindings_ctx, local);
+        net.with_context(LOCAL, |ctx| {
+            ctx.tcp_api().close(local);
         });
         net.run_until_idle(handle_frame, handle_timer);
         assert_eq!(weak_local.upgrade(), None);
@@ -6290,14 +5583,10 @@ mod tests {
         );
 
         for (name, id) in [(LOCAL, &local), (REMOTE, &remote)] {
-            net.with_context(name, |TcpCtx { core_ctx, bindings_ctx }| {
+            net.with_context(name, |ctx| {
+                let mut api = ctx.tcp_api();
                 assert_eq!(
-                    SocketHandler::shutdown(
-                        core_ctx,
-                        bindings_ctx,
-                        id,
-                        ShutdownType::Send
-                    ),
+                    api.shutdown(id,ShutdownType::Send),
                     Ok(true)
                 );
                 assert_matches!(
@@ -6313,19 +5602,14 @@ mod tests {
                     );
                 });
                 assert_eq!(
-                    SocketHandler::shutdown(
-                        core_ctx,
-                        bindings_ctx,
-                        id,
-                        ShutdownType::Send
-                    ),
+                    api.shutdown(id,ShutdownType::Send),
                     Ok(true)
                 );
             });
         }
         net.run_until_idle(handle_frame, handle_timer);
         for (name, id) in [(LOCAL, local), (REMOTE, remote)] {
-            net.with_context(name, |TcpCtx { core_ctx, bindings_ctx }| {
+            net.with_context(name, |ctx| {
                 assert_matches!(
                     id.get().deref(),
                     TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
@@ -6339,7 +5623,7 @@ mod tests {
                     );
                 });
                 let weak_id = id.downgrade();
-                SocketHandler::close(core_ctx, bindings_ctx, id);
+                ctx.tcp_api().close(id);
                 assert_eq!(weak_id.upgrade(), None)
             });
         }
@@ -6351,19 +5635,15 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let unbound = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+        let unbound = api.create(Default::default());
         let weak_unbound = unbound.downgrade();
-        SocketHandler::close(&mut core_ctx, &mut bindings_ctx, unbound);
+        api.close(unbound);
         assert_eq!(weak_unbound.upgrade(), None);
     }
 
@@ -6373,27 +5653,17 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let socket = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &socket,
-            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
-            None,
-        )
-        .expect("bind should succeed");
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+        let socket = api.create(Default::default());
+        api.bind(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), None)
+            .expect("bind should succeed");
         let weak_socket = socket.downgrade();
-        SocketHandler::close(&mut core_ctx, &mut bindings_ctx, socket);
+        api.close(socket);
         assert_eq!(weak_socket.upgrade(), None);
     }
 
@@ -6409,33 +5679,24 @@ mod tests {
     {
         set_logger_for_test();
         let mut net = new_test_net::<I>();
-        let local_listener = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
+        let local_listener = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(Default::default());
+            api.bind(
                 &socket,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 Some(PORT_1),
             )
             .expect("bind should succeed");
-            SocketHandler::listen(core_ctx, &socket, NonZeroUsize::new(5).unwrap())
-                .expect("can listen");
+            api.listen(&socket, NonZeroUsize::new(5).unwrap()).expect("can listen");
             socket
         });
 
-        let remote_connection = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
-                &socket,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
-                PORT_1,
-            )
-            .expect("connect should succeed");
+        let remote_connection = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(Default::default());
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), PORT_1)
+                .expect("connect should succeed");
             socket
         });
 
@@ -6446,11 +5707,9 @@ mod tests {
 
         // The incoming connection was signaled, and the remote end was notified
         // of connection establishment.
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(REMOTE, |ctx| {
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                ctx.tcp_api().connect(
                     &remote_connection,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                     PORT_1
@@ -6461,16 +5720,11 @@ mod tests {
 
         // Create a second half-open connection so that we have one entry in the
         // pending queue.
-        let second_connection = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket = SocketHandler::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
-                &socket,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
-                PORT_1,
-            )
-            .expect("connect should succeed");
+        let second_connection = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(Default::default());
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), PORT_1)
+                .expect("connect should succeed");
             socket
         });
 
@@ -6481,16 +5735,8 @@ mod tests {
             assert_matches!(bindings_ctx.timers.timers().len(), 1);
         });
 
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            assert_eq!(
-                SocketHandler::shutdown(
-                    core_ctx,
-                    bindings_ctx,
-                    &local_listener,
-                    ShutdownType::Receive,
-                ),
-                Ok(false)
-            );
+        net.with_context(LOCAL, |ctx| {
+            assert_eq!(ctx.tcp_api().shutdown(&local_listener, ShutdownType::Receive,), Ok(false));
         });
 
         // The timer for the pending connection should be cancelled.
@@ -6501,10 +5747,10 @@ mod tests {
         net.run_until_idle(handle_frame, handle_timer);
 
         // Both remote sockets should now be reset to Closed state.
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx: _ }| {
+        net.with_context(REMOTE, |ctx| {
             for conn in [&remote_connection, &second_connection] {
                 assert_eq!(
-                    SocketHandler::get_socket_error(core_ctx, conn),
+                    ctx.tcp_api().get_socket_error(conn),
                     Some(ConnectionError::ConnectionReset),
                 )
             }
@@ -6527,13 +5773,11 @@ mod tests {
             );
         });
 
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let new_unbound =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let new_unbound = api.create(Default::default());
             assert_matches!(
-                SocketHandler::bind(
-                    core_ctx,
-                    bindings_ctx,
+                api.bind(
                     &new_unbound,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip,).into()),
                     Some(PORT_1),
@@ -6541,31 +5785,20 @@ mod tests {
                 Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
             );
             // Bring the already-shutdown listener back to listener again.
-            SocketHandler::listen(core_ctx, &local_listener, NonZeroUsize::new(5).unwrap())
-                .expect("can listen again");
+            api.listen(&local_listener, NonZeroUsize::new(5).unwrap()).expect("can listen again");
         });
 
-        let new_remote_connection =
-            net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-                let socket = SocketHandler::<I, _>::create_socket(
-                    core_ctx,
-                    bindings_ctx,
-                    Default::default(),
-                );
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
-                    &socket,
-                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
-                    PORT_1,
-                )
+        let new_remote_connection = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(Default::default());
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), PORT_1)
                 .expect("connect should succeed");
-                socket
-            });
+            socket
+        });
 
         net.run_until_idle(handle_frame, handle_timer);
 
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(REMOTE, |ctx| {
             assert_matches!(
                 new_remote_connection.get().deref(),
                 TcpSocketState::Bound(BoundSocketState::Connected((
@@ -6580,9 +5813,7 @@ mod tests {
                     );
                     });
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                ctx.tcp_api().connect(
                     &new_remote_connection,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                     PORT_1,
@@ -6604,52 +5835,27 @@ mod tests {
         let mut local_sizes = BufferSizes { send: 2048, receive: 2000 };
         let mut remote_sizes = BufferSizes { send: 1024, receive: 2000 };
 
-        let local_listener = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let local_listener =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
+        let local_listener = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let local_listener = api.create(Default::default());
+            api.bind(
                 &local_listener,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 Some(PORT_1),
             )
             .expect("bind should succeed");
-            SocketHandler::set_send_buffer_size(
-                core_ctx,
-                bindings_ctx,
-                &local_listener,
-                local_sizes.send,
-            );
-            SocketHandler::set_receive_buffer_size(
-                core_ctx,
-                bindings_ctx,
-                &local_listener,
-                local_sizes.receive,
-            );
-            SocketHandler::listen(core_ctx, &local_listener, NonZeroUsize::new(5).unwrap())
-                .expect("can listen");
+            api.set_send_buffer_size(&local_listener, local_sizes.send);
+            api.set_receive_buffer_size(&local_listener, local_sizes.receive);
+            api.listen(&local_listener, NonZeroUsize::new(5).unwrap()).expect("can listen");
             local_listener
         });
 
-        let remote_connection = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let remote_connection =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::set_send_buffer_size(
-                core_ctx,
-                bindings_ctx,
-                &remote_connection,
-                remote_sizes.send,
-            );
-            SocketHandler::set_receive_buffer_size(
-                core_ctx,
-                bindings_ctx,
-                &remote_connection,
-                local_sizes.receive,
-            );
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
+        let remote_connection = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let remote_connection = api.create(Default::default());
+            api.set_send_buffer_size(&remote_connection, remote_sizes.send);
+            api.set_receive_buffer_size(&remote_connection, local_sizes.receive);
+            api.connect(
                 &remote_connection,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 PORT_1,
@@ -6665,51 +5871,25 @@ mod tests {
                 local_sizes.receive += 1;
                 remote_sizes.send += 1;
                 remote_sizes.receive += 1;
-                net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-                    SocketHandler::set_send_buffer_size(
-                        core_ctx,
-                        bindings_ctx,
-                        local,
-                        local_sizes.send,
-                    );
-                    if let Some(size) =
-                        SocketHandler::send_buffer_size(core_ctx, bindings_ctx, local)
-                    {
+                net.with_context(LOCAL, |ctx| {
+                    let mut api = ctx.tcp_api();
+                    api.set_send_buffer_size(local, local_sizes.send);
+                    if let Some(size) = api.send_buffer_size(local) {
                         assert_eq!(size, local_sizes.send);
                     }
-                    SocketHandler::set_receive_buffer_size(
-                        core_ctx,
-                        bindings_ctx,
-                        local,
-                        local_sizes.receive,
-                    );
-                    if let Some(size) =
-                        SocketHandler::receive_buffer_size(core_ctx, bindings_ctx, local)
-                    {
+                    api.set_receive_buffer_size(local, local_sizes.receive);
+                    if let Some(size) = api.receive_buffer_size(local) {
                         assert_eq!(size, local_sizes.receive);
                     }
                 });
-                net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-                    SocketHandler::set_send_buffer_size(
-                        core_ctx,
-                        bindings_ctx,
-                        remote,
-                        remote_sizes.send,
-                    );
-                    if let Some(size) =
-                        SocketHandler::send_buffer_size(core_ctx, bindings_ctx, remote)
-                    {
+                net.with_context(REMOTE, |ctx| {
+                    let mut api = ctx.tcp_api();
+                    api.set_send_buffer_size(remote, remote_sizes.send);
+                    if let Some(size) = api.send_buffer_size(remote) {
                         assert_eq!(size, remote_sizes.send);
                     }
-                    SocketHandler::set_receive_buffer_size(
-                        core_ctx,
-                        bindings_ctx,
-                        remote,
-                        remote_sizes.receive,
-                    );
-                    if let Some(size) =
-                        SocketHandler::receive_buffer_size(core_ctx, bindings_ctx, remote)
-                    {
+                    api.set_receive_buffer_size(remote, remote_sizes.receive);
+                    if let Some(size) = api.receive_buffer_size(remote) {
                         assert_eq!(size, remote_sizes.receive);
                     }
                 });
@@ -6722,38 +5902,21 @@ mod tests {
         // handshake process just to make sure it doesn't break.
         step_and_increment_buffer_sizes_until_idle(&mut net, &local_listener, &remote_connection);
 
-        let local_connection = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let (conn, _, _) = SocketHandler::accept(core_ctx, bindings_ctx, &local_listener)
-                .expect("received connection");
+        let local_connection = net.with_context(LOCAL, |ctx| {
+            let (conn, _, _) = ctx.tcp_api().accept(&local_listener).expect("received connection");
             conn
         });
 
         step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
 
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            assert_eq!(
-                SocketHandler::shutdown(
-                    core_ctx,
-                    bindings_ctx,
-                    &local_connection,
-                    ShutdownType::Send,
-                ),
-                Ok(true)
-            );
+        net.with_context(LOCAL, |ctx| {
+            assert_eq!(ctx.tcp_api().shutdown(&local_connection, ShutdownType::Send,), Ok(true));
         });
 
         step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
 
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            assert_eq!(
-                SocketHandler::shutdown(
-                    core_ctx,
-                    bindings_ctx,
-                    &remote_connection,
-                    ShutdownType::Send,
-                ),
-                Ok(true),
-            );
+        net.with_context(REMOTE, |ctx| {
+            assert_eq!(ctx.tcp_api().shutdown(&remote_connection, ShutdownType::Send,), Ok(true),);
         });
 
         step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
@@ -6765,42 +5928,27 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
 
         let first_bound = {
-            let socket = SocketHandler::<I, _>::create_socket(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                Default::default(),
-            );
-            SocketHandler::set_reuseaddr(&mut core_ctx, &socket, true).expect("can set");
-            SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, None)
-                .expect("bind succeeds");
+            let socket = api.create(Default::default());
+            api.set_reuseaddr(&socket, true).expect("can set");
+            api.bind(&socket, None, None).expect("bind succeeds");
             socket
         };
         let _second_bound = {
-            let socket = SocketHandler::<I, _>::create_socket(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                Default::default(),
-            );
-            SocketHandler::set_reuseaddr(&mut core_ctx, &socket, true).expect("can set");
-            SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, None)
-                .expect("bind succeeds");
+            let socket = api.create(Default::default());
+            api.set_reuseaddr(&socket, true).expect("can set");
+            api.bind(&socket, None, None).expect("bind succeeds");
             socket
         };
 
-        SocketHandler::listen(
-            &mut core_ctx,
-            &first_bound,
-            const_unwrap_option(NonZeroUsize::new(10)),
-        )
-        .expect("can listen");
+        api.listen(&first_bound, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
     }
 
     #[ip_test]
@@ -6815,30 +5963,20 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
 
-        let first = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::set_reuseaddr(&mut core_ctx, &first, set_reuseaddr[0]).expect("can set");
-        SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &first, None, Some(PORT_1))
-            .expect("bind succeeds");
+        let first = api.create(Default::default());
+        api.set_reuseaddr(&first, set_reuseaddr[0]).expect("can set");
+        api.bind(&first, None, Some(PORT_1)).expect("bind succeeds");
 
-        let second = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::set_reuseaddr(&mut core_ctx, &second, set_reuseaddr[1]).expect("can set");
-        let second_bind_result =
-            SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &second, None, Some(PORT_1));
+        let second = api.create(Default::default());
+        api.set_reuseaddr(&second, set_reuseaddr[1]).expect("can set");
+        let second_bind_result = api.bind(&second, None, Some(PORT_1));
 
         assert_eq!(second_bind_result, expected.map_err(From::from));
     }
@@ -6850,54 +5988,29 @@ mod tests {
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
         let addrs = [1, 2].map(|i| I::get_other_ip_address(i));
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
-                FakeDualStackIpSocketCtx::<_>::with_devices_state(core::iter::once::<(
-                    _,
-                    _,
-                    Vec<SpecifiedAddr<IpAddr>>,
-                )>((
-                    FakeDeviceId,
-                    I::new_device_state(
-                        addrs.iter().map(Witness::get),
-                        I::FAKE_CONFIG.subnet.prefix(),
-                    ),
-                    vec![],
-                ))),
-                FakeDualStackTcpState::default(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_inner_and_outer_state(
+            FakeDualStackIpSocketCtx::<_>::with_devices_state(core::iter::once::<(
+                _,
+                _,
+                Vec<SpecifiedAddr<IpAddr>>,
+            )>((
+                FakeDeviceId,
+                I::new_device_state(addrs.iter().map(Witness::get), I::FAKE_CONFIG.subnet.prefix()),
+                vec![],
+            ))),
+            FakeDualStackTcpState::default(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
 
-        let first = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &first,
-            Some(ZonedAddr::Unzoned(addrs[0]).into()),
-            Some(PORT_1),
-        )
-        .unwrap();
+        let first = api.create(Default::default());
+        api.bind(&first, Some(ZonedAddr::Unzoned(addrs[0]).into()), Some(PORT_1)).unwrap();
 
-        let second = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &second,
-            Some(ZonedAddr::Unzoned(addrs[1]).into()),
-            Some(PORT_1),
-        )
-        .unwrap();
+        let second = api.create(Default::default());
+        api.bind(&second, Some(ZonedAddr::Unzoned(addrs[1]).into()), Some(PORT_1)).unwrap();
         // Setting and un-setting ReuseAddr should be fine since these sockets
         // don't conflict.
-        SocketHandler::set_reuseaddr(&mut core_ctx, &first, true).expect("can set");
-        SocketHandler::set_reuseaddr(&mut core_ctx, &first, false).expect("can un-set");
+        api.set_reuseaddr(&first, true).expect("can set");
+        api.set_reuseaddr(&first, false).expect("can un-set");
     }
 
     #[ip_test]
@@ -6906,45 +6019,25 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
-        let first = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::set_reuseaddr(&mut core_ctx, &first, true).expect("can set");
-        SocketHandler::bind(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &first,
-            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
-            Some(PORT_1),
-        )
-        .unwrap();
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+        let first = api.create(Default::default());
+        api.set_reuseaddr(&first, true).expect("can set");
+        api.bind(&first, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), Some(PORT_1))
+            .unwrap();
 
-        let second = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::set_reuseaddr(&mut core_ctx, &second, true).expect("can set");
-        SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &second, None, Some(PORT_1)).unwrap();
+        let second = api.create(Default::default());
+        api.set_reuseaddr(&second, true).expect("can set");
+        api.bind(&second, None, Some(PORT_1)).unwrap();
 
         // Both sockets can be bound because they have ReuseAddr set. Since
         // removing it would introduce inconsistent state, that's not allowed.
-        assert_matches!(
-            SocketHandler::set_reuseaddr(&mut core_ctx, &first, false),
-            Err(SetReuseAddrError::AddrInUse)
-        );
-        assert_matches!(
-            SocketHandler::set_reuseaddr(&mut core_ctx, &second, false),
-            Err(SetReuseAddrError::AddrInUse)
-        );
+        assert_matches!(api.set_reuseaddr(&first, false), Err(SetReuseAddrError::AddrInUse));
+        assert_matches!(api.set_reuseaddr(&second, false), Err(SetReuseAddrError::AddrInUse));
     }
 
     #[ip_test]
@@ -6956,43 +6049,32 @@ mod tests {
         set_logger_for_test();
         let mut net = new_test_net::<I>();
 
-        let server = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let server =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::set_reuseaddr(core_ctx, &server, true).expect("can set");
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
+        let server = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let server = api.create(Default::default());
+            api.set_reuseaddr(&server, true).expect("can set");
+            api.bind(
                 &server,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 Some(PORT_1),
             )
             .expect("failed to bind the client socket");
-            SocketHandler::listen(core_ctx, &server, const_unwrap_option(NonZeroUsize::new(10)))
-                .expect("can listen");
+            api.listen(&server, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
             server
         });
 
-        let client = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let client =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
-                &client,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
-                PORT_1,
-            )
-            .expect("connect should succeed");
+        let client = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let client = api.create(Default::default());
+            api.connect(&client, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), PORT_1)
+                .expect("connect should succeed");
             client
         });
         // Finish the connection establishment.
         net.run_until_idle(handle_frame, handle_timer);
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(REMOTE, |ctx| {
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                ctx.tcp_api().connect(
                     &client,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                     PORT_1
@@ -7004,26 +6086,23 @@ mod tests {
         // Now accept the connection and close the listening socket. Then
         // binding a new socket on the same local address should fail unless the
         // socket has SO_REUSEADDR set.
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api();
             let (_server_conn, _, _): (_, SocketAddr<_, _>, ClientBuffers) =
-                SocketHandler::accept(core_ctx, bindings_ctx, &server).expect("pending connection");
+                api.accept(&server).expect("pending connection");
 
-            assert_eq!(
-                SocketHandler::shutdown(core_ctx, bindings_ctx, &server, ShutdownType::Receive),
-                Ok(false)
-            );
-            SocketHandler::close(core_ctx, bindings_ctx, server);
+            assert_eq!(api.shutdown(&server, ShutdownType::Receive), Ok(false));
+            api.close(server);
 
-            let unbound = SocketHandler::create_socket(core_ctx, bindings_ctx, Default::default());
+            let unbound = api.create(Default::default());
             assert_eq!(
-                SocketHandler::bind(core_ctx, bindings_ctx, &unbound, None, Some(PORT_1)),
+                api.bind(&unbound, None, Some(PORT_1)),
                 Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
             );
 
             // Binding should succeed after setting ReuseAddr.
-            SocketHandler::set_reuseaddr(core_ctx, &unbound, true).expect("can set");
-            SocketHandler::bind(core_ctx, bindings_ctx, &unbound, None, Some(PORT_1))
-                .expect("bind succeeds");
+            api.set_reuseaddr(&unbound, true).expect("can set");
+            api.bind(&unbound, None, Some(PORT_1)).expect("bind succeeds");
         });
     }
 
@@ -7037,68 +6116,40 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
 
         let [first_addr, second_addr] = bind_specified
             .map(|b| b.then_some(I::FAKE_CONFIG.local_ip).map(|a| ZonedAddr::Unzoned(a).into()));
         let first_bound = {
-            let socket = SocketHandler::<I, _>::create_socket(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                Default::default(),
-            );
-            SocketHandler::bind(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &socket,
-                first_addr,
-                Some(PORT_1),
-            )
-            .expect("bind succeeds");
+            let socket = api.create(Default::default());
+            api.bind(&socket, first_addr, Some(PORT_1)).expect("bind succeeds");
             socket
         };
 
-        let second = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
+        let second = api.create(Default::default());
 
         // Binding the second socket will fail because the first doesn't have
         // SO_REUSEADDR set.
         assert_matches!(
-            SocketHandler::bind(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &second,
-                second_addr,
-                Some(PORT_1)
-            ),
+            api.bind(&second, second_addr, Some(PORT_1)),
             Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
         );
 
         // Setting SO_REUSEADDR for the second socket isn't enough.
-        SocketHandler::set_reuseaddr(&mut core_ctx, &second, true).expect("can set");
+        api.set_reuseaddr(&second, true).expect("can set");
         assert_matches!(
-            SocketHandler::bind(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &second,
-                second_addr,
-                Some(PORT_1)
-            ),
+            api.bind(&second, second_addr, Some(PORT_1)),
             Err(BindError::LocalAddressError(LocalAddressError::AddressInUse))
         );
 
         // Setting SO_REUSEADDR for the first socket lets the second bind.
-        SocketHandler::set_reuseaddr(&mut core_ctx, &first_bound, true).expect("only socket");
-        SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &second, second_addr, Some(PORT_1))
-            .expect("can bind");
+        api.set_reuseaddr(&first_bound, true).expect("only socket");
+        api.bind(&second, second_addr, Some(PORT_1)).expect("can bind");
     }
 
     #[ip_test]
@@ -7107,62 +6158,38 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
             TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
 
         let bound = {
-            let socket = SocketHandler::<I, _>::create_socket(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                Default::default(),
-            );
-            SocketHandler::set_reuseaddr(&mut core_ctx, &socket, true).expect("can set");
-            SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, Some(PORT_1))
-                .expect("bind succeeds");
+            let socket = api.create(Default::default());
+            api.set_reuseaddr(&socket, true).expect("can set");
+            api.bind(&socket, None, Some(PORT_1)).expect("bind succeeds");
             socket
         };
 
         let listener = {
-            let socket = SocketHandler::<I, _>::create_socket(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                Default::default(),
-            );
-            SocketHandler::set_reuseaddr(&mut core_ctx, &socket, true).expect("can set");
+            let socket = api.create(Default::default());
+            api.set_reuseaddr(&socket, true).expect("can set");
 
-            SocketHandler::bind(&mut core_ctx, &mut bindings_ctx, &socket, None, Some(PORT_1))
-                .expect("bind succeeds");
-            SocketHandler::listen(
-                &mut core_ctx,
-                &socket,
-                const_unwrap_option(NonZeroUsize::new(5)),
-            )
-            .expect("can listen");
+            api.bind(&socket, None, Some(PORT_1)).expect("bind succeeds");
+            api.listen(&socket, const_unwrap_option(NonZeroUsize::new(5))).expect("can listen");
             socket
         };
 
         // We can't clear SO_REUSEADDR on the listener because it's sharing with
         // the bound socket.
-        assert_matches!(
-            SocketHandler::set_reuseaddr(&mut core_ctx, &listener, false),
-            Err(SetReuseAddrError::AddrInUse)
-        );
+        assert_matches!(api.set_reuseaddr(&listener, false), Err(SetReuseAddrError::AddrInUse));
 
         // We can, however, connect to the listener with the bound socket. Then
         // the unencumbered listener can clear SO_REUSEADDR.
-        SocketHandler::connect(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &bound,
-            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
-            PORT_1,
-        )
-        .expect("can connect");
-        SocketHandler::set_reuseaddr(&mut core_ctx, &listener, false).expect("can unset")
+        api.connect(&bound, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()), PORT_1)
+            .expect("can connect");
+        api.set_reuseaddr(&listener, false).expect("can unset")
     }
 
     fn deliver_icmp_error<
@@ -7230,31 +6257,24 @@ mod tests {
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<I, TcpBindingsCtx<FakeDeviceId>>
             + TcpContext<I::OtherVersion, TcpBindingsCtx<FakeDeviceId>>,
     {
-        let TcpCtx { mut core_ctx, mut bindings_ctx } =
-            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
-                I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.remote_ip,
-                I::FAKE_CONFIG.subnet.prefix(),
-            ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::FAKE_CONFIG.local_ip,
+            I::FAKE_CONFIG.remote_ip,
+            I::FAKE_CONFIG.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
 
-        let connection = SocketHandler::<I, _>::create_socket(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            Default::default(),
-        );
-        SocketHandler::connect(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &connection,
-            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
-            PORT_1,
-        )
-        .expect("failed to create a connection socket");
+        let connection = api.create(Default::default());
+        api.connect(&connection, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()), PORT_1)
+            .expect("failed to create a connection socket");
+
+        let (core_ctx, bindings_ctx) = api.contexts();
         let frames = core_ctx.inner.take_frames();
         let frame = assert_matches!(&frames[..], [(_meta, frame)] => frame);
+
         deliver_icmp_error::<I, _, _>(
-            &mut core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             I::FAKE_CONFIG.local_ip,
             I::FAKE_CONFIG.remote_ip,
             &frame[0..8],
@@ -7262,16 +6282,14 @@ mod tests {
         );
         // The TCP handshake should be aborted.
         assert_eq!(
-            SocketHandler::connect(
-                &mut core_ctx,
-                &mut bindings_ctx,
+            api.connect(
                 &connection,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                 PORT_1
             ),
             Err(ConnectError::Aborted)
         );
-        SocketHandler::get_socket_error(&mut core_ctx, &connection).unwrap()
+        api.get_socket_error(&connection).unwrap()
     }
 
     #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
@@ -7330,8 +6348,8 @@ mod tests {
             0.0,
         );
         local_snd_end.lock().extend_from_slice(b"Hello");
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            SocketHandler::do_send(core_ctx, bindings_ctx, &local);
+        net.with_context(LOCAL, |ctx| {
+            ctx.tcp_api().do_send(&local);
         });
         net.collect_frames();
         let original_body = assert_matches!(
@@ -7343,7 +6361,8 @@ mod tests {
             })] => {
             frame.clone()
         });
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(LOCAL, |ctx| {
+            let TcpCtx { core_ctx, bindings_ctx } = ctx;
             deliver_icmp_error::<I, _, _>(
                 core_ctx,
                 bindings_ctx,
@@ -7354,7 +6373,7 @@ mod tests {
             );
             // An error should be posted on the connection.
             let error = assert_matches!(
-                SocketHandler::get_socket_error(core_ctx, &local),
+                ctx.tcp_api().get_socket_error(&local),
                 Some(error) => error
             );
             // But it should stay established.
@@ -7385,26 +6404,19 @@ mod tests {
         let mut net = new_test_net::<I>();
 
         let backlog = NonZeroUsize::new(1).unwrap();
-        let server = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let server =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(core_ctx, bindings_ctx, &server, None, Some(PORT_1))
-                .expect("failed to bind the server socket");
-            SocketHandler::listen(core_ctx, &server, backlog).expect("can listen");
+        let server = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let server = api.create(Default::default());
+            api.bind(&server, None, Some(PORT_1)).expect("failed to bind the server socket");
+            api.listen(&server, backlog).expect("can listen");
             server
         });
 
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let conn =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
-                &conn,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
-                PORT_1,
-            )
-            .expect("failed to connect");
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let conn = api.create(Default::default());
+            api.connect(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()), PORT_1)
+                .expect("failed to connect");
         });
 
         assert!(!net.step(handle_frame, handle_timer).is_idle());
@@ -7485,29 +6497,24 @@ mod tests {
             0.0,
         );
         // Locally, we create a connection with a full accept queue.
-        let listener = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let listener =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::set_reuseaddr(core_ctx, &listener, true).expect("can set");
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
+        let listener = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let listener = api.create(Default::default());
+            api.set_reuseaddr(&listener, true).expect("can set");
+            api.bind(
                 &listener,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 Some(CLIENT_PORT),
             )
             .expect("failed to bind");
-            SocketHandler::listen(core_ctx, &listener, NonZeroUsize::new(1).unwrap())
-                .expect("failed to listen");
+            api.listen(&listener, NonZeroUsize::new(1).unwrap()).expect("failed to listen");
             listener
         });
         // This connection is never used, just to keep accept queue full.
-        let extra_conn = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let extra_conn =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
+        let extra_conn = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let extra_conn = api.create(Default::default());
+            api.connect(
                 &extra_conn,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 CLIENT_PORT,
@@ -7517,11 +6524,9 @@ mod tests {
         });
         net.run_until_idle(handle_frame, handle_timer);
 
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(REMOTE, |ctx| {
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                ctx.tcp_api().connect(
                     &extra_conn,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                     CLIENT_PORT,
@@ -7533,13 +6538,13 @@ mod tests {
         // Now we shutdown the sockets and try to bring the local socket to
         // TIME-WAIT.
         let weak_local = local.downgrade();
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            SocketHandler::close(core_ctx, bindings_ctx, local);
+        net.with_context(LOCAL, |ctx| {
+            ctx.tcp_api().close(local);
         });
         assert!(!net.step(handle_frame, handle_timer).is_idle());
         assert!(!net.step(handle_frame, handle_timer).is_idle());
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            SocketHandler::close(core_ctx, bindings_ctx, remote);
+        net.with_context(REMOTE, |ctx| {
+            ctx.tcp_api().close(remote);
         });
         assert!(!net.step(handle_frame, handle_timer).is_idle());
         assert!(!net.step(handle_frame, handle_timer).is_idle());
@@ -7567,12 +6572,10 @@ mod tests {
 
         // Try to initiate a connection from the remote since we have an active
         // listener locally.
-        let conn = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let conn =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
+        let conn = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let conn = api.create(Default::default());
+            api.connect(
                 &conn,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 CLIENT_PORT,
@@ -7599,24 +6602,20 @@ mod tests {
             });
 
         // Now free up the accept queue by accepting the connection.
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let _accepted = SocketHandler::accept(core_ctx, bindings_ctx, &listener)
-                .expect("failed to accept a new connection");
+        net.with_context(LOCAL, |ctx| {
+            let _accepted =
+                ctx.tcp_api().accept(&listener).expect("failed to accept a new connection");
         });
-        let conn = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
+        let conn = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(Default::default());
+            api.bind(
                 &socket,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                 Some(SERVER_PORT),
             )
             .expect("failed to bind");
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
+            api.connect(
                 &socket,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 CLIENT_PORT,
@@ -7655,11 +6654,9 @@ mod tests {
         });
         // The TIME-WAIT socket should be reused to establish the connection.
         net.run_until_idle(handle_frame, handle_timer);
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
+        net.with_context(REMOTE, |ctx| {
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                ctx.tcp_api().connect(
                     &conn,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                     CLIENT_PORT
@@ -7690,22 +6687,18 @@ mod tests {
         );
         // Now we are using the same 4-tuple again to try to create a new
         // connection, this should fail.
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket =
-                SocketHandler::<I, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::set_reuseaddr(core_ctx, &socket, true).expect("can set");
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            let socket = api.create(Default::default());
+            api.set_reuseaddr(&socket, true).expect("can set");
+            api.bind(
                 &socket,
                 Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
                 Some(PORT_1),
             )
             .expect("failed to bind");
             assert_eq!(
-                SocketHandler::connect(
-                    core_ctx,
-                    bindings_ctx,
+                api.connect(
                     &socket,
                     Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                     PORT_1
@@ -7720,31 +6713,24 @@ mod tests {
         set_logger_for_test();
         let mut net = new_test_net::<Ipv4>();
         let backlog = NonZeroUsize::new(1).unwrap();
-        let server = net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            let server =
-                SocketHandler::<Ipv4, _>::create_socket(core_ctx, bindings_ctx, Default::default());
-            SocketHandler::bind(
-                core_ctx,
-                bindings_ctx,
+        let server = net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<Ipv4>();
+            let server = api.create(Default::default());
+            api.bind(
                 &server,
                 Some(ZonedAddr::Unzoned(Ipv4::FAKE_CONFIG.remote_ip).into()),
                 Some(PORT_1),
             )
             .expect("failed to bind the server socket");
-            SocketHandler::listen(core_ctx, &server, backlog).expect("can listen");
+            api.listen(&server, backlog).expect("can listen");
             server
         });
 
         let client_ends = WriteBackClientBuffers::default();
-        let client = net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            let socket = SocketHandler::<Ipv6, _>::create_socket(
-                core_ctx,
-                bindings_ctx,
-                ProvidedBuffers::Buffers(client_ends.clone()),
-            );
-            SocketHandler::connect(
-                core_ctx,
-                bindings_ctx,
+        let client = net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<Ipv6>();
+            let socket = api.create(ProvidedBuffers::Buffers(client_ends.clone()));
+            api.connect(
                 &socket,
                 Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.remote_ip).to_ipv6_mapped()).into()),
                 PORT_1,
@@ -7755,10 +6741,8 @@ mod tests {
 
         // Step the test network until the handshake is done.
         net.run_until_idle(&mut handle_frame, handle_timer);
-        let (accepted, addr, accepted_ends) =
-            net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-                SocketHandler::accept(core_ctx, bindings_ctx, &server).expect("failed to accept")
-            });
+        let (accepted, addr, accepted_ends) = net
+            .with_context(REMOTE, |ctx| ctx.tcp_api().accept(&server).expect("failed to accept"));
         assert_eq!(addr.ip, ZonedAddr::Unzoned(Ipv4::FAKE_CONFIG.local_ip).into());
 
         let ClientBuffers { send: client_snd_end, receive: client_rcv_end } =
@@ -7767,12 +6751,8 @@ mod tests {
         for snd_end in [client_snd_end, accepted_snd_end] {
             snd_end.lock().extend_from_slice(b"Hello");
         }
-        net.with_context(LOCAL, |TcpCtx { core_ctx, bindings_ctx }| {
-            SocketHandler::<Ipv6, _>::do_send(core_ctx, bindings_ctx, &client)
-        });
-        net.with_context(REMOTE, |TcpCtx { core_ctx, bindings_ctx }| {
-            SocketHandler::<Ipv4, _>::do_send(core_ctx, bindings_ctx, &accepted)
-        });
+        net.with_context(LOCAL, |ctx| ctx.tcp_api().do_send(&client));
+        net.with_context(REMOTE, |ctx| ctx.tcp_api().do_send(&accepted));
         net.run_until_idle(&mut handle_frame, handle_timer);
 
         for rcv_end in [client_rcv_end, accepted_rcv_end] {
@@ -7789,7 +6769,7 @@ mod tests {
         // Verify that the client is connected to the IPv4 remote and has been
         // assigned an IPv4 local IP.
         let info = assert_matches!(
-            SocketHandler::get_info(net.core_ctx(LOCAL), &client),
+            net.with_context(LOCAL, |ctx| ctx.tcp_api().get_info(&client)),
             SocketInfo::Connection(info) => info
         );
         let (local_ip, remote_ip) = assert_matches!(

@@ -75,7 +75,7 @@ impl<A: IpAddress, Z> From<ZonedAddr<SpecifiedAddr<A>, Z>> for SocketZonedIpAddr
 /// addresses) are converted from their original IP version to their target IP
 /// version when entering the stack.
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
-pub(crate) struct SocketIpAddr<A: IpAddress>(NonMappedAddr<SpecifiedAddr<A>>);
+pub struct SocketIpAddr<A: IpAddress>(NonMappedAddr<SpecifiedAddr<A>>);
 
 impl<A: IpAddress> Display for SocketIpAddr<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -168,7 +168,7 @@ impl<A: IpAddress> AsRef<SpecifiedAddr<A>> for SocketIpAddr<A> {
 ///
 /// Perhaps the address was an ipv4-mapped-ipv6 addresses.
 #[derive(Debug)]
-pub(crate) struct AddrIsMappedError {}
+pub struct AddrIsMappedError {}
 
 impl<A: IpAddress> TryFrom<SpecifiedAddr<A>> for SocketIpAddr<A> {
     type Error = AddrIsMappedError;

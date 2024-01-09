@@ -242,18 +242,6 @@ pub mod sync {
 
 /// Methods for dealing with TCP sockets.
 pub mod tcp {
-    // Re-exported functions
-    //
-    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
-    // objects.
-    pub use crate::transport::tcp::socket::{
-        accept, bind, close, connect, create_socket, do_send, get_info, get_socket_error, listen,
-        receive_buffer_size, reuseaddr, send_buffer_size, set_device, set_receive_buffer_size,
-        set_reuseaddr, set_send_buffer_size, shutdown, with_info, with_socket_options,
-        with_socket_options_mut,
-    };
-
-    // Re-exported types.
     pub use crate::transport::tcp::{
         buffer::{
             Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,

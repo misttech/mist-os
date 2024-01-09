@@ -88,10 +88,9 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             })
         }
     }
-    let core_ctx = ctx.core_ctx();
     let mut visitor = DualIpVisitor::new();
-    tcp::with_info::<Ipv4, _, _>(core_ctx, &mut visitor);
-    tcp::with_info::<Ipv6, _, _>(core_ctx, &mut visitor);
+    ctx.api().tcp::<Ipv4>().with_info(&mut visitor);
+    ctx.api().tcp::<Ipv6>().with_info(&mut visitor);
 
     visitor.inspector
 }

@@ -11,7 +11,10 @@ use crate::{
     context::{BindingsContext, CounterContext},
     device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
     ip::icmp::IcmpBindingsContext,
-    transport::udp::{UdpCounters, UdpStateBindingsContext},
+    transport::{
+        tcp::socket::{TcpBindingsContext, TcpContext},
+        udp::{UdpCounters, UdpStateBindingsContext},
+    },
 };
 
 /// A marker for extensions to IP types.
@@ -40,12 +43,14 @@ impl<O> IpExt for O where
 pub trait CoreContext<I, BC>:
     crate::transport::udp::StateContext<I, BC>
     + CounterContext<UdpCounters<I>>
+    + TcpContext<I, BC>
     + crate::ip::icmp::socket::StateContext<I, BC>
     + crate::ip::icmp::IcmpStateContext
     + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
 where
     I: IpExt,
     BC: BindingsContext
+        + TcpBindingsContext<Self::WeakDeviceId>
         + UdpStateBindingsContext<I, Self::DeviceId>
         + IcmpBindingsContext<I, Self::DeviceId>,
 {
@@ -55,10 +60,12 @@ impl<I, BC, O> CoreContext<I, BC> for O
 where
     I: IpExt,
     BC: BindingsContext
+        + TcpBindingsContext<O::WeakDeviceId>
         + UdpStateBindingsContext<I, O::DeviceId>
         + IcmpBindingsContext<I, O::DeviceId>,
     O: crate::transport::udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
+        + TcpContext<I, BC>
         + crate::ip::icmp::socket::StateContext<I, BC>
         + crate::ip::icmp::IcmpStateContext
         + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>,

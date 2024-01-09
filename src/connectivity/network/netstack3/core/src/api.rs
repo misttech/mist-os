@@ -9,7 +9,7 @@ use net_types::ip::Ip;
 use crate::{
     context::{BindingsTypes, ContextProvider, CoreCtx, CtxPair},
     ip::icmp::socket::IcmpEchoSocketApi,
-    transport::udp::UdpApi,
+    transport::{tcp::socket::TcpApi, udp::UdpApi},
 };
 
 type CoreApiCtxPair<'a, BP> = CtxPair<CoreCtx<'a, <BP as ContextProvider>::Context, Unlocked>, BP>;
@@ -39,6 +39,12 @@ where
     pub fn icmp_echo<I: Ip>(self) -> IcmpEchoSocketApi<I, CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         IcmpEchoSocketApi::new(ctx)
+    }
+
+    /// Gets access to the TCP API for IP version `I`.
+    pub fn tcp<I: Ip>(self) -> TcpApi<I, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        TcpApi::new(ctx)
     }
 }
 
