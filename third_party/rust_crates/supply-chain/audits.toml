@@ -89,6 +89,11 @@ correctly, have large unsafe APIs with insufficient documentation, or perform
 many operations from safe code that could cause undefined behavior.
 """
 
+[[audits."0.7.11"]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-1"]
+version = "0.7.15"
+
 [[audits.aes]]
 who = "Joshua Liebow-Feeser <joshlf@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
