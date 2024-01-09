@@ -4,6 +4,8 @@
 
 #include "src/performance/trace_manager/tests/trace_manager_test.h"
 
+#include <lib/syslog/cpp/macros.h>
+
 #include <utility>
 
 namespace tracing {
