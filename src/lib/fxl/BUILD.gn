@@ -131,12 +131,9 @@ sdk_source_set("functional") {
 # Transitional target for things depending on the CLI
 # parts of fxl. Eventually CLI-specific functionality
 # will be removed from the main "fxl" target, and moved to this one.
-group("fxl_cli") {
-  public_deps = [ ":fxl" ]
-}
-
-sdk_source_set("fxl") {
+sdk_source_set("cli") {
   category = "internal"
+
   sources = [
     "command_line.cc",
     "command_line.h",
@@ -144,6 +141,20 @@ sdk_source_set("fxl") {
     "log_settings_command_line.h",
     "observer_list.h",
   ]
+
+  public_deps = [
+    ":fxl",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
+group("fxl_cli") {
+  public_deps = [ ":cli" ]
+}
+
+sdk_source_set("fxl") {
+  category = "internal"
+  sources = [ "observer_list.h" ]
 
   public_deps = [
     ":common",

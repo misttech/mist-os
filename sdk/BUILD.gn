@@ -577,6 +577,7 @@ sdk_molecule("platform_libs") {
     "//src/lib/containers/cpp:cpp_sdk",
     "//src/lib/diagnostics/accessor2logger:accessor2logger_sdk",
     "//src/lib/elflib:elflib_sdk",
+    "//src/lib/fxl:cli_sdk",
     "//src/lib/fxl:fxl_sdk",
     "//src/lib/process:process_sdk",
     "//third_party/re2:re2_sdk",

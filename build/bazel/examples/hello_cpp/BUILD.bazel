@@ -21,7 +21,7 @@ fuchsia_cc_binary(
     deps = [
         "@fuchsia_sdk//pkg/fdio",
         "@fuchsia_sdk//pkg/syslog",
-        "@internal_sdk//src/lib/fxl_fxl",
+        "@internal_sdk//src/lib/fxl_cli",
         "@internal_sdk//src/lib/files_files",
         "@internal_sdk//third_party/re2_re2",
         # the fidl libraries below are not effectively used in the hello world sample, they are here just to validate that
