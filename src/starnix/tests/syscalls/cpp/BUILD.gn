@@ -301,4 +301,13 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     ":extended_pstate_initial_state_child_resource",
     "//src/lib/testing/expectation:expectation_comparer",
   ]
+
+  test_specs = {
+    # TODO(fxbug.dev/319150842): GCE doesn't support Vulkan, so, for now, just disable all of these
+    # tests on GCE.
+    _env = basic_envs
+    _env += [ gce_env ]
+    _env -= [ gce_env ]
+    environments = _env
+  }
 }
