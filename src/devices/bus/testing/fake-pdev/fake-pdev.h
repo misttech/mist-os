@@ -78,6 +78,9 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
   void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override;
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   Config config_;
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;

@@ -127,6 +127,9 @@ class PlatformDevice : public PlatformDeviceType,
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
   void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override;
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Starts the underlying devmgr device.
   zx_status_t Start();

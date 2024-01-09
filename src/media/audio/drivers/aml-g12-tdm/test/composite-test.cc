@@ -106,6 +106,10 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
 
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {}
 
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
+
   void MapMmio() { ASSERT_OK(mapped_mmio_.Map(mmio_)); }
 
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {}

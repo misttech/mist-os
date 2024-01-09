@@ -129,6 +129,10 @@ void FakePDevFidl::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& c
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
+void FakePDevFidl::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {}
+
 }  // namespace fake_pdev
 
 zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,

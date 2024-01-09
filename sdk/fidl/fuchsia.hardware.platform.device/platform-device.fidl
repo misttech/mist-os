@@ -49,15 +49,15 @@ type Mmio = resource table {
 };
 
 @discoverable
-closed protocol Device {
+open protocol Device {
     /// Returns a memory mapped IO (MMIO) resource for the given |index|.
-    strict GetMmio(struct {
+    flexible GetMmio(struct {
         index uint32;
     }) -> (Mmio) error zx.Status;
 
     /// Returns an interrupt handle for the given |index|.
     /// |flags| is forwarded as the |options| parameter to `zx_interrupt_create`.
-    strict GetInterrupt(struct {
+    flexible GetInterrupt(struct {
         index uint32;
         flags uint32;
     }) -> (resource struct {
@@ -65,29 +65,29 @@ closed protocol Device {
     }) error zx.Status;
 
     /// Returns an bus transaction initiator (bti) handle for the given |index|.
-    strict GetBti(struct {
+    flexible GetBti(struct {
         index uint32;
     }) -> (resource struct {
         bti zx.Handle:BTI;
     }) error zx.Status;
 
     /// Returns an secure monitor call (smc) handle for the given |index|.
-    strict GetSmc(struct {
+    flexible GetSmc(struct {
         index uint32;
     }) -> (resource struct {
         smc zx.Handle:RESOURCE;
     }) error zx.Status;
 
     /// Returns power configuration for the device the driver has bound to.
-    strict GetPowerConfiguration() -> (struct {
+    flexible GetPowerConfiguration() -> (struct {
         config vector<fuchsia.hardware.power.PowerElementConfiguration>:32;
     }) error zx.Status;
 
     /// Returns information about the device the driver has bound to.
-    strict GetDeviceInfo() -> (DeviceInfo) error zx.Status;
+    flexible GetDeviceInfo() -> (DeviceInfo) error zx.Status;
 
     /// Return information about the board the device is attached to.
-    strict GetBoardInfo() -> (BoardInfo) error zx.Status;
+    flexible GetBoardInfo() -> (BoardInfo) error zx.Status;
 };
 
 service Service {

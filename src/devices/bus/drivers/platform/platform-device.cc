@@ -840,4 +840,11 @@ void PlatformDevice::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
   }
 }
 
+void PlatformDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(WARNING, "PlatformDevice received unknown method with ordinal: %lu",
+         metadata.method_ordinal);
+}
+
 }  // namespace platform_bus
