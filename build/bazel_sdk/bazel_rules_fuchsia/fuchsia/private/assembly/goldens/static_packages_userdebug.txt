@@ -13,6 +13,7 @@
 ?bt-init
 ?bt-rfcomm
 ?bt-snoop
+?build-info
 ?build-info-service
 ?cache_manager
 ?camera_device
@@ -20,8 +21,11 @@
 ?cobalt
 ?cobalt_system_metrics
 ?codec_factory
+?config-data
+?core
 ?dhcpv4-server
 ?dhcpv6-client
+?diagnostics
 ?diagnostics-kcounter
 ?diagnostics-persistence
 ?display-coordinator-connector
@@ -53,6 +57,7 @@
 ?netstack
 ?netstack-migration
 ?netstack3
+?network
 ?network-tun
 ?omaha-client
 ?overnet-usb-package
@@ -68,9 +73,11 @@
 ?sampler
 ?scene_manager
 ?scenic
+?sensor-config
 ?sensors
 ?session_manager
 ?setui_service
+?shell-commands
 ?sl4f
 ?snapshot
 ?soundplayer
@@ -82,10 +89,13 @@
 ?sysmem_connector
 ?system-update-committer
 ?system-update-configurator
+?system-update-realm
 ?system-updater
+?system_image
 ?text_manager
 ?time-zone-info-service
 ?timekeeper
+?toolbox
 ?triage-detect
 ?tzdata-provider
 ?ui
