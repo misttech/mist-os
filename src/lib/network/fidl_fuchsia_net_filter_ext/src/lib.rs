@@ -11,6 +11,7 @@
 //! is evolved in order to enforce that it is updated along with the FIDL
 //! library itself.
 
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use fidl::marker::SourceBreaking;
@@ -989,14 +990,33 @@ pub enum GetExistingResourcesError {
     /// `idle` events are expected.
     #[error("there was an unexpected event in the event stream: {0:?}")]
     UnexpectedEvent(Event),
+    /// A duplicate existing resource was reported in the event stream.
+    #[error("a duplicate existing resource was reported")]
+    DuplicateResource(Resource),
     /// The event stream unexpectedly ended.
     #[error("the event stream unexpectedly ended")]
     StreamEnded,
 }
 
+/// A trait for types holding filtering state that can be updated by change
+/// events.
+pub trait Update {
+    /// Add the resource to the specified controller's state.
+    ///
+    /// Optionally returns a resource that has already been added to the
+    /// controller with the same [`ResourceId`].
+    fn add(&mut self, controller: ControllerId, resource: Resource) -> Option<Resource>;
+}
+
+impl Update for HashMap<ControllerId, HashMap<ResourceId, Resource>> {
+    fn add(&mut self, controller: ControllerId, resource: Resource) -> Option<Resource> {
+        self.entry(controller).or_default().insert(resource.id(), resource)
+    }
+}
+
 /// Collects all `existing` events from the stream, stopping once the `idle`
 /// event is observed.
-pub async fn get_existing_resources<C: Extend<(ControllerId, Resource)> + Default>(
+pub async fn get_existing_resources<C: Update + Default>(
     stream: impl Stream<Item = Result<Event, WatchError>>,
 ) -> Result<C, GetExistingResourcesError> {
     use async_utils::fold::FoldWhile;
@@ -1011,8 +1031,13 @@ pub async fn get_existing_resources<C: Extend<(ControllerId, Resource)> + Defaul
                 Err(e) => FoldWhile::Done(Err(GetExistingResourcesError::ErrorInStream(e))),
                 Ok(e) => match e {
                     Event::Existing(controller, resource) => {
-                        resources.extend(std::iter::once((controller, resource)));
-                        FoldWhile::Continue(Ok(resources))
+                        if let Some(resource) = resources.add(controller, resource) {
+                            FoldWhile::Done(Err(GetExistingResourcesError::DuplicateResource(
+                                resource,
+                            )))
+                        } else {
+                            FoldWhile::Continue(Ok(resources))
+                        }
                     }
                     Event::Idle => FoldWhile::Done(Ok(resources)),
                     e @ (Event::Added(_, _) | Event::Removed(_, _) | Event::EndOfUpdate) => {
@@ -1829,8 +1854,8 @@ mod tests {
         assert_eq!(
             existing,
             HashMap::from([
-                (test_controller_a(), test_resource()),
-                (test_controller_b(), test_resource())
+                (test_controller_a(), HashMap::from([(test_resource_id(), test_resource())])),
+                (test_controller_b(), HashMap::from([(test_resource_id(), test_resource())])),
             ])
         );
 
@@ -1848,7 +1873,7 @@ mod tests {
             futures::stream::once(futures::future::ready(Err(WatchError::EmptyEventBatch)));
         futures::pin_mut!(event_stream);
         assert_matches!(
-            get_existing_resources::<Vec<_>>(event_stream).await,
+            get_existing_resources::<HashMap<_, _>>(event_stream).await,
             Err(GetExistingResourcesError::ErrorInStream(WatchError::EmptyEventBatch))
         )
     }
@@ -1858,8 +1883,22 @@ mod tests {
         let event_stream = futures::stream::once(futures::future::ready(Ok(Event::EndOfUpdate)));
         futures::pin_mut!(event_stream);
         assert_matches!(
-            get_existing_resources::<Vec<_>>(event_stream).await,
+            get_existing_resources::<HashMap<_, _>>(event_stream).await,
             Err(GetExistingResourcesError::UnexpectedEvent(Event::EndOfUpdate))
+        )
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn get_existing_resources_duplicate_resource() {
+        let event_stream = futures::stream::iter([
+            Ok(Event::Existing(test_controller_a(), test_resource())),
+            Ok(Event::Existing(test_controller_a(), test_resource())),
+        ]);
+        futures::pin_mut!(event_stream);
+        assert_matches!(
+            get_existing_resources::<HashMap<_, _>>(event_stream).await,
+            Err(GetExistingResourcesError::DuplicateResource(resource))
+                if resource == test_resource()
         )
     }
 
@@ -1871,7 +1910,7 @@ mod tests {
         ))));
         futures::pin_mut!(event_stream);
         assert_matches!(
-            get_existing_resources::<Vec<_>>(event_stream).await,
+            get_existing_resources::<HashMap<_, _>>(event_stream).await,
             Err(GetExistingResourcesError::StreamEnded)
         )
     }

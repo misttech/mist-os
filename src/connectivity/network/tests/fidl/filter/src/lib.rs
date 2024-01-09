@@ -17,6 +17,82 @@ use netstack_testing_common::{
 use netstack_testing_macros::netstack_test;
 use std::collections::{HashMap, HashSet};
 
+trait TestValue {
+    fn test_value() -> Self;
+}
+
+impl TestValue for fnet_filter_ext::ResourceId {
+    fn test_value() -> Self {
+        fnet_filter_ext::ResourceId::Namespace(fnet_filter_ext::NamespaceId::test_value())
+    }
+}
+
+impl TestValue for fnet_filter_ext::Resource {
+    fn test_value() -> Self {
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value())
+    }
+}
+
+impl TestValue for fnet_filter_ext::NamespaceId {
+    fn test_value() -> Self {
+        fnet_filter_ext::NamespaceId("NAMESPACE_ID".to_owned())
+    }
+}
+
+impl TestValue for fnet_filter_ext::Namespace {
+    fn test_value() -> Self {
+        fnet_filter_ext::Namespace {
+            id: fnet_filter_ext::NamespaceId::test_value(),
+            domain: fnet_filter_ext::Domain::AllIp,
+        }
+    }
+}
+
+impl TestValue for fnet_filter_ext::RoutineId {
+    fn test_value() -> Self {
+        fnet_filter_ext::RoutineId {
+            namespace: fnet_filter_ext::NamespaceId::test_value(),
+            name: String::from("ingress"),
+        }
+    }
+}
+
+impl TestValue for fnet_filter_ext::Routine {
+    fn test_value() -> Self {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId::test_value(),
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Ingress,
+                    priority: 0,
+                },
+            )),
+        }
+    }
+}
+
+impl TestValue for fnet_filter_ext::Rule {
+    fn test_value() -> Self {
+        fnet_filter_ext::Rule {
+            id: fnet_filter_ext::RuleId {
+                routine: fnet_filter_ext::RoutineId::test_value(),
+                index: 0,
+            },
+            matchers: fnet_filter_ext::Matchers {
+                transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                    src_port: None,
+                    dst_port: Some(
+                        fnet_filter_ext::PortMatcher::new(22, 22, /* invert */ false)
+                            .expect("valid port range"),
+                    ),
+                }),
+                ..Default::default()
+            },
+            action: fnet_filter_ext::Action::Drop,
+        }
+    }
+}
+
 #[netstack_test]
 async fn watcher_existing(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -29,9 +105,9 @@ async fn watcher_existing(name: &str) {
         let stream = fnet_filter_ext::event_stream_from_state(state.clone())
             .expect("get filter event stream");
         futures::pin_mut!(stream);
-        let observed: Vec<_> =
+        let observed: HashMap<_, _> =
             fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
-        assert_eq!(observed, Vec::new());
+        assert_eq!(observed, HashMap::new());
     }
 
     let control =
@@ -41,10 +117,11 @@ async fn watcher_existing(name: &str) {
             .await
             .expect("create controller");
 
-    let resources = [fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
-        id: fnet_filter_ext::NamespaceId("NAMESPACE_ID".to_owned()),
-        domain: fnet_filter_ext::Domain::AllIp,
-    })];
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine::test_value()),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule::test_value()),
+    ];
     controller
         .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
         .await
@@ -53,14 +130,17 @@ async fn watcher_existing(name: &str) {
 
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
     futures::pin_mut!(stream);
-    let observed: HashMap<fnet_filter_ext::ControllerId, fnet_filter_ext::Resource> =
+    let observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
     assert_eq!(
         observed,
-        resources
-            .into_iter()
-            .map(|resource| (controller.id().clone(), resource))
-            .collect::<HashMap<_, _>>()
+        HashMap::from([(
+            controller.id().clone(),
+            resources
+                .into_iter()
+                .map(|resource| (resource.id(), resource))
+                .collect::<HashMap<_, _>>(),
+        )])
     );
 }
 
@@ -84,37 +164,11 @@ async fn watcher_observe_updates(name: &str) {
         fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
             .await
             .expect("create controller");
-    let namespace = fnet_filter_ext::NamespaceId(String::from("test"));
-    let routine =
-        fnet_filter_ext::RoutineId { namespace: namespace.clone(), name: String::from("ingress") };
+
     let resources = [
-        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
-            id: namespace.clone(),
-            domain: fnet_filter_ext::Domain::AllIp,
-        }),
-        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
-            id: routine.clone(),
-            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
-                fnet_filter_ext::InstalledIpRoutine {
-                    hook: fnet_filter_ext::IpHook::Ingress,
-                    priority: 0,
-                },
-            )),
-        }),
-        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { routine, index: 0 },
-            matchers: fnet_filter_ext::Matchers {
-                transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                    src_port: None,
-                    dst_port: Some(
-                        fnet_filter_ext::PortMatcher::new(22, 22, /* invert */ false)
-                            .expect("valid port range"),
-                    ),
-                }),
-                ..Default::default()
-            },
-            action: fnet_filter_ext::Action::Drop,
-        }),
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine::test_value()),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule::test_value()),
     ];
     controller
         .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
@@ -171,7 +225,7 @@ async fn watcher_observe_updates(name: &str) {
 }
 
 #[netstack_test]
-async fn watcher_events_scoped_to_controllers(name: &str) {
+async fn resources_and_events_scoped_to_controllers(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
 
@@ -186,10 +240,6 @@ async fn watcher_events_scoped_to_controllers(name: &str) {
 
     let control =
         realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
-    let namespace = fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
-        id: fnet_filter_ext::NamespaceId(String::from("test")),
-        domain: fnet_filter_ext::Domain::AllIp,
-    });
     let create_controller_and_commit_updates = |name: &'static str| async {
         let mut controller = fnet_filter_ext::Controller::new(
             &control,
@@ -198,7 +248,9 @@ async fn watcher_events_scoped_to_controllers(name: &str) {
         .await
         .expect("create controller");
         controller
-            .push_changes(vec![fnet_filter_ext::Change::Create(namespace.clone())])
+            .push_changes(vec![fnet_filter_ext::Change::Create(
+                fnet_filter_ext::Resource::test_value(),
+            )])
             .await
             .expect("push changes");
         controller.commit().await.expect("commit pending changes");
@@ -222,7 +274,7 @@ async fn watcher_events_scoped_to_controllers(name: &str) {
             "added resources should be broadcast to watcher"
         );
         assert!(expected_controllers.remove(id.as_str()));
-        assert_eq!(added_resource, namespace);
+        assert_eq!(added_resource, fnet_filter_ext::Resource::test_value());
         assert_matches!(
             stream.next().await,
             Some(Ok(fnet_filter_ext::Event::EndOfUpdate)),
@@ -278,13 +330,9 @@ async fn watcher_channel_closed_if_not_polled(name: &str) {
     .expect("create controller");
 
     async fn create_and_remove_namespace(controller: &mut fnet_filter_ext::Controller) {
-        const NAMESPACE_ID: &str = "namespace";
         controller
             .push_changes(vec![fnet_filter_ext::Change::Create(
-                fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
-                    id: fnet_filter_ext::NamespaceId(NAMESPACE_ID.to_owned()),
-                    domain: fnet_filter_ext::Domain::AllIp,
-                }),
+                fnet_filter_ext::Resource::test_value(),
             )])
             .await
             .expect("push changes");
@@ -292,9 +340,7 @@ async fn watcher_channel_closed_if_not_polled(name: &str) {
 
         controller
             .push_changes(vec![fnet_filter_ext::Change::Remove(
-                fnet_filter_ext::ResourceId::Namespace(fnet_filter_ext::NamespaceId(
-                    NAMESPACE_ID.to_owned(),
-                )),
+                fnet_filter_ext::ResourceId::test_value(),
             )])
             .await
             .expect("push changes");
@@ -340,10 +386,7 @@ async fn on_id_assigned(name: &str) {
 
     // Add a resource with the first controller and initialize a watcher so that
     // we'll be able to observe its removal.
-    let resource = fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
-        id: fnet_filter_ext::NamespaceId("NAMESPACE_ID".to_owned()),
-        domain: fnet_filter_ext::Domain::AllIp,
-    });
+    let resource = fnet_filter_ext::Resource::test_value();
     controller
         .push_changes(vec![fnet_filter_ext::Change::Create(resource.clone())])
         .await
@@ -353,9 +396,15 @@ async fn on_id_assigned(name: &str) {
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
     futures::pin_mut!(stream);
-    let observed: HashMap<fnet_filter_ext::ControllerId, fnet_filter_ext::Resource> =
+    let observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
-    assert_eq!(observed, HashMap::from([(controller.id().clone(), resource.clone())]));
+    assert_eq!(
+        observed,
+        HashMap::from([(
+            controller.id().clone(),
+            HashMap::from([(resource.id(), resource.clone())])
+        )])
+    );
 
     // If the first controller is closed, its ID can be reused.
     //
