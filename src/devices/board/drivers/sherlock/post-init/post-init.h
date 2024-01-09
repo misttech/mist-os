@@ -8,6 +8,9 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/inspect/component/cpp/component.h>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/stdcompat/span.h>
 
 namespace sherlock {
@@ -34,6 +37,7 @@ class PostInit : public fdf::DriverBase {
   zx::result<> SetBoardInfo();
   zx::result<> InitDisplay();
   zx::result<> InitTouch();
+  zx::result<> SetInspectProperties();
 
   // Constructs a number using the value of each GPIO as one bit. The order of elements in
   // node_names determines the bits set in the result from LSB to MSB.
@@ -48,6 +52,14 @@ class PostInit : public fdf::DriverBase {
   uint8_t board_option_{};
   uint8_t display_vendor_{};
   uint8_t ddic_version_{};
+
+  std::unique_ptr<inspect::ComponentInspector> component_inspector_;
+
+  inspect::Inspector inspector_;
+  inspect::Node root_;
+  inspect::UintProperty board_rev_property_;
+  inspect::UintProperty board_option_property_;
+  inspect::UintProperty display_id_property_;
 };
 
 }  // namespace sherlock

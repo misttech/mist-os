@@ -32,6 +32,7 @@ fuchsia_driver("post-init-driver") {
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/stdcompat",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia:fuchsia_cpp",

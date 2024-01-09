@@ -70,6 +70,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
     return completer(result.take_error());
   }
 
+  if (zx::result result = SetInspectProperties(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   auto result = parent_->AddChild({std::move(args), std::move(controller_endpoints->server), {}});
   if (result.is_error()) {
     if (result.error_value().is_framework_error()) {
@@ -215,6 +219,27 @@ zx::result<uint8_t> PostInit::ReadGpios(cpp20::span<const char* const> node_name
   }
 
   return zx::ok(value);
+}
+
+zx::result<> PostInit::SetInspectProperties() {
+  auto inspect_sink = incoming()->Connect<fuchsia_inspect::InspectSink>();
+  if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
+    FDF_LOG(ERROR, "Failed to connect to InspectSink: %s", inspect_sink.status_string());
+    return inspect_sink.take_error();
+  }
+
+  component_inspector_ = std::make_unique<inspect::ComponentInspector>(
+      dispatcher(), inspect::PublishOptions{.inspector = inspector_,
+                                            .client_end = std::move(inspect_sink.value())});
+
+  root_ = inspector_.GetRoot().CreateChild("sherlock_board_driver");
+  board_rev_property_ = root_.CreateUint("board_build", board_build_);
+  board_option_property_ = root_.CreateUint("board_option", board_option_);
+  // PANEL_DETECT -> DISP_SOC_ID1
+  // DDIC_DETECT -> DISP_SOC_ID2
+  display_id_property_ = root_.CreateUint("display_id", display_vendor_ | (ddic_version_ << 1));
+
+  return zx::ok();
 }
 
 }  // namespace sherlock

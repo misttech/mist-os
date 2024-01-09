@@ -11,7 +11,6 @@
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/inspect/cpp/inspect.h>
 #include <zircon/types.h>
 
 #include <ddktl/device.h>
@@ -138,12 +137,6 @@ class Sherlock : public SherlockType {
   std::optional<uint8_t> board_option_;
   std::optional<uint8_t> display_vendor_;
   std::optional<uint8_t> ddic_version_;
-
-  inspect::Inspector inspector_;
-  inspect::Node root_;
-  inspect::UintProperty board_rev_property_;
-  inspect::UintProperty board_option_property_;
-  inspect::UintProperty display_id_property_;
 
   fdf::OutgoingDirectory outgoing_;
 };

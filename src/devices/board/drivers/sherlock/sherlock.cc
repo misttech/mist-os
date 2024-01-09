@@ -5,7 +5,6 @@
 #include "src/devices/board/drivers/sherlock/sherlock.h"
 
 #include <assert.h>
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
@@ -33,7 +32,6 @@
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
-namespace fhgpio = fuchsia_hardware_gpio;
 
 zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
   iommu_protocol_t iommu;
@@ -97,8 +95,7 @@ zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
   status = board->DdkAdd(ddk::DeviceAddArgs("sherlock")
                              .set_props(kBoardDriverProps)
                              .set_outgoing_dir(directory_endpoints->client.TakeChannel())
-                             .set_runtime_service_offers(fidl_service_offers)
-                             .set_inspect_vmo(board->inspector_.DuplicateVmo()));
+                             .set_runtime_service_offers(fidl_service_offers));
   if (status != ZX_OK) {
     return status;
   }
@@ -106,60 +103,6 @@ zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
   // devmgr is now in charge of the device.
   [[maybe_unused]] auto* dummy = board.release();
   return ZX_OK;
-}
-
-uint8_t Sherlock::GetBoardRev() {
-  if (!board_rev_) {
-    uint8_t id0, id1, id2;
-
-    gpio_impl_.ConfigIn(GPIO_HW_ID0, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.ConfigIn(GPIO_HW_ID1, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.ConfigIn(GPIO_HW_ID2, static_cast<uint32_t>(fhgpio::GpioFlags::kNoPull));
-    gpio_impl_.Read(GPIO_HW_ID0, &id0);
-    gpio_impl_.Read(GPIO_HW_ID1, &id1);
-    gpio_impl_.Read(GPIO_HW_ID2, &id2);
-
-    board_rev_.emplace(id0 | (id1 << 1) | (id2 << 2));
-  }
-
-  return *board_rev_;
-}
-
-uint8_t Sherlock::GetBoardOption() {
-  if (!board_option_) {
-    uint8_t id3, id4;
-
-    gpio_impl_.ConfigIn(GPIO_HW_ID3, GPIO_NO_PULL);
-    gpio_impl_.ConfigIn(GPIO_HW_ID4, GPIO_NO_PULL);
-    gpio_impl_.Read(GPIO_HW_ID3, &id3);
-    gpio_impl_.Read(GPIO_HW_ID4, &id4);
-
-    board_option_.emplace(id3 | (id4 << 1));
-  }
-
-  return *board_option_;
-}
-
-uint8_t Sherlock::GetDisplayVendor() {
-  if (!display_vendor_) {
-    uint8_t value;
-    gpio_impl_.ConfigIn(GPIO_PANEL_DETECT, GPIO_NO_PULL);
-    gpio_impl_.Read(GPIO_PANEL_DETECT, &value);
-    display_vendor_.emplace(value);
-  }
-
-  return *display_vendor_;
-}
-
-uint8_t Sherlock::GetDdicVersion() {
-  if (!ddic_version_) {
-    uint8_t value;
-    gpio_impl_.ConfigIn(GPIO_DDIC_DETECT, GPIO_NO_PULL);
-    gpio_impl_.Read(GPIO_DDIC_DETECT, &value);
-    ddic_version_.emplace(value);
-  }
-
-  return *ddic_version_;
 }
 
 int Sherlock::Start() {
@@ -220,11 +163,6 @@ int Sherlock::Start() {
     zxlogf(ERROR, "GpioInit() failed");
     return -1;
   }
-
-  // GPIO C is managed by a separate driver instance, so these fields need to be populated before
-  // any of its client devices are added.
-  GetBoardRev();
-  GetBoardOption();
 
   if (AddPostInitDevice() != ZX_OK) {
     zxlogf(ERROR, "AddPostInitDevice() failed");
@@ -308,14 +246,6 @@ int Sherlock::Start() {
   if (ThermistorInit() != ZX_OK) {
     zxlogf(ERROR, "ThermistorInit failed");
   }
-
-  root_ = inspector_.GetRoot().CreateChild("sherlock_board_driver");
-  board_rev_property_ = root_.CreateUint("board_build", GetBoardRev());
-  board_option_property_ = root_.CreateUint("board_option", GetBoardOption());
-  // PANEL_DETECT -> DISP_SOC_ID1
-  // DDIC_DETECT -> DISP_SOC_ID2
-  display_id_property_ =
-      root_.CreateUint("display_id", GetDisplayVendor() | (GetDdicVersion() << 1));
 
   ZX_ASSERT_MSG(clock_init_steps_.empty(), "Clock init steps added but not applied");
 

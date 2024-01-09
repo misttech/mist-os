@@ -55,9 +55,6 @@ enum {
 namespace nelson {
 
 void PostInit::Start(fdf::StartCompleter completer) {
-  component_inspector_ = std::make_unique<inspect::ComponentInspector>(
-      dispatcher(), inspect::PublishOptions{.inspector = inspector_});
-
   parent_.Bind(std::move(node()));
 
   zx::result pbus =
@@ -158,6 +155,15 @@ zx::result<> PostInit::InitBoardInfo() {
 }
 
 zx::result<> PostInit::SetInspectProperties() {
+  auto inspect_sink = incoming()->Connect<fuchsia_inspect::InspectSink>();
+  if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
+    FDF_LOG(ERROR, "Failed to connect to InspectSink: %s", inspect_sink.status_string());
+    return inspect_sink.take_error();
+  }
+
+  component_inspector_ = std::make_unique<inspect::ComponentInspector>(
+      dispatcher(), inspect::PublishOptions{.inspector = inspector_});
+
   root_ = inspector_.GetRoot().CreateChild("nelson_board_driver");
   board_build_property_ = root_.CreateUint("board_build", board_build_);
   board_option_property_ = root_.CreateUint("board_option", board_option_);
