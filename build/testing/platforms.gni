@@ -103,18 +103,6 @@ test_platforms = [
     device_type = "Astro"
   },
   {
-    testbed = "bt_sherlock_sherlock"
-    cpu = "arm64"
-    pool = "fuchsia.tests.bluetooth"
-    device_type = "Sherlock"
-  },
-  {
-    testbed = "bt_vim3_vim3"
-    cpu = "arm64"
-    pool = "fuchsia.tests.bluetooth"
-    device_type = "Vim3"
-  },
-  {
     testbed = "bt_rf_chamber_nuc_phone"
     cpu = "x64"
     pool = "fuchsia.tests.connectivity"
