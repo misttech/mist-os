@@ -428,8 +428,7 @@ mod tests {
         let data = vec![0u8; tx_bytes_to_use];
         assert_eq!(tx_bytes_to_use, local.write(&data).expect("failed to write to socket"));
 
-        let async_local =
-            fasync::Socket::from_socket(local).expect("failed to create async socket");
+        let async_local = fasync::Socket::from_socket(local);
 
         // Use a mock tx_count, which is normally incremented when the guest transfers data to the
         // device. This is a running total of bytes received by the device, and the difference
@@ -455,8 +454,7 @@ mod tests {
         let data = vec![0u8; max_tx_bytes];
         assert_eq!(max_tx_bytes, local.write(&data).expect("failed to write to socket"));
 
-        let async_local =
-            fasync::Socket::from_socket(local).expect("failed to create async socket");
+        let async_local = fasync::Socket::from_socket(local);
 
         // The tx_count being equal to the bytes pending on the socket means that no data has been
         // actually transferred to the client.
@@ -502,8 +500,7 @@ mod tests {
         let (_remote, local) = zx::Socket::create_stream();
 
         let max_tx_bytes = local.info().unwrap().tx_buf_max;
-        let async_local =
-            fasync::Socket::from_socket(local).expect("failed to create async socket");
+        let async_local = fasync::Socket::from_socket(local);
 
         credit.increment_tx_count(u32::MAX - 5);
         let mut header = VirtioVsockHeader::default();

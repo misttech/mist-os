@@ -163,7 +163,7 @@ mod tests {
         let async_channel = fasync::Channel::from_channel(rxc).expect("unable to unwrap");
 
         let (txs, rxs) = zx::Socket::create_stream();
-        let async_socket = fasync::Socket::from_socket(rxs).unwrap();
+        let async_socket = fasync::Socket::from_socket(rxs);
 
         let fut = Box::pin(super::run_rootcanal(async_socket, async_channel).fuse());
         pin_mut!(fut);

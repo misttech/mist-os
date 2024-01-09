@@ -30,37 +30,33 @@ async fn exec_server() -> Result<(), Error> {
         move |socket| {
             let router = Arc::clone(&router);
             fasync::Task::spawn(async move {
-                match fidl::AsyncSocket::from_socket(socket) {
-                    Ok(socket) => {
-                        let (mut rx, mut tx) = socket.split();
-                        let (errors_sender, errors) = unbounded();
-                        if let Err(e) = futures::future::join(
-                            circuit::multi_stream::multi_stream_node_connection_to_async(
-                                router.circuit_node(),
-                                &mut rx,
-                                &mut tx,
-                                true,
-                                circuit::Quality::NETWORK,
-                                errors_sender,
-                                "client".to_owned(),
-                            ),
-                            errors
-                                .map(|e| {
-                                    tracing::warn!("A client circuit stream failed: {e:?}");
-                                })
-                                .collect::<()>(),
-                        )
-                        .map(|(result, ())| result)
-                        .await
-                        {
-                            if let circuit::Error::ConnectionClosed(msg) = e {
-                                debug!("Overnet link closed: {:?}", msg);
-                            } else {
-                                error!("Error handling Overnet link: {:?}", e);
-                            }
-                        }
+                let socket = fidl::AsyncSocket::from_socket(socket);
+                let (mut rx, mut tx) = socket.split();
+                let (errors_sender, errors) = unbounded();
+                if let Err(e) = futures::future::join(
+                    circuit::multi_stream::multi_stream_node_connection_to_async(
+                        router.circuit_node(),
+                        &mut rx,
+                        &mut tx,
+                        true,
+                        circuit::Quality::NETWORK,
+                        errors_sender,
+                        "client".to_owned(),
+                    ),
+                    errors
+                        .map(|e| {
+                            tracing::warn!("A client circuit stream failed: {e:?}");
+                        })
+                        .collect::<()>(),
+                )
+                .map(|(result, ())| result)
+                .await
+                {
+                    if let circuit::Error::ConnectionClosed(msg) = e {
+                        debug!("Overnet link closed: {:?}", msg);
+                    } else {
+                        error!("Error handling Overnet link: {:?}", e);
                     }
-                    Err(e) => error!("Could not handle incoming link socket: {:?}", e),
                 }
             })
             .detach();

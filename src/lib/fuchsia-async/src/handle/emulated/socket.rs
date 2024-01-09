@@ -38,8 +38,8 @@ impl std::fmt::Debug for Socket {
 
 impl Socket {
     /// Construct an `Socket` from an existing `emulated_handle::Socket`
-    pub fn from_socket(socket: super::Socket) -> std::io::Result<Socket> {
-        Ok(Socket { socket })
+    pub fn from_socket(socket: super::Socket) -> Self {
+        Socket { socket }
     }
 
     /// Convert AsyncSocket back into a regular socket
@@ -226,8 +226,7 @@ mod test {
     fn async_socket_write_read() {
         block_on(async move {
             let (a, b) = Socket::create_stream();
-            let (mut a, mut b) =
-                (AsyncSocket::from_socket(a).unwrap(), AsyncSocket::from_socket(b).unwrap());
+            let (mut a, mut b) = (AsyncSocket::from_socket(a), AsyncSocket::from_socket(b));
             let mut buf = [0u8; 128];
 
             let mut cx = Context::from_waker(noop_waker_ref());

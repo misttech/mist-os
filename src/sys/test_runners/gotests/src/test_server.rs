@@ -228,12 +228,10 @@ impl TestServer {
             )
             .map_err(RunTestError::SendStart)?;
 
-        let test_stdout =
-            fasync::Socket::from_socket(test_stdout).map_err(KernelError::SocketToAsync).unwrap();
+        let test_stdout = fasync::Socket::from_socket(test_stdout);
         let mut test_stdout = SocketLogWriter::new(test_stdout);
 
-        let test_stderr =
-            fasync::Socket::from_socket(test_stderr).map_err(KernelError::SocketToAsync).unwrap();
+        let test_stderr = fasync::Socket::from_socket(test_stderr);
         let mut test_stderr = SocketLogWriter::new(test_stderr);
 
         if let Err(e) = TestServer::validate_args(&user_passed_args) {

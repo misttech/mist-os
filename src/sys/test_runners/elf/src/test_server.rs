@@ -137,12 +137,8 @@ where
                 listener,
             )
             .map_err(RunTestError::SendStart)?;
-        let mut test_stdout = SocketLogWriter::new(
-            fasync::Socket::from_socket(test_stdout).map_err(KernelError::SocketToAsync).unwrap(),
-        );
-        let mut test_stderr = SocketLogWriter::new(
-            fasync::Socket::from_socket(test_stderr).map_err(KernelError::SocketToAsync).unwrap(),
-        );
+        let mut test_stdout = SocketLogWriter::new(fasync::Socket::from_socket(test_stdout));
+        let mut test_stderr = SocketLogWriter::new(fasync::Socket::from_socket(test_stderr));
 
         let mut args = component.args.clone();
         if let Some(user_args) = &run_options.arguments {

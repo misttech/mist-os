@@ -151,6 +151,10 @@ where
 {
     /// Creates a new `RWHandle` object which will receive notifications when
     /// the underlying handle becomes readable, writable, or closes.
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
     pub fn new(handle: T) -> Self {
         let ehandle = EHandle::local();
 

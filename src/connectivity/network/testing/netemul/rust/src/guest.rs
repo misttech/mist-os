@@ -172,10 +172,8 @@ impl Controller {
             )
             .with_context(|| format!("execute_command FIDL error for guest {}", self.name))?;
 
-        let mut async_stdout = fuchsia_async::Socket::from_socket(stdout_local)
-            .context("failed to convert stdout to async")?;
-        let mut async_stderr = fuchsia_async::Socket::from_socket(stderr_local)
-            .context("failed to convert stderr to async")?;
+        let mut async_stdout = fuchsia_async::Socket::from_socket(stdout_local);
+        let mut async_stderr = fuchsia_async::Socket::from_socket(stderr_local);
 
         let mut stdout_buf = Vec::new();
         let mut stderr_buf = Vec::new();

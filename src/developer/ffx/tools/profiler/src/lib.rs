@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 mod args;
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
 use errors::{ffx_bail, ffx_error};
@@ -81,7 +81,7 @@ pub async fn profiler(
             };
 
             let (client, server) = fidl::Socket::create_stream();
-            let client = fidl::AsyncSocket::from_socket(client).context("making async socket")?;
+            let client = fidl::AsyncSocket::from_socket(client);
             let controller = controller.await?;
             controller
                 .configure(profiler::SessionConfigureRequest {

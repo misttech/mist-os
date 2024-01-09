@@ -94,7 +94,7 @@ impl LoggerStream {
     /// Create a LoggerStream from the provided zx::Socket. The `socket` object
     /// should be bound to its intented source stream (e.g. "stdout").
     pub fn new(socket: zx::Socket) -> Result<LoggerStream, zx::Status> {
-        let l = LoggerStream { socket: fasync::Socket::from_socket(socket)? };
+        let l = LoggerStream { socket: fasync::Socket::from_socket(socket) };
         Ok(l)
     }
 
@@ -176,7 +176,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn log_writer_reader_work() {
         let (sock1, sock2) = zx::Socket::create_stream();
-        let mut log_writer = SocketLogWriter::new(fasync::Socket::from_socket(sock1).unwrap());
+        let mut log_writer = SocketLogWriter::new(fasync::Socket::from_socket(sock1));
 
         let reader = LoggerStream::new(sock2).unwrap();
         let reader = LogStreamReader::new(reader);
@@ -261,8 +261,7 @@ mod tests {
 
                 // Write last byte and convert zx::Socket back to fasync::Socket.
                 let () = write_to_socket(&tx, &msg[SOCKET_BUFFER_SIZE - 1..SOCKET_BUFFER_SIZE])?;
-                let mut rx = fasync::Socket::from_socket(rx)
-                    .context("Failed to convert to fasync::Socket")?;
+                let mut rx = fasync::Socket::from_socket(rx);
                 let bytes_read =
                     rx.read(&mut buffer).await.context("Failed to read from socket")?;
                 let msg_written = std::str::from_utf8(&buffer).context("Failed to parse bytes")?;
@@ -320,10 +319,8 @@ mod tests {
 
     fn create_datagram_logger() -> Result<(SocketLogWriter, fasync::Socket), Error> {
         let (tx, rx) = zx::Socket::create_datagram();
-        let logger = SocketLogWriter::new(
-            fasync::Socket::from_socket(tx).context("Failed to create fasync::Socket")?,
-        );
-        let rx = fasync::Socket::from_socket(rx).context("Failed to create fasync::Socket")?;
+        let logger = SocketLogWriter::new(fasync::Socket::from_socket(tx));
+        let rx = fasync::Socket::from_socket(rx);
         Ok((logger, rx))
     }
 

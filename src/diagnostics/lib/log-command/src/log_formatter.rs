@@ -576,7 +576,7 @@ mod test {
             .expect("failed to write target log");
         drop(sender);
         dump_logs_from_socket(
-            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            fuchsia_async::Socket::from_socket(receiver),
             &mut formatter,
             &symbolizer,
         )
@@ -616,7 +616,7 @@ mod test {
             .expect("failed to write target log");
         drop(sender);
         dump_logs_from_socket(
-            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            fuchsia_async::Socket::from_socket(receiver),
             &mut formatter,
             &symbolizer,
         )
@@ -705,7 +705,7 @@ mod test {
             .expect("failed to write target log");
         drop(sender);
         dump_logs_from_socket(
-            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            fuchsia_async::Socket::from_socket(receiver),
             &mut formatter,
             &symbolizer,
         )
@@ -764,7 +764,7 @@ mod test {
             .expect("failed to write target log");
         drop(sender);
         dump_logs_from_socket(
-            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            fuchsia_async::Socket::from_socket(receiver),
             &mut formatter,
             &symbolizer,
         )
@@ -950,7 +950,7 @@ mod test {
             .expect("failed to write target log");
         drop(sender);
         dump_logs_from_socket(
-            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            fuchsia_async::Socket::from_socket(receiver),
             &mut formatter,
             &symbolizer,
         )
@@ -986,7 +986,7 @@ mod test {
             .expect("failed to write target log");
         drop(sender);
         dump_logs_from_socket(
-            fuchsia_async::Socket::from_socket(receiver).unwrap(),
+            fuchsia_async::Socket::from_socket(receiver),
             &mut formatter,
             &symbolizer,
         )

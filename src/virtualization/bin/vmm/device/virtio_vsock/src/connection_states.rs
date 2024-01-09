@@ -136,7 +136,7 @@ impl GuestInitiated {
 
         let get_socket = || -> Result<fasync::Socket, Error> {
             let socket = response?.map_err(zx::Status::from_raw)?;
-            let local_async = fasync::Socket::from_socket(socket)?;
+            let local_async = fasync::Socket::from_socket(socket);
             Ok(local_async)
         };
 
@@ -205,7 +205,7 @@ impl ClientInitiated {
                     }
 
                     let (client, device) = zx::Socket::create_stream();
-                    let local_async = fasync::Socket::from_socket(device)?;
+                    let local_async = fasync::Socket::from_socket(device);
 
                     // TODO(https://fxbug.dev/110903): Remove once flake is resolved.
                     tracing::info!("Sending socket to client for {:?}", self.key);
@@ -1148,8 +1148,7 @@ mod tests {
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (_client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         VsockConnectionState::ReadWrite(ReadWrite::new(
             socket,
@@ -1536,8 +1535,7 @@ mod tests {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         let state = ReadWrite::new(socket, key, ConnectionCredit::default(), control_tx);
 
@@ -1614,8 +1612,7 @@ mod tests {
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         let state = ReadWrite::new(socket, key, ConnectionCredit::default(), control_tx);
 
@@ -1727,8 +1724,7 @@ mod tests {
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         let state = ReadWrite::new(socket, key, ConnectionCredit::default(), control_tx);
         send_header_to_rw_state(
@@ -1762,8 +1758,7 @@ mod tests {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         let state = ReadWrite::new(socket, key, ConnectionCredit::default(), control_tx);
 
@@ -1831,8 +1826,7 @@ mod tests {
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         assert_eq!(client_socket.write(b"success!").expect("failed to write to socket"), 8);
 
@@ -1853,8 +1847,7 @@ mod tests {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         let state = ReadWrite::new(socket, key, ConnectionCredit::default(), control_tx);
 
@@ -1978,8 +1971,7 @@ mod tests {
         let (control_tx, _control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         let state = ReadWrite::new(socket, key, ConnectionCredit::default(), control_tx);
 
@@ -2115,8 +2107,7 @@ mod tests {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         let state = ReadWrite::new(socket, key, ConnectionCredit::default(), control_tx);
 
@@ -2201,8 +2192,7 @@ mod tests {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         let state = ReadWrite::new(socket, key, ConnectionCredit::default(), control_tx);
 
@@ -2271,8 +2261,7 @@ mod tests {
         let (control_tx, mut control_rx) = mpsc::unbounded::<VirtioVsockHeader>();
 
         let (_client_socket, device_socket) = zx::Socket::create_stream();
-        let socket =
-            fasync::Socket::from_socket(device_socket).expect("failed to create async socket");
+        let socket = fasync::Socket::from_socket(device_socket);
 
         // The read-write state knows that the device thinks there's no client credit while there
         // actually is, so immediately sends an unsolicited credit update.

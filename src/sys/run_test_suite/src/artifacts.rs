@@ -109,7 +109,7 @@ async fn copy_socket_artifact<W: Write>(
     socket: fidl::Socket,
     mut artifact: W,
 ) -> Result<usize, anyhow::Error> {
-    let mut async_socket = fidl::AsyncSocket::from_socket(socket)?;
+    let mut async_socket = fidl::AsyncSocket::from_socket(socket);
     let mut len = 0;
     loop {
         let done =
@@ -256,8 +256,7 @@ mod socket_tests {
             let (client_socket, server_socket) = fidl::Socket::create_stream();
             let mut output = vec![];
             let write_fut = async move {
-                let mut async_socket =
-                    fidl::AsyncSocket::from_socket(server_socket).expect("create socket");
+                let mut async_socket = fidl::AsyncSocket::from_socket(server_socket);
                 async_socket.write_all(case.as_slice()).await.expect("write bytes");
             };
 
@@ -291,7 +290,7 @@ mod file_tests {
     };
 
     async fn serve_content_over_socket(content: Vec<u8>, socket: fuchsia_zircon::Socket) {
-        let mut socket = fidl::AsyncSocket::from_socket(socket).unwrap();
+        let mut socket = fidl::AsyncSocket::from_socket(socket);
         socket.write_all(content.as_slice()).await.expect("Cannot serve content over socket");
     }
 

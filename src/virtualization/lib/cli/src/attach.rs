@@ -67,7 +67,7 @@ pub async fn attach(guest: GuestProxy, serial_only: bool) -> Result<(), Error> {
 async fn attach_console_and_serial(guest: GuestProxy) -> Result<(), Error> {
     // Tie serial output to stdout.
     let guest_serial_response = guest.get_serial().await?;
-    let guest_serial = fasync::Socket::from_socket(guest_serial_response)?;
+    let guest_serial = fasync::Socket::from_socket(guest_serial_response);
     let serial_output = async {
         futures::io::copy(guest_serial, &mut GuestConsole::get_unblocked_stdio(Stdio::Stdout))
             .await

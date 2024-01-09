@@ -28,8 +28,7 @@ where
 
 fn zx_socket_from_fd(fd: i32) -> Result<fidl::AsyncSocket> {
     let handle = fdio::transfer_fd(unsafe { std::fs::File::from_raw_fd(fd) })?;
-    fidl::AsyncSocket::from_socket(fidl::Socket::from(handle))
-        .context("making fidl::AsyncSocket from fidl::Socket")
+    Ok(fidl::AsyncSocket::from_socket(fidl::Socket::from(handle)))
 }
 
 fn print_prelude_info(
@@ -107,7 +106,7 @@ async fn main() -> Result<()> {
         return Err(anyhow::format_err!("Legacy overnet is no longer supported."));
     }
 
-    let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
+    let local_socket = fidl::AsyncSocket::from_socket(local_socket);
     let (mut rx_socket, mut tx_socket) = futures::AsyncReadExt::split(local_socket);
 
     let mut stdin = zx_socket_from_fd(std::io::stdin().lock().as_raw_fd())?;

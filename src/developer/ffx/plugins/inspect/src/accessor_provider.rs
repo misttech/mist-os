@@ -141,7 +141,7 @@ impl HostArchiveReader {
             )
         })?;
 
-        let mut client = fuchsia_async::Socket::from_socket(client)?;
+        let mut client = fuchsia_async::Socket::from_socket(client);
 
         let mut output = vec![];
         match client.read_to_end(&mut output).await {

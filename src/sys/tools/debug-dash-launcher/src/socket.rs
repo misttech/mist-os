@@ -82,7 +82,7 @@ pub async fn spawn_pty_forwarder(
         server.describe().await.map_err(|_| LauncherError::Pty)?;
     let epair = event.ok_or(LauncherError::Pty)?;
 
-    let socket = fasync::Socket::from_socket(socket).unwrap();
+    let socket = fasync::Socket::from_socket(socket);
     let (read_from_client, write_to_client) = socket.split();
     let server_for_dash_output = std::clone::Clone::clone(&server);
 
@@ -127,7 +127,7 @@ mod tests {
 
         let pty = spawn_pty_forwarder(stdio_server).await.unwrap();
         let pty = pty.into_proxy().unwrap();
-        let mut stdio = fasync::Socket::from_socket(stdio).unwrap();
+        let mut stdio = fasync::Socket::from_socket(stdio);
         let mut buf = [0u8, 0u8];
 
         pty.write("$ ".as_bytes()).await.unwrap().unwrap();

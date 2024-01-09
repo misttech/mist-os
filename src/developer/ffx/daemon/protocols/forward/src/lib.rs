@@ -81,13 +81,7 @@ impl Forward {
 
             let (socket, keep_alive) = socket.split();
 
-            let socket = match fuchsia_async::Socket::from_socket(socket) {
-                Ok(socket) => socket,
-                Err(e) => {
-                    tracing::error!("Error converting socket to async: {:?}", e);
-                    continue;
-                }
-            };
+            let socket = fuchsia_async::Socket::from_socket(socket);
 
             Self::establish_tcp_forward(conn, socket, keep_alive, Arc::clone(&tasks));
         }
@@ -243,13 +237,7 @@ impl FidlProtocol for Forward {
 
                         let (socket, keep_alive) = socket.split();
 
-                        let socket = match fuchsia_async::Socket::from_socket(socket) {
-                            Ok(socket) => socket,
-                            Err(e) => {
-                                tracing::error!("Error converting socket to async: {:?}", e);
-                                continue;
-                            }
-                        };
+                        let socket = fuchsia_async::Socket::from_socket(socket);
 
                         Self::establish_tcp_forward(
                             tcp_stream,

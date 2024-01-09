@@ -95,7 +95,7 @@ async fn demux_fidl(
         }
         match (log_socket, interest_listener) {
             (Some(socket), Some(listener)) => {
-                return Ok((Socket::from_socket(socket)?, listener));
+                return Ok((Socket::from_socket(socket), listener));
             }
             (s, i) => {
                 log_socket = s;
@@ -488,7 +488,7 @@ where
         if let LogSinkRequest::ConnectStructured { socket, control_handle: _ } =
             stream.next().await.unwrap()?
         {
-            puppet.socket = Socket::from_socket(socket)?;
+            puppet.socket = Socket::from_socket(socket);
         }
     } else {
         // Reset severity to TRACE so we get all messages

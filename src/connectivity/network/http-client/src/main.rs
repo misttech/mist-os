@@ -219,7 +219,7 @@ impl Loader {
                     bytes
                 }
                 Some(net_http::Body::Stream(socket)) => {
-                    let mut stream = fasync::Socket::from_socket(socket)?
+                    let mut stream = fasync::Socket::from_socket(socket)
                         .into_datagram_stream()
                         .map(|r| r.context("reading from datagram stream"));
                     let mut bytes = Vec::new();

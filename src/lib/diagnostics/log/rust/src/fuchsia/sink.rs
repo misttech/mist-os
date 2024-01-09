@@ -212,7 +212,7 @@ mod tests {
             LogSinkRequest::ConnectStructured { socket, .. } => socket,
             _ => panic!("sink ctor sent the wrong message"),
         };
-        let mut socket = fuchsia_async::Socket::from_socket(socket).expect("make async socket");
+        let mut socket = fuchsia_async::Socket::from_socket(socket);
         // Ensure we are able to read all of the data written to the socket and we didn't drop
         // anything.
         for i in 0..TOTAL_WRITES {

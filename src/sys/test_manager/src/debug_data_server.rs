@@ -199,7 +199,7 @@ async fn filter_map_filename(
 }
 
 async fn serve_file_over_socket(file: fio::FileProxy, socket: fuchsia_zircon::Socket) {
-    let mut socket = fasync::Socket::from_socket(socket).unwrap();
+    let mut socket = fasync::Socket::from_socket(socket);
 
     // We keep a buffer of 4.8 MB while reading the file
     let num_bytes: u64 = 1024 * 48;

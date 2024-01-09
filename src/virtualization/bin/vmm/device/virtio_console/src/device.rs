@@ -21,7 +21,7 @@ pub struct ConsoleDevice {
 
 impl ConsoleDevice {
     pub fn new(socket: zx::Socket) -> Result<Self, Error> {
-        let socket = fasync::Socket::from_socket(socket)?;
+        let socket = fasync::Socket::from_socket(socket);
         Ok(Self { socket })
     }
 
@@ -189,7 +189,7 @@ mod tests {
         assert_eq!(remote.outstanding_read_bytes().unwrap(), max_socket_bytes);
 
         let mut actual_bytes = vec![0u8; random_bytes.len()];
-        let mut remote = fasync::Socket::from_socket(remote).unwrap();
+        let mut remote = fasync::Socket::from_socket(remote);
 
         let rx_future = remote.read_exact(&mut actual_bytes);
         futures::pin_mut!(rx_future);
@@ -209,7 +209,7 @@ mod tests {
     #[fuchsia::test]
     async fn rx_chain_returns_any_data_available() {
         let (remote, local) = zx::Socket::create_stream();
-        let mut remote = fasync::Socket::from_socket(remote).unwrap();
+        let mut remote = fasync::Socket::from_socket(remote);
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
         let random_bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(96).collect();
@@ -260,7 +260,7 @@ mod tests {
     #[fuchsia::test]
     async fn rx_chain_returns_data_from_closed_socket() {
         let (remote, local) = zx::Socket::create_stream();
-        let mut remote = fasync::Socket::from_socket(remote).unwrap();
+        let mut remote = fasync::Socket::from_socket(remote);
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
         let random_bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(128).collect();
@@ -331,7 +331,7 @@ mod tests {
     #[fuchsia::test]
     async fn rx_more_bytes_on_socket_than_chain_size() {
         let (remote, local) = zx::Socket::create_stream();
-        let mut remote = fasync::Socket::from_socket(remote).unwrap();
+        let mut remote = fasync::Socket::from_socket(remote);
         let device = ConsoleDevice::new(local).expect("failed to create console device");
 
         let random_bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(64).collect();

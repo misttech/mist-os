@@ -25,13 +25,13 @@ pub async fn run_tool(
     let (sout, cout) = fidl::Socket::create_stream();
     let (serr, cerr) = fidl::Socket::create_stream();
 
-    let mut stdin = fidl::AsyncSocket::from_socket(cin)?;
+    let mut stdin = fidl::AsyncSocket::from_socket(cin);
     let mut stdout = Unblock::new(std::io::stdout());
     let mut stderr = Unblock::new(std::io::stderr());
 
     let in_copy = futures::io::copy(Unblock::new(std::io::stdin()), &mut stdin).fuse();
-    let out_copy = futures::io::copy(fidl::AsyncSocket::from_socket(cout)?, &mut stdout).fuse();
-    let err_copy = futures::io::copy(fidl::AsyncSocket::from_socket(cerr)?, &mut stderr).fuse();
+    let out_copy = futures::io::copy(fidl::AsyncSocket::from_socket(cout), &mut stdout).fuse();
+    let err_copy = futures::io::copy(fidl::AsyncSocket::from_socket(cerr), &mut stderr).fuse();
 
     let mut event_stream = controller_proxy.take_event_stream();
     let term_event_future = async move {

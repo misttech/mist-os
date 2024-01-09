@@ -101,12 +101,8 @@ impl SuiteServer for TestServer {
                     fidl::endpoints::create_proxy::<fidl_fuchsia_test::CaseListenerMarker>()
                         .map_err(FidlError::CreateProxy)
                         .unwrap();
-                let test_stdout = fasync::Socket::from_socket(test_stdout)
-                    .map_err(KernelError::SocketToAsync)
-                    .unwrap();
-                let test_stderr = fasync::Socket::from_socket(test_stderr)
-                    .map_err(KernelError::SocketToAsync)
-                    .unwrap();
+                let test_stdout = fasync::Socket::from_socket(test_stdout);
+                let test_stderr = fasync::Socket::from_socket(test_stderr);
 
                 run_listener
                     .on_test_case_started(

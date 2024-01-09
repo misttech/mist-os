@@ -94,16 +94,7 @@ pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
                                             return;
                                         };
 
-                                        let socket = match fasync::Socket::from_socket(socket) {
-                                            Ok(socket) => socket,
-                                            Err(error) => {
-                                                tracing::warn!(
-                                                    error = ?error,
-                                                    "Could not create socket"
-                                                );
-                                                return;
-                                            }
-                                        };
+                                        let socket = fasync::Socket::from_socket(socket);
 
                                         let (mut reader, mut writer) = socket.split();
                                         let (err_sender, mut err_receiver) =

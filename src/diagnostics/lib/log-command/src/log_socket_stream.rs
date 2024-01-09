@@ -180,7 +180,7 @@ mod test {
         // guarantee torn writes and test all the code paths
         // in the decoder.
         let (local, remote) = fuchsia_zircon::Socket::create_datagram();
-        let socket = fuchsia_async::Socket::from_socket(remote).unwrap();
+        let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {
             component_url: None,
@@ -207,7 +207,7 @@ mod test {
         // This is intentionally a datagram socket so we can
         // send the entire message as one "packet".
         let (local, remote) = fuchsia_zircon::Socket::create_datagram();
-        let socket = fuchsia_async::Socket::from_socket(remote).unwrap();
+        let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {
             component_url: None,
@@ -228,7 +228,7 @@ mod test {
     async fn test_json_decoder_large_message() {
         const MSG_COUNT: usize = 100;
         let (local, remote) = fuchsia_zircon::Socket::create_stream();
-        let socket = fuchsia_async::Socket::from_socket(remote).unwrap();
+        let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = Box::pin(
             stream_raw_json::<LogsData, 100, 10>(socket)
                 .map(|value| futures_util::stream::iter(value))
@@ -247,7 +247,7 @@ mod test {
                 .build()
             })
             .collect::<Vec<_>>();
-        let mut local = fuchsia_async::Socket::from_socket(local).unwrap();
+        let mut local = fuchsia_async::Socket::from_socket(local);
         let test_logs_clone = test_logs.clone();
         let _write_task = fuchsia_async::Task::local(async move {
             for log in test_logs {
@@ -266,7 +266,7 @@ mod test {
         // At least 10MB of characters in a single message
         const CHAR_COUNT: usize = 1000 * 1000;
         let (local, remote) = fuchsia_zircon::Socket::create_stream();
-        let socket = fuchsia_async::Socket::from_socket(remote).unwrap();
+        let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = Box::pin(
             stream_raw_json::<LogsData, 256000, 20000>(socket)
                 .map(|value| futures_util::stream::iter(value))
@@ -281,7 +281,7 @@ mod test {
         .set_message(format!("Hello world! {}", "h".repeat(CHAR_COUNT)))
         .add_tag("Some tag")
         .build();
-        let mut local = fuchsia_async::Socket::from_socket(local).unwrap();
+        let mut local = fuchsia_async::Socket::from_socket(local);
         let test_log_clone = test_log.clone();
         let _write_task = fuchsia_async::Task::local(async move {
             let serialized_log = serde_json::to_string(&test_log).unwrap();
@@ -297,7 +297,7 @@ mod test {
         // guarantee torn writes and test all the code paths
         // in the decoder.
         let (local, remote) = fuchsia_zircon::Socket::create_datagram();
-        let socket = fuchsia_async::Socket::from_socket(remote).unwrap();
+        let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {
             component_url: None,

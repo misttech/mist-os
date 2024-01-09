@@ -137,7 +137,7 @@ impl SingleSessionTrace {
 async fn drain_socket(socket: Option<zx::Socket>) -> Result<Vec<u8>, Error> {
     let mut ret = Vec::new();
     if let Some(socket) = socket {
-        let mut socket = fuchsia_async::Socket::from_socket(socket)?;
+        let mut socket = fuchsia_async::Socket::from_socket(socket);
         socket.read_to_end(&mut ret).await?;
     }
     Ok(ret)

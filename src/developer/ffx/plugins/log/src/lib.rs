@@ -144,7 +144,7 @@ async fn connect_to_target(
         .await?;
     Ok(DeviceConnection {
         boot_timestamp,
-        log_socket: fuchsia_async::Socket::from_socket(local)?,
+        log_socket: fuchsia_async::Socket::from_socket(local),
         log_settings_client,
     })
 }

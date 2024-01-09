@@ -59,7 +59,7 @@ impl FakeController {
 
     /// Simulates a call to `fuchsia.fuzzer.Manager/GetOutput` without a `fuzz-manager`.
     pub fn set_output(&self, output: fuzz::TestOutput, socket: fidl::Socket) -> zx::Status {
-        let socket = fasync::Socket::from_socket(socket).expect("failed to create sockets");
+        let socket = fasync::Socket::from_socket(socket);
         match output {
             fuzz::TestOutput::Stdout => {
                 let mut stdout_mut = self.stdout.borrow_mut();
@@ -120,7 +120,7 @@ impl FakeController {
     /// Reads test input data from a `fuchsia.fuzzer.Input` from a FIDL request.
     async fn receive_input(&self, input: FidlInput) -> Result<()> {
         let mut received_input = Vec::new();
-        let mut reader = fidl::AsyncSocket::from_socket(input.socket)?;
+        let mut reader = fidl::AsyncSocket::from_socket(input.socket);
         reader.read_to_end(&mut received_input).await?;
         let mut received_input_mut = self.received_input.borrow_mut();
         *received_input_mut = received_input;

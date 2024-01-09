@@ -360,7 +360,7 @@ impl StreamSocket {
             zx_socket
                 .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_STREAM_CONNECTED)
                 .expect("signal connected");
-            fuchsia_async::Socket::from_socket(zx_socket).expect("create fasync socket").split()
+            fuchsia_async::Socket::from_socket(zx_socket).split()
         };
 
         let (left_reader, left_writer) = signal_connected_and_create_io(&mut *this);

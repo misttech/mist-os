@@ -50,7 +50,7 @@ impl<'a> ProxyableRW<'a> for Socket {
 impl IntoProxied for fidl::Socket {
     type Proxied = Socket;
     fn into_proxied(self) -> Result<Socket, Error> {
-        Ok(Socket { socket: AsyncSocket::from_socket(self)? })
+        Ok(Socket { socket: AsyncSocket::from_socket(self) })
     }
 }
 
@@ -170,7 +170,7 @@ mod tests {
         .detach();
 
         let mut data = vec![0u8; EXPECTED_LEN];
-        let mut rx = fuchsia_async::Socket::from_socket(rx).expect("create async socket");
+        let mut rx = fuchsia_async::Socket::from_socket(rx);
         rx.read_exact(&mut data).await.expect("read from socket");
         assert_eq!(data, vec![EXPECTED_DATA; EXPECTED_LEN]);
     }

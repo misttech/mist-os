@@ -16,7 +16,6 @@ use crate::{
 };
 use derivative::Derivative;
 use diagnostics_data::{BuilderArgs, Data, LogError, Logs, LogsData, LogsDataBuilder};
-use fidl::prelude::*;
 use fidl_fuchsia_diagnostics::{Interest as FidlInterest, LogInterestSelector, StreamMode};
 use fidl_fuchsia_logger::{
     InterestChangeError, LogSinkRequest, LogSinkRequestStream,
@@ -240,29 +239,22 @@ impl LogsArtifactsContainer {
         debug!(%self.identity, "Draining LogSink channel.");
 
         macro_rules! handle_socket {
-            ($ctor:ident($socket:ident, $control_handle:ident)) => {{
-                match fasync::Socket::from_socket($socket) {
-                    Ok(socket) => {
-                        let log_stream = LogMessageSocket::$ctor(socket, self.stats.clone());
-                        self.state.lock().num_active_sockets += 1;
-                        let task = Task::spawn(self.clone().drain_messages(log_stream));
-                        sender.unbounded_send(task).expect("channel alive for whole program");
-                    },
-                    Err(err) => {
-                        $control_handle.shutdown();
-                        warn!(?self.identity, %err, "error creating socket")
-                    }
-                };
-            }}
+            ($ctor:ident($socket:ident)) => {{
+                let socket = fasync::Socket::from_socket($socket);
+                let log_stream = LogMessageSocket::$ctor(socket, self.stats.clone());
+                self.state.lock().num_active_sockets += 1;
+                let task = Task::spawn(self.clone().drain_messages(log_stream));
+                sender.unbounded_send(task).expect("channel alive for whole program");
+            }};
         }
 
         while let Some(next) = stream.next().await {
             match next {
-                Ok(LogSinkRequest::Connect { socket, control_handle }) => {
-                    handle_socket! {new(socket, control_handle)};
+                Ok(LogSinkRequest::Connect { socket, .. }) => {
+                    handle_socket! {new(socket)};
                 }
-                Ok(LogSinkRequest::ConnectStructured { socket, control_handle }) => {
-                    handle_socket! {new_structured(socket, control_handle)};
+                Ok(LogSinkRequest::ConnectStructured { socket, .. }) => {
+                    handle_socket! {new_structured(socket)};
                 }
                 Ok(LogSinkRequest::WaitForInterestChange { responder }) => {
                     // Check if we sent latest data to the client

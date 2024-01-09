@@ -41,7 +41,7 @@ impl FidlProtocol for ListenerProtocol {
 
                 // Retrieve the |ffx_socket| endpoint from the |connector|.
                 let ffx_socket = match connector.get_socket(global_id).await? {
-                    Ok(socket) => fidl::handle::AsyncSocket::from_socket(socket)?,
+                    Ok(socket) => fidl::handle::AsyncSocket::from_socket(socket),
                     Err(e) => {
                         responder.send(Err(e.clone()))?;
                         return Err(anyhow!("Connector::GetSocket error: {:?}", e));

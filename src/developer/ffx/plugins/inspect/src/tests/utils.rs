@@ -74,7 +74,7 @@ pub fn setup_fake_archive_accessor(expected_data: Vec<FakeAccessorData>) -> Arch
                     for data in expected_data.iter() {
                         if data.parameters == parameters {
                             setup_fake_accessor_provider(
-                                fuchsia_async::Socket::from_socket(stream).unwrap(),
+                                fuchsia_async::Socket::from_socket(stream),
                                 data.responses.clone(),
                             )
                             .unwrap();

@@ -149,7 +149,7 @@ async fn handle_run(
         let status = match handle_invocation(&name, stdout_tx).await {
             Ok(_) => ftest::Status::Passed,
             Err(e) => {
-                let mut stderr_tx = fasync::Socket::from_socket(stderr_tx).expect("wrap socket");
+                let mut stderr_tx = fasync::Socket::from_socket(stderr_tx);
                 stderr_tx.write_all(format!("Test failed: {:?}", e).as_bytes()).await.ok();
                 ftest::Status::Failed
             }
@@ -166,7 +166,7 @@ async fn handle_run(
 // querying the Archivist for a specific component's Inspect data and
 // reporting statistics on latency and size.
 async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Error> {
-    let mut stdout = fasync::Socket::from_socket(stdout).expect("wrap socket");
+    let mut stdout = fasync::Socket::from_socket(stdout);
 
     stdout.write_all(format!("Processing {}\n", moniker).as_bytes()).await.ok();
     let proxy: ArchiveAccessorProxy = fuchsia_component::client::connect_to_protocol_at_path::<

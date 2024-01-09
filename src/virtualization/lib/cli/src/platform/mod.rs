@@ -95,8 +95,8 @@ pub struct GuestConsole {
 impl GuestConsole {
     pub fn new(input: fidl::Socket, output: fidl::Socket) -> Result<Self> {
         Ok(GuestConsole {
-            input: Some(fasync::Socket::from_socket(input)?),
-            output: Some(fasync::Socket::from_socket(output)?),
+            input: Some(fasync::Socket::from_socket(input)),
+            output: Some(fasync::Socket::from_socket(output)),
         })
     }
 
@@ -162,8 +162,8 @@ mod test {
         // are bidirectional so we can duplicate one and split it into both in and out.
         let (host_stdio, host_stdin_sock) = fidl::Socket::create_stream();
         let host_stdout_sock = host_stdin_sock.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap();
-        let host_stdout = fasync::Socket::from_socket(host_stdout_sock).unwrap();
-        let host_stdin = fasync::Socket::from_socket(host_stdin_sock).unwrap();
+        let host_stdout = fasync::Socket::from_socket(host_stdout_sock);
+        let host_stdin = fasync::Socket::from_socket(host_stdin_sock);
 
         // Have the "guest" write this command to its console stdout, which should be pushed to our
         // stdout.

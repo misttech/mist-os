@@ -192,7 +192,7 @@ mod tests {
     #[fuchsia::test]
     async fn parse_bytes_with_newline() {
         let (s1, s2) = zx::Socket::create_stream();
-        let s1 = fasync::Socket::from_socket(s1).expect("failed to create async socket");
+        let s1 = fasync::Socket::from_socket(s1);
         let mut chunker = NewlineChunker::new(s1, 100);
         s2.write(b"test\n").expect("Failed to write");
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test".to_vec());
@@ -201,7 +201,7 @@ mod tests {
     #[fuchsia::test]
     async fn parse_bytes_with_many_newlines() {
         let (s1, s2) = zx::Socket::create_stream();
-        let s1 = fasync::Socket::from_socket(s1).expect("failed to create async socket");
+        let s1 = fasync::Socket::from_socket(s1);
         let mut chunker = NewlineChunker::new(s1, 100);
         s2.write(b"test1\ntest2\ntest3\n").expect("Failed to write");
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test1".to_vec());
@@ -214,7 +214,7 @@ mod tests {
     #[fuchsia::test]
     async fn parse_bytes_with_newlines_included() {
         let (s1, s2) = zx::Socket::create_stream();
-        let s1 = fasync::Socket::from_socket(s1).expect("failed to create async socket");
+        let s1 = fasync::Socket::from_socket(s1);
         let mut chunker = NewlineChunker::new_with_newlines(s1, 100);
         s2.write(b"test1\ntest2\ntest3\n").expect("Failed to write");
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"test1\n".to_vec());
@@ -225,7 +225,7 @@ mod tests {
     #[fuchsia::test]
     async fn max_message_size() {
         let (s1, s2) = zx::Socket::create_stream();
-        let s1 = fasync::Socket::from_socket(s1).expect("failed to create async socket");
+        let s1 = fasync::Socket::from_socket(s1);
         let mut chunker = NewlineChunker::new(s1, 2);
         s2.write(b"test\n").expect("Failed to write");
         assert_eq!(chunker.next().await.unwrap().unwrap(), b"te".to_vec());

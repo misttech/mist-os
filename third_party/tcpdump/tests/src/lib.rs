@@ -160,9 +160,9 @@ async fn start_tcpdump_and_wait_for_patterns<
         ],
     );
     let mut stdout_reader =
-        BufReader::new(fasync::Socket::from_socket(stdout_reader).expect("async socket stdout"));
+        BufReader::new(fasync::Socket::from_socket(stdout_reader));
     let mut stderr_reader =
-        BufReader::new(fasync::Socket::from_socket(stderr_reader).expect("async socket stdout"));
+        BufReader::new(fasync::Socket::from_socket(stderr_reader));
 
     let mut svcfs = ServiceFs::new_local();
     let svcfs = svcfs
@@ -248,9 +248,9 @@ async fn version_test() {
     assert_eq!(return_code, 0);
 
     let mut stdout_reader =
-        BufReader::new(fasync::Socket::from_socket(stdout_reader).expect("async socket stdout"));
+        BufReader::new(fasync::Socket::from_socket(stdout_reader));
     let mut stderr_reader =
-        fasync::Socket::from_socket(stderr_reader).expect("async socket stderr");
+        fasync::Socket::from_socket(stderr_reader);
 
     wait_for_pattern(
         &mut stdout_reader,

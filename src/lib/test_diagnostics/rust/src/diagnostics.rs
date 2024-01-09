@@ -53,7 +53,7 @@ fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Erro
             Ok(LogStream::new(BatchLogStream::from_client_end(client_end)?))
         }
         ftest_manager::Syslog::Stream(client_end) => Ok(LogStream::new(
-            LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end).unwrap())
+            LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end))
                 .map(|result| Ok(result)),
         )),
         _ => {
@@ -66,7 +66,7 @@ fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Erro
 fn get_log_stream(syslog: ftest_manager::Syslog) -> Result<LogStream, fidl::Error> {
     match syslog {
         ftest_manager::Syslog::Stream(client_end) => Ok(LogStream::new(
-            LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end).unwrap())
+            LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end))
                 .map(|result| Ok(result)),
         )),
         ftest_manager::Syslog::Batch(_) => panic!("batch iterator not supported on host"),
@@ -229,7 +229,7 @@ mod tests {
             let (client_end, server_end) = fidl::Socket::create_stream();
             let (stream, iterator) = (
                 LogStream::new(
-                    LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end).unwrap())
+                    LogsDataStream::new(fuchsia_async::Socket::from_socket(client_end))
                         .map(|result| Ok(result)),
                 ),
                 ftest_manager::LogsIterator::Stream(server_end),
@@ -238,7 +238,7 @@ mod tests {
         }
 
         async fn spawn_archive_iterator_server(socket: fidl::Socket, with_error: bool) {
-            let mut socket = fuchsia_async::Socket::from_socket(socket).unwrap();
+            let mut socket = fuchsia_async::Socket::from_socket(socket);
             let mut values = vec![1, 2, 3].into_iter();
             loop {
                 match values.next() {

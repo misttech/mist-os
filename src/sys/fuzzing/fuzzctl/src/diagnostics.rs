@@ -130,7 +130,7 @@ impl<O: OutputSink> SocketForwarder<O> {
     ///
     /// Returns an error if conversion to an async socket fails.
     pub fn try_new(socket: fidl::Socket, writer: &Writer<O>) -> Result<Self> {
-        let socket = fidl::AsyncSocket::from_socket(socket).context("failed to convert socket")?;
+        let socket = fidl::AsyncSocket::from_socket(socket);
         let (reader, _) = socket.split();
         Ok(Self { reader: Rc::new(RefCell::new(reader)), writer: writer.clone() })
     }
@@ -229,7 +229,7 @@ mod tests {
         let (tx, rx) = Socket::create_stream();
         let forwarder = SocketForwarder::try_new(rx, test.writer())?;
         let socket_fut = || async move {
-            let mut tx = fidl::AsyncSocket::from_socket(tx)?;
+            let mut tx = fidl::AsyncSocket::from_socket(tx);
             tx.write_all(b"hello\nworld!\n").await?;
             let done_marker = format!("{}\n", fuzz::DONE_MARKER);
             tx.write_all(done_marker.as_bytes()).await?;
@@ -247,7 +247,7 @@ mod tests {
         let (tx, rx) = Socket::create_stream();
         let forwarder = SocketForwarder::try_new(rx, test.writer())?;
         let socket_fut = || async move {
-            let mut tx = fidl::AsyncSocket::from_socket(tx)?;
+            let mut tx = fidl::AsyncSocket::from_socket(tx);
             send_log_entry(&mut tx, "hello world").await?;
             send_log_entry(&mut tx, fuzz::DONE_MARKER).await?;
             Ok::<(), Error>(())
@@ -283,9 +283,9 @@ mod tests {
         test.output_matches(done_marker_a.clone());
 
         let socket_fut = || async move {
-            let mut stdout_tx = fidl::AsyncSocket::from_socket(stdout_tx)?;
-            let mut stderr_tx = fidl::AsyncSocket::from_socket(stderr_tx)?;
-            let mut syslog_tx = fidl::AsyncSocket::from_socket(syslog_tx)?;
+            let mut stdout_tx = fidl::AsyncSocket::from_socket(stdout_tx);
+            let mut stderr_tx = fidl::AsyncSocket::from_socket(stderr_tx);
+            let mut syslog_tx = fidl::AsyncSocket::from_socket(syslog_tx);
 
             // Streams can be sent in any order
             send_log_entry(&mut syslog_tx, fuzz::DONE_MARKER).await?;
@@ -330,12 +330,12 @@ mod tests {
             let done_marker_bytes = done_marker.as_bytes();
 
             // Write all in one shot.
-            let mut stdout_tx = fidl::AsyncSocket::from_socket(stdout_tx)?;
+            let mut stdout_tx = fidl::AsyncSocket::from_socket(stdout_tx);
             stdout_tx.write_all(b"hello world!\n").await?;
             stdout_tx.write_all(done_marker_bytes).await?;
 
             // Write all in pieces.
-            let mut stderr_tx = fidl::AsyncSocket::from_socket(stderr_tx)?;
+            let mut stderr_tx = fidl::AsyncSocket::from_socket(stderr_tx);
             stderr_tx.write_all(b"hel").await?;
             stderr_tx.write_all(b"lo ").await?;
             stderr_tx.write_all(b"wor").await?;
@@ -343,7 +343,7 @@ mod tests {
             stderr_tx.write_all(done_marker_bytes).await?;
 
             // Write JSON. This should be made prettier when copying, e.g. newlines, spaces, etc.
-            let mut syslog_tx = fidl::AsyncSocket::from_socket(syslog_tx)?;
+            let mut syslog_tx = fidl::AsyncSocket::from_socket(syslog_tx);
             send_log_entry(&mut syslog_tx, "hello world!").await?;
             send_log_entry(&mut syslog_tx, fuzz::DONE_MARKER).await?;
             Ok::<(), Error>(())

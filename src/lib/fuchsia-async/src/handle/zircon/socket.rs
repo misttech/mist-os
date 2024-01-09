@@ -30,15 +30,18 @@ impl AsHandleRef for Socket {
 
 impl Socket {
     /// Create a new `Socket` from a previously-created `zx::Socket`.
-    // TODO(https://fxbug.dev/319131778) this function should be infallible
-    pub fn from_socket(socket: zx::Socket) -> Result<Self, zx::Status> {
-        Ok(Socket(RWHandle::new(socket)))
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
+    pub fn from_socket(socket: zx::Socket) -> Self {
+        Socket(RWHandle::new(socket))
     }
 
     /// Available for soft migration of b/319131778.
     // TODO(https://fxbug.dev/319131778) delete this function
     pub fn try_from_socket(socket: zx::Socket) -> Result<Self, zx::Status> {
-        Self::from_socket(socket)
+        Ok(Self::from_socket(socket))
     }
 
     /// Consumes `self` and returns the underlying `zx::Socket`.
@@ -278,7 +281,7 @@ mod tests {
         let bytes = &[0, 1, 2, 3];
 
         let (tx, rx) = zx::Socket::create_stream();
-        let (mut tx, mut rx) = (Socket::from_socket(tx).unwrap(), Socket::from_socket(rx).unwrap());
+        let (mut tx, mut rx) = (Socket::from_socket(tx), Socket::from_socket(rx));
 
         let receive_future = async {
             let mut buf = vec![];
@@ -311,7 +314,7 @@ mod tests {
         let (one, two) = (&[0, 1], &[2, 3, 4, 5]);
 
         let (tx, rx) = zx::Socket::create_datagram();
-        let rx = Socket::from_socket(rx).unwrap();
+        let rx = Socket::from_socket(rx);
 
         let mut out = vec![50];
 
@@ -338,7 +341,7 @@ mod tests {
         let mut exec = TestExecutor::new();
 
         let (tx, rx) = zx::Socket::create_datagram();
-        let mut rx = Socket::from_socket(rx).unwrap().into_datagram_stream();
+        let mut rx = Socket::from_socket(rx).into_datagram_stream();
 
         let packets = 20;
 
@@ -369,7 +372,7 @@ mod tests {
         let mut executor = TestExecutor::new();
 
         let (s1, s2) = zx::Socket::create_stream();
-        let mut async_s2 = Socket::from_socket(s2).expect("failed to create async socket");
+        let mut async_s2 = Socket::from_socket(s2);
 
         // The socket won't start watching for peer-closed until we actually try reading from it.
         let _ = executor.run_until_stalled(&mut pin!(async {
@@ -401,7 +404,7 @@ mod tests {
         let mut executor = TestExecutor::new();
 
         let (s1, s2) = zx::Socket::create_stream();
-        let async_s2 = Socket::from_socket(s2).expect("failed to create async socket");
+        let async_s2 = Socket::from_socket(s2);
 
         // The read signal is optimistically set on socket creation, so even though there is
         // nothing to read, poll_readable returns Ready.
@@ -433,7 +436,7 @@ mod tests {
         let bytes = vec![0u8; socket_info.tx_buf_max];
         assert_eq!(socket_info.tx_buf_max, s2.write(&bytes).expect("failed to write to socket"));
 
-        let async_s2 = Socket::from_socket(s2).expect("failed to create async rx socket");
+        let async_s2 = Socket::from_socket(s2);
 
         // The write signal is optimistically set on socket creation, so even though it's not
         // possible to write, poll_writable returns Ready.

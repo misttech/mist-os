@@ -150,12 +150,10 @@ fn bss_to_json(bss_id: impl Borrow<BssId>, bss: impl Borrow<Bss>) -> JsonValue {
 
 async fn read_socket(socket: zx::Socket) -> Option<String> {
     let mut buf = Vec::new();
-    match fuchsia_async::Socket::from_socket(socket).ok() {
-        Some(mut socket) => match socket.read_to_end(&mut buf).await {
-            Ok(_num_bytes_read) => String::from_utf8(buf).ok(),
-            Err(_) => None,
-        },
-        None => None,
+    let mut socket = fuchsia_async::Socket::from_socket(socket);
+    match socket.read_to_end(&mut buf).await {
+        Ok(_num_bytes_read) => String::from_utf8(buf).ok(),
+        Err(_) => None,
     }
 }
 

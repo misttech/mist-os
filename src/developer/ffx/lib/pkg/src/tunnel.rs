@@ -132,9 +132,8 @@ async fn run_tunnel_protocol(
             tracing::info!("tunneling connection from target {:?} to {}", target_nodename, addr);
             let (socket, keep_alive) = socket.split();
 
-            Ok(fasync::Socket::from_socket(socket)
-                .map(|socket| ConnectionStream::Socket(socket, keep_alive))
-                .map_err(Into::into))
+            let socket = fasync::Socket::from_socket(socket);
+            Ok(Ok(ConnectionStream::Socket(socket, keep_alive)))
         })
         .forward(server_sink)
         .await;

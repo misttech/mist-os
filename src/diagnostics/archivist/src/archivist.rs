@@ -577,7 +577,7 @@ mod tests {
             connect_to_protocol_at_dir_svc::<fhost::ArchiveAccessorMarker>(&directory).unwrap();
         loop {
             let (local, remote) = fuchsia_zircon::Socket::create_stream();
-            let mut reader = fuchsia_async::Socket::from_socket(local).unwrap();
+            let mut reader = fuchsia_async::Socket::from_socket(local);
             accessor
                 .stream_diagnostics(
                     &StreamParameters {

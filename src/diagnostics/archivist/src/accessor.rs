@@ -459,7 +459,7 @@ impl ArchiveAccessorTranslator for fhost::ArchiveAccessorRequestStream {
         // the client may opt to use this as an optimization.
         let _ = responder.send();
         Some(ArchiveIteratorRequest {
-            iterator: Box::new(fuchsia_async::Socket::from_socket(stream).unwrap()),
+            iterator: Box::new(fuchsia_async::Socket::from_socket(stream)),
             parameters,
         })
     }
@@ -916,7 +916,7 @@ mod tests {
         let mut executor = fasync::TestExecutor::new();
         let (local, remote) = fuchsia_zircon::Socket::create_stream();
         drop(local);
-        let mut remote = fuchsia_async::Socket::from_socket(remote).unwrap();
+        let mut remote = fuchsia_async::Socket::from_socket(remote);
         let remote_writer = &mut remote as &mut dyn ArchiveAccessorWriter;
         {
             let mut fut = remote_writer.write(vec![FormattedContent::Text(Buffer {

@@ -30,8 +30,8 @@ async fn send_bytes(
     out: &'static [u8],
     after_send: AfterSend,
 ) {
-    let mut tx = fidl::AsyncSocket::from_socket(sockets.0).unwrap();
-    let mut rx = fidl::AsyncSocket::from_socket(sockets.1).unwrap();
+    let mut tx = fidl::AsyncSocket::from_socket(sockets.0);
+    let mut rx = fidl::AsyncSocket::from_socket(sockets.1);
     fixture.lock().await.log(&format!("#    send bytes from {:?} to {:?}: {:?}", tx, rx, out));
     let expect = out.to_vec();
     let (tx_done, rx_done) = oneshot::channel();

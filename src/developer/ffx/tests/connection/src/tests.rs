@@ -21,8 +21,7 @@ async fn test_stuff_socket(connector: LaunchedComponentConnector) {
     // Full socket shouldn't block other requests.
     assert_eq!(proxy.echo("john").await.unwrap(), "john");
     // All data should be available from the socket.
-    let mut async_socket =
-        fuchsia_async::Socket::from_socket(client_socket).expect("create async socket");
+    let mut async_socket = fuchsia_async::Socket::from_socket(client_socket);
     let mut socket_data = vec![];
     async_socket.read_to_end(&mut socket_data).await.expect("read socket");
     assert_eq!(socket_data, vec![0xFF; bytes_written as usize]);

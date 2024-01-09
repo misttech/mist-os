@@ -136,8 +136,8 @@ pub async fn run_process_async<'a>(
                 process.info().expect("process info");
             return_code
         }),
-        fasync::Socket::from_socket(stdout_reader).unwrap(),
-        fasync::Socket::from_socket(stderr_reader).unwrap(),
+        fasync::Socket::from_socket(stdout_reader),
+        fasync::Socket::from_socket(stderr_reader),
     )
 }
 

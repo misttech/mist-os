@@ -369,7 +369,7 @@ async fn run_single_stream_bidirectional_test(
 
     let mut write_socket = fasync::Socket::from_socket(
         read_socket.as_ref().duplicate_handle(fidl::Rights::SAME_RIGHTS)?,
-    )?;
+    );
 
     wait_for_magic_numbers(HashSet::from([SINGLE_STREAM_BIDIRECTIONAL_MAGIC_NUM]), control_socket)
         .await?;
@@ -650,7 +650,7 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
                 }?;
 
                 let (client_socket, device_socket) = fidl::Socket::create_stream();
-                let client_socket = fasync::Socket::from_socket(client_socket)?;
+                let client_socket = fasync::Socket::from_socket(client_socket);
 
                 responder.send(Ok(device_socket))
                     .map_err(|err| anyhow!("failed to send response to device: {}", err))?;

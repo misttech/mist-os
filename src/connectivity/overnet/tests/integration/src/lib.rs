@@ -142,7 +142,7 @@ async fn run_overnet_command(node: Arc<Router>, cmd: OvernetCommand) -> Result<(
             node.connect_to_service(node_id, &service_name, channel).await
         }
         OvernetCommand::AttachCircuitSocketLink(socket, is_server) => {
-            let (mut rx, mut tx) = fidl::AsyncSocket::from_socket(socket)?.split();
+            let (mut rx, mut tx) = fidl::AsyncSocket::from_socket(socket).split();
             let (errors_sender, _black_hole) = unbounded();
             multi_stream_node_connection_to_async(
                 node.circuit_node(),

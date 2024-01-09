@@ -25,7 +25,7 @@ use crate::common::*;
 const ADB_DEFAULT_PORT: u32 = 5555;
 
 async fn serve_adb_connection(mut stream: TcpStream, bridge_socket: fidl::Socket) -> Result<()> {
-    let mut bridge = fidl::AsyncSocket::from_socket(bridge_socket)?;
+    let mut bridge = fidl::AsyncSocket::from_socket(bridge_socket);
     let (breader, mut bwriter) = (&mut bridge).split();
     let (sreader, mut swriter) = (&mut stream).split();
 
@@ -226,7 +226,7 @@ mod test {
         stream.write_all(&test_data_1).await.unwrap();
 
         let mut buf = [0u8; 64];
-        let mut async_socket = fidl::AsyncSocket::from_socket(cbridge).unwrap();
+        let mut async_socket = fidl::AsyncSocket::from_socket(cbridge);
         let bytes_read = async_socket.read(&mut buf).await.unwrap();
         assert_eq!(test_data_1.len(), bytes_read);
         for (a, b) in test_data_1.iter().zip(buf[..bytes_read].iter()) {

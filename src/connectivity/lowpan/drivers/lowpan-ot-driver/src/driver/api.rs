@@ -543,7 +543,7 @@ where
 
         let (server_socket_fidl, client_socket_fidl) = fidl::Socket::create_stream();
         self.setup_ot_cli(server_socket_fidl).await?;
-        let mut client_socket = fuchsia_async::Socket::from_socket(client_socket_fidl)?;
+        let mut client_socket = fuchsia_async::Socket::from_socket(client_socket_fidl);
 
         // Flush out any previous response. If we don't do this then we might get
         // unexpected text at the top of the command output, which would be confusing.
@@ -585,7 +585,7 @@ where
         let ot_instance = &driver_state.ot_instance;
         let ot_ctl = &driver_state.ot_ctl;
         ot_ctl
-            .replace_client_socket(fuchsia_async::Socket::from_socket(server_socket)?, ot_instance);
+            .replace_client_socket(fuchsia_async::Socket::from_socket(server_socket), ot_instance);
         Ok(())
     }
 

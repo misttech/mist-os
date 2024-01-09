@@ -51,7 +51,7 @@ async fn connect(fuzz_manager: &fuzz::ManagerProxy) -> (fuzz::ControllerProxy, f
         .unwrap_or_else(|e| panic!("{}: {:?}", manager_name("GetOutput"), e));
     assert_eq!(status, Ok(()));
     let log_task = fasync::Task::spawn(async move {
-        let mut socket = fasync::Socket::from_socket(rx).unwrap();
+        let mut socket = fasync::Socket::from_socket(rx);
         let mut buf: [u8; BUF_SIZE as usize] = [0; BUF_SIZE as usize];
         let mut logs = Vec::new();
         loop {
@@ -80,15 +80,14 @@ async fn connect(fuzz_manager: &fuzz::ManagerProxy) -> (fuzz::ControllerProxy, f
 fn make_fidl_input(input: &str) -> Result<(fasync::Socket, fuzz::Input)> {
     let (rx, tx) = zx::Socket::create_stream();
     let fidl_input = fuzz::Input { socket: rx, size: input.len() as u64 };
-    let tx = fasync::Socket::from_socket(tx).context("failed to covert socket")?;
+    let tx = fasync::Socket::from_socket(tx);
     Ok((tx, fidl_input))
 }
 
 // Receives data from the socket in the |input|.
 async fn recv_input(input: fuzz::Input) -> Result<Vec<u8>> {
     let mut buf = vec![0; input.size as usize];
-    let mut rx =
-        fasync::Socket::from_socket(input.socket).context("Failed to create async socket")?;
+    let mut rx = fasync::Socket::from_socket(input.socket);
     rx.read_exact(&mut buf).await.context("Async socket read failed")?;
     Ok(buf)
 }

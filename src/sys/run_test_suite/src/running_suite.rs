@@ -833,11 +833,9 @@ mod test {
         let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
             .expect("create stream");
         let stdio_write_fut = async move {
-            let mut async_stdout =
-                fasync::Socket::from_socket(stdout_write).expect("make async socket");
+            let mut async_stdout = fasync::Socket::from_socket(stdout_write);
             async_stdout.write_all(STDOUT_CONTENT.as_bytes()).await.expect("write to socket");
-            let mut async_stderr =
-                fasync::Socket::from_socket(stderr_write).expect("make async socket");
+            let mut async_stderr = fasync::Socket::from_socket(stderr_write);
             async_stderr.write_all(STDERR_CONTENT.as_bytes()).await.expect("write to socket");
         };
         let test_fut = async move {
@@ -920,11 +918,9 @@ mod test {
         let serve_fut = async move {
             // server side will send all events, then write to (and close) sockets.
             serve_all_events(stream, all_events).await;
-            let mut async_stdout =
-                fasync::Socket::from_socket(stdout_write).expect("make async socket");
+            let mut async_stdout = fasync::Socket::from_socket(stdout_write);
             async_stdout.write_all(STDOUT_CONTENT.as_bytes()).await.expect("write to socket");
-            let mut async_stderr =
-                fasync::Socket::from_socket(stderr_write).expect("make async socket");
+            let mut async_stderr = fasync::Socket::from_socket(stderr_write);
             async_stderr.write_all(STDERR_CONTENT.as_bytes()).await.expect("write to socket");
         };
         let test_fut = async move {
@@ -1004,11 +1000,9 @@ mod test {
         let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>()
             .expect("create stream");
         let stdio_write_fut = async move {
-            let mut async_stdout =
-                fasync::Socket::from_socket(stdout_write).expect("make async socket");
+            let mut async_stdout = fasync::Socket::from_socket(stdout_write);
             async_stdout.write_all(STDOUT_CONTENT.as_bytes()).await.expect("write to socket");
-            let mut async_stderr =
-                fasync::Socket::from_socket(stderr_write).expect("make async socket");
+            let mut async_stderr = fasync::Socket::from_socket(stderr_write);
             async_stderr.write_all(STDERR_CONTENT.as_bytes()).await.expect("write to socket");
         };
         let test_fut = async move {

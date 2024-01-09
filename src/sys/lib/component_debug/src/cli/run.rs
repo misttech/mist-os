@@ -28,7 +28,7 @@ use {
 const TRANSFER_CHUNK_SIZE: usize = 8192;
 
 async fn copy<W: std::io::Write>(source: fidl::Socket, mut sink: W) -> Result<()> {
-    let mut source = fuchsia_async::Socket::from_socket(source)?;
+    let mut source = fuchsia_async::Socket::from_socket(source);
     let mut buf = [0u8; TRANSFER_CHUNK_SIZE];
     loop {
         let bytes_read = source.read(&mut buf).await?;

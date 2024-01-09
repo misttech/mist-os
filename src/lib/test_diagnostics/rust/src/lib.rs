@@ -76,7 +76,7 @@ pub async fn collect_and_send_string_output(
     socket: fidl::Socket,
     mut sender: mpsc::Sender<String>,
 ) -> Result<(), anyhow::Error> {
-    let mut async_socket = fidl::AsyncSocket::from_socket(socket)?;
+    let mut async_socket = fidl::AsyncSocket::from_socket(socket);
     loop {
         let maybe_string = SocketReadFut::new(&mut async_socket, |maybe_buf| {
             Ok(maybe_buf.map(|buf| String::from_utf8_lossy(buf).into()))

@@ -105,7 +105,7 @@ async fn get_raw_data(collector: &CollectorProxy) -> Result<Vec<u8>> {
     collector.collect_json_stats(tx)?;
 
     // Read all the bytes sent from the other end of the socket.
-    let mut rx_async = fidl::AsyncSocket::from_socket(rx)?;
+    let mut rx_async = fidl::AsyncSocket::from_socket(rx);
     let mut buffer = Vec::new();
     rx_async.read_to_end(&mut buffer).await?;
 
@@ -168,7 +168,7 @@ mod tests {
             fidl_fuchsia_memory_inspection::CollectorRequest::CollectJsonStats {
                 socket, ..
             } => {
-                let mut s = fidl::AsyncSocket::from_socket(socket).unwrap();
+                let mut s = fidl::AsyncSocket::from_socket(socket);
                 fuchsia_async::Task::local(async move {
                     s.write_all(&DATA_WRITTEN_BY_MEMORY_MONITOR).await.unwrap();
                 })

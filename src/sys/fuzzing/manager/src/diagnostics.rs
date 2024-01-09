@@ -168,7 +168,7 @@ trait ArtifactBridgeInternal: ArtifactBridge {
                 let socket_receiver = Rc::clone(&socket_receiver_rc);
                 let socket_fut = || async move {
                     let mut socket_receiver = socket_receiver.borrow_mut();
-                    socket_receiver.next().await.and_then(|s| fasync::Socket::from_socket(s).ok())
+                    socket_receiver.next().await.and_then(|s| Some(fasync::Socket::from_socket(s)))
                 };
                 let socket_fut = socket_fut().fuse();
                 pin_mut!(timer_fut, socket_fut);
@@ -183,14 +183,7 @@ trait ArtifactBridgeInternal: ArtifactBridge {
                 let mut socket_receiver = socket_receiver_rc.borrow_mut();
                 match socket_receiver.try_next() {
                     Ok(Some(s)) => {
-                        match fasync::Socket::from_socket(s) {
-                            Ok(s) => {
-                                socket = Some(s);
-                            }
-                            Err(e) => {
-                                warn!(?e, "failed to convert socket");
-                            }
-                        };
+                        socket = Some(fasync::Socket::from_socket(s));
                     }
                     // Either the socket_receiver closed, or there's no sockets available.
                     Ok(None) => break,
@@ -248,7 +241,7 @@ impl ArtifactBridgeInternal for SocketBridge {
         let mut artifact_receiver = self.artifact_receiver.borrow_mut();
         if let Some(socket) = artifact_receiver.next().await {
             let mut artifact = self.artifact.borrow_mut();
-            *artifact = fasync::Socket::from_socket(socket).ok();
+            *artifact = Some(fasync::Socket::from_socket(socket));
         }
     }
 

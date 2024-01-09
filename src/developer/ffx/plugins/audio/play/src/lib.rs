@@ -139,8 +139,7 @@ mod tests {
         let (play_remote, play_local) = fidl::Socket::create_datagram();
         let mut async_play_local = fidl::AsyncSocket::from_socket(
             play_local.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
-        )
-        .unwrap();
+        );
 
         async_play_local.write_all(ffx_audio_common::tests::WAV_HEADER_EXT).await.unwrap();
         let result = play_impl(

@@ -272,8 +272,8 @@ pub async fn handle_vsh<P: PlatformServices>(
 
     // No practical difference between |socket_in| and |socket_out| but semantically separate them
     let mut socket_in =
-        fasync::Socket::from_socket(raw_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;
-    let socket_out = fasync::Socket::from_socket(raw_socket)?;
+        fasync::Socket::from_socket(raw_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?);
+    let socket_out = fasync::Socket::from_socket(raw_socket);
 
     let is_login_shell = args.is_empty();
 

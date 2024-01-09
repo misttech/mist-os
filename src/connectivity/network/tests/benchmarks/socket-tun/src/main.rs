@@ -521,11 +521,7 @@ async fn main() {
             .await
             .expect("starting tracing FIDL")
             .expect("start tracing");
-        Some((
-            tracing_controller,
-            fasync::Socket::from_socket(tracing_socket).expect("make zircon socket async"),
-            file,
-        ))
+        Some((tracing_controller, fasync::Socket::from_socket(tracing_socket), file))
     } else {
         None
     };

@@ -72,7 +72,7 @@ impl AudioDaemon {
         let mut socket = socket::Socket {
             socket: &mut fasync::Socket::from_socket(
                 wav_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-            )?,
+            ),
         };
 
         let capturer_proxy = Self::create_capturer_from_location(
@@ -109,7 +109,7 @@ impl AudioDaemon {
         let mut stream = capturer_proxy.take_event_stream();
         let mut packets_so_far = 0;
 
-        let mut async_wav_writer = fidl::AsyncSocket::from_socket(wav_socket)?;
+        let mut async_wav_writer = fidl::AsyncSocket::from_socket(wav_socket);
 
         socket.write_wav_header(duration, &format).await?;
         let packet_fut = async {
@@ -452,7 +452,7 @@ impl AudioDaemon {
         let mut socket = socket::Socket {
             socket: &mut fasync::Socket::from_socket(
                 data_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-            )?,
+            ),
         };
         let spec = socket.read_wav_header().await?;
         let format = format_utils::Format::from(&spec);
@@ -508,9 +508,7 @@ impl AudioDaemon {
             // TODO(b/300279107): Calculate total bytes sent to an AudioRenderer.
             Self::send_next_packet(
                 offset.to_owned() as u64,
-                fasync::Socket::from_socket(
-                    data_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                )?,
+                fasync::Socket::from_socket(data_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?),
                 vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
                 &audio_renderer_proxy,
                 bytes_per_packet,
@@ -544,7 +542,7 @@ impl AudioDaemon {
 
         let mut device = device::Device::new(device_controller);
 
-        let async_socket = fasync::Socket::from_socket(data_socket)?;
+        let async_socket = fasync::Socket::from_socket(data_socket);
         device.play(async_socket).await
     }
 
@@ -595,7 +593,7 @@ impl AudioDaemon {
                 device
                     .record(
                         format_utils::Format::from(&stream_type),
-                        fasync::Socket::from_socket(wav_socket)?,
+                        fasync::Socket::from_socket(wav_socket),
                         duration,
                         cancel_server,
                     )

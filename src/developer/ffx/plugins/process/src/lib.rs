@@ -95,7 +95,7 @@ async fn get_raw_data(
     query_proxy.write_json_processes_data(tx)?;
 
     // Read all the bytes sent from the other end of the socket.
-    let mut rx_async = fidl::AsyncSocket::from_socket(rx)?;
+    let mut rx_async = fidl::AsyncSocket::from_socket(rx);
     let mut buffer = Vec::new();
     rx_async.read_to_end(&mut buffer).await?;
 
@@ -345,7 +345,7 @@ mod tests {
     fn setup_fake_query_svc() -> QueryProxy {
         fho::testing::fake_proxy(|request| match request {
             QueryRequest::WriteJsonProcessesData { socket, .. } => {
-                let mut s = fidl::AsyncSocket::from_socket(socket).unwrap();
+                let mut s = fidl::AsyncSocket::from_socket(socket);
                 fuchsia_async::Task::local(async move {
                     s.write_all(&serde_json::to_vec(&*EXPECTED_PROCESSES_DATA).unwrap())
                         .await

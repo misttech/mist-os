@@ -176,7 +176,7 @@ async fn check_body(body: Option<zx::Socket>, mut expected: &[u8]) {
     use futures::AsyncReadExt as _;
 
     let body = body.expect("response did not include body socket");
-    let mut body = fasync::Socket::from_socket(body).expect("failed to create async socket");
+    let mut body = fasync::Socket::from_socket(body);
 
     let mut buf = [0; 1024];
     while !expected.is_empty() {

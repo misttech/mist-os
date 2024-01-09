@@ -407,20 +407,7 @@ impl LibraryCommand {
                 };
             }
             Self::SocketRead { lib, socket, mut out_buf, responder } => {
-                let socket = match fidl::AsyncSocket::from_socket(socket) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        lib.write_err(e);
-                        responder
-                            .send(ReadResponse {
-                                actual_bytes_count: 0,
-                                actual_handles_count: 0,
-                                result: zx_status::Status::INTERNAL,
-                            })
-                            .unwrap();
-                        return;
-                    }
-                };
+                let socket = fidl::AsyncSocket::from_socket(socket);
                 let waker =
                     handle_notifier_waker(socket.raw_handle(), lib.notification_sender().await);
                 let task_ctx = &mut Context::from_waker(&waker);

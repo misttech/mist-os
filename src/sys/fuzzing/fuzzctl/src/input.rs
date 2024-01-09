@@ -115,8 +115,7 @@ impl Input {
     /// This will deliver the data to the `fuchsia.fuzzer.Input` created with this object.
     pub async fn send(mut self) -> Result<()> {
         let socket = self.socket.take().context("input already sent")?;
-        let mut writer = fidl::AsyncSocket::from_socket(socket)
-            .context("failed to convert socket for sending fuzz input")?;
+        let mut writer = fidl::AsyncSocket::from_socket(socket);
         writer.write_all(&self.data).await.context("failed to write fuzz input")?;
         Ok(())
     }
@@ -126,8 +125,7 @@ impl Input {
     /// Returns an error if unable to read from the underlying socket.
     pub async fn try_receive(fidl_input: FidlInput) -> Result<Self> {
         let mut data = Vec::new();
-        let reader = fidl::AsyncSocket::from_socket(fidl_input.socket)
-            .context("failed to convert socket for saving fuzz input")?;
+        let reader = fidl::AsyncSocket::from_socket(fidl_input.socket);
         reader
             .take(fidl_input.size)
             .read_to_end(&mut data)
@@ -224,8 +222,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_send() -> Result<()> {
         async fn recv(fidl_input: FidlInput, expected: &[u8]) {
-            let mut reader =
-                fidl::AsyncSocket::from_socket(fidl_input.socket).expect("from_socket failed");
+            let mut reader = fidl::AsyncSocket::from_socket(fidl_input.socket);
             let mut buf = Vec::new();
             let num_read = reader.read_to_end(&mut buf).await.expect("read_to_end failed");
             assert_eq!(num_read as u64, fidl_input.size);

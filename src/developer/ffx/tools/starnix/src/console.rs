@@ -17,7 +17,7 @@ use termion::raw::IntoRawMode;
 use crate::common::*;
 
 fn forward_stdin(console_in: fidl::Socket) -> Result<()> {
-    let mut tx = fidl::AsyncSocket::from_socket(console_in)?;
+    let mut tx = fidl::AsyncSocket::from_socket(console_in);
 
     // We spin off a separate thread to copy data from stdin into this console.
     //
@@ -34,7 +34,7 @@ fn forward_stdin(console_in: fidl::Socket) -> Result<()> {
 }
 
 async fn forward_stdout(console_out: fidl::Socket) -> Result<()> {
-    let rx = fidl::AsyncSocket::from_socket(console_out)?;
+    let rx = fidl::AsyncSocket::from_socket(console_out);
 
     // We spin off a separate thread to copy data from this console to stdout.
     //

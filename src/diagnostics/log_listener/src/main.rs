@@ -92,7 +92,7 @@ async fn main() -> Result<(), Error> {
     cmd.maybe_set_interest(&log_settings, &realm_proxy, cmd.json).await?;
     formatter.set_boot_timestamp(boot_ts.into_nanos());
     let _ = read_logs_from_socket(
-        fuchsia_async::Socket::from_socket(receiver).unwrap(),
+        fuchsia_async::Socket::from_socket(receiver),
         &mut formatter,
         &Symbolizer::new(),
     )

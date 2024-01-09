@@ -49,7 +49,7 @@ where
                 .map_err(|e| anyhow::anyhow!("future try join failed with error {e}"))
         },
         async move {
-            let mut socket_writer = fidl::AsyncSocket::from_socket(play_local)?;
+            let mut socket_writer = fidl::AsyncSocket::from_socket(play_local);
             let stdin_res = futures::io::copy(Unblock::new(input_reader), &mut socket_writer).await;
 
             // Close ffx end of socket so that daemon end reads EOF and stops waiting for data.
@@ -81,7 +81,7 @@ where
     };
 
     let wav_fut = {
-        futures::io::copy(fidl::AsyncSocket::from_socket(record_local)?, &mut output_writer)
+        futures::io::copy(fidl::AsyncSocket::from_socket(record_local), &mut output_writer)
             .map_err(|e| anyhow::anyhow!("wav output failure: {:?}", e))
     };
 
@@ -198,7 +198,7 @@ pub mod tests {
                 let data_socket =
                     payload.wav_source.ok_or(anyhow::anyhow!("Socket argument missing.")).unwrap();
 
-                let mut socket = fidl::AsyncSocket::from_socket(data_socket).unwrap();
+                let mut socket = fidl::AsyncSocket::from_socket(data_socket);
                 let mut wav_file = vec![0u8; 11];
                 fuchsia_async::Task::local(async move {
                     let _ = socket.read_exact(&mut wav_file).await.unwrap();
@@ -226,7 +226,7 @@ pub mod tests {
                     payload.wav_data.ok_or(anyhow::anyhow!("Socket argument missing.")).unwrap();
 
                 fuchsia_async::Task::local(async move {
-                    let mut socket = fidl::AsyncSocket::from_socket(wav_socket).unwrap();
+                    let mut socket = fidl::AsyncSocket::from_socket(wav_socket);
                     socket.write_all(SINE_WAV).await.unwrap();
                 })
                 .detach();

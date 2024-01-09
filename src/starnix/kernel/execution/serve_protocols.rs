@@ -177,8 +177,8 @@ fn forward_to_pty(
     // Matches fuchsia.io.Transfer capacity, somewhat arbitrarily.
     const BUFFER_CAPACITY: usize = 8192;
 
-    let mut rx = fuchsia_async::Socket::from_socket(console_in)?;
-    let mut tx = fuchsia_async::Socket::from_socket(console_out)?;
+    let mut rx = fuchsia_async::Socket::from_socket(console_in);
+    let mut tx = fuchsia_async::Socket::from_socket(console_out);
     let pty_sink = pty.clone();
     kernel.kthreads.spawn({
         move |_, current_task| {

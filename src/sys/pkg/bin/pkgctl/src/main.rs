@@ -428,7 +428,7 @@ async fn fetch_url<T: Into<String>>(url_string: T) -> Result<Vec<u8>, anyhow::Er
     }
 
     let socket = match response.body {
-        Some(s) => fasync::Socket::from_socket(s).context("Error while wrapping body socket")?,
+        Some(s) => fasync::Socket::from_socket(s),
         _ => {
             return Err(format_err!("failed to read UrlBody from the stream"));
         }

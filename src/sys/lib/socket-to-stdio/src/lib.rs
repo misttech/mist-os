@@ -92,8 +92,7 @@ where
         })
         .context("spawning stdin thread")?;
 
-    let (mut socket_in, mut socket_out) =
-        fuchsia_async::Socket::from_socket(socket).context("creating async socket_in")?.split();
+    let (mut socket_in, mut socket_out) = fuchsia_async::Socket::from_socket(socket).split();
 
     let stdin_to_socket = async move {
         while let Some(stdin) = stdin_recv.next().await {
@@ -148,7 +147,7 @@ mod tests {
             connect_socket_to_stdio_impl(socket_remote, || &b"test input"[..], vec![]).unwrap();
 
         let (connect_res, bytes_from_socket) = futures::join!(connect_fut, async move {
-            let mut socket = fuchsia_async::Socket::from_socket(socket).unwrap();
+            let mut socket = fuchsia_async::Socket::from_socket(socket);
             let mut out = vec![0u8; 100];
             let bytes_read = socket.read(&mut out).await.unwrap();
             drop(socket);

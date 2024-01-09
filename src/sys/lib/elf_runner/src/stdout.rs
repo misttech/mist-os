@@ -102,7 +102,7 @@ fn forward_socket_to_syslog(
 
 fn new_socket_bound_to_fd(fd: i32) -> Result<(fasync::Socket, fproc::HandleInfo), zx::Status> {
     let (tx, rx) = zx::Socket::create_stream();
-    let rx = fasync::Socket::from_socket(rx)?;
+    let rx = fasync::Socket::from_socket(rx);
     Ok((
         rx,
         fproc::HandleInfo {
@@ -224,7 +224,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_splits_into_max_size_chunks() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
-        let rx = fasync::Socket::from_socket(rx).unwrap();
+        let rx = fasync::Socket::from_socket(rx);
         let (mut sender, recv) = create_mock_logger();
         let msg = get_random_string(MAX_MESSAGE_SIZE * 4);
 
@@ -248,7 +248,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_splits_at_newline() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
-        let rx = fasync::Socket::from_socket(rx).unwrap();
+        let rx = fasync::Socket::from_socket(rx);
         let (mut sender, recv) = create_mock_logger();
         let msg = std::iter::repeat_with(|| {
             Alphanumeric.sample_string(&mut thread_rng(), MAX_MESSAGE_SIZE - 1)
@@ -270,7 +270,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_writes_when_message_is_received() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
-        let rx = fasync::Socket::from_socket(rx).unwrap();
+        let rx = fasync::Socket::from_socket(rx);
         let (mut sender, mut recv) = create_mock_logger();
         let messages: Vec<String> = vec!["Hello!\n".to_owned(), "World!\n".to_owned()];
 
@@ -296,7 +296,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_waits_for_entire_lines() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
-        let rx = fasync::Socket::from_socket(rx).unwrap();
+        let rx = fasync::Socket::from_socket(rx);
         let (mut sender, mut recv) = create_mock_logger();
 
         let ((), ()) = try_join!(
@@ -324,7 +324,7 @@ mod tests {
     #[fuchsia::test]
     async fn drain_lines_collapses_repeated_newlines() -> Result<(), Error> {
         let (tx, rx) = zx::Socket::create_stream();
-        let rx = fasync::Socket::from_socket(rx).unwrap();
+        let rx = fasync::Socket::from_socket(rx);
         let (mut sender, mut recv) = create_mock_logger();
 
         let drainer = Task::spawn(async move { drain_lines(rx, &mut sender).await });

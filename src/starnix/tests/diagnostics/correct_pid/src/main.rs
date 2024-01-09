@@ -24,7 +24,7 @@ async fn main() {
     info!("initializing tracing...");
     let tracing_controller = connect_to_protocol::<TracingControllerMarker>().unwrap();
     let (tracing_socket, tracing_socket_write) = Socket::create_stream();
-    let mut tracing_socket = AsyncSocket::from_socket(tracing_socket).unwrap();
+    let mut tracing_socket = AsyncSocket::from_socket(tracing_socket);
     tracing_controller
         .initialize_tracing(
             &TraceConfig {

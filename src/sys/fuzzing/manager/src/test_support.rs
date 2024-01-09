@@ -109,8 +109,7 @@ pub fn connect_to_manager(test_realm: Rc<RefCell<TestRealm>>) -> Result<fuzz::Ma
 pub async fn read_async(socket: &zx::Socket) -> Result<String> {
     let socket =
         socket.duplicate_handle(zx::Rights::SAME_RIGHTS).context("failed to duplicate handle")?;
-    let mut socket =
-        fasync::Socket::from_socket(socket).context("failed to create async socket")?;
+    let mut socket = fasync::Socket::from_socket(socket);
     let mut buf: [u8; BUF_SIZE as usize] = [0; BUF_SIZE as usize];
     let bytes_read = socket.read(&mut buf).await.context("failed to read from socket")?;
     Ok(std::str::from_utf8(&buf[..bytes_read]).unwrap_or_default().to_string())
@@ -347,14 +346,14 @@ fn send_default_run_events(
         .context("failed to send RunStarted run event")?;
 
     let (out_rx, out_tx) = zx::Socket::create_stream();
-    let stdout = fasync::Socket::from_socket(out_tx).context("failed to create async socket")?;
+    let stdout = fasync::Socket::from_socket(out_tx);
     fuzzers.put_stdout(&url, stdout);
     fuzzers
         .send_run_event(url, RunEventPayload::Artifact(Artifact::Stdout(out_rx)))
         .context("failed to send Stdout run event")?;
 
     let (err_rx, err_tx) = zx::Socket::create_stream();
-    let stderr = fasync::Socket::from_socket(err_tx).context("failed to create async socket")?;
+    let stderr = fasync::Socket::from_socket(err_tx);
     fuzzers.put_stderr(&url, stderr);
     fuzzers
         .send_run_event(url, RunEventPayload::Artifact(Artifact::Stderr(err_rx)))

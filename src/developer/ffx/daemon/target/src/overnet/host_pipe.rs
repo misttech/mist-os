@@ -940,14 +940,14 @@ where
 /// creates the socket for overnet. IoError is possible from socket operations.
 fn overnet_pipe(node: Arc<overnet_core::Router>) -> Result<fidl::AsyncSocket, io::Error> {
     let (local_socket, remote_socket) = fidl::Socket::create_stream();
-    let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
+    let local_socket = fidl::AsyncSocket::from_socket(local_socket);
     let (errors_sender, errors) = futures::channel::mpsc::unbounded();
     Task::spawn(
         futures::future::join(
             async move {
                 if let Err(e) = async move {
                     let (mut rx, mut tx) = futures::AsyncReadExt::split(
-                        fuchsia_async::Socket::from_socket(remote_socket)?,
+                        fuchsia_async::Socket::from_socket(remote_socket),
                     );
                     circuit::multi_stream::multi_stream_node_connection_to_async(
                         node.circuit_node(),

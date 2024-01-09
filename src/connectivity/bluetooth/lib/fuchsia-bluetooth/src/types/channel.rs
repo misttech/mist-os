@@ -88,7 +88,7 @@ impl Channel {
     /// Returns Err(status) if there is an error.
     pub fn from_socket(socket: zx::Socket, max_tx_size: usize) -> Result<Self, zx::Status> {
         Ok(Channel {
-            socket: fasync::Socket::from_socket(socket)?,
+            socket: fasync::Socket::from_socket(socket),
             mode: ChannelMode::Basic,
             max_tx_size,
             flush_timeout: Arc::new(Mutex::new(None)),
@@ -195,7 +195,7 @@ impl TryFrom<fidl_fuchsia_bluetooth_bredr::Channel> for Channel {
 
     fn try_from(fidl: bredr::Channel) -> Result<Self, Self::Error> {
         Ok(Self {
-            socket: fasync::Socket::from_socket(fidl.socket.ok_or(zx::Status::INVALID_ARGS)?)?,
+            socket: fasync::Socket::from_socket(fidl.socket.ok_or(zx::Status::INVALID_ARGS)?),
             mode: fidl.channel_mode.unwrap_or(bredr::ChannelMode::Basic).into(),
             max_tx_size: fidl.max_tx_sdu_size.ok_or(zx::Status::INVALID_ARGS)? as usize,
             flush_timeout: Arc::new(Mutex::new(fidl.flush_timeout.map(zx::Duration::from_nanos))),

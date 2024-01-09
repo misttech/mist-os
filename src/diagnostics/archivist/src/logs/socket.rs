@@ -127,7 +127,7 @@ mod tests {
         packet.fill_data(1..6, b'A' as _);
         packet.fill_data(7..12, b'B' as _);
 
-        let socket = fasync::Socket::from_socket(sout).unwrap();
+        let socket = fasync::Socket::from_socket(sout);
         let mut ls = LogMessageSocket::new(socket, Default::default());
         sin.write(packet.as_bytes()).unwrap();
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -184,7 +184,7 @@ mod tests {
         ))
         .build();
 
-        let socket = fasync::Socket::from_socket(sout).unwrap();
+        let socket = fasync::Socket::from_socket(sout);
         let mut stream = LogMessageSocket::new_structured(socket, Default::default());
 
         sin.write(encoded).unwrap();

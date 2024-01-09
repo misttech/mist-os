@@ -568,6 +568,10 @@ impl fmt::Debug for EHandle {
 
 impl EHandle {
     /// Returns the thread-local executor.
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
     pub fn local() -> Self {
         let inner = EXECUTOR
             .with(|e| e.borrow().as_ref().map(|x| x.0.clone()))

@@ -371,15 +371,11 @@ mod tests {
         let local_node = overnet_core::Router::new(None).unwrap();
         let node2 = overnet_core::Router::new(None).unwrap();
         let (rx2, tx2) = fidl::Socket::create_stream();
-        let (mut rx2, mut tx2) = (
-            fidl::AsyncSocket::from_socket(rx2).unwrap(),
-            fidl::AsyncSocket::from_socket(tx2).unwrap(),
-        );
+        let (mut rx2, mut tx2) =
+            (fidl::AsyncSocket::from_socket(rx2), fidl::AsyncSocket::from_socket(tx2));
         let (rx1, tx1) = fidl::Socket::create_stream();
-        let (mut rx1, mut tx1) = (
-            fidl::AsyncSocket::from_socket(rx1).unwrap(),
-            fidl::AsyncSocket::from_socket(tx1).unwrap(),
-        );
+        let (mut rx1, mut tx1) =
+            (fidl::AsyncSocket::from_socket(rx1), fidl::AsyncSocket::from_socket(tx1));
         let (error_sink, _) = futures::channel::mpsc::unbounded();
         let error_sink_clone = error_sink.clone();
         let local_node_clone = Arc::clone(&local_node);
