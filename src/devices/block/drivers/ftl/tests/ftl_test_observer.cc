@@ -45,7 +45,7 @@ void FtlTestObserver::CreateDevice() {
 
                       .page_size = 4096,
                       .pages_per_block = 64,
-                      .num_blocks = 192,
+                      .num_blocks = 96,
                       .ecc_bits = 8,
                       .oob_size = 8,
                       .nand_class = fuchsia_hardware_nand::wire::Class::kFtl,
