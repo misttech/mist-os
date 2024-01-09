@@ -82,21 +82,20 @@ pub trait WriteObjectHandle: ObjectHandle {
     async fn flush(&self) -> Result<(), Error>;
 }
 
-#[async_trait]
 /// This trait is an asynchronous streaming writer.
-pub trait WriteBytes {
+pub trait WriteBytes: Sized {
     fn handle(&self) -> &dyn WriteObjectHandle;
 
     /// Buffers writes to be written to the underlying handle. This may flush bytes immediately
     /// or when buffers are full.
-    async fn write_bytes(&mut self, buf: &[u8]) -> Result<(), Error>;
+    fn write_bytes(&mut self, buf: &[u8]) -> impl Future<Output = Result<(), Error>> + Send;
 
     /// Called to flush to the handle.  Named to avoid conflict with the flush method above.
-    async fn complete(&mut self) -> Result<(), Error>;
+    fn complete(&mut self) -> impl Future<Output = Result<(), Error>> + Send;
 
     /// Moves the offset forward by `amount`, which will result in zeroes in the output stream, even
     /// if no other data is appended to it.
-    async fn skip(&mut self, amount: u64) -> Result<(), Error>;
+    fn skip(&mut self, amount: u64) -> impl Future<Output = Result<(), Error>> + Send;
 }
 
 impl ReadObjectHandle for Box<dyn ReadObjectHandle> {

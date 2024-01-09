@@ -1239,7 +1239,6 @@ impl<'a, S: HandleOwner> DirectWriter<'a, S> {
     }
 }
 
-#[async_trait]
 impl<'a, S: HandleOwner> WriteBytes for DirectWriter<'a, S> {
     fn handle(&self) -> &dyn WriteObjectHandle {
         self.handle

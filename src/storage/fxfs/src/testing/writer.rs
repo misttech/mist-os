@@ -5,7 +5,6 @@
 use {
     crate::object_handle::{WriteBytes, WriteObjectHandle},
     anyhow::Error,
-    async_trait::async_trait,
     storage_device::buffer::Buffer,
 };
 
@@ -23,7 +22,6 @@ impl<'a> Writer<'a> {
     }
 }
 
-#[async_trait]
 impl WriteBytes for Writer<'_> {
     fn handle(&self) -> &dyn WriteObjectHandle {
         self.handle
