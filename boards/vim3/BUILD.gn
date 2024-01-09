@@ -258,7 +258,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/bt-hci-broadcom.cm" ]
     },
     {
-      package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-dfv2"
+      package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali"
       package_set = "base"
       driver_components = [ "meta/msd_arm_dfv2.cm" ]
     },

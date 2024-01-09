@@ -114,24 +114,6 @@ source_set("src") {
   ]
 }
 
-source_set("parent_device_dfv1") {
-  sources = [
-    "parent_device_dfv1.cc",
-    "parent_device_dfv1.h",
-  ]
-
-  deps = [
-    "//src/graphics/magma/lib/magma/platform:thread",
-    "//src/graphics/magma/lib/magma/platform/zircon:interrupt",
-    "//src/graphics/magma/lib/magma/platform/zircon:mmio",
-    "//src/graphics/magma/lib/magma/platform/zircon:thread_profile",
-  ]
-  public_deps = [
-    ":src",
-    "//src/devices/bus/lib/device-protocol-pdev",
-  ]
-}
-
 source_set("parent_device_dfv2") {
   sources = [
     "parent_device_dfv2.cc",

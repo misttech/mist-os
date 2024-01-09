@@ -10,65 +10,6 @@ declare_args() {
   enable_msd_arm_mali_dfv2 = false
 }
 
-fuchsia_driver("msd_arm-driver") {
-  output_name = "msd_arm"
-  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
-
-  deps = [
-    ":msd_arm_entry",
-    "src",
-    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
-  ]
-}
-
-fuchsia_driver_component("msd_arm") {
-  component_name = "msd_arm"
-  deps = [
-    ":msd_arm-driver",
-    ":msd_arm_bind",
-  ]
-  info = "msd_arm-info.json"
-  manifest = "meta/msd_arm.cml"
-}
-
-# The driver framework can't use the initial composite bind rules when rebinding a driver, so the
-# "rebind" driver has different bind rules so it can be bound the second time.
-# TODO(https://fxbug.dev/124976): Unify rebind and production drivers.
-fuchsia_driver_component("msd_arm_rebind") {
-  component_name = "msd_arm_rebind"
-  deps = [
-    ":msd_arm-driver",
-    ":msd_arm_rebind_bind",
-  ]
-  info = "msd_arm-info.json"
-  manifest = "meta/msd_arm_rebind.cml"
-}
-
-fuchsia_driver("msd_arm_test-driver") {
-  testonly = true
-  output_name = "msd_arm_test"
-  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
-
-  deps = [
-    ":msd_arm_test_entry",
-    "src",
-    "tests/unit_tests:tests_requiring_hardware",
-    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
-    "//src/graphics/magma/tests/msd_conformance_tests",
-  ]
-}
-
-fuchsia_driver_component("msd_arm_test") {
-  testonly = true
-  component_name = "msd_arm_test"
-  deps = [
-    ":msd_arm_test-driver",
-    ":msd_arm_test_bind",
-  ]
-  info = "msd_arm_test-info.json"
-  manifest = "meta/msd_arm_test.cml"
-}
-
 driver_bind_rules("msd_arm_bind") {
   rules = "msd_arm.bind"
   tests = "tests/bind_tests.json"
@@ -184,47 +125,6 @@ fuchsia_driver_component("msd_arm_test_dfv2") {
   manifest = "meta/msd_arm_test_dfv2.cml"
 }
 
-entry_deps = [
-  "src:parent_device_dfv1",
-  "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
-  "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp",
-  "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp",
-  "//src/devices/bin/driver_runtime",
-  "//src/devices/lib/driver",
-  "//src/graphics/magma/lib/magma/platform:bus_mapper",
-  "//src/graphics/magma/lib/magma/platform:logger",
-  "//src/graphics/magma/lib/magma/platform:trace",
-  "//src/graphics/magma/lib/magma/platform/zircon:status",
-  "//src/graphics/magma/lib/magma/platform/zircon:thread_profile",
-  "//src/graphics/magma/lib/magma/util:macros",
-  "//src/graphics/magma/lib/magma_service/sys_driver",
-  "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:device_impl",
-  "//src/lib/ddk",
-  "//src/lib/ddktl",
-  "//zircon/system/ulib/trace",
-  "//zircon/system/ulib/trace-vthread",
-  "//zircon/system/ulib/zx",
-]
-
-source_set("msd_arm_entry") {
-  sources = [ "src/driver_entry.cc" ]
-  deps = entry_deps + [ "src" ]
-}
-
-source_set("msd_arm_test_entry") {
-  testonly = true
-  sources = [
-    "src/driver_entry.cc",
-    "src/driver_test_gtest.cc",
-  ]
-  defines = [ "MAGMA_TEST_DRIVER=1" ]
-  deps = entry_deps + [
-           "src",
-           "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
-           "//third_party/googletest:gtest",
-         ]
-}
-
 group("tests") {
   testonly = true
   public_deps = [
@@ -234,20 +134,12 @@ group("tests") {
 }
 
 group("msd-system") {
-  if (enable_msd_arm_mali_dfv2) {
-    deps = [ ":msd-arm-mali-dfv2" ]
-  } else {
-    deps = [ ":msd-arm-mali" ]
-  }
+  deps = [ ":msd-arm-mali" ]
 }
 
 group("msd-config") {
 }
 
-fuchsia_driver_package("msd-arm-mali-dfv2") {
-  driver_components = [ ":msd_arm_dfv2" ]
-}
-
 fuchsia_driver_package("msd-arm-mali") {
-  driver_components = [ ":msd_arm" ]
+  driver_components = [ ":msd_arm_dfv2" ]
 }
