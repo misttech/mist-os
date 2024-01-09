@@ -32,6 +32,8 @@
         type: "CpuControlHandler",
         name: "cpu_control",
         config: {
+            sustainable_power: 1.3,
+            power_gain: 0.04,
             driver_path: "/dev/class/cpu-ctrl/000",
             capacitance: 150E-12,
             logical_cpu_numbers: [
@@ -72,11 +74,10 @@
         name: "thermal_policy",
         dependencies: {
             temperature_handler_node: "temperature_soc_pll",
-            cpu_control_nodes: [
+            system_power_handler_node: "sys_shutdown",
+            thermal_load_notify_nodes: [
                 "cpu_control",
             ],
-            system_power_handler_node: "sys_shutdown",
-            thermal_load_notify_nodes: [],
             platform_metrics_node: "platform_metrics",
         },
         config: {
@@ -86,8 +87,6 @@
                 target_temperature: 85.0,
                 e_integral_min: -20.0,
                 e_integral_max: 0.0,
-                sustainable_power: 1.3,
-                integral_gain: 0.2,
             },
             thermal_shutdown_temperature: 95.0,
         },

@@ -9,7 +9,7 @@ use crate::platform_metrics::PlatformMetric;
 use crate::shutdown_request::{RebootReason, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::timer::get_periodic_timer_stream;
-use crate::types::{Celsius, Nanoseconds, Seconds, ThermalLoad, Watts};
+use crate::types::{Celsius, Nanoseconds, Seconds, ThermalLoad};
 use crate::utils::get_current_timestamp;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
@@ -34,7 +34,6 @@ use tracing::*;
 ///
 /// Sends Messages:
 ///     - ReadTemperature
-///     - SetMaxPowerConsumption
 ///     - SystemShutdown
 ///     - UpdateThermalLoad
 ///     - LogPlatformMetric
@@ -60,8 +59,6 @@ impl<'a> ThermalPolicyBuilder<'a> {
             target_temperature: f64,
             e_integral_min: f64,
             e_integral_max: f64,
-            sustainable_power: f64,
-            integral_gain: f64,
         }
 
         #[derive(Deserialize)]
@@ -72,7 +69,6 @@ impl<'a> ThermalPolicyBuilder<'a> {
 
         #[derive(Deserialize)]
         struct Dependencies {
-            cpu_control_nodes: Vec<String>,
             system_power_handler_node: String,
             temperature_handler_node: String,
             thermal_load_notify_nodes: Vec<String>,
@@ -88,12 +84,6 @@ impl<'a> ThermalPolicyBuilder<'a> {
         let data: JsonData = json::from_value(json_data).unwrap();
         let thermal_config = ThermalConfig {
             temperature_node: nodes[&data.dependencies.temperature_handler_node].clone(),
-            cpu_control_nodes: data
-                .dependencies
-                .cpu_control_nodes
-                .iter()
-                .map(|node| nodes[node].clone())
-                .collect(),
             sys_pwr_handler: nodes[&data.dependencies.system_power_handler_node].clone(),
             thermal_load_notify_nodes: data
                 .dependencies
@@ -111,8 +101,6 @@ impl<'a> ThermalPolicyBuilder<'a> {
                     target_temperature: Celsius(data.config.controller_params.target_temperature),
                     e_integral_min: data.config.controller_params.e_integral_min,
                     e_integral_max: data.config.controller_params.e_integral_max,
-                    sustainable_power: Watts(data.config.controller_params.sustainable_power),
-                    integral_gain: data.config.controller_params.integral_gain,
                 },
                 thermal_shutdown_temperature: Celsius(data.config.thermal_shutdown_temperature),
             },
@@ -183,11 +171,6 @@ pub struct ThermalConfig {
     /// this node responds to the ReadTemperature message.
     pub temperature_node: Rc<dyn Node>,
 
-    /// The nodes used to impose limits on CPU power state. There will be one node for each CPU
-    /// power domain (e.g., big.LITTLE). It is expected that these nodes respond to the
-    /// SetMaxPowerConsumption message.
-    pub cpu_control_nodes: Vec<Rc<dyn Node>>,
-
     /// The node to handle system power state changes (e.g., shutdown). It is expected that this
     /// node responds to the SystemShutdown message.
     pub sys_pwr_handler: Rc<dyn Node>,
@@ -221,20 +204,14 @@ pub struct ThermalControllerParams {
     /// Time constant for the low-pass filter used for smoothing the temperature input signal
     pub filter_time_constant: Seconds,
 
-    /// Target temperature for the PI control calculation
+    /// Target temperature for the integral control calculation
     pub target_temperature: Celsius,
 
-    /// Minimum integral error [degC * s] for the PI control calculation
+    /// Minimum integral error [degC * s] for the integral control calculation
     pub e_integral_min: f64,
 
-    /// Maximum integral error [degC * s] for the PI control calculation
+    /// Maximum integral error [degC * s] for the integral control calculation
     pub e_integral_max: f64,
-
-    /// The available power when there is no temperature error
-    pub sustainable_power: Watts,
-
-    /// The integral gain [W / (degC * s)] for the PI control calculation
-    pub integral_gain: f64,
 }
 
 /// State information that is used for calculations across controller iterations
@@ -329,16 +306,6 @@ impl ThermalPolicy {
         fuchsia_trace::instant!(
             "power_manager",
             "ThermalPolicy::process_thermal_load_result",
-            fuchsia_trace::Scope::Thread,
-            "result" => format!("{:?}", result).as_str()
-        );
-
-        // Update the power allocation according to the new temperature error readings
-        let result = self.update_power_allocation(error_integral).await;
-        log_if_err!(result, "Error running thermal feedback controller");
-        fuchsia_trace::instant!(
-            "power_manager",
-            "ThermalPolicy::update_power_allocation_result",
             fuchsia_trace::Scope::Thread,
             "result" => format!("{:?}", result).as_str()
         );
@@ -521,76 +488,6 @@ impl ThermalPolicy {
             )
         }
     }
-
-    /// Updates the power allocation according to the provided integral error
-    /// of temperature.
-    async fn update_power_allocation(&self, error_integral: f64) -> Result<(), Error> {
-        fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalPolicy::update_power_allocation",
-            "error_integral" => error_integral
-        );
-        let available_power = self.calculate_available_power(error_integral);
-        fuchsia_trace::counter!(
-            "power_manager",
-            "ThermalPolicy available_power",
-            0,
-            "available_power" => available_power.0
-        );
-
-        self.distribute_power(available_power).await
-    }
-
-    /// A PI control algorithm that uses temperature as the measured process variable, and
-    /// available power as the control variable.
-    fn calculate_available_power(&self, error_integral: f64) -> Watts {
-        fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalPolicy::calculate_available_power",
-            "error_integral" => error_integral
-        );
-
-        let controller_params = &self.config.policy_params.controller_params;
-        let i_term = error_integral * controller_params.integral_gain;
-        let power_available = f64::max(0.0, controller_params.sustainable_power.0 + i_term);
-
-        Watts(power_available)
-    }
-
-    /// This function is responsible for distributing the available power (as determined by the
-    /// prior PI calculation) to the various power actors that are included in this closed loop
-    /// system. Initially, CPU is the only power actor. In later versions of the thermal policy,
-    /// there may be more power actors with associated "weights" for distributing power amongst
-    /// them.
-    async fn distribute_power(&self, mut total_available_power: Watts) -> Result<(), Error> {
-        fuchsia_trace::duration!(
-            "power_manager",
-            "ThermalPolicy::distribute_power",
-            "total_available_power" => total_available_power.0
-        );
-
-        // The power distribution currently works by allocating the total available power to the
-        // first CPU control node in `cpu_control_nodes`. The node replies to the
-        // SetMaxPowerConsumption message with the amount of power it was able to utilize. This
-        // utilized amount is subtracted from the total available power, then the remaining power is
-        // allocated to the remaining CPU control nodes in the same way.
-
-        // TODO(https://fxbug.dev/48205): We may want to revisit this distribution algorithm to avoid potentially
-        // starving some CPU control nodes. We'll want to have some discussions and learn more about
-        // intended big.LITTLE scheduling and operation to better inform our decisions here. We may
-        // find that we'll need to first query the nodes to learn how much power they intend to use
-        // before making allocation decisions.
-        for node in self.config.cpu_control_nodes.iter() {
-            if let MessageReturn::SetMaxPowerConsumption(power_used) = self
-                .send_message(&node, &Message::SetMaxPowerConsumption(total_available_power))
-                .await?
-            {
-                total_available_power = total_available_power - power_used;
-            }
-        }
-
-        Ok(())
-    }
 }
 
 #[async_trait(?Send)]
@@ -655,8 +552,6 @@ impl InspectData {
         ctrl_params_node.record_double("target_temperature (C)", params.target_temperature.0);
         ctrl_params_node.record_double("e_integral_min", params.e_integral_min);
         ctrl_params_node.record_double("e_integral_max", params.e_integral_max);
-        ctrl_params_node.record_double("sustainable_power (W)", params.sustainable_power.0);
-        ctrl_params_node.record_double("integral_gain", params.integral_gain);
         policy_params_node.record(ctrl_params_node);
 
         self.root_node.record(policy_params_node);
@@ -679,8 +574,6 @@ pub mod tests {
                 target_temperature: Celsius(85.0),
                 e_integral_min: -20.0,
                 e_integral_max: 0.0,
-                sustainable_power: Watts(1.1),
-                integral_gain: 0.2,
             },
             thermal_shutdown_temperature: Celsius(95.0),
         }
@@ -728,7 +621,6 @@ pub mod tests {
     async fn test_get_time_delta() {
         let thermal_config = ThermalConfig {
             temperature_node: create_dummy_node(),
-            cpu_control_nodes: vec![create_dummy_node()],
             sys_pwr_handler: create_dummy_node(),
             thermal_load_notify_nodes: vec![create_dummy_node()],
             policy_params: default_policy_params(),
@@ -753,7 +645,6 @@ pub mod tests {
 
         let thermal_config = ThermalConfig {
             temperature_node: create_dummy_node(),
-            cpu_control_nodes: vec![create_dummy_node()],
             sys_pwr_handler: create_dummy_node(),
             thermal_load_notify_nodes: vec![create_dummy_node()],
             policy_params,
@@ -767,84 +658,6 @@ pub mod tests {
         assert_eq!(node.get_temperature_error(Celsius(90.0), Seconds(1.0)), -20.0);
     }
 
-    /// Tests that the ThermalPolicy will correctly divide total available power amongst multiple
-    /// CPU control nodes.
-    #[fasync::run_singlethreaded(test)]
-    async fn test_multiple_cpu_actors() {
-        let mut mock_maker = MockNodeMaker::new();
-
-        // Set up the two CpuControlHandler mock nodes. The message reply to SetMaxPowerConsumption
-        // indicates how much power the mock node was able to utilize, and ultimately drives the
-        // test logic.
-        let cpu_node_1 = mock_maker.make(
-            "CpuCtrlNode1",
-            vec![
-                // On the first iteration, this node will consume all available power (1W)
-                (
-                    msg_eq!(SetMaxPowerConsumption(Watts(1.0))),
-                    msg_ok_return!(SetMaxPowerConsumption(Watts(1.0))),
-                ),
-                // On the second iteration, this node will consume half of the available power
-                // (0.5W)
-                (
-                    msg_eq!(SetMaxPowerConsumption(Watts(1.0))),
-                    msg_ok_return!(SetMaxPowerConsumption(Watts(0.5))),
-                ),
-                // On the third iteration, this node will consume none of the available power
-                // (0.0W)
-                (
-                    msg_eq!(SetMaxPowerConsumption(Watts(1.0))),
-                    msg_ok_return!(SetMaxPowerConsumption(Watts(0.0))),
-                ),
-            ],
-        );
-        let cpu_node_2 = mock_maker.make(
-            "CpuCtrlNode2",
-            vec![
-                // On the first iteration, the first node consumes all available power (1W), so
-                // expect to receive a power allocation of 0W
-                (
-                    msg_eq!(SetMaxPowerConsumption(Watts(0.0))),
-                    msg_ok_return!(SetMaxPowerConsumption(Watts(0.0))),
-                ),
-                // On the second iteration, the first node consumes half of the available power
-                // (1W), so expect to receive a power allocation of 0.5W
-                (
-                    msg_eq!(SetMaxPowerConsumption(Watts(0.5))),
-                    msg_ok_return!(SetMaxPowerConsumption(Watts(0.5))),
-                ),
-                // On the third iteration, the first node consumes none of the available power
-                // (1W), so expect to receive a power allocation of 1W
-                (
-                    msg_eq!(SetMaxPowerConsumption(Watts(1.0))),
-                    msg_ok_return!(SetMaxPowerConsumption(Watts(1.0))),
-                ),
-            ],
-        );
-
-        let thermal_config = ThermalConfig {
-            temperature_node: mock_maker.make(
-                "TemperatureNode",
-                vec![(msg_eq!(GetDriverPath), msg_ok_return!(GetDriverPath(String::new())))],
-            ),
-            cpu_control_nodes: vec![cpu_node_1, cpu_node_2],
-            sys_pwr_handler: mock_maker.make("SysPwrNode", vec![]),
-            thermal_load_notify_nodes: vec![mock_maker.make("ThermalLoadNotify", vec![])],
-            policy_params: default_policy_params(),
-            platform_metrics_node: create_dummy_node(),
-        };
-        let node_futures = FuturesUnordered::new();
-        let node = ThermalPolicyBuilder::new(thermal_config).build(&node_futures).await.unwrap();
-
-        // Distribute 1W of total power across the two CPU nodes. The real test logic happens inside
-        // the mock node, where we verify that the expected power amounts are granted to both CPU
-        // nodes via the SetMaxPowerConsumption message. Repeat for the number of messages that the
-        // mock nodes expect to receive (three).
-        node.distribute_power(Watts(1.0)).await.unwrap();
-        node.distribute_power(Watts(1.0)).await.unwrap();
-        node.distribute_power(Watts(1.0)).await.unwrap();
-    }
-
     /// Tests for the presence and correctness of dynamically-added inspect data
     #[fasync::run_singlethreaded(test)]
     async fn test_inspect_data() {
@@ -856,7 +669,6 @@ pub mod tests {
                 "TemperatureNode",
                 vec![(msg_eq!(GetDriverPath), msg_ok_return!(GetDriverPath(String::new())))],
             ),
-            cpu_control_nodes: vec![mock_maker.make("CpuCtrlNode", vec![])],
             sys_pwr_handler: mock_maker.make("SysPwrNode", vec![]),
             thermal_load_notify_nodes: vec![mock_maker.make("ThermalLoadNotify", vec![])],
             policy_params: default_policy_params(),
@@ -886,9 +698,6 @@ pub mod tests {
                                 policy_params.controller_params.target_temperature.0,
                             "e_integral_min": policy_params.controller_params.e_integral_min,
                             "e_integral_max": policy_params.controller_params.e_integral_max,
-                            "sustainable_power (W)":
-                                policy_params.controller_params.sustainable_power.0,
-                            "integral_gain": policy_params.controller_params.integral_gain,
                         }
                     }
                 }
@@ -910,26 +719,21 @@ pub mod tests {
                     "target_temperature": 80.0,
                     "e_integral_min": -20.0,
                     "e_integral_max": 0.0,
-                    "sustainable_power": 0.876,
-                    "integral_gain": 0.08
                 }
             },
             "dependencies": {
-                "cpu_control_nodes": [
-                    "cpu_control"
-                ],
                 "system_power_handler_node": "sys_power",
                 "temperature_handler_node": "temperature",
-                "thermal_load_notify_nodes": ["thermal_load_notify"],
+                "thermal_load_notify_nodes": ["thermal_load_notify", "cpu_control"],
                 "platform_metrics_node": "metrics"
               },
         });
 
         let mut nodes: HashMap<String, Rc<dyn Node>> = HashMap::new();
         nodes.insert("temperature".to_string(), create_dummy_node());
-        nodes.insert("cpu_control".to_string(), create_dummy_node());
         nodes.insert("sys_power".to_string(), create_dummy_node());
         nodes.insert("thermal_load_notify".to_string(), create_dummy_node());
+        nodes.insert("cpu_control".to_string(), create_dummy_node());
         nodes.insert("metrics".to_string(), create_dummy_node());
         let _ = ThermalPolicyBuilder::new_from_json(json_data, &nodes);
     }
@@ -946,8 +750,6 @@ pub mod tests {
         policy_params.controller_params.e_integral_max = 0.0;
         policy_params.controller_params.e_integral_min = -20.0;
         policy_params.thermal_shutdown_temperature = Celsius(80.0);
-        policy_params.controller_params.integral_gain = 0.1;
-        policy_params.controller_params.sustainable_power = Watts(1.0);
         policy_params.controller_params.filter_time_constant = Seconds(0.0);
 
         // The executor's fake time must be set before node creation to ensure the periodic timer's
@@ -964,9 +766,8 @@ pub mod tests {
         let node_futures = FuturesUnordered::new();
         let node_builder = ThermalPolicyBuilder::new(ThermalConfig {
             temperature_node: mock_temperature.clone(),
-            cpu_control_nodes: vec![create_dummy_node()],
             sys_pwr_handler: create_dummy_node(),
-            thermal_load_notify_nodes: vec![],
+            thermal_load_notify_nodes: vec![create_dummy_node()],
             platform_metrics_node: mock_metrics.clone(),
             policy_params,
         })
@@ -1057,7 +858,6 @@ pub mod tests {
                     msg_ok_return!(GetDriverPath("Sensor1".to_string())),
                 )],
             ),
-            cpu_control_nodes: vec![create_dummy_node()],
             sys_pwr_handler: create_dummy_node(),
             thermal_load_notify_nodes: vec![mock_maker.make(
                 "ThermalLoadNotify",
@@ -1100,7 +900,6 @@ pub mod tests {
                     msg_ok_return!(GetDriverPath("Sensor1".to_string())),
                 )],
             ),
-            cpu_control_nodes: vec![create_dummy_node()],
             sys_pwr_handler: create_dummy_node(),
             thermal_load_notify_nodes: vec![mock_notify1.clone(), mock_notify2.clone()],
             policy_params: default_policy_params(),

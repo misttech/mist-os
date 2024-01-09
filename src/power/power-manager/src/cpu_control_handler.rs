@@ -7,12 +7,13 @@ use crate::error::PowerManagerError;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
-use crate::types::{Farads, Hertz, PState, Volts, Watts};
+use crate::types::{Farads, Hertz, PState, ThermalLoad, Volts, Watts};
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
 use fidl_fuchsia_hardware_cpu_ctrl as fcpuctrl;
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_thermal as fthermal;
 use fuchsia_inspect::{self as inspect, Property};
 use serde_derive::Deserialize;
 use serde_json as json;
@@ -31,7 +32,7 @@ use std::rc::Rc;
 ///          interface.
 ///
 /// Handles Messages:
-///     - SetMaxPowerConsumption
+///     - UpdateThermalLoad
 ///
 /// Sends Messages:
 ///     - GetCpuLoads
@@ -99,6 +100,8 @@ pub fn get_cpu_power(capacitance: Farads, voltage: Volts, op_completion_rate: He
 /// A builder for constructing the CpuControlHandler node. The fields of this struct are documented
 /// as part of the CpuControlHandler struct.
 pub struct CpuControlHandlerBuilder<'a> {
+    sustainable_power: Option<Watts>,
+    power_gain: Option<Watts>,
     cpu_driver_path: Option<String>,
     cpu_stats_handler: Option<Rc<dyn Node>>,
     cpu_dev_handler: Option<Rc<dyn Node>>,
@@ -115,6 +118,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         use crate::test::mock_node::create_dummy_node;
 
         Self {
+            sustainable_power: Some(Watts(0.0)),
+            power_gain: Some(Watts(0.0)),
             cpu_driver_path: Some("TestCpuControlHandler".to_string()),
             cpu_stats_handler: Some(create_dummy_node()),
             cpu_dev_handler: Some(create_dummy_node()),
@@ -124,6 +129,18 @@ impl<'a> CpuControlHandlerBuilder<'a> {
             capacitance: Some(Farads(0.0)),
             logical_cpu_numbers: Some(vec![0]),
         }
+    }
+
+    #[cfg(test)]
+    pub fn sustainable_power(mut self, power: Watts) -> Self {
+        self.sustainable_power = Some(power);
+        self
+    }
+
+    #[cfg(test)]
+    pub fn power_gain(mut self, power: Watts) -> Self {
+        self.power_gain = Some(power);
+        self
     }
 
     #[cfg(test)]
@@ -171,6 +188,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
     pub fn new_from_json(json_data: json::Value, nodes: &HashMap<String, Rc<dyn Node>>) -> Self {
         #[derive(Deserialize)]
         struct Config {
+            sustainable_power: f64,
+            power_gain: f64,
             driver_path: String,
             capacitance: f64,
             min_cpu_clock_speed: f64,
@@ -191,6 +210,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
 
         let data: JsonData = json::from_value(json_data).unwrap();
         Self {
+            sustainable_power: Some(Watts(data.config.sustainable_power)),
+            power_gain: Some(Watts(data.config.power_gain)),
             cpu_driver_path: Some(data.config.driver_path),
             min_cpu_clock_speed: Some(Hertz(data.config.min_cpu_clock_speed)),
             cpu_stats_handler: Some(nodes[&data.dependencies.cpu_stats_handler_node].clone()),
@@ -203,6 +224,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
     }
 
     pub fn build(self) -> Result<Rc<CpuControlHandler>, Error> {
+        let sustainable_power = ok_or_default_err!(self.sustainable_power)?;
+        let power_gain = ok_or_default_err!(self.power_gain)?;
         let cpu_driver_path = ok_or_default_err!(self.cpu_driver_path)?;
         let cpu_stats_handler = ok_or_default_err!(self.cpu_stats_handler)?;
         let cpu_dev_handler = ok_or_default_err!(self.cpu_dev_handler)?;
@@ -230,6 +253,8 @@ impl<'a> CpuControlHandlerBuilder<'a> {
         let trace_counter_id = hasher.finish();
 
         Ok(Rc::new(CpuControlHandler {
+            sustainable_power,
+            power_gain,
             init_done: AsyncEvent::new(),
             cpu_driver_path,
             cpu_stats_handler,
@@ -250,6 +275,12 @@ impl<'a> CpuControlHandlerBuilder<'a> {
 }
 
 pub struct CpuControlHandler {
+    /// The available power when thermal load is 0.
+    sustainable_power: Watts,
+
+    /// A scale factor that maps thermal load to available power.
+    power_gain: Watts,
+
     /// Signalled after `init()` has completed. Used to ensure node doesn't process messages until
     /// its `init()` has completed.
     init_done: AsyncEvent,
@@ -324,19 +355,68 @@ impl CpuControlHandler {
         }
     }
 
+    /// Handles an `UpdateThermalLoad` message.
+    ///
+    /// The new thermal load is checked for validity then used to calculate the available power.
+    async fn handle_update_thermal_load(
+        &self,
+        thermal_load: ThermalLoad,
+        sensor: &str,
+    ) -> Result<MessageReturn, PowerManagerError> {
+        fuchsia_trace::duration!(
+            "power_manager",
+            "CpuControlHandler::handle_update_thermal_load",
+            "thermal_load" => thermal_load.0,
+            "sensor" => sensor
+        );
+
+        if thermal_load > ThermalLoad(fthermal::MAX_THERMAL_LOAD) {
+            return Err(PowerManagerError::InvalidArgument(format!(
+                "Thermal load {:?} exceeds max {}",
+                thermal_load,
+                fthermal::MAX_THERMAL_LOAD
+            )));
+        }
+
+        let available_power = self.calculate_available_power(thermal_load);
+        fuchsia_trace::counter!(
+            "power_manager",
+            "CpuControlHandler available_power",
+            0,
+            "available_power" => available_power.0
+        );
+
+        if let Err(e) = self.set_max_power_consumption(&available_power).await {
+            tracing::error!("Error setting max power consumption: {}", e);
+        }
+
+        Ok(MessageReturn::UpdateThermalLoad)
+    }
+
+    /// Calculate available power based on thermal load.
+    fn calculate_available_power(&self, thermal_load: ThermalLoad) -> Watts {
+        fuchsia_trace::duration!(
+            "power_manager",
+            "CpuControlHandler::calculate_available_power",
+            "thermal_load" => thermal_load.0
+        );
+
+        let power_available =
+            f64::max(0.0, self.sustainable_power.0 - thermal_load.0 as f64 * self.power_gain.0);
+
+        Watts(power_available)
+    }
+
     /// Sets the P-state to the highest-power state with consumption below `max_power`.
     ///
     /// The estimated power consumption depends on the operation completion rate by the CPU.
     /// We assume that the rate of operations requested over the next sample interval will be
     /// the same as it was over the previous sample interval, up to CPU's max completion rate
     /// for a P-state under consideration.
-    async fn handle_set_max_power_consumption(
-        &self,
-        max_power: &Watts,
-    ) -> Result<MessageReturn, PowerManagerError> {
+    async fn set_max_power_consumption(&self, max_power: &Watts) -> Result<(), Error> {
         fuchsia_trace::duration!(
             "power_manager",
-            "CpuControlHandler::handle_set_max_power_consumption",
+            "CpuControlHandler::set_max_power_consumption",
             "driver" => self.cpu_driver_path.as_str(),
             "max_power" => max_power.0
         );
@@ -413,6 +493,13 @@ impl CpuControlHandler {
             }
         }
 
+        fuchsia_trace::counter!(
+            "power_manager",
+            "CpuControlHandler estimated_power",
+            0,
+            "value (W)" => estimated_power.0
+        );
+
         if p_state_index != current_p_state_index {
             fuchsia_trace::instant!(
                 "power_manager",
@@ -441,8 +528,7 @@ impl CpuControlHandler {
             self.trace_counter_id,
             self.cpu_driver_path.as_str() => p_state_index as u32
         );
-
-        Ok(MessageReturn::SetMaxPowerConsumption(estimated_power))
+        Ok(())
     }
 }
 
@@ -527,7 +613,9 @@ impl Node for CpuControlHandler {
 
     async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, PowerManagerError> {
         match msg {
-            Message::SetMaxPowerConsumption(p) => self.handle_set_max_power_consumption(p).await,
+            Message::UpdateThermalLoad(thermal_load, sensor) => {
+                self.handle_update_thermal_load(*thermal_load, sensor).await
+            }
             _ => Err(PowerManagerError::Unsupported),
         }
     }
@@ -774,10 +862,10 @@ pub mod tests {
         }
     }
 
-    /// Tests that the SetMaxPowerConsumption message causes the node to correctly consider CPU load
+    /// Tests that the UpdateThermalLoad message causes the node to correctly consider CPU load
     /// and parameters to choose the appropriate P-states.
     #[fasync::run_singlethreaded(test)]
-    async fn test_set_max_power_consumption() {
+    async fn test_update_thermal_load() {
         let mut mock_maker = MockNodeMaker::new();
 
         // Arbitrary CpuControlParams chosen to allow the node to demonstrate P-state selection
@@ -807,7 +895,7 @@ pub mod tests {
         let stats_node = mock_maker.make(
             "StatsNode",
             // The CpuControlHandler node queries the current CPU load each time it receives a
-            // SetMaxPowerConsumption message
+            // UpdateThermalLoad message
             vec![
                 // Make StatsNode give load for more CPUs than we care about to test the filtering
                 // logic
@@ -834,6 +922,8 @@ pub mod tests {
             ],
         );
         let cpu_ctrl_node = CpuControlHandlerBuilder::new()
+            .sustainable_power(power_consumption[0].mul_scalar(1.5))
+            .power_gain(power_consumption[0].mul_scalar(0.015))
             .cpu_stats_handler(stats_node)
             .cpu_dev_handler(devhost_node.clone())
             .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_p_states(cpu_params.p_states))
@@ -842,32 +932,49 @@ pub mod tests {
             .build_and_init()
             .await;
 
-        // Test case 1: Allow power consumption of the highest P-state; expect to be in P-state 0
-        let commanded_power = power_consumption[0].mul_scalar(1.01);
-        let expected_power = power_consumption[0];
-        assert_matches!(
-            cpu_ctrl_node.handle_message(&Message::SetMaxPowerConsumption(commanded_power)).await,
-            Ok(MessageReturn::SetMaxPowerConsumption(power)) if power == expected_power
+        // Test case 1: Select a thermal load that allows power consumption of the highest P-state;
+        // expect to be in P-state 0
+        let available_power = power_consumption[0].mul_scalar(1.01);
+        // Thermal load is calculated to ensure that `available_power` is the approximate output of
+        // `calculate_available_power`
+        let thermal_load = ThermalLoad(
+            ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
+                as u32,
         );
+        let result = cpu_ctrl_node
+            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
+            .await;
+        result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 0);
 
-        // Test case 2: Lower power consumption to that of P-state 1; expect to be in P-state 1
-        let commanded_power = power_consumption[1].mul_scalar(1.01);
-        let expected_power = power_consumption[1];
-        assert_matches!(
-            cpu_ctrl_node.handle_message(&Message::SetMaxPowerConsumption(commanded_power)).await,
-            Ok(MessageReturn::SetMaxPowerConsumption(power)) if power == expected_power
+        // Test case 2: Select a thermal load that lowers power consumption to that of P-state 1;
+        // expect to be in P-state 1
+        let available_power = power_consumption[1].mul_scalar(1.01);
+        // Thermal load is calculated to ensure that `available_power` is the approximate output of
+        // `calculate_available_power`
+        let thermal_load = ThermalLoad(
+            ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
+                as u32,
         );
+        let result = cpu_ctrl_node
+            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
+            .await;
+        result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
 
-        // Test case 3: Reduce the power consumption limit below the lowest P-state; expect to drop
-        // to the lowest P-state
-        let commanded_power = Watts(0.0);
-        let expected_power = power_consumption[2];
-        assert_matches!(
-            cpu_ctrl_node.handle_message(&Message::SetMaxPowerConsumption(commanded_power)).await,
-            Ok(MessageReturn::SetMaxPowerConsumption(power)) if power == expected_power
+        // Test case 3: Select a thermal load that reduce the power consumption limit below the
+        // lowest P-state; expect to drop to the lowest P-state
+        let available_power = Watts(0.0);
+        // Thermal load is calculated to ensure that `available_power` is the approximate output of
+        // `calculate_available_power`
+        let thermal_load = ThermalLoad(
+            ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
+                as u32,
         );
+        let result = cpu_ctrl_node
+            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
+            .await;
+        result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
     }
 
@@ -901,7 +1008,7 @@ pub mod tests {
         let stats_node = mock_maker.make(
             "StatsNode",
             // The CpuControlHandler node queries the current CPU load each time it receives a
-            // SetMaxPowerConsumption message
+            // UpdateThermalLoad message
             vec![
                 (msg_eq!(GetCpuLoads), msg_ok_return!(GetCpuLoads(vec![1.0; 4]))),
                 (msg_eq!(GetCpuLoads), msg_ok_return!(GetCpuLoads(vec![1.0; 4]))),
@@ -922,6 +1029,8 @@ pub mod tests {
         );
 
         let cpu_ctrl_node = CpuControlHandlerBuilder::new()
+            .sustainable_power(power_consumption[0].mul_scalar(1.5))
+            .power_gain(power_consumption[0].mul_scalar(0.015))
             .cpu_ctrl_proxy(fake_cpu_ctrl_driver_with_p_states(p_states))
             .capacitance(capacitance)
             .logical_cpu_numbers(logical_cpu_numbers)
@@ -931,23 +1040,34 @@ pub mod tests {
             .build_and_init()
             .await;
 
-        // Test case 1: Allow power consumption of the highest P-state; expect to be in P-state 0
-        let commanded_power = power_consumption[0].mul_scalar(1.01);
-        let expected_power = power_consumption[0];
-        assert_matches!(
-            cpu_ctrl_node.handle_message(&Message::SetMaxPowerConsumption(commanded_power)).await,
-            Ok(MessageReturn::SetMaxPowerConsumption(power)) if power == expected_power
+        // Test case 1: Select a thermal load that allows power consumption of the highest P-state;
+        // expect to be in P-state 0
+        let available_power = power_consumption[0].mul_scalar(1.01);
+        // Thermal load is calculated to ensure that `available_power` is the approximate output of
+        // `calculate_available_power`
+        let thermal_load = ThermalLoad(
+            ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
+                as u32,
         );
+        let result = cpu_ctrl_node
+            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
+            .await;
+        result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 0);
 
-        // Test case 2: Reduce power consumption to below the lowest P-state; expect to be in
-        // P-state 1 (state 2 should be disallowed).
-        let commanded_power = Watts(0.0);
-        let expected_power = power_consumption[1];
-        assert_matches!(
-            cpu_ctrl_node.handle_message(&Message::SetMaxPowerConsumption(commanded_power)).await,
-            Ok(MessageReturn::SetMaxPowerConsumption(power)) if power == expected_power
+        // Test case 2: Select a thermal load that reduces power consumption to below the lowest
+        // P-state; expect to be in P-state 1 (state 2 should be disallowed).
+        let available_power = Watts(0.0);
+        // Thermal load is calculated to ensure that `available_power` is the approximate output of
+        // `calculate_available_power`
+        let thermal_load = ThermalLoad(
+            ((cpu_ctrl_node.sustainable_power.0 - available_power.0) / cpu_ctrl_node.power_gain.0)
+                as u32,
         );
+        let result = cpu_ctrl_node
+            .handle_message(&Message::UpdateThermalLoad(thermal_load, "sensor".to_string()))
+            .await;
+        result.unwrap();
         assert_eq!(get_perf_state(devhost_node.clone()).await, 1);
     }
 
@@ -1003,6 +1123,8 @@ pub mod tests {
             "type": "CpuControlHandler",
             "name": "cpu_control",
             "config": {
+                "sustainable_power": 0.952,
+                "power_gain": 0.0096,
                 "driver_path": "/dev/class/cpu-ctrl/000",
                 "capacitance": 1.2E-10,
                 "min_cpu_clock_speed": 1.0e9,

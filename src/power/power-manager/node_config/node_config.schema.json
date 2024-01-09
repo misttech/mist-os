@@ -58,6 +58,15 @@
                     "config": {
                         "type": "object",
                         "properties": {
+                            "sustainable_power": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            },
+                            "power_gain": {
+                                "type": "number",
+                                "minimum": 0
+                            },
                             "driver_path": {
                                 "type": "string"
                             },
@@ -151,6 +160,15 @@
                     "config": {
                         "type": "object",
                         "properties": {
+                            "sustainable_power": {
+                                "type": "number",
+                                "minimum": 0,
+                                "exclusiveMinimum": true
+                            },
+                            "power_gain": {
+                                "type": "number",
+                                "minimum": 0
+                            },
                             "clusters": {
                                 "type": "array",
                                 "minItems": 1,
@@ -592,13 +610,6 @@
                     "dependencies": {
                         "type": "object",
                         "properties": {
-                            "cpu_control_nodes": {
-                                "type": "array",
-                                "minItems": 1,
-                                "items": {
-                                    "type": "string"
-                                }
-                            },
                             "platform_metrics_node": {
                                 "type": "string"
                             },
@@ -617,7 +628,6 @@
                         },
                         "additionalProperties": false,
                         "required": [
-                            "cpu_control_nodes",
                             "platform_metrics_node",
                             "system_power_handler_node",
                             "temperature_handler_node",
@@ -655,15 +665,6 @@
                                     "e_integral_max": {
                                         "type": "number",
                                         "minimum": 0
-                                    },
-                                    "sustainable_power": {
-                                        "type": "number",
-                                        "minimum": 0,
-                                        "exclusiveMinimum": true
-                                    },
-                                    "integral_gain": {
-                                        "type": "number",
-                                        "minimum": 0
                                     }
                                 },
                                 "additionalProperties": false,
@@ -672,9 +673,7 @@
                                     "filter_time_constant",
                                     "target_temperature",
                                     "e_integral_min",
-                                    "e_integral_max",
-                                    "sustainable_power",
-                                    "integral_gain"
+                                    "e_integral_max"
                                 ]
                             }
                         },

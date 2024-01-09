@@ -6,11 +6,12 @@ use crate::error::PowerManagerError;
 use crate::message::{Message, MessageResult, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
-use crate::types::{NormPerfs, PState, Watts};
+use crate::types::{NormPerfs, PState, ThermalLoad, Watts};
 use crate::utils::result_debug_panic::ResultDebugPanic;
 use anyhow::{bail, format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
+use fidl_fuchsia_thermal as fthermal;
 use fuchsia_inspect::{self as inspect, ArrayProperty as _, Property as _};
 use fuchsia_zircon::sys;
 use serde_derive::Deserialize;
@@ -29,7 +30,7 @@ use std::rc::Rc;
 ///          interface for managing DVFS.
 ///
 /// Handles Messages:
-///     - SetMaxPowerConsumption
+///     - UpdateThermalLoad
 ///
 /// Sends Messages:
 ///     - GetCpuLoads
@@ -404,6 +405,8 @@ struct ThermalStateConfig {
 
 #[derive(Deserialize)]
 struct Config {
+    sustainable_power: f64,
+    power_gain: f64,
     clusters: Vec<ClusterConfig>,
     thermal_states: Vec<ThermalStateConfig>,
 }
@@ -423,6 +426,8 @@ struct JsonData {
 
 /// Builder for `CpuManager`
 pub struct CpuManagerBuilder<'a> {
+    sustainable_power: Watts,
+    power_gain: Watts,
     cluster_configs: Vec<ClusterConfig>,
 
     /// Parallel to `cluster_configs`; contains one `CpuDeviceHandler` node (or equivalent) for each
@@ -449,6 +454,8 @@ impl<'a> CpuManagerBuilder<'a> {
         let syscall_handler = nodes[&data.dependencies.syscall_handler].clone();
 
         Self::new(
+            Watts(data.config.sustainable_power),
+            Watts(data.config.power_gain),
             data.config.clusters,
             cluster_handlers,
             data.config.thermal_states,
@@ -458,6 +465,8 @@ impl<'a> CpuManagerBuilder<'a> {
     }
 
     fn new(
+        sustainable_power: Watts,
+        power_gain: Watts,
         cluster_configs: Vec<ClusterConfig>,
         cluster_handlers: Vec<Rc<dyn Node>>,
         thermal_state_configs: Vec<ThermalStateConfig>,
@@ -465,6 +474,8 @@ impl<'a> CpuManagerBuilder<'a> {
         cpu_stats_handler: Rc<dyn Node>,
     ) -> Self {
         Self {
+            sustainable_power,
+            power_gain,
             cluster_configs,
             cluster_handlers,
             thermal_state_configs,
@@ -498,6 +509,8 @@ impl<'a> CpuManagerBuilder<'a> {
         };
 
         Ok(Rc::new(CpuManager {
+            sustainable_power: self.sustainable_power,
+            power_gain: self.power_gain,
             init_done: AsyncEvent::new(),
             cpu_stats_handler: self.cpu_stats_handler,
             syscall_handler: self.syscall_handler,
@@ -515,6 +528,12 @@ impl<'a> CpuManagerBuilder<'a> {
 }
 
 pub struct CpuManager {
+    /// The available power when thermal load is 0.
+    sustainable_power: Watts,
+
+    /// A scale factor that maps thermal load to available power.
+    power_gain: Watts,
+
     /// Signalled after `init()` has completed. Used to ensure node doesn't process messages until
     /// its `init()` has completed.
     init_done: AsyncEvent,
@@ -646,13 +665,62 @@ impl CpuManager {
         }
     }
 
-    /// Handles a SetMaxPowerConsumption message. If an error is encountered in the execution of
-    /// this method, CpuManager will keep itself in a usable state by using pessimistic estimates of
-    /// any value that it cannot determine and then propagate the error to the caller.
-    async fn handle_set_max_power_consumption(&self, available_power: Watts) -> MessageResult {
+    /// Handles an `UpdateThermalLoad` message.
+    ///
+    /// The new thermal load is checked for validity then used to calculate the available power.
+    async fn handle_update_thermal_load(
+        &self,
+        thermal_load: ThermalLoad,
+        sensor: &str,
+    ) -> Result<MessageReturn, PowerManagerError> {
         fuchsia_trace::duration!(
             "power_manager",
-            "CpuManager::handle_set_max_power_consumption",
+            "CpuManager::handle_update_thermal_load",
+            "thermal_load" => thermal_load.0,
+            "sensor" => sensor
+        );
+
+        if thermal_load > ThermalLoad(fthermal::MAX_THERMAL_LOAD) {
+            return Err(PowerManagerError::InvalidArgument(format!(
+                "Thermal load {:?} exceeds max {}",
+                thermal_load,
+                fthermal::MAX_THERMAL_LOAD
+            )));
+        }
+
+        let available_power = self.calculate_available_power(thermal_load);
+        fuchsia_trace::counter!(
+            "power_manager",
+            "CpuManager available_power",
+            0,
+            "available_power" => available_power.0
+        );
+        self.set_max_power_consumption(available_power).await;
+
+        Ok(MessageReturn::UpdateThermalLoad)
+    }
+
+    /// Calculate available power based on thermal load.
+    fn calculate_available_power(&self, thermal_load: ThermalLoad) -> Watts {
+        fuchsia_trace::duration!(
+            "power_manager",
+            "CpuManager::calculate_available_power",
+            "thermal_load" => thermal_load.0
+        );
+
+        let power_available =
+            f64::max(0.0, self.sustainable_power.0 - thermal_load.0 as f64 * self.power_gain.0);
+
+        Watts(power_available)
+    }
+
+    /// If an error is encountered in the execution of this method, CpuManager will keep itself in
+    /// a usable state by using pessimistic estimates of any value that it cannot determine and then
+    /// log the error.
+    async fn set_max_power_consumption(&self, available_power: Watts) {
+        fuchsia_trace::duration!(
+            "power_manager",
+            "CpuManager::set_max_power_consumption",
             "available_power" => available_power.0
         );
 
@@ -661,17 +729,16 @@ impl CpuManager {
         self.inspect.available_power.set(available_power.0);
 
         // Gather CPU loads over the last time interval. In the unlikely event of an error, use the
-        // worst-case CPU load of 1.0 for all CPUs and throttle accordingly before propagating the
-        // error.
-        let (cpu_loads, load_query_error) = match self.get_cpu_loads().await {
-            Ok(loads) => (loads, None),
+        // worst-case CPU load of 1.0 for all CPUs and throttle accordingly.
+        let cpu_loads = match self.get_cpu_loads().await {
+            Ok(loads) => loads,
             Err(e) => {
                 tracing::error!(
                     "Error querying CPU loads: {}\nWill throttle assuming maximal load.",
                     e
                 );
                 self.inspect.last_error.set(&e.to_string());
-                (vec![1.0; self.mutable_inner.borrow().num_cpus as usize], Some(e))
+                vec![1.0; self.mutable_inner.borrow().num_cpus as usize]
             }
         };
 
@@ -715,7 +782,8 @@ impl CpuManager {
 
         if let Err(e) = self.update_thermal_state(new_thermal_state_index).await {
             self.inspect.last_error.set(&e.to_string());
-            return Err(e);
+            tracing::error!("Error updating thermal states: {}", e);
+            return;
         }
 
         fuchsia_trace::counter!(
@@ -733,12 +801,6 @@ impl CpuManager {
             "value (W)" => estimate.power.0
         );
         self.inspect.projected_power.set(estimate.power.0);
-
-        // Bubble up any error that may have occurred while querying CPU load.
-        match load_query_error {
-            None => Ok(MessageReturn::SetMaxPowerConsumption(estimate.power)),
-            Some(e) => Err(e.into()),
-        }
     }
 }
 
@@ -883,7 +945,9 @@ impl Node for CpuManager {
 
     async fn handle_message(&self, msg: &Message) -> MessageResult {
         match msg {
-            &Message::SetMaxPowerConsumption(p) => self.handle_set_max_power_consumption(p).await,
+            Message::UpdateThermalLoad(thermal_load, sensor) => {
+                self.handle_update_thermal_load(*thermal_load, sensor).await
+            }
             _ => Err(PowerManagerError::Unsupported),
         }
     }
@@ -997,6 +1061,11 @@ mod tests {
         PState { frequency: Hertz(0.8e9), voltage: Volts(0.3) },
     ];
     static LITTLE_PERFORMANCE_PER_GHZ: NormPerfs = NormPerfs(0.5);
+
+    // Select sensible random numbers here.
+    // They determine the correlation between thermal load and available power.
+    static DEFUALT_SUSTAINABLE_POWER: Watts = Watts(6.22);
+    static DEFUALT_POWER_GAIN: Watts = Watts(0.0622046);
 
     fn make_default_cluster_configs() -> Vec<ClusterConfig> {
         vec![
@@ -1129,6 +1198,8 @@ mod tests {
             "type": "CpuManager",
             "name": "cpu_manager",
             "config": {
+                "sustainable_power": DEFUALT_SUSTAINABLE_POWER.0,
+                "power_gain": DEFUALT_POWER_GAIN.0,
                 "clusters": [
                       {
                           "name": "big_cluster",
@@ -1230,6 +1301,8 @@ mod tests {
             },
         ];
         let builder = CpuManagerBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
             cluster_configs.clone(),
             vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],
             thermal_state_configs.clone(),
@@ -1255,6 +1328,8 @@ mod tests {
             },
         ];
         let builder = CpuManagerBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
             cluster_configs.clone(),
             vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],
             thermal_state_configs,
@@ -1281,6 +1356,8 @@ mod tests {
             },
         ];
         let builder = CpuManagerBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
             cluster_configs.clone(),
             vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],
             thermal_state_configs.clone(),
@@ -1307,6 +1384,8 @@ mod tests {
             },
         ];
         let builder = CpuManagerBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
             cluster_configs.clone(),
             vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],
             thermal_state_configs.clone(),
@@ -1342,6 +1421,8 @@ mod tests {
             dynamic_power_per_normperf_w: 1.0,
         }];
         let builder = CpuManagerBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
             make_default_cluster_configs(),
             vec![big_cluster_handler, little_cluster_handler],
             thermal_state_configs,
@@ -1351,9 +1432,9 @@ mod tests {
         assert!(builder.build().unwrap().init().await.is_err());
     }
 
-    // Verify that CpuManager responds as expected to SetMaxPowerConsumption messages.
+    // Verify that CpuManager responds as expected to UpdateThermalLoad messages.
     #[fasync::run_singlethreaded(test)]
-    async fn test_set_max_power_consumption() {
+    async fn test_update_thermal_load() {
         let handlers = Handlers::new();
 
         let thermal_state_configs = vec![
@@ -1378,6 +1459,8 @@ mod tests {
         ];
 
         let node = CpuManagerBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
             make_default_cluster_configs(),
             vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],
             thermal_state_configs,
@@ -1387,50 +1470,65 @@ mod tests {
         .build_and_init()
         .await;
 
+        // The thermal load is 52, we have max power consumption of 2.985W.
         // The current P-state is 0, so with 0.1 fractional utililzation per core, we have:
         //   Big cluster: 0.2 cores load -> 0.4GHz utilized -> 0.4 NormPerfs
         //   Little cluster: 0.2 cores load -> 0.2GHz utilized -> 0.1 NormPerfs
         // At thermal state 0, the projected power use at 0.5 NormPerfs is
         //   2W static + 0.5W dynamic = 2.5W
-        // This is within the 3W budget, so there are no P-state changes.
+        // This is within the 2.985W budget, so there are no P-state changes.
         handlers.enqueue_cpu_loads(vec![0.1; 4]);
-        let result = node.handle_message(&Message::SetMaxPowerConsumption(Watts(3.0))).await;
+        let result = node
+            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(52), "Sensor".to_string()))
+            .await;
         result.unwrap();
 
+        // The thermal load is 52, we have max power consumption of 2.985W.
         // The current P-state is 0, so with 0.25 fractional utililzation per core, we have:
         //   Big cluster: 0.5 cores load -> 1GHz utilized -> 1 NormPerfs
         //   Little cluster: 0.5 cores load -> 0.5GHz utilized -> 0.25 NormPerfs
         // Projected power usage at 1.25 NormPerfs is:
-        //   Thermal state 0: 2W static + 1.25 dynamic = 3.25W => over 3W budget
-        //   Thermal state 1: 1.5W static + 1W dynamic = 2.5W => within 3W budget
+        //   Thermal state 0: 2W static + 1.25 dynamic = 3.25W => over 2.985W budget
+        //   Thermal state 1: 1.5W static + 1W dynamic = 2.5W => within 2.985W budget
         // So the new thermal state is 1, for which the little cluster changes to P-state 1.
         handlers.enqueue_cpu_loads(vec![0.25; 4]);
         handlers.expect_little_pstate(1);
-        let result = node.handle_message(&Message::SetMaxPowerConsumption(Watts(3.0))).await;
+        let result = node
+            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(52), "Sensor".to_string()))
+            .await;
         result.unwrap();
 
-        // CPU load stays the same, but the power budget drops to 2.4W, below allocation for thermal
+        // The thermal load is 61, we have max power consumption of 2.426W.
+        // CPU load stays the same, but the power budget drops to 2.426W, below allocation for thermal
         // state 1. This pushes us to thermal state 2, with big P-state 1 and little P-state 2.
         handlers.enqueue_cpu_loads(vec![0.25; 4]);
         handlers.expect_big_pstate(1);
         handlers.expect_little_pstate(2);
-        let result = node.handle_message(&Message::SetMaxPowerConsumption(Watts(2.4))).await;
+        let result = node
+            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(61), "Sensor".to_string()))
+            .await;
         result.unwrap();
 
-        // The power budget is 1.4W, which is below the static power for thermal state 1. However,
+        // The thermal load is 77, we have max power consumption of 1.43W.
+        // The power budget is 1.43W, which is below the static power for thermal state 1. However,
         // at 0.05 fractional utilization per core, the projected performance is 0.25 Perfs, which
         // makes thermal state 2 inadmissible. Thus, we fall back to thermal state 1.
         handlers.enqueue_cpu_loads(vec![0.05; 4]);
         handlers.expect_big_pstate(0);
         handlers.expect_little_pstate(1);
-        let result = node.handle_message(&Message::SetMaxPowerConsumption(Watts(1.4))).await;
+        let result = node
+            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(77), "Sensor".to_string()))
+            .await;
         result.unwrap();
 
+        // The thermal load is 84, we have max power consumption of 0.9948W.
         // At 0.01 fractional utilization per core, the projected performance is 0.05 Perfs, so now
         // thermal state 1 is inadmissible. This drives us to thermal state 0.
         handlers.enqueue_cpu_loads(vec![0.01; 4]);
         handlers.expect_little_pstate(0);
-        let result = node.handle_message(&Message::SetMaxPowerConsumption(Watts(1.4))).await;
+        let result = node
+            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(84), "Sensor".to_string()))
+            .await;
         result.unwrap();
     }
 
@@ -1461,6 +1559,8 @@ mod tests {
         ];
 
         let node = CpuManagerBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
             make_default_cluster_configs(),
             vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],
             thermal_state_configs.clone(),
@@ -1474,34 +1574,33 @@ mod tests {
         handlers.enqueue_cpu_loads(vec![0.1; 4]);
         handlers.expect_big_pstate(2);
         handlers.expect_little_pstate(2);
-        let result = node.handle_message(&Message::SetMaxPowerConsumption(Watts(1.0))).await;
+        let result = node
+            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(85), "Sensor".to_string()))
+            .await;
         result.unwrap();
 
         // Now saturate the CPUs. This corresponds to 4.4 NormPerfs.
         handlers.enqueue_cpu_loads(vec![1.0; 4]);
 
         // We choose a max power above state 1's max and below state 0's.
-        let (max_power, state_1_max_power) = {
+        let thermal_load = {
             let inner = node.mutable_inner.borrow();
             let state = &inner.thermal_states[1];
             let state_1_max_power = state.estimate_power(Saturated);
             let max_power = state_1_max_power + Watts(0.1);
             assert_lt!(max_power, inner.thermal_states[0].estimate_power(Saturated));
-            (max_power, state_1_max_power)
+            ThermalLoad(((DEFUALT_SUSTAINABLE_POWER.0 - max_power.0) / DEFUALT_POWER_GAIN.0) as u32)
         };
 
         // Now we confirm that:
         //  - State 1 is selected, verifying that its min performance was disregarded due to CPU
         //    saturation.
-        //  - The expected power consumption corresponds to the max power of state 1.
         handlers.expect_big_pstate(1);
         handlers.expect_little_pstate(1);
-        match node.handle_message(&Message::SetMaxPowerConsumption(max_power)).await {
-            Ok(MessageReturn::SetMaxPowerConsumption(p)) => {
-                assert_eq!(p, state_1_max_power);
-            }
-            other => panic!("Unexpected result: {:?}", other),
-        }
+        let result = node
+            .handle_message(&Message::UpdateThermalLoad(thermal_load, "Sensor".to_string()))
+            .await;
+        result.unwrap();
     }
 
     // Verify that Inspect data is populated as expected.
@@ -1526,6 +1625,8 @@ mod tests {
 
         let inspector = inspect::Inspector::default();
         let builder = CpuManagerBuilder::new(
+            DEFUALT_SUSTAINABLE_POWER,
+            DEFUALT_POWER_GAIN,
             make_default_cluster_configs(),
             vec![handlers.big_cluster.clone(), handlers.little_cluster.clone()],
             thermal_states,
@@ -1540,7 +1641,9 @@ mod tests {
         handlers.enqueue_cpu_loads(vec![1.0; 4]);
         handlers.expect_big_pstate(1);
         handlers.expect_little_pstate(2);
-        let result = node.handle_message(&Message::SetMaxPowerConsumption(Watts(1.0))).await;
+        let result = node
+            .handle_message(&Message::UpdateThermalLoad(ThermalLoad(84), "Sensor".to_string()))
+            .await;
         assert_matches!(result, Ok(_));
 
         let estimate =
@@ -1559,7 +1662,7 @@ mod tests {
                         "little_cluster": {
                             "last_load (#cores)": 2.0,
                         },
-                        "available_power (W)": 1.0,
+                        "available_power (W)": 0.9948135999999996,
                         "projected_performance (NormPerfs)": estimate.performance.0,
                         "projected_power (W)": estimate.power.0,
                         "last_error": "<None>",

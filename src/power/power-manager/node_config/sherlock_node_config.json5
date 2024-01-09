@@ -46,6 +46,8 @@
     type: "CpuManager",
     name: "cpu_manager",
     config: {
+      sustainable_power: 6.22,
+      power_gain: 0.0622046,
       clusters: [
         {
           name: "big_cluster",
@@ -305,12 +307,10 @@
     name: "thermal_policy",
     dependencies: {
       temperature_handler_node: "temperature_soc_pll",
-      cpu_control_nodes: [
-        "cpu_manager"
-      ],
       system_power_handler_node: "sys_shutdown",
       thermal_load_notify_nodes: [
-        "cpu_thermal_state_handler"
+        "cpu_thermal_state_handler",
+        "cpu_manager"
       ],
       platform_metrics_node: "platform_metrics"
     },
@@ -321,8 +321,6 @@
         target_temperature: 94.0,
         e_integral_min: -39.37,
         e_integral_max: 0.0,
-        sustainable_power: 6.22,
-        integral_gain: 0.158
       },
       thermal_shutdown_temperature: 100.0
     }
