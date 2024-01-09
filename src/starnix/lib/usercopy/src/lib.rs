@@ -48,6 +48,43 @@ extern "C" {
 
     // Symbol representing the end of the atomic_store_u32_release() function.
     fn atomic_store_u32_release_end();
+
+    // This performs an atomic compare-and-exchange operation of the 32 bit value at `addr`.
+    // If the operation succeeded, stores `desired` to `addr` and returns 1.
+    //
+    // If the operation failed because `addr` did not contain the value `*expected`, stores the
+    // observed value to `*expected`.
+    //
+    // Memory ordering:
+    // On success, the read-modify-write has both acquire and release semantics.
+    // On failure, the load from 'addr' has acquire semantics.
+    //
+    // If the operation encountered a fault, the high bits of the returned value will be one.
+    fn atomic_compare_exchange_u32_acq_rel(addr: usize, expected: *mut u32, desired: u32) -> u64;
+
+    // Symbol representing the end of the atomic_compare_exchange_u32_acq_rel() function.
+    fn atomic_compare_exchange_u32_acq_rel_end();
+
+    // This performs an atomic compare-and-exchange operation of the 32 bit value at `addr`.
+    // If the operation succeeded, stores `desired` to `addr` and returns 1.
+    // If the operation failed (perhaps because `addr` did not contain the value `*expected`),
+    // stores the observed value to `*expected` and returns 0.
+    //
+    // This operation can fail spuriously.
+    //
+    // Memory ordering:
+    // On success, the read-modify-write has both acquire and release semantics.
+    // On failure, the load from 'addr' has acquire semantics.
+    //
+    // If the operation encountered a fault, the high bits of the returned value will be one.
+    fn atomic_compare_exchange_weak_u32_acq_rel(
+        addr: usize,
+        expected: *mut u32,
+        desired: u32,
+    ) -> u64;
+
+    // Symbol representing the end of the atomic_compare_exchange_weak_u32_relaxed() function.
+    fn atomic_compare_exchange_weak_u32_acq_rel_end();
 }
 
 // Used to provide empty/unused implementations to make the platform-agnostic code
@@ -71,7 +108,10 @@ mod missing_impls {
     }
 }
 #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-use missing_impls::*;
+use missing_impls::{
+    atomic_load_u32_acquire, atomic_load_u32_relaxed, atomic_store_u32_relaxed,
+    atomic_store_u32_release,
+};
 
 /// Converts a slice to an equivalent MaybeUninit slice.
 pub fn slice_to_maybe_uninit_mut<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
@@ -310,6 +350,20 @@ impl Usercopy {
         #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
         let atomic_store_release_range = 0..0;
 
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        let atomic_compare_exchange_range = atomic_compare_exchange_u32_acq_rel as *const ()
+            as usize
+            ..atomic_compare_exchange_u32_acq_rel_end as *const () as usize;
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        let atomic_compare_exchange_range = 0..0;
+
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        let atomic_compare_exchange_weak_range = atomic_compare_exchange_weak_u32_acq_rel
+            as *const () as usize
+            ..atomic_compare_exchange_weak_u32_acq_rel_end as *const () as usize;
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        let atomic_compare_exchange_weak_range = 0..0;
+
         let (tx, rx) = std::sync::mpsc::channel::<zx::Status>();
 
         let shutdown_event = zx::Event::create();
@@ -391,6 +445,8 @@ impl Usercopy {
                     || atomic_load_acquire_range.contains(&pc)
                     || atomic_store_relaxed_range.contains(&pc)
                     || atomic_store_release_range.contains(&pc)
+                    || atomic_compare_exchange_range.contains(&pc)
+                    || atomic_compare_exchange_weak_range.contains(&pc)
                 {
                     set_registers_for_atomic_error(&mut regs);
                 } else {
@@ -589,6 +645,68 @@ impl Usercopy {
     /// `addr` must be aligned to 4 bytes.
     pub fn atomic_store_u32_release(&self, addr: usize, value: u32) -> Result<(), ()> {
         self.atomic_store_u32(atomic_store_u32_release, addr, value)
+    }
+
+    /// Performs an atomic compare and exchange of a 32 bit value at addr `addr`.
+    /// `addr` must be aligned to 4 bytes.
+    pub fn atomic_compare_exchange_u32_acq_rel(
+        &self,
+        addr: usize,
+        expected: u32,
+        desired: u32,
+    ) -> Result<Result<u32, u32>, ()> {
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            let _ = addr;
+            let _ = expected;
+            let _ = desired;
+            return Err(());
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        {
+            let mut expected = expected;
+            let value_or_error = unsafe {
+                atomic_compare_exchange_u32_acq_rel(addr, &mut expected as *mut u32, desired)
+            };
+            Self::parse_compare_exchange_result(expected, value_or_error)
+        }
+    }
+
+    /// Performs a weak atomic compare and exchange of a 32 bit value at addr `addr`.
+    /// `addr` must be aligned to 4 bytes.
+    pub fn atomic_compare_exchange_weak_u32_acq_rel(
+        &self,
+        addr: usize,
+        expected: u32,
+        desired: u32,
+    ) -> Result<Result<u32, u32>, ()> {
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        {
+            let _ = addr;
+            let _ = expected;
+            let _ = desired;
+            return Err(());
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        {
+            let mut expected = expected;
+            let value_or_error = unsafe {
+                atomic_compare_exchange_weak_u32_acq_rel(addr, &mut expected as *mut u32, desired)
+            };
+            Self::parse_compare_exchange_result(expected, value_or_error)
+        }
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+    fn parse_compare_exchange_result(
+        expected: u32,
+        value_or_error: u64,
+    ) -> Result<Result<u32, u32>, ()> {
+        match value_or_error {
+            0 => Ok(Err(expected)),
+            1 => Ok(Ok(expected)),
+            _ => Err(()),
+        }
     }
 }
 
@@ -985,26 +1103,63 @@ mod test {
         assert_eq!(result, 0);
         assert_eq!(source, [0]);
     }
+    struct MappedPageUsercopy {
+        usercopy: Usercopy,
+        addr: usize,
+    }
+
+    impl MappedPageUsercopy {
+        fn new(flags: zx::VmarFlags) -> Option<Self> {
+            let page_size = zx::system_get_page_size() as usize;
+
+            let vmo = zx::Vmo::create(page_size as u64).unwrap();
+
+            let root_vmar = fuchsia_runtime::vmar_root_self();
+
+            let addr = root_vmar.map(0, &vmo, 0, page_size, flags).unwrap();
+
+            if cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
+                let usercopy = Usercopy::new(addr..addr + page_size).unwrap().unwrap();
+                Some(Self { usercopy, addr })
+            } else {
+                None
+            }
+        }
+    }
+
+    impl std::ops::Drop for MappedPageUsercopy {
+        fn drop(&mut self) {
+            let page_size = zx::system_get_page_size() as usize;
+
+            unsafe { fuchsia_runtime::vmar_root_self().unmap(self.addr, page_size) }.unwrap();
+        }
+    }
+
+    macro_rules! new_mapped_page_usercopy_for_test {
+        ($perms:expr) => {{
+            let m = MappedPageUsercopy::new($perms);
+            if cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
+                m.unwrap()
+            } else {
+                // Skip test if not a supported architecture
+                assert!(m.is_none());
+                return;
+            }
+        }};
+    }
 
     #[test_case(|usercopy, mapped_addr| usercopy.atomic_load_u32_relaxed(mapped_addr); "relaxed")]
     #[test_case(|usercopy, mapped_addr| usercopy.atomic_load_u32_acquire(mapped_addr); "acquire")]
     #[::fuchsia::test]
     fn atomic_load_u32_no_fault(load_fn: fn(&Usercopy, usize) -> Result<u32, ()>) {
-        let page_size = zx::system_get_page_size() as usize;
+        let m = new_mapped_page_usercopy_for_test!(
+            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
+        );
 
-        let dest_vmo = zx::Vmo::create(page_size as u64).unwrap();
+        unsafe { *(m.addr as *mut u32) = 0x12345678 };
 
-        let root_vmar = fuchsia_runtime::vmar_root_self();
+        let result = load_fn(&m.usercopy, m.addr);
 
-        let mapped_addr = root_vmar
-            .map(0, &dest_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
-            .unwrap();
-
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
-
-        unsafe { *(mapped_addr as *mut u32) = 0x12345678 };
-
-        let result = load_fn(&usercopy, mapped_addr);
         assert_eq!(Ok(0x12345678), result);
     }
 
@@ -1012,18 +1167,9 @@ mod test {
     #[test_case(|usercopy, mapped_addr| usercopy.atomic_load_u32_acquire(mapped_addr); "acquire")]
     #[::fuchsia::test]
     fn atomic_load_u32_fault(load_fn: fn(&Usercopy, usize) -> Result<u32, ()>) {
-        let page_size = zx::system_get_page_size() as usize;
+        let m = new_mapped_page_usercopy_for_test!(zx::VmarFlags::empty());
 
-        let dest_vmo = zx::Vmo::create(page_size as u64).unwrap();
-
-        let root_vmar = fuchsia_runtime::vmar_root_self();
-
-        let mapped_addr =
-            root_vmar.map(0, &dest_vmo, 0, page_size, zx::VmarFlags::empty()).unwrap();
-
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
-
-        let result = load_fn(&usercopy, mapped_addr);
+        let result = load_fn(&m.usercopy, m.addr);
         assert_eq!(Err(()), result);
     }
 
@@ -1031,43 +1177,69 @@ mod test {
     #[test_case(|usercopy, mapped_addr, val| usercopy.atomic_store_u32_release(mapped_addr, val); "release")]
     #[::fuchsia::test]
     fn atomic_store_u32_no_fault(store_fn: fn(&Usercopy, usize, u32) -> Result<(), ()>) {
-        let page_size = zx::system_get_page_size() as usize;
+        let m = new_mapped_page_usercopy_for_test!(
+            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
+        );
 
-        let dest_vmo = zx::Vmo::create(page_size as u64).unwrap();
+        assert_eq!(store_fn(&m.usercopy, m.addr, 0x12345678), Ok(()));
 
-        let root_vmar = fuchsia_runtime::vmar_root_self();
-
-        let mapped_addr = root_vmar
-            .map(0, &dest_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
-            .unwrap();
-
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
-
-        assert_eq!(store_fn(&usercopy, mapped_addr, 0x12345678), Ok(()));
-
-        assert_eq!(unsafe { *(mapped_addr as *mut u32) }, 0x12345678);
+        assert_eq!(unsafe { *(m.addr as *mut u32) }, 0x12345678);
     }
 
     #[test_case(|usercopy, mapped_addr, val| usercopy.atomic_store_u32_relaxed(mapped_addr, val); "relaxed")]
     #[test_case(|usercopy, mapped_addr, val| usercopy.atomic_store_u32_release(mapped_addr, val); "release")]
     #[::fuchsia::test]
     fn atomic_store_u32_fault(store_fn: fn(&Usercopy, usize, u32) -> Result<(), ()>) {
-        let page_size = zx::system_get_page_size() as usize;
+        let m = new_mapped_page_usercopy_for_test!(zx::VmarFlags::empty());
 
-        let dest_vmo = zx::Vmo::create(page_size as u64).unwrap();
-
-        let root_vmar = fuchsia_runtime::vmar_root_self();
-
-        let mapped_addr =
-            root_vmar.map(0, &dest_vmo, 0, page_size, zx::VmarFlags::empty()).unwrap();
-
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
-
-        let result = store_fn(&usercopy, mapped_addr, 0x12345678);
+        let result = store_fn(&m.usercopy, m.addr, 0x12345678);
         assert_eq!(Err(()), result);
 
-        unsafe { root_vmar.protect(mapped_addr, page_size, zx::VmarFlags::PERM_READ) }.unwrap();
+        let page_size = zx::system_get_page_size() as usize;
+        unsafe {
+            fuchsia_runtime::vmar_root_self().protect(m.addr, page_size, zx::VmarFlags::PERM_READ)
+        }
+        .unwrap();
 
-        assert_ne!(unsafe { *(mapped_addr as *mut u32) }, 0x12345678);
+        assert_ne!(unsafe { *(m.addr as *mut u32) }, 0x12345678);
+    }
+
+    #[::fuchsia::test]
+    fn atomic_compare_exchange_u32_acq_rel_no_fault() {
+        let m = new_mapped_page_usercopy_for_test!(
+            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
+        );
+
+        unsafe { *(m.addr as *mut u32) = 0x12345678 };
+
+        assert_eq!(
+            m.usercopy.atomic_compare_exchange_u32_acq_rel(m.addr, 0x12345678, 0xffffffff),
+            Ok(Ok(0x12345678))
+        );
+
+        assert_eq!(unsafe { *(m.addr as *mut u32) }, 0xffffffff);
+
+        assert_eq!(
+            m.usercopy.atomic_compare_exchange_u32_acq_rel(m.addr, 0x22222222, 0x11111111),
+            Ok(Err(0xffffffff))
+        );
+
+        assert_eq!(unsafe { *(m.addr as *mut u32) }, 0xffffffff);
+    }
+
+    #[::fuchsia::test]
+    fn atomic_compare_exchange_u32_acq_rel_fault() {
+        let m = new_mapped_page_usercopy_for_test!(zx::VmarFlags::empty());
+
+        let result = m.usercopy.atomic_compare_exchange_u32_acq_rel(m.addr, 0x00000000, 0x11111111);
+        assert_eq!(Err(()), result);
+
+        let page_size = zx::system_get_page_size() as usize;
+        unsafe {
+            fuchsia_runtime::vmar_root_self().protect(m.addr, page_size, zx::VmarFlags::PERM_READ)
+        }
+        .unwrap();
+
+        assert_eq!(unsafe { *(m.addr as *mut u32) }, 0x00000000);
     }
 }

@@ -90,6 +90,7 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
                             "atomic_load.S",
                             "atomic_store.S",
                             "atomic_error.S",
+                            "atomic_compare_exchange.S",
                           ],
                           ".",
                           arch_dir)
