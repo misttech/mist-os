@@ -6,6 +6,7 @@ use crate::mm::{
     read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessor, MemoryAccessorExt,
     MemoryManager,
 };
+use smallvec::SmallVec;
 use starnix_uapi::{
     errno, error, errors::Errno, user_address::UserAddress, user_buffer::UserBuffer,
 };
@@ -24,39 +25,51 @@ fn slice_to_maybe_uninit(buffer: &[u8]) -> &[MaybeUninit<u8>] {
     unsafe { std::slice::from_raw_parts(buffer.as_ptr() as *const MaybeUninit<u8>, buffer.len()) }
 }
 
-/// Provides access to a slice of `iovec`s while retaining some reference.
-pub struct IovecsRef<'a> {
-    iovecs: Vec<syncio::zxio::iovec>,
-    _marker: std::marker::PhantomData<&'a syncio::zxio::iovec>,
+pub trait Iovec: Sized {
+    fn create(buffer: &UserBuffer) -> Self;
 }
 
-impl Deref for IovecsRef<'_> {
-    type Target = [syncio::zxio::iovec];
+impl Iovec for syncio::zxio::iovec {
+    fn create(buffer: &UserBuffer) -> Self {
+        Self { iov_base: buffer.address.ptr() as *mut starnix_uapi::c_void, iov_len: buffer.length }
+    }
+}
+
+impl Iovec for syncio::zxio::zx_iovec {
+    fn create(buffer: &UserBuffer) -> Self {
+        Self { buffer: buffer.address.ptr() as *mut starnix_uapi::c_void, capacity: buffer.length }
+    }
+}
+
+const IOVECS_IN_HEAP_THRESHOLD: usize = 5;
+
+/// Provides access to a slice of iovecs while retaining some reference.
+pub struct IovecsRef<'a, I: Sized> {
+    iovecs: SmallVec<[I; IOVECS_IN_HEAP_THRESHOLD]>,
+    _marker: std::marker::PhantomData<&'a I>,
+}
+
+impl<'a, I: Iovec> IovecsRef<'a, I> {
+    /// Returns the list of iovecs backing the buffer.
+    ///
+    /// Note that we use `IovecsRef<'_>` so that while `IovecsRef` is held,
+    /// no other methods may be called on the `Buffer` since `IovecsRef`
+    /// holds onto the mutable reference for the `Buffer`.
+    fn new<B: Buffer + ?Sized>(buf: &'a mut B) -> Result<Self, Errno> {
+        let mut iovecs = SmallVec::with_capacity(buf.segments_count()?);
+        buf.peek_each_segment(&mut |buffer| iovecs.push(I::create(buffer)))?;
+        Ok(IovecsRef { iovecs, _marker: Default::default() })
+    }
+}
+
+impl<I> Deref for IovecsRef<'_, I> {
+    type Target = [I];
     fn deref(&self) -> &Self::Target {
         &self.iovecs
     }
 }
 
-impl DerefMut for IovecsRef<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.iovecs
-    }
-}
-
-/// Provides access to a slice of `zx_iovec`s while retaining some reference.
-pub struct ZxIovecsRef<'a> {
-    iovecs: Vec<syncio::zxio::zx_iovec>,
-    _marker: std::marker::PhantomData<&'a syncio::zxio::zx_iovec>,
-}
-
-impl Deref for ZxIovecsRef<'_> {
-    type Target = [syncio::zxio::zx_iovec];
-    fn deref(&self) -> &Self::Target {
-        &self.iovecs
-    }
-}
-
-impl DerefMut for ZxIovecsRef<'_> {
+impl<I> DerefMut for IovecsRef<'_, I> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.iovecs
     }
@@ -68,6 +81,10 @@ pub type PeekBufferSegmentsCallback<'a> = dyn FnMut(&UserBuffer) + 'a;
 ///
 /// Provides the common implementations for input and output buffers.
 pub trait Buffer: std::fmt::Debug {
+    /// Returns the number of segments, if the buffer supports I/O directly
+    /// to/from individual segments.
+    fn segments_count(&self) -> Result<usize, Errno>;
+
     /// Calls the callback with each segment backing this buffer.
     ///
     /// Each segment is safe to read from (if this is an `InputBuffer`) or write
@@ -85,36 +102,22 @@ pub trait Buffer: std::fmt::Debug {
     ///
     /// Each segment is safe to read from (if this is an `InputBuffer`) or write
     /// to (if this is an `OutputBuffer`) without causing undefined behaviour.
-    fn peek_all_segments_as_iovecs(&mut self) -> Result<IovecsRef<'_>, Errno> {
-        let mut iovecs = vec![];
-        self.peek_each_segment(&mut |buffer| {
-            iovecs.push(syncio::zxio::iovec {
-                iov_base: buffer.address.ptr() as *mut starnix_uapi::c_void,
-                iov_len: buffer.length,
-            })
-        })?;
-
-        Ok(IovecsRef { iovecs, _marker: Default::default() })
+    fn peek_all_segments_as_iovecs(&mut self) -> Result<IovecsRef<'_, syncio::zxio::iovec>, Errno> {
+        IovecsRef::new(self)
     }
 
     /// Returns all the segments backing this `Buffer`.
     ///
-    /// Note that we use `ZxIovecsRef<'_>` so that while `ZxIovecsRef` is held,
-    /// no other methods may be called on this `Buffer` since `ZxIovecsRef`
+    /// Note that we use `IovecsRef<'_>` so that while `IovecsRef` is held,
+    /// no other methods may be called on this `Buffer` since `IovecsRef`
     /// holds onto the mutable reference for this `Buffer`.
     ///
     /// Each segment is safe to read from (if this is an `InputBuffer`) or write
     /// to (if this is an `OutputBuffer`) without causing undefined behaviour.
-    fn peek_all_segments_as_zx_iovecs(&mut self) -> Result<ZxIovecsRef<'_>, Errno> {
-        let mut iovecs = vec![];
-        self.peek_each_segment(&mut |buffer| {
-            iovecs.push(syncio::zxio::zx_iovec {
-                buffer: buffer.address.ptr() as *mut starnix_uapi::c_void,
-                capacity: buffer.length,
-            })
-        })?;
-
-        Ok(ZxIovecsRef { iovecs, _marker: Default::default() })
+    fn peek_all_segments_as_zx_iovecs(
+        &mut self,
+    ) -> Result<IovecsRef<'_, syncio::zxio::zx_iovec>, Errno> {
+        IovecsRef::new(self)
     }
 }
 
@@ -381,6 +384,10 @@ impl<'a> UserBuffersOutputBuffer<'a, true> {
 }
 
 impl<'a, const USE_VMO: bool> Buffer for UserBuffersOutputBuffer<'a, USE_VMO> {
+    fn segments_count(&self) -> Result<usize, Errno> {
+        Ok(self.buffers.iter().filter(|b| b.is_null()).count())
+    }
+
     fn peek_each_segment(
         &mut self,
         callback: &mut PeekBufferSegmentsCallback<'_>,
@@ -542,6 +549,10 @@ impl<'a> UserBuffersInputBuffer<'a, true> {
 }
 
 impl<'a, const USE_VMO: bool> Buffer for UserBuffersInputBuffer<'a, USE_VMO> {
+    fn segments_count(&self) -> Result<usize, Errno> {
+        Ok(self.buffers.iter().filter(|b| b.is_null()).count())
+    }
+
     fn peek_each_segment(
         &mut self,
         callback: &mut PeekBufferSegmentsCallback<'_>,
@@ -655,6 +666,10 @@ impl From<VecOutputBuffer> for Vec<u8> {
 }
 
 impl Buffer for VecOutputBuffer {
+    fn segments_count(&self) -> Result<usize, Errno> {
+        Ok(1)
+    }
+
     fn peek_each_segment(
         &mut self,
         callback: &mut PeekBufferSegmentsCallback<'_>,
@@ -731,6 +746,10 @@ impl From<Vec<u8>> for VecInputBuffer {
 }
 
 impl Buffer for VecInputBuffer {
+    fn segments_count(&self) -> Result<usize, Errno> {
+        Ok(1)
+    }
+
     fn peek_each_segment(
         &mut self,
         callback: &mut PeekBufferSegmentsCallback<'_>,

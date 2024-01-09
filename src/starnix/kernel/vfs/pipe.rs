@@ -446,6 +446,10 @@ struct SpliceOutputBuffer<'a> {
 }
 
 impl<'a> Buffer for SpliceOutputBuffer<'a> {
+    fn segments_count(&self) -> Result<usize, Errno> {
+        error!(ENOTSUP)
+    }
+
     fn peek_each_segment(
         &mut self,
         _callback: &mut PeekBufferSegmentsCallback<'_>,
@@ -500,6 +504,10 @@ struct SpliceInputBuffer<'a> {
 }
 
 impl<'a> Buffer for SpliceInputBuffer<'a> {
+    fn segments_count(&self) -> Result<usize, Errno> {
+        Ok(self.pipe.messages.len())
+    }
+
     fn peek_each_segment(
         &mut self,
         callback: &mut PeekBufferSegmentsCallback<'_>,

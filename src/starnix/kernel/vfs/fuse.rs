@@ -1625,6 +1625,10 @@ impl FuseOperation {
         }
 
         impl Buffer for CountingOutputBuffer {
+            fn segments_count(&self) -> Result<usize, Errno> {
+                panic!("Should not be called");
+            }
+
             fn peek_each_segment(
                 &mut self,
                 _callback: &mut PeekBufferSegmentsCallback<'_>,
