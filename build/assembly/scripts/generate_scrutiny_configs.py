@@ -33,6 +33,9 @@ def collect_aib_artifacts(aib, aib_path):
     for base_driver in aib.base_drivers:
         name = base_driver.package.removeprefix("packages/base_drivers/")
         static_packages.add(name)
+    for boot_driver in aib.boot_drivers:
+        name = boot_driver.package.removeprefix("packages/boot_drivers/")
+        bootfs_packages.add(name)
 
     bootfs_files = set()
     deps = []
