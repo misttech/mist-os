@@ -286,15 +286,6 @@ class CxxRemoteAction(object):
             # TODO: might need -Wno-constant-logical-operand to workaround
             #   ZX_DEBUG_ASSERT.
 
-        if self.cxx_action.compiler_is_clang:
-            # Include sanitizer-specific toolchain support files
-            remote_inputs.extend(
-                fuchsia.remote_clang_compiler_toolchain_inputs(
-                    clang_path_rel=self.remote_compiler,
-                    sanitizers=self.cxx_action.sanitizers,
-                )
-            )
-
         # Prepare remote compile action
         remote_output_dirs = (
             list(self.cxx_action.output_dirs()) + self.command_line_output_dirs
