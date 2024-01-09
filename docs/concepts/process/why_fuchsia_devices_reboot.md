@@ -97,11 +97,6 @@ throttling the CPU or reducing the audio volume.
 If the session manager is unable to restart a crashed session or a session
 determines it has failed in an unrecoverable manner, the device reboots.
 
-### Sysmgr failure
-
-If the system manager for legacy components (sysmgr) crashes, the device
-reboots.
-
 ### Critical component failure
 
 If a component marked `"on_terminate": "reboot"` crashed, the device reboots.
@@ -155,7 +150,6 @@ Retry system update          | `RETRY_SYSTEM_UPDATE`        | `RetrySystemUpdate
 ZBI swap                     | `ZBI_SWAP`                   | `ZbiSwap`                  | N/A\*
 High temperature             | `HIGH_TEMPERATURE`           | `HighTemperature`          | `fuchsia-reboot-high-temperature`
 Session failure              | `SESSION_FAILURE`            | `SessionFailure`           | `fuchsia-session-failure`
-Sysmgr failure               | `SYSMGR_FAILURE`             | `SysmgrFailure`            | `fuchsia-sysmgr-failure`
 Critical component failure   | `CRITICAL_COMPONENT_FAILURE` | `CriticalComponentFailure` | `fuchsia-critical-component-failure` or `fuchsia-reboot-$CULPRIT-terminated`
 Factory data reset           | `FACTORY_DATA_RESET`         | `FactoryDataReset`         | N/A\*
 Root job termination         | `ROOT_JOB_TERMINATION        | `RootJobTermination`       | `fuchsia-root-job-termination` or `fuchsia-reboot-$CULPRIT-terminated`
