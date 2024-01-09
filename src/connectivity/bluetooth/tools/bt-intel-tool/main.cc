@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
     return EXIT_FAILURE;
   }
 
-  zx::result device = component::Connect<fuchsia_hardware_bluetooth::Hci>(hci_dev_path);
+  zx::result device = component::Connect<fuchsia_hardware_bluetooth::FullHci>(hci_dev_path);
   if (device.is_error()) {
     std::cout << "Failed to connect to " << hci_dev_path << ": " << device.status_string()
               << std::endl;

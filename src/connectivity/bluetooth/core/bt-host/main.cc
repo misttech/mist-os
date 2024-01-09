@@ -62,8 +62,8 @@ int main() {
     BT_DEBUG_ASSERT(host);
     if (!success) {
       bt_log(ERROR, "bt-host", "Failed to initialize bt-host; shutting down...");
-      // TODO(https://fxbug.dev/136534): Verify that calling Lifecycler handler's stop function does not
-      // cause use after free in Adapter with integration tests
+      // TODO(https://fxbug.dev/136534): Verify that calling Lifecycler handler's stop function does
+      // not cause use after free in Adapter with integration tests
       lifecycle_handler.Stop();
     } else {
       bt_log(DEBUG, "bt-host", "bt-host initialized");
@@ -71,11 +71,11 @@ int main() {
   };
   auto error_cb = [&lifecycle_handler]() {
     bt_log(WARN, "bt-host", "Error initializing bt-host; shutting down...");
-    // TODO(https://fxbug.dev/136534): Verify that calling Lifecycler handler's stop function does not cause
-    // use after free in Adapter with integration tests
+    // TODO(https://fxbug.dev/136534): Verify that calling Lifecycler handler's stop function does
+    // not cause use after free in Adapter with integration tests
     lifecycle_handler.Stop();
   };
-  fuchsia::hardware::bluetooth::HciHandle hci_handle =
+  fuchsia::hardware::bluetooth::FullHciHandle hci_handle =
       bthost::CreateHciHandle(config.device_path());
   if (!hci_handle) {
     bt_log(ERROR, "bt-host", "Failed to create HciHandle; cannot initialize bt-host");

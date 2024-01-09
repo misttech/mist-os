@@ -33,7 +33,7 @@ namespace bt_hci_virtual {
 enum class Channel { ACL, COMMAND, SNOOP, EMULATOR };
 
 class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
-                       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::FullHci>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Emulator> {
  public:
   explicit EmulatorDevice(zx_device_t* device);
@@ -49,8 +49,20 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
                           OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
                           OpenAclDataChannelCompleter::Sync& completer) override;
+  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                          OpenScoDataChannelCompleter::Sync& completer) override;
+  void ConfigureSco(ConfigureScoRequestView request,
+                    ConfigureScoCompleter::Sync& completer) override;
+  void ResetSco(ResetScoCompleter::Sync& completer) override;
+  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                          OpenIsoDataChannelCompleter::Sync& completer) override;
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
 
   void ClearHciDev() { hci_dev_ = nullptr; }

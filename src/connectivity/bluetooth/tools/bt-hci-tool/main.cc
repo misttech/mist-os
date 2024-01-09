@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher(loop.dispatcher());
 
-  fuchsia::hardware::bluetooth::HciHandle hci_handle(std::move(local));
+  fuchsia::hardware::bluetooth::FullHciHandle hci_handle(std::move(local));
   auto controller =
       std::make_unique<bt::controllers::FidlController>(std::move(hci_handle), loop.dispatcher());
 

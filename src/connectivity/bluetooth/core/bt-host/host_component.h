@@ -35,7 +35,7 @@ class BtHostComponent {
   // false if initialization fails, otherwise returns true.
   using InitCallback = fit::callback<void(bool success)>;
   using ErrorCallback = fit::callback<void()>;
-  [[nodiscard]] bool Initialize(fuchsia::hardware::bluetooth::HciHandle hci_handle,
+  [[nodiscard]] bool Initialize(fuchsia::hardware::bluetooth::FullHciHandle hci_handle,
                                 InitCallback init_cb, ErrorCallback error_cb);
 
   // Shuts down all systems.
