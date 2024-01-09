@@ -35,8 +35,11 @@ pub fn validation_test<
                     Ok(serde_val) => {
                         println!("Reserialized: {serde_val}");
 
-                        if example != &serde_val {
-                            eprintln!("/!\\ Serialization output is different:\n\t{serde_val}");
+                        println!("Comparing serialized outputs");
+                        if let Err(_) =
+                            validate::compare::ValidationTestDiff::check(example, &serde_val)
+                        {
+                            eprintln!("/!\\ Serialization output is different");
                             fail = true;
                         }
 

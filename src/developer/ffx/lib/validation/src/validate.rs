@@ -6,6 +6,8 @@ use std::{any::TypeId, borrow::Cow, collections::HashMap, fmt::Display, ops::Con
 
 use crate::schema::*;
 
+pub(crate) mod compare;
+
 /// Test-only. Validates that the given JSON value follows the schema.
 pub fn validate(schema: Walk, value: &serde_json::Value) -> Result<(), Vec<ValidationError>> {
     let mut validation = Validation::new(value);
@@ -23,13 +25,13 @@ pub fn validate(schema: Walk, value: &serde_json::Value) -> Result<(), Vec<Valid
 
 /// Represents either a named struct field, or an indexed tuple struct field.
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum FieldId {
-    Name(Cow<'static, str>),
+pub enum FieldId<'a> {
+    Name(Cow<'a, str>),
     // Tuple struct/enum fields
     Index(u32),
 }
 
-impl Display for FieldId {
+impl<'a> Display for FieldId<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Name(key) => write!(f, ".{key}"),
@@ -38,13 +40,13 @@ impl Display for FieldId {
     }
 }
 
-impl From<&'static str> for FieldId {
-    fn from(value: &'static str) -> Self {
+impl<'a> From<&'a str> for FieldId<'a> {
+    fn from(value: &'a str) -> Self {
         Self::Name(Cow::Borrowed(value))
     }
 }
 
-impl From<u32> for FieldId {
+impl From<u32> for FieldId<'static> {
     fn from(value: u32) -> Self {
         Self::Index(value)
     }
@@ -75,7 +77,7 @@ pub enum ValidationErrorMessage {
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct ValidationError {
     messages: Vec<ValidationErrorMessage>,
-    fields: HashMap<FieldId, Vec<ValidationError>>,
+    fields: HashMap<FieldId<'static>, Vec<ValidationError>>,
 }
 
 impl Display for ValidationError {
@@ -109,7 +111,11 @@ impl ValidationError {
         self.messages.is_empty() && self.fields.is_empty()
     }
 
-    fn push_field(&mut self, field: FieldId, errors: impl IntoIterator<Item = ValidationError>) {
+    fn push_field(
+        &mut self,
+        field: FieldId<'static>,
+        errors: impl IntoIterator<Item = ValidationError>,
+    ) {
         use std::collections::hash_map::Entry;
         let entry = self.fields.entry(field);
 
