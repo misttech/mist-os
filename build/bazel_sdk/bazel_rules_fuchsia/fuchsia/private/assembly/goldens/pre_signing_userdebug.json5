@@ -24,5 +24,51 @@
             },
         ],
     },
-    package_checks: [],
+    package_checks: [
+        // Checks involving the system image package.
+        {
+            source: "SystemImage",
+            file_checks: [
+                // Ensure that iquery is not included in static packages, as it is a debugging
+                // tool for use in eng builds.
+                {
+                    source: {
+                        MetaContents: "data/static_packages",
+                    },
+                    state: "Present",
+                    content_checks: {
+                        must_not_contain: [
+                            {
+                                String: "iquery",
+                            },
+                        ],
+                    },
+                },
+
+                // One of either data/cache_packages or data/cache_packages.json may be present.
+                // Ensure that it is absent or empty for userdebug builds.
+                {
+                    source: {
+                        MetaContents: "data/cache_packages",
+                    },
+                    state: "AbsentOrEmpty",
+                },
+                {
+                    source: {
+                        MetaContents: "data/cache_packages.json",
+                    },
+                    state: "AbsentOrEmpty",
+                },
+
+                // Ensure data/pkgfs_disable_executability_restrictions file is absent.
+                // The presence of this file disables executability enforcement.
+                {
+                    source: {
+                        MetaContents: "data/pkgfs_disable_executability_restrictions",
+                    },
+                    state: "Absent",
+                },
+            ],
+        },
+    ],
 }
