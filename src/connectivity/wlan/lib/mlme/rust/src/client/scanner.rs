@@ -14,7 +14,7 @@ use {
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_zircon as zx,
+    fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr},
     thiserror::Error,
     tracing::{error, warn},
@@ -300,6 +300,8 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         ies: &[u8],
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) {
+        trace::duration!("wlan", "BoundScanner::handle_ap_advertisement");
+
         let mlme_txn_id = match self.scanner.ongoing_scan {
             Some(OngoingScan::PassiveOffloadScan { mlme_txn_id, .. }) => mlme_txn_id,
             Some(OngoingScan::ActiveOffloadScan { mlme_txn_id, .. }) => mlme_txn_id,
@@ -513,6 +515,12 @@ fn active_scan_request_series(
 }
 
 fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_internal::BssDescription, device: &mut D) {
+    if trace::is_enabled() {
+        let trace_bss = wlan_common::bss::BssDescription::try_from(bss.clone())
+            .map(|bss| format!("{}", bss))
+            .unwrap_or_else(|e| format!("{}", e));
+        trace::duration!("wlan", "send_scan_result", "bss" => &*trace_bss);
+    }
     device
         .send_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
             result: fidl_mlme::ScanResult {

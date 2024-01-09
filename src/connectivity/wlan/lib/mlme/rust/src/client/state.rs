@@ -23,7 +23,7 @@ use {
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_zircon as zx,
+    fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, MacAddrBytes},
     tracing::{debug, error, info, trace, warn},
     wlan_common::{
@@ -172,6 +172,8 @@ impl Authenticating {
         auth_hdr: &mac::AuthHdr,
         body: &[u8],
     ) -> AuthProgress {
+        trace::duration!("wlan", "Authenticating::on_auth_frame");
+
         let state = self.algorithm.handle_auth_frame(sta, auth_hdr, Some(body));
         self.akm_state_update_notify_sme(sta, state)
     }
@@ -207,6 +209,8 @@ impl Authenticating {
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
     ) {
+        trace::duration!("wlan", "Authenticating::on_deauth_frame");
+
         info!(
             "received spurious deauthentication frame while authenticating with BSS (unusual); \
              authentication failed: {:?}",
@@ -283,6 +287,8 @@ impl Associating {
         assoc_resp_hdr: &mac::AssocRespHdr,
         elements: B,
     ) -> Result<Association, ()> {
+        trace::duration!("wlan", "Associating::on_assoc_resp_frame");
+
         // TODO(https://fxbug.dev/91353): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
         match Option::<fidl_ieee80211::StatusCode>::from(assoc_resp_hdr.status_code)
             .unwrap_or(fidl_ieee80211::StatusCode::RefusedReasonUnspecified)
@@ -405,6 +411,7 @@ impl Associating {
         sta: &mut BoundClient<'_, D>,
         _disassoc_hdr: &mac::DisassocHdr,
     ) {
+        trace::duration!("wlan", "Associating::on_disassoc_frame");
         warn!("received unexpected disassociation frame while associating");
         sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc);
     }
@@ -417,6 +424,7 @@ impl Associating {
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
     ) {
+        trace::duration!("wlan", "Associating::on_deauth_frame");
         info!(
             "received spurious deauthentication frame while associating with BSS (unusual); \
              association failed: {:?}",
@@ -543,6 +551,7 @@ impl Associated {
         sta: &mut BoundClient<'_, D>,
         disassoc_hdr: &mac::DisassocHdr,
     ) {
+        trace::duration!("wlan", "Associated::on_disassoc_frame");
         self.pre_leaving_associated_state(sta);
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(disassoc_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
@@ -555,6 +564,7 @@ impl Associated {
         sta: &mut BoundClient<'_, D>,
         deauth_hdr: &mac::DeauthHdr,
     ) {
+        trace::duration!("wlan", "Associated::on_deauth_frame");
         self.pre_leaving_associated_state(sta);
         let reason_code = fidl_ieee80211::ReasonCode::from_primitive(deauth_hdr.reason_code.0)
             .unwrap_or(fidl_ieee80211::ReasonCode::UnspecifiedReason);
@@ -602,6 +612,7 @@ impl Associated {
         header: &BeaconHdr,
         elements: B,
     ) {
+        trace::duration!("wlan", "Associated::on_beacon_frame");
         self.0.lost_bss_counter.reset();
         // TODO(b/253637931): Add metrics to track channel switch counts and success rates.
         if let Err(e) =
@@ -641,6 +652,8 @@ impl Associated {
         qos_ctrl: Option<mac::QosControl>,
         body: B,
     ) {
+        trace::duration!("wlan", "States::on_data_frame");
+
         self.request_bu_if_available(
             sta,
             fixed_data_fields.frame_ctrl,
@@ -658,6 +671,8 @@ impl Associated {
         }
         // Handle aggregated and non-aggregated MSDUs.
         for msdu in msdus {
+            trace::duration!("wlan", "States::on_data_frame MSDU");
+
             let mac::Msdu { dst_addr, src_addr, llc_frame } = &msdu;
             match llc_frame.hdr.protocol_id.to_native() {
                 // Forward EAPoL frames to SME independent of the controlled port's
@@ -676,7 +691,7 @@ impl Associated {
                     }
                 }
                 // Drop all non-EAPoL MSDUs if the controlled port is closed.
-                _ => (),
+                _ => {}
             }
         }
     }
@@ -972,6 +987,8 @@ impl States {
         bytes: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) -> States {
+        trace::duration!("wlan", "States::on_mac_frame");
+
         let body_aligned = (rx_info.rx_flags
             & banjo_wlan_softmac::WlanRxInfoFlags::FRAME_BODY_PADDING_4)
             != banjo_wlan_softmac::WlanRxInfoFlags(0);
@@ -1035,6 +1052,8 @@ impl States {
         body: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) -> States {
+        trace::duration!("wlan", "States::on_mgmt_frame");
+
         // Parse management frame. Drop corrupted ones.
         let mgmt_body = match mac::MgmtBody::parse({ mgmt_hdr.frame_ctrl }.mgmt_subtype(), body) {
             Some(x) => x,
@@ -1308,6 +1327,7 @@ impl States {
 
     /// Returns |true| iff a given FrameClass is permitted to be processed in the current state.
     fn is_frame_class_permitted(&self, class: mac::FrameClass) -> bool {
+        trace::duration!("wlan", "State::is_frame_class_permitted");
         match self {
             States::Joined(_) | States::Authenticating(_) => class == mac::FrameClass::Class1,
             States::Authenticated(_) | States::Associating(_) => class <= mac::FrameClass::Class2,

@@ -8,7 +8,7 @@ use {
     banjo_fuchsia_wlan_common as banjo_common,
     banjo_fuchsia_wlan_softmac::{self as banjo_wlan_softmac, WlanRxPacket, WlanTxPacket},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::channel::mpsc,
     ieee80211::{MacAddr, MacAddrBytes},
     std::{ffi::c_void, fmt::Display, sync::Arc},
@@ -627,12 +627,16 @@ pub struct WlanSoftmacIfcProtocolOps {
 
 #[no_mangle]
 extern "C" fn handle_recv(ctx: &mut crate::DriverEventSink, packet: *const WlanRxPacket) {
+    trace::duration!("wlan", "handle_recv");
+
     // TODO(https://fxbug.dev/29063): C++ uses a buffer allocator for this, determine if we need one.
     let bytes =
         unsafe { std::slice::from_raw_parts((*packet).mac_frame_buffer, (*packet).mac_frame_size) }
             .into();
     let rx_info = unsafe { (*packet).info };
-    let _ = ctx.0.unbounded_send(crate::DriverEvent::MacFrameRx { bytes, rx_info });
+    let _ = ctx.0.unbounded_send(crate::DriverEvent::MacFrameRx { bytes, rx_info }).map_err(|e| {
+        error!("Failed to receive frame: {:?}", e);
+    });
 }
 #[no_mangle]
 extern "C" fn handle_complete_tx(

@@ -26,7 +26,7 @@ use {
     channel_switch::ChannelState,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid},
     scanner::Scanner,
     state::States,
@@ -131,6 +131,7 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
         bytes: &[u8],
         rx_info: banjo_fuchsia_wlan_softmac::WlanRxInfo,
     ) {
+        trace::duration!("wlan", "ClientMlme::handle_mac_frame_rx");
         Self::on_mac_frame_rx(self, bytes, rx_info)
     }
     fn handle_eth_frame_tx(&mut self, bytes: &[u8]) -> Result<(), anyhow::Error> {
@@ -231,6 +232,7 @@ impl<D: DeviceOps> ClientMlme<D> {
     }
 
     pub fn on_mac_frame_rx(&mut self, frame: &[u8], rx_info: banjo_wlan_softmac::WlanRxInfo) {
+        trace::duration!("wlan", "ClientMlme::on_mac_frame_rx");
         // TODO(https://fxbug.dev/44487): Send the entire frame to scanner.
         match mac::MacFrame::parse(frame, false) {
             Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) => {
@@ -238,6 +240,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                 let frame_ctrl = mgmt_hdr.frame_ctrl;
                 match mac::MgmtBody::parse(frame_ctrl.mgmt_subtype(), body) {
                     Some(mac::MgmtBody::Beacon { bcn_hdr, elements }) => {
+                        trace::duration!("wlan", "MgmtBody::Beacon");
                         self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
                             bssid,
                             bcn_hdr.beacon_interval,
@@ -247,6 +250,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                         );
                     }
                     Some(mac::MgmtBody::ProbeResp { probe_resp_hdr, elements }) => {
+                        trace::duration!("wlan", "MgmtBody::ProbeResp");
                         self.scanner.bind(&mut self.ctx).handle_ap_advertisement(
                             bssid,
                             probe_resp_hdr.beacon_interval,
@@ -616,6 +620,8 @@ impl Client {
     /// be the BSSID the client associated to and the receiver address should either be non-unicast
     /// or the client's MAC address.
     fn should_handle_frame<B: ByteSlice>(&self, mac_frame: &mac::MacFrame<B>) -> bool {
+        trace::duration!("wlan", "Client::should_handle_frame");
+
         // Technically, |transmitter_addr| and |receiver_addr| would be more accurate but using src
         // src and dst to be consistent with |data_dst_addr()|.
         let (src_addr, dst_addr) = match mac_frame {
@@ -990,6 +996,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         bytes: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) {
+        trace::duration!("wlan", "BoundClient::on_mac_frame");
         // Safe: |state| is never None and always replaced with Some(..).
         self.sta.state = Some(self.sta.state.take().unwrap().on_mac_frame(self, bytes, rx_info));
     }

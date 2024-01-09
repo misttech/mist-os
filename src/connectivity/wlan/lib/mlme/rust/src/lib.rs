@@ -35,7 +35,7 @@ use {
     },
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_sync::Mutex,
-    fuchsia_zircon as zx,
+    fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::{channel::mpsc, select, StreamExt},
     std::{cmp, sync::Arc, time::Duration},
     tracing::{error, info},
@@ -268,6 +268,7 @@ async fn main_loop_impl<T: MlmeImpl>(
                         return Ok(())
                     },
                     DriverEvent::MacFrameRx { bytes, rx_info } => {
+                        trace::duration!("wlan", "DriverEvent::MacFrameRx");
                         mlme_impl.handle_mac_frame_rx(&bytes[..], rx_info);
                     }
                     DriverEvent::EthFrameTx { bytes } => {
