@@ -35,8 +35,6 @@ class AnnotationManager {
 
   // Returns all annotations collected by the manager in a promise that is guaranteed to complete
   // before |timeout| expires.
-  //
-  // Note: currently only immediately available annotations are returned.
   ::fpromise::promise<Annotations> GetAll(zx::duration timeout);
 
   // Returns the annotations that are immediately available.
