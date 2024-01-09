@@ -37,3 +37,8 @@ fuchsia_driver_component("post-init") {
   info = "post-init-info.json"
   manifest = "meta/post-init.cml"
 }
+
+group("tests") {
+  testonly = true
+  deps = [ ":sherlock-post-init-bind_test" ]
+}

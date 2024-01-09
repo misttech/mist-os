@@ -99,6 +99,11 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(GPIO_SOC_BT_REG_ON),
     // For lights.
     DECL_GPIO_PIN(GPIO_AMBER_LED),
+
+    // Board revision GPIOs.
+    DECL_GPIO_PIN(GPIO_HW_ID0),
+    DECL_GPIO_PIN(GPIO_HW_ID1),
+    DECL_GPIO_PIN(GPIO_HW_ID2),
 };
 
 zx_status_t Astro::GpioInit() {

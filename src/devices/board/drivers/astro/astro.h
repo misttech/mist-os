@@ -18,6 +18,8 @@
 #include <fbl/macros.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
+
 namespace astro {
 
 // BTI IDs for our devices
@@ -86,7 +88,10 @@ class Astro : public AstroType {
   explicit Astro(zx_device_t* parent,
                  fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
                  iommu_protocol_t* iommu)
-      : AstroType(parent), pbus_(std::move(pbus)), iommu_(iommu) {}
+      : AstroType(parent),
+        pbus_(std::move(pbus)),
+        iommu_(iommu),
+        outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -95,6 +100,12 @@ class Astro : public AstroType {
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Astro);
+
+  void Serve(fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> request) {
+    device_connect_runtime_protocol(
+        parent(), fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
+        fuchsia_hardware_platform_bus::Service::PlatformBus::Name, request.TakeChannel().release());
+  }
 
   zx::result<> AdcInit();
   zx_status_t AudioInit();
@@ -125,6 +136,7 @@ class Astro : public AstroType {
   zx_status_t UsbInit();
   zx_status_t VideoInit();
   zx_status_t DsiInit();
+  zx_status_t AddPostInitDevice();
   int Thread();
 
   uint32_t GetBoardRev(void);
@@ -156,6 +168,8 @@ class Astro : public AstroType {
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;
 
   thrd_t thread_;
+
+  fdf::OutgoingDirectory outgoing_;
 };
 
 }  // namespace astro

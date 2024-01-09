@@ -244,11 +244,13 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
       "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp",
       "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
+      "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
       "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
       "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
       "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
       "//sdk/lib/driver/component/cpp:cpp",
+      "//sdk/lib/driver/outgoing/cpp",
       "//src/connectivity/openthread/lib/ot-radio",
       "//src/devices/bind/fuchsia:fuchsia_cpp",
       "//src/devices/bind/fuchsia.adc:fuchsia.adc_cpp",
@@ -314,15 +316,25 @@ template("sherlock_driver") {
     configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
   }
 
-  fuchsia_driver_component(target_name) {
-    deps = [ ":${target_name}-driver" ]
-    info = "${target_name}-info.json"
-    manifest = "meta/${target_name}.cml"
+  fuchsia_driver_component("${invoker.target_name}-component") {
+    deps = [ ":${invoker.target_name}-driver" ]
+    info = "${invoker.target_name}-info.json"
+    manifest = "meta/${invoker.target_name}.cml"
   }
 
   fuchsia_driver_package("${invoker.target_name}-package") {
     package_name = "${invoker.target_name}"
-    driver_components = [ ":${invoker.target_name}" ]
+    driver_components = [
+      ":${invoker.target_name}-component",
+      "post-init",
+    ]
+  }
+
+  group(target_name) {
+    deps = [
+      ":${invoker.target_name}-component",
+      "post-init",
+    ]
   }
 }
 
@@ -336,5 +348,8 @@ sherlock_driver("sherlock-factory") {
 
 group("tests") {
   testonly = true
-  deps = [ ":sherlock-bind_test" ]
+  deps = [
+    ":sherlock-bind_test",
+    "post-init:tests",
+  ]
 }

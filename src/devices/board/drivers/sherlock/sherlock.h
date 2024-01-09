@@ -12,12 +12,13 @@
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <threads.h>
 #include <zircon/types.h>
 
 #include <ddktl/device.h>
 #include <fbl/macros.h>
 #include <soc/aml-t931/t931-hw.h>
+
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
 
 namespace sherlock {
 
@@ -72,7 +73,7 @@ constexpr uint8_t BOARD_REV_EVT1 = 0x0E;
 constexpr uint8_t BOARD_REV_EVT2 = 0x0F;
 
 class Sherlock;
-using SherlockType = ddk::Device<Sherlock>;
+using SherlockType = ddk::Device<Sherlock, ddk::Initializable>;
 
 // This is the main class for the platform bus driver.
 class Sherlock : public SherlockType {
@@ -80,15 +81,25 @@ class Sherlock : public SherlockType {
   explicit Sherlock(zx_device_t* parent,
                     fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
                     iommu_protocol_t* iommu)
-      : SherlockType(parent), pbus_(std::move(pbus)), iommu_(iommu) {}
+      : SherlockType(parent),
+        pbus_(std::move(pbus)),
+        iommu_(iommu),
+        outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   // Device protocol implementation.
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Sherlock);
+
+  void Serve(fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> request) {
+    device_connect_runtime_protocol(
+        parent(), fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
+        fuchsia_hardware_platform_bus::Service::PlatformBus::Name, request.TakeChannel().release());
+  }
 
   uint8_t GetBoardRev();
   uint8_t GetBoardOption();
@@ -131,6 +142,7 @@ class Sherlock : public SherlockType {
   zx_status_t CpuInit();
   zx_status_t ThermistorInit();
   zx_status_t DsiInit();
+  zx_status_t AddPostInitDevice();
   int Thread();
 
   zx_status_t EnableWifi32K(void);
@@ -158,7 +170,6 @@ class Sherlock : public SherlockType {
   fidl::Arena<> init_arena_;
   std::vector<fuchsia_hardware_gpioimpl::wire::InitStep> gpio_init_steps_;
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;
-  thrd_t thread_;
 
   std::optional<uint8_t> board_rev_;
   std::optional<uint8_t> board_option_;
@@ -170,6 +181,8 @@ class Sherlock : public SherlockType {
   inspect::UintProperty board_rev_property_;
   inspect::UintProperty board_option_property_;
   inspect::UintProperty display_id_property_;
+
+  fdf::OutgoingDirectory outgoing_;
 };
 
 }  // namespace sherlock

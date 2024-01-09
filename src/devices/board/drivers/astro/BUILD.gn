@@ -144,11 +144,13 @@ fuchsia_driver("astro-driver") {
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/outgoing/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.adc:fuchsia.adc_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
@@ -211,7 +213,7 @@ fuchsia_driver("astro-driver") {
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
-fuchsia_driver_component("astro") {
+fuchsia_driver_component("astro-component") {
   component_name = "astro"
   deps = [ ":astro-driver" ]
   info = "astro-info.json"
@@ -220,7 +222,17 @@ fuchsia_driver_component("astro") {
 
 fuchsia_driver_package("package") {
   package_name = "astro"
-  driver_components = [ ":astro" ]
+  driver_components = [
+    ":astro-component",
+    "post-init",
+  ]
+}
+
+group("astro") {
+  deps = [
+    ":astro-component",
+    "post-init",
+  ]
 }
 
 group("tests") {
@@ -232,5 +244,6 @@ group("tests") {
     ":astro-wifi-bind_test",
     ":pd-armcore-bind_test",
     ":pwm-ao-d-bind_test",
+    "post-init:tests",
   ]
 }

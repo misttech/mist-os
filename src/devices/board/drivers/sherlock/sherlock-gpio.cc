@@ -132,7 +132,7 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(T931_GPIOE(6)),     DECL_GPIO_PIN(T931_GPIOE(7)),
 };
 #else
-#define GPIO_PIN_COUNT 26
+#define GPIO_PIN_COUNT 31
 static const gpio_pin_t gpio_pins[] = {
     // For wifi.
     DECL_GPIO_PIN(T931_WIFI_HOST_WAKE),
@@ -170,6 +170,10 @@ static const gpio_pin_t gpio_pins[] = {
     // For Bluetooth.
     DECL_GPIO_PIN(GPIO_SOC_WIFI_LPO_32k768),
     DECL_GPIO_PIN(GPIO_SOC_BT_REG_ON),
+
+    // Board revision GPIOs.
+    DECL_GPIO_PIN(GPIO_HW_ID0),
+    DECL_GPIO_PIN(GPIO_HW_ID1),
 };
 #endif  // FACTORY_BUILD
 
@@ -183,6 +187,11 @@ static const gpio_pin_t gpio_c_pins[] = {
 #else
     // For SPI interface.
     DECL_GPIO_PIN(GPIO_SPICC0_SS0),
+
+    // Board revision GPIOs.
+    DECL_GPIO_PIN(GPIO_HW_ID2),
+    DECL_GPIO_PIN(GPIO_HW_ID3),
+    DECL_GPIO_PIN(GPIO_HW_ID4),
 #endif
 };
 

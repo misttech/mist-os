@@ -12,8 +12,7 @@ using fuchsia.hardware.platform.bus;
 primary node "pbus" {
   fuchsia.hardware.platform.bus.Service == fuchsia.hardware.platform.bus.Service.DriverTransport;
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE;
-  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.google.platform.BIND_PLATFORM_DEV_PID.SHERLOCK;
-  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 1;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.google.platform.BIND_PLATFORM_DEV_DID.POST_INIT;
 }
 
 node "hw-id-0" {

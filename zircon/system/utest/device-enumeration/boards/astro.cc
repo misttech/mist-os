@@ -9,6 +9,7 @@ namespace {
 TEST_F(DeviceEnumerationTest, AstroTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/astro",
+      "sys/platform/pt/astro/post-init/post-init",
       "sys/platform/05:03:1/aml-gpio",
       "sys/platform/05:03:1/aml-gpio/gpio-init",
       "sys/platform/05:03:1/aml-gpio/gpio-2/astro-buttons/hid-buttons",

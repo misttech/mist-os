@@ -14,9 +14,18 @@
         compat: "driver/sherlock.so",
         colocate: "true",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.platform.bus.Service" },
+    ],
     use: [
         { protocol: "fuchsia.kernel.MmioResource" },
         { protocol: "fuchsia.boot.Arguments" },
         { service: "fuchsia.hardware.platform.bus.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.platform.bus.Service",
+            from: "self",
+        },
     ],
 }
