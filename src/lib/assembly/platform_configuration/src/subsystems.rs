@@ -42,6 +42,7 @@ mod input_groups;
 mod intl;
 mod kernel;
 mod media;
+mod paravirtualization;
 mod power;
 mod radar;
 mod rcs;
@@ -291,6 +292,13 @@ fn configure_subsystems(
 
     power::PowerManagementSubsystem::define_configuration(context, &(), builder)
         .context("Configuring the 'power' subsystem")?;
+
+    paravirtualization::ParavirtualizationSubsystem::define_configuration(
+        context,
+        &config.platform.paravirtualization,
+        builder,
+    )
+    .context("Configuring the 'paravirtualization' subsystem")?;
 
     radar::RadarSubsystemConfig::define_configuration(context, &(), builder)
         .context("Configuring the 'radar' subsystem")?;
