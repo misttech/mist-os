@@ -6,6 +6,7 @@ import("//build/dist/zip_resource.gni")
 import("//build/testing/perf/test.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/starnix/kernel/args.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
@@ -548,7 +549,7 @@ template("gvisor_with_expectations_test_package") {
 }
 
 gvisor_with_expectations_test_package("starnix_gvisor_tests") {
-  expectations = "expectations/default.json5"
+  expectations = "expectations/default_no_unified_aspace.json5"
   test_components = []
   foreach(test_name, gvisor_tests) {
     test_components += [ ":${test_name}" ]
@@ -564,6 +565,9 @@ gvisor_with_expectations_test_package("starnix_gvisor_tests") {
 # Thesse tests assume the data filesystem uses Fxfs.
 gvisor_with_expectations_test_package("starnix_gvisor_tests_on_fxfs") {
   expectations = "expectations/using_fxfs_test.json5"
+  if (!starnix_unified_aspace) {
+    expectations = "expectations/using_fxfs_test_no_unified_aspace.json5"
+  }
   test_components = []
   foreach(test_name, gvisor_tests) {
     test_components += [ ":${test_name}_use_persistent_storage" ]

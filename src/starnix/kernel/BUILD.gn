@@ -9,33 +9,7 @@ import("//build/rust/rustc_test.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/lib/gzip/gzip.gni")
 import("//tools/protobuf/rust_proto_library.gni")
-
-declare_args() {
-  # Whether or not logging is disabled globally.
-  starnix_disable_logging = false
-
-  # Whether or not tracing is enabled globally.
-  starnix_enable_tracing = true
-
-  # Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
-  starnix_enable_tracing_firehose = false
-
-  # Compiles-in trace and debug logging in release builds. By default, these
-  # logs are compiled-out for performance reasons. For more information, see
-  # https://fuchsia-review.googlesource.com/c/fuchsia/+/929995.
-  starnix_enable_trace_and_debug_logs_in_release = false
-
-  # Whether or not syscall status inspect is enabled globally.
-  starnix_syscall_stats = false
-
-  # Whether or not unified address spaces are leveraged.
-  # TODO(https://fxbug.dev/132980): Enable on other platforms once Zircon
-  # support is available.
-  starnix_unified_aspace = target_cpu == "x64" || target_cpu == "arm64"
-
-  # Whether to use an alternate strategy for anonymous memory allocations.
-  starnix_enable_alternate_anon_allocs = false
-}
+import("args.gni")
 
 group("kernel") {
   deps = [ ":starnix_kernel_package" ]

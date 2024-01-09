@@ -5,7 +5,7 @@
 use crate::{
     device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
     fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async},
-    mm::{ProtectionFlags, VMEX_RESOURCE},
+    mm::{ProtectionFlags, UNIFIED_ASPACES_ENABLED, VMEX_RESOURCE},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -28,9 +28,16 @@ use starnix_logging::{impossible_error, log_warn, trace_category_starnix_mm, tra
 use starnix_sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
-    from_status_like_fdio, fsverity_descriptor, ino_t, mount_flags::MountFlags, off_t,
-    open_flags::OpenFlags, statfs,
+    auth::FsCred,
+    device_type::DeviceType,
+    errno, error,
+    errors::{Errno, ENOTSUP},
+    file_mode::FileMode,
+    from_status_like_fdio, fsverity_descriptor, ino_t,
+    mount_flags::MountFlags,
+    off_t,
+    open_flags::OpenFlags,
+    statfs,
 };
 use std::sync::Arc;
 use syncio::{
@@ -1007,31 +1014,135 @@ impl FsNodeOps for RemoteSpecialNode {
     }
 }
 
+fn zxio_read_write_inner_map_error(status: zx::Status) -> Errno {
+    match status {
+        // zx::Stream may return invalid args or not found error because of
+        // invalid zx_iovec buffer pointers.
+        zx::Status::INVALID_ARGS | zx::Status::NOT_FOUND => errno!(EFAULT, ""),
+        status => from_status_like_fdio!(status),
+    }
+}
+
+fn zxio_read_inner(
+    data: &mut dyn OutputBuffer,
+    unified_read_fn: impl FnOnce(&[syncio::zxio::zx_iovec]) -> Result<usize, zx::Status>,
+    vmo_read_fn: impl FnOnce(&mut [u8]) -> Result<usize, zx::Status>,
+) -> Result<usize, Errno> {
+    let read_bytes = if UNIFIED_ASPACES_ENABLED {
+        match data.peek_all_segments_as_zx_iovecs() {
+            Ok(iovecs) => {
+                let actual = unified_read_fn(&iovecs).map_err(zxio_read_write_inner_map_error)?;
+                // SAFETY: we successfully read `actual` bytes
+                // directly to the user's buffer segments.
+                unsafe { data.advance(actual) }?;
+                Some(Ok(actual))
+            }
+            Err(e) => {
+                if e.code == ENOTSUP {
+                    // Fallback to the slower read with an intermediate buffer
+                    // when the output buffer doesn't support I/O directly to its
+                    // segments.
+                    None
+                } else {
+                    Some(Err(e))
+                }
+            }
+        }
+    } else {
+        // Fallback to the slower read with an intermediate buffer when unified
+        // aspaces is not enabled.
+        None
+    };
+
+    read_bytes.unwrap_or_else(|| {
+        // Perform the (slower) operation by using an intermediate buffer.
+        let total = data.available();
+        let mut bytes = vec![0u8; total];
+        let actual = vmo_read_fn(&mut bytes).map_err(|status| from_status_like_fdio!(status))?;
+        data.write_all(&bytes[0..actual])
+    })
+}
+
 fn zxio_read(zxio: &Zxio, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-    let total = data.available();
-    let mut bytes = vec![0u8; total];
-    let actual = zxio.read(&mut bytes).map_err(|status| from_status_like_fdio!(status))?;
-    data.write_all(&bytes[0..actual])
+    zxio_read_inner(
+        data,
+        |iovecs| {
+            // SAFETY: `zxio_read_inner` maps the returned error to an appropriate
+            // `Errno` for userspace to handle. `data` only points to memory that
+            // is allowed to be written to (Linux user-mode aspace or a valid
+            // Starnix owned buffer).
+            unsafe { zxio.readv(iovecs) }
+        },
+        |bytes| zxio.read(bytes),
+    )
 }
 
 fn zxio_read_at(zxio: &Zxio, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-    let total = data.available();
-    let mut bytes = vec![0u8; total];
-    let actual =
-        zxio.read_at(offset as u64, &mut bytes).map_err(|status| from_status_like_fdio!(status))?;
-    data.write_all(&bytes[0..actual])?;
-    Ok(actual)
+    let offset = offset as u64;
+    zxio_read_inner(
+        data,
+        |iovecs| {
+            // SAFETY: `zxio_read_inner` maps the returned error to an appropriate
+            // `Errno` for userspace to handle. `data` only points to memory that
+            // is allowed to be written to (Linux user-mode aspace or a valid
+            // Starnix owned buffer).
+            unsafe { zxio.readv_at(offset, iovecs) }
+        },
+        |bytes| zxio.read_at(offset, bytes),
+    )
 }
 
+fn zxio_write_inner(
+    data: &mut dyn InputBuffer,
+    unified_write_fn: impl FnOnce(&[syncio::zxio::zx_iovec]) -> Result<usize, zx::Status>,
+    vmo_write_fn: impl FnOnce(&[u8]) -> Result<usize, zx::Status>,
+) -> Result<usize, Errno> {
+    let write_bytes = if UNIFIED_ASPACES_ENABLED {
+        match data.peek_all_segments_as_zx_iovecs() {
+            Ok(iovecs) => {
+                let actual = unified_write_fn(&iovecs).map_err(zxio_read_write_inner_map_error)?;
+                data.advance(actual)?;
+                Some(Ok(actual))
+            }
+            Err(e) => {
+                if e.code == ENOTSUP {
+                    // Fallback to the slower read with an intermediate buffer
+                    // when the output buffer doesn't support I/O directly to its
+                    // segments.
+                    None
+                } else {
+                    Some(Err(e))
+                }
+            }
+        }
+    } else {
+        // Fallback to the slower read with an intermediate buffer when unified
+        // aspaces is not enabled.
+        None
+    };
+
+    write_bytes.unwrap_or_else(|| {
+        // Perform the (slower) operation by using an intermediate buffer.
+        let bytes = data.peek_all()?;
+        let actual = vmo_write_fn(&bytes).map_err(|status| from_status_like_fdio!(status))?;
+        data.advance(actual)?;
+        Ok(actual)
+    })
+}
 fn zxio_write(
     zxio: &Zxio,
     _current_task: &CurrentTask,
     data: &mut dyn InputBuffer,
 ) -> Result<usize, Errno> {
-    let bytes = data.peek_all()?;
-    let actual = zxio.write(&bytes).map_err(|status| from_status_like_fdio!(status))?;
-    data.advance(actual)?;
-    Ok(actual)
+    zxio_write_inner(
+        data,
+        |iovecs| {
+            // SAFETY: `zxio_write_inner` maps the returned error to an appropriate
+            // `Errno` for userspace to handle.
+            unsafe { zxio.writev(iovecs) }
+        },
+        |bytes| zxio.write(bytes),
+    )
 }
 
 fn zxio_write_at(
@@ -1040,11 +1151,16 @@ fn zxio_write_at(
     offset: usize,
     data: &mut dyn InputBuffer,
 ) -> Result<usize, Errno> {
-    let bytes = data.peek_all()?;
-    let actual =
-        zxio.write_at(offset as u64, &bytes).map_err(|status| from_status_like_fdio!(status))?;
-    data.advance(actual)?;
-    Ok(actual)
+    let offset = offset as u64;
+    zxio_write_inner(
+        data,
+        |iovecs| {
+            // SAFETY: `zxio_write_inner` maps the returned error to an appropriate
+            // `Errno` for userspace to handle.
+            unsafe { zxio.writev_at(offset, iovecs) }
+        },
+        |bytes| zxio.write_at(offset, bytes),
+    )
 }
 
 /// Helper struct to track the context necessary to iterate over dir entries.

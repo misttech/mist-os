@@ -720,6 +720,31 @@ impl Zxio {
         Ok(actual)
     }
 
+    /// Performs a vectorized read, returning the number of bytes read to `data`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must check the returned `Result` to make sure the buffers
+    /// provided are valid. The caller must provide pointers that are compatible
+    /// with the backing implementation of zxio.
+    ///
+    /// This call allows writing to arbitrary memory locations. It is up to the
+    /// caller to make sure that calling this method does not result in undefined
+    /// behaviour.
+    pub unsafe fn readv(&self, data: &[zxio::zx_iovec]) -> Result<usize, zx::Status> {
+        let flags = zxio::zxio_flags_t::default();
+        let mut actual = 0usize;
+        let status = zxio::zxio_readv(
+            self.as_ptr(),
+            data.as_ptr() as *const zxio::zx_iovec,
+            data.len(),
+            flags,
+            &mut actual,
+        );
+        zx::ok(status)?;
+        Ok(actual)
+    }
+
     pub fn clone(&self) -> Result<Zxio, zx::Status> {
         let mut handle = 0;
         let status = unsafe { zxio::zxio_clone(self.as_ptr(), &mut handle) };
@@ -744,6 +769,37 @@ impl Zxio {
         Ok(actual)
     }
 
+    /// Performs a vectorized read at an offset, returning the number of bytes
+    /// read to `data`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must check the returned `Result` to make sure the buffers
+    /// provided are valid. The caller must provide pointers that are compatible
+    /// with the backing implementation of zxio.
+    ///
+    /// This call allows writing to arbitrary memory locations. It is up to the
+    /// caller to make sure that calling this method does not result in undefined
+    /// behaviour.
+    pub unsafe fn readv_at(
+        &self,
+        offset: u64,
+        data: &[zxio::zx_iovec],
+    ) -> Result<usize, zx::Status> {
+        let flags = zxio::zxio_flags_t::default();
+        let mut actual = 0usize;
+        let status = zxio::zxio_readv_at(
+            self.as_ptr(),
+            offset,
+            data.as_ptr() as *const zxio::zx_iovec,
+            data.len(),
+            flags,
+            &mut actual,
+        );
+        zx::ok(status)?;
+        Ok(actual)
+    }
+
     pub fn write(&self, data: &[u8]) -> Result<usize, zx::Status> {
         let flags = zxio::zxio_flags_t::default();
         let mut actual = 0;
@@ -756,6 +812,32 @@ impl Zxio {
                 &mut actual,
             )
         };
+        zx::ok(status)?;
+        Ok(actual)
+    }
+
+    /// Performs a vectorized write, returning the number of bytes written from
+    /// `data`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must check the returned `Result` to make sure the buffers
+    /// provided are valid. The caller must provide pointers that are compatible
+    /// with the backing implementation of zxio.
+    ///
+    /// This call allows reading from arbitrary memory locations. It is up to the
+    /// caller to make sure that calling this method does not result in undefined
+    /// behaviour.
+    pub unsafe fn writev(&self, data: &[zxio::zx_iovec]) -> Result<usize, zx::Status> {
+        let flags = zxio::zxio_flags_t::default();
+        let mut actual = 0;
+        let status = zxio::zxio_writev(
+            self.as_ptr(),
+            data.as_ptr() as *const zxio::zx_iovec,
+            data.len(),
+            flags,
+            &mut actual,
+        );
         zx::ok(status)?;
         Ok(actual)
     }
@@ -773,6 +855,37 @@ impl Zxio {
                 &mut actual,
             )
         };
+        zx::ok(status)?;
+        Ok(actual)
+    }
+
+    /// Performs a vectorized write at an offset, returning the number of bytes
+    /// written from `data`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must check the returned `Result` to make sure the buffers
+    /// provided are valid. The caller must provide pointers that are compatible
+    /// with the backing implementation of zxio.
+    ///
+    /// This call allows reading from arbitrary memory locations. It is up to the
+    /// caller to make sure that calling this method does not result in undefined
+    /// behaviour.
+    pub unsafe fn writev_at(
+        &self,
+        offset: u64,
+        data: &[zxio::zx_iovec],
+    ) -> Result<usize, zx::Status> {
+        let flags = zxio::zxio_flags_t::default();
+        let mut actual = 0;
+        let status = zxio::zxio_writev_at(
+            self.as_ptr(),
+            offset,
+            data.as_ptr() as *const zxio::zx_iovec,
+            data.len(),
+            flags,
+            &mut actual,
+        );
         zx::ok(status)?;
         Ok(actual)
     }
