@@ -5,7 +5,6 @@
 #include "src/lib/json_parser/rapidjson_validation.h"
 
 #include <lib/fit/result.h>
-#include <lib/syslog/cpp/macros.h>
 #include <zircon/assert.h>
 
 #include <memory>
@@ -16,8 +15,8 @@ namespace json_parser {
 
 std::string InitSchemaError::ToString() const {
   std::stringstream s;
-  s << "Schema validation spec is not valid JSON"
-    << ": offset " << offset << ", " << rapidjson::GetParseError_En(code);
+  s << "Schema validation spec is not valid JSON" << ": offset " << offset << ", "
+    << rapidjson::GetParseError_En(code);
   return s.str();
 }
 
