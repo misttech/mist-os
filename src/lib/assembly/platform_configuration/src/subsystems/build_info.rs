@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_schema::product_config::BuildInfoConfig;
-use assembly_util::{FileEntry, PackageDestination};
+use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct BuildInfoSubsystem;
 impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsystem {
@@ -15,7 +15,7 @@ impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsyste
     ) -> anyhow::Result<()> {
         if let Some(build_info) = &build_info {
             let dir = builder
-                .add_domain_config(PackageDestination::BuildInfo)
+                .add_domain_config(PackageSetDestination::Blob(PackageDestination::BuildInfo))
                 .skip_expose()
                 .directory("data");
             dir.entry_from_contents("board", &context.board_info.name)?;

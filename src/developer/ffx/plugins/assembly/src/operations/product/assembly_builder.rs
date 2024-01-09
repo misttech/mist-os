@@ -27,7 +27,8 @@ use assembly_structured_config::{BootfsRepackager, Repackager};
 use assembly_tool::ToolProvider;
 use assembly_util as util;
 use assembly_util::{
-    BootfsDestination, FileEntry, InsertAllUniqueExt, InsertUniqueExt, NamedMap, PackageDestination,
+    BootfsDestination, BootfsPackageDestination, FileEntry, InsertAllUniqueExt, InsertUniqueExt,
+    NamedMap, PackageDestination, PackageSetDestination,
 };
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
@@ -356,7 +357,16 @@ impl ImageAssemblyConfigBuilder {
     ) -> Result<()> {
         // Create PackageEntry
         let package_entry = PackageEntry::parse_from(path.as_ref().to_owned())?;
-        let d = PackageDestination::FromAIB(package_entry.name().to_string());
+        let d = match to_package_set.to_owned() {
+            PackageSet::Base | PackageSet::Cache | PackageSet::System | PackageSet::Flexible => {
+                PackageSetDestination::Blob(PackageDestination::FromAIB(
+                    package_entry.name().to_string(),
+                ))
+            }
+            PackageSet::Bootfs => PackageSetDestination::Boot(BootfsPackageDestination::FromAIB(
+                package_entry.name().to_string(),
+            )),
+        };
         self.add_unique_package_entry(d, package_entry, to_package_set)
     }
 
@@ -367,7 +377,9 @@ impl ImageAssemblyConfigBuilder {
     ) -> Result<()> {
         // Create PackageEntry
         let package_entry = PackageEntry::parse_from(path.as_ref().to_owned())?;
-        let d = PackageDestination::FromProduct(package_entry.name().to_string());
+        let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
+            package_entry.name().to_string(),
+        ));
         self.add_unique_package_entry(d, package_entry, to_package_set)
     }
 
@@ -375,7 +387,7 @@ impl ImageAssemblyConfigBuilder {
     /// packages in the builder
     fn add_unique_package_entry(
         &mut self,
-        d: PackageDestination,
+        d: PackageSetDestination,
         package_entry: PackageEntry,
         to_package_set: &PackageSet,
     ) -> Result<()> {
@@ -463,7 +475,9 @@ impl ImageAssemblyConfigBuilder {
                 Self::parse_product_package_entry(entry)?;
             let package_manifest_name = pkg_manifest.name().to_string();
             let package_entry = PackageEntry { path: manifest_path.into(), manifest: pkg_manifest };
-            let d = PackageDestination::FromProduct(package_entry.name().to_string());
+            let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
+                package_entry.name().to_string(),
+            ));
             self.add_unique_package_entry(d, package_entry, &to_package_set)?;
             // Add the config data entries to the map
             for config in config_data {
@@ -488,7 +502,9 @@ impl ImageAssemblyConfigBuilder {
                     format!("parsing {} as a package manifest", driver_details.package)
                 })?;
             let entry = PackageEntry { path: driver_details.package.clone(), manifest };
-            let d = PackageDestination::FromProduct(entry.name().to_string());
+            let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
+                entry.name().to_string(),
+            ));
             self.base
                 .add_package(d, entry)
                 .context(format!("Adding driver {}", &driver_details.package))?;
@@ -587,7 +603,7 @@ impl ImageAssemblyConfigBuilder {
     /// Add a domain config package.
     pub fn add_domain_config(
         &mut self,
-        package: PackageDestination,
+        package: PackageSetDestination,
         config: DomainConfig,
     ) -> Result<()> {
         if self.domain_configs.insert(package.into(), config).is_none() {
@@ -677,7 +693,9 @@ impl ImageAssemblyConfigBuilder {
                 .with_context(|| format!("building compiled package {}", &package_name))?;
 
             if let Some(p) = package_manifest_path {
-                let d = PackageDestination::FromProduct(package_name.clone());
+                let d = PackageSetDestination::Blob(PackageDestination::FromProduct(
+                    package_name.clone(),
+                ));
                 base.add_package_from_path(d, p)
                     .with_context(|| format!("adding compiled package {}", &package_name))?;
             };
@@ -715,13 +733,15 @@ impl ImageAssemblyConfigBuilder {
         for (package, config) in &package_configs {
             // Only process configs that have component entries for structured config.
             if !config.components.is_empty() {
-                // All repackaged packages come from AIBs.
-                let d = PackageDestination::FromAIB(package.to_string());
-
                 // Get the manifest for this package name, returning the set from which it was removed
-                if let Some((manifest, source_package_set)) = remove_package_from_sets(
-                    &d,
-                    [&mut base, &mut cache, &mut system, &mut bootfs_packages],
+                if let Some((manifest, source_package_set, destination)) = remove_package_from_sets(
+                    package.to_string(),
+                    [
+                        (&mut base, PackageSet::Base),
+                        (&mut cache, PackageSet::Cache),
+                        (&mut system, PackageSet::System),
+                        (&mut bootfs_packages, PackageSet::Bootfs),
+                    ],
                 )
                 .with_context(|| format!("removing {package} for repackaging"))?
                 {
@@ -740,7 +760,7 @@ impl ImageAssemblyConfigBuilder {
                         .with_context(|| format!("building repackaged {package}"))?;
                     let new_entry = PackageEntry::parse_from(new_path)
                         .with_context(|| format!("parsing repackaged {package}"))?;
-                    source_package_set.insert(d, new_entry);
+                    source_package_set.insert(destination, new_entry);
                 } else {
                     // TODO(https://fxbug.dev/101556) return an error here
                 }
@@ -756,8 +776,20 @@ impl ImageAssemblyConfigBuilder {
             let (path, manifest) = package
                 .build(outdir)
                 .with_context(|| format!("building domain config package {package_name}"))?;
-            base.add_package(package_name.clone(), PackageEntry { path, manifest })
-                .with_context(|| format!("Adding domain config package: {}", package_name))?;
+            match &package_name {
+                d @ PackageSetDestination::Blob(_) => {
+                    base.add_package(d.clone(), PackageEntry { path, manifest }).with_context(
+                        || format!("Adding domain config package: {}", package_name),
+                    )?;
+                }
+                d @ PackageSetDestination::Boot(_) => {
+                    bootfs_packages
+                        .add_package(d.clone(), PackageEntry { path, manifest })
+                        .with_context(|| {
+                            format!("Adding domain config package: {}", package_name)
+                        })?;
+                }
+            }
         }
 
         // Construct the config capability package.
@@ -773,7 +805,10 @@ impl ImageAssemblyConfigBuilder {
                         format!("building config capabilties package {package_name}")
                     })?;
             bootfs_packages
-                .add_package(PackageDestination::Config, PackageEntry { path, manifest })
+                .add_package(
+                    PackageSetDestination::Boot(BootfsPackageDestination::Config),
+                    PackageEntry { path, manifest },
+                )
                 .with_context(|| format!("Adding config capabilities package: {}", package_name))?;
         }
 
@@ -810,8 +845,11 @@ impl ImageAssemblyConfigBuilder {
             let manifest_path = config_data_builder
                 .build(outdir)
                 .context("writing the 'config_data' package metafar.")?;
-            base.add_package_from_path(PackageDestination::ConfigData, manifest_path)
-                .context("adding generated config-data package")?;
+            base.add_package_from_path(
+                PackageSetDestination::Blob(PackageDestination::ConfigData),
+                manifest_path,
+            )
+            .context("adding generated config-data package")?;
         }
 
         if !shell_commands.is_empty() {
@@ -819,8 +857,11 @@ impl ImageAssemblyConfigBuilder {
             shell_commands_builder.add_shell_commands(shell_commands, "fuchsia.com".to_string());
             let manifest =
                 shell_commands_builder.build(outdir).context("building shell commands package")?;
-            base.add_package_from_path(PackageDestination::ShellCommands, manifest)
-                .context("adding shell commands package to base")?;
+            base.add_package_from_path(
+                PackageSetDestination::Blob(PackageDestination::ShellCommands),
+                manifest,
+            )
+            .context("adding shell commands package to base")?;
         }
 
         let bootfs_files = bootfs_files
@@ -856,18 +897,30 @@ impl ImageAssemblyConfigBuilder {
 /// Remove a package with a matching name from the provided package sets, returning its parsed
 /// manifest and a mutable reference to the set from which it was removed.
 fn remove_package_from_sets<'a, 'b: 'a, const N: usize>(
-    package_name: &PackageDestination,
-    package_sets: [&'a mut assembly_package_set::PackageSet; N],
-) -> anyhow::Result<Option<(PackageManifest, &'a mut assembly_package_set::PackageSet)>> {
+    package_name: String,
+    package_sets: [(&'a mut assembly_package_set::PackageSet, assembly_config_schema::PackageSet);
+        N],
+) -> anyhow::Result<
+    Option<(PackageManifest, &'a mut assembly_package_set::PackageSet, PackageSetDestination)>,
+> {
     let mut matches_name = None;
 
-    for package_set in package_sets {
-        if let Some(entry) = package_set.remove(package_name) {
+    for (package_set, package_set_type) in package_sets {
+        // All repackaged packages come from AIBs.
+        let destination = match package_set_type {
+            PackageSet::Base | PackageSet::Cache | PackageSet::System | PackageSet::Flexible => {
+                PackageSetDestination::Blob(PackageDestination::FromAIB(package_name.clone()))
+            }
+            PackageSet::Bootfs => {
+                PackageSetDestination::Boot(BootfsPackageDestination::FromAIB(package_name.clone()))
+            }
+        };
+        if let Some(entry) = package_set.remove(&destination) {
             ensure!(
                 matches_name.is_none(),
                 "only one package with a given name is allowed per product"
             );
-            matches_name = Some((entry.manifest, package_set));
+            matches_name = Some((entry.manifest, package_set, destination));
         }
     }
 
@@ -1417,6 +1470,58 @@ mod tests {
 
         // 6.  Validate its contents.
         assert_eq!(config_file_data, "configuration data".as_bytes());
+    }
+
+    #[test]
+    fn test_builder_with_domain_config() {
+        let vars = TempdirPathsForTest::new();
+        let tools = FakeToolProvider::default();
+
+        let bundle = make_test_assembly_bundle(&vars.outdir, &vars.bundle_path);
+        let mut builder = setup_builder(&vars, vec![bundle]);
+
+        let destination = PackageSetDestination::Blob(PackageDestination::ForTest);
+        let config = DomainConfig {
+            directories: NamedMap::new("test"),
+            name: destination.clone(),
+            expose_directories: false,
+        };
+        builder.add_domain_config(destination, config).unwrap();
+
+        let result: assembly_config_schema::ImageAssemblyConfig =
+            builder.build(&vars.outdir, &tools).unwrap();
+
+        // The domain config's manifest is in outdir
+        let expected_manifest_path = vars.outdir.join("for-test").join("package_manifest.json");
+
+        // Validate that the base package set contains the domain config.
+        assert!(result.base.contains(&expected_manifest_path));
+    }
+
+    #[test]
+    fn test_builder_with_bootfs_domain_config() {
+        let vars = TempdirPathsForTest::new();
+        let tools = FakeToolProvider::default();
+
+        let bundle = make_test_assembly_bundle(&vars.outdir, &vars.bundle_path);
+        let mut builder = setup_builder(&vars, vec![bundle]);
+
+        let destination = PackageSetDestination::Boot(BootfsPackageDestination::ForTest);
+        let config = DomainConfig {
+            directories: NamedMap::new("test"),
+            name: destination.clone(),
+            expose_directories: false,
+        };
+        builder.add_domain_config(destination, config).unwrap();
+
+        let result: assembly_config_schema::ImageAssemblyConfig =
+            builder.build(&vars.outdir, &tools).unwrap();
+
+        // The domain config's manifest is in outdir
+        let expected_manifest_path = vars.outdir.join("for-test").join("package_manifest.json");
+
+        // Validate that the bootfs package set contains the domain config.
+        assert!(result.bootfs_packages.contains(&expected_manifest_path));
     }
 
     #[test]

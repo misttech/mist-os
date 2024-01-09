@@ -13,8 +13,8 @@ mod paths;
 
 pub use fast_copy::fast_copy;
 pub use files::{
-    BootfsComponentForRepackage, BootfsDestination, CompiledPackageDestination, Destination,
-    FileEntry, PackageDestination,
+    BootfsComponentForRepackage, BootfsDestination, BootfsPackageDestination,
+    CompiledPackageDestination, Destination, FileEntry, PackageDestination, PackageSetDestination,
 };
 pub use insert_unique::{
     BTreeMapDuplicateKeyError, DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry,

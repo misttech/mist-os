@@ -11,7 +11,7 @@ use assembly_manifest::{AssemblyManifest, Image};
 use assembly_package_list::{PackageList, WritablePackageList};
 use assembly_package_set::{PackageEntry, PackageSet};
 use assembly_tool::Tool;
-use assembly_util::{BootfsDestination, PackageDestination};
+use assembly_util::{BootfsDestination, BootfsPackageDestination, PackageSetDestination};
 use camino::{Utf8Path, Utf8PathBuf};
 use utf8_path::path_relative_from_current_dir;
 use zbi::ZbiBuilder;
@@ -70,11 +70,13 @@ pub fn construct_zbi(
     // Add the packages to a set first, to ensure uniqueness, and ensure a deterministic order.
     let mut bootfs_package_set = PackageSet::new("bootfs packages");
     for bootfs_package in &product.bootfs_packages {
-        // While these are not technically _all_ from the product, at this point, we do not care.
+        // While these are not technically _all_ from AIBs, at this point, we do not care.
         // Product Assembly has already succeeded, which is the piece that cares that all the
         // destinations are provided and correct.
         let entry = PackageEntry::parse_from(bootfs_package)?;
-        let d = PackageDestination::FromProduct(entry.name().to_string());
+        let d = PackageSetDestination::Boot(BootfsPackageDestination::FromAIB(
+            entry.name().to_string(),
+        ));
         bootfs_package_set.add_package(d, entry)?;
     }
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use assembly_util::{NamedMap, PackageDestination};
+use assembly_util::{NamedMap, PackageSetDestination};
 use camino::Utf8PathBuf;
 use fuchsia_merkle::Hash;
 use fuchsia_pkg::PackageManifest;
@@ -45,7 +45,7 @@ impl PartialEq for PackageEntry {
 #[derive(Debug, Serialize)]
 pub struct PackageSet {
     /// Map of packages keyed by the package name.
-    map: NamedMap<PackageDestination, PackageEntry>,
+    map: NamedMap<PackageSetDestination, PackageEntry>,
 }
 
 impl PackageSet {
@@ -56,14 +56,14 @@ impl PackageSet {
 
     /// Add the package described by the ProductPackageSetEntry to the
     /// PackageSet
-    pub fn add_package(&mut self, d: PackageDestination, entry: PackageEntry) -> Result<()> {
+    pub fn add_package(&mut self, d: PackageSetDestination, entry: PackageEntry) -> Result<()> {
         self.map.try_insert_unique(d, entry)
     }
 
     /// Parse the given path as a PackageManifest, and add it to the PackageSet.
     pub fn add_package_from_path<P: Into<Utf8PathBuf>>(
         &mut self,
-        d: PackageDestination,
+        d: PackageSetDestination,
         path: P,
     ) -> Result<()> {
         {
@@ -85,7 +85,7 @@ impl PackageSet {
 }
 
 impl std::ops::Deref for PackageSet {
-    type Target = NamedMap<PackageDestination, PackageEntry>;
+    type Target = NamedMap<PackageSetDestination, PackageEntry>;
 
     fn deref(&self) -> &Self::Target {
         &self.map

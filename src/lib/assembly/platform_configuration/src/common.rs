@@ -13,7 +13,7 @@ use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_
 use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
 use assembly_named_file_map::NamedFileMap;
 use assembly_util::{
-    BootfsComponentForRepackage, BootfsDestination, FileEntry, NamedMap, PackageDestination,
+    BootfsComponentForRepackage, BootfsDestination, FileEntry, NamedMap, PackageSetDestination,
 };
 
 /// The platform's base service level.
@@ -154,7 +154,7 @@ pub(crate) trait ConfigurationBuilder {
     fn package(&mut self, name: &str) -> &mut dyn PackageConfigBuilder;
 
     /// Create a new domain config package.
-    fn add_domain_config(&mut self, name: PackageDestination) -> &mut dyn DomainConfigBuilder;
+    fn add_domain_config(&mut self, name: PackageSetDestination) -> &mut dyn DomainConfigBuilder;
 
     /// Add a core shard.
     fn core_shard(&mut self, path: &Utf8PathBuf);
@@ -360,7 +360,7 @@ pub type ComponentConfigs = NamedMap<String, ComponentConfiguration>;
 pub type BootfsComponentConfigs = NamedMap<BootfsComponentForRepackage, ComponentConfiguration>;
 
 /// A map from package name to domain config.
-pub type DomainConfigs = NamedMap<PackageDestination, DomainConfig>;
+pub type DomainConfigs = NamedMap<PackageSetDestination, DomainConfig>;
 
 /// All of the configuration that applies to a single package.
 ///
@@ -414,7 +414,7 @@ impl Default for ComponentConfiguration {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct DomainConfig {
     pub directories: NamedMap<String, DomainConfigDirectory>,
-    pub name: PackageDestination,
+    pub name: PackageSetDestination,
     pub expose_directories: bool,
 }
 
@@ -473,7 +473,7 @@ impl ConfigurationBuilder for ConfigurationBuilderImpl {
         })
     }
 
-    fn add_domain_config(&mut self, name: PackageDestination) -> &mut dyn DomainConfigBuilder {
+    fn add_domain_config(&mut self, name: PackageSetDestination) -> &mut dyn DomainConfigBuilder {
         self.domain_configs.entry(name.clone()).or_insert_with_key(|name| DomainConfig {
             directories: NamedMap::new("directories"),
             name: name.clone(),

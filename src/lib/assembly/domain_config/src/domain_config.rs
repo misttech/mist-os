@@ -110,7 +110,7 @@ impl DomainConfigPackage {
 mod tests {
     use super::*;
     use assembly_platform_configuration::DomainConfigDirectory;
-    use assembly_util::{NamedMap, PackageDestination};
+    use assembly_util::{NamedMap, PackageDestination, PackageSetDestination};
     use assert_matches::assert_matches;
     use cm_rust::{ComponentDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget};
     use fidl::unpersist;
@@ -142,7 +142,7 @@ mod tests {
             )
             .unwrap();
         let config = DomainConfig {
-            name: PackageDestination::ForTest,
+            name: PackageSetDestination::Blob(PackageDestination::ForTest),
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
             expose_directories: true,
         };
@@ -215,7 +215,7 @@ mod tests {
             )
             .unwrap();
         let config = DomainConfig {
-            name: PackageDestination::ForTest,
+            name: PackageSetDestination::Blob(PackageDestination::ForTest),
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
             expose_directories: false,
         };
@@ -258,7 +258,7 @@ mod tests {
 
         // Prepare the domain config input.
         let config = DomainConfig {
-            name: PackageDestination::ForTest,
+            name: PackageSetDestination::Blob(PackageDestination::ForTest),
             directories: NamedMap::new("directories"),
             expose_directories: true,
         };
@@ -300,7 +300,7 @@ mod tests {
         // Prepare the domain config input.
         let entries = NamedMap::<String, FileOrContents>::new("config files");
         let config = DomainConfig {
-            name: PackageDestination::ForTest,
+            name: PackageSetDestination::Blob(PackageDestination::ForTest),
             directories: [("config-dir".into(), DomainConfigDirectory { entries })].into(),
             expose_directories: true,
         };

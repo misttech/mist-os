@@ -102,8 +102,6 @@ pub enum PackageDestination {
     SensorConfig,
     /// The base package.
     Base,
-    /// The component config package.
-    Config,
     /// The config data package.
     ConfigData,
     /// The shell commands package.
@@ -126,12 +124,56 @@ impl std::fmt::Display for PackageDestination {
                 Self::BuildInfo => "build-info",
                 Self::SensorConfig => "sensor-config",
                 Self::Base => "system_image",
-                Self::Config => "config",
                 Self::ConfigData => "config-data",
                 Self::ShellCommands => "shell-commands",
                 Self::ForTest => "for-test",
             }
         )
+    }
+}
+
+/// A bootfs package that assembly is allowed to include.
+#[derive(Debug, Clone, EnumIter, Serialize)]
+#[serde(into = "String")]
+pub enum BootfsPackageDestination {
+    /// The component config package.
+    Config,
+    /// Variant specifically for making tests easier.
+    ForTest,
+    /// Any package that came from an AIB.
+    FromAIB(String),
+}
+
+impl std::fmt::Display for BootfsPackageDestination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::FromAIB(s) => return write!(f, "{}", s),
+                Self::Config => "config",
+                Self::ForTest => "for-test",
+            }
+        )
+    }
+}
+
+/// A destination key for a package set which can be either for blobfs or bootfs.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(into = "String")]
+pub enum PackageSetDestination {
+    /// A package destined for blobfs.
+    Blob(PackageDestination),
+    /// A package destined for bootfs.
+    Boot(BootfsPackageDestination),
+}
+
+impl std::fmt::Display for PackageSetDestination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Blob(d) => write!(f, "{}", d),
+            Self::Boot(d) => write!(f, "{}", d),
+        }
     }
 }
 
@@ -221,6 +263,22 @@ impl Ord for PackageDestination {
         self.to_string().cmp(&other.to_string())
     }
 }
+impl Eq for BootfsPackageDestination {}
+impl PartialEq for BootfsPackageDestination {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string() == other.to_string()
+    }
+}
+impl PartialOrd for BootfsPackageDestination {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.to_string().cmp(&other.to_string()))
+    }
+}
+impl Ord for BootfsPackageDestination {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_string().cmp(&other.to_string())
+    }
+}
 
 // Be able to convert to a string.
 impl From<BootfsDestination> for String {
@@ -230,6 +288,16 @@ impl From<BootfsDestination> for String {
 }
 impl From<PackageDestination> for String {
     fn from(p: PackageDestination) -> Self {
+        p.to_string()
+    }
+}
+impl From<BootfsPackageDestination> for String {
+    fn from(p: BootfsPackageDestination) -> Self {
+        p.to_string()
+    }
+}
+impl From<PackageSetDestination> for String {
+    fn from(p: PackageSetDestination) -> Self {
         p.to_string()
     }
 }
@@ -250,11 +318,15 @@ impl std::fmt::Display for BootfsComponentForRepackage {
 
 impl Key for BootfsDestination {}
 impl Key for PackageDestination {}
+impl Key for BootfsPackageDestination {}
+impl Key for PackageSetDestination {}
 impl Key for CompiledPackageDestination {}
 impl Key for BootfsComponentForRepackage {}
 impl Destination for String {}
 impl Destination for BootfsDestination {}
 impl Destination for PackageDestination {}
+impl Destination for BootfsPackageDestination {}
+impl Destination for PackageSetDestination {}
 impl Destination for CompiledPackageDestination {}
 
 #[cfg(test)]
@@ -291,7 +363,6 @@ mod tests {
             "",
             "",
             "build-info",
-            "config",
             "config-data",
             "core",
             "diagnostics",
@@ -312,6 +383,14 @@ mod tests {
 
         let mut packages: Vec<String> = PackageDestination::iter().map(|p| p.to_string()).collect();
         packages.append(&mut CompiledPackageDestination::iter().map(|p| p.to_string()).collect());
+        packages.sort();
+        assert_eq!(packages_expected, packages);
+
+        let packages_expected: Vec<String> =
+            vec!["", "config", "for-test"].iter().map(ToString::to_string).collect();
+
+        let mut packages: Vec<String> =
+            BootfsPackageDestination::iter().map(|p| p.to_string()).collect();
         packages.sort();
         assert_eq!(packages_expected, packages);
 
