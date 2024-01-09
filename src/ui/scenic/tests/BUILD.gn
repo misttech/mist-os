@@ -12,6 +12,7 @@ group("tests") {
     ":flatland_cpu_renderer_integration_test",
     ":flatland_integration_tests",
     ":flatland_null_renderer_integration_test",
+    ":flatland_pixeltest_yuv",
     ":flatland_protected_memory_integration_test",
     ":observer_integration_tests",
   ]
@@ -385,13 +386,10 @@ executable("flatland_pixeltest_bin") {
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//src/lib/testing/loop_fixture",
-    "//src/ui/lib/escher/test/common:gtest_escher",
     "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils",
     "//src/ui/scenic/lib/utils:utils",
     "//src/ui/testing/util:screenshot_helper",
-    "//third_party/googletest:gmock",
-    "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -424,6 +422,24 @@ fuchsia_test_package("flatland_integration_tests") {
   ]
   test_specs = {
     environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_component("pixeltest_yuv") {
+  component_name = "flatland_pixeltest_yuv"
+  manifest = "meta/flatland_pixeltest_yuv.cml"
+  deps = [ ":flatland_pixeltest_bin" ]
+  test_type = "vulkan"
+}
+
+fuchsia_test_package("flatland_pixeltest_yuv") {
+  test_components = [ ":pixeltest_yuv" ]
+  test_specs = {
+    # TODO(https://fxbug.dev/59804): Skip this test for AEMU as YUV Sysmem images are not supported yet.
+    environments = magma_libvulkan_hardware_envs
     log_settings = {
       max_severity = "ERROR"
     }

@@ -11,9 +11,8 @@
 
 #include <cstdint>
 
-#include <gtest/gtest.h>
+#include <zxtest/zxtest.h>
 
-#include "src/ui/lib/escher/test/common/gtest_escher.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
@@ -27,6 +26,10 @@ namespace integration_tests {
 namespace fuc = fuchsia::ui::composition;
 
 using component_testing::RealmRoot;
+
+#define EXPECT_NEAR(val1, val2, eps)                                         \
+  EXPECT_LE(std::abs(static_cast<double>(val1) - static_cast<double>(val2)), \
+            static_cast<double>(eps))
 
 constexpr fuc::TransformId kRootTransform{.value = 1};
 constexpr auto kEpsilon = 1;
@@ -47,12 +50,12 @@ void CompareColor(utils::Pixel actual, utils::Pixel expected) {
 }
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandPixelTestBase : public LoggingEventLoop, public ::testing::Test {
+class FlatlandPixelTestBase : public LoggingEventLoop, public zxtest::Test {
  public:
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the
     // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(ScenicRealmBuilder()
+    realm_ = std::make_unique<RealmRoot>(ScenicRealmBuilder({.display_rotation = 0})
                                              .AddRealmProtocol(fuc::Flatland::Name_)
                                              .AddRealmProtocol(fuc::FlatlandDisplay::Name_)
                                              .AddRealmProtocol(fuc::Screenshot::Name_)
@@ -65,7 +68,8 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public ::testing::Test {
 
     flatland_display_ = realm_->component().Connect<fuc::FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
+      FX_LOGS(ERROR) << "Lost connection to Scenic: " << zx_status_get_string(status);
+      FAIL();
     });
 
     flatland_allocator_ = realm_->component().ConnectSync<fuc::Allocator>();
@@ -73,7 +77,8 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public ::testing::Test {
     // Create a root view.
     root_flatland_ = realm_->component().Connect<fuc::Flatland>();
     root_flatland_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
+      FX_LOGS(ERROR) << "Lost connection to Scenic: " << zx_status_get_string(status);
+      FAIL();
     });
 
     // Attach |root_flatland_| as the only Flatland under |flatland_display_|.
@@ -107,7 +112,7 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public ::testing::Test {
     realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
     RunLoopUntil([&]() { return complete; });
 
-    ::testing::Test::TearDown();
+    zxtest::Test::TearDown();
   }
 
   // Draws a rectangle of size |width|*|height|, color |color|, opacity |opacity| and origin
@@ -203,18 +208,15 @@ class FlatlandPixelTestBase : public LoggingEventLoop, public ::testing::Test {
 
 class ParameterizedPixelFormatTest
     : public FlatlandPixelTestBase,
-      public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
+      public zxtest::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
 
 class ParameterizedYUVPixelTest : public ParameterizedPixelFormatTest {};
 
 INSTANTIATE_TEST_SUITE_P(YuvPixelFormats, ParameterizedYUVPixelTest,
-                         ::testing::Values(fuchsia::sysmem::PixelFormatType::NV12,
-                                           fuchsia::sysmem::PixelFormatType::I420));
+                         zxtest::Values(fuchsia::sysmem::PixelFormatType::NV12,
+                                        fuchsia::sysmem::PixelFormatType::I420));
 
 TEST_P(ParameterizedYUVPixelTest, YUVTest) {
-  // TODO(https://fxbug.dev/59804): Skip this test for AEMU as YUV sysmem images are not supported yet.
-  SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
-
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
 
   // Send one token to Flatland Allocator.
@@ -296,8 +298,8 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
 class ParameterizedSRGBPixelTest : public ParameterizedPixelFormatTest {};
 
 INSTANTIATE_TEST_SUITE_P(RgbPixelFormats, ParameterizedSRGBPixelTest,
-                         ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
-                                           fuchsia::sysmem::PixelFormatType::R8G8B8A8));
+                         zxtest::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
+                                        fuchsia::sysmem::PixelFormatType::R8G8B8A8));
 
 TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
@@ -382,7 +384,7 @@ using FlipAndOrientationTestParams =
 
 class ParameterizedFlipAndOrientationTest
     : public FlatlandPixelTestBase,
-      public ::testing::WithParamInterface<FlipAndOrientationTestParams> {
+      public zxtest::WithParamInterface<FlipAndOrientationTestParams> {
  protected:
   ParameterizedFlipAndOrientationTest() {
     // Image flip: LEFT_RIGHT; Orientation: CCW_0.
@@ -531,15 +533,16 @@ class ParameterizedFlipAndOrientationTest
       expected_colors_map;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    ParameterizedFlipAndOrientationTestWithParams, ParameterizedFlipAndOrientationTest,
-    ::testing::Combine(::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
-                                         fuchsia::sysmem::PixelFormatType::R8G8B8A8),
-                       ::testing::Values(fuc::Orientation::CCW_0_DEGREES,
-                                         fuc::Orientation::CCW_90_DEGREES,
-                                         fuc::Orientation::CCW_180_DEGREES,
-                                         fuc::Orientation::CCW_270_DEGREES),
-                       ::testing::Values(fuc::ImageFlip::LEFT_RIGHT, fuc::ImageFlip::UP_DOWN)));
+INSTANTIATE_TEST_SUITE_P(ParameterizedFlipAndOrientationTestWithParams,
+                         ParameterizedFlipAndOrientationTest,
+                         zxtest::Combine(zxtest::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
+                                                        fuchsia::sysmem::PixelFormatType::R8G8B8A8),
+                                         zxtest::Values(fuc::Orientation::CCW_0_DEGREES,
+                                                        fuc::Orientation::CCW_90_DEGREES,
+                                                        fuc::Orientation::CCW_180_DEGREES,
+                                                        fuc::Orientation::CCW_270_DEGREES),
+                                         zxtest::Values(fuc::ImageFlip::LEFT_RIGHT,
+                                                        fuc::ImageFlip::UP_DOWN)));
 
 TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
   auto [pixel_format, orientation, image_flip] = GetParam();
@@ -647,7 +650,8 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
   // Verify that the number of pixels is the same (i.e. the image hasn't changed).
   auto histogram = screenshot.Histogram();
   const uint32_t pixel_color_count = num_pixels / 4;
-  // TODO(https://fxbug.dev/116631): Switch to exact comparisons after Astro precision issues are resolved.
+  // TODO(https://fxbug.dev/116631): Switch to exact comparisons after Astro precision issues are
+  // resolved.
   EXPECT_NEAR(histogram[utils::kBlue], pixel_color_count, display_width_);
   EXPECT_NEAR(histogram[utils::kGreen], pixel_color_count, display_width_);
   EXPECT_NEAR(histogram[utils::kBlack], pixel_color_count, display_width_);
@@ -729,7 +733,7 @@ struct OpacityTestParams {
 };
 
 class ParameterizedOpacityPixelTest : public FlatlandPixelTestBase,
-                                      public ::testing::WithParamInterface<OpacityTestParams> {};
+                                      public zxtest::WithParamInterface<OpacityTestParams> {};
 
 // We use the same background/foreground color for each test iteration, but
 // vary the opacity.  When the opacity is 0% we expect the pure background
@@ -737,9 +741,9 @@ class ParameterizedOpacityPixelTest : public FlatlandPixelTestBase,
 // opacity is 50% we expect a blend of the two when |f.u.c.BlendMode| is |f.u.c.BlendMode.SRC_OVER|.
 INSTANTIATE_TEST_SUITE_P(
     Opacity, ParameterizedOpacityPixelTest,
-    ::testing::Values(OpacityTestParams{.opacity = 0.0f, .expected_pixel = {0, 0, 255, 255}},
-                      OpacityTestParams{.opacity = 0.5f, .expected_pixel = {0, 188, 188, 255}},
-                      OpacityTestParams{.opacity = 1.0f, .expected_pixel = {0, 255, 0, 255}}));
+    zxtest::Values(OpacityTestParams{.opacity = 0.0f, .expected_pixel = {0, 0, 255, 255}},
+                   OpacityTestParams{.opacity = 0.5f, .expected_pixel = {0, 188, 188, 255}},
+                   OpacityTestParams{.opacity = 1.0f, .expected_pixel = {0, 255, 0, 255}}));
 
 // This test first draws a rectangle of size |display_width_* display_height_| and then draws
 // another rectangle having same dimensions on the top.
