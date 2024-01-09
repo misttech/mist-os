@@ -37,10 +37,6 @@ impl<D: Destination> std::fmt::Display for FileEntry<D> {
 pub enum BootfsDestination {
     /// List of additional boot arguments to add to the ZBI.
     AdditionalBootArgs,
-    /// An archivist config for the Diagnostics subsystem.
-    /// The product owner is allowed to specify the path of the file under the
-    /// archivist config directory.
-    ArchivistConfig(String),
     /// The driver manifest for base drivers.
     BaseDriverManifest,
     /// The driver manifest for boot drivers.
@@ -73,7 +69,6 @@ impl std::fmt::Display for BootfsDestination {
             f,
             "{}",
             match self {
-                Self::ArchivistConfig(s) => return write!(f, "config/archivist/{}", s),
                 Self::FromAIB(s) => return write!(f, "{}", s),
                 Self::AdditionalBootArgs => "config/additional_boot_args",
                 Self::BaseDriverManifest => "config/driver_index/base_driver_manifest",
@@ -136,6 +131,8 @@ impl std::fmt::Display for PackageDestination {
 #[derive(Debug, Clone, EnumIter, Serialize)]
 #[serde(into = "String")]
 pub enum BootfsPackageDestination {
+    /// The archivist pipelines configuration for the Diagnostics subsystem.
+    ArchivistPipelines,
     /// The component config package.
     Config,
     /// Variant specifically for making tests easier.
@@ -151,6 +148,7 @@ impl std::fmt::Display for BootfsPackageDestination {
             "{}",
             match self {
                 Self::FromAIB(s) => return write!(f, "{}", s),
+                Self::ArchivistPipelines => "archivist-pipelines",
                 Self::Config => "config",
                 Self::ForTest => "for-test",
             }
@@ -336,15 +334,15 @@ mod tests {
 
     #[test]
     fn test_to_string() {
-        let dest = BootfsDestination::ArchivistConfig("path/to/file.txt".to_string());
-        assert_eq!("config/archivist/path/to/file.txt", &dest.to_string());
+        let dest = BootfsDestination::AdditionalBootArgs;
+        assert_eq!("config/additional_boot_args", &dest.to_string());
         assert_eq!("for-test", &BootfsDestination::ForTest.to_string());
     }
 
     #[test]
     fn test_serialize() {
-        let dest = BootfsDestination::ArchivistConfig("path/to/file.txt".to_string());
-        assert_eq!("\"config/archivist/path/to/file.txt\"", &serde_json::to_string(&dest).unwrap());
+        let dest = BootfsDestination::AdditionalBootArgs;
+        assert_eq!("\"config/additional_boot_args\"", &serde_json::to_string(&dest).unwrap());
         assert_eq!("\"for-test\"", &serde_json::to_string(&BootfsDestination::ForTest).unwrap());
     }
 
@@ -386,8 +384,10 @@ mod tests {
         packages.sort();
         assert_eq!(packages_expected, packages);
 
-        let packages_expected: Vec<String> =
-            vec!["", "config", "for-test"].iter().map(ToString::to_string).collect();
+        let packages_expected: Vec<String> = vec!["", "archivist-pipelines", "config", "for-test"]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
 
         let mut packages: Vec<String> =
             BootfsPackageDestination::iter().map(|p| p.to_string()).collect();
@@ -397,7 +397,6 @@ mod tests {
         let bootfs_expected: Vec<String> = vec![
             "",
             "config/additional_boot_args",
-            "config/archivist/",
             "config/component_id_index",
             "config/component_manager",
             "config/driver_index/base_driver_manifest",

@@ -9,6 +9,12 @@
         forward_stdout_to: "none",
         forward_stderr_to: "none",
     },
+    children: [
+        {
+            name: "archivist-pipelines",
+            url: "fuchsia-boot:///archivist-pipelines#meta/archivist-pipelines.cm",
+        },
+    ],
     capabilities: [
         {
             protocol: [
@@ -36,7 +42,8 @@
             availability: "optional",
         },
         {
-            directory: "config-data",
+            directory: "config",
+            from: "#archivist-pipelines",
             rights: [ "r*" ],
             path: "/config/data",
         },
