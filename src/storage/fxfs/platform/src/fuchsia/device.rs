@@ -594,7 +594,7 @@ impl BlockServer {
 
         // Handling requests from fifo
         let fifo_future = async {
-            let fifo = fasync::Fifo::<BlockFifoRequest, BlockFifoResponse>::from_fifo(server_fifo)?;
+            let fifo = fasync::Fifo::<BlockFifoRequest, BlockFifoResponse>::from_fifo(server_fifo);
             loop {
                 match fifo.read_entry().await {
                     Ok(request) => {

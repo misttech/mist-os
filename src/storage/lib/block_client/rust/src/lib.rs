@@ -562,7 +562,7 @@ impl RemoteBlockClient {
         let (session, server) = fidl::endpoints::create_proxy()?;
         let () = remote.open_session(server)?;
         let fifo = session.get_fifo().await?.map_err(zx::Status::from_raw)?;
-        let fifo = fasync::Fifo::from_fifo(fifo)?;
+        let fifo = fasync::Fifo::from_fifo(fifo);
         let temp_vmo = zx::Vmo::create(TEMP_VMO_SIZE as u64)?;
         let dup = temp_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let vmo_id = session.attach_vmo(dup).await?.map_err(zx::Status::from_raw)?;
@@ -655,17 +655,11 @@ impl RemoteBlockClientSync {
         let (sender, receiver) = oneshot::channel::<Result<Self, Error>>();
         std::thread::spawn(move || {
             let mut executor = fasync::LocalExecutor::new();
-            match fasync::Fifo::from_fifo(fifo) {
-                Ok(fifo) => {
-                    let common = Common::new(fifo, &info, temp_vmo, vmo_id);
-                    let fifo_state = common.fifo_state.clone();
-                    let _ = sender.send(Ok(RemoteBlockClientSync { session, common }));
-                    executor.run_singlethreaded(FifoPoller { fifo_state });
-                }
-                Err(e) => {
-                    let _ = sender.send(Err(e.into()));
-                }
-            }
+            let fifo = fasync::Fifo::from_fifo(fifo);
+            let common = Common::new(fifo, &info, temp_vmo, vmo_id);
+            let fifo_state = common.fifo_state.clone();
+            let _ = sender.send(Ok(RemoteBlockClientSync { session, common }));
+            executor.run_singlethreaded(FifoPoller { fifo_state });
         });
         block_on(receiver)?
     }
@@ -1079,7 +1073,7 @@ mod tests {
             let (fifo_future_abort, fifo_future_abort_registration) = AbortHandle::new_pair();
             let fifo_future = Abortable::new(
                 async {
-                    let fifo = fasync::Fifo::from_fifo(server_fifo).expect("from_fifo failed");
+                    let fifo = fasync::Fifo::from_fifo(server_fifo);
                     loop {
                         let request = match fifo.read_entry().await {
                             Ok(r) => r,

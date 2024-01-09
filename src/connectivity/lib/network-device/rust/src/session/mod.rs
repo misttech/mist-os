@@ -155,10 +155,8 @@ impl Inner {
             .await?
             .map_err(|raw| Error::Open(name.to_owned(), zx::Status::from_raw(raw)))?;
         let proxy = client.into_proxy()?;
-        let rx =
-            fasync::Fifo::from_fifo(rx).map_err(|status| Error::Fifo("create", "rx", status))?;
-        let tx =
-            fasync::Fifo::from_fifo(tx).map_err(|status| Error::Fifo("create", "tx", status))?;
+        let rx = fasync::Fifo::from_fifo(rx);
+        let tx = fasync::Fifo::from_fifo(tx);
 
         Ok(Arc::new(Self {
             pool,
@@ -775,7 +773,7 @@ mod tests {
     fn make_fifos<K: AllocKind>() -> (Fifo<DescId<K>>, fuchsia_zircon::Fifo) {
         let size = std::mem::size_of::<DescId<K>>();
         let (handle, other_end) = fuchsia_zircon::Fifo::create(1, size).unwrap();
-        (Fifo::from_fifo(handle).unwrap(), other_end)
+        (Fifo::from_fifo(handle), other_end)
     }
 
     fn remove_rights<T: FromBytes + AsBytes + NoCell>(
@@ -786,7 +784,7 @@ mod tests {
         let rights = fifo.as_handle_ref().basic_info().expect("can retrieve info").rights;
 
         let fifo = fifo.replace_handle(rights ^ rights_to_remove).expect("can replace");
-        Fifo::from_fifo(fifo).expect("is still a valid FIFO")
+        Fifo::from_fifo(fifo)
     }
 
     enum TxOrRx {

@@ -282,13 +282,12 @@ impl<R, W> From<Fifo<R, W>> for zx::Fifo {
 
 impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
     /// Creates a new `Fifo` from a previously-created `zx::Fifo`.
-    // TODO(https://fxbug.dev/319131778) this function should be infallible
-    pub fn from_fifo(fifo: zx::Fifo) -> Result<Self, zx::Status> {
-        Ok(Fifo {
-            handle: RWHandle::new(fifo),
-            read_marker: PhantomData,
-            write_marker: PhantomData,
-        })
+    ///
+    /// # Panics
+    ///
+    /// If called on a thread that does not have a current async executor.
+    pub fn from_fifo(fifo: zx::Fifo) -> Self {
+        Fifo { handle: RWHandle::new(fifo), read_marker: PhantomData, write_marker: PhantomData }
     }
 
     /// Writes entries to the fifo and registers this `Fifo` as
@@ -501,10 +500,7 @@ mod tests {
 
         let (tx, rx) =
             zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (
-            Fifo::<entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
 
         let mut buffer = entry::default();
         let receive_future = rx.read_entries(&mut buffer).map_ok(|count| {
@@ -529,10 +525,7 @@ mod tests {
 
         let (tx, rx) =
             zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (
-            Fifo::<entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<wrong_entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<wrong_entry>::from_fifo(rx));
 
         let mut buffer = wrong_entry::default();
         let receive_future = rx
@@ -560,10 +553,7 @@ mod tests {
 
         let (tx, rx) =
             zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, _rx) = (
-            Fifo::<wrong_entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, _rx) = (Fifo::<wrong_entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
 
         let sender = Timer::new(10.millis().after_now()).then(|()| tx.write_entries(elements));
 
@@ -584,10 +574,7 @@ mod tests {
 
         let (tx, rx) =
             zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (
-            Fifo::<entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
 
         // Use `writes_completed` to verify that not all writes
         // are transmitted at once, and the last write is actually blocked.
@@ -636,10 +623,7 @@ mod tests {
 
         let (tx, rx) =
             zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (
-            Fifo::<entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
 
         let sender = tx.write_entries(elements);
 
@@ -670,10 +654,7 @@ mod tests {
             &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
         let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())
             .expect("failed to create zx fifo");
-        let (tx, rx) = (
-            Fifo::<entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
 
         let write_fut = async {
             tx.write_entries(&elements[..]).await.expect("failed write entries");
@@ -695,10 +676,7 @@ mod tests {
             &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
         let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())
             .expect("failed to create zx fifo");
-        let (tx, rx) = (
-            Fifo::<entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
 
         let write_fut = async {
             tx.write_entries(&elements[..]).await.expect("failed write entries");
@@ -718,10 +696,7 @@ mod tests {
         let element = entry { a: 10, b: 20 };
         let (tx, rx) =
             zx::Fifo::create(1, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (
-            Fifo::<entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
 
         let write_fut = async {
             tx.write_entries(&element).await.expect("failed write entries");
@@ -744,10 +719,7 @@ mod tests {
             &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
         let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())
             .expect("failed to create zx fifo");
-        let (tx, rx) = (
-            Fifo::<entry>::from_fifo(tx).expect("failed to create async tx fifo"),
-            Fifo::<entry>::from_fifo(rx).expect("failed to create async rx fifo"),
-        );
+        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
 
         let write_fut = async {
             tx.write_entries(&elements[..]).await.expect("failed write entries");
