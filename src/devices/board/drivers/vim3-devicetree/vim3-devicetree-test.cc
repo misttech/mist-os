@@ -47,6 +47,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/register-controller-1000",
       "sys/platform/nna-ff100000",
       "sys/platform/dsi-7000",
+      "sys/platform/canvas-ff638000",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());

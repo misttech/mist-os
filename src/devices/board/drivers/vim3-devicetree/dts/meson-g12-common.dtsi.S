@@ -15,18 +15,6 @@
 		#size-cells = <2>;
 		ranges;
 
-		gic: interrupt-controller@ffc01000 {
-			compatible = "arm,gic-400";
-			reg = <0x0 0xffc01000 0 0x1000>,
-				  <0x0 0xffc02000 0 0x2000>,
-				  <0x0 0xffc04000 0 0x2000>,
-				  <0x0 0xffc06000 0 0x2000>;
-			interrupt-controller;
-			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | GIC_IRQ_MODE_LEVEL_HIGH)>;
-			#interrupt-cells = <3>;
-			#address-cells = <0>;
-		};
-
 		aobus: bus@ff800000 {
 			reg = <0x0 0xff800000 0x0 0x100000>;
 			#address-cells = <2>;
@@ -42,6 +30,17 @@
 			};
 		};
 
+		gic: interrupt-controller@ffc01000 {
+			compatible = "arm,gic-400";
+			reg = <0x0 0xffc01000 0 0x1000>,
+				  <0x0 0xffc02000 0 0x2000>,
+				  <0x0 0xffc04000 0 0x2000>,
+				  <0x0 0xffc06000 0 0x2000>;
+			interrupt-controller;
+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) | GIC_IRQ_MODE_LEVEL_HIGH)>;
+			#interrupt-cells = <3>;
+			#address-cells = <0>;
+		};
 
 		cbus: bus@ffd00000 {
 			reg = <0x0 0xFFD00000 0x0 0x100000>;

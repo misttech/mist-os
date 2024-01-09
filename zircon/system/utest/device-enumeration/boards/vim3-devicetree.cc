@@ -21,7 +21,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/register-controller-1000/registers-device",
       "sys/platform/nna-ff100000",
       "sys/platform/dsi-7000/dw-dsi",
-
+      "sys/platform/canvas-ff638000",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
