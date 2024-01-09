@@ -78,6 +78,10 @@ if (is_host && has_board) {
     if (board_name == "arm64" || board_name == "qemu-arm64") {
       environments -= [ emu_env ]
     }
+
+    # TODO(https://fxbug.dev/319163754): This test doesn't pass on GCE.
+    environments += [ gce_env ]
+    environments -= [ gce_env ]
   }
 
   host_test_data("zxdb_e2e_test_data") {
