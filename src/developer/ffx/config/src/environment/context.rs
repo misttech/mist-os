@@ -22,7 +22,7 @@ use std::{
     sync::Arc,
 };
 use thiserror::Error;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, trace};
 
 use super::{EnvironmentKind, ExecutableKind};
 
@@ -472,11 +472,11 @@ impl EnvironmentContext {
         let module = self.query("sdk.module").build(Some(BuildOverride::NoBuild)).get().await.ok();
         match module {
             Some(module) => {
-                info!("Found modular Fuchsia SDK at {manifest:?} with module {module}");
+                debug!("Found modular Fuchsia SDK at {manifest:?} with module {module}");
                 Ok(SdkRoot::Modular { manifest, module })
             }
             _ => {
-                info!("Found full Fuchsia SDK at {manifest:?}");
+                debug!("Found full Fuchsia SDK at {manifest:?}");
                 Ok(SdkRoot::Full(manifest))
             }
         }
