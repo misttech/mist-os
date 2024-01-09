@@ -252,10 +252,6 @@ int Sherlock::Start() {
     zxlogf(ERROR, "DsiInit() failed");
   }
 
-  if (DisplayInit() != ZX_OK) {
-    zxlogf(ERROR, "DisplayInit() failed");
-  }
-
   // Then the platform device drivers.
   if (UsbInit() != ZX_OK) {
     zxlogf(ERROR, "UsbInit() failed");

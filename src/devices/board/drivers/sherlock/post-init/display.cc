@@ -4,9 +4,6 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/binding.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
@@ -14,81 +11,74 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
-#include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
+#include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/display/dsi/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <ddk/metadata/display.h>
-#include <soc/aml-s905d2/s905d2-gpio.h>
-#include <soc/aml-s905d2/s905d2-hw.h>
+#include <soc/aml-t931/t931-gpio.h>
+#include <soc/aml-t931/t931-hw.h>
 
-#include "astro-gpios.h"
-#include "astro.h"
-#include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+#include "src/devices/board/drivers/sherlock/post-init/post-init.h"
+#include "src/devices/board/drivers/sherlock/sherlock-btis.h"
 
-namespace astro {
+namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
+namespace {
 static const std::vector<fpbus::Mmio> display_mmios{
     {{
         // VPU
-        .base = S905D2_VPU_BASE,
-        .length = S905D2_VPU_LENGTH,
+        .base = T931_VPU_BASE,
+        .length = T931_VPU_LENGTH,
     }},
     {{
         // MIPI DSI "TOP"
-        .base = S905D2_MIPI_TOP_DSI_BASE,
-        .length = S905D2_MIPI_TOP_DSI_LENGTH,
+        .base = T931_TOP_MIPI_DSI_BASE,
+        .length = T931_TOP_MIPI_DSI_LENGTH,
     }},
     {{
         // MIPI DSI PHY
-        .base = S905D2_DSI_PHY_BASE,
-        .length = S905D2_DSI_PHY_LENGTH,
+        .base = T931_DSI_PHY_BASE,
+        .length = T931_DSI_PHY_LENGTH,
     }},
     {{
         // HIU / HHI
-        .base = S905D2_HIU_BASE,
-        .length = S905D2_HIU_LENGTH,
+        .base = T931_HIU_BASE,
+        .length = T931_HIU_LENGTH,
     }},
     {{
         // AOBUS
         // TODO(https://fxbug.dev/131170): Restrict range to RTI
-        .base = S905D2_AOBUS_BASE,
-        .length = S905D2_AOBUS_LENGTH,
+        .base = T931_AOBUS_BASE,
+        .length = T931_AOBUS_LENGTH,
     }},
     {{
         // RESET
-        .base = S905D2_RESET_BASE,
-        .length = S905D2_RESET_LENGTH,
+        .base = T931_RESET_BASE,
+        .length = T931_RESET_LENGTH,
     }},
     {{
         // PERIPHS_REGS (GPIO Multiplexer)
-        .base = S905D2_GPIO_BASE,
-        .length = S905D2_GPIO_LENGTH,
+        .base = T931_GPIO_BASE,
+        .length = T931_GPIO_LENGTH,
     }},
 };
 
 static const std::vector<fpbus::Irq> display_irqs{
     {{
-        .irq = S905D2_VIU1_VSYNC_IRQ,
+        .irq = T931_VIU1_VSYNC_IRQ,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
     {{
-        .irq = S905D2_RDMA_DONE,
+        .irq = T931_RDMA_DONE,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
     {{
-        .irq = S905D2_VID1_WR,
+        .irq = T931_VID1_WR,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
-    }},
-};
-
-static std::vector<fpbus::Metadata> display_panel_metadata{
-    {{
-        .type = DEVICE_METADATA_DISPLAY_CONFIG,
-        // No metadata for this item.
     }},
 };
 
@@ -99,33 +89,42 @@ static const std::vector<fpbus::Bti> display_btis{
     }},
 };
 
-zx_status_t Astro::DisplayInit() {
+}  // namespace
+
+zx::result<> PostInit::InitDisplay() {
   display_panel_t display_panel_info[] = {
       {
-          .width = 600,
-          .height = 1024,
+          .width = 800,
+          .height = 1280,
       },
   };
 
-  uint8_t pt;
-  gpio_impl_.ConfigIn(GPIO_PANEL_DETECT, GPIO_NO_PULL);
-  gpio_impl_.Read(GPIO_PANEL_DETECT, &pt);
-  if (pt) {
-    display_panel_info[0].panel_type = PANEL_P070ACB_FT;
+  if (display_vendor_) {
+    display_panel_info[0].panel_type = PANEL_G101B158_FT;
   } else {
-    display_panel_info[0].panel_type = PANEL_TV070WSM_FT;
+    if (ddic_version_) {
+      display_panel_info[0].panel_type = PANEL_TV101WXM_FT;
+    } else {
+      display_panel_info[0].panel_type = PANEL_TV101WXM_FT_9365;
+    }
   }
-  display_panel_metadata[0].data() =
-      std::vector(reinterpret_cast<uint8_t*>(&display_panel_info),
-                  reinterpret_cast<uint8_t*>(&display_panel_info) + sizeof(display_panel_info));
 
-  const fpbus::Node display_dev = []() {
+  std::vector<fpbus::Metadata> display_panel_metadata{
+      {{
+          .type = DEVICE_METADATA_DISPLAY_CONFIG,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<uint8_t*>(&display_panel_info),
+              reinterpret_cast<uint8_t*>(&display_panel_info) + sizeof(display_panel_info)),
+      }},
+  };
+
+  static const fpbus::Node display_dev = [&]() {
     fpbus::Node dev = {};
     dev.name() = "display";
     dev.vid() = PDEV_VID_AMLOGIC;
     dev.pid() = PDEV_PID_AMLOGIC_S905D2;
     dev.did() = PDEV_DID_AMLOGIC_DISPLAY;
-    dev.metadata() = display_panel_metadata;
+    dev.metadata() = std::move(display_panel_metadata);
     dev.mmio() = display_mmios;
     dev.irq() = display_irqs;
     dev.bti() = display_btis;
@@ -144,7 +143,7 @@ zx_status_t Astro::DisplayInit() {
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
-                              bind_fuchsia_amlogic_platform_s905d2::GPIOH_PIN_ID_PIN_6),
+                              bind_fuchsia_amlogic_platform_t931::GPIOH_PIN_ID_PIN_6),
   };
 
   std::vector<fuchsia_driver_framework::NodeProperty> gpio_properties{
@@ -191,26 +190,26 @@ zx_status_t Astro::DisplayInit() {
       }},
   };
 
-  fuchsia_driver_framework::CompositeNodeSpec node_group{{.name = "display", .parents = parents}};
+  auto spec = fuchsia_driver_framework::CompositeNodeSpec{{.name = "display", .parents = parents}};
 
   // TODO(payamm): Change from "dsi" to nullptr to separate DSI and Display into two different
-  // driver hosts once support for it lands.
+  // driver hosts once support has landed for it
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('DISP');
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, display_dev),
-                                                          fidl::ToWire(fidl_arena, node_group));
+                                                          fidl::ToWire(fidl_arena, spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeSpec Display(display_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+    FDF_LOG(ERROR, "AddCompositeSpec Display(display_dev) request failed: %s",
+            result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeSpec Display(display_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "AddCompositeSpec Display(display_dev) failed: %s",
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-}  // namespace astro
+}  // namespace sherlock

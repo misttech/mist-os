@@ -19,34 +19,8 @@
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
-
+#include "src/devices/board/drivers/sherlock/sherlock-btis.h"
 namespace sherlock {
-
-// BTI IDs for our devices
-enum {
-  BTI_BOARD,
-  BTI_USB,
-  BTI_EMMC,
-  BTI_SDIO,
-  BTI_MALI,
-  BTI_CANVAS,
-  BTI_VIDEO,
-  BTI_ISP,
-  BTI_MIPI,
-  BTI_GDC,
-  BTI_DISPLAY,
-  BTI_AUDIO_OUT,
-  BTI_AUDIO_IN,
-  BTI_AUDIO_BT_OUT,
-  BTI_AUDIO_BT_IN,
-  BTI_SYSMEM,
-  BTI_TEE,
-  BTI_GE2D,
-  BTI_NNA,
-  BTI_AML_SECURE_MEM,
-  BTI_VIDEO_ENC,
-  BTI_HEVC_ENC,
-};
 
 // MAC address metadata indices
 enum {
@@ -119,7 +93,6 @@ class Sherlock : public SherlockType {
   zx_status_t VideoEncInit();
   zx_status_t HevcEncInit();
   zx_status_t ButtonsInit();
-  zx_status_t DisplayInit();
   zx_status_t AudioInit();
   zx_status_t ThermalInit();
   zx_status_t TouchInit();

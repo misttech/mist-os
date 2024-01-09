@@ -19,28 +19,9 @@
 #include <soc/aml-s905d2/s905d2-gpio.h>
 
 #include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
+#include "src/devices/board/drivers/astro/astro-btis.h"
 
 namespace astro {
-
-// BTI IDs for our devices
-enum {
-  BTI_BOARD,
-  BTI_USB,
-  BTI_DISPLAY,
-  BTI_MALI,
-  BTI_VIDEO,
-  BTI_AML_RAW_NAND,
-  BTI_SDIO,
-  BTI_CANVAS,
-  BTI_AUDIO_IN,
-  BTI_AUDIO_OUT,
-  BTI_AUDIO_BT_IN,
-  BTI_AUDIO_BT_OUT,
-  BTI_TEE,
-  BTI_SYSMEM,
-  BTI_AML_SECURE_MEM,
-  BTI_RAM_CTL,
-};
 
 // MAC address metadata indices
 enum {
@@ -103,7 +84,6 @@ class Astro : public AstroType {
   zx_status_t CanvasInit();
   zx_status_t ClkInit();
   zx_status_t CpuInit();
-  zx_status_t DisplayInit();
   zx_status_t GpioInit();
   zx_status_t I2cInit();
   zx_status_t LightInit();

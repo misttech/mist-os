@@ -115,10 +115,6 @@ int Astro::Thread() {
     zxlogf(ERROR, "DsiInit failed: %d", status);
   }
 
-  if ((status = DisplayInit()) != ZX_OK) {
-    zxlogf(ERROR, "DisplayInit failed: %d", status);
-  }
-
   if ((status = CanvasInit()) != ZX_OK) {
     zxlogf(ERROR, "CanvasInit failed: %d", status);
   }
