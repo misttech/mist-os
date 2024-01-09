@@ -8,11 +8,11 @@
 toc:
 - title: "Overview"
   path: /docs/reference/testing/README.md
+- heading: "Guides"
+- title: "What tests to write"
+  path: /docs/reference/testing/what-tests-to-write.md
 - heading: "File formats"
 - title: "Test output format"
   path: /docs/reference/testing/test-output-format.md
 - title: "tests.json format"
   path: /docs/reference/testing/tests-json-format.md
-- heading: "Guides"
-- title: "What tests to write"
-  path: /docs/reference/testing/what-tests-to-write.md
