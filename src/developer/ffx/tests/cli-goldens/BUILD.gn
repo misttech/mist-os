@@ -71,6 +71,7 @@ if (is_host && has_board) {
 
   compiled_action("generate_ffx_command_list") {
     testonly = true
+    visibility = [ ":*" ]
 
     # Avoid using the host tool coming from previous builds.
     can_use_previously_built_tool = false
@@ -138,8 +139,12 @@ group("tests") {
   # board.
   # TODO(b/287779902) Also check that dual mode as subtools aren't enabled,
   # because that produces an incomplete SDK.
-  if (is_host && is_linux && has_board &&
-      !ffx_build_dual_mode_plugins_as_subtools) {
-    deps = [ ":ffx-golden-command-list" ] + command_test_deps
+  if (is_host && is_linux && has_board) {
+    if (!ffx_build_dual_mode_plugins_as_subtools) {
+      deps = [ ":ffx-golden-command-list" ] + command_test_deps
+    } else {
+      print(
+          "Warning! ffx command golden file tests are disabled because this build has ffx_build_dual_mode_plugins_as_subtools = true.")
+    }
   }
 }

@@ -12,6 +12,10 @@ template("ffx_command_golden_file_test") {
   command_name = invoker.command_name
   golden_processor_tool = invoker.golden_processor_tool
   _sdk_path = invoker.sdk_path
+  visibility = [ ":*" ]
+  if (defined(invoker.visibility)) {
+    visibility += invoker.visibility
+  }
 
   _deps = []
   if (defined(invoker.deps)) {
