@@ -13,6 +13,7 @@ driver_bind_rules("aml_saradc_bind") {
   tests = "test_bind.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

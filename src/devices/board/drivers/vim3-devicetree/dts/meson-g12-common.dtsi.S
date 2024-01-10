@@ -28,6 +28,14 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 			};
+
+			saradc: adc@9000 {
+				compatible = "amlogic,meson-g12a-saradc";
+				reg = <0x0 0x9000 0x0 0x1000>,
+					<0x0 0x0 0x0 0x100000>;
+				interrupts = <GIC_SPI 200 GIC_IRQ_MODE_EDGE_RISING>;
+			};
+
 		};
 
 		gic: interrupt-controller@ffc01000 {
