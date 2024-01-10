@@ -232,9 +232,7 @@ fn browser_open(url: &str) -> Result<()> {
 
     println!(
         "A browser window will open to request access to GCS. \
-        Please grant access.\n\nIf you're running without a gui (such as \
-        through ssh) this may appear to hang,\nin that case rerun with the \
-        `--auth oob` option.\n\n(If you decide not to grant access, press \
+        Please grant access.\n\n(If you decide not to grant access, press \
         ctrl+c to exit.)\n"
     );
 
