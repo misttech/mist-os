@@ -54,8 +54,7 @@ namespace fio = fuchsia_io;
 // StdoutToDebuglog::Init();
 // fx_logger_set_min_severity
 // And boot arguments are obtained
-int RunDfv2(driver_manager_config::Config config,
-            fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args) {
+int RunDfv2(driver_manager_config::Config config) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   InspectManager inspect_manager(loop.dispatcher());
