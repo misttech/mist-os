@@ -15,7 +15,6 @@
                 "ip_endpoint_packets_ns3",
                 "ip_endpoints_socket_ns3",
                 "tcp_bind_with_zone_connect_unzoned_ns2",
-                "tcp_connect_bound_to_device_ns2",
                 "tcp_socket_shutdown_listener_v4_ns2",
                 "tcp_socket_shutdown_listener_v6_ns2",
                 "udp_recv_msg_postflight_fidl_ns3*",
@@ -34,6 +33,11 @@
                 // TODO(https://fxbug.dev/100759): Flakes. Reenable once ns3
                 // device access is fallible.
                 "tcp_connect_bound_to_device_ns3",
+
+                // TODO(https://fxbug.dev/319298842): Fails by timing out.
+                // Reenable once Netstack2 uses the bound device when
+                // connecting.
+                "tcp_connect_bound_to_device_ns2",
                 "tcp_bind_with_zone_connect_unzoned_ns3",
             ],
         },
