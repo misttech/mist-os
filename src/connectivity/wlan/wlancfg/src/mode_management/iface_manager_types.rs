@@ -134,6 +134,7 @@ pub(crate) enum IfaceManagerOperation {
     ConfigureStateMachine,
     SetCountry(SetCountryOperationState),
     ReportDefect,
+    PerformRecovery,
 }
 
 #[cfg_attr(test, derive(Debug))]

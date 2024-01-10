@@ -408,7 +408,7 @@ pub type ApRecoveryMechanism = metrics::ConnectivityWlanMetricDimensionApRecover
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PhyRecoveryMechanism {
-    PhyReset,
+    PhyReset = 0,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

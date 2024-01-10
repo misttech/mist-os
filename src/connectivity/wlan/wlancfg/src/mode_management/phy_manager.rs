@@ -5,7 +5,9 @@
 use {
     crate::{
         mode_management::{
-            iface_manager::wpa3_supported, Defect, EventHistory, IfaceFailure, PhyFailure,
+            iface_manager::wpa3_supported,
+            recovery::{self, IfaceRecoveryOperation, PhyRecoveryOperation, RecoveryAction},
+            Defect, EventHistory, IfaceFailure, PhyFailure,
         },
         regulatory_manager::REGION_CODE_LEN,
         telemetry::{TelemetryEvent, TelemetrySender},
@@ -63,6 +65,7 @@ pub(crate) struct PhyContainer {
     client_ifaces: HashMap<u16, fidl_common::SecuritySupport>,
     ap_ifaces: HashSet<u16>,
     defects: EventHistory<Defect>,
+    recoveries: EventHistory<recovery::RecoveryAction>,
 }
 
 #[async_trait]
@@ -148,14 +151,18 @@ pub trait PhyManagerApi {
         power_state: fidl_common::PowerSaveType,
     ) -> Result<fuchsia_zircon::Status, anyhow::Error>;
 
-    /// Store a record for the provided defect.  When it becomes possible, potentially recover the
-    /// offending PHY.
-    async fn record_defect(&mut self, defect: Defect);
+    /// Store a record for the provided defect.
+    fn record_defect(&mut self, defect: Defect);
+
+    /// Take the recovery action proposed by the recovery summary.
+    async fn perform_recovery(&mut self, summary: recovery::RecoverySummary);
 }
 
 /// Maintains a record of all PHYs that are present and their associated interfaces.
 pub struct PhyManager {
     phys: HashMap<u16, PhyContainer>,
+    recovery_profile: recovery::RecoveryProfile,
+    recovery_enabled: bool,
     device_monitor: fidl_service::DeviceMonitorProxy,
     client_connections_enabled: bool,
     power_state: fidl_common::PowerSaveType,
@@ -163,6 +170,7 @@ pub struct PhyManager {
     saved_country_code: Option<[u8; REGION_CODE_LEN]>,
     _node: inspect::Node,
     telemetry_sender: TelemetrySender,
+    recovery_action_sender: recovery::RecoveryActionSender,
     phy_add_fail_count: inspect::UintProperty,
 }
 
@@ -175,6 +183,7 @@ impl PhyContainer {
             client_ifaces: HashMap::new(),
             ap_ifaces: HashSet::new(),
             defects: EventHistory::<Defect>::new(DEFECT_RETENTION_SECONDS),
+            recoveries: EventHistory::<RecoveryAction>::new(DEFECT_RETENTION_SECONDS),
         }
     }
 }
@@ -187,12 +196,17 @@ impl PhyManager {
     /// destroy interfaces as requested.
     pub fn new(
         device_monitor: fidl_service::DeviceMonitorProxy,
+        recovery_profile: recovery::RecoveryProfile,
+        recovery_enabled: bool,
         node: inspect::Node,
         telemetry_sender: TelemetrySender,
+        recovery_action_sender: recovery::RecoveryActionSender,
     ) -> Self {
         let phy_add_fail_count = node.create_uint("phy_add_fail_count", 0);
         PhyManager {
             phys: HashMap::new(),
+            recovery_profile,
+            recovery_enabled,
             device_monitor,
             client_connections_enabled: false,
             power_state: fidl_common::PowerSaveType::PsModePerformance,
@@ -200,6 +214,7 @@ impl PhyManager {
             saved_country_code: None,
             _node: node,
             telemetry_sender,
+            recovery_action_sender,
             phy_add_fail_count,
         }
     }
@@ -240,6 +255,43 @@ impl PhyManager {
                 None
             })
             .collect()
+    }
+
+    /// Log the provided recovery summary.
+    fn log_recovery_action(&mut self, summary: recovery::RecoverySummary) {
+        let affected_phy_id = match summary.action {
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id }) => {
+                if let Some(container) = self.phys.get_mut(&phy_id) {
+                    container.recoveries.add_event(summary.action);
+                    Some(phy_id)
+                } else {
+                    None
+                }
+            }
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { iface_id })
+            | RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { iface_id })
+            | RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { iface_id }) => {
+                let mut affected_phy_id = None;
+                for (phy_id, phy_info) in self.phys.iter_mut() {
+                    if phy_info.ap_ifaces.contains(&iface_id)
+                        || phy_info.client_ifaces.contains_key(&iface_id)
+                    {
+                        phy_info.recoveries.add_event(summary.action);
+                        affected_phy_id = Some(*phy_id);
+                    }
+                }
+
+                affected_phy_id
+            }
+        };
+
+        if let Some(phy_id) = affected_phy_id {
+            warn!("Recovery has been recommended for PHY {}: {:?}", phy_id, summary.action);
+        }
+
+        if let Some(recovery_summary) = summary.as_recovery_reason() {
+            self.telemetry_sender.send(TelemetryEvent::RecoveryEvent { reason: recovery_summary });
+        }
     }
 }
 
@@ -403,8 +455,7 @@ impl PhyManagerApi for PhyManager {
                             error_encountered = Err(e);
                             self.record_defect(Defect::Phy(PhyFailure::IfaceCreationFailure {
                                 phy_id: *client_phy,
-                            }))
-                            .await;
+                            }));
                             continue;
                         }
                     };
@@ -473,7 +524,6 @@ impl PhyManagerApi for PhyManager {
         if result.is_err() {
             for phy_id in failing_phys {
                 self.record_defect(Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id }))
-                    .await
             }
         }
 
@@ -535,8 +585,7 @@ impl PhyManagerApi for PhyManager {
                     Err(e) => {
                         self.record_defect(Defect::Phy(PhyFailure::IfaceCreationFailure {
                             phy_id: *ap_phy_id,
-                        }))
-                        .await;
+                        }));
                         return Err(e);
                     }
                 };
@@ -582,7 +631,6 @@ impl PhyManagerApi for PhyManager {
         match (result.as_ref(), failing_phy) {
             (Err(_), Some(phy_id)) => {
                 self.record_defect(Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id }))
-                    .await
             }
             _ => {}
         }
@@ -619,7 +667,6 @@ impl PhyManagerApi for PhyManager {
                 self.record_defect(Defect::Phy(PhyFailure::IfaceDestructionFailure {
                     phy_id: *phy_id,
                 }))
-                .await
             }
         }
 
@@ -690,33 +737,74 @@ impl PhyManagerApi for PhyManager {
         Ok(final_status)
     }
 
-    async fn record_defect(&mut self, defect: Defect) {
+    fn record_defect(&mut self, defect: Defect) {
+        let mut recovery_action = None;
+
         match defect {
             Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id })
             | Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id }) => {
                 if let Some(container) = self.phys.get_mut(&phy_id) {
-                    container.defects.add_event(defect)
+                    container.defects.add_event(defect);
+                    recovery_action = (self.recovery_profile)(
+                        phy_id,
+                        &mut container.defects,
+                        &mut container.recoveries,
+                        defect,
+                    )
                 }
             }
             Defect::Iface(IfaceFailure::CanceledScan { iface_id })
             | Defect::Iface(IfaceFailure::FailedScan { iface_id })
             | Defect::Iface(IfaceFailure::EmptyScanResults { iface_id })
             | Defect::Iface(IfaceFailure::ConnectionFailure { iface_id }) => {
-                for (_, phy_info) in self.phys.iter_mut() {
+                for (phy_id, phy_info) in self.phys.iter_mut() {
                     if phy_info.client_ifaces.contains_key(&iface_id) {
                         phy_info.defects.add_event(defect);
+
+                        recovery_action = (self.recovery_profile)(
+                            *phy_id,
+                            &mut phy_info.defects,
+                            &mut phy_info.recoveries,
+                            defect,
+                        );
+
                         break;
                     }
                 }
             }
             Defect::Iface(IfaceFailure::ApStartFailure { iface_id }) => {
-                for (_, phy_info) in self.phys.iter_mut() {
+                for (phy_id, phy_info) in self.phys.iter_mut() {
                     if phy_info.ap_ifaces.contains(&iface_id) {
                         phy_info.defects.add_event(defect);
+
+                        recovery_action = (self.recovery_profile)(
+                            *phy_id,
+                            &mut phy_info.defects,
+                            &mut phy_info.recoveries,
+                            defect,
+                        );
+
                         break;
                     }
                 }
             }
+        }
+
+        if let Some(recovery_action) = recovery_action.take() {
+            if let Err(e) = self
+                .recovery_action_sender
+                .try_send(recovery::RecoverySummary::new(defect, recovery_action))
+            {
+                warn!("Unable to suggest recovery action {:?}: {:?}", recovery_action, e);
+            }
+        }
+    }
+
+    async fn perform_recovery(&mut self, summary: recovery::RecoverySummary) {
+        // When recovery APIs are available, perform recovery here if allowed by the product
+        // configuration.
+        if !self.recovery_enabled {
+            self.log_recovery_action(summary);
         }
     }
 }
@@ -874,6 +962,7 @@ async fn set_power_save_mode(
 mod tests {
     use {
         super::*,
+        crate::telemetry,
         diagnostics_assertions::assert_data_tree,
         fidl::endpoints,
         fidl_fuchsia_wlan_device_service as fidl_service, fidl_fuchsia_wlan_sme as fidl_sme,
@@ -895,6 +984,8 @@ mod tests {
         node: inspect::Node,
         telemetry_sender: TelemetrySender,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
+        recovery_sender: recovery::RecoveryActionSender,
+        recovery_receiver: recovery::RecoveryActionReceiver,
     }
 
     /// Create a TestValues for a unit test.
@@ -908,6 +999,8 @@ mod tests {
         let node = inspector.root().create_child("phy_manager");
         let (sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(sender);
+        let (recovery_sender, recovery_receiver) =
+            mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
 
         TestValues {
             monitor_proxy,
@@ -916,6 +1009,8 @@ mod tests {
             node,
             telemetry_sender,
             telemetry_receiver,
+            recovery_sender,
+            recovery_receiver,
         }
     }
 
@@ -1089,8 +1184,11 @@ mod tests {
 
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
         {
             let add_phy_fut = phy_manager.add_phy(0);
@@ -1122,8 +1220,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         {
@@ -1151,8 +1252,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         let fake_phy_id = 0;
@@ -1211,8 +1315,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         let fake_iface_id = 1;
@@ -1280,8 +1387,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         let fake_phy_id = 1;
@@ -1329,8 +1439,11 @@ mod tests {
 
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         {
@@ -1382,8 +1495,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         let fake_phy_id = 1;
@@ -1404,8 +1520,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         let fake_phy_id = 1;
@@ -1426,8 +1545,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1494,8 +1616,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1569,8 +1694,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1651,8 +1779,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1723,8 +1854,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         {
@@ -1752,8 +1886,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1783,8 +1920,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1815,8 +1955,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         let client = phy_manager.get_client();
@@ -1831,8 +1974,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1856,8 +2002,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
         phy_manager.client_connections_enabled = true;
 
@@ -1887,8 +2036,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1913,8 +2065,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -1956,8 +2111,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer with WPA3 support to be inserted into the test
@@ -1987,8 +2145,11 @@ mod tests {
         // Create a new PhyManager.  On construction, client connections are disabled.
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
         assert!(!phy_manager.client_connections_enabled);
 
@@ -2013,8 +2174,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2060,8 +2224,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2100,8 +2267,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Drop the monitor stream so that the request to destroy the interface fails.
@@ -2151,8 +2321,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         let get_ap_future = phy_manager.create_or_get_ap_iface();
@@ -2170,8 +2343,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2211,8 +2387,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Drop the monitor stream so that the request to destroy the interface fails.
@@ -2254,8 +2433,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2288,8 +2470,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2314,8 +2499,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2357,8 +2545,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2400,8 +2591,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Drop the monitor stream so that the request to destroy the interface fails.
@@ -2453,8 +2647,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2501,8 +2698,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2540,8 +2740,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Drop the monitor stream so that the request to destroy the interface fails.
@@ -2596,8 +2799,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2645,8 +2851,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create an initial PhyContainer to be inserted into the test PhyManager before the fake
@@ -2706,8 +2915,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Drop the monitor stream so that the request to create the interface fails.
@@ -2749,8 +2961,11 @@ mod tests {
         let test_values = test_setup();
         let phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
         assert_eq!(phy_manager.get_phy_ids(), Vec::<u16>::new());
     }
@@ -2763,8 +2978,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         {
@@ -2790,8 +3008,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         {
@@ -2829,8 +3050,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         assert_data_tree!(test_values.inspector, root: {
@@ -2855,8 +3079,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Insert a couple fake PHYs.
@@ -2867,6 +3094,7 @@ mod tests {
                 client_ifaces: HashMap::new(),
                 ap_ifaces: HashSet::new(),
                 defects: EventHistory::new(DEFECT_RETENTION_SECONDS),
+                recoveries: EventHistory::new(DEFECT_RETENTION_SECONDS),
             },
         );
         let _ = phy_manager.phys.insert(
@@ -2876,6 +3104,7 @@ mod tests {
                 client_ifaces: HashMap::new(),
                 ap_ifaces: HashSet::new(),
                 defects: EventHistory::new(DEFECT_RETENTION_SECONDS),
+                recoveries: EventHistory::new(DEFECT_RETENTION_SECONDS),
             },
         );
 
@@ -2946,8 +3175,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Insert a fake PHY.
@@ -2958,6 +3190,7 @@ mod tests {
                 client_ifaces: HashMap::new(),
                 ap_ifaces: HashSet::new(),
                 defects: EventHistory::new(DEFECT_RETENTION_SECONDS),
+                recoveries: EventHistory::new(DEFECT_RETENTION_SECONDS),
             },
         );
 
@@ -3003,8 +3236,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
         let fake_mac_roles = vec![fidl_common::WlanMacRole::Client];
 
@@ -3091,8 +3327,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
         let fake_mac_roles = vec![fidl_common::WlanMacRole::Client];
 
@@ -3192,8 +3431,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Create a fake PHY entry without client interfaces.  Note that client connections have
@@ -3229,8 +3471,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Verify that client connections are initially stopped.
@@ -3289,8 +3534,11 @@ mod tests {
 
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
         let mut phy_container = PhyContainer::new(vec![]);
         let _ = phy_container.client_ifaces.insert(0, security_support);
@@ -3319,8 +3567,11 @@ mod tests {
 
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
         let _ = phy_manager.phys.insert(fake_phy_id, phy_container);
 
@@ -3334,8 +3585,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         phy_manager.client_connections_enabled = true;
@@ -3349,8 +3603,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         phy_manager.client_connections_enabled = false;
@@ -3364,8 +3621,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         assert_eq!(phy_manager.power_state, fidl_common::PowerSaveType::PsModePerformance);
@@ -3419,8 +3679,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         assert_eq!(phy_manager.power_state, fidl_common::PowerSaveType::PsModePerformance);
@@ -3484,8 +3747,11 @@ mod tests {
         let test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Drop the receiving end of the device monitor channel.
@@ -3516,8 +3782,11 @@ mod tests {
         let mut test_values = test_setup();
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         assert_eq!(phy_manager.power_state, fidl_common::PowerSaveType::PsModePerformance);
@@ -3777,13 +4046,16 @@ mod tests {
     /// Verify that client iface failures are added properly.
     #[fuchsia::test]
     fn test_record_iface_event() {
-        let mut exec = TestExecutor::new();
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
 
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         let security_support = fidl_common::SecuritySupport {
@@ -3828,38 +4100,13 @@ mod tests {
         phy_manager.phys.get_mut(&3).expect("missing PHY").defects = EventHistory::new(u32::MAX);
 
         // Log some client interface failures.
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::CanceledScan { iface_id: 123 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::FailedScan { iface_id: 456 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 789 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 123 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::CanceledScan { iface_id: 123 }));
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::FailedScan { iface_id: 456 }));
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 789 }));
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 123 }));
 
         // Log an AP interface failure.
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 246 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 246 }));
 
         // Verify that the defects have been logged.
         assert_eq!(phy_manager.phys[&0].defects.events.len(), 2);
@@ -3891,13 +4138,16 @@ mod tests {
     /// Verify that AP ifaces do not receive client failures..
     #[fuchsia::test]
     fn test_aps_do_not_record_client_defects() {
-        let mut exec = TestExecutor::new();
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
 
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Add some PHYs with interfaces.
@@ -3910,30 +4160,10 @@ mod tests {
         phy_manager.phys.get_mut(&0).expect("missing PHY").defects = EventHistory::new(u32::MAX);
 
         // Log some client interface failures.
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::CanceledScan { iface_id: 123 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::FailedScan { iface_id: 123 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 123 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 123 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::CanceledScan { iface_id: 123 }));
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::FailedScan { iface_id: 123 }));
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 123 }));
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 123 }));
 
         // Verify that the defects have been logged.
         assert_eq!(phy_manager.phys[&0].defects.events.len(), 0);
@@ -3942,13 +4172,16 @@ mod tests {
     /// Verify that client ifaces do not receive AP defects.
     #[fuchsia::test]
     fn test_clients_do_not_record_ap_defects() {
-        let mut exec = TestExecutor::new();
+        let _exec = TestExecutor::new();
         let test_values = test_setup();
 
         let mut phy_manager = PhyManager::new(
             test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender,
+            test_values.recovery_sender,
         );
 
         // Add some PHYs with interfaces.
@@ -3973,14 +4206,238 @@ mod tests {
         phy_manager.phys.get_mut(&0).expect("missing PHY").defects = EventHistory::new(u32::MAX);
 
         // Log an AP interface failure.
-        {
-            let defect_fut = phy_manager
-                .record_defect(Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 123 }));
-            pin_mut!(defect_fut);
-            assert_variant!(exec.run_until_stalled(&mut defect_fut), Poll::Ready(()));
-        }
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 123 }));
 
         // Verify that the defects have been not logged.
         assert_eq!(phy_manager.phys[&0].defects.events.len(), 0);
+    }
+
+    fn aggressive_test_recovery_profile(
+        _phy_id: u16,
+        _defect_history: &mut EventHistory<Defect>,
+        _recovery_history: &mut EventHistory<RecoveryAction>,
+        _latest_defect: Defect,
+    ) -> Option<RecoveryAction> {
+        Some(RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 }))
+    }
+
+    #[test_case(
+        Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 123 }) ;
+        "recommend AP start recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 456 }) ;
+        "recommend connection failure recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 456 }) ;
+        "recommend empty scan recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::FailedScan { iface_id: 456 }) ;
+        "recommend failed scan recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::CanceledScan { iface_id: 456 }) ;
+        "recommend canceled scan recovery"
+    )]
+    #[test_case(
+        Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id: 0 }) ;
+        "recommend iface destruction recovery"
+    )]
+    #[test_case(
+        Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id: 0 }) ;
+        "recommend iface creation recovery"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_recovery_action_sent_from_record_defect(defect: Defect) {
+        let _exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = PhyManager::new(
+            test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Insert a fake PHY, client interface, and AP interface.
+        let mut phy_container = PhyContainer::new(vec![]);
+        let _ = phy_container.ap_ifaces.insert(123);
+        let _ = phy_container.client_ifaces.insert(
+            456,
+            fidl_common::SecuritySupport {
+                sae: fidl_common::SaeFeature {
+                    driver_handler_supported: false,
+                    sme_handler_supported: false,
+                },
+                mfp: fidl_common::MfpFeature { supported: false },
+            },
+        );
+        let _ = phy_manager.phys.insert(0, phy_container);
+
+        // Swap the recovery profile with one that always suggests recovery.
+        phy_manager.recovery_profile = aggressive_test_recovery_profile;
+
+        // Record the defect.
+        phy_manager.record_defect(defect);
+
+        // Verify that a recovery event was sent.
+        let recovery_action = test_values.recovery_receiver.try_next().unwrap().unwrap();
+        assert_eq!(recovery_action.defect, defect);
+        assert_eq!(
+            recovery_action.action,
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 })
+        );
+    }
+
+    #[test_case(
+        Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 123 }) ;
+        "do not recommend AP start recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 456 }) ;
+        "do not recommend connection failure recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 456 }) ;
+        "do not recommend empty scan recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::FailedScan { iface_id: 456 }) ;
+        "do not recommend failed scan recovery"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::CanceledScan { iface_id: 456 }) ;
+        "do not recommend canceled scan recovery"
+    )]
+    #[test_case(
+        Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id: 0 }) ;
+        "do not recommend iface destruction recovery"
+    )]
+    #[test_case(
+        Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id: 0 }) ;
+        "do not recommend iface creation recovery"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_no_recovery_when_defect_contains_bad_ids(defect: Defect) {
+        let _exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // This PhyManager doesn't have any PHYs or interfaces.
+        let mut phy_manager = PhyManager::new(
+            test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Swap the recovery profile with one that always suggests recovery.
+        phy_manager.recovery_profile = aggressive_test_recovery_profile;
+
+        // Record the defect.
+        phy_manager.record_defect(defect);
+
+        // Verify that a recovery event was sent.
+        assert!(test_values.recovery_receiver.try_next().is_err());
+    }
+
+    #[test_case(
+        recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: 0 }),
+            action: RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 })
+        },
+        telemetry::RecoveryReason::ScanResultsEmpty(
+            telemetry::ClientRecoveryMechanism::PhyReset
+        ) ;
+        "PHY reset for empty scan results"
+    )]
+    #[test_case(
+        recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::CanceledScan { iface_id: 0 }),
+            action: RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 })
+        },
+        telemetry::RecoveryReason::ScanCancellation(
+            telemetry::ClientRecoveryMechanism::PhyReset
+        ) ;
+        "PHY reset for scan cancellation"
+    )]
+    #[test_case(
+        recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::FailedScan { iface_id: 0 }),
+            action: RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 })
+        },
+        telemetry::RecoveryReason::ScanFailure(
+            telemetry::ClientRecoveryMechanism::PhyReset
+        ) ;
+        "PHY reset for scan failure"
+    )]
+    #[test_case(
+        recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 0 }),
+            action: RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 })
+        },
+        telemetry::RecoveryReason::StartApFailure(
+            telemetry::ApRecoveryMechanism::ResetPhy
+        ) ;
+        "PHY reset for start AP failure"
+    )]
+    #[test_case(
+        recovery::RecoverySummary {
+            defect: Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 0 }),
+            action: RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 })
+        },
+        telemetry::RecoveryReason::ConnectFailure(
+            telemetry::ClientRecoveryMechanism::PhyReset
+        ) ;
+        "PHY reset for connection failure"
+    )]
+    #[test_case(
+        recovery::RecoverySummary {
+            defect: Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id: 0 }),
+            action: RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 })
+        },
+        telemetry::RecoveryReason::DestroyIfaceFailure(
+            telemetry::PhyRecoveryMechanism::PhyReset
+        ) ;
+        "PHY reset for iface destruction failure"
+    )]
+    #[test_case(
+        recovery::RecoverySummary {
+            defect: Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id: 0 }),
+            action: RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: 0 })
+        },
+        telemetry::RecoveryReason::CreateIfaceFailure(
+            telemetry::PhyRecoveryMechanism::PhyReset
+        ) ;
+        "PHY reset for iface creation failure"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_log_recovery_action_sends_metrics(
+        summary: recovery::RecoverySummary,
+        expected_reason: telemetry::RecoveryReason,
+    ) {
+        let _exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = PhyManager::new(
+            test_values.monitor_proxy,
+            recovery::lookup_recovery_profile(""),
+            false,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Send the provided recovery summary and expect the associated telemetry event.
+        phy_manager.log_recovery_action(summary);
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::RecoveryEvent { reason } )) => {
+                assert_eq!(reason, expected_reason);
+            },
+        )
     }
 }

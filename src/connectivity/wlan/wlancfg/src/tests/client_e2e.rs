@@ -17,6 +17,7 @@ use {
             create_iface_manager, device_monitor,
             iface_manager_api::IfaceManagerApi,
             phy_manager::{PhyManager, PhyManagerApi},
+            recovery,
         },
         telemetry::{TelemetryEvent, TelemetrySender},
         util::listener,
@@ -187,6 +188,8 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
     let (scan_request_sender, scan_request_receiver) =
         mpsc::channel(scan::SCAN_REQUEST_BUFFER_SIZE);
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
+    let (recovery_sender, recovery_receiver) =
+        mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
 
     let connection_selector = Arc::new(connection_selection::ConnectionSelector::new(
         saved_networks.clone(),
@@ -226,8 +229,11 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
 
     let phy_manager = Arc::new(Mutex::new(PhyManager::new(
         monitor_service_proxy.clone(),
+        recovery::lookup_recovery_profile(""),
+        false,
         inspect::Inspector::default().root().create_child("phy_manager"),
         telemetry_sender.clone(),
+        recovery_sender,
     )));
     let (iface_manager, iface_manager_service) = create_iface_manager(
         phy_manager.clone(),
@@ -238,6 +244,7 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         local_roam_manager,
         connection_selector.clone(),
         telemetry_sender.clone(),
+        recovery_receiver,
     );
     let iface_manager_service = Box::pin(iface_manager_service);
     let scan_manager_service = Box::pin(

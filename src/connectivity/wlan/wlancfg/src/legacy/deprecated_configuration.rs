@@ -58,6 +58,7 @@ mod tests {
         crate::{
             mode_management::{
                 phy_manager::{CreateClientIfacesReason, PhyManagerError},
+                recovery::RecoverySummary,
                 Defect,
             },
             regulatory_manager::REGION_CODE_LEN,
@@ -163,7 +164,11 @@ mod tests {
             unimplemented!();
         }
 
-        async fn record_defect(&mut self, _defect: Defect) {
+        fn record_defect(&mut self, _defect: Defect) {
+            unimplemented!();
+        }
+
+        async fn perform_recovery(&mut self, _summary: RecoverySummary) {
             unimplemented!();
         }
     }

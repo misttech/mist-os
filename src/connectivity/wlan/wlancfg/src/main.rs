@@ -48,6 +48,7 @@ use {
             iface_manager_api::IfaceManagerApi,
             low_power_manager::PowerModeManager,
             phy_manager::{PhyManager, PhyManagerApi},
+            recovery,
         },
         regulatory_manager::RegulatoryManager,
         telemetry::{
@@ -364,10 +365,17 @@ async fn run_all_futures() -> Result<(), Error> {
 
     let roam_manager_service_fut = roam_manager_service.serve();
 
+    let (recovery_sender, recovery_receiver) =
+        mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
     let phy_manager = Arc::new(Mutex::new(PhyManager::new(
         monitor_svc.clone(),
+        // The recovery profile is initially hard-coded to not provide any recovery recommendations.
+        // Future changes will make this configurable.
+        recovery::lookup_recovery_profile(""),
+        false,
         component::inspector().root().create_child("phy_manager"),
         telemetry_sender.clone(),
+        recovery_sender,
     )));
     let configurator =
         legacy::deprecated_configuration::DeprecatedConfigurator::new(phy_manager.clone());
@@ -386,6 +394,7 @@ async fn run_all_futures() -> Result<(), Error> {
         local_roam_manager,
         connection_selector.clone(),
         telemetry_sender.clone(),
+        recovery_receiver,
     );
 
     let scanning_service = scan::serve_scanning_loop(

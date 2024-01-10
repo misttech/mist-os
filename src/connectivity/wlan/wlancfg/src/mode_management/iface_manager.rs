@@ -14,7 +14,7 @@ use {
             iface_manager_api::{ConnectAttemptRequest, SmeForScan},
             iface_manager_types::*,
             phy_manager::{CreateClientIfacesReason, PhyManagerApi},
-            Defect,
+            recovery, Defect,
         },
         telemetry::{TelemetryEvent, TelemetrySender},
         util::{atomic_oneshot_stream, future_with_metadata, listener},
@@ -1154,8 +1154,20 @@ fn initiate_record_defect(
 ) -> BoxFuture<'static, IfaceManagerOperation> {
     let fut = async move {
         let mut phy_manager = phy_manager.lock().await;
-        phy_manager.record_defect(defect).await;
+        phy_manager.record_defect(defect);
         IfaceManagerOperation::ReportDefect
+    };
+    fut.boxed()
+}
+
+fn initiate_recovery(
+    phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
+    summary: recovery::RecoverySummary,
+) -> BoxFuture<'static, IfaceManagerOperation> {
+    let fut = async move {
+        let mut phy_manager = phy_manager.lock().await;
+        phy_manager.perform_recovery(summary).await;
+        IfaceManagerOperation::PerformRecovery
     };
     fut.boxed()
 }
@@ -1306,6 +1318,7 @@ pub(crate) async fn serve_iface_manager_requests(
     connection_selector: Arc<ConnectionSelector>,
     requests: mpsc::Receiver<IfaceManagerRequest>,
     mut defect_receiver: mpsc::UnboundedReceiver<Defect>,
+    mut recovery_action_receiver: recovery::RecoveryActionReceiver,
 ) -> Result<Infallible, Error> {
     // Client and AP state machines need to be allowed to run in order for several operations to
     // complete.  In such cases, futures can be added to this list to progress them once the state
@@ -1347,7 +1360,8 @@ pub(crate) async fn serve_iface_manager_requests(
                     ).await;
                 },
                 IfaceManagerOperation::ConfigureStateMachine
-                | IfaceManagerOperation::ReportDefect => {},
+                | IfaceManagerOperation::ReportDefect
+                | IfaceManagerOperation::PerformRecovery => {},
             },
             connection_selection_result = iface_manager.connection_selection_futures.select_next_some() => {
                 handle_connection_selection_results(
@@ -1371,6 +1385,9 @@ pub(crate) async fn serve_iface_manager_requests(
             },
             defect = defect_receiver.select_next_some() => {
                 operation_futures.push(initiate_record_defect(iface_manager.phy_manager.clone(), defect))
+            },
+            action = recovery_action_receiver.select_next_some() => {
+                operation_futures.push(initiate_recovery(iface_manager.phy_manager.clone(), action))
             },
             (token, req) = atomic_iface_manager_requests.select_next_some() => {
                 handle_iface_manager_request(
@@ -1397,6 +1414,7 @@ mod tests {
             },
             mode_management::{
                 phy_manager::{self, PhyManagerError},
+                recovery::RecoverySummary,
                 IfaceFailure, PhyFailure,
             },
             regulatory_manager::REGION_CODE_LEN,
@@ -1465,6 +1483,8 @@ mod tests {
         pub telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         pub defect_sender: mpsc::UnboundedSender<Defect>,
         pub defect_receiver: mpsc::UnboundedReceiver<Defect>,
+        pub recovery_sender: recovery::RecoveryActionSender,
+        pub recovery_receiver: recovery::RecoveryActionReceiver,
     }
 
     /// Create a TestValues for a unit test.
@@ -1495,6 +1515,8 @@ mod tests {
         ));
         let (defect_sender, defect_receiver) = mpsc::unbounded();
         let local_roam_manager = Arc::new(Mutex::new(FakeLocalRoamManager::new()));
+        let (recovery_sender, recovery_receiver) =
+            mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
 
         TestValues {
             monitor_service_proxy,
@@ -1512,6 +1534,8 @@ mod tests {
             telemetry_receiver,
             defect_sender,
             defect_receiver,
+            recovery_sender,
+            recovery_receiver,
         }
     }
 
@@ -1520,8 +1544,16 @@ mod tests {
         monitor_service: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         node: inspect::Node,
         telemetry_sender: TelemetrySender,
+        recovery_sender: recovery::RecoveryActionSender,
     ) -> Arc<Mutex<dyn PhyManagerApi + Send>> {
-        Arc::new(Mutex::new(phy_manager::PhyManager::new(monitor_service, node, telemetry_sender)))
+        Arc::new(Mutex::new(phy_manager::PhyManager::new(
+            monitor_service,
+            recovery::lookup_recovery_profile(""),
+            false,
+            node,
+            telemetry_sender,
+            recovery_sender,
+        )))
     }
 
     #[derive(Debug)]
@@ -1534,6 +1566,7 @@ mod tests {
         client_connections_enabled: bool,
         client_ifaces: Vec<u16>,
         defects: Vec<Defect>,
+        recoveries: Vec<RecoverySummary>,
     }
 
     #[async_trait]
@@ -1642,8 +1675,12 @@ mod tests {
             unimplemented!();
         }
 
-        async fn record_defect(&mut self, defect: Defect) {
+        fn record_defect(&mut self, defect: Defect) {
             self.defects.push(defect);
+        }
+
+        async fn perform_recovery(&mut self, summary: RecoverySummary) {
+            self.recoveries.push(summary);
         }
     }
 
@@ -1745,6 +1782,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         };
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -1802,6 +1840,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
+            recoveries: vec![],
         };
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -2301,6 +2340,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         }));
 
         // Configure the mock CSM with the expected connect request
@@ -2342,6 +2382,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
 
         let mut iface_manager = IfaceManagerService::new(
@@ -2379,6 +2420,7 @@ mod tests {
             client_connections_enabled: false,
             client_ifaces: vec![],
             defects: vec![],
+            recoveries: vec![],
         }));
 
         // Create the IfaceManager
@@ -2533,8 +2575,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -2668,8 +2713,11 @@ mod tests {
         // Create and empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -2747,6 +2795,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         }));
 
         // Create a PhyManager with a single, known client iface.
@@ -2780,8 +2829,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -2910,8 +2962,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -2953,6 +3008,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
+            recoveries: vec![],
         }));
 
         {
@@ -2981,6 +3037,7 @@ mod tests {
             client_connections_enabled: false,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         }));
 
         // Delete all client records initially.
@@ -3116,8 +3173,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -3250,8 +3310,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -3398,8 +3461,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -3707,8 +3773,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -3813,8 +3882,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -3883,8 +3955,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -4031,11 +4106,14 @@ mod tests {
         // Start the service loop
         let (mut sender, receiver) = mpsc::channel(1);
         let (_defect_sender, defect_receiver) = mpsc::unbounded();
+        let (_recovery_sender, recovery_receiver) =
+            mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             connection_selector,
             receiver,
             defect_receiver,
+            recovery_receiver,
         );
         pin_mut!(serve_fut);
 
@@ -4102,11 +4180,14 @@ mod tests {
         // Start the service loop
         let (mut sender, receiver) = mpsc::channel(1);
         let (_defect_sender, defect_receiver) = mpsc::unbounded();
+        let (_recovery_sender, recovery_receiver) =
+            mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             connection_selector,
             receiver,
             defect_receiver,
+            recovery_receiver,
         );
         pin_mut!(serve_fut);
 
@@ -4257,6 +4338,7 @@ mod tests {
             connection_selector,
             receiver,
             test_values.defect_receiver,
+            test_values.recovery_receiver,
         );
         pin_mut!(serve_fut);
 
@@ -4311,6 +4393,7 @@ mod tests {
             connection_selector,
             receiver,
             test_values.defect_receiver,
+            test_values.recovery_receiver,
         );
         pin_mut!(serve_fut);
 
@@ -4354,6 +4437,7 @@ mod tests {
             connection_selector,
             receiver,
             test_values.defect_receiver,
+            test_values.recovery_receiver,
         );
         pin_mut!(serve_fut);
 
@@ -4378,8 +4462,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -4410,6 +4497,7 @@ mod tests {
             connection_selector,
             receiver,
             test_values.defect_receiver,
+            test_values.recovery_receiver,
         );
         pin_mut!(serve_fut);
 
@@ -4508,8 +4596,11 @@ mod tests {
         // Create an empty PhyManager and IfaceManager.
         let phy_manager = phy_manager::PhyManager::new(
             test_values.monitor_service_proxy.clone(),
+            recovery::lookup_recovery_profile(""),
+            false,
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let iface_manager = IfaceManagerService::new(
             Arc::new(Mutex::new(phy_manager)),
@@ -4575,6 +4666,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
+            recoveries: vec![],
         },
         TestType::Pass;
         "successfully started client connections"
@@ -4589,6 +4681,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         },
         TestType::Fail;
         "failed to start client connections"
@@ -4603,6 +4696,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         },
         TestType::ClientError;
         "client dropped receiver"
@@ -4652,6 +4746,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         },
         TestType::Pass;
         "successfully stopped client connections"
@@ -4666,6 +4761,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         },
         TestType::Fail;
         "failed to stop client connections"
@@ -4680,6 +4776,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         },
         TestType::ClientError;
         "client dropped receiver"
@@ -4920,6 +5017,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             test_values.node,
             test_values.telemetry_sender.clone(),
+            test_values.recovery_sender,
         );
         let mut iface_manager = IfaceManagerService::new(
             phy_manager,
@@ -5438,6 +5536,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         }));
         let fut = iface_manager.has_wpa3_capable_client();
         pin_mut!(fut);
@@ -5463,6 +5562,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![TEST_CLIENT_IFACE_ID],
             defects: vec![],
+            recoveries: vec![],
         }));
         let fut = iface_manager.has_wpa3_capable_client();
         pin_mut!(fut);
@@ -5529,6 +5629,7 @@ mod tests {
             client_connections_enabled,
             client_ifaces: vec![],
             defects: vec![],
+            recoveries: vec![],
         }));
 
         let mut iface_manager = IfaceManagerService::new(
@@ -5614,6 +5715,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
+            recoveries: vec![],
         }));
 
         {
@@ -5654,6 +5756,7 @@ mod tests {
             client_connections_enabled: true,
             client_ifaces: vec![],
             defects: vec![],
+            recoveries: vec![],
         }));
         let iface_manager = IfaceManagerService::new(
             phy_manager.clone(),
@@ -5679,6 +5782,7 @@ mod tests {
             test_values.connection_selector,
             receiver,
             test_values.defect_receiver,
+            test_values.recovery_receiver,
         );
         pin_mut!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -5690,6 +5794,70 @@ mod tests {
             exec.run_until_stalled(&mut phy_manager_fut),
             Poll::Ready(phy_manager) => {
                 assert_eq!(phy_manager.defects, vec![Defect::Iface(IfaceFailure::ApStartFailure {iface_id: 0})])
+            }
+        );
+    }
+
+    /// Verify that recovery actions are acknowledged by the IfaceManager service loop.
+    #[fuchsia::test]
+    fn test_receive_recovery_summaries() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+        let mut test_values = test_setup(&mut exec);
+        let phy_manager = Arc::new(Mutex::new(FakePhyManager {
+            create_iface_ok: true,
+            destroy_iface_ok: true,
+            wpa3_iface: None,
+            set_country_ok: true,
+            country_code: None,
+            client_connections_enabled: true,
+            client_ifaces: vec![],
+            defects: vec![],
+            recoveries: vec![],
+        }));
+        let iface_manager = IfaceManagerService::new(
+            phy_manager.clone(),
+            test_values.client_update_sender.clone(),
+            test_values.ap_update_sender.clone(),
+            test_values.monitor_service_proxy.clone(),
+            test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
+            test_values.telemetry_sender.clone(),
+            test_values.defect_sender.clone(),
+        );
+
+        // Send a recovery summary to the IfaceManager service loop.
+        let defect = Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 0 });
+        let action =
+            recovery::RecoveryAction::PhyRecovery(recovery::PhyRecoveryOperation::ResetPhy {
+                phy_id: 0,
+            });
+        test_values
+            .recovery_sender
+            .try_send(recovery::RecoverySummary { defect, action })
+            .expect("failed to send recovery summary");
+
+        // Run the IfaceManager service so that it can process the recovery summary.
+        let (_, receiver) = mpsc::channel(0);
+        let serve_fut = serve_iface_manager_requests(
+            iface_manager,
+            test_values.connection_selector,
+            receiver,
+            test_values.defect_receiver,
+            test_values.recovery_receiver,
+        );
+        pin_mut!(serve_fut);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Verify that the recovery summary has been recorded.
+        let phy_manager_fut = phy_manager.lock();
+        pin_mut!(phy_manager_fut);
+        assert_variant!(
+            exec.run_until_stalled(&mut phy_manager_fut),
+            Poll::Ready(phy_manager) => {
+                assert_eq!(
+                    phy_manager.recoveries,
+                    vec![recovery::RecoverySummary { defect, action}]
+                )
             }
         );
     }
@@ -5789,6 +5957,7 @@ mod tests {
                     client_connections_enabled: false,
                     client_ifaces: vec![],
                     defects: vec![],
+                    recoveries: vec![],
                 }));
                 iface_manager.phy_manager = phy_manager;
                 let _ = iface_manager.aps.drain(..);
@@ -5804,6 +5973,7 @@ mod tests {
             test_values.connection_selector,
             req_receiver,
             defect_receiver,
+            test_values.recovery_receiver,
         );
         pin_mut!(serve_fut);
 

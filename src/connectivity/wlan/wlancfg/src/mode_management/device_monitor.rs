@@ -5,8 +5,7 @@
 use {
     crate::{
         legacy::{Iface, IfaceRef},
-        mode_management::iface_manager_api::IfaceManagerApi,
-        mode_management::phy_manager::PhyManagerApi,
+        mode_management::{iface_manager_api::IfaceManagerApi, phy_manager::PhyManagerApi},
     },
     anyhow::format_err,
     fidl::endpoints::create_proxy,
@@ -154,6 +153,7 @@ mod tests {
             mode_management::{
                 iface_manager_api::{ConnectAttemptRequest, SmeForScan},
                 phy_manager::{CreateClientIfacesReason, PhyManagerError},
+                recovery::RecoverySummary,
                 Defect,
             },
             regulatory_manager::REGION_CODE_LEN,
@@ -865,7 +865,11 @@ mod tests {
             unimplemented!();
         }
 
-        async fn record_defect(&mut self, _defect: Defect) {
+        fn record_defect(&mut self, _defect: Defect) {
+            unimplemented!();
+        }
+
+        async fn perform_recovery(&mut self, _summary: RecoverySummary) {
             unimplemented!();
         }
     }

@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![cfg(test)]
-
 use {
-    crate::mode_management::{Defect, EventHistory, IfaceFailure, PhyFailure},
+    crate::{
+        mode_management::{Defect, EventHistory, IfaceFailure, PhyFailure},
+        telemetry,
+    },
+    futures::channel::mpsc,
     tracing::warn,
 };
 
@@ -34,9 +36,12 @@ const DESTROY_IFACE_FAILURE_RECOVERY_THRESHOLD: usize = 1;
 #[derive(Clone, Copy, Debug)]
 pub enum PhyRecoveryOperation {
     #[allow(unused)]
-    DestroyIface { iface_id: u16 },
-    #[allow(unused)]
-    ResetPhy { phy_id: u16 },
+    DestroyIface {
+        iface_id: u16,
+    },
+    ResetPhy {
+        phy_id: u16,
+    },
 }
 
 impl PartialEq for PhyRecoveryOperation {
@@ -76,8 +81,108 @@ impl PartialEq for IfaceRecoveryOperation {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RecoveryAction {
     PhyRecovery(PhyRecoveryOperation),
+    #[allow(unused)]
     IfaceRecovery(IfaceRecoveryOperation),
 }
+
+impl RecoveryAction {
+    fn as_phy_recovery_mechanism(self) -> Option<telemetry::PhyRecoveryMechanism> {
+        match self {
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { .. }) => {
+                Some(telemetry::PhyRecoveryMechanism::PhyReset)
+            }
+            RecoveryAction::IfaceRecovery(..)
+            | RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { .. }) => {
+                return None
+            }
+        }
+    }
+
+    fn as_ap_recovery_mechanism(self) -> Option<telemetry::ApRecoveryMechanism> {
+        match self {
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { .. }) => {
+                Some(telemetry::ApRecoveryMechanism::DestroyIface)
+            }
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { .. }) => {
+                Some(telemetry::ApRecoveryMechanism::ResetPhy)
+            }
+            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { .. }) => {
+                Some(telemetry::ApRecoveryMechanism::StopAp)
+            }
+            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { .. }) => {
+                return None
+            }
+        }
+    }
+
+    fn as_client_recovery_mechanism(self) -> Option<telemetry::ClientRecoveryMechanism> {
+        match self {
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { .. }) => {
+                Some(telemetry::ClientRecoveryMechanism::DestroyIface)
+            }
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { .. }) => {
+                Some(telemetry::ClientRecoveryMechanism::PhyReset)
+            }
+            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { .. }) => {
+                Some(telemetry::ClientRecoveryMechanism::Disconnect)
+            }
+            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { .. }) => return None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RecoverySummary {
+    pub defect: Defect,
+    pub action: RecoveryAction,
+}
+
+impl RecoverySummary {
+    pub fn new(defect: Defect, action: RecoveryAction) -> Self {
+        RecoverySummary { defect, action }
+    }
+
+    pub fn as_recovery_reason(self) -> Option<telemetry::RecoveryReason> {
+        // Construct the associated metric and its dimension.
+        match self.defect {
+            Defect::Phy(PhyFailure::IfaceCreationFailure { .. }) => {
+                Some(telemetry::RecoveryReason::CreateIfaceFailure(
+                    self.action.as_phy_recovery_mechanism()?,
+                ))
+            }
+            Defect::Phy(PhyFailure::IfaceDestructionFailure { .. }) => {
+                Some(telemetry::RecoveryReason::DestroyIfaceFailure(
+                    self.action.as_phy_recovery_mechanism()?,
+                ))
+            }
+            Defect::Iface(IfaceFailure::ApStartFailure { .. }) => Some(
+                telemetry::RecoveryReason::StartApFailure(self.action.as_ap_recovery_mechanism()?),
+            ),
+            Defect::Iface(IfaceFailure::CanceledScan { .. }) => {
+                Some(telemetry::RecoveryReason::ScanCancellation(
+                    self.action.as_client_recovery_mechanism()?,
+                ))
+            }
+            Defect::Iface(IfaceFailure::FailedScan { .. }) => Some(
+                telemetry::RecoveryReason::ScanFailure(self.action.as_client_recovery_mechanism()?),
+            ),
+            Defect::Iface(IfaceFailure::EmptyScanResults { .. }) => {
+                Some(telemetry::RecoveryReason::ScanResultsEmpty(
+                    self.action.as_client_recovery_mechanism()?,
+                ))
+            }
+            Defect::Iface(IfaceFailure::ConnectionFailure { .. }) => {
+                Some(telemetry::RecoveryReason::ConnectFailure(
+                    self.action.as_client_recovery_mechanism()?,
+                ))
+            }
+        }
+    }
+}
+
+pub const RECOVERY_SUMMARY_CHANNEL_CAPACITY: usize = 100;
+pub(crate) type RecoveryActionSender = mpsc::Sender<RecoverySummary>;
+pub(crate) type RecoveryActionReceiver = mpsc::Receiver<RecoverySummary>;
 
 // The purpose of a RecoveryProfile function is to look at the most-recently observed defect in the
 // context of past defects that have been encountered and past recovery actions that have been
@@ -169,7 +274,7 @@ fn thresholded_recovery(
 }
 
 // Enable the lookup of recovery profiles by description.
-pub(crate) fn lookup_recovery_profile(profile_name: &str) -> RecoveryProfile {
+pub fn lookup_recovery_profile(profile_name: &str) -> RecoveryProfile {
     match profile_name {
         "" => recovery_disabled,
         "thresholded_recovery" => thresholded_recovery,

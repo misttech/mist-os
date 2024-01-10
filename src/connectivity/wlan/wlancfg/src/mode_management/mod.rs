@@ -34,6 +34,7 @@ pub fn create_iface_manager(
     local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
     connection_selector: Arc<ConnectionSelector>,
     telemetry_sender: TelemetrySender,
+    recovery_receiver: recovery::RecoveryActionReceiver,
 ) -> (Arc<Mutex<iface_manager_api::IfaceManager>>, impl Future<Output = Result<Infallible, Error>>)
 {
     let (sender, receiver) = mpsc::channel(0);
@@ -54,6 +55,7 @@ pub fn create_iface_manager(
         connection_selector,
         receiver,
         defect_receiver,
+        recovery_receiver,
     );
 
     (iface_manager_sender, iface_manager_service)
@@ -131,14 +133,12 @@ impl<T: PartialEq> EventHistory<T> {
         self.retain_unexpired_events(curr_time);
     }
 
-    #[cfg(test)]
     fn event_count(&mut self, value: T) -> usize {
         let curr_time = fasync::Time::now();
         self.retain_unexpired_events(curr_time);
         self.events.iter().filter(|event| event.value == value).count()
     }
 
-    #[cfg(test)]
     fn time_since_last_event(&mut self, value: T) -> Option<fuchsia_zircon::Duration> {
         let curr_time = fasync::Time::now();
         self.retain_unexpired_events(curr_time);
