@@ -289,6 +289,15 @@
                 ],
             },
             {
+                source_moniker: "/",
+                source: "framework",
+                source_name: "fuchsia.component.Introspector",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/memory_monitor",
+                ],
+            },
+            {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
                 source_name: "blob",
