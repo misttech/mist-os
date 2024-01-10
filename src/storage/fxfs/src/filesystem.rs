@@ -883,7 +883,7 @@ mod tests {
     use {
         super::{FxFilesystem, FxFilesystemBuilder, SyncOptions},
         crate::{
-            fsck::fsck,
+            fsck::{fsck, fsck_volume},
             lsm_tree::{types::Item, Operation},
             object_handle::{ObjectHandle, WriteObjectHandle},
             object_store::{
@@ -891,6 +891,7 @@ mod tests {
                 directory::Directory,
                 journal::JournalOptions,
                 transaction::{lock_keys, LockKey, Options},
+                volume::root_volume,
             },
         },
         fuchsia_async as fasync,
@@ -898,8 +899,12 @@ mod tests {
             future::join_all,
             stream::{FuturesUnordered, TryStreamExt},
         },
+        fxfs_insecure_crypto::InsecureCrypt,
         rustc_hash::FxHashMap as HashMap,
-        std::sync::{Arc, Mutex},
+        std::{
+            sync::{Arc, Mutex},
+            time::Duration,
+        },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
     };
 
@@ -1134,13 +1139,13 @@ mod tests {
     async fn test_continuously_trim() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystemBuilder::new()
-            .trim_config(Some((std::time::Duration::ZERO, std::time::Duration::ZERO)))
+            .trim_config(Some((Duration::ZERO, Duration::ZERO)))
             .format(true)
             .open(device)
             .await
             .expect("open failed");
         // Do a small sleep so trim has time to get going.
-        fasync::Timer::new(std::time::Duration::from_millis(10)).await;
+        fasync::Timer::new(Duration::from_millis(10)).await;
 
         // Create and delete a bunch of files whilst trim is ongoing.  This just ensures that
         // regular usage isn't affected by trim.
@@ -1181,6 +1186,75 @@ mod tests {
                 .await
                 .expect("replace_child failed");
             transaction.commit().await.expect("commit failed");
+        }
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_power_fail() {
+        let (store_id, device) = {
+            let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
+            let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+            let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+
+            fs.sync(SyncOptions { flush_device: true, ..SyncOptions::default() })
+                .await
+                .expect("sync failed");
+
+            let store = root_volume
+                .new_volume("test", Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .expect("new_volume failed");
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            let root_directory = Directory::open(&store, store.root_directory_object_id())
+                .await
+                .expect("open failed");
+            let object = root_directory
+                .create_child_file(&mut transaction, "test", None)
+                .await
+                .expect("create_child_file failed");
+            transaction.commit().await.expect("commit failed");
+
+            let mut transaction = object.new_transaction().await.expect("new_transaction failed");
+            let mut buffer = object.allocate_buffer(4096).await;
+            buffer.as_mut_slice().fill(0xed);
+            object.txn_write(&mut transaction, 0, buffer.as_ref()).await.expect("txn_write failed");
+            transaction.commit().await.expect("commit failed");
+
+            // Sync the device, but don't flush the device. We want to do this so we can randomly
+            // discard blocks below.
+            fs.sync(SyncOptions::default()).await.expect("sync failed");
+
+            // When we call `sync` above on the filesystem, it will pad the journal so that it will
+            // get written, but it doesn't wait for the write to occur.  We wait for a short time
+            // here to give allow time for the journal to be written.  Adding timers isn't great,
+            // but this test already isn't deterministic since we randomly discard blocks.
+            fasync::Timer::new(Duration::from_millis(10)).await;
+
+            (store.store_object_id(), fs.device().snapshot().expect("snapshot failed"))
+        };
+
+        // Randomly discard blocks since the last flush.  This simulates what might happen in the
+        // case of power-loss.
+        device.discard_random_since_last_flush().expect("discard_random_since_last_flush failed");
+
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        fsck(fs.clone()).await.expect("fsck failed");
+
+        if fs.object_manager().store(store_id).is_some() {
+            fsck_volume(&fs, store_id, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .expect("fsck_volume failed");
         }
         fs.close().await.expect("close failed");
     }

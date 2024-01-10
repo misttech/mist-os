@@ -75,6 +75,11 @@ pub trait Device: Send + Sync {
     fn snapshot(&self) -> Result<DeviceHolder, Error> {
         bail!("Not supported");
     }
+
+    /// Discards random blocks since the last flush.
+    fn discard_random_since_last_flush(&self) -> Result<(), Error> {
+        bail!("Not supported");
+    }
 }
 
 // Arc<dyn Device> can easily be cloned and supports concurrent access, but sometimes exclusive

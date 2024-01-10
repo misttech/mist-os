@@ -10,6 +10,7 @@ use {
     },
     anyhow::{ensure, Error},
     async_trait::async_trait,
+    rand::Rng,
     std::{
         ops::Range,
         sync::{
@@ -28,7 +29,7 @@ pub enum Op {
 /// A Device backed by a memory buffer.
 pub struct FakeDevice {
     allocator: BufferAllocator,
-    data: Mutex<Vec<u8>>,
+    data: Mutex<(/* data: */ Vec<u8>, /* blocks_written_since_last_flush: */ Vec<usize>)>,
     closed: AtomicBool,
     operation_closure: Box<dyn Fn(Op) -> Result<(), Error> + Send + Sync>,
     read_only: AtomicBool,
@@ -42,7 +43,10 @@ impl FakeDevice {
             BufferAllocator::new(block_size as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         Self {
             allocator,
-            data: Mutex::new(vec![0 as u8; block_count as usize * block_size as usize]),
+            data: Mutex::new((
+                vec![0 as u8; block_count as usize * block_size as usize],
+                Vec::new(),
+            )),
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
@@ -70,7 +74,7 @@ impl FakeDevice {
         reader.read_to_end(&mut data)?;
         Ok(Self {
             allocator,
-            data: Mutex::new(data),
+            data: Mutex::new((data, Vec::new())),
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_| Ok(())),
             read_only: AtomicBool::new(false),
@@ -90,7 +94,7 @@ impl Device for FakeDevice {
     }
 
     fn block_count(&self) -> u64 {
-        self.data.lock().unwrap().len() as u64 / self.block_size() as u64
+        self.data.lock().unwrap().0.len() as u64 / self.block_size() as u64
     }
 
     async fn read(&self, offset: u64, mut buffer: MutableBufferRef<'_>) -> Result<(), Error> {
@@ -101,13 +105,13 @@ impl Device for FakeDevice {
         let data = self.data.lock().unwrap();
         let size = buffer.len();
         assert!(
-            offset + size <= data.len(),
+            offset + size <= data.0.len(),
             "offset: {} len: {} data.len: {}",
             offset,
             size,
-            data.len()
+            data.0.len()
         );
-        buffer.as_mut_slice().copy_from_slice(&data[offset..offset + size]);
+        buffer.as_mut_slice().copy_from_slice(&data.0[offset..offset + size]);
         Ok(())
     }
 
@@ -120,13 +124,17 @@ impl Device for FakeDevice {
         let mut data = self.data.lock().unwrap();
         let size = buffer.len();
         assert!(
-            offset + size <= data.len(),
+            offset + size <= data.0.len(),
             "offset: {} len: {} data.len: {}",
             offset,
             size,
-            data.len()
+            data.0.len()
         );
-        data[offset..offset + size].copy_from_slice(buffer.as_slice());
+        data.0[offset..offset + size].copy_from_slice(buffer.as_slice());
+        let first_block = offset / self.allocator.block_size();
+        for block in first_block..first_block + size / self.allocator.block_size() {
+            data.1.push(block)
+        }
         Ok(())
     }
 
@@ -137,7 +145,7 @@ impl Device for FakeDevice {
         assert_eq!(range.end % self.block_size() as u64, 0);
         // Blast over the range to simulate it being used for something else.
         let mut data = self.data.lock().unwrap();
-        data[range.start as usize..range.end as usize].fill(0xab);
+        data.0[range.start as usize..range.end as usize].fill(0xab);
         Ok(())
     }
 
@@ -147,6 +155,7 @@ impl Device for FakeDevice {
     }
 
     async fn flush(&self) -> Result<(), Error> {
+        self.data.lock().unwrap().1.clear();
         (self.operation_closure)(Op::Flush)
     }
 
@@ -173,5 +182,22 @@ impl Device for FakeDevice {
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
         }))
+    }
+
+    fn discard_random_since_last_flush(&self) -> Result<(), Error> {
+        let bs = self.allocator.block_size();
+        let mut rng = rand::thread_rng();
+        let mut guard = self.data.lock().unwrap();
+        let (ref mut data, ref mut blocks_written) = &mut *guard;
+        tracing::info!("Discarding from {blocks_written:?}");
+        let mut discarded = Vec::new();
+        for block in blocks_written.drain(..) {
+            if rng.gen() {
+                data[block * bs..(block + 1) * bs].fill(0xaf);
+                discarded.push(block);
+            }
+        }
+        tracing::info!("Discarded {discarded:?}");
+        Ok(())
     }
 }
