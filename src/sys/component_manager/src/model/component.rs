@@ -17,10 +17,10 @@ use {
         context::ModelContext,
         environment::Environment,
         error::{
-            AddChildError, AddDynamicChildError, CreateNamespaceError, DestroyActionError,
-            DiscoverActionError, DynamicOfferError, ModelError, OpenExposedDirError,
-            OpenOutgoingDirError, RebootError, ResolveActionError, StartActionError,
-            StopActionError, StructuredConfigError, UnresolveActionError,
+            AddChildError, AddDynamicChildError, ComponentProviderError, CreateNamespaceError,
+            DestroyActionError, DiscoverActionError, DynamicOfferError, ModelError,
+            OpenExposedDirError, OpenOutgoingDirError, RebootError, ResolveActionError,
+            StartActionError, StopActionError, StructuredConfigError, UnresolveActionError,
         },
         exposed_dir::ExposedDir,
         hooks::{CapabilityReceiver, Event, EventPayload, Hooks},
@@ -31,7 +31,7 @@ use {
         },
         token::{InstanceToken, InstanceTokenState},
     },
-    crate::sandbox_util::{new_terminating_router, DictExt, LaunchTaskOnReceive},
+    crate::sandbox_util::{DictExt, LaunchTaskOnReceive},
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, ComponentCapability, NamespaceCapabilities},
@@ -46,9 +46,8 @@ use {
         resolving::{
             ComponentAddress, ComponentResolutionContext, ResolvedComponent, ResolvedPackage,
         },
-        Router,
+        Completer, Request, Routable, Router,
     },
-    anyhow::anyhow,
     async_trait::async_trait,
     async_utils::async_once::Once,
     clonable_error::ClonableError,
@@ -56,8 +55,8 @@ use {
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_rust::{
-        self, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative, NativeIntoFidl,
-        OfferDeclCommon, UseDecl,
+        self, CapabilityDecl, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative,
+        NativeIntoFidl, OfferDeclCommon, UseDecl,
     },
     cm_types::Name,
     cm_util::channel,
@@ -69,7 +68,6 @@ use {
         epitaph::ChannelEpitaphExt,
     },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client,
@@ -79,14 +77,14 @@ use {
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Dict, Message, Receiver, Sender},
-    std::iter::{self, Iterator},
+    sandbox::{Dict, Open, Receiver},
+    std::iter::Iterator,
     std::{
         boxed::Box,
         clone::Clone,
         collections::{HashMap, HashSet},
         convert::TryFrom,
-        fmt,
+        fmt, iter,
         path::PathBuf,
         sync::{Arc, Weak},
         time::Duration,
@@ -868,6 +866,8 @@ impl ComponentInstance {
         join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))
     }
 
+    /// Opens an object referenced by `path` from the outgoing directory of the component.
+    /// The component must have a program and must be started, or this method will fail.
     pub async fn open_outgoing(
         &self,
         flags: fio::OpenFlags,
@@ -882,6 +882,34 @@ impl ComponentInstance {
         let server_end = ServerEnd::new(server_chan);
         out_dir.open(flags, fio::ModeType::empty(), path, server_end)?;
         Ok(())
+    }
+
+    /// Returns an [`Open`] representation of the outgoing directory of the component. It performs
+    /// the same checks as `open_outgoing`, but errors are surfaced at the server endpoint.
+    pub fn get_outgoing(self: &Arc<Self>) -> Open {
+        let weak_component = WeakComponentInstance::from(self);
+        Open::new(
+            move |scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  path: vfs::path::Path,
+                  mut server_end: zx::Channel| {
+                let Ok(component) = weak_component.upgrade() else {
+                    let _ = server_end.close_with_epitaph(
+                        ComponentProviderError::SourceInstanceNotFound.as_zx_status(),
+                    );
+                    return;
+                };
+                scope.spawn(async move {
+                    match component.open_outgoing(flags, path.as_ref(), &mut server_end).await {
+                        Ok(()) => {}
+                        Err(err) => {
+                            let _ = server_end.close_with_epitaph(err.as_zx_status());
+                        }
+                    }
+                });
+            },
+            fio::DirentType::Directory,
+        )
     }
 
     /// Connects `server_chan` to this instance's exposed directory if it has
@@ -1380,9 +1408,6 @@ pub struct ResolvedInstanceState {
     /// Requesting capabilities from this router will start the component.
     program_output: Router,
 
-    /// The dict containing receivers for all capabilities that we declare.
-    program_receivers_dict: Dict,
-
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these dicts (which is potentially extended by
     /// dynamic offers).
@@ -1408,37 +1433,8 @@ impl ResolvedInstanceState {
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let decl = resolved_component.decl.clone();
 
-        // All declared capabilities must have a router, unless we are non-executable.
-        let program_output_dict = Dict::new();
-        let program_receivers_dict = Dict::new();
-        if decl.program.is_some() {
-            for capability in &decl.capabilities {
-                // We only support protocol capabilities right now
-                match &capability {
-                    cm_rust::CapabilityDecl::Protocol(_) => (),
-                    _ => continue,
-                }
-                let (receiver, sender) = Receiver::new();
-                let router = new_terminating_router(sender);
-                let router = router.with_policy_check(
-                    CapabilitySource::Component {
-                        capability: ComponentCapability::Protocol(match capability {
-                            cm_rust::CapabilityDecl::Protocol(p) => p.clone(),
-                            _ => panic!("we currently only support protocols"),
-                        }),
-                        component: weak_component.clone(),
-                    },
-                    component.policy_checker().clone(),
-                );
-                program_output_dict
-                    .insert_capability(iter::once(capability.name().as_str()), router);
-                program_receivers_dict
-                    .insert_capability(iter::once(capability.name().as_str()), receiver);
-            }
-        }
-        let program_output =
-            Self::start_component_on_request(Router::from_routable(program_output_dict), component);
-
+        let program_output_dict = Self::build_program_output_dict(component, &decl);
+        let program_output = Router::from_routable(program_output_dict);
         let component_input = Router::from_routable(component_input_dict.clone());
 
         let mut state = Self {
@@ -1459,7 +1455,6 @@ impl ResolvedInstanceState {
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
             program_output,
-            program_receivers_dict,
             collection_dicts: HashMap::new(),
         };
         state.add_static_children(component).await?;
@@ -1475,23 +1470,66 @@ impl ResolvedInstanceState {
             &mut state.collection_dicts,
         );
         state.discover_static_children(component_sandbox.child_dicts).await;
-
         state.dispatch_receivers_to_providers(component, component_sandbox.sources_and_receivers);
         Ok(state)
     }
 
-    /// Given a [`Router`] representing the program output, returns a router that starts the
-    /// component upon a capability request, then delegate the request to the provided router.
-    fn start_component_on_request(
-        program_output: Router,
+    /// Builds the program output dict given the resolved `decl`.
+    ///
+    /// The program output dict is a dict of routers, keyed by capability name.
+    /// Each router will request the corresponding capability from the program, which involves:
+    /// - Policy check
+    /// - Start component
+    /// - Capability requested hook
+    /// - Open within outgoing directory
+    pub fn build_program_output_dict(
         component: &Arc<ComponentInstance>,
+        decl: &ComponentDecl,
+    ) -> Dict {
+        let started = Self::start_component_on_request(component, decl);
+
+        // Wrap the started router with policy checks, such that we don't perform extra work
+        // given requests that violate policy.
+        let program_output_dict = Dict::new();
+        let weak_component = WeakComponentInstance::new(component);
+        for capability in &decl.capabilities {
+            // We only support protocol capabilities right now
+            match &capability {
+                cm_rust::CapabilityDecl::Protocol(_) => (),
+                _ => continue,
+            }
+            let router = started.clone().with_name(capability.name().as_str());
+            let router = router.with_policy_check(
+                CapabilitySource::Component {
+                    capability: ComponentCapability::Protocol(match capability {
+                        cm_rust::CapabilityDecl::Protocol(p) => p.clone(),
+                        _ => panic!("we currently only support protocols"),
+                    }),
+                    component: weak_component.clone(),
+                },
+                component.policy_checker().clone(),
+            );
+            program_output_dict.insert_capability(iter::once(capability.name().as_str()), router);
+        }
+        program_output_dict
+    }
+
+    /// Returns a router that starts the component upon a capability request,
+    /// then delegates the request to the program outgoing dict of the component.
+    fn start_component_on_request(
+        component: &Arc<ComponentInstance>,
+        decl: &ComponentDecl,
     ) -> Router {
+        if decl.program.is_none() {
+            return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable.into());
+        }
+        let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
         let weak_component = WeakComponentInstance::new(component);
         Router::new(move |request, completer| {
-            let program_output = program_output.clone();
             if let Ok(component) = weak_component.upgrade() {
                 let component_clone = component.clone();
-                component.nonblocking_task_group.spawn(async move {
+                let outgoing_dict = outgoing_dict.clone();
+                component.nonblocking_task_group().spawn(async move {
                     let target: WeakComponentInstance = request.target.unwrap();
                     let target_moniker = target.moniker;
                     // The path segments may be empty if one requested the entire program output.
@@ -1499,7 +1537,7 @@ impl ResolvedInstanceState {
                     let name = name.parse().unwrap();
 
                     // If the component is already started, this will be a no-op.
-                    if let Err(e) = component_clone
+                    match component_clone
                         .start(
                             &StartReason::AccessCapability { target: target_moniker, name },
                             None,
@@ -1508,18 +1546,44 @@ impl ResolvedInstanceState {
                         )
                         .await
                     {
-                        return completer.complete(Err(anyhow!(
-                            "failed to start component due to capability access: {}",
-                            e
-                        )));
+                        Ok(_) => outgoing_dict.route(request, completer),
+                        Err(e) => completer.complete(Err(ComponentProviderError::from(e).into())),
                     }
-
-                    program_output.route(request, completer);
                 });
             } else {
-                completer.complete(Err(anyhow!("component is destroyed")));
+                completer.complete(Err(ComponentProviderError::SourceInstanceNotFound.into()));
             }
         })
+    }
+
+    /// Builds the program outgoing dict such that most work is done once and cached even if
+    /// the underlying outgoing directory FIDL endpoint changes across restarts.
+    ///
+    /// The program outgoing dict is a dict of routers. For each capability declared by a
+    /// program that is published at some path in the outgoing directory, there will be a
+    /// [`Router`] that requests that capability, keyed by capability name.
+    fn build_program_outgoing_dict(
+        component: &Arc<ComponentInstance>,
+        capabilities: &Vec<CapabilityDecl>,
+    ) -> Dict {
+        let outgoing_dir = component.get_outgoing();
+        let weak_component = WeakComponentInstance::from(component);
+        let dict = Dict::new();
+        for capability in capabilities {
+            let Some(path) = capability.path() else {
+                continue;
+            };
+            let name = capability.name().as_str();
+            let path = fuchsia_fs::canonicalize_path(path.as_str());
+            let open = outgoing_dir.clone().downscope_path(sandbox::Path::new(path));
+            let router = Router::from_routable(open).with_capability_requested_hook(
+                component.nonblocking_task_group(),
+                weak_component.clone(),
+                capability.name().clone(),
+            );
+            dict.insert_capability(iter::once(name), router);
+        }
+        dict
     }
 
     fn dispatch_receivers_to_providers(
@@ -2057,16 +2121,11 @@ struct ProgramRuntime {
     /// Listens for the controller channel to close in the background. This task is cancelled when
     /// the [`ProgramRuntime`] is dropped.
     exit_listener: fasync::Task<()>,
-
-    /// Reads messages from the program dict and dispatches those messages into the program's
-    /// outgoing directory.
-    _dict_dispatcher: DictDispatcher,
 }
 
 impl ProgramRuntime {
     pub fn new(program: Program, component: WeakComponentInstance) -> Self {
         let terminated_fut = program.on_terminate();
-        let component_clone = component.clone();
         let exit_listener = fasync::Task::spawn(async move {
             terminated_fut.await;
             if let Ok(component) = component.upgrade() {
@@ -2080,11 +2139,7 @@ impl ProgramRuntime {
                 }));
             }
         });
-        let dict_dispatcher = DictDispatcher::new(
-            <fio::DirectoryProxy as Clone>::clone(program.outgoing()),
-            component_clone,
-        );
-        Self { program, exit_listener, _dict_dispatcher: dict_dispatcher }
+        Self { program, exit_listener }
     }
 
     pub async fn stop<'a, 'b>(
@@ -2140,9 +2195,6 @@ impl ComponentRuntime {
     ///
     /// Creates a background task waiting for the program to terminate. When that happens, use the
     /// [WeakComponentInstance] to stop the component.
-    ///
-    /// Creates a background task that watches for incoming requests directed to the program, and
-    /// dispatches them to the outgoing directory of the program.
     pub fn set_program(&mut self, program: Program, component: WeakComponentInstance) {
         self.program = Some(ProgramRuntime::new(program, component));
     }
@@ -2182,109 +2234,56 @@ impl ComponentRuntime {
     }
 }
 
-/// Reads messages from Receivers in a Dict, writing open requests into the given directory.
-struct DictDispatcher {
-    _task: fasync::Task<()>,
-}
-
-impl DictDispatcher {
-    pub fn new(directory: fio::DirectoryProxy, component: WeakComponentInstance) -> Self {
-        Self {
-            _task: fasync::Task::spawn(async move {
-                // Obtain the receivers dict and capability declarations.
-                let (dict, capability_decls) = {
-                    let Some(component) = component.upgrade().ok() else {
-                        return;
-                    };
-                    let Some(resolved) = component.lock_resolved_state().await.ok() else {
-                        return;
-                    };
-                    (resolved.program_receivers_dict.clone(), resolved.capabilities().clone())
-                };
-
-                while let Some((name, message)) = dict.read_receivers().await {
-                    let capability_decl = capability_decls
-                        .iter()
-                        .find(|decl| decl.name() == &name)
-                        .expect("capability received for name not in dict");
-                    // Check if the hooks system wants to claim the handle.
-                    let channel = message.payload.channel;
-                    if let Some(sender) = Self::dispatch_capability_requested_hook(
-                        &component,
-                        name.to_string(),
-                        message.target,
-                    )
-                    .await
-                    {
-                        // Deliver the handle to the event system.
-                        let _ = sender.send(Message {
-                            payload: fsandbox::ProtocolPayload {
-                                channel,
-                                flags: message.payload.flags,
-                            },
-                            target: (),
-                        });
-                        continue;
-                    }
-                    // Deliver the handle to the component.
-                    let path = fuchsia_fs::canonicalize_path(
-                        capability_decl.path().expect("invalid protocol capability decl").as_str(),
-                    );
-                    let server_end = ServerEnd::new(channel);
-                    // There's not much we can do if the open fails. The component's probably
-                    // crashed, and the stop action should be initiated momentarily or already
-                    // have started.
-                    let _ = directory.open(
-                        message.payload.flags,
-                        fio::ModeType::empty(),
-                        path,
-                        server_end,
-                    );
+trait RouterExt: Routable + Clone + Send + Sync + 'static {
+    /// Returns a router that delegates to the event system if the capability request is
+    /// intercepted by some hook, and delegates to the current router otherwise.
+    fn with_capability_requested_hook(
+        self,
+        task_group: TaskGroup,
+        source: WeakComponentInstance,
+        name: Name,
+    ) -> Router {
+        let name = name.to_string();
+        let route_fn = move |request: Request, completer: Completer| {
+            let source = match source.upgrade() {
+                Ok(component) => component,
+                Err(_) => {
+                    return completer
+                        .complete(Err(ComponentProviderError::SourceInstanceNotFound.into()));
                 }
-            }),
-        }
-    }
-
-    /// Dispatches the capability routed hook. Returns an [`Sender`] if a hook wants to
-    /// intercept the capability request. The caller should then send the server
-    /// endpoint to the [`Sender`].
-    async fn dispatch_capability_requested_hook(
-        source_component: &WeakComponentInstance,
-        name: String,
-        target_component: WeakComponentInstance,
-    ) -> Option<Sender<()>> {
-        let source_component = match source_component.upgrade() {
-            Ok(component) => component,
-            Err(_) => {
-                // If the source component doesn't exist anymore, then there's nothing to be done.
-                return None;
-            }
+            };
+            let target: WeakComponentInstance = request.target.unwrap();
+            let target = match target.upgrade() {
+                Ok(component) => component,
+                Err(_) => {
+                    return completer
+                        .complete(Err(ComponentProviderError::TargetInstanceNotFound.into()));
+                }
+            };
+            let (receiver, sender) = CapabilityReceiver::new();
+            let event = Event::new(
+                &target,
+                EventPayload::CapabilityRequested {
+                    source_moniker: source.moniker.clone(),
+                    name: name.clone(),
+                    receiver: receiver.clone(),
+                },
+            );
+            let router = self.clone();
+            task_group.spawn(async move {
+                source.hooks.dispatch(&event).await;
+                if receiver.is_taken() {
+                    completer.complete(Ok(Box::new(sender)))
+                } else {
+                    router.route(request, completer)
+                }
+            });
         };
-        let target_component = match target_component.upgrade() {
-            Ok(component) => component,
-            Err(_) => {
-                // If the target component doesn't exist anymore, then we can't craft the following
-                // event payload.
-                return None;
-            }
-        };
-        let (receiver, sender) = CapabilityReceiver::new();
-        let event = Event::new(
-            &target_component,
-            EventPayload::CapabilityRequested {
-                source_moniker: source_component.moniker.clone(),
-                name,
-                receiver: receiver.clone(),
-            },
-        );
-        source_component.hooks.dispatch(&event).await;
-        if receiver.is_taken() {
-            Some(sender)
-        } else {
-            None
-        }
+        Router::new(route_fn)
     }
 }
+
+impl<T: Routable + Clone + Send + Sync + 'static> RouterExt for T {}
 
 #[cfg(test)]
 pub mod tests {

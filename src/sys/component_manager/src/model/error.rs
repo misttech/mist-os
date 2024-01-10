@@ -512,7 +512,7 @@ pub enum ComponentProviderError {
 }
 
 impl ComponentProviderError {
-    fn as_zx_status(&self) -> zx::Status {
+    pub fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::SourceInstanceNotFound | Self::TargetInstanceNotFound => zx::Status::NOT_FOUND,
             Self::SourceStartError { err } => err.as_zx_status(),

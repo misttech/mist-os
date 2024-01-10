@@ -18,10 +18,7 @@ use {
     },
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx},
-    futures::{
-        future::BoxFuture,
-        stream::{FuturesUnordered, StreamExt},
-    },
+    futures::future::BoxFuture,
     lazy_static::lazy_static,
     sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Message, Open, Receiver, Sender},
     std::sync::{self, Arc},
@@ -90,11 +87,6 @@ pub trait DictExt {
 
     /// Removes the capability at the path, if it exists.
     fn remove_capability<'a>(&self, path: impl Iterator<Item = &'a str>);
-
-    /// Reads a message from any of the receivers in the top-level dictionary, and returns the name
-    /// of the receiver that was read from along with the message. Returns `None` if there are no
-    /// receivers in this dictionary.
-    async fn read_receivers(&self) -> Option<(Name, Message<WeakComponentInstance>)>;
 }
 
 #[async_trait]
@@ -193,37 +185,6 @@ impl DictExt for Dict {
                     return;
                 }
             }
-        }
-    }
-
-    /// Reads messages from Receivers in this Dict.
-    ///
-    /// Once a message is received, returns the name of the Dict that the Receiver was in and the
-    /// message that was received. Returns `None` if there are no Receivers in this Dict, or if
-    /// the senders to those receivers are all dropped.
-    async fn read_receivers(&self) -> Option<(Name, Message<WeakComponentInstance>)> {
-        let mut futures_unordered = FuturesUnordered::new();
-        // Extra scope is needed due to https://github.com/rust-lang/rust/issues/57478
-        {
-            let entries = self.lock_entries();
-            for (cap_name, cap) in entries.iter() {
-                if let Ok(receiver) = Receiver::try_from(cap.clone()) {
-                    let cap_name = cap_name.clone();
-                    futures_unordered.push(async move { (cap_name, receiver.receive().await) });
-                }
-            }
-            drop(entries);
-        }
-        loop {
-            // Pick the next ready receiver or return when all receivers have terminated.
-            let Some((name, message)) = futures_unordered.next().await else {
-                return None;
-            };
-            let Some(message) = message else {
-                // One receiver terminated.
-                continue;
-            };
-            return Some((name.parse().unwrap(), message));
         }
     }
 }
@@ -346,6 +307,7 @@ pub mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::ClientEnd;
+    use futures::StreamExt;
     use std::iter;
 
     #[fuchsia::test]
