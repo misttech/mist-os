@@ -157,7 +157,6 @@ num-traits = "0.2"
 once_cell = { version = "1.17.0", features = ["parking_lot"] }
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
 pkcs8 = "0.9.0"
-parking_lot = "0.9"
 paste = "1.0"
 pathdiff = { version = "0.2.1", features = ["camino"] }
 pem = "0.8.3"
@@ -291,6 +290,8 @@ loom = "0.7.0"
 # pulled in automatically by tokio
 mio = { version = "0.8.5", features = ["net", "os-ext", "os-poll"] }
 notify = { version = "5.1.0", default-features = false, features = ["macos_fsevent"] }
+# See b/42169853, not used for target-side code to avoid system-wide impact of yield in spinloops.
+parking_lot = "0.9"
 petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.58", features = ["span-locations"] }
 pulldown-cmark = "0.6.0"
@@ -601,6 +602,10 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 [gn.package.num-iter."0.1.42"]
 rustflags = ["--cfg=has_i128"]
 
+[gn.package.parking_lot."0.9.0"]
+# Funnel usage of parking_lot through fuchsia_sync.
+visibility = ["//src/lib/fuchsia-sync", "//third_party/rust_crates:*"]
+
 [gn.package.parking_lot_core."0.9.6"]
 rustflags = []
 
@@ -842,7 +847,6 @@ uses_fuchsia_license = true
 [gn.package.crossbeam-utils."0.7.2"]
 [gn.package.memoffset."0.5.3"]
 [gn.package.nom."5.0.0"]
-[gn.package.parking_lot."0.9.0"]
 [gn.package.parking_lot_core."0.6.2"]
 [gn.package.pulldown-cmark."0.6.0"]
 [gn.package.rayon-core."1.7.0"]
