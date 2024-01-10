@@ -31,6 +31,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp",
     "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/ui/a11y/lib/magnifier",
     "//src/ui/a11y/lib/view",
     "//src/ui/a11y/testing/fidl:test.accessibility_hlcpp",
