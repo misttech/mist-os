@@ -620,7 +620,6 @@ impl<W: WriteBytes, K: Key, V: Value> SimplePersistentLayerWriter<W, K, V> {
     }
 }
 
-#[async_trait]
 impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V>
     for SimplePersistentLayerWriter<W, K, V>
 {

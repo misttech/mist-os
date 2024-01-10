@@ -367,17 +367,16 @@ pub(super) trait LayerIteratorMut<K, V>: LayerIterator<K, V> {
 }
 
 /// Trait for writing new layers.
-#[async_trait]
-pub trait LayerWriter<K, V>
+pub trait LayerWriter<K, V>: Sized
 where
     K: Debug + Send + Versioned + Sync,
     V: Debug + Send + Versioned + Sync,
 {
     /// Writes the given item to this layer.
-    async fn write(&mut self, item: ItemRef<'_, K, V>) -> Result<(), Error>;
+    fn write(&mut self, item: ItemRef<'_, K, V>) -> impl Future<Output = Result<(), Error>> + Send;
 
     /// Flushes any buffered items to the backing storage.
-    async fn flush(&mut self) -> Result<(), Error>;
+    fn flush(&mut self) -> impl Future<Output = Result<(), Error>> + Send;
 }
 
 /// A `LayerIterator`` that filters the items of another `LayerIterator`.
