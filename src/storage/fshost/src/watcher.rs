@@ -285,7 +285,7 @@ mod tests {
     #[fuchsia::test]
     async fn watcher_populates_device_stream() {
         // Start with a couple of devices
-        let block = vfs::mut_pseudo_directory! {
+        let block = vfs::pseudo_directory! {
             "000" => vfs::pseudo_directory! {
                 "device_controller" => fshost_controller("block-000"),
             },
@@ -294,7 +294,7 @@ mod tests {
             },
         };
 
-        let nand = vfs::mut_pseudo_directory! {
+        let nand = vfs::pseudo_directory! {
             "000" => vfs::pseudo_directory! {
                 "device_controller" => fshost_controller("nand-000"),
             },
