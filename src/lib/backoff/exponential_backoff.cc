@@ -4,8 +4,8 @@
 
 #include "src/lib/backoff/exponential_backoff.h"
 
-#include <lib/syslog/cpp/macros.h>
 #include <stdlib.h>
+#include <zircon/assert.h>
 #include <zircon/syscalls.h>
 
 namespace backoff {
@@ -21,9 +21,9 @@ ExponentialBackoff::ExponentialBackoff(zx::duration initial_delay, uint32_t retr
       max_delay_(max_delay),
       max_delay_divided_by_factor_(max_delay_ / retry_factor_),
       rng_(seed_generator()) {
-  FX_DCHECK(zx::duration() <= initial_delay_ && initial_delay_ <= max_delay_);
-  FX_DCHECK(0 < retry_factor_);
-  FX_DCHECK(zx::duration() <= max_delay_);
+  ZX_DEBUG_ASSERT(zx::duration() <= initial_delay_ && initial_delay_ <= max_delay_);
+  ZX_DEBUG_ASSERT(0 < retry_factor_);
+  ZX_DEBUG_ASSERT(zx::duration() <= max_delay_);
 }
 
 ExponentialBackoff::~ExponentialBackoff() {}
