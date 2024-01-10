@@ -4,21 +4,12 @@
 
 # buildifier: disable=module-docstring
 load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaVirtualDeviceInfo")
-load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script")
+load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_virtual_device_test_impl(ctx):
     virtual_device_file = ctx.attr.virtual_device[FuchsiaVirtualDeviceInfo].config
     golden_file = ctx.file.golden_file
-    script, runfiles = create_validation_script(ctx, virtual_device_file, golden_file)
-    return [
-        DefaultInfo(
-            executable = script,
-            runfiles = runfiles,
-            files = depset(
-                direct = ctx.files.virtual_device,
-            ),
-        ),
-    ]
+    return [create_validation_script_provider(ctx, virtual_device_file, golden_file)]
 
 fuchsia_virtual_device_test = rule(
     doc = """Validate the generated virtual device config file.""",

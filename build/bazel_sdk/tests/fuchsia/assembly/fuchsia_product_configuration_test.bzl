@@ -4,21 +4,12 @@
 
 # buildifier: disable=module-docstring
 load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaProductConfigInfo")
-load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script")
+load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_product_configuration_test_impl(ctx):
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
     golden_file = ctx.file.golden_file
-    script, runfiles = create_validation_script(ctx, product_config_file, golden_file)
-    return [
-        DefaultInfo(
-            executable = script,
-            runfiles = runfiles,
-            files = depset(
-                direct = ctx.files.product_config,
-            ),
-        ),
-    ]
+    return [create_validation_script_provider(ctx, product_config_file, golden_file)]
 
 fuchsia_product_configuration_test = rule(
     doc = """Validate the generated product configuration file.""",
@@ -50,17 +41,12 @@ def _fuchsia_product_ota_config_test_impl(ctx):
     if not file_to_test:
         fail("Unable to location a file named: %s" % golden_file.basename)
 
-    script, runfiles = create_validation_script(ctx, file_to_test, golden_file)
-
-    return [
-        DefaultInfo(
-            executable = script,
-            runfiles = runfiles,
-            files = depset(
-                direct = ctx.files.product_config,
-            ),
-        ),
-    ]
+    return [create_validation_script_provider(
+        ctx,
+        file_to_test,
+        golden_file,
+        ctx.runfiles(files = ctx.files.product_config),
+    )]
 
 fuchsia_product_ota_config_test = rule(
     doc = """Validate a generated ota config file from a product config label""",

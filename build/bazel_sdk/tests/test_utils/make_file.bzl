@@ -4,11 +4,11 @@
 
 """file-making utilities."""
 
-load("@fuchsia_sdk//fuchsia/private:utils.bzl", "make_resource_struct")
 load(
     "@fuchsia_sdk//fuchsia/private:providers.bzl",
     "FuchsiaPackageResourcesInfo",
 )
+load("@fuchsia_sdk//fuchsia/private:utils.bzl", "make_resource_struct")
 
 def _make_file_impl(ctx):
     f = ctx.actions.declare_file(ctx.attr.filename)

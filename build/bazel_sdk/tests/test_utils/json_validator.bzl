@@ -4,17 +4,7 @@
 
 """Convenience function to generate a JSON validating script."""
 
-load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS")
-
-# Script template
-_validator_command_template = """\
-#!/bin/sh
-
-python3 {validator} \
-    --generated {generated} \
-    --golden "{golden}" \
-    "$@"
-"""
+load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 
 # These attributes must be part of any rule() whose implementation
 # function wants to call create_validation_script() below. They
@@ -29,7 +19,7 @@ CREATE_VALIDATION_SCRIPT_ATTRS = {
     ),
 } | PY_TOOLCHAIN_DEPS
 
-def create_validation_script(ctx, generated_file, golden_file):
+def create_validation_script_provider(ctx, generated_file, golden_file, runfiles = None):
     """Create a validation script and its related runfiles object.
 
     Create a validation script that invokes json_comparator.py to
@@ -46,28 +36,32 @@ def create_validation_script(ctx, generated_file, golden_file):
       golden_file: a File object pointing to the golden file used
          for verification.
 
-    Returns:
-      A (script, runfiles) pair, where `script` is an output File
-      corresponding to the comparison script produced by the
-      action produced by this function, and `runfiles` corresponds
-      to the files needed to run it at runtime.
-    """
-    script = ctx.actions.declare_file(ctx.label.name + ".sh")
-    script_content = _validator_command_template.format(
-        validator = ctx.executable._json_comparator.short_path,
-        generated = generated_file.short_path,
-        golden = golden_file.short_path,
-    )
-    ctx.actions.write(script, script_content, is_executable = True)
+      runfiles: an optional runfiles value for extra runtime requirements.
 
-    runfiles = ctx.runfiles(
+    Returns:
+        A DefaultInfo provider for the script and its runtime requirements.
+    """
+    validator_path = ctx.executable._json_comparator.short_path
+
+    validator_args = [
+        "--generated={}".format(generated_file.short_path),
+        "--golden={}".format(golden_file.short_path),
+    ]
+
+    validator_runfiles = ctx.runfiles(
         files = [
             golden_file,
             generated_file,
         ],
-    ).merge_all([
+    ).merge(
         ctx.attr._json_comparator[DefaultInfo].default_runfiles,
-        ctx.attr._py_toolchain[DefaultInfo].default_runfiles,
-    ])
+    )
+    if runfiles != None:
+        validator_runfiles = validator_runfiles.merge(runfiles)
 
-    return script, runfiles
+    return create_python3_shell_wrapper_provider(
+        ctx,
+        validator_path,
+        args = validator_args,
+        runfiles = validator_runfiles,
+    )

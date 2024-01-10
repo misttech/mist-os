@@ -4,14 +4,13 @@
 
 # buildifier: disable=module-docstring
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "populate_py_test_sh_script")
+load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 
 def _fuchsia_package_checker_test_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     package_info = ctx.attr.package_under_test[FuchsiaPackageInfo]
     meta_far = package_info.meta_far
 
-    script = ctx.actions.declare_file(ctx.label.name + ".sh")
     args = [
         "--far={}".format(sdk.far.short_path),
         "--ffx={}".format(sdk.ffx.short_path),
@@ -52,16 +51,16 @@ def _fuchsia_package_checker_test_impl(ctx):
     # append the subpackages
     args.extend(["--subpackages={}".format(s) for s in ctx.attr.expected_subpackages])
 
-    populate_py_test_sh_script(ctx, script, ctx.executable._package_checker, args)
+    runfiles = ctx.runfiles(
+        files = runfiles,
+    ).merge(ctx.attr._package_checker[DefaultInfo].default_runfiles)
 
-    return [
-        DefaultInfo(
-            executable = script,
-            runfiles = ctx.runfiles(
-                files = runfiles,
-            ).merge(ctx.attr._package_checker[DefaultInfo].default_runfiles),
-        ),
-    ]
+    return [create_python3_shell_wrapper_provider(
+        ctx,
+        ctx.executable._package_checker.short_path,
+        args,
+        runfiles,
+    )]
 
 fuchsia_package_checker_test = rule(
     doc = """Validate the generated package.""",

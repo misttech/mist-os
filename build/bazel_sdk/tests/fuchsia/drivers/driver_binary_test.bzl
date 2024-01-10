@@ -2,11 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-""" A test which verifies that driver binaries are built correctly. """
+"""A test which verifies that driver binaries are built correctly. """
 
 load("@fuchsia_sdk//fuchsia/private:fuchsia_debug_symbols.bzl", "strip_resources")
 load("@fuchsia_sdk//fuchsia/private:fuchsia_transition.bzl", "fuchsia_transition")
-load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "populate_py_test_sh_script")
+load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 
 def _driver_binary_test_impl(ctx):
     # We normally strip the binary when we do our packaging but we don't need to
@@ -18,27 +18,24 @@ def _driver_binary_test_impl(ctx):
     stripped_resources, _debug_info = strip_resources(ctx, [resource])
     driver = stripped_resources[0].src
 
-    script = ctx.actions.declare_file(ctx.label.name + ".sh")
-    args = [
+    py_script_path = ctx.executable._binary_checker.short_path
+    script_args = [
         "--driver_binary={}".format(driver.short_path),
         "--readelf={}".format(ctx.executable._readelf.short_path),
     ]
+    script_runfiles = ctx.runfiles(
+        files = [
+            ctx.executable._readelf,
+            driver,
+        ],
+    ).merge(ctx.attr._binary_checker[DefaultInfo].default_runfiles)
 
-    runfiles = [
-        ctx.executable._readelf,
-        driver,
-    ]
-
-    populate_py_test_sh_script(ctx, script, ctx.executable._binary_checker, args)
-
-    return [
-        DefaultInfo(
-            executable = script,
-            runfiles = ctx.runfiles(
-                files = runfiles,
-            ).merge(ctx.attr._binary_checker[DefaultInfo].default_runfiles),
-        ),
-    ]
+    return create_python3_shell_wrapper_provider(
+        ctx,
+        py_script_path,
+        script_args,
+        script_runfiles,
+    )
 
 driver_binary_test = rule(
     doc = """Validate the driver binary.""",

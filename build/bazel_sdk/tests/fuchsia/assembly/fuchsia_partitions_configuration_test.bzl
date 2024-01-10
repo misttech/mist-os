@@ -4,21 +4,12 @@
 
 # buildifier: disable=module-docstring
 load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaAssemblyConfigInfo")
-load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script")
+load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_partitions_configuration_test_impl(ctx):
     partitions_config_file = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
     golden_file = ctx.file.golden_file
-    script, runfiles = create_validation_script(ctx, partitions_config_file, golden_file)
-    return [
-        DefaultInfo(
-            executable = script,
-            runfiles = runfiles,
-            files = depset(
-                direct = ctx.files.partitions_config,
-            ),
-        ),
-    ]
+    return [create_validation_script_provider(ctx, partitions_config_file, golden_file)]
 
 fuchsia_partitions_configuration_test = rule(
     doc = """Validate the generated partitions configuration file.""",

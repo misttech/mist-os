@@ -23,5 +23,8 @@ py_test(
     name = "review_test",
     srcs = ["review_test.py"],
     data = [":review.zip"] + glob(["goldens/**/*"]),
+    # b/319458863: py_test() does not support our custom Python
+    # toolchain with remote builds!
+    tags = ["no-remote"],
     visibility = ["//visibility:public"],
 )
