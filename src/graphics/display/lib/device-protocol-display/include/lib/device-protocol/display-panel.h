@@ -31,7 +31,9 @@
 const display_setting_t kDisplaySettingTV070WSM_FT = {
     .lane_num = 4,
     .bit_rate_max = 360,
-    .clock_factor = 8,
+    // The vendor-provided configuration hard-coded this to 8. This is not
+    // necessary, because our clocking code produces the same value.
+    .clock_factor = 0,
     .lcd_clock = 44250000,
     .h_active = 600,
     .v_active = 1024,
@@ -47,7 +49,9 @@ const display_setting_t kDisplaySettingTV070WSM_FT = {
 const display_setting_t kDisplaySettingP070ACB_FT = {
     .lane_num = 4,
     .bit_rate_max = 400,
-    .clock_factor = 8,
+    // The vendor-provided configuration hard-coded this to 8. This is not
+    // necessary, because our clocking code produces the same value.
+    .clock_factor = 0,
     .lcd_clock = 49434000,
     .h_active = 600,
     .v_active = 1024,
@@ -63,7 +67,9 @@ const display_setting_t kDisplaySettingP070ACB_FT = {
 const display_setting_t kDisplaySettingG101B158_FT = {
     .lane_num = 4,
     .bit_rate_max = 566,
-    .clock_factor = 8,
+    // The vendor-provided configuration hard-coded this to 8. This is not
+    // necessary, because our clocking code produces the same value.
+    .clock_factor = 0,
     .lcd_clock = 70701600,
     .h_active = 800,
     .v_active = 1280,
@@ -79,7 +85,9 @@ const display_setting_t kDisplaySettingG101B158_FT = {
 const display_setting_t kDisplaySettingTV101WXM_FT = {
     .lane_num = 4,
     .bit_rate_max = 566,
-    .clock_factor = 8,
+    // The vendor-provided configuration hard-coded this to 8. This is not
+    // necessary, because our clocking code produces the same value.
+    .clock_factor = 0,
     .lcd_clock = 70701600,
     .h_active = 800,
     .v_active = 1280,
