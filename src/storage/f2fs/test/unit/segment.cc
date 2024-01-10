@@ -297,18 +297,18 @@ TEST_F(SegmentManagerTest, SelectBGVictims) TA_NO_THREAD_SAFETY_ANALYSIS {
   auto &bitmap = dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)];
 
   size_t invalid_ratio = 2;
-  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  zx::nanosleep(zx::deadline_after(zx::sec(2)));
   // Make a dirty segment with 98% of valid blocks
   MakeDirtySegments(invalid_ratio, 1);
   ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 1U);
 
-  // Make a dirty segment with 97% of valid blocks after 1 sec
-  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  // Make a dirty segment with 97% of valid blocks after 2 sec
+  zx::nanosleep(zx::deadline_after(zx::sec(2)));
   MakeDirtySegments(invalid_ratio + 1, 1);
   ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 2U);
 
-  // Make a dirty segment with 99% of valid blocks after 1 sec
-  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  // Make a dirty segment with 99% of valid blocks after 2 sec
+  zx::nanosleep(zx::deadline_after(zx::sec(2)));
   MakeDirtySegments(invalid_ratio - 1, 1);
   ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 3U);
 
