@@ -32,7 +32,6 @@ source_set("lib") {
   public_deps = [
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_hlcpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/exceptions/fidl:fuchsia.exception.internal_hlcpp",
     "//src/lib/fsl",
@@ -42,6 +41,7 @@ source_set("lib") {
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
 }

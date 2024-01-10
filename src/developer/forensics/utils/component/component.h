@@ -7,8 +7,8 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/binding.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
@@ -59,7 +59,7 @@ class Component {
   async::Loop loop_;
   async_dispatcher_t* dispatcher_;
   std::unique_ptr<sys::ComponentContext> context_;
-  sys::ComponentInspector inspector_;
+  inspect::ComponentInspector inspector_;
   timekeeper::SystemClock clock_;
   size_t instance_index_;
 };

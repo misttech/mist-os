@@ -47,10 +47,10 @@ source_set("inspect") {
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/lib/backoff",
     "//src/lib/fxl",
     "//zircon/system/ulib/async",
+    "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
 

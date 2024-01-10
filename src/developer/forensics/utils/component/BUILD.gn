@@ -14,8 +14,8 @@ source_set("component") {
   ]
 
   public_deps = [
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/timekeeper",
     "//src/lib/timekeeper:system",

@@ -76,10 +76,10 @@ source_set("inspect_budget") {
   ]
 
   public_deps = [
-    "//sdk/lib/sys/inspect/cpp",
     "//src/developer/forensics/utils:archive",
     "//src/developer/forensics/utils:inspect_node_manager",
     "//src/developer/forensics/utils/cobalt",
+    "//zircon/system/ulib/inspect",
   ]
 
   deps = [

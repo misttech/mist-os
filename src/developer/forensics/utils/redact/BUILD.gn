@@ -13,8 +13,8 @@ source_set("redact") {
   ]
 
   public_deps = [
-    "//sdk/lib/sys/inspect/cpp",
     "//src/developer/forensics/feedback:constants",
+    "//zircon/system/ulib/inspect",
   ]
 
   deps = [

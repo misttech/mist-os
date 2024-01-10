@@ -54,9 +54,9 @@ source_set("inspect_node_manager") {
   ]
 
   public_deps = [
-    "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
+    "//zircon/system/ulib/inspect",
   ]
 }
 
@@ -64,8 +64,9 @@ source_set("instrumented_binding_set") {
   sources = [ "instrumented_binding_set.h" ]
 
   public_deps = [
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/fidl/cpp",
     "//src/developer/forensics/utils:inspect_node_manager",
+    "//zircon/system/ulib/inspect",
   ]
 }
 
@@ -107,6 +108,7 @@ source_set("sized_data") {
 
 source_set("storage_size") {
   sources = [ "storage_size.h" ]
+  public_deps = [ "//sdk/lib/syslog/cpp" ]
 }
 
 source_set("time") {

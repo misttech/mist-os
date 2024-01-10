@@ -26,7 +26,7 @@ Component::Component()
     : loop_(&kAsyncLoopConfigAttachToCurrentThread),
       dispatcher_(loop_.dispatcher()),
       context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()),
-      inspector_(context_.get()),
+      inspector_(dispatcher_, {}),
       clock_(),
       instance_index_(InitialInstanceIndex()) {
   WriteInstanceIndex();
@@ -36,7 +36,7 @@ Component::Component(async_dispatcher_t* dispatcher, std::unique_ptr<sys::Compon
     : loop_(&kAsyncLoopConfigNeverAttachToThread),
       dispatcher_(dispatcher),
       context_(std::move(context)),
-      inspector_(context_.get()),
+      inspector_(dispatcher_, {}),
       clock_(),
       instance_index_(InitialInstanceIndex()) {
   WriteInstanceIndex();
