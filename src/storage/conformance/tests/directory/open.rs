@@ -999,7 +999,10 @@ async fn open2_dir_optional_rights() {
             &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions {
-                        optional_rights: Some(fio::Operations::WRITE_BYTES),
+                        // Optional rights not supported in the parent connection will be removed.
+                        optional_rights: Some(
+                            fio::Operations::WRITE_BYTES | fio::Operations::EXECUTE,
+                        ),
                         ..Default::default()
                     }),
                     ..Default::default()
