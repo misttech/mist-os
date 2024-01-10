@@ -119,17 +119,6 @@ class SoftmacBinding : public DeviceInterface,
   std::mutex ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
 
-  /////////////////////////////////////
-  // Member variables and methods to support communication via SME,
-  // MLME, and WlanSoftmac protocols.
-
-  enum class DevicePacket : uint64_t {
-    kShutdown,
-    kPacketQueued,
-    kIndication,
-    kHwScanComplete,
-  };
-
   // Informs the message loop to shut down. Calling this function more than once
   // has no effect.
   void ShutdownMainLoop();
