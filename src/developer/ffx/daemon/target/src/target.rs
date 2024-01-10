@@ -753,7 +753,7 @@ impl Target {
         let current_status = self.get_compatibility_status();
         let new_status = match current_status {
             Some(_) => {
-                println!(
+                tracing::debug!(
                     "ignoring status change from id:{} {:?} to {:?}",
                     self.id(),
                     current_status,
@@ -762,7 +762,7 @@ impl Target {
                 return;
             }
             None if status.is_some() => {
-                println!("status change from None to id: {} {:?}", self.id(), status);
+                tracing::debug!("status change from None to id: {} {:?}", self.id(), status);
                 status.clone()
             }
             _ => None,
