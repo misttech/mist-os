@@ -51,7 +51,7 @@ pub(crate) enum PipeError {
     TargetGone,
     #[error("creating pipe to {1} failed: {0}")]
     PipeCreationFailed(String, String),
-    #[error("no shh address to {0}")]
+    #[error("no ssh address to {0}")]
     NoAddress(String),
     #[error("running target overnet pipe: {0}")]
     SpawnError(String),
