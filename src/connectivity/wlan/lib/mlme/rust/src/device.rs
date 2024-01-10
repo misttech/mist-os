@@ -843,6 +843,7 @@ pub mod test_utils {
     #[derive(Clone)]
     pub struct FakeDevice {
         state: Arc<Mutex<FakeDeviceState>>,
+        mlme_event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
     }
 
     pub struct FakeDeviceState {
@@ -850,7 +851,6 @@ pub mod test_utils {
         pub minstrel: Option<crate::MinstrelWrapper>,
         pub eth_queue: Vec<Vec<u8>>,
         pub wlan_queue: Vec<(Vec<u8>, u32)>,
-        pub mlme_event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
         pub mlme_event_stream: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
         pub mlme_request_sink: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
         pub mlme_request_stream: Option<mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>>,
@@ -913,7 +913,6 @@ pub mod test_utils {
                 minstrel: None,
                 eth_queue: vec![],
                 wlan_queue: vec![],
-                mlme_event_sink,
                 mlme_event_stream: Some(mlme_event_stream),
                 mlme_request_sink,
                 mlme_request_stream: Some(mlme_request_stream),
@@ -941,7 +940,7 @@ pub mod test_utils {
                 install_key_results: VecDeque::new(),
                 captured_update_wmm_parameters_request: None,
             }));
-            (FakeDevice { state: state.clone() }, state)
+            (FakeDevice { state: state.clone(), mlme_event_sink }, state)
         }
 
         pub fn state(&self) -> Arc<Mutex<FakeDeviceState>> {
@@ -1152,7 +1151,7 @@ pub mod test_utils {
         }
 
         fn send_mlme_event(&mut self, event: fidl_mlme::MlmeEvent) -> Result<(), anyhow::Error> {
-            self.state.lock().unwrap().mlme_event_sink.unbounded_send(event).map_err(|e| e.into())
+            self.mlme_event_sink.unbounded_send(event).map_err(|e| e.into())
         }
 
         fn set_minstrel(&mut self, minstrel: crate::MinstrelWrapper) {
