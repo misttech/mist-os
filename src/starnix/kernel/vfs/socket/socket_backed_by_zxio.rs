@@ -39,16 +39,16 @@ impl ServiceConnector for SocketProviderServiceConnector {
     fn connect(service_name: &str) -> Result<&'static zx::Channel, zx::Status> {
         match service_name {
             fposix_socket::ProviderMarker::PROTOCOL_NAME => {
-                static mut CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
-                unsafe { &CHANNEL }
+                static CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
+                &CHANNEL
             }
             fposix_socket_packet::ProviderMarker::PROTOCOL_NAME => {
-                static mut CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
-                unsafe { &CHANNEL }
+                static CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
+                &CHANNEL
             }
             fposix_socket_raw::ProviderMarker::PROTOCOL_NAME => {
-                static mut CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
-                unsafe { &CHANNEL }
+                static CHANNEL: OnceLock<Result<zx::Channel, zx::Status>> = OnceLock::new();
+                &CHANNEL
             }
             _ => return Err(zx::Status::INTERNAL),
         }
