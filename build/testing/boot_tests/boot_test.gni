@@ -34,7 +34,7 @@ _all_emu_types = [
 #  * cpu_for_host
 #    - Required: The host CPU to generate the test for.
 #
-#  * deps
+#  * data_deps, deps
 #    - Optional: The usual GN meaning.
 #
 # See boot_test() for all other parameters.
@@ -94,6 +94,7 @@ template("_boot_test") {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
+                             "data_deps",
                              "deps",
                              "visibility",
                            ])
@@ -203,7 +204,7 @@ template("_boot_test") {
 #    - Type: int
 #    - Default: 600 (10 minutes)
 #
-#  * assert_no_deps, metadata, visibility
+#  * assert_no_deps, data_deps, metadata, visibility
 #    - Optional: Usual GN meanings.
 #
 template("boot_test") {

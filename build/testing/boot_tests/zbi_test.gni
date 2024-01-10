@@ -87,7 +87,6 @@ template("zbi_test") {
                            [
                              "cpu",
                              "compress",
-                             "data_deps",
                              "output_dir",
                              "output_extension",
                              "visibility",
@@ -167,6 +166,7 @@ template("zbi_test") {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
+                             "data_deps",
                              "device_types",
                              "metadata",
                              "qemu_kernel",
