@@ -285,7 +285,7 @@ fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
 home = "0.5.3"
 hyper-rustls = { version = "0.22.1", default-features = false, features = ["rustls-native-certs"] }
 indoc = "1.0.3"
-loom = "0.7.0"
+loom = "0.7.1"
 # TODO(https://fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio
 mio = { version = "0.8.5", features = ["net", "os-ext", "os-poll"] }
@@ -493,7 +493,7 @@ rustflags = [ "--cfg=fn_like_proc_macro" ]
 # generator has not gone through a thorough safety review yet, and needs to be
 # re-reviewed before it can be used outside of tests.
 [gn.package.generator."0.7.5"]
-visibility = [ ":loom-v0_7_0" ]
+visibility = [ ":loom-v0_7_1" ]
 testonly = true
 deps = [
   "//build/validate:non_production_tag",
@@ -551,7 +551,7 @@ group_visibility = { import = "//src/lib/diagnostics/log/log_visibility.gni", va
 
 # Loom has not gone through a thorough safety review yet, and needs to be
 # re-reviewed before it can be used outside of tests.
-[gn.package.loom."0.7.0"]
+[gn.package.loom."0.7.1"]
 deps = [ "//build/validate:non_production_tag" ]
 testonly = true
 
@@ -670,7 +670,7 @@ rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]
 # re-reviewed before it can be used outside of tests.
 [gn.package.scoped-tls."1.0.1"]
 deps = [ "//build/validate:non_production_tag" ]
-visibility = [ ":loom-v0_7_0" ]
+visibility = [ ":loom-v0_7_1" ]
 testonly = true
 
 # We always want to optimize scrypt for speed, because a single key derivation

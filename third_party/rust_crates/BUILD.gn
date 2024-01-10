@@ -459,7 +459,7 @@ group("log") {
 
 if (!(current_os == "fuchsia")) {
   group("loom") {
-    public_deps = [ ":loom-v0_7_0" ]
+    public_deps = [ ":loom-v0_7_1" ]
     testonly = true
   }
 }
@@ -5961,7 +5961,7 @@ rust_library("generator-v0_7_5") {
   ]
 
   visibility = []
-  visibility += [ ":loom-v0_7_0" ]
+  visibility += [ ":loom-v0_7_1" ]
   testonly = true
   applicable_licenses = [ ":generator-v0_7_5.license" ]
 }
@@ -7729,15 +7729,15 @@ rust_library("log-v0_4_20") {
   applicable_licenses = [ ":log-v0_4_20.license" ]
 }
 
-license("loom-v0_7_0.license") {
+license("loom-v0_7_1.license") {
   public_package_name = "loom"
-  license_files = [ "//third_party/rust_crates/vendor/loom-0.7.0/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/loom-0.7.1/LICENSE" ]
 }
 
-rust_library("loom-v0_7_0") {
+rust_library("loom-v0_7_1") {
   crate_name = "loom"
-  crate_root = "//third_party/rust_crates/vendor/loom-0.7.0/src/lib.rs"
-  output_name = "loom-d2c193a75c1dc004"
+  crate_root = "//third_party/rust_crates/vendor/loom-0.7.1/src/lib.rs"
+  output_name = "loom-7b415502d397946a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -7752,15 +7752,15 @@ rust_library("loom-v0_7_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=d2c193a75c1dc004",
-    "-Cextra-filename=-d2c193a75c1dc004",
+    "-Cmetadata=7b415502d397946a",
+    "-Cextra-filename=-7b415502d397946a",
     "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
 
   testonly = true
-  applicable_licenses = [ ":loom-v0_7_0.license" ]
+  applicable_licenses = [ ":loom-v0_7_1.license" ]
 }
 
 license("lru-cache-v0_1_2.license") {
@@ -13159,7 +13159,7 @@ rust_library("scoped-tls-v1_0_1") {
   ]
 
   visibility = []
-  visibility += [ ":loom-v0_7_0" ]
+  visibility += [ ":loom-v0_7_1" ]
   testonly = true
   applicable_licenses = [ ":scoped-tls-v1_0_1.license" ]
 }

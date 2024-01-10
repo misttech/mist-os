@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.60.0"
 name = "loom"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Carl Lerche <me@carllerche.com>"]
 description = "Permutation testing for concurrent code"
 homepage = "https://github.com/tokio-rs/loom"
