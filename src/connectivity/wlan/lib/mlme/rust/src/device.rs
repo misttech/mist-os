@@ -275,6 +275,10 @@ pub trait DeviceOps {
         &mut self,
         request: &fidl_softmac::WlanSoftmacBridgeClearAssociationRequest,
     ) -> Result<(), zx::Status>;
+    fn update_wmm_parameters(
+        &mut self,
+        request: &fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest,
+    ) -> Result<(), zx::Status>;
     fn take_mlme_event_stream(&mut self) -> Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>;
     fn send_mlme_event(&mut self, event: fidl_mlme::MlmeEvent) -> Result<(), anyhow::Error>;
     fn set_minstrel(&mut self, minstrel: crate::MinstrelWrapper);
@@ -537,6 +541,20 @@ impl DeviceOps for Device {
             .map_err(zx::Status::from_raw)
     }
 
+    fn notify_association_complete(
+        &mut self,
+        assoc_cfg: fidl_softmac::WlanAssociationConfig,
+    ) -> Result<(), zx::Status> {
+        if let Some(minstrel) = &self.minstrel {
+            minstrel.lock().add_peer(&assoc_cfg)?;
+        }
+        Self::flatten_and_log_error(
+            "NotifyAssociationComplete",
+            self.wlan_softmac_bridge_proxy
+                .notify_association_complete(&assoc_cfg, zx::Time::INFINITE),
+        )
+    }
+
     fn clear_association(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBridgeClearAssociationRequest,
@@ -557,17 +575,13 @@ impl DeviceOps for Device {
         )
     }
 
-    fn notify_association_complete(
+    fn update_wmm_parameters(
         &mut self,
-        assoc_cfg: fidl_softmac::WlanAssociationConfig,
+        request: &fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest,
     ) -> Result<(), zx::Status> {
-        if let Some(minstrel) = &self.minstrel {
-            minstrel.lock().add_peer(&assoc_cfg)?;
-        }
         Self::flatten_and_log_error(
-            "NotifyAssociationComplete",
-            self.wlan_softmac_bridge_proxy
-                .notify_association_complete(&assoc_cfg, zx::Time::INFINITE),
+            "UpdateWmmParameters",
+            self.wlan_softmac_bridge_proxy.update_wmm_parameters(request, zx::Time::INFINITE),
         )
     }
 
@@ -861,6 +875,8 @@ pub mod test_utils {
         pub assocs: std::collections::HashMap<MacAddr, fidl_softmac::WlanAssociationConfig>,
         pub buffer_provider: BufferProvider,
         pub install_key_results: VecDeque<Result<(), zx::Status>>,
+        pub captured_update_wmm_parameters_request:
+            Option<fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest>,
     }
 
     impl FakeDevice {
@@ -923,6 +939,7 @@ pub mod test_utils {
                 assocs: std::collections::HashMap::new(),
                 buffer_provider: FakeBufferProvider::new(),
                 install_key_results: VecDeque::new(),
+                captured_update_wmm_parameters_request: None,
             }));
             (FakeDevice { state: state.clone() }, state)
         }
@@ -1116,6 +1133,15 @@ pub mod test_utils {
             }
             state.assocs.remove(&addr);
             state.join_bss_request = None;
+            Ok(())
+        }
+
+        fn update_wmm_parameters(
+            &mut self,
+            request: &fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest,
+        ) -> Result<(), zx::Status> {
+            let mut state = self.state.lock().unwrap();
+            state.captured_update_wmm_parameters_request.replace(request.clone());
             Ok(())
         }
 
@@ -1734,5 +1760,54 @@ mod tests {
             .expect("error clearing assoc");
         assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 0);
         assert!(fake_device_state.lock().unwrap().join_bss_request.is_none());
+    }
+
+    #[test]
+    fn fake_device_captures_update_wmm_parameters_request() {
+        let exec = fasync::TestExecutor::new();
+        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+
+        let request = fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest {
+            ac: Some(fidl_ieee80211::WlanAccessCategory::Background),
+            params: Some(fidl_common::WlanWmmParameters {
+                apsd: true,
+                ac_be_params: fidl_common::WlanWmmAccessCategoryParameters {
+                    ecw_min: 10,
+                    ecw_max: 100,
+                    aifsn: 1,
+                    txop_limit: 5,
+                    acm: true,
+                },
+                ac_bk_params: fidl_common::WlanWmmAccessCategoryParameters {
+                    ecw_min: 11,
+                    ecw_max: 100,
+                    aifsn: 1,
+                    txop_limit: 5,
+                    acm: true,
+                },
+                ac_vi_params: fidl_common::WlanWmmAccessCategoryParameters {
+                    ecw_min: 12,
+                    ecw_max: 100,
+                    aifsn: 1,
+                    txop_limit: 5,
+                    acm: true,
+                },
+                ac_vo_params: fidl_common::WlanWmmAccessCategoryParameters {
+                    ecw_min: 13,
+                    ecw_max: 100,
+                    aifsn: 1,
+                    txop_limit: 5,
+                    acm: true,
+                },
+            }),
+            ..Default::default()
+        };
+        let result = fake_device.update_wmm_parameters(&request);
+        assert!(result.is_ok());
+
+        assert_eq!(
+            fake_device_state.lock().unwrap().captured_update_wmm_parameters_request,
+            Some(request),
+        );
     }
 }

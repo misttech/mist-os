@@ -669,6 +669,15 @@ closed protocol WlanSoftmacBridge {
     strict CancelScan(table {
         1: scan_id uint64;
     }) -> () error zx.Status;
+
+    /// Indicate the device of modified WiFi Multimedia (WMM) parameters for a
+    /// particular access category (AC).
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.UpdateWmmParameters")
+    strict UpdateWmmParameters(table {
+        1: ac ieee80211.WlanAccessCategory;
+        2: params fuchsia.wlan.common.WlanWmmParameters;
+    }) -> () error zx.Status;
 };
 
 @discoverable
@@ -906,7 +915,7 @@ closed protocol WlanSoftmac {
 
     /// Indicate the device of modified WiFi Multimedia (WMM) parameters for a
     /// particular access category (AC).
-    @available(added=15)
+    @available(added=15, removed=HEAD)
     strict UpdateWmmParameters(table {
         1: ac ieee80211.WlanAccessCategory;
         2: params fuchsia.wlan.common.WlanWmmParameters;

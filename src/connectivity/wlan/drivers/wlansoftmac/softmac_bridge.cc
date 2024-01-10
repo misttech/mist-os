@@ -190,6 +190,44 @@ void SoftmacBridge::SetChannel(SetChannelRequestView request,
   DispatchAndComplete(__func__, dispatcher, completer);
 }
 
+void SoftmacBridge::JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
+  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::JoinBss> dispatcher =
+      [request](const auto& arena, const auto& softmac_client) {
+        return softmac_client.sync().buffer(arena)->JoinBss(request->join_request);
+      };
+  DispatchAndComplete(__func__, dispatcher, completer);
+}
+
+void SoftmacBridge::EnableBeaconing(EnableBeaconingRequestView request,
+                                    EnableBeaconingCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
+  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::EnableBeaconing> dispatcher =
+      [request](const auto& arena, const auto& softmac_client) {
+        return softmac_client.sync().buffer(arena)->EnableBeaconing(*request);
+      };
+  DispatchAndComplete(__func__, dispatcher, completer);
+}
+
+void SoftmacBridge::DisableBeaconing(DisableBeaconingCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
+  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::DisableBeaconing> dispatcher =
+      [](const auto& arena, const auto& softmac_client) {
+        return softmac_client.sync().buffer(arena)->DisableBeaconing();
+      };
+  DispatchAndComplete(__func__, dispatcher, completer);
+}
+
+void SoftmacBridge::InstallKey(InstallKeyRequestView request,
+                               InstallKeyCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
+  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::InstallKey> dispatcher =
+      [request](const auto& arena, const auto& softmac_client) {
+        return softmac_client.sync().buffer(arena)->InstallKey(*request);
+      };
+  DispatchAndComplete(__func__, dispatcher, completer);
+}
+
 void SoftmacBridge::NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
                                               NotifyAssociationCompleteCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
@@ -240,40 +278,12 @@ void SoftmacBridge::CancelScan(CancelScanRequestView request,
   DispatchAndComplete(__func__, dispatcher, completer);
 }
 
-void SoftmacBridge::JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& completer) {
+void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequestView request,
+                                        UpdateWmmParametersCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::JoinBss> dispatcher =
+  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::UpdateWmmParameters> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->JoinBss(request->join_request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
-}
-
-void SoftmacBridge::EnableBeaconing(EnableBeaconingRequestView request,
-                                    EnableBeaconingCompleter::Sync& completer) {
-  WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::EnableBeaconing> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->EnableBeaconing(*request);
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
-}
-
-void SoftmacBridge::DisableBeaconing(DisableBeaconingCompleter::Sync& completer) {
-  WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::DisableBeaconing> dispatcher =
-      [](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->DisableBeaconing();
-      };
-  DispatchAndComplete(__func__, dispatcher, completer);
-}
-
-void SoftmacBridge::InstallKey(InstallKeyRequestView request,
-                               InstallKeyCompleter::Sync& completer) {
-  WLAN_TRACE_DURATION();
-  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::InstallKey> dispatcher =
-      [request](const auto& arena, const auto& softmac_client) {
-        return softmac_client.sync().buffer(arena)->InstallKey(*request);
+        return softmac_client.sync().buffer(arena)->UpdateWmmParameters(*request);
       };
   DispatchAndComplete(__func__, dispatcher, completer);
 }

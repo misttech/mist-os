@@ -37,6 +37,11 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void QuerySpectrumManagementSupport(
       QuerySpectrumManagementSupportCompleter::Sync& completer) final;
   void SetChannel(SetChannelRequestView request, SetChannelCompleter::Sync& completer) final;
+  void JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& completer) final;
+  void EnableBeaconing(EnableBeaconingRequestView request,
+                       EnableBeaconingCompleter::Sync& completer) final;
+  void DisableBeaconing(DisableBeaconingCompleter::Sync& completer) final;
+  void InstallKey(InstallKeyRequestView request, InstallKeyCompleter::Sync& completer) final;
   void NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
                                  NotifyAssociationCompleteCompleter::Sync& completer) final;
   void ClearAssociation(ClearAssociationRequestView request,
@@ -46,11 +51,9 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void StartActiveScan(StartActiveScanRequestView request,
                        StartActiveScanCompleter::Sync& completer) final;
   void CancelScan(CancelScanRequestView request, CancelScanCompleter::Sync& completer) final;
-  void JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& completer) final;
-  void EnableBeaconing(EnableBeaconingRequestView request,
-                       EnableBeaconingCompleter::Sync& completer) final;
-  void DisableBeaconing(DisableBeaconingCompleter::Sync& completer) final;
-  void InstallKey(InstallKeyRequestView request, InstallKeyCompleter::Sync& completer) final;
+  void UpdateWmmParameters(UpdateWmmParametersRequestView request,
+                           UpdateWmmParametersCompleter::Sync& completer) final;
+
   void QueueEthFrameTx(eth::BorrowedOperation<> op);
 
  private:
