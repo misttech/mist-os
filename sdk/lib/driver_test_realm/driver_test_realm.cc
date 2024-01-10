@@ -40,7 +40,6 @@
 
 #include <ddk/metadata/test.h>
 #include <fbl/string_printf.h>
-#include <mock-boot-arguments/server.h>
 
 #include "sdk/lib/driver_test_realm/driver_test_realm_config.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -56,23 +55,6 @@ namespace fdr = fuchsia_driver_registrar;
 namespace fdd = fuchsia_driver_development;
 
 using namespace component_testing;
-
-const char* LogLevelToString(fuchsia_diagnostics::Severity severity) {
-  switch (severity) {
-    case fuchsia_diagnostics::Severity::kTrace:
-      return "TRACE";
-    case fuchsia_diagnostics::Severity::kDebug:
-      return "DEBUG";
-    case fuchsia_diagnostics::Severity::kInfo:
-      return "INFO";
-    case fuchsia_diagnostics::Severity::kWarn:
-      return "WARN";
-    case fuchsia_diagnostics::Severity::kError:
-      return "ERROR";
-    case fuchsia_diagnostics::Severity::kFatal:
-      return "FATAL";
-  }
-}
 
 // This board driver knows how to interpret the metadata for which devices to
 // spawn.
@@ -222,37 +204,6 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
   }
 };
 
-std::map<std::string, std::string> CreateBootArgs(const fuchsia_driver_test::RealmArgs& args) {
-  std::map<std::string, std::string> boot_args;
-
-  if (args.driver_tests_enable_all().has_value() && *args.driver_tests_enable_all()) {
-    boot_args["driver.tests.enable"] = "true";
-  }
-
-  if (args.driver_tests_enable().has_value()) {
-    for (const auto& driver : *args.driver_tests_enable()) {
-      auto string = fbl::StringPrintf("driver.%s.tests.enable", driver.c_str());
-      boot_args[string.data()] = "true";
-    }
-  }
-
-  if (args.driver_tests_disable().has_value()) {
-    for (const auto& driver : *args.driver_tests_disable()) {
-      auto string = fbl::StringPrintf("driver.%s.tests.enable", driver.c_str());
-      boot_args[string.data()] = "false";
-    }
-  }
-
-  if (args.driver_log_level().has_value()) {
-    for (const auto& driver : *args.driver_log_level()) {
-      auto string = fbl::StringPrintf("driver.%s.log", driver.name().c_str());
-      boot_args[string.data()] = LogLevelToString(driver.log_level());
-    }
-  }
-
-  return boot_args;
-}
-
 zx::result<fidl::ClientEnd<fio::Directory>> OpenPkgDir() {
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
@@ -344,37 +295,10 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     }
     is_started_ = true;
 
-    auto boot_args = CreateBootArgs(request.args());
-    for (std::pair<std::string, std::string> boot_arg : boot_args) {
-      if (boot_arg.first.size() > fuchsia_boot::wire::kMaxArgsNameLength) {
-        FX_SLOG(ERROR, "The length of the name of the boot argument is too long",
-                FX_KV("arg", boot_arg.first.data()),
-                FX_KV("maximum_length", fuchsia_boot::wire::kMaxArgsNameLength));
-        completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
-        return;
-      }
-
-      if (boot_arg.second.size() > fuchsia_boot::wire::kMaxArgsValueLength) {
-        FX_SLOG(ERROR, "The length of the value of the boot argument is too long",
-                FX_KV("arg", boot_arg.first.data()), FX_KV("value", boot_arg.second.data()),
-                FX_KV("maximum_length", fuchsia_boot::wire::kMaxArgsValueLength));
-        completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
-        return;
-      }
-    }
-    auto boot_arguments = std::make_unique<mock_boot_arguments::Server>(std::move(boot_args));
-
-    // Add protocols which are routed to realm builder.
-    zx::result result = outgoing_->AddProtocol<fuchsia_boot::Arguments>(std::move(boot_arguments));
-    if (result.is_error()) {
-      completer.Reply(result.take_error());
-      return;
-    }
-
     // Tunnel fuchsia_boot::Items from parent to realm builder if |tunnel_boot_items| configuration
     // is set. If not, provide fuchsia_boot::Items from local.
     if (config_.tunnel_boot_items()) {
-      result = outgoing_->AddUnmanagedProtocol<fuchsia_boot::Items>(
+      zx::result result = outgoing_->AddUnmanagedProtocol<fuchsia_boot::Items>(
           [](fidl::ServerEnd<fuchsia_boot::Items> server_end) {
             if (const zx::result status = component::Connect<fuchsia_boot::Items>(
                     std::move(server_end),
@@ -384,20 +308,24 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
                              << status.status_string();
             }
           });
+      if (result.is_error()) {
+        completer.Reply(result.take_error());
+        return;
+      }
     } else {
       auto boot_items = std::make_unique<FakeBootItems>();
       if (request.args().board_name().has_value()) {
         boot_items->board_name_ = *request.args().board_name();
       }
 
-      result = outgoing_->AddProtocol<fuchsia_boot::Items>(std::move(boot_items));
+      zx::result result = outgoing_->AddProtocol<fuchsia_boot::Items>(std::move(boot_items));
       if (result.is_error()) {
         completer.Reply(result.take_error());
         return;
       }
     }
 
-    result = outgoing_->AddProtocol<fuchsia_device_manager::SystemStateTransition>(
+    zx::result result = outgoing_->AddProtocol<fuchsia_device_manager::SystemStateTransition>(
         std::make_unique<FakeSystemStateTransition>());
     if (result.is_error()) {
       completer.Reply(result.take_error());

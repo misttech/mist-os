@@ -36,7 +36,6 @@
         // From DTR to #realm_builder
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.kernel.RootJob",
@@ -70,7 +69,6 @@
         },
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.kernel.RootJob",
