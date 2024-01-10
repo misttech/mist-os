@@ -84,9 +84,9 @@ WeaveInspector& WeaveInspector::GetWeaveInspector() {
   return weave_inspector;
 }
 
-WeaveInspector::WeaveInspector()
-    : inspector_(std::make_unique<sys::ComponentInspector>(
-          DeviceLayer::PlatformMgrImpl().GetComponentContextForProcess())),
+WeaveInspector::WeaveInspector(async_dispatcher_t* dispatcher)
+    : inspector_(
+          std::make_unique<inspect::ComponentInspector>(dispatcher, inspect::PublishOptions{})),
       tunnel_status_(inspector_->root()),
       weave_status_(inspector_->root()) {}
 

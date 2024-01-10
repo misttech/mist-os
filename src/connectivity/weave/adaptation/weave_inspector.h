@@ -4,7 +4,7 @@
 #ifndef SRC_CONNECTIVITY_WEAVE_ADAPTATION_WEAVE_INSPECTOR_H_
 #define SRC_CONNECTIVITY_WEAVE_ADAPTATION_WEAVE_INSPECTOR_H_
 
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 
 #pragma GCC diagnostic push
 #include <Weave/DeviceLayer/PlatformManager.h>
@@ -139,7 +139,8 @@ class WeaveInspector final {
   friend class testing::WeaveInspectorTest;
 
  private:
-  WeaveInspector();
+  WeaveInspector() : WeaveInspector(async_get_default_dispatcher()) {}
+  explicit WeaveInspector(async_dispatcher_t* dispatcher);
 
   class WeaveStatusNode {
    public:
@@ -224,7 +225,7 @@ class WeaveInspector final {
     inspect::UintProperty tunnel_down_time_property_;
   };
 
-  std::unique_ptr<sys::ComponentInspector> inspector_;
+  std::unique_ptr<inspect::ComponentInspector> inspector_;
   TunnelStatusNode tunnel_status_;
   WeaveStatusNode weave_status_;
 };

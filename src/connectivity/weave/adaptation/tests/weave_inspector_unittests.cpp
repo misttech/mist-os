@@ -27,10 +27,11 @@ const std::string kNode_WeaveStatus_SetupState = "setup_state";
 
 class WeaveInspectorTest : public ::gtest::RealLoopFixture {
  public:
+  WeaveInspectorTest() : weave_inspector_(loop().dispatcher()) {}
   // Get the underlying inspect::Inspector for Weave component.
   inspect::Inspector* GetInspector() {
     auto& weave_inspector = GetTestWeaveInspector();
-    return weave_inspector.inspector_->inspector();
+    return &weave_inspector.inspector_->inspector();
   }
 
   // Return WeaveInspector for test.
