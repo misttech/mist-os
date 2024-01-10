@@ -12,6 +12,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "src/ui/lib/escher/escher_process_init.h"
 #include "src/ui/lib/escher/fs/hack_filesystem.h"
 #include "src/ui/lib/escher/hmd/pose_buffer_latching_shader.h"
 #include "src/ui/lib/escher/paper/paper_renderer_static_config.h"
