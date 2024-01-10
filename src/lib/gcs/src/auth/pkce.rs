@@ -10,7 +10,7 @@
 
 use {
     crate::{
-        auth::info::{AUTH_SCOPE, CLIENT_ID, CLIENT_SECRET},
+        auth::info::{AUTH_SCOPE, CLIENT_ID, CLIENT_SECRET, OAUTH_REFRESH_TOKEN_ENDPOINT},
         error::GcsError,
     },
     anyhow::{bail, Context, Result},
@@ -29,12 +29,9 @@ use {
 
 const AUTHORIZATION_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 
-/// URL used to exchange an auth_code for a refresh_token.
-const EXCHANGE_AUTH_CODE_URL: &str = "https://oauth2.googleapis.com/token";
-
 const PKCE_BYTE_LENGTH: usize = 32;
 
-/// POST body to [`EXCHANGE_AUTH_CODE_URL`].
+/// POST body to [`OAUTH_REFRESH_TOKEN_ENDPOINT`].
 #[derive(Serialize)]
 struct ExchangeAuthCodeRequest<'a> {
     /// A value provided by GCS for fetching tokens.
@@ -54,7 +51,7 @@ struct ExchangeAuthCodeRequest<'a> {
     redirect_uri: &'a str,
 }
 
-/// Response body from [`EXCHANGE_AUTH_CODE_URL`].
+/// Response body from [`OAUTH_REFRESH_TOKEN_ENDPOINT`].
 /// 'expires_in' is intentionally omitted.
 #[derive(Deserialize)]
 struct ExchangeAuthCodeResponse {
@@ -283,7 +280,7 @@ pub(crate) async fn auth_code_to_refresh(
     let req = Request::builder()
         .method(Method::POST)
         .header("Content-Type", "application/x-www-form-urlencoded")
-        .uri(EXCHANGE_AUTH_CODE_URL)
+        .uri(OAUTH_REFRESH_TOKEN_ENDPOINT)
         .body(Body::from(body))?;
 
     let https_client = fuchsia_hyper::new_https_client();

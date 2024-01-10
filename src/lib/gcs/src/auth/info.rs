@@ -16,3 +16,8 @@ pub(crate) const CLIENT_ID: &str =
 pub(crate) const CLIENT_SECRET: &str = "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";
 
 pub(crate) const AUTH_SCOPE: &str = "https://www.googleapis.com/auth/cloud-platform";
+
+/// URL used for gaining a new access token.
+///
+/// See RefreshTokenRequest, OauthTokenResponse.
+pub(crate) const OAUTH_REFRESH_TOKEN_ENDPOINT: &str = "https://oauth2.googleapis.com/token";

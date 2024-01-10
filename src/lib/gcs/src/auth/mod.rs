@@ -23,16 +23,11 @@ use {
     crate::error::GcsError,
     anyhow::Result,
     hyper::{Body, Method, Request},
-    info::{CLIENT_ID, CLIENT_SECRET},
+    info::{CLIENT_ID, CLIENT_SECRET, OAUTH_REFRESH_TOKEN_ENDPOINT},
     serde::{Deserialize, Serialize},
     serde_json,
     std::fmt,
 };
-
-/// URL used for gaining a new access token.
-///
-/// See RefreshTokenRequest, OauthTokenResponse.
-const OAUTH_REFRESH_TOKEN_ENDPOINT: &str = "https://www.googleapis.com/oauth2/v3/token";
 
 #[derive(Clone, PartialEq)]
 pub struct GcsCredentials {
