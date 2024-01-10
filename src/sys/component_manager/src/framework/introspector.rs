@@ -2,23 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.cti
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Context;
 use async_trait::async_trait;
+use cm_rust::ProtocolDecl;
 use cm_types::Name;
+use cm_util::TaskGroup;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component as fcomponent;
+use fidl_fuchsia_io as fio;
+use fuchsia_zircon as zx;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
-use moniker::{Moniker, MonikerBase};
-use routing::capability_source::InternalCapability;
+use moniker::{ExtendedMoniker, Moniker, MonikerBase};
+use routing::{
+    capability_source::{ComponentCapability, InternalCapability},
+    policy::PolicyError,
+};
 use tracing::warn;
 
 use crate::{
     capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
     model::{
         component::WeakComponentInstance,
+        error::CapabilityProviderError,
+        routing::report_routing_failure,
         token::{InstanceRegistry, InstanceToken},
     },
 };
@@ -103,8 +112,66 @@ impl FrameworkCapability for IntrospectorFrameworkCapability {
     fn new_provider(
         &self,
         scope: WeakComponentInstance,
-        _target: WeakComponentInstance,
+        target: WeakComponentInstance,
     ) -> Box<dyn CapabilityProvider> {
+        lazy_static! {
+            static ref MEMORY_MONITOR: Moniker =
+                Moniker::parse_str("/core/memory_monitor").unwrap();
+        };
+        // TODO(https://fxbug.dev/318904493): Temporary workaround to prevent other components from
+        // using `Introspector` while improvements to framework capability allowlists are under way.
+        //
+        // In production, the capability is minted at `/`, then offered to `/core/memory_monitor`.
+        //
+        // In the `introspector-integration-test`, the capability is minted at some test specific
+        // realm, then exposed from `/`.
+        //
+        // All other cases are disallowed.
+        if target.moniker != *MEMORY_MONITOR && !target.moniker.is_root() {
+            return Box::new(AccessDeniedCapabilityProvider {
+                target,
+                source_moniker: scope.moniker,
+            });
+        }
         Box::new(IntrospectorCapability::new(scope.moniker.clone(), self.instance_registry.clone()))
+    }
+}
+
+// TODO(https://fxbug.dev/318904493): Remove this.
+struct AccessDeniedCapabilityProvider {
+    target: WeakComponentInstance,
+    source_moniker: Moniker,
+}
+
+#[async_trait]
+impl CapabilityProvider for AccessDeniedCapabilityProvider {
+    async fn open(
+        self: Box<Self>,
+        _task_group: TaskGroup,
+        _flags: fio::OpenFlags,
+        _relative_path: PathBuf,
+        server_end: &mut zx::Channel,
+    ) -> Result<(), CapabilityProviderError> {
+        let server_end = cm_util::channel::take_channel(server_end);
+        let Ok(target) = self.target.upgrade() else {
+            return Ok(());
+        };
+        let cap = ComponentCapability::Protocol(ProtocolDecl {
+            name: INTROSPECTOR_SERVICE.clone(),
+            source_path: None,
+        });
+        report_routing_failure(
+            &target,
+            &cap,
+            PolicyError::CapabilityUseDisallowed {
+                cap: INTROSPECTOR_SERVICE.to_string(),
+                source_moniker: ExtendedMoniker::ComponentInstance(self.source_moniker),
+                target_moniker: self.target.moniker,
+            }
+            .into(),
+            server_end,
+        )
+        .await;
+        Ok(())
     }
 }
