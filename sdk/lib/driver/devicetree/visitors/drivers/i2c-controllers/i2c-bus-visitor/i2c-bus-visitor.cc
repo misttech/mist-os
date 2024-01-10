@@ -93,6 +93,7 @@ zx::result<> I2cBusVisitor::ParseChild(I2cController& controller, fdf_devicetree
 
   fuchsia_hardware_i2c_businfo::I2CChannel channel;
   channel.address() = address;
+  channel.name() = child.name();
   FDF_LOG(DEBUG, "I2c channel added at address 0x%x to controller '%s'", address,
           parent.name().c_str());
   controller.channels.emplace_back(channel);
