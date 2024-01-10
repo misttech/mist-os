@@ -29,6 +29,7 @@ executable("bin") {
     "//src/connectivity/bluetooth/core/bt-host/transport",
     "//src/lib/fxl:fxl_cli",
     "//third_party/pigweed/backends/pw_log:printf",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }

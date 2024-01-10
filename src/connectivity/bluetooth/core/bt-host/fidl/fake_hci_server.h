@@ -8,7 +8,6 @@
 #include <fuchsia/hardware/bluetooth/cpp/fidl_test_base.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
-#include <lib/fidl/cpp/binding.h>
 #include <lib/zx/channel.h>
 
 #include <string>

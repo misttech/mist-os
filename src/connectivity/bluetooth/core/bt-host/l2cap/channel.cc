@@ -4,8 +4,6 @@
 
 #include "channel.h"
 
-#include <lib/async/default.h>
-
 #include <memory>
 #include <utility>
 

@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_interrogator.h"
 
-#include <lib/async/default.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/gap/peer_cache.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_l2cap.h"

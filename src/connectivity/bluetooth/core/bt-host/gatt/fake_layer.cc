@@ -4,8 +4,6 @@
 
 #include "fake_layer.h"
 
-#include <lib/async/default.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/gatt/remote_service.h"
 
 namespace bt::gatt::testing {

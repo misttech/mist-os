@@ -4,8 +4,6 @@
 
 #include "service_discoverer.h"
 
-#include <lib/async/default.h>
-
 #include <functional>
 
 namespace bt::sdp {

@@ -6,7 +6,6 @@
 
 #include <endian.h>
 #include <lib/async/cpp/time.h>
-#include <lib/async/default.h>
 
 #include <iterator>
 

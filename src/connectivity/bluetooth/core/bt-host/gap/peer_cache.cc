@@ -6,7 +6,6 @@
 
 #include <lib/fit/function.h>
 
-#include "lib/async/default.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/random.h"
 #include "src/connectivity/bluetooth/core/bt-host/gap/peer.h"

@@ -5,7 +5,6 @@
 #include "controller_test_double_base.h"
 
 #include <lib/async/cpp/task.h>
-#include <lib/async/default.h>
 
 namespace bt::testing {
 

@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async/default.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/status.h>
 #include <zircon/types.h>

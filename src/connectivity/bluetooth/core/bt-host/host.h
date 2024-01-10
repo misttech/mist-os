@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/bt/vendor/c/banjo.h>
+#include <lib/async/default.h>
 #include <lib/fit/function.h>
 #include <lib/fit/thread_checker.h>
 #include <zircon/types.h>

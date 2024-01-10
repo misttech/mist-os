@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/sdp/service_discoverer.h"
 
-#include <lib/async/default.h>
-
 #include <gtest/gtest.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_channel.h"

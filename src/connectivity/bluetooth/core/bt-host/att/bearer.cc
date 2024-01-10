@@ -4,7 +4,6 @@
 
 #include "bearer.h"
 
-#include <lib/async/default.h>
 #include <lib/fit/defer.h>
 
 #include <type_traits>

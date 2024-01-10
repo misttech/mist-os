@@ -4,7 +4,6 @@
 
 #include "host_server.h"
 
-#include <fuchsia/mem/cpp/fidl.h>
 #include <lib/fpromise/result.h>
 
 #include <utility>

@@ -6,7 +6,6 @@
 
 #include <gtest/gtest.h>
 
-#include "lib/async/default.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/random.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/uint128.h"

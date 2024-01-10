@@ -5,7 +5,6 @@
 #include "fake_local_address_delegate.h"
 
 #include <lib/async/cpp/task.h>
-#include <lib/async/default.h>
 
 namespace bt::hci {
 

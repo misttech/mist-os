@@ -4,8 +4,6 @@
 
 #include "server.h"
 
-#include <lib/async/default.h>
-
 #include <cstdint>
 #include <cstdio>
 

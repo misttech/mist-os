@@ -4,7 +4,6 @@
 
 #include "gatt.h"
 
-#include <lib/async/default.h>
 #include <lib/fit/defer.h>
 
 #include <unordered_map>

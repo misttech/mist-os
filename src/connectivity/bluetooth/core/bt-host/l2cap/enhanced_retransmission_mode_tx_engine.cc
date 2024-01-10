@@ -6,7 +6,6 @@
 
 #include <limits>
 
-#include "lib/async/default.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/l2cap/frame_headers.h"

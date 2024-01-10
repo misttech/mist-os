@@ -5,7 +5,6 @@
 #include "mock_channel_test.h"
 
 #include <lib/async/cpp/task.h>
-#include <lib/async/default.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
 

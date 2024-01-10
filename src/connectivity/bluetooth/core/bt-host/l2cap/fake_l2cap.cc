@@ -5,7 +5,6 @@
 #include "fake_l2cap.h"
 
 #include <lib/async/cpp/task.h>
-#include <lib/async/default.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"

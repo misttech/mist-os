@@ -6,7 +6,6 @@
 
 #include <endian.h>
 #include <lib/async/cpp/task.h>
-#include <lib/async/default.h>
 
 #include <cstdint>
 

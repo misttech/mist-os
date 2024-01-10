@@ -5,7 +5,6 @@
 #include "legacy_low_energy_scanner.h"
 
 #include <endian.h>
-#include <lib/async/default.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/log.h"

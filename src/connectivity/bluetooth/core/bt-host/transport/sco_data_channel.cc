@@ -4,7 +4,6 @@
 
 #include "sco_data_channel.h"
 
-#include <lib/async/default.h>
 #include <lib/fit/defer.h>
 
 namespace bt::hci {

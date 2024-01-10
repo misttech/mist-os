@@ -4,8 +4,6 @@
 
 #include "channel_manager.h"
 
-#include <lib/async/default.h>
-
 #include "logical_link.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/log.h"

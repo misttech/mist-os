@@ -4,8 +4,6 @@
 
 #include "client.h"
 
-#include <lib/async/default.h>
-
 #include <functional>
 #include <optional>
 

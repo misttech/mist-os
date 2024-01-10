@@ -5,7 +5,6 @@
 #include "command_channel.h"
 
 #include <endian.h>
-#include <lib/async/default.h>
 #include <lib/fit/defer.h>
 
 #include "slab_allocators.h"

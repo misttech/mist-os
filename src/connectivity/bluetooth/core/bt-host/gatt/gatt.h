@@ -8,7 +8,6 @@
 #include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 
-#include "lib/fidl/cpp/vector.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/uuid.h"
 #include "src/connectivity/bluetooth/core/bt-host/gatt/gatt_defs.h"
 #include "src/connectivity/bluetooth/core/bt-host/gatt/local_service_manager.h"

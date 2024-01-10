@@ -75,7 +75,7 @@ pw_source_set("common") {
 
   if (current_os == "fuchsia") {
     public_deps += [
-      "//sdk/lib/sys/inspect/cpp",
+      "//sdk/lib/inspect/component/cpp",
       "//zircon/system/ulib/trace",
     ]
   }

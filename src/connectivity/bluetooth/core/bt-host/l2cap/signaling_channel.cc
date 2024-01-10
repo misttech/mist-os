@@ -4,7 +4,6 @@
 
 #include "signaling_channel.h"
 
-#include <lib/async/default.h>
 #include <lib/fit/function.h>
 
 #include "channel.h"

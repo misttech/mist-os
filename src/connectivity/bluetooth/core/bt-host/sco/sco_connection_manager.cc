@@ -4,8 +4,6 @@
 
 #include "sco_connection_manager.h"
 
-#include <lib/async/default.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci/sco_connection.h"
 

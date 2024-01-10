@@ -5,7 +5,6 @@
 #include "legacy_low_energy_advertiser.h"
 
 #include <endian.h>
-#include <lib/async/default.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/assert.h"

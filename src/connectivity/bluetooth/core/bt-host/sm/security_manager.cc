@@ -10,7 +10,6 @@
 #include <utility>
 #include <variant>
 
-#include "lib/async/default.h"
 #include "lib/fit/function.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"

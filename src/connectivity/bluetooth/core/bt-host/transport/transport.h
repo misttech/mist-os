@@ -6,7 +6,6 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_TRANSPORT_TRANSPORT_H_
 
 #include <lib/async/cpp/wait.h>
-#include <lib/async/default.h>
 #include <lib/async/dispatcher.h>
 
 #include <atomic>
