@@ -252,7 +252,7 @@ Finally, update the imports to include the new Inspect libraries:
   #include <lib/fidl/cpp/binding.h>
   #include <lib/inspect/cpp/inspect.h>
   #include <lib/sys/cpp/component_context.h>
-  #include <lib/sys/inspect/cpp/component.h>
+  #include <lib/inspect/component/cpp/component.h>
   ```
 
 Run `fx build` again to rebuild the component:

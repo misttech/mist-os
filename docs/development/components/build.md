@@ -1071,7 +1071,7 @@ using [Inspect][doc-inspect]:
 
 * {C++}
 
-  1.  Your component depends on `//sdk/lib/sys/inspect/cpp`:
+  1.  Your component depends on `//sdk/lib/inspect/component/cpp`:
 
       ```gn {:.devsite-disable-click-to-copy}
       executable("bin") {
@@ -1082,14 +1082,14 @@ using [Inspect][doc-inspect]:
           "//examples/components/routing/fidl:echo",
           "//sdk/lib/sys/cpp",
           {{ '<strong>' }}# This library requires "inspect/client.shard.cml" {{ '</strong>' }}
-          {{ '<strong>' }}"//sdk/lib/sys/inspect/cpp", {{ '</strong>' }}
+          {{ '<strong>' }}"//sdk/lib/inspect/component/cpp", {{ '</strong>' }}
           "//zircon/system/ulib/async-loop:async-loop-cpp",
           "//zircon/system/ulib/async-loop:async-loop-default",
         ]
       }
       ```
 
-  1.  [`//sdk/lib/sys/inspect/cpp`][src-inspect-cpp] depends on
+  1.  [`//sdk/lib/inspect/component/cpp`][src-inspect-cpp] depends on
       [`//sdk/lib/inspect:client_includes`][src-inspect-include], which is an
       `expect_includes()` rule.
 
@@ -1153,7 +1153,7 @@ required the include:
   ```none {:.devsite-disable-click-to-copy}
   $ fx gn path $(fx get-build-dir) //examples/components/routing/cpp/echo_server //sdk/lib/inspect:client_includes --with-data
   //examples/components/echo_server:bin --[private]-->
-  //sdk/lib/sys/inspect/cpp:cpp --[data]-->
+  //sdk/lib/inspect/component/cpp --[data]-->
   //sdk/lib/inspect:client_includes
   ```
 

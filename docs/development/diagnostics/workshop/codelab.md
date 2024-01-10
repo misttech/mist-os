@@ -175,7 +175,7 @@ source_set("lib") {
   ...
   public_deps = [
     ...
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
   ]
 }
 ```
@@ -183,10 +183,10 @@ source_set("lib") {
 Next, initialize Inspect in `main.cc`:
 
 ```
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 ...
 // Immediately following the line defining "startup".
-auto inspector = std::make_unique<sys::ComponentInspector>(startup.get());
+auto inspector = std::make_unique<inspect::ComponentInspector>(async_get_default_dispatcher(), inspect::PublishOptions{});
 inspector->Health().Ok();
 ```
 
