@@ -594,6 +594,8 @@ class EventRecorder:
             return ""
         if payload.start_timestamp is not None:
             return "Starting Run"
+        elif payload.load_config is not None:
+            return "Loaded config: " + str(payload.load_config)
         elif payload.parse_flags is not None:
             return "Parsed flags: " + str(payload.parse_flags)
         elif payload.process_env is not None:
