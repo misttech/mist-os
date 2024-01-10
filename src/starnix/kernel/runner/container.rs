@@ -3,15 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{init_common_devices, parse_features, run_container_features},
-    execution::{
-        create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
-        expose_root, serve_component_runner, serve_container_controller, serve_graphical_presenter,
-    },
-    fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
-    task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task, TaskBuilder},
-    time::utc::update_utc_clock,
-    vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount},
+    expose_root, serve_component_runner, serve_container_controller, serve_graphical_presenter,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -35,6 +27,16 @@ use fuchsia_zircon::{
 };
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
+use starnix_core::{
+    device::{init_common_devices, parse_features, run_container_features},
+    execution::{
+        create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
+    },
+    fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
+    task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task, TaskBuilder},
+    time::utc::update_utc_clock,
+    vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount},
+};
 use starnix_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_category_starnix, trace_duration,
@@ -317,7 +319,7 @@ async fn create_container(
     let features = parse_features(&config.features)?;
     let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
     if features.android_serialno {
-        match crate::device::get_serial_number().await {
+        match starnix_core::device::get_serial_number().await {
             Ok(serial) => {
                 kernel_cmdline.extend(b" androidboot.serialno=");
                 kernel_cmdline.extend(&*serial);
@@ -532,12 +534,12 @@ async fn wait_for_init_file(
 #[cfg(test)]
 mod test {
     use super::wait_for_init_file;
-    use crate::{
+    use fuchsia_async as fasync;
+    use futures::{SinkExt, StreamExt};
+    use starnix_core::{
         testing::{create_kernel_and_task, create_kernel_task_and_unlocked},
         vfs::FdNumber,
     };
-    use fuchsia_async as fasync;
-    use futures::{SinkExt, StreamExt};
     use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, CLONE_FS};
 
     #[fuchsia::test]

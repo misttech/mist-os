@@ -1503,7 +1503,6 @@ impl CurrentTask {
 
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
     /// exit signal as in clone().
-    #[cfg(test)]
     pub fn clone_task_for_test<L>(
         &self,
         locked: &mut Locked<'_, L>,

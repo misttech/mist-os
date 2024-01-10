@@ -22,5 +22,4 @@ pub mod time;
 pub mod vdso;
 pub mod vfs;
 
-#[cfg(test)]
 pub mod testing;

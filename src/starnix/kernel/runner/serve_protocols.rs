@@ -2,17 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    execution::execute_task_with_prerun_result,
-    fs::{devpts::create_main_and_replica, fuchsia::create_fuchsia_pipe},
-    task::{CurrentTask, ExitStatus, Kernel},
-    vfs::{
-        buffers::{VecInputBuffer, VecOutputBuffer},
-        file_server::serve_file_at,
-        socket::VsockSocket,
-        FdFlags, FileHandle,
-    },
-};
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner as frunner;
@@ -24,6 +13,17 @@ use fuchsia_async::{
 };
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, TryStreamExt};
+use starnix_core::{
+    execution::execute_task_with_prerun_result,
+    fs::{devpts::create_main_and_replica, fuchsia::create_fuchsia_pipe},
+    task::{CurrentTask, ExitStatus, Kernel},
+    vfs::{
+        buffers::{VecInputBuffer, VecOutputBuffer},
+        file_server::serve_file_at,
+        socket::VsockSocket,
+        FdFlags, FileHandle,
+    },
+};
 use starnix_logging::log_error;
 use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, sync::Arc};

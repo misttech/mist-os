@@ -22,9 +22,10 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-use starnix_core::{
-    execution::{Container, ContainerServiceConfig},
-    mm::{init_usercopy, zxio_maybe_faultable_copy_impl},
+use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
+use starnix_kernel_runner::{
+    create_component_from_stream, serve_component_runner, serve_container_controller, Container,
+    ContainerServiceConfig,
 };
 use starnix_logging::{log_debug, trace_category_starnix, trace_instant, trace_name_start_kernel};
 
@@ -101,7 +102,7 @@ async fn build_container(
     stream: frunner::ComponentRunnerRequestStream,
     returned_config: &mut Option<ContainerServiceConfig>,
 ) -> Result<Container, Error> {
-    let (container, config) = starnix_core::execution::create_component_from_stream(stream).await?;
+    let (container, config) = create_component_from_stream(stream).await?;
     *returned_config = Some(config);
     Ok(container)
 }
@@ -173,20 +174,14 @@ async fn main() -> Result<(), Error> {
                 }
             }
             KernelServices::ComponentRunner(stream) => {
-                starnix_core::execution::serve_component_runner(
-                    stream,
-                    &container.wait().await.system_task(),
-                )
-                .await
-                .expect("failed to start component runner");
+                serve_component_runner(stream, &container.wait().await.system_task())
+                    .await
+                    .expect("failed to start component runner");
             }
             KernelServices::ContainerController(stream) => {
-                starnix_core::execution::serve_container_controller(
-                    stream,
-                    &container.wait().await.system_task(),
-                )
-                .await
-                .expect("failed to start container controller");
+                serve_container_controller(stream, &container.wait().await.system_task())
+                    .await
+                    .expect("failed to start container controller");
             }
         }
     })

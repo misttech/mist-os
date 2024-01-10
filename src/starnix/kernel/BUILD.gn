@@ -41,6 +41,7 @@ rustc_binary("starnix_kernel_bin") {
   deps = [
     ":android_5.10_kernel_config",
     ":starnix_core",
+    ":starnix_kernel_runner",
     ":starnix_logging",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
@@ -127,11 +128,8 @@ rustc_library("starnix_core") {
     "device/uinput.rs",
     "device/zram.rs",
     "dynamic_thread_spawner.rs",
-    "execution/component_runner.rs",
-    "execution/container.rs",
     "execution/mod.rs",
     "execution/restricted_executor.rs",
-    "execution/serve_protocols.rs",
     "execution/shared.rs",
     "fs/devpts.rs",
     "fs/devtmpfs.rs",
@@ -276,14 +274,11 @@ rustc_library("starnix_core") {
 
   deps = [
     ":perfetto_consumer_proto",
-    ":starnix_kernel_config",
     ":starnix_lifecycle",
     ":starnix_logging",
     ":starnix_sync",
     ":vdso-data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
@@ -301,7 +296,6 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
-    "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.starnix.gralloc:fuchsia.starnix.gralloc_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
@@ -356,7 +350,6 @@ rustc_library("starnix_core") {
     "//src/storage/ext4/lib/metadata",
     "//src/storage/ext4/read-only:ext4-read-only",
     "//src/storage/lib/vfs/rust:vfs",
-    "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
@@ -426,6 +419,57 @@ rustc_library("starnix_core") {
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
   }
+
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+}
+
+rustc_library("starnix_kernel_runner") {
+  name = "starnix_kernel_runner"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "runner/lib.rs"
+
+  # TODO(https://fxbug.dev/107698): Re-enable starnix in these environments.
+  exclude_toolchain_tags = [
+    "asan",
+    "hwasan",
+  ]
+
+  sources = [
+    "runner/component_runner.rs",
+    "runner/container.rs",
+    "runner/lib.rs",
+    "runner/serve_protocols.rs",
+  ]
+
+  deps = [
+    ":starnix_core",
+    ":starnix_kernel_config",
+    ":starnix_logging",
+    ":starnix_sync",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
+    "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
+    "//src/graphics/lib/magma/src/libmagma",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-uapi",
+    "//src/sys/lib/runner",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:bstr",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:rand",
+  ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
@@ -691,6 +735,7 @@ fuchsia_unittest_package("starnix-tests") {
     ":starnix-test-files",
     ":starnix_core_test",
     ":starnix_kernel_bin_test",
+    ":starnix_kernel_runner_test",
     "//src/starnix/examples/hello_starnix:bin",
   ]
   test_specs = {
