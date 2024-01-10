@@ -144,20 +144,21 @@ foreach(test, shard_test_list) {
 _tests = [
   {
     name = "flatland_benchmark"
-    expected_metric_filename = "fuchsia.flatland_latency.txt"
+    expected_metric_filenames = [ "fuchsia.flatland_latency.txt" ]
   },
   {
     name = "input_latency_benchmark"
-    expected_metric_filename = "fuchsia.input_latency.simplest_app.txt"
+    expected_metric_filenames = [ "fuchsia.input_latency.simplest_app.txt" ]
     transport = "sl4f"
   },
   {
     name = "perf_publish_example"
-    expected_metric_filename = "fuchsia.example.txt"
+    expected_metric_filenames = [ "fuchsia.example.txt" ]
     libraries = [ "//src/performance/lib/perf_publish" ]
   },
   {
     name = "perftest_trace_events_test"
+    expected_metric_filenames = []
     libraries = [ "//src/performance/lib/trace_processing" ]
   },
 ]
@@ -170,8 +171,10 @@ foreach(test, _tests) {
     python_perf_test(_test_name) {
       main_source = "test/${_name}.py"
       forward_variables_from(test, [ "transport" ])
-      if (defined(test.expected_metric_filename)) {
-        expected_metric_names_filepaths = [ "//src/tests/end_to_end/perf/expected_metric_names/${test.expected_metric_filename}" ]
+      expected_metric_names_filepaths = []
+      foreach(filename, test.expected_metric_filenames) {
+        expected_metric_names_filepaths +=
+            [ "//src/tests/end_to_end/perf/expected_metric_names/${filename}" ]
       }
       libraries =
           [ "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test" ]

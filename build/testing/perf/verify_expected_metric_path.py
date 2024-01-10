@@ -18,8 +18,8 @@ def main():
     parser.add_argument(
         "--expected-metric-names-filepath",
         help="Path to the expected metrics name file",
-        required=True,
-        nargs="+",
+        nargs="*",
+        default=[],
     )
     parser.add_argument(
         "--output-file", help="Path to the verification file", required=True
