@@ -10,8 +10,9 @@ use {
     diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, TreeAssertion},
     diagnostics_hierarchy::DiagnosticsHierarchy,
     diagnostics_reader::{ArchiveReader, Inspect},
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
-    fidl_fuchsia_paver as fpaver,
+    fidl_fuchsia_boot as fboot,
+    fidl_fuchsia_feedback::FileReportResults,
+    fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_paver as fpaver,
     fidl_fuchsia_pkg::{self as fpkg, PackageCacheRequestStream, PackageResolverRequestStream},
     fidl_fuchsia_update::{
         AttemptsMonitorMarker, AttemptsMonitorRequest, AttemptsMonitorRequestStream,
@@ -316,9 +317,9 @@ impl TestEnvBuilder {
         });
 
         // Set up crash reporter service.
-        let crash_reporter = Arc::new(
-            self.crash_reporter.unwrap_or_else(|| MockCrashReporterService::new(|_| Ok(()))),
-        );
+        let crash_reporter = Arc::new(self.crash_reporter.unwrap_or_else(|| {
+            MockCrashReporterService::new(|_| Ok(FileReportResults::default()))
+        }));
         svc.add_fidl_service(move |stream| {
             fasync::Task::spawn(Arc::clone(&crash_reporter).run_crash_reporter_service(stream))
                 .detach()
@@ -1943,7 +1944,7 @@ fn assert_signature(report: CrashReport, expected_signature: &str) {
 /// When we fail with an installation error, we should file a crash report.
 #[fasync::run_singlethreaded(test)]
 async fn test_crash_report_installation_error() {
-    let (hook, mut recv) = ThrottleHook::new(Ok(()));
+    let (hook, mut recv) = ThrottleHook::new(Ok(FileReportResults::default()));
     let env = TestEnvBuilder::new()
         .default_with_response(OmahaResponse::Update)
         .installer(MockUpdateInstallerService::with_response(Err(
@@ -1981,7 +1982,7 @@ async fn test_crash_report_installation_error() {
 /// When we fail 5 times to check for updates, we should file a crash report.
 #[fasync::run_singlethreaded(test)]
 async fn test_crash_report_consecutive_failed_update_checks() {
-    let (hook, mut recv) = ThrottleHook::new(Ok(()));
+    let (hook, mut recv) = ThrottleHook::new(Ok(FileReportResults::default()));
     let env = TestEnvBuilder::new()
         .default_with_response(OmahaResponse::InvalidResponse)
         .crash_reporter(MockCrashReporterService::new(hook))

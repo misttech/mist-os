@@ -237,7 +237,7 @@ mod tests {
     use crate::installer::InstallerFailure;
     use anyhow::anyhow;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_feedback::CrashReport;
+    use fidl_fuchsia_feedback::{CrashReport, FileReportResults};
     use fuchsia_async::{self as fasync, Task};
     use fuchsia_inspect::Inspector;
     use futures::channel::mpsc;
@@ -353,7 +353,7 @@ mod tests {
     async fn test_installation_error_crash_report() {
         let mut observer = new_test_observer().await;
 
-        let (hook, mut recv) = ThrottleHook::new(Ok(()));
+        let (hook, mut recv) = ThrottleHook::new(Ok(FileReportResults::default()));
         let mock = Arc::new(MockCrashReporterService::new(hook));
         let (proxy, _fidl_server) = mock.spawn_crash_reporter_service();
         let mut time_source = MockTimeSource::new_from_now();
@@ -404,7 +404,7 @@ mod tests {
     async fn test_consecutive_failed_update_checks_crash_report() {
         let mut observer = new_test_observer().await;
 
-        let (hook, mut recv) = ThrottleHook::new(Ok(()));
+        let (hook, mut recv) = ThrottleHook::new(Ok(FileReportResults::default()));
         let mock = Arc::new(MockCrashReporterService::new(hook));
         let (proxy, _fidl_server) = mock.spawn_crash_reporter_service();
         let _handler = Task::local(

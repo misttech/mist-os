@@ -23,15 +23,21 @@ pub use fidl_fuchsia_feedback::CrashReport;
 
 /// A call hook that can be used to inject responses into the CrashReporter service.
 pub trait Hook: Send + Sync {
-    /// Describes what the file call will return.
-    fn file(&self, report: CrashReport) -> BoxFuture<'static, Result<(), Status>>;
+    /// Describes what the file_report call will return.
+    fn file_report(
+        &self,
+        report: CrashReport,
+    ) -> BoxFuture<'static, Result<FileReportResults, FilingError>>;
 }
 
 impl<F> Hook for F
 where
-    F: Fn(CrashReport) -> Result<(), Status> + Send + Sync,
+    F: Fn(CrashReport) -> Result<FileReportResults, FilingError> + Send + Sync,
 {
-    fn file(&self, report: CrashReport) -> BoxFuture<'static, Result<(), Status>> {
+    fn file_report(
+        &self,
+        report: CrashReport,
+    ) -> BoxFuture<'static, Result<FileReportResults, FilingError>> {
         future::ready(self(report)).boxed()
     }
 }
@@ -56,7 +62,7 @@ impl MockCrashReporterService {
         (proxy, task)
     }
 
-    /// Serves fuchsia.feedback/CrashReporter.File requests on the given request stream.
+    /// Serves fuchsia.feedback/CrashReporter.FileReport requests on the given request stream.
     pub async fn run_crash_reporter_service(
         self: Arc<Self>,
         mut stream: CrashReporterRequestStream,
@@ -64,12 +70,15 @@ impl MockCrashReporterService {
         while let Some(event) = stream.try_next().await.expect("received CrashReporter request") {
             match event {
                 fidl_fuchsia_feedback::CrashReporterRequest::File { report, responder } => {
-                    let res = self.call_hook.file(report).await.map_err(|s| s.into_raw());
-                    responder.send(res).unwrap();
+                    let res = self.call_hook.file_report(report).await;
+                    match res {
+                        Err(_) => responder.send(Err(Status::NOT_SUPPORTED.into_raw())).unwrap(),
+                        Ok(_) => responder.send(Ok(())).unwrap(),
+                    }
                 }
 
                 fidl_fuchsia_feedback::CrashReporterRequest::FileReport { report, responder } => {
-                    let res = self.call_hook.file(report).await;
+                    let res = self.call_hook.file_report(report).await;
                     match res {
                         Err(_) => responder.send(Err(FilingError::InvalidArgsError)).unwrap(),
                         Ok(_) => responder.send(Ok(&FileReportResults::default())).unwrap(),
@@ -80,25 +89,30 @@ impl MockCrashReporterService {
     }
 }
 
-/// Hook that can be used to yield control of the `file` call to the caller. The caller can
-/// control when `file` calls complete by pulling from the mpsc::Receiver.
+/// Hook that can be used to yield control of the `file_report` call to the caller. The caller can
+/// control when `file_report` calls complete by pulling from the mpsc::Receiver.
 pub struct ThrottleHook {
-    file_response: Result<(), Status>,
+    file_response: Result<FileReportResults, FilingError>,
     sender: Arc<Mutex<mpsc::Sender<CrashReport>>>,
 }
 
 impl ThrottleHook {
-    pub fn new(file_response: Result<(), Status>) -> (Self, mpsc::Receiver<CrashReport>) {
+    pub fn new(
+        file_response: Result<FileReportResults, FilingError>,
+    ) -> (Self, mpsc::Receiver<CrashReport>) {
         // We deliberately give a capacity of 1 so that the caller must pull from the
-        // receiver in order to unblock the `file` call.
+        // receiver in order to unblock the `file_report` call.
         let (sender, recv) = mpsc::channel(0);
         (Self { file_response, sender: Arc::new(Mutex::new(sender)) }, recv)
     }
 }
 impl Hook for ThrottleHook {
-    fn file(&self, report: CrashReport) -> BoxFuture<'static, Result<(), Status>> {
+    fn file_report(
+        &self,
+        report: CrashReport,
+    ) -> BoxFuture<'static, Result<FileReportResults, FilingError>> {
         let sender = Arc::clone(&self.sender);
-        let file_response = self.file_response;
+        let file_response = self.file_response.clone();
 
         async move {
             sender.lock().await.send(report).await.unwrap();
@@ -118,26 +132,22 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_crash_reporter() {
-        let mock = Arc::new(MockCrashReporterService::new(|_| Ok(())));
+        let mock = Arc::new(MockCrashReporterService::new(|_| Ok(FileReportResults::default())));
         let (proxy, _server) = mock.spawn_crash_reporter_service();
 
-        let file_result = proxy.file(CrashReport::default()).await.expect("made fidl call");
+        let file_result = proxy.file_report(CrashReport::default()).await.expect("made fidl call");
 
-        assert_eq!(file_result, Ok(()));
+        assert_eq!(file_result, Ok(FileReportResults::default()));
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_crash_reporter_fails() {
-        let mock = Arc::new(MockCrashReporterService::new(|_| Err(Status::NOT_FOUND)));
+        let mock = Arc::new(MockCrashReporterService::new(|_| Err(FilingError::InvalidArgsError)));
         let (proxy, _server) = mock.spawn_crash_reporter_service();
 
-        let file_result = proxy
-            .file(CrashReport::default())
-            .await
-            .expect("made fidl call")
-            .map_err(Status::from_raw);
+        let file_result = proxy.file_report(CrashReport::default()).await.expect("made fidl call");
 
-        assert_eq!(file_result, Err(Status::NOT_FOUND));
+        assert_eq!(file_result, Err(FilingError::InvalidArgsError));
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -146,13 +156,13 @@ mod tests {
         let called_clone = Arc::clone(&called);
         let mock = Arc::new(MockCrashReporterService::new(move |_| {
             called_clone.fetch_add(1, Ordering::SeqCst);
-            Ok(())
+            Ok(FileReportResults::default())
         }));
         let (proxy, _server) = mock.spawn_crash_reporter_service();
 
-        let file_result = proxy.file(CrashReport::default()).await.expect("made fidl call");
+        let file_result = proxy.file_report(CrashReport::default()).await.expect("made fidl call");
 
-        assert_eq!(file_result, Ok(()));
+        assert_eq!(file_result, Ok(FileReportResults::default()));
         assert_eq!(called.load(Ordering::SeqCst), 1);
     }
 }

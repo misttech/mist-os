@@ -162,13 +162,14 @@ pub fn assert_signature(report: CrashReport, expected_signature: &str) {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use fidl_fuchsia_feedback::{FileReportResults, FilingError};
     use fuchsia_async::{self as fasync, Task};
     use mock_crash_reporter::{MockCrashReporterService, ThrottleHook};
     use omaha_client::time::MockTimeSource;
     use std::sync::Arc;
 
     /// Verifies the file function behaves as expected.
-    async fn test_file_crash_report(res: Result<(), zx::Status>) {
+    async fn test_file_crash_report(res: Result<FileReportResults, FilingError>) {
         let (hook, mut recv) = ThrottleHook::new(res);
         let mock = Arc::new(MockCrashReporterService::new(hook));
         let (proxy, _crash_report_server) = mock.spawn_crash_reporter_service();
@@ -183,19 +184,19 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_file_crash_report_success() {
-        test_file_crash_report(Ok(())).await
+        test_file_crash_report(Ok(FileReportResults::default())).await
     }
 
     /// We should ignore any errors from the CrashReporter service.
     #[fasync::run_singlethreaded(test)]
     async fn test_file_crash_report_error_ignored() {
-        test_file_crash_report(Err(zx::Status::NOT_FOUND)).await
+        test_file_crash_report(Err(FilingError::InvalidArgsError)).await
     }
 
     /// Verifies installation error reports are deduplicated over 24 hour periods.
     #[fasync::run_singlethreaded(test)]
     async fn test_installation_error() {
-        let (hook, mut recv) = ThrottleHook::new(Ok(()));
+        let (hook, mut recv) = ThrottleHook::new(Ok(FileReportResults::default()));
         let mock = Arc::new(MockCrashReporterService::new(hook));
         let (proxy, _fidl_server) = mock.spawn_crash_reporter_service();
         let mut time_source = MockTimeSource::new_from_now();
@@ -232,7 +233,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_consecutive_failed_update_checks() {
-        let (hook, mut recv) = ThrottleHook::new(Ok(()));
+        let (hook, mut recv) = ThrottleHook::new(Ok(FileReportResults::default()));
         let mock = Arc::new(MockCrashReporterService::new(hook));
         let (proxy, _fidl_server) = mock.spawn_crash_reporter_service();
         let (mut ch, fut) = handle_crash_reports_impl(HandleCrashReportsParams {
@@ -264,7 +265,7 @@ mod tests {
     /// Tests that the number of pending crash reports is correctly bounded.
     #[fasync::run_singlethreaded(test)]
     async fn test_max_pending_crash_reports() {
-        let (hook, mut recv) = ThrottleHook::new(Ok(()));
+        let (hook, mut recv) = ThrottleHook::new(Ok(FileReportResults::default()));
         let mock = Arc::new(MockCrashReporterService::new(hook));
         let (proxy, _fidl_server) = mock.spawn_crash_reporter_service();
         let (mut ch, fut) = handle_crash_reports_impl(HandleCrashReportsParams {
@@ -300,7 +301,7 @@ mod tests {
     /// terminates.
     #[fasync::run_singlethreaded(test)]
     async fn test_ch_dropped() {
-        let mock = Arc::new(MockCrashReporterService::new(|_| Ok(())));
+        let mock = Arc::new(MockCrashReporterService::new(|_| Ok(FileReportResults::default())));
         let (proxy, _fidl_server) = mock.spawn_crash_reporter_service();
         let (ch, fut) = handle_crash_reports_impl(HandleCrashReportsParams {
             proxy,
