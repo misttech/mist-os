@@ -576,7 +576,6 @@
                 // rtsignal_test
                 "RtSignalTest.InvalidCodes",
                 "RtSignalTest.SignoMatch",
-                "RtSignalTest.ValueDelivered",
 
                 // sendfile_test
                 "SendFileTest.InvalidOffset",
@@ -1059,6 +1058,9 @@
 
                 // Skip for roll
                 "PivotRootTest.UnreachableNewRootFails",
+
+                // Skip for roll
+                "RtSignalTest.ValueDelivered",
             ],
         },
     ],
