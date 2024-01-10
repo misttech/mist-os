@@ -265,17 +265,6 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
-			name: "ffx deps",
-			flags: testsharderFlags{
-				ffxDeps: true,
-			},
-			testSpecs: []build.TestSpec{
-				fuchsiaTestSpec("foo"),
-				fuchsiaTestSpec("bar"),
-				fuchsiaTestSpec("baz"),
-			},
-		},
-		{
 			name: "multiply affected test",
 			flags: testsharderFlags{
 				affectedTestsMultiplyThreshold: 3,
@@ -533,17 +522,15 @@ func TestExecute(t *testing.T) {
 				// correct number of affected tests even with extra whitespace.
 				tc.flags.affectedTestsPath = writeTempFile(t, strings.Join(tc.affectedTests, "\n")+"\n")
 			}
-			if tc.flags.ffxDeps {
-				sdkManifest := map[string]interface{}{
-					"atoms": []interface{}{},
-				}
-				sdkManifestPath := filepath.Join(tc.flags.buildDir, "sdk", "manifest", "core")
-				if err := os.MkdirAll(filepath.Dir(sdkManifestPath), os.ModePerm); err != nil {
-					t.Fatal(err)
-				}
-				if err := jsonutil.WriteToFile(sdkManifestPath, sdkManifest); err != nil {
-					t.Fatal(err)
-				}
+			sdkManifest := map[string]interface{}{
+				"atoms": []interface{}{},
+			}
+			sdkManifestPath := filepath.Join(tc.flags.buildDir, "sdk", "manifest", "core")
+			if err := os.MkdirAll(filepath.Dir(sdkManifestPath), os.ModePerm); err != nil {
+				t.Fatal(err)
+			}
+			if err := jsonutil.WriteToFile(sdkManifestPath, sdkManifest); err != nil {
+				t.Fatal(err)
 			}
 			// Write test-list.json.
 			if err := jsonutil.WriteToFile(

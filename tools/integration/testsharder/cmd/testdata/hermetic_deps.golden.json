@@ -59,7 +59,8 @@
         },
         "deps": [
             "images.json",
-            "repo_AEMU"
+            "repo_AEMU",
+            "sdk/manifest/core"
         ],
         "pkg_repo": "repo_AEMU",
         "timeout_secs": 0,

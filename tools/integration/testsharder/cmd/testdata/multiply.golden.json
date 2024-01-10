@@ -44,6 +44,10 @@
                 "device_type": "AEMU"
             }
         },
+        "deps": [
+            "images.json",
+            "sdk/manifest/core"
+        ],
         "timeout_secs": 614,
         "summary": {
             "tests": null

@@ -68,7 +68,6 @@ if (is_host) {
     "affected tests",
     "arbitrary dimensions",
     "boot test with modifiers",
-    "ffx_deps",
     "hermetic deps",
     "max shards per env",
     "mixed device types",
