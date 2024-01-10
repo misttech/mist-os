@@ -11,7 +11,6 @@ use crate::{
         entry::DirectoryEntry,
         entry_container,
         mutable::entry_constructor::NewEntryType,
-        DirectoryOptions,
     },
     execution_scope::ExecutionScope,
     node::OpenNode,
@@ -49,7 +48,9 @@ impl ImmutableConnection {
         // Ensure we close the directory if we fail to create the connection.
         let directory = OpenNode::new(directory as Arc<dyn entry_container::Directory>);
 
-        let connection = Self::new(scope.clone(), directory, protocols.to_directory_options()?);
+        let connection = ImmutableConnection {
+            base: BaseConnection::<Self>::new(scope, directory, protocols.to_directory_options()?),
+        };
 
         // If we fail to send the task to the executor, it is probably shut down or is in the
         // process of shutting down (this is the only error state currently).  So there is nothing
@@ -67,14 +68,6 @@ impl ImmutableConnection {
 impl DerivedConnection for ImmutableConnection {
     type Directory = dyn entry_container::Directory;
     const MUTABLE: bool = false;
-
-    fn new(
-        scope: ExecutionScope,
-        directory: OpenNode<Self::Directory>,
-        options: DirectoryOptions,
-    ) -> Self {
-        ImmutableConnection { base: BaseConnection::<Self>::new(scope, directory, options) }
-    }
 
     fn entry_not_found(
         _scope: ExecutionScope,

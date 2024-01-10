@@ -46,12 +46,6 @@ pub trait DerivedConnection: Send + Sync {
     /// Whether these connections support mutable connections.
     const MUTABLE: bool;
 
-    fn new(
-        scope: ExecutionScope,
-        directory: OpenNode<Self::Directory>,
-        options: DirectoryOptions,
-    ) -> Self;
-
     fn entry_not_found(
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,

@@ -14,7 +14,6 @@ use crate::{
         entry::DirectoryEntry,
         entry_container::MutableDirectory,
         mutable::entry_constructor::NewEntryType,
-        DirectoryOptions,
     },
     execution_scope::ExecutionScope,
     name::validate_name,
@@ -42,14 +41,6 @@ pub struct MutableConnection {
 impl DerivedConnection for MutableConnection {
     type Directory = dyn MutableDirectory;
     const MUTABLE: bool = true;
-
-    fn new(
-        scope: ExecutionScope,
-        directory: OpenNode<Self::Directory>,
-        options: DirectoryOptions,
-    ) -> Self {
-        MutableConnection { base: BaseConnection::<Self>::new(scope, directory, options) }
-    }
 
     fn entry_not_found(
         scope: ExecutionScope,
@@ -79,7 +70,9 @@ impl MutableConnection {
         // Ensure we close the directory if we fail to prepare the connection.
         let directory = OpenNode::new(directory as Arc<dyn MutableDirectory>);
 
-        let connection = Self::new(scope, directory, protocols.to_directory_options()?);
+        let connection = MutableConnection {
+            base: BaseConnection::<Self>::new(scope, directory, protocols.to_directory_options()?),
+        };
 
         let object_request = object_request.take();
         Ok(async move {
