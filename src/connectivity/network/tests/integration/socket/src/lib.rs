@@ -44,7 +44,9 @@ use net_types::{
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, TestInterface};
 use netstack_testing_common::{
     constants::ipv6 as ipv6_consts,
-    devices, ndp, ping,
+    devices,
+    interfaces::TestInterfaceExt as _,
+    ndp, ping,
     realms::{KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
     Result,
 };
@@ -2522,6 +2524,7 @@ async fn with_multinic_and_peer_networks<
                 })
                 .await
                 .expect("configure address");
+            peer_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
             (peer, Interface { iface: peer_iface, ip: peer_ip.into() })
         };
         let multinic_interface = {
@@ -2535,6 +2538,7 @@ async fn with_multinic_and_peer_networks<
                 })
                 .await
                 .expect("configure address");
+            multinic_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
             Interface { iface: multinic_iface, ip: multinic_ip.into() }
         };
         Network { peer_realm, peer_interface, _network: network, multinic_interface }
