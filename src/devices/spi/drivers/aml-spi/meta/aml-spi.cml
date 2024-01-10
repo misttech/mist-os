@@ -13,6 +13,7 @@
         compat: "driver/aml-spi.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
+        colocate: "true",
     },
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
