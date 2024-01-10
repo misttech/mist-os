@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/aml-gpu.so",
         bind: "meta/bind/aml-gpu.bindbc",
         colocate: "false",
-        compat: "driver/aml-gpu.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
@@ -21,6 +20,7 @@
     use: [
         { service: "fuchsia.hardware.registers.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.driver.compat.Service" },
         { protocol: "fuchsia.kernel.MmioResource" },
     ],
     expose: [

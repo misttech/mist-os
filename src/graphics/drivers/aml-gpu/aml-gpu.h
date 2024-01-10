@@ -7,7 +7,9 @@
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/cpp/completion.h>
@@ -15,8 +17,6 @@
 #include <memory>
 #include <optional>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <soc/aml-common/aml-registers.h>
 
 constexpr uint32_t kPwrKey = 0x14;
@@ -62,20 +62,15 @@ typedef struct aml_pll_dev aml_pll_dev_t;
 namespace aml_gpu {
 class TestAmlGpu;
 
-class AmlGpu;
-using DdkDeviceType = ddk::Device<AmlGpu>;
-
-class AmlGpu final : public DdkDeviceType,
-                     public fdf::WireServer<fuchsia_hardware_gpu_mali::ArmMali>,
-                     public ddk::EmptyProtocol<ZX_PROTOCOL_GPU_THERMAL> {
+class AmlGpu final : public fdf::DriverBase,
+                     public fdf::WireServer<fuchsia_hardware_gpu_mali::ArmMali> {
  public:
-  AmlGpu(zx_device_t* parent);
+  AmlGpu(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
   ~AmlGpu();
 
-  zx_status_t Bind();
-
-  void DdkRelease() { delete this; }
+  zx::result<> Start() override;
+  void Stop() override;
 
   void GetProperties(fdf::Arena& arena, GetPropertiesCompleter::Sync& completer) override;
   void EnterProtectedMode(fdf::Arena& arena, EnterProtectedModeCompleter::Sync& completer) override;
@@ -100,6 +95,9 @@ class AmlGpu final : public DdkDeviceType,
 
   ddk::PDevFidl pdev_;
   fidl::Arena<> arena_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+
   fuchsia_hardware_gpu_mali::wire::MaliProperties properties_;
 
   std::optional<fdf::MmioBuffer> hiu_buffer_;
@@ -113,11 +111,10 @@ class AmlGpu final : public DdkDeviceType,
   std::optional<fdf::MmioBuffer> hiu_dev_;
   std::unique_ptr<aml_pll_dev_t> gp0_pll_dev_;
   int32_t current_clk_source_ = -1;
-  // /dev/diagnostics/class/gpu-thermal/000.inspect
   inspect::Inspector inspector_;
+  std::unique_ptr<inspect::ComponentInspector> component_inspector_;
   // bootstrap/driver_manager:root/aml-gpu
   inspect::Node root_;
-  fdf::OutgoingDirectory outgoing_dir_;
   // Signaled when the loop is shutdown.
   libsync::Completion loop_shutdown_completion_;
   fdf::UnsynchronizedDispatcher loop_dispatcher_;
