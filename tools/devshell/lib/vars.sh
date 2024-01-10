@@ -300,7 +300,7 @@ function fx-change-build-dir {
   local -r pb_path="$(_query_product_bundle_path)"
   # Only set product bundle path if a product bundle is produced by the build.
   if [[ -n "${pb_path}" ]]; then
-    json-config-set "${FUCHSIA_BUILD_DIR}.json" "product.path" "${pb_path}"
+    json-config-set "${FUCHSIA_BUILD_DIR}.json" "product.path" "\$BUILD_DIR/${pb_path}"
   fi
 }
 
