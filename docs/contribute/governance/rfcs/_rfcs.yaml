@@ -3075,3 +3075,16 @@
   reviewers: ['abarth@google.com', 'crjohns@google.com', 'markdittmer@google.com', 'miguelfrde@google.com', 'phosek@google.com', 'surajmalhotra@google.com', 'ypomortsev@google.com']
   submitted: '2023-10-16'
   reviewed: ''
+
+- name: 'RFC-0236'
+  title: 'VMO Snapshot-Modified Clone'
+  short_description: 'The objective is to introduce a new VMO child type that allows a snapshot to be taken that captures any modified pages in a pager-backed VMO.'
+  authors: ['sagebarreda@google.com']
+  file: '0236_vmo_snapshot_modified_clone.md'
+  area: ['Kernel']
+  issue: ['123742']
+  gerrit_change_id: ['883471']
+  status: 'Accepted'
+  reviewers: ['cpu@google.com', 'rashaeqbal@google.com', 'jamesr@google.com']
+  submitted: '2023-07-20'
+  reviewed: '2023-12-12'
