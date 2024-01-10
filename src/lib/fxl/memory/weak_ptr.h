@@ -10,7 +10,7 @@
 #define SRC_LIB_FXL_MEMORY_WEAK_PTR_H_
 
 #include <inttypes.h>
-#include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
 
 #include <cstddef>
 #include <utility>
@@ -77,12 +77,12 @@ class WeakPtr {
   T* get() const { return *this ? ptr_ : nullptr; }
 
   T& operator*() const {
-    FX_DCHECK(*this);
+    ZX_DEBUG_ASSERT(*this);
     return *get();
   }
 
   T* operator->() const {
-    FX_DCHECK(*this);
+    ZX_DEBUG_ASSERT(*this);
     return get();
   }
 
@@ -145,16 +145,16 @@ class WeakPtr {
 template <typename T>
 class WeakPtrFactory {
  public:
-  explicit WeakPtrFactory(T* ptr) : ptr_(ptr) { FX_DCHECK(ptr_); }
+  explicit WeakPtrFactory(T* ptr) : ptr_(ptr) { ZX_DEBUG_ASSERT(ptr_); }
   ~WeakPtrFactory() {
     InvalidateWeakPtrs();
-    FX_DCHECK(Poison());
+    ZX_DEBUG_ASSERT(Poison());
   }
 
   // Gets a new weak pointer, which will be valid until either
   // |InvalidateWeakPtrs()| is called or this object is destroyed.
   WeakPtr<T> GetWeakPtr() {
-    FX_DCHECK(reinterpret_cast<uintptr_t>(ptr_) != kPoisonedPointer);
+    ZX_DEBUG_ASSERT(reinterpret_cast<uintptr_t>(ptr_) != kPoisonedPointer);
     if (!flag_)
       flag_ = MakeRefCounted<internal::WeakPtrFlag>();
     return WeakPtr<T>(ptr_, flag_.Clone());

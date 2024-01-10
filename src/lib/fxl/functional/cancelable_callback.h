@@ -6,7 +6,7 @@
 #define SRC_LIB_FXL_FUNCTIONAL_CANCELABLE_CALLBACK_H_
 
 #include <lib/fit/function.h>
-#include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
 
 #include <functional>
 
@@ -50,7 +50,7 @@ class CancelableCallback<void(Args...)> {
 
   explicit CancelableCallback(fit::function<void(Args...)> callback)
       : callback_(std::move(callback)), weak_ptr_factory_(this) {
-    FX_DCHECK(callback_);
+    ZX_DEBUG_ASSERT(callback_);
     BindWrapper();
   }
 
@@ -72,7 +72,7 @@ class CancelableCallback<void(Args...)> {
   // Sets |callback| as the closure that may be canceled. |callback| may not be
   // null. Outstanding and any previously wrapped callbacks are canceled.
   void Reset(fit::function<void(Args...)> callback) {
-    FX_DCHECK(callback);
+    ZX_DEBUG_ASSERT(callback);
     Cancel();
 
     callback_ = std::move(callback);
@@ -85,7 +85,7 @@ class CancelableCallback<void(Args...)> {
     wrapper_ = [self](Args... args) {
       if (!self)
         return;
-      FX_DCHECK(self->callback_);
+      ZX_DEBUG_ASSERT(self->callback_);
       self->callback_(std::forward<Args>(args)...);
     };
   }
