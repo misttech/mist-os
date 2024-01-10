@@ -208,21 +208,20 @@ impl BodyLen for Message {
 
 impl BindingData {
     fn new(
-        ctx: &Ctx,
+        ctx: &mut Ctx,
         kind: fppacket::Kind,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
-        let (core_ctx, _bindings_ctx) = ctx.contexts();
         let (local_event, peer_event) = zx::EventPair::create();
         match local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
             Ok(()) => (),
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         }
 
-        let id = netstack3_core::device_socket::create(
-            core_ctx,
-            SocketState { queue: Mutex::new(MessageQueue::new(local_event)), kind },
-        );
+        let id = ctx
+            .api()
+            .device_socket()
+            .create(SocketState { queue: Mutex::new(MessageQueue::new(local_event)), kind });
 
         BindingData { peer_event, id }
     }
@@ -252,7 +251,7 @@ impl worker::SocketWorkerHandler for BindingData {
 
     fn close(self, ctx: &mut Ctx) {
         let Self { peer_event: _, id } = self;
-        netstack3_core::device_socket::remove(ctx.core_ctx(), id)
+        ctx.api().device_socket().remove(id)
     }
 }
 
@@ -290,12 +289,11 @@ impl<'a> RequestHandler<'a> {
             })
             .transpose()?;
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let device = match interface {
             fppacket::BoundInterfaceId::All(fppacket::Empty) => None,
             fppacket::BoundInterfaceId::Specified(id) => {
                 let id = BindingId::new(id).ok_or(DeviceNotFoundError.into_errno())?;
-                Some(id.try_into_core_with_ctx(bindings_ctx).map_err(IntoErrno::into_errno)?)
+                Some(id.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?)
             }
         };
         let device_selector = match device.as_ref() {
@@ -304,13 +302,10 @@ impl<'a> RequestHandler<'a> {
         };
 
         match protocol {
-            Some(protocol) => netstack3_core::device_socket::set_device_and_protocol(
-                core_ctx,
-                id,
-                device_selector,
-                protocol,
-            ),
-            None => netstack3_core::device_socket::set_device(core_ctx, id, device_selector),
+            Some(protocol) => {
+                ctx.api().device_socket().set_device_and_protocol(id, device_selector, protocol)
+            }
+            None => ctx.api().device_socket().set_device(id, device_selector),
         }
         Ok(())
     }
@@ -322,15 +317,14 @@ impl<'a> RequestHandler<'a> {
         fposix::Errno,
     > {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
-        let SocketInfo { device, protocol } = netstack3_core::device_socket::get_info(core_ctx, id);
+        let SocketInfo { device, protocol } = ctx.api().device_socket().get_info(id);
         let SocketState { queue: _, kind } = *id.socket_state();
 
         let interface = match device {
             TargetDevice::AnyDevice => fppacket::BoundInterface::All(fppacket::Empty),
             TargetDevice::SpecificDevice(d) => fppacket::BoundInterface::Specified(
-                d.try_into_fidl_with_ctx(bindings_ctx).map_err(IntoErrno::into_errno)?,
+                d.try_into_fidl_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?,
             ),
         };
 
@@ -372,27 +366,24 @@ impl<'a> RequestHandler<'a> {
         data: Vec<u8>,
     ) -> Result<(), fposix::Errno> {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         let SocketState { kind, queue: _ } = *id.socket_state();
 
         let data = Buf::new(data, ..);
         match kind {
             fppacket::Kind::Network => {
-                let params = packet_info.try_into_core_with_ctx(bindings_ctx)?;
-                netstack3_core::device_socket::send_datagram(
-                    core_ctx,
-                    bindings_ctx,
-                    id,
-                    params,
-                    data,
-                )
-                .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
+                let params = packet_info.try_into_core_with_ctx(ctx.bindings_ctx())?;
+                ctx.api()
+                    .device_socket()
+                    .send_datagram(id, params, data)
+                    .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
             }
             fppacket::Kind::Link => {
                 let params = packet_info
-                    .try_into_core_with_ctx(bindings_ctx)
+                    .try_into_core_with_ctx(ctx.bindings_ctx())
                     .map_err(IntoErrno::into_errno)?;
-                netstack3_core::device_socket::send_frame(core_ctx, bindings_ctx, id, params, data)
+                ctx.api()
+                    .device_socket()
+                    .send_frame(id, params, data)
                     .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
             }
         }

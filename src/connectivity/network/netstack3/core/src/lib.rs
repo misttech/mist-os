@@ -96,15 +96,6 @@ pub mod device {
 
 /// Device socket API.
 pub mod device_socket {
-    // Re-exported functions.
-    //
-    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
-    // objects.
-    pub use crate::device::socket::{
-        create, get_info, remove, send_datagram, send_frame, set_device, set_device_and_protocol,
-    };
-
-    // Re-exported types.
     pub use crate::device::{
         base::FrameDestination,
         socket::{

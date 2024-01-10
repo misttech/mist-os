@@ -22,10 +22,10 @@ use packet_formats::{
 };
 
 use crate::{
-    context::SendFrameContext,
+    context::{ContextPair, SendFrameContext},
     device::{self, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination, WeakDeviceId},
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
-    CoreCtx, StackState, SyncCtx,
+    CoreCtx, StackState,
 };
 
 /// A selector for frames based on link-layer protocol number.
@@ -110,7 +110,7 @@ impl<S, D> EntryKey for StrongId<S, D> {
     }
 }
 
-trait StrongSocketId {
+pub trait StrongSocketId {
     type Primary;
 }
 
@@ -157,7 +157,7 @@ struct SocketState<S, D> {
 
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = ""))]
-struct Target<D> {
+pub struct Target<D> {
     protocol: Option<Protocol>,
     device: TargetDevice<D>,
 }
@@ -169,7 +169,7 @@ struct Target<D> {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derivative(Debug, PartialEq(bound = "Id: Hash + Eq")))]
-pub(crate) struct DeviceSockets<Id>(HashSet<Id>);
+pub struct DeviceSockets<Id>(HashSet<Id>);
 
 /// Convenience alias for use in device state storage.
 pub(super) type HeldDeviceSockets<BT> =
@@ -184,7 +184,7 @@ pub(super) type HeldSockets<BT> = Sockets<
 >;
 
 /// Common types across all core context traits for device sockets.
-trait DeviceSocketContextTypes {
+pub trait DeviceSocketContextTypes {
     /// The strongly-owning socket ID type.
     ///
     /// This type is held in various data structures and its existence
@@ -193,7 +193,7 @@ trait DeviceSocketContextTypes {
 }
 
 /// Core context for accessing socket state.
-trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
+pub trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     DeviceSocketAccessor<BC>
 {
     /// The core context available in callbacks to methods on this context.
@@ -237,7 +237,7 @@ trait DeviceSocketContext<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
 }
 
 /// Core context for accessing the state of an individual socket.
-trait SocketStateAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
+pub trait SocketStateAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     DeviceSocketContextTypes + DeviceIdContext<AnyDevice>
 {
     /// Core context available in callbacks to methods on this context.
@@ -277,7 +277,7 @@ trait SocketStateAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
 }
 
 /// Core context for accessing the socket state for a device.
-trait DeviceSocketAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
+pub trait DeviceSocketAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
     SocketStateAccessor<BC>
 {
     /// Core context available in callbacks to methods on this context.
@@ -309,56 +309,6 @@ trait DeviceSocketAccessor<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
         device: &Self::DeviceId,
         cb: F,
     ) -> R;
-}
-
-/// Internal implementation trait that allows abstracting over device ID types.
-trait DeviceSocketApi<BC: DeviceSocketBindingsContext<Self::DeviceId>>:
-    DeviceSocketContextTypes + DeviceIdContext<AnyDevice>
-{
-    /// Creates a new packet socket.
-    fn create(&mut self, external_state: BC::SocketState) -> Self::SocketId;
-
-    /// Sets the device for a packet socket without affecting the protocol.
-    fn set_device(&mut self, socket: &Self::SocketId, device: TargetDevice<&Self::DeviceId>);
-
-    /// Sets both the device and protocol for a packet socket.
-    fn set_device_and_protocol(
-        &mut self,
-        id: &Self::SocketId,
-        device: TargetDevice<&Self::DeviceId>,
-        protocol: Protocol,
-    );
-
-    /// Gets information about a socket.
-    fn get_info(&mut self, id: &Self::SocketId) -> SocketInfo<Self::WeakDeviceId>;
-
-    /// Removes a packet socket.
-    fn remove(&mut self, id: Self::SocketId);
-
-    /// Sends a frame exactly as provided, or returns an error.
-    fn send_frame<S>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        socket: &Self::SocketId,
-        params: SendFrameParams<Self::DeviceId>,
-        body: S,
-    ) -> Result<(), (S, SendFrameError)>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut;
-
-    /// Sends a datagram with a constructed link-layer header or returns an
-    /// error.
-    fn send_datagram<S>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        socket: &Self::SocketId,
-        params: SendDatagramParams<Self::DeviceId>,
-        body: S,
-    ) -> Result<(), (S, SendDatagramError)>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut;
 }
 
 /// An error encountered when sending a frame.
@@ -473,14 +423,44 @@ fn update_device_and_protocol<
     })
 }
 
-impl<CC, BC> DeviceSocketApi<BC> for CC
+/// The device socket API.
+pub struct DeviceSocketApi<C>(C);
+
+impl<C> DeviceSocketApi<C> {
+    pub(crate) fn new(ctx: C) -> Self {
+        Self(ctx)
+    }
+}
+
+impl<C> DeviceSocketApi<C>
 where
-    CC: DeviceSocketContext<BC> + SendFrameContext<BC, DeviceSocketMetadata<CC::DeviceId>>,
-    BC: DeviceSocketBindingsContext<CC::DeviceId>,
+    C: ContextPair,
+    C::CoreContext: DeviceSocketContext<C::BindingsContext>
+        + SendFrameContext<
+            C::BindingsContext,
+            DeviceSocketMetadata<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        >,
+    C::BindingsContext:
+        DeviceSocketBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
-    fn create(&mut self, external_state: BC::SocketState) -> Self::SocketId {
-        let strong = self.create_socket(external_state);
-        self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), _core_ctx| {
+    fn core_ctx(&mut self) -> &mut C::CoreContext {
+        let Self(pair) = self;
+        pair.core_ctx()
+    }
+
+    fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
+        let Self(pair) = self;
+        pair.contexts()
+    }
+
+    /// Creates an packet socket with no protocol set configured for all devices.
+    pub fn create(
+        &mut self,
+        external_state: <C::BindingsContext as DeviceSocketTypes>::SocketState,
+    ) -> <C::CoreContext as DeviceSocketContextTypes>::SocketId {
+        let core_ctx = self.core_ctx();
+        let strong = core_ctx.create_socket(external_state);
+        core_ctx.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), _core_ctx| {
             // On creation, sockets do not target any device or protocol.
             // Inserting them into the `any_device_sockets` table lets us treat
             // newly-created sockets uniformly with sockets whose target device
@@ -492,29 +472,50 @@ where
         strong
     }
 
-    fn set_device(&mut self, socket: &Self::SocketId, device: TargetDevice<&CC::DeviceId>) {
-        update_device_and_protocol(self, socket, device, MaybeUpdate::NoChange)
+    /// Sets the device for which a packet socket will receive packets.
+    pub fn set_device(
+        &mut self,
+        socket: &<C::CoreContext as DeviceSocketContextTypes>::SocketId,
+        device: TargetDevice<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    ) {
+        update_device_and_protocol(self.core_ctx(), socket, device, MaybeUpdate::NoChange)
     }
 
-    fn set_device_and_protocol(
+    /// Sets the device and protocol for which a socket will receive packets.
+    pub fn set_device_and_protocol(
         &mut self,
-        socket: &Self::SocketId,
-        device: TargetDevice<&CC::DeviceId>,
+        socket: &<C::CoreContext as DeviceSocketContextTypes>::SocketId,
+        device: TargetDevice<&<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         protocol: Protocol,
     ) {
-        update_device_and_protocol(self, socket, device, MaybeUpdate::NewValue(protocol))
+        update_device_and_protocol(self.core_ctx(), socket, device, MaybeUpdate::NewValue(protocol))
     }
 
-    fn get_info(&mut self, id: &Self::SocketId) -> SocketInfo<Self::WeakDeviceId> {
-        self.with_socket_state(id, |_external_state, Target { device, protocol }, _core_ctx| {
-            SocketInfo { device: device.clone(), protocol: *protocol }
-        })
+    /// Gets the bound info for a socket.
+    pub fn get_info(
+        &mut self,
+        id: &<C::CoreContext as DeviceSocketContextTypes>::SocketId,
+    ) -> SocketInfo<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId> {
+        self.core_ctx().with_socket_state(
+            id,
+            |_external_state, Target { device, protocol }, _core_ctx| SocketInfo {
+                device: device.clone(),
+                protocol: *protocol,
+            },
+        )
     }
 
-    fn remove(&mut self, id: Self::SocketId) {
-        self.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), core_ctx| {
+    /// Removes a bound socket.
+    ///
+    /// # Panics
+    ///
+    /// If the provided `id` is not the last instance for a socket, this
+    /// method will panic.
+    pub fn remove(&mut self, id: <C::CoreContext as DeviceSocketContextTypes>::SocketId) {
+        let core_ctx = self.core_ctx();
+        core_ctx.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), core_ctx| {
             let old_device =
-                core_ctx.with_socket_state_mut(&id, |_: &BC::SocketState, target, core_ctx| {
+                core_ctx.with_socket_state_mut(&id, |_external_state, target, core_ctx| {
                     let Target { device, protocol: _ } = target;
                     match &device {
                         TargetDevice::SpecificDevice(device) => {
@@ -536,43 +537,47 @@ where
             }
         });
 
-        self.remove_socket(id)
+        core_ctx.remove_socket(id)
     }
 
-    fn send_frame<S>(
+    /// Sends a frame for the specified socket without any additional framing.
+    pub fn send_frame<S>(
         &mut self,
-        bindings_ctx: &mut BC,
-        id: &Self::SocketId,
-        params: SendFrameParams<CC::DeviceId>,
+        id: &<C::CoreContext as DeviceSocketContextTypes>::SocketId,
+        params: SendFrameParams<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendFrameError)>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let metadata = match self.with_socket_state(id, |_: &BC::SocketState, target, core_ctx| {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let metadata = match core_ctx.with_socket_state(id, |_external_state, target, core_ctx| {
             make_send_metadata(core_ctx, target, params, None)
         }) {
             Ok(metadata) => metadata,
             Err(e) => return Err((body, e)),
         };
-        self.send_frame(bindings_ctx, metadata, body).map_err(|s| (s, SendFrameError::SendFailed))
+        core_ctx
+            .send_frame(bindings_ctx, metadata, body)
+            .map_err(|s| (s, SendFrameError::SendFailed))
     }
 
-    fn send_datagram<S>(
+    /// Sends a datagram with system-determined framing.
+    pub fn send_datagram<S>(
         &mut self,
-        bindings_ctx: &mut BC,
-        id: &Self::SocketId,
-        params: SendDatagramParams<Self::DeviceId>,
+        id: &<C::CoreContext as DeviceSocketContextTypes>::SocketId,
+        params: SendDatagramParams<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         body: S,
     ) -> Result<(), (S, SendDatagramError)>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        let metadata = match self.with_socket_state(
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let metadata = match core_ctx.with_socket_state(
             id,
-            |_: &BC::SocketState, target @ Target { device: _, protocol }, core_ctx| {
+            |_external_state, target @ Target { device: _, protocol }, core_ctx| {
                 let SendDatagramParams { frame, protocol: target_protocol, dest_addr } = params;
                 let protocol = match target_protocol.or_else(|| {
                     protocol.and_then(|p| match p {
@@ -596,13 +601,14 @@ where
             Ok(metadata) => metadata,
             Err(e) => return Err((body, e)),
         };
-        self.send_frame(bindings_ctx, metadata, body)
+        core_ctx
+            .send_frame(bindings_ctx, metadata, body)
             .map_err(|s| (s, SendDatagramError::Frame(SendFrameError::SendFailed)))
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct DeviceSocketMetadata<D> {
+pub struct DeviceSocketMetadata<D> {
     pub(super) device_id: D,
     pub(super) header: Option<DatagramHeader>,
 }
@@ -637,92 +643,16 @@ fn make_send_metadata<CC: DeviceIdContext<AnyDevice>>(
 ///
 /// Strongly owns the state of the socket. So long as the `SocketId` for a
 /// socket is not dropped, the socket is guaranteed to exist.
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = "BC::SocketState: Debug"))]
-pub struct SocketId<BC: crate::BindingsContext>(StrongId<BC::SocketState, WeakDeviceId<BC>>);
+pub type SocketId<BC> = StrongId<<BC as DeviceSocketTypes>::SocketState, WeakDeviceId<BC>>;
 
-impl<BC: crate::BindingsContext> SocketId<BC> {
+impl<S, D> StrongId<S, D> {
     /// Provides immutable access to [`DeviceSocketTypes::SocketState`] for the
     /// socket.
-    pub fn socket_state(&self) -> &BC::SocketState {
-        let Self(StrongId(strong)) = self;
+    pub fn socket_state(&self) -> &S {
+        let Self(strong) = self;
         let SocketState { external_state, all_sockets_index: _, target: _ } = &**strong;
         external_state
     }
-}
-
-/// Creates an packet socket with no protocol set configured for all devices.
-pub fn create<BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    external_state: BC::SocketState,
-) -> SocketId<BC> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    SocketId(DeviceSocketApi::create(&mut core_ctx, external_state))
-}
-
-/// Sets the device for which a packet socket will receive packets.
-pub fn set_device<BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    SocketId(id): &SocketId<BC>,
-    device: TargetDevice<&DeviceId<BC>>,
-) {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    DeviceSocketApi::set_device(&mut core_ctx, id, device)
-}
-
-/// Sets the device and protocol for which a socket will receive packets.
-pub fn set_device_and_protocol<BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    SocketId(id): &SocketId<BC>,
-    device: TargetDevice<&DeviceId<BC>>,
-    protocol: Protocol,
-) {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    DeviceSocketApi::set_device_and_protocol(&mut core_ctx, id, device, protocol)
-}
-
-/// Gets the bound info for a socket.
-pub fn get_info<BC: crate::BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    SocketId(id): &SocketId<BC>,
-) -> SocketInfo<WeakDeviceId<BC>> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    DeviceSocketApi::get_info(&mut core_ctx, id)
-}
-
-/// Removes a bound socket.
-///
-/// # Panics
-///
-/// If the provided [`SocketId`] is not the last instance for a socket, this
-/// method will panic.
-pub fn remove<BC: crate::BindingsContext>(core_ctx: &SyncCtx<BC>, SocketId(id): SocketId<BC>) {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    DeviceSocketApi::remove(&mut core_ctx, id)
-}
-
-/// Sends a frame for the specified socket without any additional framing.
-pub fn send_frame<BC: crate::BindingsContext, B: BufferMut>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    SocketId(id): &SocketId<BC>,
-    params: SendFrameParams<DeviceId<BC>>,
-    body: B,
-) -> Result<(), (B, SendFrameError)> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    DeviceSocketApi::send_frame(&mut core_ctx, bindings_ctx, id, params, body)
-}
-
-/// Sends a datagram with system-determined framing.
-pub fn send_datagram<BC: crate::BindingsContext, B: BufferMut>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    SocketId(id): &SocketId<BC>,
-    params: SendDatagramParams<DeviceId<BC>>,
-    body: B,
-) -> Result<(), (B, SendDatagramError)> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    DeviceSocketApi::send_datagram(&mut core_ctx, bindings_ctx, id, params, body)
 }
 
 /// Allows the rest of the stack to dispatch packets to listening sockets.
@@ -1168,7 +1098,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        context::testutil::FakeCoreCtx,
         device::{
             testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             Id,
@@ -1208,6 +1137,8 @@ mod tests {
         raw: Vec<u8>,
     }
 
+    type FakeCoreCtx<D> = crate::context::testutil::FakeCoreCtx<FakeSockets<D>, (), D>;
+    type FakeCtx<D> = crate::testutil::ContextPair<FakeCoreCtx<D>, FakeBindingsCtx<D>>;
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]
     struct FakeBindingsCtx<D> {
@@ -1236,7 +1167,7 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId> SendFrameContext<FakeBindingsCtx<D>, DeviceSocketMetadata<D>>
-        for FakeCoreCtx<FakeSockets<D>, (), D>
+        for FakeCoreCtx<D>
     {
         fn send_frame<S>(
             &mut self,
@@ -1258,6 +1189,16 @@ mod tests {
             }
         }
     }
+
+    /// A trait providing a shortcut to instantiate a [`DeviceSocketApi`] from a
+    /// context.
+    trait DeviceSocketApiExt: crate::context::ContextPair + Sized {
+        fn device_socket_api(self) -> DeviceSocketApi<Self> {
+            DeviceSocketApi::new(self)
+        }
+    }
+
+    impl<O> DeviceSocketApiExt for O where O: crate::context::ContextPair + Sized {}
 
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]
@@ -1292,7 +1233,7 @@ mod tests {
         ) -> FakeSocketsMutRefs<'_, Self::AnyDevice, Self::AllSockets, Self::Devices>;
     }
 
-    impl<D: FakeStrongDeviceId> AsFakeSocketsMutRefs for FakeCoreCtx<FakeSockets<D>, (), D> {
+    impl<D: FakeStrongDeviceId> AsFakeSocketsMutRefs for FakeCoreCtx<D> {
         type AnyDevice = AnyDeviceSockets<FakeStrongId>;
         type AllSockets = FakeAllSockets<D>;
         type Devices = HashMap<D, DeviceSockets<FakeStrongId>>;
@@ -1328,11 +1269,11 @@ mod tests {
     }
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    pub(crate) struct FakeStrongId(usize);
+    pub struct FakeStrongId(usize);
 
     #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     #[derive(Debug)]
-    pub(crate) struct FakePrimaryId(usize);
+    pub struct FakePrimaryId(usize);
 
     impl StrongSocketId for FakeStrongId {
         type Primary = FakePrimaryId;
@@ -1383,7 +1324,7 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeCoreCtx<FakeSockets<D>, (), D> {
+    impl<D: FakeStrongDeviceId> DeviceIdContext<AnyDevice> for FakeCoreCtx<D> {
         type DeviceId = D;
         type WeakDeviceId = D::Weak;
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
@@ -1589,31 +1530,37 @@ mod tests {
 
     #[test]
     fn create_remove() {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
+        let mut api = ctx.device_socket_api();
 
-        let bound = DeviceSocketApi::create(&mut core_ctx, Default::default());
+        let bound = api.create(Default::default());
         assert_eq!(
-            DeviceSocketApi::get_info(&mut core_ctx, &bound),
+            api.get_info(&bound),
             SocketInfo { device: TargetDevice::AnyDevice, protocol: None }
         );
 
-        DeviceSocketApi::remove(&mut core_ctx, bound);
+        api.remove(bound);
     }
 
     #[test_case(TargetDevice::AnyDevice)]
     #[test_case(TargetDevice::SpecificDevice(&MultipleDevicesId::A))]
     fn test_set_device(device: TargetDevice<&MultipleDevicesId>) {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
+        let mut api = ctx.device_socket_api();
 
-        let bound = DeviceSocketApi::create(&mut core_ctx, Default::default());
-        DeviceSocketApi::set_device(&mut core_ctx, &bound, device.clone());
+        let bound = api.create(Default::default());
+        api.set_device(&bound, device.clone());
         assert_eq!(
-            DeviceSocketApi::get_info(&mut core_ctx, &bound),
+            api.get_info(&bound),
             SocketInfo { device: device.with_weak_id(), protocol: None }
         );
 
         let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            core_ctx.get_ref();
+            api.core_ctx().get_ref();
         if let TargetDevice::SpecificDevice(d) = device {
             let DeviceSockets(socket_ids) = device_sockets.get(&d).expect("device state exists");
             assert_eq!(socket_ids, &HashSet::from([bound]));
@@ -1622,25 +1569,19 @@ mod tests {
 
     #[test]
     fn update_device() {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
+        let mut api = ctx.device_socket_api();
+        let bound = api.create(Default::default());
 
-        let bound = DeviceSocketApi::create(&mut core_ctx, Default::default());
-
-        DeviceSocketApi::set_device(
-            &mut core_ctx,
-            &bound,
-            TargetDevice::SpecificDevice(&MultipleDevicesId::A),
-        );
+        api.set_device(&bound, TargetDevice::SpecificDevice(&MultipleDevicesId::A));
 
         // Now update the device and make sure the socket only appears in the
         // one device's list.
-        DeviceSocketApi::set_device(
-            &mut core_ctx,
-            &bound,
-            TargetDevice::SpecificDevice(&MultipleDevicesId::B),
-        );
+        api.set_device(&bound, TargetDevice::SpecificDevice(&MultipleDevicesId::B));
         assert_eq!(
-            DeviceSocketApi::get_info(&mut core_ctx, &bound),
+            api.get_info(&bound),
             SocketInfo {
                 device: TargetDevice::SpecificDevice(FakeWeakDeviceId(MultipleDevicesId::B)),
                 protocol: None
@@ -1648,7 +1589,7 @@ mod tests {
         );
 
         let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            core_ctx.get_ref();
+            api.core_ctx().get_ref();
         let device_socket_lists = device_sockets
             .iter()
             .map(|(d, DeviceSockets(indexes))| (d, indexes.iter().collect()))
@@ -1675,56 +1616,48 @@ mod tests {
         protocol: Protocol,
         device: TargetDevice<&MultipleDevicesId>,
     ) {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
+        let mut api = ctx.device_socket_api();
 
-        let mut sockets =
-            [(); 3].map(|()| DeviceSocketApi::create(&mut core_ctx, Default::default()));
+        let mut sockets = [(); 3].map(|()| api.create(Default::default()));
         for socket in &mut sockets {
-            DeviceSocketApi::set_device_and_protocol(
-                &mut core_ctx,
-                socket,
-                device.clone(),
-                protocol,
-            );
+            api.set_device_and_protocol(socket, device.clone(), protocol);
             assert_eq!(
-                DeviceSocketApi::get_info(&mut core_ctx, socket),
+                api.get_info(socket),
                 SocketInfo { device: device.with_weak_id(), protocol: Some(protocol) }
             );
         }
 
         for socket in sockets {
-            DeviceSocketApi::remove(&mut core_ctx, socket)
+            api.remove(socket)
         }
     }
 
     #[test]
     fn change_device_after_removal() {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
+        let mut api = ctx.device_socket_api();
 
-        let bound = DeviceSocketApi::create(&mut core_ctx, Default::default());
+        let bound = api.create(Default::default());
         // Set the device for the socket before removing the device state
         // entirely.
         const DEVICE_TO_REMOVE: MultipleDevicesId = MultipleDevicesId::A;
-        DeviceSocketApi::set_device(
-            &mut core_ctx,
-            &bound,
-            TargetDevice::SpecificDevice(&DEVICE_TO_REMOVE),
-        );
+        api.set_device(&bound, TargetDevice::SpecificDevice(&DEVICE_TO_REMOVE));
 
         // Now remove the device; this should cause future attempts to upgrade
         // the device ID to fail.
-        let removed = core_ctx.get_mut().remove_device(&DEVICE_TO_REMOVE);
+        let removed = api.core_ctx().get_mut().remove_device(&DEVICE_TO_REMOVE);
         assert_eq!(removed, DeviceSockets(HashSet::from([bound.clone()])));
 
         // Changing the device should gracefully handle the fact that the
         // earlier-bound device is now gone.
-        DeviceSocketApi::set_device(
-            &mut core_ctx,
-            &bound,
-            TargetDevice::SpecificDevice(&MultipleDevicesId::B),
-        );
+        api.set_device(&bound, TargetDevice::SpecificDevice(&MultipleDevicesId::B));
         assert_eq!(
-            DeviceSocketApi::get_info(&mut core_ctx, &bound),
+            api.get_info(&bound),
             SocketInfo {
                 device: TargetDevice::SpecificDevice(FakeWeakDeviceId(MultipleDevicesId::B)),
                 protocol: None,
@@ -1732,7 +1665,7 @@ mod tests {
         );
 
         let FakeSockets { device_sockets, any_device_sockets: _, all_sockets: _ } =
-            core_ctx.get_ref();
+            api.core_ctx().get_ref();
         let DeviceSockets(weak_sockets) =
             device_sockets.get(&MultipleDevicesId::B).expect("device state exists");
         assert_eq!(weak_sockets, &HashSet::from([bound]));
@@ -1763,22 +1696,21 @@ mod tests {
 
     const WRONG_PROTO: NonZeroU16 = const_unwrap_option(NonZeroU16::new(0x08ff));
 
-    fn make_bound<CC: DeviceSocketApi<BC>, BC: DeviceSocketBindingsContext<CC::DeviceId>>(
-        core_ctx: &mut CC,
-        device: TargetDevice<CC::DeviceId>,
+    fn make_bound<D: FakeStrongDeviceId>(
+        ctx: &mut FakeCtx<D>,
+        device: TargetDevice<D>,
         protocol: Option<Protocol>,
-        state: BC::SocketState,
-    ) -> CC::SocketId {
-        let id = DeviceSocketApi::create(core_ctx, state);
+        state: ExternalSocketState<D>,
+    ) -> FakeStrongId {
+        let mut api = ctx.device_socket_api();
+        let id = api.create(state);
         let device = match &device {
             TargetDevice::AnyDevice => TargetDevice::AnyDevice,
             TargetDevice::SpecificDevice(d) => TargetDevice::SpecificDevice(d),
         };
         match protocol {
-            Some(protocol) => {
-                DeviceSocketApi::set_device_and_protocol(core_ctx, &id, device, protocol)
-            }
-            None => DeviceSocketApi::set_device(core_ctx, &id, device),
+            Some(protocol) => api.set_device_and_protocol(&id, device, protocol),
+            None => api.set_device(&id, device),
         };
         id
     }
@@ -1787,8 +1719,7 @@ mod tests {
     /// sockets it was delivered to.
     fn deliver_one_frame(
         delivered_frame: Frame<&[u8]>,
-        mut core_ctx: FakeCoreCtx<FakeSockets<MultipleDevicesId>, (), MultipleDevicesId>,
-        mut bindings_ctx: FakeBindingsCtx<MultipleDevicesId>,
+        FakeCtx { mut core_ctx, mut bindings_ctx }: FakeCtx<MultipleDevicesId>,
     ) -> HashSet<FakeStrongId> {
         DeviceSocketHandler::handle_frame(
             &mut core_ctx,
@@ -1822,19 +1753,20 @@ mod tests {
 
     #[test]
     fn receive_frame_deliver_to_multiple() {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let bindings_ctx = FakeBindingsCtx::default();
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
 
         use Protocol::*;
         use TargetDevice::*;
         let never_bound = {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            DeviceSocketApi::create(&mut core_ctx, state)
+            ctx.device_socket_api().create(state)
         };
 
         let mut make_bound = |device, protocol| {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            make_bound(&mut core_ctx, device, protocol, state)
+            make_bound(&mut ctx, device, protocol, state)
         };
         let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
         let bound_a_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::A), Some(All));
@@ -1859,8 +1791,7 @@ mod tests {
                 FrameDestination::Individual { local: true },
             )
             .into(),
-            core_ctx,
-            bindings_ctx,
+            ctx,
         );
 
         let _ = (
@@ -1884,19 +1815,20 @@ mod tests {
 
     #[test]
     fn sent_frame_deliver_to_multiple() {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let bindings_ctx = FakeBindingsCtx::default();
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
 
         use Protocol::*;
         use TargetDevice::*;
         let never_bound = {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            DeviceSocketApi::create(&mut core_ctx, state)
+            ctx.device_socket_api().create(state)
         };
 
         let mut make_bound = |device, protocol| {
             let state = ExternalSocketState::<MultipleDevicesId>::default();
-            make_bound(&mut core_ctx, device, protocol, state)
+            make_bound(&mut ctx, device, protocol, state)
         };
         let bound_a_no_protocol = make_bound(SpecificDevice(MultipleDevicesId::A), None);
         let bound_a_all_protocols = make_bound(SpecificDevice(MultipleDevicesId::A), Some(All));
@@ -1915,11 +1847,8 @@ mod tests {
         let bound_any_same_protocol = make_bound(AnyDevice, Some(Specific(TestData::PROTO)));
         let bound_any_wrong_protocol = make_bound(AnyDevice, Some(Specific(WRONG_PROTO)));
 
-        let mut sockets_with_received_frames = deliver_one_frame(
-            SentFrame::Ethernet(TestData::frame().into()).into(),
-            core_ctx,
-            bindings_ctx,
-        );
+        let mut sockets_with_received_frames =
+            deliver_one_frame(SentFrame::Ethernet(TestData::frame().into()).into(), ctx);
 
         let _ = (
             never_bound,
@@ -1943,14 +1872,16 @@ mod tests {
 
     #[test]
     fn deliver_multiple_frames() {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let mut bindings_ctx = FakeBindingsCtx::default();
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
         let socket = make_bound(
-            &mut core_ctx,
+            &mut ctx,
             TargetDevice::AnyDevice,
             Some(Protocol::All),
             ExternalSocketState::default(),
         );
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = ctx;
 
         const RECEIVE_COUNT: usize = 10;
         for _ in 0..RECEIVE_COUNT {
@@ -2005,34 +1936,25 @@ mod tests {
         send_device: Option<MultipleDevicesId>,
         expected_device: Result<MultipleDevicesId, SendFrameError>,
     ) {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let mut bindings_ctx = FakeBindingsCtx::default();
-
-        let id = DeviceSocketApi::create(&mut core_ctx, Default::default());
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
+        let mut api = ctx.device_socket_api();
+        let id = api.create(Default::default());
         if let Some(bind_device) = bind_device {
-            DeviceSocketApi::set_device(
-                &mut core_ctx,
-                &id,
-                TargetDevice::SpecificDevice(&bind_device),
-            );
+            api.set_device(&id, TargetDevice::SpecificDevice(&bind_device));
         }
 
         let destination = SendFrameParams { device: send_device };
         let expected_status = expected_device.as_ref().map(|_| ()).map_err(|e| *e);
         assert_eq!(
-            DeviceSocketApi::send_frame(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &id,
-                destination,
-                Buf::new(Vec::from(TestData::BODY), ..),
-            )
-            .map_err(|(_, e): (Buf<Vec<u8>>, _)| e),
+            api.send_frame(&id, destination, Buf::new(Vec::from(TestData::BODY), ..),)
+                .map_err(|(_, e): (Buf<Vec<u8>>, _)| e),
             expected_status
         );
 
         if let Ok(expected_device) = expected_device {
-            let FakeBindingsCtx { sent } = bindings_ctx;
+            let FakeBindingsCtx { sent } = ctx.bindings_ctx;
             assert_eq!(
                 sent,
                 [(
@@ -2105,31 +2027,27 @@ mod tests {
         destination: SendDatagramParams<MultipleDevicesId>,
         expected_device: Result<MultipleDevicesId, SendDatagramError>,
     ) {
-        let mut core_ctx = FakeCoreCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
-        let mut bindings_ctx = FakeBindingsCtx::default();
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
 
         let id = make_bound(
-            &mut core_ctx,
+            &mut ctx,
             bind_device.map_or(TargetDevice::AnyDevice, TargetDevice::SpecificDevice),
             bind_protocol,
             Default::default(),
         );
 
+        let mut api = ctx.device_socket_api();
         let expected_status = expected_device.as_ref().map(|_| ()).map_err(|e| *e);
         assert_eq!(
-            DeviceSocketApi::send_datagram(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &id,
-                destination,
-                Buf::new(Vec::from(TestData::BODY), ..),
-            )
-            .map_err(|(_, e): (Buf<Vec<u8>>, _)| e),
+            api.send_datagram(&id, destination, Buf::new(Vec::from(TestData::BODY), ..),)
+                .map_err(|(_, e): (Buf<Vec<u8>>, _)| e),
             expected_status
         );
 
         if let Ok(expected_device) = expected_device {
-            let FakeBindingsCtx { sent } = bindings_ctx;
+            let FakeBindingsCtx { sent } = ctx.bindings_ctx;
             let expected_sent = (
                 DeviceSocketMetadata {
                     device_id: expected_device,
@@ -2148,21 +2066,20 @@ mod tests {
     fn drop_real_ids() {
         /// Test with a real `SyncCtx` to assert that IDs aren't dropped in the
         /// wrong order.
-        use crate::testutil::{Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V4};
+        use crate::testutil::{FakeEventDispatcherBuilder, FAKE_CONFIG_V4};
         let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4).build();
 
-        let Ctx { core_ctx, bindings_ctx: _ } = &mut ctx;
+        let mut api = ctx.core_api().device_socket();
 
-        let never_bound = create(core_ctx, Mutex::default());
+        let never_bound = api.create(Mutex::default());
         let bound_any_device = {
-            let id = create(core_ctx, Mutex::default());
-            set_device(core_ctx, &id, TargetDevice::AnyDevice);
+            let id = api.create(Mutex::default());
+            api.set_device(&id, TargetDevice::AnyDevice);
             id
         };
         let bound_specific_device = {
-            let id = create(core_ctx, Mutex::default());
-            set_device(
-                core_ctx,
+            let id = api.create(Mutex::default());
+            api.set_device(
                 &id,
                 TargetDevice::SpecificDevice(&DeviceId::Ethernet(device_ids[0].clone())),
             );

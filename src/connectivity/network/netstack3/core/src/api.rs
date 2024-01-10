@@ -8,6 +8,7 @@ use net_types::ip::Ip;
 
 use crate::{
     context::{BindingsTypes, ContextProvider, CoreCtx, CtxPair},
+    device::socket::DeviceSocketApi,
     ip::icmp::socket::IcmpEchoSocketApi,
     transport::{tcp::socket::TcpApi, udp::UdpApi},
 };
@@ -45,6 +46,12 @@ where
     pub fn tcp<I: Ip>(self) -> TcpApi<I, CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         TcpApi::new(ctx)
+    }
+
+    /// Gets access to the device socket API.
+    pub fn device_socket(self) -> DeviceSocketApi<CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        DeviceSocketApi::new(ctx)
     }
 }
 

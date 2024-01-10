@@ -22,7 +22,7 @@ use netstack3_core::{
     sync::Mutex,
     testutil::{
         ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-        FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
+        ContextPair, FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
     },
     CoreApi,
 };
@@ -57,22 +57,21 @@ fn packet_socket_change_device_and_protocol_atomic() {
         let dev_indexes =
             [(); 2].map(|()| builder.add_device(UnicastAddr::new(DEVICE_MAC).unwrap()));
         let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
+        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
 
-        let core_ctx = Arc::new(core_ctx);
         let devs = dev_indexes.map(|i| indexes_to_device_ids[i].clone());
         drop(indexes_to_device_ids);
 
-        let socket = netstack3_core::device_socket::create(&*core_ctx, Mutex::new(Vec::new()));
-        netstack3_core::device_socket::set_device_and_protocol(
-            &*core_ctx,
+        let socket = ctx.core_api().device_socket().create(Mutex::new(Vec::new()));
+        ctx.core_api().device_socket().set_device_and_protocol(
             &socket,
             TargetDevice::SpecificDevice(&devs[0].clone().into()),
             Protocol::Specific(first_proto),
         );
 
-        let thread_vars = (core_ctx.clone(), bindings_ctx.clone(), devs.clone());
+        let thread_vars = (ctx.clone(), devs.clone());
         let deliver = loom::thread::spawn(move || {
-            let (core_ctx, mut bindings_ctx, devs) = thread_vars;
+            let (ContextPair { core_ctx, mut bindings_ctx }, devs) = thread_vars;
             for (device, ethertype) in [
                 (&devs[0], first_proto.get().into()),
                 (&devs[0], second_proto.get().into()),
@@ -88,12 +87,11 @@ fn packet_socket_change_device_and_protocol_atomic() {
             }
         });
 
-        let thread_vars = (core_ctx.clone(), devs[1].clone(), socket.clone());
+        let thread_vars = (ctx.clone(), devs[1].clone(), socket.clone());
 
         let change_device = loom::thread::spawn(move || {
-            let (core_ctx, dev, socket) = thread_vars;
-            netstack3_core::device_socket::set_device_and_protocol(
-                &*core_ctx,
+            let (mut ctx, dev, socket) = thread_vars;
+            ctx.core_api().device_socket().set_device_and_protocol(
                 &socket,
                 TargetDevice::SpecificDevice(&dev.clone().into()),
                 Protocol::Specific(second_proto),

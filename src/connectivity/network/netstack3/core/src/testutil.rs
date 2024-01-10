@@ -10,6 +10,7 @@ use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
 #[cfg(test)]
 use core::time::Duration;
 use core::{
+    borrow::Borrow,
     convert::Infallible as Never,
     ffi::CStr,
     fmt::{self, Debug, Display},
@@ -53,8 +54,8 @@ use crate::{
             FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, WithFakeFrameContext,
             WithFakeTimerContext,
         },
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
-        TracingContext,
+        BindingsTypes, EventContext, InstantBindingsTypes, InstantContext, RngContext,
+        TimerContext, TracingContext,
     },
     device::{
         ethernet::MaxEthernetFrameSize, link::LinkDevice, loopback::LoopbackDeviceId, DeviceId,
@@ -102,7 +103,7 @@ pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 /// A structure holding a core and a bindings context.
 // TODO(https://fxbug.dev/42083910): Remove this struct and alias
 // `crate::context::CtxPair` here instead.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ContextPair<CC, BT> {
     /// The core context.
     pub core_ctx: CC,
@@ -173,11 +174,17 @@ impl<BC: crate::BindingsContext + Default> Ctx<BC> {
         let state = builder.build_with_ctx(&mut bindings_ctx);
         Self { core_ctx: SyncCtx { state }, bindings_ctx }
     }
+}
 
+impl<CC, BC> ContextPair<CC, BC>
+where
+    CC: Borrow<SyncCtx<BC>>,
+    BC: BindingsTypes,
+{
     /// Retrieves a [`crate::api::CoreApi`] from this [`Ctx`].
     pub fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
         let Self { core_ctx, bindings_ctx } = self;
-        crate::api::CoreApi::with_contexts(core_ctx, bindings_ctx)
+        CC::borrow(core_ctx).state.api(bindings_ctx)
     }
 }
 
