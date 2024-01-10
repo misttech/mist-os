@@ -13,7 +13,7 @@ use {
     namespace::{Path as NamespacePath, PathError},
     serde::{de, ser},
     serde::{Deserialize, Serialize},
-    std::{cmp, default::Default, fmt, path::PathBuf, str::FromStr},
+    std::{cmp, default::Default, fmt, iter, path::PathBuf, str::FromStr},
     thiserror::Error,
     url,
 };
@@ -426,6 +426,14 @@ impl RelativePath {
     pub fn as_str(&self) -> &str {
         &*self.0
     }
+
+    pub fn iter_segments(&self) -> impl Iterator<Item = &str> {
+        self.0
+            .as_str()
+            .split("/")
+            // `split("/")` produces empty segments if there is nothing before or after a slash.
+            .filter(|s| !s.is_empty())
+    }
 }
 
 impl FromStr for RelativePath {
@@ -505,6 +513,55 @@ impl<'de> de::Deserialize<'de> for RelativePath {
     }
 }
 
+/// Path that separates the dirname and basename as different variables
+/// (referencing type). Convenient for / path representations that split the
+/// dirname and basename, like Fuchsia component decl.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BorrowedSeparatedPath<'a> {
+    pub dirname: Option<&'a RelativePath>,
+    pub basename: &'a str,
+}
+
+impl BorrowedSeparatedPath<'_> {
+    /// Returns an iterator over the segments in this path.
+    pub fn iter_segments(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        if let Some(d) = self.dirname {
+            Box::new(d.iter_segments().chain(iter::once(self.basename)))
+        } else {
+            Box::new(iter::once(self.basename))
+        }
+    }
+
+    /// Converts this [BorrowedSeparatedPath] to the owned type.
+    pub fn to_owned(&self) -> SeparatedPath {
+        SeparatedPath { dirname: self.dirname.map(Clone::clone), basename: self.basename.into() }
+    }
+}
+
+/// Path that separates the dirname and basename as different variables (owned
+/// type). Convenient for path representations that split the dirname and
+/// basename, like Fuchsia component decl.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SeparatedPath {
+    pub dirname: Option<RelativePath>,
+    pub basename: String,
+}
+
+impl SeparatedPath {
+    /// Returns an iterator over the segments in this path.
+    pub fn iter_segments(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        if let Some(d) = &self.dirname {
+            Box::new(d.iter_segments().chain(iter::once(self.basename.as_str())))
+        } else {
+            Box::new(iter::once(self.basename.as_str()))
+        }
+    }
+
+    /// Obtains a reference to this [SeparatedPath] as the borrowed type.
+    pub fn as_ref(&self) -> BorrowedSeparatedPath<'_> {
+        BorrowedSeparatedPath { dirname: self.dirname.as_ref(), basename: &self.basename }
+    }
+}
 /// A component URL. The URL is validated, but represented as a string to avoid
 /// normalization and retain the original representation.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -945,6 +1002,28 @@ mod tests {
         assert_eq!((path.dirname(), path.basename()), ("/foo", "bar"));
         let path = Path::new("/foo/bar/baz").unwrap();
         assert_eq!((path.dirname(), path.basename()), ("/foo/bar", "baz"));
+    }
+
+    #[test]
+    fn test_separated_path() {
+        fn test_path(path: SeparatedPath, expected_segments: Vec<&str>) {
+            let segments: Vec<_> = path.iter_segments().collect();
+            assert_eq!(segments, expected_segments);
+            let borrowed_path = path.as_ref();
+            let segments: Vec<_> = borrowed_path.iter_segments().collect();
+            assert_eq!(segments, expected_segments);
+            let owned_path = borrowed_path.to_owned();
+            assert_eq!(path, owned_path);
+        }
+        test_path(SeparatedPath { dirname: None, basename: "foo".into() }, vec!["foo"]);
+        test_path(
+            SeparatedPath { dirname: Some("bar".parse().unwrap()), basename: "foo".into() },
+            vec!["bar", "foo"],
+        );
+        test_path(
+            SeparatedPath { dirname: Some("bar/baz".parse().unwrap()), basename: "foo".into() },
+            vec!["bar", "baz", "foo"],
+        );
     }
 
     #[test]

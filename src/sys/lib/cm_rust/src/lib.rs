@@ -8,7 +8,7 @@ use {
         CapabilityDeclCommon, ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl,
         OfferDeclCommon, OfferDeclCommonNoAvailability, UseDeclCommon,
     },
-    cm_types::{AllowedOffers, Name, Path},
+    cm_types::{AllowedOffers, BorrowedSeparatedPath, Name, Path, RelativePath},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess,
     flyweights::FlyStr,
@@ -76,6 +76,19 @@ impl FidlIntoNative<Path> for String {
 }
 
 impl NativeIntoFidl<String> for Path {
+    fn native_into_fidl(self) -> String {
+        self.to_string()
+    }
+}
+
+impl FidlIntoNative<RelativePath> for String {
+    fn fidl_into_native(self) -> RelativePath {
+        // cm_fidl_validator should have already validated this
+        self.parse().unwrap()
+    }
+}
+
+impl NativeIntoFidl<String> for RelativePath {
     fn native_into_fidl(self) -> String {
         self.to_string()
     }
@@ -248,6 +261,10 @@ fidl_translations_symmetrical_enums!(
     Transitional
 );
 
+pub trait SourcePath {
+    fn source_path(&self) -> BorrowedSeparatedPath<'_>;
+}
+
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize, Serialize),
@@ -271,7 +288,7 @@ pub enum UseDecl {
 pub struct UseServiceDecl {
     pub source: UseSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target_path: Path,
     pub dependency_type: DependencyType,
     #[fidl_decl(default)]
@@ -284,11 +301,20 @@ pub struct UseServiceDecl {
 pub struct UseProtocolDecl {
     pub source: UseSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target_path: Path,
     pub dependency_type: DependencyType,
     #[fidl_decl(default)]
     pub availability: Availability,
+}
+
+impl SourcePath for UseProtocolDecl {
+    fn source_path(&self) -> BorrowedSeparatedPath<'_> {
+        BorrowedSeparatedPath {
+            dirname: self.source_dictionary.as_ref(),
+            basename: self.source_name.as_str(),
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -297,7 +323,7 @@ pub struct UseProtocolDecl {
 pub struct UseDirectoryDecl {
     pub source: UseSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target_path: Path,
 
     #[cfg_attr(
@@ -367,7 +393,7 @@ pub struct UseEventStreamDecl {
 pub struct UseRunnerDecl {
     pub source: UseSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
 }
 
 impl SourceName for UseRunnerDecl {
@@ -470,7 +496,7 @@ impl FidlIntoNative<NameMapping> for fdecl::NameMapping {
 pub struct OfferServiceDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: OfferTarget,
     pub target_name: Name,
     pub source_instance_filter: Option<Vec<String>>,
@@ -485,7 +511,7 @@ pub struct OfferServiceDecl {
 pub struct OfferProtocolDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: OfferTarget,
     pub target_name: Name,
     pub dependency_type: DependencyType,
@@ -499,7 +525,7 @@ pub struct OfferProtocolDecl {
 pub struct OfferDirectoryDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: OfferTarget,
     pub target_name: Name,
     pub dependency_type: DependencyType,
@@ -536,7 +562,7 @@ pub struct OfferStorageDecl {
 pub struct OfferRunnerDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: OfferTarget,
     pub target_name: Name,
 }
@@ -547,7 +573,7 @@ pub struct OfferRunnerDecl {
 pub struct OfferResolverDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: OfferTarget,
     pub target_name: Name,
 }
@@ -558,7 +584,7 @@ pub struct OfferResolverDecl {
 pub struct OfferDictionaryDecl {
     pub source: OfferSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: OfferTarget,
     pub target_name: Name,
     pub dependency_type: DependencyType,
@@ -789,7 +815,7 @@ impl ExposeDeclCommon for ExposeDecl {
 pub struct ExposeServiceDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: ExposeTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -802,7 +828,7 @@ pub struct ExposeServiceDecl {
 pub struct ExposeProtocolDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: ExposeTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -815,7 +841,7 @@ pub struct ExposeProtocolDecl {
 pub struct ExposeDirectoryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: ExposeTarget,
     pub target_name: Name,
 
@@ -840,7 +866,7 @@ pub struct ExposeDirectoryDecl {
 pub struct ExposeRunnerDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: ExposeTarget,
     pub target_name: Name,
 }
@@ -851,7 +877,7 @@ pub struct ExposeRunnerDecl {
 pub struct ExposeResolverDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: ExposeTarget,
     pub target_name: Name,
 }
@@ -862,7 +888,7 @@ pub struct ExposeResolverDecl {
 pub struct ExposeDictionaryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
     pub target: ExposeTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -990,7 +1016,7 @@ pub struct EventStreamDecl {
 pub struct DictionaryDecl {
     pub name: Name,
     pub source: Option<DictionarySource>,
-    pub source_dictionary: Option<PathBuf>,
+    pub source_dictionary: Option<RelativePath>,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
