@@ -5,7 +5,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_CODECS_TAS58XX_TAS58XX_INSPECT_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_CODECS_TAS58XX_TAS58XX_INSPECT_H_
 
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 
 #include <deque>
 

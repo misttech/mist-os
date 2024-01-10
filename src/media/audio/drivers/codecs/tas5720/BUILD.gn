@@ -24,7 +24,7 @@ fuchsia_driver("tas5720-driver") {
   ]
   deps = [
     ":ti_tas5720-bind",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
@@ -63,8 +63,8 @@ test("tas5720-test-bin") {
     ":tas5720",
     ":ti_tas5720-bind",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/testing/mock-ddk",

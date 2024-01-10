@@ -105,7 +105,7 @@ source_set("audio_core_lib") {
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit-promise",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
     "//src/media/audio/audio_core/shared",

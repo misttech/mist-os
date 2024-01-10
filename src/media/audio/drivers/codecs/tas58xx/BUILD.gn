@@ -36,7 +36,7 @@ fuchsia_driver("tas58xx-driver") {
   deps = [
     ":ti_tas58xx-bind",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/devices/lib/ti",
@@ -76,8 +76,8 @@ test("tas58xx-test") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//sdk/lib/sys/inspect/cpp",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/i2c/testing/mock-i2c",

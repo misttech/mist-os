@@ -10,8 +10,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <list>
@@ -108,7 +108,7 @@ class CodecFactoryApp {
   ProdOrTest prod_or_test_;
 
   std::unique_ptr<sys::ComponentContext> startup_context_;
-  std::unique_ptr<sys::ComponentInspector> inspector_;
+  std::unique_ptr<inspect::ComponentInspector> inspector_;
   inspect::Node hardware_factory_nodes_;
   std::string board_name_;
 

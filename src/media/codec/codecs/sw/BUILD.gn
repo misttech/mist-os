@@ -29,8 +29,8 @@ source_set("codec_runner_sw") {
   deps = [ "//src/media/lib/codec_impl" ]
 
   public_deps = [
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/trace-provider",
   ]

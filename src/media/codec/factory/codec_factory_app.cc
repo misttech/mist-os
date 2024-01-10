@@ -158,7 +158,8 @@ CodecFactoryApp::CodecFactoryApp(async_dispatcher_t* dispatcher, ProdOrTest prod
       startup_context_(sys::ComponentContext::Create()),
       board_name_(GetBoardName()),
       policy_(this) {
-  inspector_ = std::make_unique<sys::ComponentInspector>(startup_context_.get());
+  inspector_ =
+      std::make_unique<inspect::ComponentInspector>(dispatcher_, inspect::PublishOptions{});
   inspector_->Health().StartingUp();
   hardware_factory_nodes_ = inspector_->root().CreateChild("hardware_factory_nodes");
   // Don't publish service or outgoing()->ServeFromStartupInfo() until after initial discovery is
