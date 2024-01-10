@@ -4,6 +4,16 @@
         "skips": [
             {
                 "notes": [
+                    "New Flutter licenses are tripping the license checker.",
+                    "Remove this skip once the flutter licenses can be successfully parsed.",
+                    "See b/225400494 for more info."
+                ],
+                "paths": [
+                    "third_party/dart-pkg/git/flutter"
+                ]
+            },
+            {
+                "notes": [
                     "Legacy GN license checker does not know how to process SPDX files.",
                     "This is a temporary skip until either the old system is updated to read spdx,",
                     "or the new bazel-based GN metadata solution is enabled across the tree.",
