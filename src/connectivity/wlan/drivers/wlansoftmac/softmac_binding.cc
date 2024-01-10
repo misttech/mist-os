@@ -43,7 +43,6 @@
 
 #include "buffer_allocator.h"
 #include "convert.h"
-#include "device_interface.h"
 
 namespace wlan::drivers::wlansoftmac {
 
@@ -53,7 +52,6 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
-  state_ = fbl::AdoptRef(new DeviceState);
 
   // Create a dispatcher to server the WlanSoftmacBridge protocol.
   {
@@ -499,7 +497,5 @@ void SoftmacBinding::NotifyScanComplete(NotifyScanCompleteRequestView request, f
                                                         request->status(), request->scan_id());
   completer.buffer(arena).Reply();
 }
-
-fbl::RefPtr<DeviceState> SoftmacBinding::GetState() { return state_; }
 
 }  // namespace wlan::drivers::wlansoftmac

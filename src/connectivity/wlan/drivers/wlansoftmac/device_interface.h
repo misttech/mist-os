@@ -22,19 +22,6 @@
 
 namespace wlan::drivers {
 
-class Packet;
-
-// DeviceState represents the common runtime state of a device needed for
-// interacting with external systems.
-class DeviceState : public fbl::RefCounted<DeviceState> {
- public:
-  bool online() const { return online_; }
-  void set_online(bool online) { online_ = online; }
-
- private:
-  bool online_ = false;
-};
-
 // DeviceInterface represents the actions that may interact with external
 // systems.
 class DeviceInterface {
@@ -49,8 +36,6 @@ class DeviceInterface {
   virtual zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) = 0;
 
   virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;
-
-  virtual fbl::RefPtr<DeviceState> GetState() = 0;
 };
 
 }  // namespace wlan::drivers

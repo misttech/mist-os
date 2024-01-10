@@ -55,7 +55,6 @@ class SoftmacBinding : public DeviceInterface,
       __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) final;
   zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
-  fbl::RefPtr<DeviceState> GetState() final;
 
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
   void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
@@ -141,8 +140,6 @@ class SoftmacBinding : public DeviceInterface,
   // calls to this protocol should only be performed by the vendor driver.
   std::unique_ptr<wlan_softmac_ifc_protocol_ops_t> wlan_softmac_ifc_protocol_ops_;
   std::unique_ptr<wlan_softmac_ifc_protocol_t> wlan_softmac_ifc_protocol_;
-
-  fbl::RefPtr<DeviceState> state_;
 
   fdf::Dispatcher softmac_bridge_server_dispatcher_;
   std::unique_ptr<SoftmacBridge> softmac_bridge_;
