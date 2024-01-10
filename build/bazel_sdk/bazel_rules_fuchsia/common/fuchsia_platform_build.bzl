@@ -1,3 +1,7 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
 """Misc utilities that are related to the Fuchsia platform build only."""
 
 load(
@@ -121,6 +125,20 @@ def _get_rbe_config(repo_ctx):
         container_image = container_image,
     )
 
+def _get_formatted_starlak_dict(dict_value, margin):
+    """Convert dictionary into formatted Starlak expression.
+
+    Args:
+        dict_value: (dict) dictionary value.
+        margin: (string) A string of spaces to use as the current left-margin
+           for the location where the value will be inserted.
+    Returns:
+        A string holding a formatted Starlark expression for the input
+        dictionary. If not empty, this will use multiple lines (one per key)
+        with identation of |len(margin) + 4| spaces.
+    """
+    return json.encode_indent(dict_value, prefix = margin, indent = margin + "   ")
+
 def _fuchsia_build_config_repository_impl(repo_ctx):
     host_os = get_fuchsia_host_os(repo_ctx)
     host_arch = get_fuchsia_host_arch(repo_ctx)
@@ -143,11 +161,13 @@ def _fuchsia_build_config_repository_impl(repo_ctx):
 
     defs_content = '''# Auto-generated DO NOT EDIT
 
+"""Global information about this build's configuration."""
+
 build_config = struct(
     # The host operating system, using Fuchsia conventions
     host_os = "{host_os}",
 
-    # The host CPU architecture, isong Fuchsia conventions.
+    # The host CPU architecture, using Fuchsia conventions.
     host_arch = "{host_arch}",
 
     # The host tag, used to separate prebuilts in the Fuchsia source tree
@@ -193,8 +213,36 @@ build_config = struct(
     )
 
     repo_ctx.file("WORKSPACE.bazel", "")
-    repo_ctx.file("BUILD.bazel", "")
     repo_ctx.file("defs.bzl", defs_content)
+
+    # Generate a BUILD.bazel file that contains a platform definition using the
+    # right rbe_container_image execution property for linux-x64.
+    if host_tag == "linux-x64":
+        exec_properties = {
+            "container-image": rbe_config.container_image,
+            "OSFamily": "Linux",
+        }
+    else:
+        exec_properties = {}
+
+    build_bazel_content = '''# Auto-generated DO NOT EDIT
+
+"""A host platform() with optional support for remote builds."""
+
+platform(
+    name = "host",
+    constraint_values = [
+        "{host_os_constraint}",
+        "{host_cpu_constraint}",
+    ],
+    exec_properties = {exec_properties_str},
+)
+'''.format(
+        host_os_constraint = host_os_constraint,
+        host_cpu_constraint = host_cpu_constraint,
+        exec_properties_str = _get_formatted_starlak_dict(exec_properties, "    "),
+    )
+    repo_ctx.file("BUILD.bazel", build_bazel_content)
 
 fuchsia_build_config_repository = repository_rule(
     implementation = _fuchsia_build_config_repository_impl,
