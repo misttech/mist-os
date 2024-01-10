@@ -29,6 +29,7 @@ source_set("chunked-compression") {
     "//zircon/system/ulib/zx",
   ]
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//third_party/zstd",
     "//zircon/system/ulib/fbl",
@@ -116,6 +117,7 @@ fuchsia_library_fuzzer("header-reader-fuzzer") {
   deps = [
     ":chunked-compression",
     ":chunked-compression-testutils",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
   ]
 }
@@ -130,6 +132,7 @@ fuchsia_library_fuzzer("decompressor-fuzzer") {
   deps = [
     ":chunked-compression",
     ":chunked-compression-testutils",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
   ]
 }
