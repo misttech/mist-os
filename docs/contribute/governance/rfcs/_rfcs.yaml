@@ -3088,3 +3088,16 @@
   reviewers: ['cpu@google.com', 'rashaeqbal@google.com', 'jamesr@google.com']
   submitted: '2023-07-20'
   reviewed: '2023-12-12'
+
+- name: 'RFC-0238'
+  title: 'VMO size'
+  short_description: 'Defines the size and stream size of a VMO.'
+  authors: ['abarth@google.com']
+  file: '0238_vmo_size.md'
+  area: ['Kernel']
+  issue: ['']
+  gerrit_change_id: ['891370']
+  status: 'Accepted'
+  reviewers: ['cpu@google.com', 'csuter@google.com', 'jamesr@google.com', 'rashaeqbal@google.com']
+  submitted: '2024-01-10'
+  reviewed: '2024-01-10'
