@@ -18,6 +18,7 @@
 #include <lib/fdf/dispatcher.h>
 #include <lib/fit/result.h>
 #include <lib/operation/ethernet.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
@@ -52,6 +53,20 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
+
+  // Create a dispatcher to server the WlanSoftmacBridge protocol.
+  {
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                            "wlansoftmacbridge_server", [](fdf_dispatcher_t*) {});
+
+    if (dispatcher.is_error()) {
+      ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
+                    zx_status_get_string(dispatcher.status_value()));
+    }
+
+    softmac_bridge_server_dispatcher_ = *std::move(dispatcher);
+  }
 
   // Create a dispatcher to serve the WlanSoftmacIfc protocol.
   {
@@ -172,7 +187,8 @@ void SoftmacBinding::Init() {
           device_init_reply(child_device, status, nullptr);
         });
       });
-  auto softmac_bridge = SoftmacBridge::New(std::move(completer), this, client_.Clone());
+  auto softmac_bridge = SoftmacBridge::New(softmac_bridge_server_dispatcher_, std::move(completer),
+                                           this, client_.Clone());
   if (softmac_bridge.is_error()) {
     lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
     device_init_reply(child_device_, softmac_bridge.error_value(), nullptr);
@@ -184,15 +200,23 @@ void SoftmacBinding::Init() {
 // See lib/ddk/device.h for documentation on when this method is called.
 void SoftmacBinding::Unbind() {
   ldebug(0, nullptr, "Entering.");
+  auto softmac_bridge = softmac_bridge_.release();
+  auto stop_sta_returned = std::make_unique<libsync::Completion>();
+  auto unowned_stop_sta_returned = stop_sta_returned.get();
   auto completer = std::make_unique<StopStaCompleter>(
-      [&, dispatcher = main_driver_dispatcher_->async_dispatcher(),
-       client_dispatcher = client_dispatcher_.release()] {
-        async::PostTask(dispatcher, [&, client_dispatcher]() {
-          softmac_bridge_.reset();
-          fdf_dispatcher_shutdown_async(client_dispatcher);
-        });
+      [softmac_bridge_server_dispatcher = softmac_bridge_server_dispatcher_.async_dispatcher(),
+       softmac_bridge, client_dispatcher = client_dispatcher_.release(),
+       stop_sta_returned = std::move(stop_sta_returned)]() mutable {
+        async::PostTask(softmac_bridge_server_dispatcher,
+                        [softmac_bridge, client_dispatcher,
+                         stop_sta_returned = std::move(stop_sta_returned)]() {
+                          stop_sta_returned->Wait();
+                          delete softmac_bridge;
+                          fdf_dispatcher_shutdown_async(client_dispatcher);
+                        });
       });
-  softmac_bridge_->StopSta(std::move(completer));
+  softmac_bridge->StopSta(std::move(completer));
+  unowned_stop_sta_returned->Signal();
 }
 
 // See lib/ddk/device.h for documentation on when this method is called.

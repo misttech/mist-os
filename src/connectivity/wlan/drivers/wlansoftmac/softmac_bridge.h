@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
 #include <lib/operation/ethernet.h>
@@ -23,6 +24,7 @@ using StopStaCompleter = fit::callback<void()>;
 class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacBridge> {
  public:
   static zx::result<std::unique_ptr<SoftmacBridge>> New(
+      fdf::Dispatcher& softmac_bridge_server_dispatcher,
       std::unique_ptr<fit::callback<void(zx_status_t status)>> completer, DeviceInterface* device,
       fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client);
   zx_status_t StopSta(std::unique_ptr<StopStaCompleter> completer);
@@ -56,6 +58,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
       : softmac_client_(
             std::forward<fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>>(softmac_client)),
         device_interface_(device_interface) {}
+
   template <typename, typename = void>
   static constexpr bool has_value_type = false;
   template <typename T>

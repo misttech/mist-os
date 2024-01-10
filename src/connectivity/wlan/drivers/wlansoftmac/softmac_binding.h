@@ -143,6 +143,7 @@ class SoftmacBinding : public DeviceInterface,
 
   fbl::RefPtr<DeviceState> state_;
 
+  fdf::Dispatcher softmac_bridge_server_dispatcher_;
   std::unique_ptr<SoftmacBridge> softmac_bridge_;
 
   // The FIDL client to communicate with iwlwifi

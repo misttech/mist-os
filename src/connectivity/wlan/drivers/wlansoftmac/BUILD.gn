@@ -72,6 +72,7 @@ source_set("source_set") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
 
