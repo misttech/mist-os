@@ -438,7 +438,7 @@ trait ICUMapExt<'a> {
 impl<'a> ICUMapExt<'a> for ICUMap {
     fn resolve_revision(&'a self, requested_revision: &'a Revision) -> Result<(&Revision, &str)> {
         let (computed_revision, computed_commit_id) = match requested_revision {
-            Revision::Default | Revision::Stable | Revision::Latest => (
+            Revision::Default | Revision::Latest => (
                 Some(requested_revision),
                 ICU_CONFIG_INFO.commit_id_for_revision(requested_revision),
             ),
@@ -1068,7 +1068,6 @@ mod tests {
 
     #[test]
     fn check_icu_map() {
-        assert!(ICU_CONFIG_INFO.commit_id_for_revision(&Revision::Stable).is_some());
         assert!(ICU_CONFIG_INFO.commit_id_for_revision(&Revision::Latest).is_some());
         assert!(ICU_CONFIG_INFO.commit_id_for_revision(&Revision::Default).is_some());
     }

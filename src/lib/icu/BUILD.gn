@@ -30,11 +30,6 @@ config("version_default") {
       [ "RUST_ICU_MAJOR_VERSION_NUMBER=${icu_flavor_major_versions.default}" ]
 }
 
-config("version_stable") {
-  rustenv =
-      [ "RUST_ICU_MAJOR_VERSION_NUMBER=${icu_flavor_major_versions.stable}" ]
-}
-
 config("version_latest") {
   rustenv =
       [ "RUST_ICU_MAJOR_VERSION_NUMBER=${icu_flavor_major_versions.latest}" ]
@@ -105,10 +100,6 @@ icu_resource("icudtl_root_versioned") {
 
 config("default") {
   defines = [ "FUCHSIA_ICU_VARIANT=0" ]
-}
-
-config("stable") {
-  defines = [ "FUCHSIA_ICU_VARIANT=1" ]
 }
 
 config("latest") {

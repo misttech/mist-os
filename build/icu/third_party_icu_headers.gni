@@ -107,7 +107,6 @@ template("third_party_icu_headers") {
   if (icu_assembly) {
     _icu_dirs = {
       default = "third_party/icu/default"
-      stable = "third_party/icu/stable"
       latest = "third_party/icu/latest"
     }
   }
@@ -115,7 +114,6 @@ template("third_party_icu_headers") {
   _contents_map = {
     default = []
     latest = []
-    stable = []
   }
   foreach(_header, headers) {
     # #include "third_party/icu/blah" --> #include "${icu_root}/blah"
@@ -129,12 +127,10 @@ template("third_party_icu_headers") {
       _header_path = {
         default =
             string_replace(_header, "third_party/icu", _icu_dirs.default, 1)
-        stable = string_replace(_header, "third_party/icu", _icu_dirs.stable, 1)
         latest = string_replace(_header, "third_party/icu", _icu_dirs.latest, 1)
       }
 
       _contents_map.default += [ "#include \"${_header_path.default}\"" ]
-      _contents_map.stable += [ "#include \"${_header_path.stable}\"" ]
       _contents_map.latest += [ "#include \"${_header_path.latest}\"" ]
     }
   }
@@ -146,16 +142,14 @@ template("third_party_icu_headers") {
       ] + _contents +
       [ "#elif FUCHSIA_ICU_VARIANT == 0 /* //src/lib/icu:default */" ] +
       _contents_map.default +
-      [ "#elif FUCHSIA_ICU_VARIANT == 1 /* //src/lib/icu:stable */" ] +
-      _contents_map.stable +
       [ "#elif FUCHSIA_ICU_VARIANT == 2 /* //src/lib/icu:latest */" ] +
       _contents_map.latest +
       [ "#elif FUCHSIA_ICU_VARIANT == 3 /* //src/lib/icu:icu_root */" ] +
       _contents +
       [
         "#else",
-        "/* Refer to //src/lib/icu:{default,stable,latest,icu_root} */",
-        "#  error FUCHSIA_ICU_VARIANT needs a value between 0 or 3",
+        "/* Refer to //src/lib/icu:{default,latest,icu_root} */",
+        "#  error FUCHSIA_ICU_VARIANT needs a value between 0 and 3",
         "#endif",
       ]
 

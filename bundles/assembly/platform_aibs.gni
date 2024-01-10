@@ -164,11 +164,9 @@ user_platform_aib_names =
       "setui",
       "setui.icu_default_${icu_git_info.default}",
       "setui.icu_latest_${icu_git_info.latest}",
-      "setui.icu_stable_${icu_git_info.stable}",
       "setui_with_camera",
       "setui_with_camera.icu_default_${icu_git_info.default}",
       "setui_with_camera.icu_latest_${icu_git_info.latest}",
-      "setui_with_camera.icu_stable_${icu_git_info.stable}",
 
       # Storage
       "factory_data",
@@ -181,22 +179,18 @@ user_platform_aib_names =
 
       "intl_services.icu_default_${icu_git_info.default}",
       "intl_services.icu_latest_${icu_git_info.latest}",
-      "intl_services.icu_stable_${icu_git_info.stable}",
 
       "intl_services_small.icu_default_${icu_git_info.default}",
       "intl_services_small.icu_latest_${icu_git_info.latest}",
-      "intl_services_small.icu_stable_${icu_git_info.stable}",
 
       "intl_services_small_with_timezone.icu_default_${icu_git_info.default}",
       "intl_services_small_with_timezone.icu_latest_${icu_git_info.latest}",
-      "intl_services_small_with_timezone.icu_stable_${icu_git_info.stable}",
 
       # UI
       "ui",
       "ui_user_and_userdebug",
       "ui_user_and_userdebug.icu_default_${icu_git_info.default}",
       "ui_user_and_userdebug.icu_latest_${icu_git_info.latest}",
-      "ui_user_and_userdebug.icu_stable_${icu_git_info.stable}",
       "ui_package_user_and_userdebug",
       "ui_package_eng_userdebug_with_synthetic_device_support",
       "brightness_manager",
@@ -277,7 +271,6 @@ eng_only_platform_aib_names =
       "ui_eng",
       "ui_eng.icu_default_${icu_git_info.default}",
       "ui_eng.icu_latest_${icu_git_info.latest}",
-      "ui_eng.icu_stable_${icu_git_info.stable}",
       "ui_package_eng",
       "ui_package_eng_userdebug_with_synthetic_device_support",
 

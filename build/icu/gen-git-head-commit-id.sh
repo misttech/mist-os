@@ -10,8 +10,8 @@ set -eu
 #
 # Args:
 #   - ${1}: format ("json"|"bzl");
-#   - ${2}, ${3}, ${4}: the directories to examine, in
-#      order: default, stable, latest.
+#   - ${2}, ${3}: the directories to examine, in
+#      order: default, latest.
 
 
 # Obtains the commit ID of the current branch for the provided repository
@@ -44,16 +44,8 @@ if [[ "${default_commit_id}" == "" ]]; then
   exit 1
 fi
 
-# Filesystem path to //third_party/icu/stable
-readonly stable_git_path="${2}"
-readonly stable_commit_id="$(get_git_commit_id ${stable_git_path})"
-if [[ "${stable_commit_id}" == "" ]]; then
-  echo "stable commit id not found"
-  exit 1
-fi
-
 # Filesystem path to //third_party/icu/latest
-readonly latest_git_path="${3}"
+readonly latest_git_path="${2}"
 readonly latest_commit_id="$(get_git_commit_id ${latest_git_path})"
 if [[ "${latest_commit_id}" == "" ]]; then
   echo "latest commit id not found"
@@ -66,7 +58,6 @@ if [[ "${format}" == "json" ]]; then
   readonly output="$(cat <<EOF
 {
   "default": "${default_commit_id}",
-  "stable": "${stable_commit_id}",
   "latest": "${latest_commit_id}"
 }
 EOF
@@ -80,7 +71,6 @@ elif [[ "${format}" == "bzl" ]]; then
 icu_flavors = struct(
     default_git_commit = "${default_commit_id}",
     latest_git_commit = "${latest_commit_id}",
-    stable_git_commit = "${stable_commit_id}",
 )
 EOF
 )"

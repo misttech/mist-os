@@ -23,8 +23,6 @@ pub enum Revision {
     /// Whatever revision is currently 'default'.
     #[default]
     Default,
-    /// Whatever revision is currently 'stable'.
-    Stable,
     /// Whatever revision is currently 'latest'.
     Latest,
     /// If none of the above work, then you can specify a git commit ID.
@@ -46,7 +44,6 @@ impl std::fmt::Display for Revision {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Revision::Default => write!(f, "default"),
-            Revision::Stable => write!(f, "stable"),
             Revision::Latest => write!(f, "latest"),
             Revision::CommitId(id) => write!(f, "commit_id({})", &id),
         }
@@ -58,7 +55,7 @@ impl std::fmt::Display for Revision {
 pub struct ICUConfig {
     /// The revision (corresponding to either one of the labels, or a git commit ID) of the ICU
     /// library to use in system assembly. This revision is constrained to the commit IDs available
-    /// in the repos at `//third_party/icu/{default,stable,latest}`,
+    /// in the repos at `//third_party/icu/{default,latest}`,
     #[serde(default)]
     pub revision: Revision,
 
@@ -85,10 +82,6 @@ mod tests {
                     revision: Revision::CommitId("deadbeef".into()),
                     legacy_tzdata_packages: vec![],
                 },
-            },
-            TestCase {
-                input: r#"{ "revision": "stable" }"#,
-                expected: ICUConfig { revision: Revision::Stable, legacy_tzdata_packages: vec![] },
             },
             TestCase {
                 input: r#"{}"#,

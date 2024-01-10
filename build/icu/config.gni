@@ -15,7 +15,6 @@ icu_git_info =
                 [
                   "json",
                   rebase_path("//third_party/icu/default", root_build_dir),
-                  rebase_path("//third_party/icu/stable", root_build_dir),
                   rebase_path("//third_party/icu/latest", root_build_dir),
                 ],
                 "json")
@@ -23,7 +22,7 @@ icu_git_info =
 # A registry of the ICU flavors known to the build system.
 #
 # Each entry is a scope of:
-#   - name[string]: one of "default", "latest", "stable"
+#   - name[string]: one of "default", "latest",
 #   - commit_id[string]: the git commit ID at which the flavor currently is.
 icu_flavors = [
   {
@@ -33,10 +32,6 @@ icu_flavors = [
   {
     name = "latest"
     commit_id = icu_git_info.latest
-  },
-  {
-    name = "stable"
-    commit_id = icu_git_info.stable
   },
 ]
 
@@ -53,7 +48,6 @@ icu_fixup_deps = icu_fixup_deps_no_testonly + [ "//src/lib/icu:icu" ]
 # These can not be directly inserted in the assignments of
 # `icu_flavor_major_versions` below, that is a GN limitation.
 icu_default_config = read_file("//third_party/icu/default/version.json", "json")
-icu_stable_config = read_file("//third_party/icu/stable/version.json", "json")
 icu_latest_config = read_file("//third_party/icu/latest/version.json", "json")
 
 # The major version numbers per each ICU flavor.
@@ -61,5 +55,4 @@ icu_latest_config = read_file("//third_party/icu/latest/version.json", "json")
 icu_flavor_major_versions = {
   default = icu_default_config.major_version
   latest = icu_latest_config.major_version
-  stable = icu_stable_config.major_version
 }
