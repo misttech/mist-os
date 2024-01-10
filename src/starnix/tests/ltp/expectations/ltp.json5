@@ -124,7 +124,8 @@
                 "io_submit01",
                 "io_submit02",
                 "io_submit03",
-                "ioctl_loop04",
+
+                // Skipped with tmpfs.
                 "ioctl_loop05",
                 "ioprio_get01",
                 "ioprio_set01",

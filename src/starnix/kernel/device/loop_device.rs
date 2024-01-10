@@ -9,8 +9,9 @@ use crate::{
     task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless,
-        FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString,
+        default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless, Buffer,
+        FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString, InputBufferCallback,
+        PeekBufferSegmentsCallback,
     },
 };
 use bitflags::bitflags;
@@ -27,6 +28,7 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     uapi,
     user_address::UserRef,
+    user_buffer::UserBuffer,
     BLKFLSBUF, BLKGETSIZE, BLKGETSIZE64, LOOP_CHANGE_FD, LOOP_CLR_FD, LOOP_CONFIGURE, LOOP_CTL_ADD,
     LOOP_CTL_GET_FREE, LOOP_CTL_REMOVE, LOOP_GET_STATUS, LOOP_GET_STATUS64, LOOP_SET_BLOCK_SIZE,
     LOOP_SET_CAPACITY, LOOP_SET_DIRECT_IO, LOOP_SET_FD, LOOP_SET_STATUS, LOOP_SET_STATUS64,
@@ -186,6 +188,83 @@ impl BlockDeviceInfo for LoopDevice {
     }
 }
 
+#[derive(Debug)]
+struct CroppedInputBuffer<'a> {
+    base: &'a mut dyn InputBuffer,
+    size: usize,
+    drained: bool,
+}
+
+impl<'a> CroppedInputBuffer<'a> {
+    fn new(base: &'a mut dyn InputBuffer, size: usize) -> Self {
+        debug_assert!(size <= base.bytes_read() + base.available());
+        CroppedInputBuffer { base, size, drained: false }
+    }
+}
+
+impl<'a> Buffer for CroppedInputBuffer<'a> {
+    fn segments_count(&self) -> Result<usize, Errno> {
+        error!(ENOTSUP)
+    }
+
+    fn peek_each_segment(
+        &mut self,
+        callback: &mut PeekBufferSegmentsCallback<'_>,
+    ) -> Result<(), Errno> {
+        let mut pos = 0;
+        self.base.peek_each_segment(&mut |buffer: &UserBuffer| {
+            if pos >= self.size {
+                return;
+            } else if pos + buffer.length > self.size {
+                let cropped_size = self.size - pos;
+                pos += buffer.length;
+                callback(&UserBuffer { address: buffer.address, length: cropped_size });
+            } else {
+                pos += buffer.length;
+                callback(buffer);
+            }
+        })
+    }
+}
+
+impl<'a> InputBuffer for CroppedInputBuffer<'a> {
+    fn peek_each(&mut self, callback: &mut InputBufferCallback<'_>) -> Result<usize, Errno> {
+        if self.drained {
+            return Ok(0);
+        }
+        let mut pos = self.base.bytes_read();
+        self.base.peek_each(&mut |buf: &[u8]| {
+            if pos >= self.size {
+                return Ok(0);
+            }
+            let size = std::cmp::min(buf.len(), self.size - pos);
+            pos += size;
+            callback(&buf[..size])
+        })
+    }
+    fn advance(&mut self, length: usize) -> Result<(), Errno> {
+        if length > self.available() {
+            return error!(EINVAL);
+        }
+        self.base.advance(length)
+    }
+    fn available(&self) -> usize {
+        if self.drained || self.size < self.bytes_read() {
+            0
+        } else {
+            self.size - self.bytes_read()
+        }
+    }
+    fn bytes_read(&self) -> usize {
+        self.base.bytes_read()
+    }
+    fn drain(&mut self) -> usize {
+        let size = self.available();
+        self.drained = true;
+        size
+    }
+}
+
 struct LoopDeviceFile {
     device: Arc<LoopDevice>,
 }
@@ -215,7 +294,28 @@ impl FileOps for LoopDeviceFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         if let Some(backing_file) = self.device.backing_file() {
-            backing_file.write_at(current_task, self.device.offset_for_backing_file(offset), data)
+            let limit = self.device.state.lock().size_limit as usize;
+            if offset >= limit {
+                // Can't write past the size limit.
+                return Ok(0);
+            }
+            let mut cropped_buf;
+            let data = if offset + data.available() > limit {
+                // If the write would exceed the size limit, then crop the input buffer to write
+                // to the limit without exceeding it.
+                let bytes_to_write = limit - offset;
+                let cropped_size = data.bytes_read() + bytes_to_write;
+                cropped_buf = CroppedInputBuffer::new(data, cropped_size);
+                &mut cropped_buf
+            } else {
+                data
+            };
+            let r = backing_file.write_at(
+                current_task,
+                self.device.offset_for_backing_file(offset),
+                data,
+            );
+            r
         } else {
             error!(ENOSPC)
         }
