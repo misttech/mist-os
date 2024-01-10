@@ -162,8 +162,7 @@ fn connect_peer(
     overnet
         .connect_to_service(node_id, triangle::ConscriptMarker::PROTOCOL_NAME.to_owned(), s)
         .unwrap();
-    let proxy = fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
-    Ok(triangle::ConscriptProxy::new(proxy))
+    Ok(triangle::ConscriptProxy::new(fidl::AsyncChannel::from_channel(p)))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -250,8 +249,7 @@ async fn exec_conscript<
             let action = action.clone();
             async move {
                 tracing::info!(node_id = node_id.0, "Received service request for service");
-                let chan = fidl::AsyncChannel::from_channel(chan)
-                    .context("failed to make async channel")?;
+                let chan = fidl::AsyncChannel::from_channel(chan);
                 tracing::info!(node_id = node_id.0, "Started service handler");
                 triangle::ConscriptRequestStream::from_channel(chan)
                     .map_err(Into::into)

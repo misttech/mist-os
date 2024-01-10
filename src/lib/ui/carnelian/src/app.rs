@@ -487,16 +487,12 @@ impl App {
     async fn handle_message(&mut self, message: MessageInternal) -> Result<(), Error> {
         match message {
             MessageInternal::ServiceConnection(channel, service_name) => {
-                match fasync::Channel::from_channel(channel) {
-                    Ok(channel) => {
-                        self.assistant
-                            .handle_service_connection_request(service_name, channel)
-                            .unwrap_or_else(|e| {
-                                eprintln!("error running {} server: {:?}", service_name, e)
-                            });
-                    }
-                    Err(e) => eprintln!("error asyncifying channel: {:?}", e),
-                }
+                let channel = fasync::Channel::from_channel(channel);
+                self.assistant
+                    .handle_service_connection_request(service_name, channel)
+                    .unwrap_or_else(|e| {
+                        eprintln!("error running {} server: {:?}", service_name, e)
+                    });
             }
             MessageInternal::CreateView(params) => {
                 self.create_view_with_params(params, None).await?

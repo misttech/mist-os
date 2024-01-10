@@ -69,9 +69,7 @@ async fn exec_client(overnet: Arc<Overnet>, text: Option<&str>) -> Result<(), Er
             overnet
                 .connect_to_service(peer.node_id, echo::EchoMarker::PROTOCOL_NAME.to_owned(), s)
                 .unwrap();
-            let proxy =
-                fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
-            let cli = echo::EchoProxy::new(proxy);
+            let cli = echo::EchoProxy::new(fidl::AsyncChannel::from_channel(p));
             tracing::info!(
                 node_id = overnet.node_id().0,
                 "Sending {:?} to {:?}",
@@ -98,9 +96,8 @@ async fn exec_server(overnet: Arc<Overnet>) -> Result<(), Error> {
         .map(Result::<_, Error>::Ok)
         .try_for_each_concurrent(None, |chan| async move {
             tracing::info!(node_id = node_id.0, "Received service request for service");
-            let chan =
-                fidl::AsyncChannel::from_channel(chan).context("failed to make async channel")?;
-            let mut stream = echo::EchoRequestStream::from_channel(chan);
+            let mut stream =
+                echo::EchoRequestStream::from_channel(fidl::AsyncChannel::from_channel(chan));
             while let Some(echo::EchoRequest::EchoString { value, responder }) =
                 stream.try_next().await.context("error running echo server")?
             {

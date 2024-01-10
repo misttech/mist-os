@@ -35,15 +35,18 @@ impl From<Channel> for zx::Channel {
 
 impl Channel {
     /// Creates a new `Channel` from a previously-created `zx::Channel`.
-    // TODO(https://fxbug.dev/319131778) this function should be infallible
-    pub fn from_channel(channel: zx::Channel) -> Result<Self, zx::Status> {
-        Ok(Channel(RWHandle::new(channel)))
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
+    pub fn from_channel(channel: zx::Channel) -> Self {
+        Channel(RWHandle::new(channel))
     }
 
     /// Available for soft migration of b/319131778.
     // TODO(https://fxbug.dev/319131778) delete this function
     pub fn try_from_channel(channel: zx::Channel) -> Result<Self, zx::Status> {
-        Self::from_channel(channel)
+        Ok(Self::from_channel(channel))
     }
 
     /// Consumes `self` and returns the underlying `zx::Channel`.
@@ -211,7 +214,7 @@ mod tests {
         let bytes = &[0, 1, 2, 3];
 
         let (tx, rx) = zx::Channel::create();
-        let f_rx = Channel::from_channel(rx).unwrap();
+        let f_rx = Channel::from_channel(rx);
 
         let receiver = async move {
             let mut buffer = MessageBuf::new();
@@ -234,7 +237,7 @@ mod tests {
         let bytes = &[0, 1, 2, 3];
 
         let (tx, rx) = zx::Channel::create();
-        let f_rx = Channel::from_channel(rx).unwrap();
+        let f_rx = Channel::from_channel(rx);
 
         let receiver = async move {
             let mut buffer = MessageBufEtc::new();
@@ -256,10 +259,10 @@ mod tests {
         let mut exec = TestExecutor::new();
         let (tx0, rx0) = zx::Channel::create();
         let (_tx1, rx1) = zx::Channel::create();
-        let f_rx0 = Channel::from_channel(rx0).unwrap();
+        let f_rx0 = Channel::from_channel(rx0);
         mem::drop(tx0);
         mem::drop(f_rx0);
-        let f_rx1 = Channel::from_channel(rx1).unwrap();
+        let f_rx1 = Channel::from_channel(rx1);
         // f_rx0 and f_rx1 use the same key.
         let receiver = async move {
             let mut buffer = MessageBuf::new();
@@ -275,10 +278,10 @@ mod tests {
         let mut exec = TestExecutor::new();
         let (tx0, rx0) = zx::Channel::create();
         let (_tx1, rx1) = zx::Channel::create();
-        let f_rx0 = Channel::from_channel(rx0).unwrap();
+        let f_rx0 = Channel::from_channel(rx0);
         mem::drop(tx0);
         mem::drop(f_rx0);
-        let f_rx1 = Channel::from_channel(rx1).unwrap();
+        let f_rx1 = Channel::from_channel(rx1);
         // f_rx0 and f_rx1 use the same key.
         let receiver = async move {
             let mut buffer = MessageBufEtc::new();

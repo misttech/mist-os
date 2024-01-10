@@ -43,7 +43,7 @@ mod private {
         fn try_from(
             server_end: fidl::endpoints::ServerEnd<fio::DirectoryWatcherMarker>,
         ) -> Result<Self, Self::Error> {
-            let channel = fuchsia_async::Channel::from_channel(server_end.into_channel())?;
+            let channel = fuchsia_async::Channel::from_channel(server_end.into_channel());
             Ok(Self { channel })
         }
     }

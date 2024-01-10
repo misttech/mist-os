@@ -41,7 +41,7 @@ impl CommandChannel {
 
     /// Take a channel and wrap it in a `CommandChannel`.
     fn from_channel(chan: Channel) -> Result<CommandChannel, Error> {
-        let chan = fasync::Channel::from_channel(chan)?;
+        let chan = fasync::Channel::from_channel(chan);
 
         Ok(CommandChannel { chan })
     }

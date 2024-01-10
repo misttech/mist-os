@@ -509,7 +509,7 @@ mod tests {
         // should get peer-closed.
         let (client_end, server_end) = zx::Channel::create();
         fdio::service_connect_at(&dir, "fuchsia.Closed", server_end).unwrap();
-        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+        fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
 
         drop(dir);
         drop(processargs);
@@ -569,7 +569,7 @@ mod tests {
             if path == "abc" && *flags == flags_for_abc
         );
 
-        let client_end = fasync::Channel::from_channel(client_end.into()).unwrap();
+        let client_end = fasync::Channel::from_channel(client_end.into());
         assert_matches!(exec.run_until_stalled(&mut client_end.on_closed()), Poll::Pending);
         // Drop the request, including the server endpoint.
         drop(request);

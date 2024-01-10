@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use ffx::DaemonError;
 use ffx_daemon_core::events::Queue;
@@ -108,9 +108,7 @@ impl Context {
             .inner
             .open_target_proxy_with_info(target_identifier, moniker, P::PROTOCOL_NAME)
             .await?;
-        let proxy = P::Proxy::from_channel(
-            fidl::AsyncChannel::from_channel(channel).context("making async channel")?,
-        );
+        let proxy = P::Proxy::from_channel(fidl::AsyncChannel::from_channel(channel));
         Ok((info, proxy))
     }
 
@@ -183,9 +181,7 @@ impl Context {
                 <S as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME.to_owned(),
             )
             .await?;
-        let proxy = S::Proxy::from_channel(
-            fidl::AsyncChannel::from_channel(channel).context("making protocol async channel")?,
-        );
+        let proxy = S::Proxy::from_channel(fidl::AsyncChannel::from_channel(channel));
         Ok(proxy)
     }
 

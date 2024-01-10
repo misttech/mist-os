@@ -59,7 +59,7 @@ fn test_register_new_client() {
     assert_eq!(requests.len(), 0);
 
     let (_tx, rx) = zx::Channel::create();
-    let stream = SnoopRequestStream::from_channel(Channel::from_channel(rx).unwrap());
+    let stream = SnoopRequestStream::from_channel(Channel::from_channel(rx));
     register_new_client(stream, &mut requests, ClientId(0));
     assert_eq!(requests.len(), 1);
 }

@@ -36,9 +36,7 @@ impl InterestFilter {
                 _ => default_severity,
             };
             (
-                LogSinkProxy::new(
-                    fidl::AsyncChannel::from_channel(sync_proxy.into_channel()).unwrap(),
-                ),
+                LogSinkProxy::new(fidl::AsyncChannel::from_channel(sync_proxy.into_channel())),
                 Arc::new(RwLock::new(initial_severity)),
             )
         } else {

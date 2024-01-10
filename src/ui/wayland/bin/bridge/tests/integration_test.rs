@@ -58,7 +58,7 @@ mod test {
         let bridge_proxy = connect_to_protocol::<Server_Marker>()?;
         let (h1, h2) = zx::Channel::create();
         bridge_proxy.connect(h1)?;
-        let client_channel = fasync::Channel::from_channel(h2)?;
+        let client_channel = fasync::Channel::from_channel(h2);
 
         // Get the registry and issue a Sync; this should cause the server to
         // report all globals.

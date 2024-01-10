@@ -395,9 +395,8 @@ mod tests {
             PublishOptions::default()
                 .on_inspect_sink_client(ClientEnd::<InspectSinkMarker>::new(client)),
         );
-        let mut request_stream = InspectSinkRequestStream::from_channel(
-            fidl::AsyncChannel::from_channel(server).unwrap(),
-        );
+        let mut request_stream =
+            InspectSinkRequestStream::from_channel(fidl::AsyncChannel::from_channel(server));
 
         let tree = request_stream.next().await.unwrap();
 

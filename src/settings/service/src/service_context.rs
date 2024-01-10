@@ -54,7 +54,7 @@ impl ServiceContext {
         let proxy = if let Some(generate_service) = &self.generate_service {
             let (client, server) = zx::Channel::create();
             ((generate_service)(P::PROTOCOL_NAME, server)).await?;
-            P::Proxy::from_channel(fasync::Channel::from_channel(client)?)
+            P::Proxy::from_channel(fasync::Channel::from_channel(client))
         } else {
             connect_to_protocol::<P>()?
         };
@@ -79,7 +79,7 @@ impl ServiceContext {
         let proxy = if let Some(generate_service) = &self.generate_service {
             let (client, server) = zx::Channel::create();
             ((generate_service)(P::PROTOCOL_NAME, server)).await?;
-            P::Proxy::from_channel(fasync::Channel::from_channel(client)?)
+            P::Proxy::from_channel(fasync::Channel::from_channel(client))
         } else {
             connect_to_protocol::<P>()?
         };

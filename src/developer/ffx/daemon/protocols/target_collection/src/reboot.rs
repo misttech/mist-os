@@ -367,7 +367,7 @@ mod tests {
     use std::time::Instant;
 
     fn setup_admin(chan: fidl::Channel) -> Result<()> {
-        let mut stream = AdminRequestStream::from_channel(fidl::AsyncChannel::from_channel(chan)?);
+        let mut stream = AdminRequestStream::from_channel(fidl::AsyncChannel::from_channel(chan));
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

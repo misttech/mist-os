@@ -290,7 +290,7 @@ pub fn handle_lifecycle_requests(
 ) -> Result<(), Error> {
     if let Some(handle) = fuchsia_runtime::take_startup_handle(HandleType::Lifecycle.into()) {
         let mut stream =
-            LifecycleRequestStream::from_channel(fasync::Channel::from_channel(handle.into())?);
+            LifecycleRequestStream::from_channel(fasync::Channel::from_channel(handle.into()));
         fasync::Task::spawn(async move {
             match stream.try_next().await {
                 Ok(Some(LifecycleRequest::Stop { .. })) => {

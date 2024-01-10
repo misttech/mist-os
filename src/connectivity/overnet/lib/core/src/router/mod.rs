@@ -893,8 +893,8 @@ mod tests {
             router1.connect_to_service(router2.node_id, "send_datagram_immediately", p).await?;
             println!("send_datagram_immediately: wait for connection");
             let s = s.await?;
-            let c = fidl::AsyncChannel::from_channel(c)?;
-            let s = fidl::AsyncChannel::from_channel(s)?;
+            let c = fidl::AsyncChannel::from_channel(c);
+            let s = fidl::AsyncChannel::from_channel(s);
             c.write(&[1, 2, 3, 4, 5], &mut Vec::new())?;
             let mut buf = fidl::MessageBufEtc::new();
             println!("send_datagram_immediately: wait for datagram");
@@ -916,8 +916,8 @@ mod tests {
             router1.connect_to_service(router2.node_id, "ping_pong", p).await?;
             println!("ping_pong: wait for connection");
             let s = s.await?;
-            let c = fidl::AsyncChannel::from_channel(c)?;
-            let s = fidl::AsyncChannel::from_channel(s)?;
+            let c = fidl::AsyncChannel::from_channel(c);
+            let s = fidl::AsyncChannel::from_channel(s);
             println!("ping_pong: send ping");
             c.write(&[1, 2, 3, 4, 5], &mut Vec::new())?;
             println!("ping_pong: receive ping");

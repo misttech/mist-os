@@ -325,7 +325,7 @@ mod tests {
                     }
                     Ok(ControllerRequest::ConnectToDeviceFidl { server, .. }) => {
                         fasync::Task::spawn(mock_partition(PartitionRequestStream::from_channel(
-                            fasync::Channel::from_channel(server).unwrap(),
+                            fasync::Channel::from_channel(server),
                         )))
                         .detach();
                     }

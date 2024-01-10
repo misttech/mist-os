@@ -130,8 +130,7 @@ async fn open_virtual_device(control_device: &str) -> Result<fasync::Channel, Er
 
     let (remote_channel, local_channel) = zx::Channel::create();
     controller.create_loopback_device(remote_channel)?;
-    fasync::Channel::from_channel(local_channel)
-        .map_err(|e| anyhow!("Error opening virtual device {:?}", e))
+    Ok(fasync::Channel::from_channel(local_channel))
 }
 
 /// Connects to the socket addr and loopack device and runs the loop proxing data between both.
@@ -160,7 +159,7 @@ mod tests {
 
         // Mock channel setup
         let (txc, rxc) = zx::Channel::create();
-        let async_channel = fasync::Channel::from_channel(rxc).expect("unable to unwrap");
+        let async_channel = fasync::Channel::from_channel(rxc);
 
         let (txs, rxs) = zx::Socket::create_stream();
         let async_socket = fasync::Socket::from_socket(rxs);

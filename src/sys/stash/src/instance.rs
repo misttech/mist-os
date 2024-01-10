@@ -52,7 +52,7 @@ impl Instance {
             self.client_name.clone().ok_or(format_err!("identify has not been called"))?,
         );
 
-        let server_chan = fasync::Channel::from_channel(server_end.into_channel())?;
+        let server_chan = fasync::Channel::from_channel(server_end.into_channel());
 
         fasync::Task::spawn(
             async move {

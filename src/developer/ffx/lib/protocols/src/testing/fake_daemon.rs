@@ -125,8 +125,7 @@ impl FakeDaemon {
     pub async fn open_proxy<P: DiscoverableProtocolMarker>(&self) -> P::Proxy {
         let client = fidl::AsyncChannel::from_channel(
             self.open_protocol(P::PROTOCOL_NAME.to_string()).await.unwrap(),
-        )
-        .unwrap();
+        );
         P::Proxy::from_channel(client)
     }
 
@@ -161,7 +160,7 @@ impl DaemonProtocolProvider for FakeDaemon {
             .open(
                 protocol_name,
                 Context::new(self.clone()),
-                fidl::AsyncChannel::from_channel(server)?,
+                fidl::AsyncChannel::from_channel(server),
             )
             .await?;
         Ok(client)

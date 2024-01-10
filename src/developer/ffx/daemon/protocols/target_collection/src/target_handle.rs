@@ -429,8 +429,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let rcs_proxy =
-            fidl_rcs::RemoteControlProxy::new(fidl::AsyncChannel::from_channel(client).unwrap());
+        let rcs_proxy = fidl_rcs::RemoteControlProxy::new(fidl::AsyncChannel::from_channel(client));
         let rcs =
             RcsConnection::new_with_proxy(local_node, rcs_proxy.clone(), &node2.node_id().into());
 

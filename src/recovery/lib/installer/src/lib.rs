@@ -93,7 +93,7 @@ fn paver_connect(path: &str) -> Result<(PaverProxy, DynamicDataSinkProxy), Error
     )?;
 
     let data_sink =
-        DynamicDataSinkProxy::from_channel(fidl::AsyncChannel::from_channel(data_sink_chan)?);
+        DynamicDataSinkProxy::from_channel(fidl::AsyncChannel::from_channel(data_sink_chan));
     Ok((paver, data_sink))
 }
 

@@ -41,8 +41,8 @@ async fn send_message(
     mut out: Vec<(&[u8], &mut Vec<fidl::Handle>)>,
 ) {
     let channels = (
-        fidl::AsyncChannel::from_channel(channels.0).unwrap(),
-        fidl::AsyncChannel::from_channel(channels.1).unwrap(),
+        fidl::AsyncChannel::from_channel(channels.0),
+        fidl::AsyncChannel::from_channel(channels.1),
     );
     let num_handles_in: Vec<_> = out.iter().map(|(_, handles)| handles.len()).collect();
     for (out_bytes, handles) in out.iter_mut() {

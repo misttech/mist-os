@@ -65,7 +65,7 @@ impl ObjectRequest {
     ) -> Result<<T::Protocol as ProtocolMarker>::RequestStream, Status> {
         let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
             self.object_request,
-        )?);
+        ));
         match self.what_to_send {
             ObjectRequestSend::OnOpen => {
                 let control_handle = stream.control_handle();
@@ -108,7 +108,7 @@ impl ObjectRequest {
     ) -> Result<fidl::Channel, Status> {
         let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
             self.object_request,
-        )?);
+        ));
         send_on_open(&stream.control_handle(), node_info)?;
         let (inner, _is_terminated) = stream.into_inner();
         // It's safe to unwrap here because inner is clearly the only Arc reference left.

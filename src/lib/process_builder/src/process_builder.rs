@@ -998,7 +998,7 @@ mod tests {
         let (proxy, server) = zx::Channel::create();
         fdio::service_connect_at(&client, UtilMarker::PROTOCOL_NAME, server)
             .context("failed to connect to util service")?;
-        Ok(UtilProxy::from_channel(fasync::Channel::from_channel(proxy)?))
+        Ok(UtilProxy::from_channel(fasync::Channel::from_channel(proxy)))
     }
 
     fn create_test_util_builder() -> Result<ProcessBuilder, Error> {

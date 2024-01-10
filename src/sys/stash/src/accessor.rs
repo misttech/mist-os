@@ -142,7 +142,7 @@ impl Accessor {
 
         fasync::Task::spawn(
             async move {
-                let server_chan = fasync::Channel::from_channel(server_end.into_channel())?;
+                let server_chan = fasync::Channel::from_channel(server_end.into_channel());
                 let mut stream = ListIteratorRequestStream::from_channel(server_chan);
                 let mut remaining_results = &list_results[..];
                 while let Some(ListIteratorRequest::GetNext { responder }) =
@@ -214,7 +214,7 @@ impl Accessor {
 
         fasync::Task::spawn(
             async move {
-                let server_chan = fasync::Channel::from_channel(server_end.into_channel())?;
+                let server_chan = fasync::Channel::from_channel(server_end.into_channel());
                 let mut stream = GetIteratorRequestStream::from_channel(server_chan);
 
                 if !enable_bytes {

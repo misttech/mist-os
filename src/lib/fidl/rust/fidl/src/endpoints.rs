@@ -245,6 +245,7 @@ pub trait MemberOpener {
 
 /// Utility that spawns a new task to handle requests of a particular type, requiring a
 /// singlethreaded executor. The requests are handled one at a time.
+// TODO(https://fxbug.dev/319159026) this should be infallible
 pub fn spawn_local_stream_handler<P, F, Fut>(f: F) -> Result<P, Error>
 where
     P: Proxy,
@@ -258,6 +259,7 @@ where
 
 /// Utility that spawns a new task to handle requests of a particular type. The request handler
 /// must be threadsafe. The requests are handled one at a time.
+// TODO(https://fxbug.dev/319159026) this should be infallible
 pub fn spawn_stream_handler<P, F, Fut>(f: F) -> Result<P, Error>
 where
     P: Proxy,
@@ -306,10 +308,9 @@ impl<T> ClientEnd<T> {
 
 impl<T: ProtocolMarker> ClientEnd<T> {
     /// Convert the `ClientEnd` into a `Proxy` through which FIDL calls may be made.
+    // TODO(https://fxbug.dev/319159026) this should be infallible
     pub fn into_proxy(self) -> Result<T::Proxy, Error> {
-        Ok(T::Proxy::from_channel(
-            AsyncChannel::from_channel(self.inner).map_err(Error::AsyncChannel)?,
-        ))
+        Ok(T::Proxy::from_channel(AsyncChannel::from_channel(self.inner)))
     }
 
     /// Convert the `ClientEnd` into a `SynchronousProxy` through which thread-blocking FIDL calls
@@ -382,17 +383,25 @@ impl<T> ServerEnd<T> {
     }
 
     /// Create a stream of requests off of the channel.
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
+    // TODO(https://fxbug.dev/319159026) this should be infallible
     pub fn into_stream(self) -> Result<T::RequestStream, Error>
     where
         T: ProtocolMarker,
     {
-        Ok(T::RequestStream::from_channel(
-            AsyncChannel::from_channel(self.inner).map_err(Error::AsyncChannel)?,
-        ))
+        Ok(T::RequestStream::from_channel(AsyncChannel::from_channel(self.inner)))
     }
 
     /// Create a stream of requests and an event-sending handle
     /// from the channel.
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
+    // TODO(https://fxbug.dev/319159026) this should be infallible
     pub fn into_stream_and_control_handle(
         self,
     ) -> Result<(T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle), Error>
@@ -460,6 +469,11 @@ pub fn create_endpoints<T: ProtocolMarker>() -> (ClientEnd<T>, ServerEnd<T>) {
 ///
 /// Useful for sending channel handles to calls that take arguments
 /// of type `server_end:SomeProtocol`
+///
+/// # Panics
+///
+/// If called outside the context of an active async executor.
+// TODO(https://fxbug.dev/319159026) this should be infallible
 pub fn create_proxy<T: ProtocolMarker>() -> Result<(T::Proxy, ServerEnd<T>), Error> {
     let (client, server) = create_endpoints();
     Ok((client.into_proxy()?, server))
@@ -479,6 +493,11 @@ pub fn create_sync_proxy<T: ProtocolMarker>() -> (T::SynchronousProxy, ServerEnd
 ///
 /// Useful for sending channel handles to calls that take arguments
 /// of type `client_end:SomeProtocol`
+///
+/// # Panics
+///
+/// If called outside the context of an active async executor.
+// TODO(https://fxbug.dev/319159026) this should be infallible
 pub fn create_request_stream<T: ProtocolMarker>() -> Result<(ClientEnd<T>, T::RequestStream), Error>
 {
     let (client, server) = create_endpoints();
@@ -489,6 +508,11 @@ pub fn create_request_stream<T: ProtocolMarker>() -> Result<(ClientEnd<T>, T::Re
 ///
 /// Useful for testing where both the request stream and proxy are
 /// used in the same process.
+///
+/// # Panics
+///
+/// If called outside the context of an active async executor.
+// TODO(https://fxbug.dev/319159026) this should be infallible
 pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::RequestStream), Error> {
     let (client, server) = create_endpoints::<T>();
     Ok((client.into_proxy()?, server.into_stream()?))
@@ -498,6 +522,11 @@ pub fn create_proxy_and_stream<T: ProtocolMarker>() -> Result<(T::Proxy, T::Requ
 ///
 /// Useful for testing where both the request stream and proxy are
 /// used in the same process.
+///
+/// # Panics
+///
+/// If called outside the context of an active async executor.
+// TODO(https://fxbug.dev/319159026) this should be infallible
 #[cfg(target_os = "fuchsia")]
 pub fn create_sync_proxy_and_stream<T: ProtocolMarker>(
 ) -> Result<(T::SynchronousProxy, T::RequestStream), Error> {

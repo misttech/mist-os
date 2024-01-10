@@ -303,7 +303,7 @@ mod tests {
                 BT_FASTPAIR_PROVIDER_CHILD_NAME => self.bt_fastpair_provider_channel = Some(local),
                 _ => panic!("MockComponentClient received unexpected child name: {}", child_name),
             }
-            Ok(fio::DirectoryProxy::from_channel(AsyncChannel::from_channel(client).unwrap()))
+            Ok(fio::DirectoryProxy::from_channel(AsyncChannel::from_channel(client)))
         }
     }
 

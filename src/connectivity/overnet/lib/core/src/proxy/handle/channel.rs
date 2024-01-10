@@ -59,7 +59,7 @@ impl<'a> ProxyableRW<'a> for Channel {
 impl IntoProxied for fidl::Channel {
     type Proxied = Channel;
     fn into_proxied(self) -> Result<Channel, Error> {
-        Ok(Channel { chan: AsyncChannel::from_channel(self)? })
+        Ok(Channel { chan: AsyncChannel::from_channel(self) })
     }
 }
 

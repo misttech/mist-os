@@ -185,8 +185,8 @@ impl Channel {
     }
 
     /// Creates a new `Channel` from a previously-created `emulated_handle::Channel`.
-    pub fn from_channel(channel: super::Channel) -> Result<Self, zx_status::Status> {
-        Ok(Channel { channel })
+    pub fn from_channel(channel: super::Channel) -> Self {
+        Channel { channel }
     }
 }
 
@@ -242,8 +242,7 @@ mod test {
     fn async_channel_write_read() {
         block_on(async move {
             let (a, b) = Channel::create();
-            let (a, b) =
-                (AsyncChannel::from_channel(a).unwrap(), AsyncChannel::from_channel(b).unwrap());
+            let (a, b) = (AsyncChannel::from_channel(a), AsyncChannel::from_channel(b));
             let mut buf = MessageBuf::new();
 
             let mut cx = Context::from_waker(noop_waker_ref());
@@ -266,8 +265,7 @@ mod test {
     fn async_channel_write_etc_read_etc() {
         block_on(async move {
             let (a, b) = Channel::create();
-            let (a, b) =
-                (AsyncChannel::from_channel(a).unwrap(), AsyncChannel::from_channel(b).unwrap());
+            let (a, b) = (AsyncChannel::from_channel(a), AsyncChannel::from_channel(b));
             let mut buf = MessageBufEtc::new();
 
             let mut cx = Context::from_waker(noop_waker_ref());

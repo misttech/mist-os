@@ -193,7 +193,7 @@ impl DaemonProtocolProvider for Daemon {
             .open(
                 protocol_name,
                 protocols::Context::new(self.clone()),
-                fidl::AsyncChannel::from_channel(server)?,
+                fidl::AsyncChannel::from_channel(server),
             )
             .await?;
         Ok(client)
@@ -756,7 +756,7 @@ impl Daemon {
                     .open(
                         name,
                         protocols::Context::new(self.clone()),
-                        fidl::AsyncChannel::from_channel(server_end)?,
+                        fidl::AsyncChannel::from_channel(server_end),
                     )
                     .await
                 {
@@ -819,7 +819,7 @@ impl Daemon {
                     Some(chan) => {
                         tracing::trace!("Received protocol request for protocol");
                         let chan =
-                            fidl::AsyncChannel::from_channel(chan).context("failed to make async channel")?;
+                            fidl::AsyncChannel::from_channel(chan);
                         let daemon_clone = self.clone();
                         let mut quit_tx = quit_tx.clone();
                         let info = info.clone();

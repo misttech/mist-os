@@ -543,7 +543,7 @@ where
     F: FnOnce(UnknownInteractionsProtocolProxy),
 {
     let (client_end, server_end) = Channel::create();
-    let client_end = AsyncChannel::from_channel(client_end).unwrap();
+    let client_end = AsyncChannel::from_channel(client_end);
     let client = UnknownInteractionsProtocolProxy::from_channel(client_end);
 
     client_runner(client);
@@ -595,7 +595,7 @@ where
     F: Future<Output = R>,
 {
     let (client_end, server_end) = Channel::create();
-    let client_end = AsyncChannel::from_channel(client_end).unwrap();
+    let client_end = AsyncChannel::from_channel(client_end);
     let client = UnknownInteractionsProtocolProxy::new(client_end);
 
     let t = std::thread::spawn(move || {
@@ -866,7 +866,7 @@ async fn two_way_flexible_err_async_send_error_variant() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_event_strict_async() {
     let (client_end, server_end) = Channel::create();
-    let client_end = AsyncChannel::from_channel(client_end).unwrap();
+    let client_end = AsyncChannel::from_channel(client_end);
     let mut client = UnknownInteractionsProtocolProxy::from_channel(client_end).take_event_stream();
 
     server_end
@@ -897,7 +897,7 @@ async fn receive_unknown_event_strict_async() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_event_flexible_async() {
     let (client_end, server_end) = Channel::create();
-    let client_end = AsyncChannel::from_channel(client_end).unwrap();
+    let client_end = AsyncChannel::from_channel(client_end);
     let mut client = UnknownInteractionsProtocolProxy::from_channel(client_end).take_event_stream();
 
     server_end
@@ -925,7 +925,7 @@ async fn receive_unknown_event_flexible_async() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_event_strict_ajar_async() {
     let (client_end, server_end) = Channel::create();
-    let client_end = AsyncChannel::from_channel(client_end).unwrap();
+    let client_end = AsyncChannel::from_channel(client_end);
     let mut client =
         UnknownInteractionsAjarProtocolProxy::from_channel(client_end).take_event_stream();
 
@@ -957,7 +957,7 @@ async fn receive_unknown_event_strict_ajar_async() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_event_flexible_ajar_async() {
     let (client_end, server_end) = Channel::create();
-    let client_end = AsyncChannel::from_channel(client_end).unwrap();
+    let client_end = AsyncChannel::from_channel(client_end);
     let mut client =
         UnknownInteractionsAjarProtocolProxy::from_channel(client_end).take_event_stream();
 
@@ -986,7 +986,7 @@ async fn receive_unknown_event_flexible_ajar_async() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_event_strict_closed_async() {
     let (client_end, server_end) = Channel::create();
-    let client_end = AsyncChannel::from_channel(client_end).unwrap();
+    let client_end = AsyncChannel::from_channel(client_end);
     let mut client =
         UnknownInteractionsClosedProtocolProxy::from_channel(client_end).take_event_stream();
 
@@ -1018,7 +1018,7 @@ async fn receive_unknown_event_strict_closed_async() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_event_flexible_closed_async() {
     let (client_end, server_end) = Channel::create();
-    let client_end = AsyncChannel::from_channel(client_end).unwrap();
+    let client_end = AsyncChannel::from_channel(client_end);
     let mut client =
         UnknownInteractionsClosedProtocolProxy::from_channel(client_end).take_event_stream();
 
@@ -1058,7 +1058,7 @@ where
     F: FnOnce(UnknownInteractionsProtocolControlHandle),
 {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let server =
         UnknownInteractionsProtocolRequestStream::from_channel(server_end).control_handle();
 
@@ -1164,7 +1164,7 @@ async fn run_two_way_response<S, F>(
     F: Future<Output = ()>,
 {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let server = UnknownInteractionsProtocolRequestStream::from_channel(server_end);
 
     let t = std::thread::spawn(move || {
@@ -1378,7 +1378,7 @@ async fn flexible_two_way_err_response_error() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_one_way_strict() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1409,7 +1409,7 @@ async fn receive_unknown_one_way_strict() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_one_way_flexible() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1441,7 +1441,7 @@ async fn receive_unknown_one_way_flexible() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_two_way_strict() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1507,7 +1507,7 @@ async fn receive_unknown_two_way_flexible() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_one_way_ajar_strict() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsAjarProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1538,7 +1538,7 @@ async fn receive_unknown_one_way_ajar_strict() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_one_way_ajar_flexible() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsAjarProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1566,7 +1566,7 @@ async fn receive_unknown_one_way_ajar_flexible() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_two_way_ajar_strict() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsAjarProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1597,7 +1597,7 @@ async fn receive_unknown_two_way_ajar_strict() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_two_way_ajar_flexible() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsAjarProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1628,7 +1628,7 @@ async fn receive_unknown_two_way_ajar_flexible() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_one_way_closed_strict() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsClosedProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1659,7 +1659,7 @@ async fn receive_unknown_one_way_closed_strict() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_one_way_closed_flexible() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsClosedProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1690,7 +1690,7 @@ async fn receive_unknown_one_way_closed_flexible() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_two_way_closed_strict() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsClosedProtocolRequestStream::from_channel(server_end);
 
     client_end
@@ -1721,7 +1721,7 @@ async fn receive_unknown_two_way_closed_strict() {
 #[fasync::run_singlethreaded(test)]
 async fn receive_unknown_two_way_closed_flexible() {
     let (client_end, server_end) = Channel::create();
-    let server_end = AsyncChannel::from_channel(server_end).unwrap();
+    let server_end = AsyncChannel::from_channel(server_end);
     let mut server = UnknownInteractionsClosedProtocolRequestStream::from_channel(server_end);
 
     client_end

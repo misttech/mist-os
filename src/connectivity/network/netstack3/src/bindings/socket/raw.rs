@@ -96,8 +96,7 @@ impl<'a> RequestHandler<'a> {
     {
         match request {
             fpraw::SocketRequest::Clone2 { request, control_handle: _ } => {
-                let channel = fidl::AsyncChannel::from_channel(request.into_channel())
-                    .expect("failed to create async channel");
+                let channel = fidl::AsyncChannel::from_channel(request.into_channel());
                 let stream = fpraw::SocketRequestStream::from_channel(channel);
                 return ControlFlow::Continue(Some(stream));
             }

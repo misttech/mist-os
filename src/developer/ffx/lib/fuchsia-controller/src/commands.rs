@@ -215,20 +215,7 @@ impl LibraryCommand {
                 }
             }
             Self::ChannelRead { lib, channel, mut out_buf, mut out_handles, responder } => {
-                let channel = match fidl::AsyncChannel::from_channel(channel) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        lib.write_err(e);
-                        responder
-                            .send(ReadResponse {
-                                actual_bytes_count: 0,
-                                actual_handles_count: 0,
-                                result: zx_status::Status::INTERNAL,
-                            })
-                            .unwrap();
-                        return;
-                    }
-                };
+                let channel = fidl::AsyncChannel::from_channel(channel);
                 // Creates a waker that can notify when the channel needs to be
                 // woken for reads. Does not actually cause any reads to happen. One
                 // must manually invoke reading from this channel in a subsequent

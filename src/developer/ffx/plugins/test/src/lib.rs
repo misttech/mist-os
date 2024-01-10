@@ -916,7 +916,7 @@ mod test {
                         responder.send(Ok(())).expect("error sending EchoString response");
 
                         let mut stream = EarlyBootProfileRequestStream::from_channel(
-                            fidl::AsyncChannel::from_channel(server_channel).unwrap(),
+                            fidl::AsyncChannel::from_channel(server_channel),
                         );
                         while let Some(request) = stream.try_next().await.unwrap() {
                             match request {

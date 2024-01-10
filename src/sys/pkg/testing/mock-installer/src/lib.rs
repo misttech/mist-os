@@ -123,9 +123,8 @@ impl MockUpdateInstallerService {
                         options,
                         reboot_controller_present: reboot_controller.is_some(),
                     });
-                    let proxy = MonitorProxy::new(
-                        fasync::Channel::from_channel(monitor.into_channel()).unwrap(),
-                    );
+                    let proxy =
+                        MonitorProxy::new(fasync::Channel::from_channel(monitor.into_channel()));
                     fasync::Task::spawn(Arc::clone(&self).send_states(proxy)).detach();
                     if let Some(reboot_controller) = reboot_controller {
                         let service = Arc::clone(&self);

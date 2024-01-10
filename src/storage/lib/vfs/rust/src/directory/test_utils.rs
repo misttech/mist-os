@@ -138,7 +138,7 @@ macro_rules! assert_watch {
         let status = $proxy.watch($mask, 0, server).await.expect("watch failed");
         assert_eq!(Status::from_raw(status), Status::OK);
 
-        Channel::from_channel(client.into_channel()).unwrap()
+        Channel::from_channel(client.into_channel())
     }};
 }
 

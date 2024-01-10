@@ -1684,7 +1684,7 @@ mod test {
             + Clone
             + 'static,
     {
-        let channel = fidl::AsyncChannel::from_channel(server_channel).unwrap();
+        let channel = fidl::AsyncChannel::from_channel(server_channel);
         let mut stream = TargetCollectionRequestStream::from_channel(channel);
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {

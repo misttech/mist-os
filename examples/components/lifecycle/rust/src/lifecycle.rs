@@ -23,9 +23,7 @@ async fn main() {
             info!("Lifecycle channel received.");
             // Begin listening for lifecycle requests on this channel
             let x: fuchsia_zircon::Channel = lifecycle_handle.into();
-            let async_x = AsyncChannel::from(
-                fuchsia_async::Channel::from_channel(x).expect("Async channel conversion failed."),
-            );
+            let async_x = AsyncChannel::from(fuchsia_async::Channel::from_channel(x));
             let mut req_stream = LifecycleRequestStream::from_channel(async_x);
             info!("Awaiting request to close...");
             if let Some(request) =

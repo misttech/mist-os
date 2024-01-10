@@ -521,9 +521,8 @@ mod test {
         Task::local(async move {
             while let Some(chan) = receiver.next().await {
                 let link_tasks = link_tasks.clone();
-                let mut stream = DaemonRequestStream::from_channel(
-                    fidl::AsyncChannel::from_channel(chan).unwrap(),
-                );
+                let mut stream =
+                    DaemonRequestStream::from_channel(fidl::AsyncChannel::from_channel(chan));
                 while let Some(request) = stream.try_next().await.unwrap_or(None) {
                     match request {
                         DaemonRequest::GetVersionInfo { responder, .. } => {
@@ -731,10 +730,8 @@ mod test {
                 DaemonRequest::ConnectToProtocol { name, server_end, responder }
                     if name == TargetCollectionMarker::PROTOCOL_NAME =>
                 {
-                    start_target_collection_task(
-                        fidl::AsyncChannel::from_channel(server_end).unwrap(),
-                    )
-                    .detach();
+                    start_target_collection_task(fidl::AsyncChannel::from_channel(server_end))
+                        .detach();
 
                     responder.send(Ok(()))?;
                 }

@@ -59,7 +59,7 @@ pub extern "C" fn wayland_server_create(
                 dispatcher
                     .display
                     .clone()
-                    .spawn_new_client(fasync::Channel::from_channel(channel).unwrap(), false);
+                    .spawn_new_client(fasync::Channel::from_channel(channel), false);
             }
         });
     });

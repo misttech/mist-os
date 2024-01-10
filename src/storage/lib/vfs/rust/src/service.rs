@@ -121,15 +121,13 @@ impl DirectoryEntry for Service {
                         .into_channel_after_sending_on_open(fio::NodeInfoDeprecated::Service(
                             fio::Service,
                         ))
-                        .and_then(Channel::from_channel)
+                        .map(Channel::from_channel)
                     {
                         (self.open)(scope, channel);
                     }
                 } else {
-                    if let Ok(channel) = Channel::from_channel(object_request.take().into_channel())
-                    {
-                        (self.open)(scope, channel);
-                    }
+                    let channel = Channel::from_channel(object_request.take().into_channel());
+                    (self.open)(scope, channel);
                 }
             }
             Ok(())

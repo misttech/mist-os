@@ -97,9 +97,7 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
         .expect("FIDL error when binding to child in Realm")
         .expect("Cannot bind to test harness child in Realm");
 
-    let exposed_dir = fio::DirectoryProxy::new(
-        fidl::AsyncChannel::from_channel(client).expect("Cannot create async channel"),
-    );
+    let exposed_dir = fio::DirectoryProxy::new(fidl::AsyncChannel::from_channel(client));
 
     fuchsia_component::client::connect_to_protocol_at_dir_root::<io_test::Io1HarnessMarker>(
         &exposed_dir,

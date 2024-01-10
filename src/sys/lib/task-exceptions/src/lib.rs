@@ -77,7 +77,7 @@ impl ExceptionsStream {
     }
 
     pub fn from_channel(chan: zx::Channel) -> Result<Self, zx::Status> {
-        Ok(Self { inner: fasync::Channel::from_channel(chan)?, is_terminated: false })
+        Ok(Self { inner: fasync::Channel::from_channel(chan), is_terminated: false })
     }
 }
 

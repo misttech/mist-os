@@ -61,9 +61,7 @@ impl RcsConnection {
     pub fn new(node: Arc<overnet_core::Router>, id: &mut NodeId) -> Result<Self> {
         let (s, p) = fidl::Channel::create();
         let _result = RcsConnection::connect_to_service(Arc::clone(&node), id, s)?;
-        let proxy = RemoteControlProxy::new(
-            fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?,
-        );
+        let proxy = RemoteControlProxy::new(fidl::AsyncChannel::from_channel(p));
 
         Ok(Self { node, proxy, overnet_id: id.clone() })
     }
@@ -188,7 +186,7 @@ pub async fn knock_rcs(rcs_proxy: &RemoteControlProxy) -> Result<(), ffx::Target
 
 async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsError> {
     let (knock_client, knock_remote) = fidl::handle::Channel::create();
-    let knock_client = fuchsia_async::Channel::from_channel(knock_client)?;
+    let knock_client = fuchsia_async::Channel::from_channel(knock_client);
     let knock_client = fidl::client::Client::new(knock_client, "knock_client");
     rcs_proxy
         .open_capability(

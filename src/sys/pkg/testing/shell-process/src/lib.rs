@@ -11,7 +11,7 @@
 //! let mut fs = ServiceFs::new();
 //! let (svc_client_end, svc_server_end) = zx::Channel::create().expect("create channel");
 //! let svc_proxy = fidl_fuchsia_io::DirectoryProxy::from_channel(
-//!     fuchsia_async::Channel::from_channel(svc_client_end).unwrap(),
+//!     fuchsia_async::Channel::from_channel(svc_client_end),
 //! );
 //! let env = fs.serve_connection(svc_server_end);
 //! ...

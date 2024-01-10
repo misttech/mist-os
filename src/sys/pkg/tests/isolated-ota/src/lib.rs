@@ -230,9 +230,9 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
             }
         };
 
-        let blobfs_proxy = fio::DirectoryProxy::from_channel(
-            fasync::Channel::from_channel(blobfs_handle.into_channel()).unwrap(),
-        );
+        let blobfs_proxy = fio::DirectoryProxy::from_channel(fasync::Channel::from_channel(
+            blobfs_handle.into_channel(),
+        ));
 
         let (blobfs_client_end_clone, remote) =
             fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
@@ -498,7 +498,7 @@ fn launch_cloned_blobfs(
 ) {
     let flags =
         if flags.contains(fio::OpenFlags::CLONE_SAME_RIGHTS) { parent_flags } else { flags };
-    let chan = fidl::AsyncChannel::from_channel(end.into_channel()).expect("cloning blobfs dir");
+    let chan = fidl::AsyncChannel::from_channel(end.into_channel());
     let stream = fio::DirectoryRequestStream::from_channel(chan);
     fasync::Task::spawn(async move {
         serve_failing_blobfs(stream, flags)
@@ -660,7 +660,7 @@ pub async fn test_blobfs_broken() -> Result<(), Error> {
         .context("Building TestEnv")?;
 
     let stream =
-        fio::DirectoryRequestStream::from_channel(fidl::AsyncChannel::from_channel(server)?);
+        fio::DirectoryRequestStream::from_channel(fidl::AsyncChannel::from_channel(server));
 
     fasync::Task::spawn(async move {
         serve_failing_blobfs(stream, fio::OpenFlags::empty())

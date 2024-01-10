@@ -15,8 +15,7 @@ pub fn take_lifecycle_request_stream() -> LifecycleRequestStream {
     let lifecycle_handle_info = HandleInfo::new(HandleType::Lifecycle, 0);
     let lifecycle_handle = take_startup_handle(lifecycle_handle_info)
         .expect("must have been provided a lifecycle channel in procargs");
-    let async_chan = fasync::Channel::from_channel(lifecycle_handle.into())
-        .expect("Async channel conversion failed.");
+    let async_chan = fasync::Channel::from_channel(lifecycle_handle.into());
     LifecycleRequestStream::from_channel(async_chan)
 }
 

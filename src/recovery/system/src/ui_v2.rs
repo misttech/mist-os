@@ -334,7 +334,7 @@ mod tests {
         recovery_app_assistant
             .handle_service_connection_request(
                 ProgressRendererMarker::PROTOCOL_NAME,
-                fasync::Channel::from_channel(progress_server.into_channel()).unwrap(),
+                fasync::Channel::from_channel(progress_server.into_channel()),
             )
             .unwrap();
 
@@ -386,7 +386,7 @@ mod tests {
         recovery_app_assistant
             .handle_service_connection_request(
                 ProgressRendererMarker::PROTOCOL_NAME,
-                fasync::Channel::from_channel(progress_server.into_channel()).unwrap(),
+                fasync::Channel::from_channel(progress_server.into_channel()),
             )
             .unwrap();
 

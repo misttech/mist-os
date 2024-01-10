@@ -201,9 +201,8 @@ async fn handle_archive_accessor(
 }
 
 async fn handle_log_settings(channel: fidl::Channel, mut scheduler: TaskScheduler) {
-    let mut stream = LogSettingsRequestStream::from_channel(
-        fuchsia_async::Channel::from_channel(channel).unwrap(),
-    );
+    let mut stream =
+        LogSettingsRequestStream::from_channel(fuchsia_async::Channel::from_channel(channel));
     while let Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =
         stream.next().await
     {

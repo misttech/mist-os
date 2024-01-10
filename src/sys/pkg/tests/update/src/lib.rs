@@ -212,9 +212,9 @@ impl MockUpdateManagerService {
                         monitor_present: monitor.is_some(),
                     });
                     if let Some(monitor) = monitor {
-                        let proxy = fidl_update::MonitorProxy::new(
-                            fasync::Channel::from_channel(monitor.into_channel()).unwrap(),
-                        );
+                        let proxy = fidl_update::MonitorProxy::new(fasync::Channel::from_channel(
+                            monitor.into_channel(),
+                        ));
                         let mut receiver = self.states_receiver.lock().await;
                         let states = receiver.next().await.unwrap();
                         fasync::Task::spawn(Self::send_states(proxy, states)).detach();

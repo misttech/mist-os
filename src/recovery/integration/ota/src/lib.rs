@@ -365,9 +365,9 @@ async fn route_and_serve_local_mocks(
         .await
         .expect("failed to route paver protocol");
 
-    let blobfs_proxy = fio::DirectoryProxy::from_channel(
-        fasync::Channel::from_channel(blobfs_handle.into_channel()).unwrap(),
-    );
+    let blobfs_proxy = fio::DirectoryProxy::from_channel(fasync::Channel::from_channel(
+        blobfs_handle.into_channel(),
+    ));
 
     let fshost_admin_server = builder
         .add_local_child(

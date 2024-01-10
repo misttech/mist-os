@@ -627,10 +627,8 @@ pub async fn get_entries(
     fdio::service_connect(path, control_server)
         .context(format!("failed to connect to {:?}", path))?;
 
-    let directory_proxy = fio::DirectoryProxy::from_channel(
-        fasync::Channel::from_channel(control_client)
-            .map_err(|e| anyhow::anyhow!("Could not create fasync channel: {}", e))?,
-    );
+    let directory_proxy =
+        fio::DirectoryProxy::from_channel(fasync::Channel::from_channel(control_client));
 
     let (status, buf) = directory_proxy
         .read_dirents(fio::MAX_BUF)

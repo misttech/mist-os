@@ -139,7 +139,7 @@ impl Snooper {
 
     /// Take a channel and wrap it in a `Snooper`.
     pub fn from_channel(chan: Channel, path: &str) -> Result<Snooper, Error> {
-        let chan = fasync::Channel::from_channel(chan)?;
+        let chan = fasync::Channel::from_channel(chan);
 
         let device_name = path.to_owned();
         Ok(Snooper { device_name, chan })

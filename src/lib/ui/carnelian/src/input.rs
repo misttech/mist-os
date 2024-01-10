@@ -406,7 +406,7 @@ pub struct Event {
 async fn listen_to_path(device_path: &Path, internal_sender: &InternalSender) -> Result<(), Error> {
     let (client, server) = zx::Channel::create();
     fdio::service_connect(device_path.to_str().expect("bad path"), server)?;
-    let client = fasync::Channel::from_channel(client)?;
+    let client = fasync::Channel::from_channel(client);
     let device = hid_input_report::InputDeviceProxy::new(client);
     let descriptor = device
         .get_descriptor()

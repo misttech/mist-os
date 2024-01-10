@@ -7718,7 +7718,7 @@ pub mod tests {
         server_end: ServerEnd<fbinder::ProcessAccessorMarker>,
     ) -> Result<TestFdTable, anyhow::Error> {
         let mut stream = fbinder::ProcessAccessorRequestStream::from_channel(
-            fasync::Channel::from_channel(server_end.into_channel())?,
+            fasync::Channel::from_channel(server_end.into_channel()),
         );
         // The fd table is per connection.
         let mut next_fd = 0;

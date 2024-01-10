@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context as _, Error},
+    anyhow::Error,
     diagnostics_log::PublishOptions,
     fidl::prelude::*,
     fidl_fuchsia_developer_remotecontrol as rcs, fuchsia_async as fasync,
@@ -75,8 +75,7 @@ async fn exec_server() -> Result<(), Error> {
 
     let sc = Rc::clone(&service);
     let onet_fut = receiver.for_each_concurrent(None, move |chan| {
-        let chan =
-            fidl::AsyncChannel::from_channel(chan).context("failed to make async channel").unwrap();
+        let chan = fidl::AsyncChannel::from_channel(chan);
 
         let sc = Rc::clone(&sc);
         sc.serve_stream(rcs::RemoteControlRequestStream::from_channel(chan))

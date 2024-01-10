@@ -33,8 +33,7 @@ pub(crate) fn setup_proxies_and_data() -> SetupData {
         .into_stream()
         .expect("Cannot convert channel to Light server end");
 
-    let channel =
-        fasync::Channel::from_channel(proxy).expect("Cannot create async channel from zx channel");
+    let channel = fasync::Channel::from_channel(proxy);
     let light_proxy = LightProxy::from_channel(channel);
 
     // Create control proxy and request stream.
@@ -43,8 +42,7 @@ pub(crate) fn setup_proxies_and_data() -> SetupData {
         .into_stream()
         .expect("Cannot convert channel to Light server end");
 
-    let channel =
-        fasync::Channel::from_channel(proxy).expect("Cannot create async channel from zx channel");
+    let channel = fasync::Channel::from_channel(proxy);
     let brightness_proxy = ControlProxy::from_channel(channel);
 
     // Create default, disabled light groups.

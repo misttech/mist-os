@@ -65,13 +65,8 @@ where
 {
     type Output = Output;
     fn connect(&mut self, channel: zx::Channel) -> Option<Self::Output> {
-        match fasync::Channel::from_channel(channel) {
-            Ok(chan) => Some((self.f)(RS::from_channel(chan))),
-            Err(e) => {
-                eprintln!("ServiceFs failed to convert channel to fasync channel: {:?}", e);
-                None
-            }
-        }
+        let chan = fasync::Channel::from_channel(channel);
+        Some((self.f)(RS::from_channel(chan)))
     }
 }
 
@@ -142,13 +137,8 @@ where
     type Output = Output;
 
     fn connect(&mut self, channel: zx::Channel) -> Option<Self::Output> {
-        match fasync::Channel::from_channel(channel) {
-            Ok(chan) => Some((self.f)(SR::dispatch(self.member, chan))),
-            Err(e) => {
-                eprintln!("ServiceFs failed to convert channel to fasync channel: {:?}", e);
-                None
-            }
-        }
+        let chan = fasync::Channel::from_channel(channel);
+        Some((self.f)(SR::dispatch(self.member, chan)))
     }
 }
 

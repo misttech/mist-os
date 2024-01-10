@@ -408,7 +408,7 @@ impl VirtualOutput {
             async move {
                 let mut worker = OutputWorker::default();
                 let va_output = fidl_fuchsia_virtualaudio::DeviceProxy::new(
-                    fasync::Channel::from_channel(va_output_client.into_channel())?,
+                    fasync::Channel::from_channel(va_output_client.into_channel()),
                 );
                 worker.run(rx, va_output).await?;
                 Ok::<(), Error>(())
@@ -819,7 +819,7 @@ impl VirtualInput {
             async move {
                 let mut worker = InputWorker::default();
                 let va_input = fidl_fuchsia_virtualaudio::DeviceProxy::new(
-                    fasync::Channel::from_channel(va_input_client.into_channel())?,
+                    fasync::Channel::from_channel(va_input_client.into_channel()),
                 );
                 worker.run(rx, va_input).await?;
                 Ok::<(), Error>(())

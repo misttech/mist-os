@@ -109,9 +109,9 @@ impl Display {
     #[cfg(test)]
     pub fn new_no_scenic(registry: Registry) -> Result<Self, Error> {
         let (c1, _c2) = zx::Channel::create();
-        let scenic = ScenicProxy::new(fasync::Channel::from_channel(c1)?);
+        let scenic = ScenicProxy::new(fasync::Channel::from_channel(c1));
         let (c1, _c2) = zx::Channel::create();
-        let graphical_presenter = GraphicalPresenterProxy::new(fasync::Channel::from_channel(c1)?);
+        let graphical_presenter = GraphicalPresenterProxy::new(fasync::Channel::from_channel(c1));
         Ok(Display {
             registry: Arc::new(Mutex::new(registry)),
             scenic: Arc::new(scenic),

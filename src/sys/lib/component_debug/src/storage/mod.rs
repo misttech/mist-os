@@ -45,15 +45,11 @@ pub mod test {
     }
 
     pub fn node_to_directory(object: ServerEnd<fio::NodeMarker>) -> fio::DirectoryRequestStream {
-        fio::DirectoryRequestStream::from_channel(
-            AsyncChannel::from_channel(object.into_channel()).unwrap(),
-        )
+        fio::DirectoryRequestStream::from_channel(AsyncChannel::from_channel(object.into_channel()))
     }
 
     pub fn node_to_file(object: ServerEnd<fio::NodeMarker>) -> fio::FileRequestStream {
-        fio::FileRequestStream::from_channel(
-            AsyncChannel::from_channel(object.into_channel()).unwrap(),
-        )
+        fio::FileRequestStream::from_channel(AsyncChannel::from_channel(object.into_channel()))
     }
 
     pub fn setup_fake_storage_admin(

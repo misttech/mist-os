@@ -395,8 +395,7 @@ impl<'a> RequestHandler<'a> {
     ) -> ControlFlow<fppacket::SocketCloseResponder, Option<fppacket::SocketRequestStream>> {
         match request {
             fppacket::SocketRequest::Clone2 { request, control_handle: _ } => {
-                let channel = fidl::AsyncChannel::from_channel(request.into_channel())
-                    .expect("failed to create async channel");
+                let channel = fidl::AsyncChannel::from_channel(request.into_channel());
                 let stream = fppacket::SocketRequestStream::from_channel(channel);
                 return ControlFlow::Continue(Some(stream));
             }

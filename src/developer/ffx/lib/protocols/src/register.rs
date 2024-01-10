@@ -298,7 +298,7 @@ mod test {
             .open(
                 ffx_test::NoopMarker::PROTOCOL_NAME.to_owned(),
                 Context::new(TestDaemon::default()),
-                fidl::AsyncChannel::from_channel(server.into_channel())?,
+                fidl::AsyncChannel::from_channel(server.into_channel()),
             )
             .await?;
         Ok((noop_proxy.into_proxy()?, register))
@@ -322,7 +322,7 @@ mod test {
             .open(
                 ffx_test::NoopMarker::PROTOCOL_NAME.to_owned(),
                 Context::new(TestDaemon::default()),
-                fidl::AsyncChannel::from_channel(server.into_channel())?,
+                fidl::AsyncChannel::from_channel(server.into_channel()),
             )
             .await;
         let noop_proxy = noop_proxy.into_proxy()?;

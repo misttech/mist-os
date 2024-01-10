@@ -591,7 +591,7 @@ impl ProtocolConnector {
     pub fn connect_to_protocol<P: DiscoverableProtocolMarker>(&self) -> Result<P::Proxy, Error> {
         let (client_channel, server_channel) = zx::Channel::create();
         self.pass_to_protocol::<P>(server_channel)?;
-        Ok(P::Proxy::from_channel(fasync::Channel::from_channel(client_channel)?))
+        Ok(P::Proxy::from_channel(fasync::Channel::from_channel(client_channel)))
     }
 
     /// Connect to a protocol by passing a channel for the server.

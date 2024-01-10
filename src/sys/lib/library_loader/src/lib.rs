@@ -52,8 +52,7 @@ pub fn start_with_multiple_dirs(lib_dirs: Vec<Arc<fio::DirectoryProxy>>, chan: z
         async move {
             let mut search_dirs = lib_dirs.clone();
             // Wait for requests
-            let mut stream =
-                LoaderRequestStream::from_channel(fasync::Channel::from_channel(chan)?);
+            let mut stream = LoaderRequestStream::from_channel(fasync::Channel::from_channel(chan));
             while let Some(req) = stream.try_next().await? {
                 match req {
                     LoaderRequest::Done { control_handle } => {

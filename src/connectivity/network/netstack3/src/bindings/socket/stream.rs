@@ -1026,8 +1026,7 @@ where
                 return ControlFlow::Break(responder);
             }
             fposix_socket::StreamSocketRequest::Clone2 { request, control_handle: _ } => {
-                let channel = fidl::AsyncChannel::from_channel(request.into_channel())
-                    .expect("failed to create async channel");
+                let channel = fidl::AsyncChannel::from_channel(request.into_channel());
                 let rs = fposix_socket::StreamSocketRequestStream::from_channel(channel);
                 return ControlFlow::Continue(Some(rs));
             }

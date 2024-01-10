@@ -303,7 +303,7 @@ async fn create_container(
 
     // Install container svc into the kernel namespace
     let svc_dir = if let Some(svc_dir) = config.svc_dir.take() {
-        Some(fio::DirectoryProxy::new(AsyncChannel::from_channel(svc_dir)?))
+        Some(fio::DirectoryProxy::new(AsyncChannel::from_channel(svc_dir)))
     } else {
         None
     };

@@ -15,7 +15,7 @@ use {
 pub async fn load_hierarchy_from_path(path: &str) -> Result<DiagnosticsHierarchy, Error> {
     let (client, server) = zx::Channel::create();
     fdio::service_connect(path, server)?;
-    let inspect_proxy = InspectProxy::new(fasync::Channel::from_channel(client)?);
+    let inspect_proxy = InspectProxy::new(fasync::Channel::from_channel(client));
     let hierarchy = load_hierarchy(inspect_proxy).await?;
     Ok(hierarchy)
 }
@@ -45,7 +45,7 @@ pub async fn load_hierarchy(proxy: InspectProxy) -> Result<DiagnosticsHierarchy,
                 .proxy
                 .open_child(&next_child, fidl::endpoints::ServerEnd::new(server))
                 .await?;
-            let child_proxy = InspectProxy::new(fasync::Channel::from_channel(client)?);
+            let child_proxy = InspectProxy::new(fasync::Channel::from_channel(client));
             let child_node = read_node(child_proxy).await?;
             pending_nodes.push(current_node);
             pending_nodes.push(child_node);

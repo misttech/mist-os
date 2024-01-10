@@ -205,7 +205,7 @@ impl Partition {
             }
             let (local, remote) = zx::Channel::create();
             fdio::service_connect(&entry.class_path, remote).context("Connecting to partition")?;
-            let local = fidl::AsyncChannel::from_channel(local).context("Creating AsyncChannel")?;
+            let local = fidl::AsyncChannel::from_channel(local);
 
             let proxy = PartitionProxy::from_channel(local);
             if let Some(partition) = Partition::new(entry.class_path.clone(), proxy, bootloader)

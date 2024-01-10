@@ -37,7 +37,7 @@ async fn create_daemon_proxy(
 ) -> Result<DaemonProxy> {
     let (s, p) = fidl::Channel::create();
     node.connect_to_service((*id).into(), DaemonMarker::PROTOCOL_NAME, s).await?;
-    let proxy = fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
+    let proxy = fidl::AsyncChannel::from_channel(p);
     Ok(DaemonProxy::new(proxy))
 }
 

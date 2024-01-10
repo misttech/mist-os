@@ -677,7 +677,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             }
         }
         let stream = fbinder::LutexControllerRequestStream::from_channel(
-            fasync::Channel::from_channel(server_end.into_channel())?,
+            fasync::Channel::from_channel(server_end.into_channel()),
         );
         stream
             .map(|result| result.context("failed fbinder::LutexController request"))
@@ -720,7 +720,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         // The stream for the Binder protocol
         let stream = fbinder::BinderRequestStream::from_channel(fasync::Channel::from_channel(
             binder.into_channel(),
-        )?);
+        ));
 
         pin_mut!(receiver, stream);
         // The stream that will cancel once receiver returns a value.
@@ -745,7 +745,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         server_end: ServerEnd<fbinder::DevBinderMarker>,
     ) -> Result<(), Error> {
         let mut stream = fbinder::DevBinderRequestStream::from_channel(
-            fasync::Channel::from_channel(server_end.into_channel())?,
+            fasync::Channel::from_channel(server_end.into_channel()),
         );
         // Keep track of the current task serving the different Binder protocol. When a given
         // Binder is closed, this task will actually wait for the associated Binder task to finish,
@@ -1175,8 +1175,7 @@ mod tests {
 
         // Wait for the Start request
         let mut remote_controller_stream = fbinder::RemoteControllerRequestStream::from_channel(
-            fasync::Channel::from_channel(remote_controller_server.into_channel())
-                .expect("from_channel"),
+            fasync::Channel::from_channel(remote_controller_server.into_channel()),
         );
         let (dev_binder_client_end, lutex_controller_client_end) =
             match remote_controller_stream.try_next().await {

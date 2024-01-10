@@ -396,7 +396,7 @@ mod tests {
         );
 
         // Server endpoint is closed because the path does not exist.
-        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+        fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
 
         // We should get a notification about this path.
         assert_eq!(not_found_receiver.next().await, Some("/svc/non_existent".to_string()));

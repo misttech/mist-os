@@ -1137,8 +1137,7 @@ where
                 request,
                 control_handle: _,
             } => {
-                let channel = fidl::AsyncChannel::from_channel(request.into_channel())
-                    .expect("failed to create async channel");
+                let channel = fidl::AsyncChannel::from_channel(request.into_channel());
                 let stream =
                     fposix_socket::SynchronousDatagramSocketRequestStream::from_channel(channel);
                 return ControlFlow::Continue(Some(stream));
@@ -2354,9 +2353,9 @@ mod tests {
             .expect("Socket succeeds");
         match response {
             fposix_socket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(sock) => {
-                fposix_socket::SynchronousDatagramSocketProxy::new(
-                    fasync::Channel::from_channel(sock.into_channel()).unwrap(),
-                )
+                fposix_socket::SynchronousDatagramSocketProxy::new(fasync::Channel::from_channel(
+                    sock.into_channel(),
+                ))
             }
             // TODO(https://fxrev.dev/99905): Implement Fast UDP sockets in Netstack3.
             fposix_socket::ProviderDatagramSocketResponse::DatagramSocket(sock) => {

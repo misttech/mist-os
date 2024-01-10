@@ -58,8 +58,7 @@ impl Directory {
             let _guard = guard;
             // Wait for the client endpoint to be written or closed. These are the only two
             // operations the client could do that warrants our attention.
-            let server_end = fasync::Channel::from_channel(server_end.into_channel())
-                .expect("failed to convert server_end into async channel");
+            let server_end = fasync::Channel::from_channel(server_end.into_channel());
             let on_signal_fut = fasync::OnSignals::new(
                 &server_end,
                 zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,

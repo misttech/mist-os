@@ -250,8 +250,7 @@ async fn send_handle_async_helper<'a>(
         });
     });
 
-    let async_client_end =
-        fasync::Channel::from_channel(transformable_channel.take_client_end()).unwrap();
+    let async_client_end = fasync::Channel::from_channel(transformable_channel.take_client_end());
     let proxy = SendHandleProtocolProxy::new(async_client_end);
     let ev = Event::create();
     send_fn(&proxy, ev).unwrap();
@@ -464,8 +463,7 @@ async fn echo_handle_async_helper(
         });
     });
 
-    let async_client_end =
-        fasync::Channel::from_channel(transformable_channel.take_client_end()).unwrap();
+    let async_client_end = fasync::Channel::from_channel(transformable_channel.take_client_end());
     let th = std::thread::spawn(move || {
         transformable_channel.transform();
         transformable_channel.reversed_transform();
@@ -548,7 +546,7 @@ async fn push_event_receiver_thread(
     receiver_end: Channel,
     sender_fifo: std::sync::mpsc::SyncSender<()>,
 ) {
-    let async_receiver_end = fasync::Channel::from_channel(receiver_end).unwrap();
+    let async_receiver_end = fasync::Channel::from_channel(receiver_end);
     let proxy = PushEventProtocolProxy::new(async_receiver_end);
     while let Some(msg) = proxy.take_event_stream().next().await {
         match msg {
@@ -672,7 +670,7 @@ async fn error_syntax_async_end_to_end() {
         });
     });
 
-    let async_client_end = fasync::Channel::from_channel(client_end).unwrap();
+    let async_client_end = fasync::Channel::from_channel(client_end);
     let proxy = ErrorSyntaxProtocolProxy::new(async_client_end);
     let h_response = proxy.test_error_syntax().await.unwrap();
 

@@ -33,8 +33,7 @@ lazy_static! {
 }
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
-    let channel =
-        AsyncChannel::from_channel(channel).expect("failed to convert handle into async channel");
+    let channel = AsyncChannel::from_channel(channel);
     P::RequestStream::from_channel(channel)
 }
 

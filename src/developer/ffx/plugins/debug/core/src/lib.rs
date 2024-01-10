@@ -124,7 +124,7 @@ async fn list_minidumps(rcs: &RemoteControlProxy, capability: &str) -> Result<Ve
         .map_err(|e| anyhow!("Error in get_storage_admin: {:?}", e))?;
 
     let storage_admin =
-        fidl_fuchsia_sys2::StorageAdminProxy::new(fidl::AsyncChannel::from_channel(client)?);
+        fidl_fuchsia_sys2::StorageAdminProxy::new(fidl::AsyncChannel::from_channel(client));
 
     let (root_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
     storage_admin

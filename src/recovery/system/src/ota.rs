@@ -212,7 +212,7 @@ impl OtaEnv {
         fn proxy_from_file(file: File) -> Result<fio::DirectoryProxy, Error> {
             Ok(fio::DirectoryProxy::new(fuchsia_async::Channel::from_channel(
                 fdio::transfer_fd(file)?.into(),
-            )?))
+            )))
         }
 
         // Utilize the repository configs and ssl certificates we were provided,

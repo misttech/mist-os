@@ -32,9 +32,7 @@ async fn main() -> Result<(), Error> {
     match take_startup_handle(HandleInfo::new(HandleType::Lifecycle, 0)) {
         Some(lifecycle_handle) => {
             let chan: zx::Channel = lifecycle_handle.into();
-            let async_chan = AsyncChannel::from(
-                fasync::Channel::from_channel(chan).expect("Async channel conversion failed."),
-            );
+            let async_chan = AsyncChannel::from(fasync::Channel::from_channel(chan));
             let mut req_stream = LifecycleRequestStream::from_channel(async_chan);
             if let Some(LifecycleRequest::Stop { control_handle: c }) =
                 req_stream.try_next().await.expect("Failure receiving lifecycle FIDL message")

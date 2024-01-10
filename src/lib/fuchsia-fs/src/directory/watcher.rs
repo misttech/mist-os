@@ -97,12 +97,7 @@ impl Watcher {
         zx::Status::ok(status).map_err(WatcherCreateError::WatchError)?;
         let mut buf = MessageBuf::new();
         buf.ensure_capacity_bytes(fio::MAX_BUF as usize);
-        Ok(Watcher {
-            ch: fasync::Channel::from_channel(client_end.into_channel())
-                .map_err(WatcherCreateError::ChannelConversion)?,
-            buf,
-            idx: 0,
-        })
+        Ok(Watcher { ch: fasync::Channel::from_channel(client_end.into_channel()), buf, idx: 0 })
     }
 
     fn reset_buf(&mut self) {

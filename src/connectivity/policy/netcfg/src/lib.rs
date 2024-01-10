@@ -1064,8 +1064,7 @@ impl<'a> NetCfg<'a> {
             LIFECYCLE_HANDLE_ARG,
         ))
         .ok_or_else(|| anyhow::anyhow!("lifecycle handle not present"))?;
-        let lifecycle = fuchsia_async::Channel::from_channel(lifecycle.into())
-            .context("lifecycle async channel")?;
+        let lifecycle = fuchsia_async::Channel::from_channel(lifecycle.into());
         let mut lifecycle = fidl_fuchsia_process_lifecycle::LifecycleRequestStream::from_channel(
             fidl::AsyncChannel::from(lifecycle),
         );

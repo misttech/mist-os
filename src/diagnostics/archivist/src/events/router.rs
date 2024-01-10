@@ -540,9 +540,9 @@ mod tests {
         // Emit an event
         let (_, server_end) = fidl::endpoints::create_proxy::<LogSinkMarker>().unwrap();
         let request_stream_koid = server_end.as_handle_ref().get_koid().unwrap();
-        let request_stream = LogSinkRequestStream::from_channel(
-            fidl::AsyncChannel::from_channel(server_end.into_channel()).unwrap(),
-        );
+        let request_stream = LogSinkRequestStream::from_channel(fidl::AsyncChannel::from_channel(
+            server_end.into_channel(),
+        ));
         let timestamp = zx::Time::get_monotonic();
         producer
             .dispatcher

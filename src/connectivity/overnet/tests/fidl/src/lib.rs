@@ -141,8 +141,8 @@ impl Fixture {
         router1.connect_to_service(router3.node_id(), &service, dist_c).await.unwrap();
         tracing::info!(%test_name, %fixture_id, "get 3");
         let dist_c = recv_handle.next().await.unwrap();
-        let dist_b = fidl::AsyncChannel::from_channel(dist_b).unwrap();
-        let dist_c = fidl::AsyncChannel::from_channel(dist_c).unwrap();
+        let dist_b = fidl::AsyncChannel::from_channel(dist_b);
+        let dist_c = fidl::AsyncChannel::from_channel(dist_c);
         Fixture { dist_a_to_b, dist_b, dist_a_to_c, dist_c, test_name, _service_task: service_task }
     }
 

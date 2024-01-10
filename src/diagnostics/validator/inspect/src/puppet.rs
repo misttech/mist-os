@@ -256,7 +256,7 @@ pub(crate) mod tests {
                 let mut inspector_maybe: Option<Inspector> = None;
                 let mut nodes: HashMap<u32, Node> = HashMap::new();
                 let mut properties: HashMap<u32, IntProperty> = HashMap::new();
-                let server_chan = fasync::Channel::from_channel(server_end.into_channel())?;
+                let server_chan = fasync::Channel::from_channel(server_end.into_channel());
                 let mut stream = InspectPuppetRequestStream::from_channel(server_chan);
                 while let Some(event) = stream.try_next().await? {
                     match event {

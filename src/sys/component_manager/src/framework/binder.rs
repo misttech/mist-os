@@ -234,8 +234,7 @@ mod tests {
             .expect("failed to call open()");
         task_group.join().await;
 
-        let client_end =
-            AsyncChannel::from_channel(client_end).expect("failed to create AsyncChanel");
+        let client_end = AsyncChannel::from_channel(client_end);
         let client = Client::new(client_end, "binder_service");
         let mut event_receiver = client.take_event_receiver();
         assert_matches!(

@@ -455,7 +455,7 @@ impl Component {
 
     async fn handle_lifecycle_requests(&self, lifecycle_channel: zx::Channel) -> Result<(), Error> {
         let mut stream =
-            LifecycleRequestStream::from_channel(fasync::Channel::from_channel(lifecycle_channel)?);
+            LifecycleRequestStream::from_channel(fasync::Channel::from_channel(lifecycle_channel));
         match stream.try_next().await.context("Reading request")? {
             Some(LifecycleRequest::Stop { .. }) => {
                 info!("Received Lifecycle::Stop request");

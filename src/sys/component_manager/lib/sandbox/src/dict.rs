@@ -778,7 +778,7 @@ mod tests {
         let (client_end, server_end) = zx::Channel::create();
         let dir = dir_client_end.channel();
         fdio::service_connect_at(dir, &format!("{CAP_KEY}/bar"), server_end).unwrap();
-        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+        fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
         assert_eq!(OPEN_COUNT.get(), 1);
     }
 
@@ -829,7 +829,7 @@ mod tests {
         let (client_end, server_end) = zx::Channel::create();
         let dir = dir.into_channel().unwrap().into_zx_channel();
         fdio::service_connect_at(&dir, &format!("{CAP_KEY}/{CAP_KEY}/bar"), server_end).unwrap();
-        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
+        fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
         assert_eq!(OPEN_COUNT.get(), 1)
     }
 }
