@@ -15,6 +15,7 @@ if (is_host) {
     deps = [
       ":lib",
       "//sdk/lib/fidl_base",
+      "//sdk/lib/syslog/cpp",
       "//src/developer/debug/ipc",
       "//src/developer/debug/zxdb/client",
       "//src/developer/debug/zxdb/common",
@@ -39,6 +40,7 @@ if (is_host) {
     sources = [ "command_line_options.cc" ]
 
     deps = [
+      "//sdk/lib/syslog/cpp",
       "//src/lib/fidl_codec",
       "//src/lib/fxl",
       "//zircon/system/ulib/cmdline",
@@ -65,6 +67,7 @@ if (is_host) {
     sources = [ "command_line_options_test.cc" ]
     deps = [
       ":lib",
+      "//sdk/lib/syslog/cpp",
       "//src/lib/fxl",
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/cmdline",
