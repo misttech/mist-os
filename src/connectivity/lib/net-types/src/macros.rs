@@ -83,7 +83,7 @@ fn impl_derive_generic_over_ip(ast: &syn::DeriveInput) -> TokenStream2 {
     // trailing comma if there is one.
     let mut impl_generics = impl_generics.into_token_stream().into_iter();
 
-    let expect_trailing_angle_bracket = impl_generics.next().map_or(false, |first| {
+    let expect_trailing_angle_bracket = impl_generics.next().is_some_and(|first| {
         assert_matches!(first, TokenTree::Punct(p) if p.as_char() == '<');
         true
     });

@@ -346,7 +346,7 @@ impl TraitToConcreteVisit {
         let Self { type_ident, concrete, trait_path } = self;
         if qself == &None {
             let mut segments = path.segments.iter();
-            if segments.next().map_or(false, |p| &p.ident == type_ident) {
+            if segments.next().is_some_and(|p| &p.ident == type_ident) {
                 let remaining_path = segments.cloned().collect::<Vec<_>>();
                 let TypePath { path: new_path, qself: new_qself } = if remaining_path.is_empty() {
                     parse_quote!(#concrete)

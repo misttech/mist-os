@@ -419,7 +419,7 @@ impl PartialEq<Option<fidl_security::Credentials>> for Credential {
                     // `Credential::Password` is used for both WEP and WPA. The encoding of WEP
                     // keys is unspecified and may be either binary (unencoded) or ASCII-encoded
                     // hexadecimal. To compare, this WEP key must be parsed.
-                    WepKey::parse(unparsed).map_or(false, |parsed| &Vec::from(parsed) == key)
+                    WepKey::parse(unparsed).is_ok_and(|parsed| &Vec::from(parsed) == key)
                 } else {
                     false
                 }

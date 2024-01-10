@@ -416,7 +416,7 @@ impl LinkState {
 }
 
 fn triggered(id: &Option<EventId>, received_id: EventId) -> bool {
-    id.map_or(false, |id| id == received_id)
+    id.is_some_and(|id| id == received_id)
 }
 
 fn cancel(event_id: &mut Option<EventId>) {

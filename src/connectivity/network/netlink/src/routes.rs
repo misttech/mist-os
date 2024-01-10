@@ -1201,8 +1201,8 @@ fn select_route_for_deletion<I: Ip>(
             let metric_matches = priority.map_or(true, |p| p.get() == *existing_metric);
             let interface_matches =
                 outbound_interface.map_or(true, |i| i.get() == (*existing_interface).into());
-            let next_hop_matches = next_hop
-                .map_or(true, |n| existing_next_hop.map_or(false, |e| n.get().bytes() == e));
+            let next_hop_matches =
+                next_hop.map_or(true, |n| existing_next_hop.is_some_and(|e| n.get().bytes() == e));
             if subnet_matches && metric_matches && interface_matches && next_hop_matches {
                 Some((route, *existing_metric))
             } else {

@@ -1631,7 +1631,7 @@ async fn watcher<N: Netstack>(name: &str) {
                 assert!(!addresses_empty, "duplicate addresses property change to {:?}", addresses);
                 addresses.len() == 0
             });
-            let online_changed = online.map_or(false, |got_online| {
+            let online_changed = online.is_some_and(|got_online| {
                 assert!(!got_online, "online must change to false");
                 true
             });

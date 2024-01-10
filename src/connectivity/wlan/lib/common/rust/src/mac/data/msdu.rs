@@ -92,7 +92,7 @@ impl<B: ByteSlice> MsduIterator<B> {
         let fc = fixed_fields.frame_ctrl;
         if fc.data_subtype().null() {
             MsduIterator::Null
-        } else if qos_ctrl.map_or(false, |x| x.amsdu_present()) {
+        } else if qos_ctrl.is_some_and(|x| x.amsdu_present()) {
             MsduIterator::Amsdu(BufferReader::new(body))
         } else {
             MsduIterator::Llc {
@@ -128,7 +128,7 @@ where
         let fc = frame.fixed_fields.frame_ctrl;
         if fc.data_subtype().null() {
             MsduIterator::Null
-        } else if frame.qos_ctrl.map_or(false, |qos_ctrl| qos_ctrl.get().amsdu_present()) {
+        } else if frame.qos_ctrl.is_some_and(|qos_ctrl| qos_ctrl.get().amsdu_present()) {
             MsduIterator::Amsdu(BufferReader::new(frame.body))
         } else {
             MsduIterator::Llc {

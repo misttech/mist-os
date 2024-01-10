@@ -453,7 +453,7 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
 
             match EthernetFrame::parse(&mut body, EthernetFrameLengthCheck::NoCheck) {
                 Ok(ethernet) => {
-                    if ethernet.ethertype().map_or(false, |e| e == EtherType::from(ETHERTYPE)) {
+                    if ethernet.ethertype().is_some_and(|e| e == EtherType::from(ETHERTYPE)) {
                         break frame;
                     }
                 }

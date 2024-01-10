@@ -632,7 +632,7 @@ impl Client {
             // Control frames are not supported. Drop them.
             _ => return false,
         };
-        src_addr.map_or(false, |src_addr| src_addr == self.bssid().into())
+        src_addr.is_some_and(|src_addr| src_addr == self.bssid().into())
             && (!dst_addr.is_unicast() || dst_addr == self.iface_mac)
     }
 }

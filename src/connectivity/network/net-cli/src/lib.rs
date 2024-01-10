@@ -1285,7 +1285,7 @@ fn neigh_entry_stream(
     .map_ok(|items| futures::stream::iter(items.into_iter().map(Ok)))
     .try_flatten()
     .take_while(move |item| {
-        futures::future::ready(item.as_ref().map_or(false, |item| {
+        futures::future::ready(item.as_ref().is_ok_and(|item| {
             if let fneighbor::EntryIteratorItem::Idle(fneighbor::IdleEvent {}) = item {
                 watch_for_changes
             } else {

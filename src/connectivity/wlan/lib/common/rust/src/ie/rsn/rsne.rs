@@ -479,7 +479,7 @@ impl Rsne {
     /// Pairwise Cipher: CCMP-128, TKIP
     /// AKM: PSK, SAE
     pub fn is_wpa2_rsn_compatible(&self, security_support: &fidl_common::SecuritySupport) -> bool {
-        let group_data_supported = self.group_data_cipher_suite.as_ref().map_or(false, |c| {
+        let group_data_supported = self.group_data_cipher_suite.as_ref().is_some_and(|c| {
             // IEEE allows TKIP usage only for compatibility reasons.
             c.has_known_usage()
                 && (c.suite_type == cipher::CCMP_128 || c.suite_type == cipher::TKIP)
@@ -512,7 +512,7 @@ impl Rsne {
     /// AKM: SAE (also PSK in transition mode)
     /// The MFPR bit is required, except for transition mode.
     pub fn is_wpa3_rsn_compatible(&self, security_support: &fidl_common::SecuritySupport) -> bool {
-        let group_data_supported = self.group_data_cipher_suite.as_ref().map_or(false, |c| {
+        let group_data_supported = self.group_data_cipher_suite.as_ref().is_some_and(|c| {
             c.has_known_usage()
                 && (c.suite_type == cipher::CCMP_128 || c.suite_type == cipher::TKIP)
         });
@@ -527,7 +527,7 @@ impl Rsne {
         let caps_supported = self
             .rsn_capabilities
             .as_ref()
-            .map_or(false, |caps| caps.is_wpa3_compatible(wpa2_compatibility_mode));
+            .is_some_and(|caps| caps.is_wpa3_compatible(wpa2_compatibility_mode));
         let mut features_supported = self
             .rsn_capabilities
             .as_ref()

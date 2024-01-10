@@ -1108,7 +1108,7 @@ fn validate_recv_msg_postflight_response(
     } = response;
     let RequestedCmsgSetExpectation { valid, requested_cmsg_type } = expectation;
     let cmsg_expected =
-        |cmsg_type| requested_cmsg_type.map_or(false, |req_type| req_type == cmsg_type);
+        |cmsg_type| requested_cmsg_type.is_some_and(|req_type| req_type == cmsg_type);
 
     use fposix_socket::{CmsgRequests, TimestampOption};
 

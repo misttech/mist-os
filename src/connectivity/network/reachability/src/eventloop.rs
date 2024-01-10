@@ -439,7 +439,7 @@ impl EventLoop {
                 if online.is_some()
                     || has_default_ipv4_route.is_some()
                     || has_default_ipv6_route.is_some()
-                    || addresses.map_or(false, |addresses| {
+                    || addresses.is_some_and(|addresses| {
                         let previous = addresses
                             .iter()
                             .filter_map(|fnet_interfaces::Address { addr, .. }| addr.as_ref());

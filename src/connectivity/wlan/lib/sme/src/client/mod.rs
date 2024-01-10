@@ -145,19 +145,17 @@ impl ClientConfig {
             //                         is assumed here. Query and track this as with other security
             //                         protocols.
             has_privacy
-                && bss.rsne().map_or(false, |rsne| {
-                    rsne::from_bytes(rsne).map_or(false, |(_, a_rsne)| {
-                        a_rsne.is_wpa2_rsn_compatible(security_support)
-                    })
+                && bss.rsne().is_some_and(|rsne| {
+                    rsne::from_bytes(rsne)
+                        .is_ok_and(|(_, a_rsne)| a_rsne.is_wpa2_rsn_compatible(security_support))
                 })
         };
         let has_wpa3_support = || {
             self.wpa3_supported
                 && has_privacy
-                && bss.rsne().map_or(false, |rsne| {
-                    rsne::from_bytes(rsne).map_or(false, |(_, a_rsne)| {
-                        a_rsne.is_wpa3_rsn_compatible(security_support)
-                    })
+                && bss.rsne().is_some_and(|rsne| {
+                    rsne::from_bytes(rsne)
+                        .is_ok_and(|(_, a_rsne)| a_rsne.is_wpa3_rsn_compatible(security_support))
                 })
         };
 
