@@ -5,6 +5,7 @@
 """Unit tests for honeydew.transports.ffx.py."""
 
 import ipaddress
+import os
 import subprocess
 import unittest
 from typing import Any
@@ -147,6 +148,19 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     return f"{test_func_name}_with_{test_label}"
 
 
+_FUCHSIA_DIR_PATH = "mock_fuchsia_dir"
+
+
+def _mock_no_fuchsia_dir():
+    return mock.patch.dict(os.environ, {"FUCHSIA_DIR": ""}, clear=False)
+
+
+def _mock_fuchsia_dir():
+    return mock.patch.dict(
+        os.environ, {"FUCHSIA_DIR": _FUCHSIA_DIR_PATH}, clear=False
+    )
+
+
 class FfxCliTests(unittest.TestCase):
     """Unit tests for honeydew.transports.ffx.py."""
 
@@ -157,7 +171,6 @@ class FfxCliTests(unittest.TestCase):
             target_name=_INPUT_ARGS["target_name"],
             target_ip=_INPUT_ARGS["target_ip"],
         )
-
         self.ffx_obj_wo_ip = ffx.FFX(
             target_name=_INPUT_ARGS["target_name"],
         )
@@ -377,10 +390,11 @@ class FfxCliTests(unittest.TestCase):
     )
     def test_ffx_run(self, mock_subprocess_check_output) -> None:
         """Test case for ffx.run()"""
-        self.assertEqual(
-            self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
-            _EXPECTED_VALUES["ffx_target_show_output"],
-        )
+        with _mock_no_fuchsia_dir():
+            self.assertEqual(
+                self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
+                _EXPECTED_VALUES["ffx_target_show_output"],
+            )
 
         mock_subprocess_check_output.assert_called_with(
             [
@@ -401,13 +415,46 @@ class FfxCliTests(unittest.TestCase):
         return_value=_MOCK_ARGS["ffx_target_show_output"],
         autospec=True,
     )
+    def test_ffx_run_with_fuchsia_dir(
+        self, mock_subprocess_check_output
+    ) -> None:
+        """Test case for ffx.run() when FUCHSIA_DIR is present in env, which will add a host-tools flag"""
+
+        with _mock_fuchsia_dir():
+            self.assertEqual(
+                self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
+                _EXPECTED_VALUES["ffx_target_show_output"],
+            )
+
+        mock_subprocess_check_output.assert_called_with(
+            [
+                "ffx",
+                "-t",
+                _IPV6,
+                "-c",
+                f"ffx.subtool-search-paths={_FUCHSIA_DIR_PATH}/out/default/host-tools",
+                "--config",
+                '{"discovery": {"mdns": {"enabled": false}}}',
+            ]
+            + ffx._FFX_CMDS["TARGET_SHOW"],
+            stderr=subprocess.STDOUT,
+            timeout=10,
+        )
+
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_output",
+        return_value=_MOCK_ARGS["ffx_target_show_output"],
+        autospec=True,
+    )
     def test_ffx_run_with_mdns(self, mock_subprocess_check_output) -> None:
         """Test case for ffx.run() where ffx object is created without target_ip
         which means we need to set mdns to true."""
-        self.assertEqual(
-            self.ffx_obj_wo_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
-            _EXPECTED_VALUES["ffx_target_show_output"],
-        )
+        with _mock_no_fuchsia_dir():
+            self.assertEqual(
+                self.ffx_obj_wo_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
+                _EXPECTED_VALUES["ffx_target_show_output"],
+            )
 
         mock_subprocess_check_output.assert_called_with(
             [
@@ -438,12 +485,13 @@ class FfxCliTests(unittest.TestCase):
         self, mock_subprocess_check_output, mock_subprocess_check_call
     ) -> None:
         """Test case for ffx.run()"""
-        self.assertEqual(
-            self.ffx_obj_with_ip.run(
-                cmd=["test", "run", "my-test"], capture_output=False
-            ),
-            "",
-        )
+        with _mock_no_fuchsia_dir():
+            self.assertEqual(
+                self.ffx_obj_with_ip.run(
+                    cmd=["test", "run", "my-test"], capture_output=False
+                ),
+                "",
+            )
         mock_subprocess_check_output.assert_not_called()
         mock_subprocess_check_call.assert_called_with(
             [
@@ -467,15 +515,16 @@ class FfxCliTests(unittest.TestCase):
     )
     def test_ffx_run_test_component(self, mock_subprocess_check_call) -> None:
         """Test case for ffx.run()"""
-        self.assertEqual(
-            self.ffx_obj_with_ip.run_test_component(
-                "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
-                ffx_test_args=["--foo", "bar"],
-                test_component_args=["baz", "--x", "2"],
-                capture_output=False,
-            ),
-            "",
-        )
+        with _mock_no_fuchsia_dir():
+            self.assertEqual(
+                self.ffx_obj_with_ip.run_test_component(
+                    "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
+                    ffx_test_args=["--foo", "bar"],
+                    test_component_args=["baz", "--x", "2"],
+                    capture_output=False,
+                ),
+                "",
+            )
         mock_subprocess_check_call.assert_called_with(
             [
                 "ffx",
@@ -494,6 +543,38 @@ class FfxCliTests(unittest.TestCase):
                 "2",
             ],
             timeout=10,
+        )
+
+    @mock.patch.object(
+        ffx.subprocess,
+        "Popen",
+        return_value=None,
+        autospec=True,
+    )
+    def test_ffx_popen(self, mock_subprocess_popen_call) -> None:
+        """Test case for ffx.popen()"""
+        with _mock_no_fuchsia_dir():
+            self.assertEqual(
+                self.ffx_obj_with_ip.popen(
+                    cmd=["a", "b", "c"],
+                    # Popen forwards arbitrary kvargs to subprocess.Popen
+                    text=True,  # example kvarg
+                    stdout="abc",  # another example kvarg
+                ),
+                None,
+            )
+
+        mock_subprocess_popen_call.assert_called_with(
+            [
+                "ffx",
+                "-t",
+                _IPV6,
+                "--config",
+                '{"discovery": {"mdns": {"enabled": false}}}',
+            ]
+            + ["a", "b", "c"],
+            text=True,
+            stdout="abc",
         )
 
     @parameterized.expand(

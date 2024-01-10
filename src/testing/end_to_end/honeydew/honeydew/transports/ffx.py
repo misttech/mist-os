@@ -8,6 +8,7 @@ import atexit
 import ipaddress
 import json
 import logging
+import os
 import subprocess
 from typing import Any, Iterable, Type
 
@@ -443,9 +444,10 @@ class FFX:
                 ).decode()
                 _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
                 return output
-            _LOGGER.debug("`%s` finished executing", " ".join(ffx_cmd))
-            subprocess.check_call(ffx_cmd, timeout=timeout)
-            return ""
+            else:
+                subprocess.check_call(ffx_cmd, timeout=timeout)
+                _LOGGER.debug("`%s` finished executing", " ".join(ffx_cmd))
+                return ""
         except Exception as err:  # pylint: disable=broad-except
             # Catching all exceptions into this broad one because of
             # `exceptions_to_skip` argument
@@ -473,6 +475,31 @@ class FFX:
                     ) from err
 
             raise errors.FfxCommandError(f"`{ffx_cmd}` command failed") from err
+
+    def popen(
+        self,
+        cmd: list[str],
+        **kwargs,
+    ) -> subprocess.Popen:
+        """Executes the command `ffx -t {target} ... {cmd}` via `subprocess.Popen`.
+
+        Intended for executing daemons or processing streamed output. Given
+        the raw nature of this API, it is up to callers to detect and handle
+        potential errors, and make sure to close this process eventually
+        (e.g. with `popen.terminate` method). Otherwise, use the simpler `run`
+        method instead.
+
+        Args:
+            cmd: FFX command to run.
+            kwargs: Forwarded as-is to subprocess.Popen.
+
+        Returns:
+            The Popen object of `ffx -t {target} {cmd}`.
+        """
+
+        ffx_cmd: list[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
+        _LOGGER.info("Opening ffx process `%s`...", " ".join(ffx_cmd))
+        return subprocess.Popen(ffx_cmd, **kwargs)
 
     def run_test_component(
         self,
@@ -625,6 +652,22 @@ class FFX:
         # To run FFX in isolation mode
         if _ISOLATE_DIR:
             ffx_args.extend(["--isolate-dir", _ISOLATE_DIR.directory()])
+
+        # Search path for ffx plugins. But tests need to depend on the plugin target
+        # to have it built.
+        # TODO(b/316198820): Refactor into "ffx config set <config>" too,
+        # and read from commandline to support OOT workflow too.
+        fuchsia_dir = os.getenv("FUCHSIA_DIR")
+        if fuchsia_dir:
+            host_tools_path = os.path.join(
+                fuchsia_dir, "out/default/host-tools"
+            )
+            ffx_args.extend(
+                [
+                    "-c",
+                    f"ffx.subtool-search-paths={host_tools_path}",
+                ]
+            )
 
         # TODO(b/316198820): Consider using "ffx config set <config>" for below
         config: dict[str, Any] = {}
