@@ -464,10 +464,11 @@ def main():
     try:
         with open(json_path, "r") as json_file:
             project = json.loads(json_file.read())
-    except IOError:
+    except (IOError, json.decoder.JSONDecodeError) as err:
         print("Failed to generate Cargo.toml files")
         print("No project.json in the root of your out directory!")
         print("Run gn with the --ide=json flag set")
+        print(f"Caused by: Could not parse file {json_path}: {err}")
         # returns 0 so that CQ doesn't fail if this isn't set properly
         return 0
 
