@@ -82,6 +82,10 @@ unsafe impl Sync for ScannedDir {}
 
 #[derive(Debug)]
 struct ScannedSymlink {
+    // A list of parent object IDs for the symlink.
+    parents: Vec<u64>,
+    // The number of references to the file, according to its metadata.
+    stored_refs: u64,
     // Attributes for this symlink
     attributes: ScannedAttributes,
 }
@@ -247,7 +251,7 @@ impl<'a> ScannedStore<'a> {
                         }
                     }
                     ObjectValue::Object {
-                        kind: ObjectKind::Symlink { .. },
+                        kind: ObjectKind::Symlink { refs, .. },
                         attributes: ObjectAttributes { project_id, allocated_size, .. },
                     } => {
                         if *project_id > 0 {
@@ -264,6 +268,8 @@ impl<'a> ScannedStore<'a> {
                         self.objects.insert(
                             key.object_id,
                             ScannedObject::Symlink(ScannedSymlink {
+                                parents: vec![],
+                                stored_refs: *refs,
                                 attributes: ScannedAttributes {
                                     attributes: Vec::new(),
                                     stored_allocated_size: *allocated_size,
@@ -581,7 +587,10 @@ impl<'a> ScannedStore<'a> {
                 let expected = match s {
                     ScannedObject::Directory(_) => ObjectDescriptor::Directory,
                     ScannedObject::File(_) | ScannedObject::Graveyard => ObjectDescriptor::File,
-                    ScannedObject::Symlink(_) => ObjectDescriptor::Symlink,
+                    ScannedObject::Symlink(ScannedSymlink { parents, .. }) => {
+                        parents.push(parent_id);
+                        ObjectDescriptor::Symlink
+                    }
                     ScannedObject::Tombstone => unreachable!(),
                 };
                 if &expected != object_descriptor {
@@ -722,7 +731,11 @@ impl<'a> ScannedStore<'a> {
                 ScannedObject::Directory(ScannedDir { attributes, .. })
                 | ScannedObject::Symlink(ScannedSymlink { attributes, .. }),
             ) => {
-                attributes.in_graveyard = true;
+                if tombstone {
+                    attributes.in_graveyard = true;
+                } else {
+                    self.fsck.error(FsckError::UnexpectedObjectInGraveyard(object_id))?;
+                }
             }
             Some(ScannedObject::Graveyard | ScannedObject::Tombstone) => {
                 self.fsck.error(FsckError::UnexpectedObjectInGraveyard(object_id))?;
@@ -1062,6 +1075,9 @@ pub(super) async fn scan_store(
                 }
                 validate_attributes(fsck, store_id, *object_id, attributes, false, false)?;
                 if let Some(mut oid) = parent {
+                    if attributes.in_graveyard {
+                        fsck.error(FsckError::ZombieDir(store_id, *object_id, oid))?;
+                    }
                     // Check this directory is attached to a root object.
                     // SAFETY: This is safe because here and below are the only places that we
                     // manipulate `visited`.
@@ -1095,14 +1111,34 @@ pub(super) async fn scan_store(
                             }
                         }
                     }
-                } else {
+                } else if !attributes.in_graveyard {
                     fsck.warning(FsckWarning::OrphanedObject(store_id, *object_id))?;
                 }
             }
             ScannedObject::Graveyard => other += 1,
-            ScannedObject::Symlink(ScannedSymlink { attributes }) => {
+            ScannedObject::Symlink(ScannedSymlink { parents, stored_refs, attributes }) => {
                 symlinks += 1;
+                let observed_refs = parents.len().try_into().unwrap();
+                // observed_refs == 0 is handled separately to distinguish orphaned objects
+                if observed_refs != *stored_refs && observed_refs > 0 {
+                    fsck.error(FsckError::RefCountMismatch(
+                        *object_id,
+                        observed_refs,
+                        *stored_refs,
+                    ))?;
+                }
                 validate_attributes(fsck, store_id, *object_id, attributes, false, false)?;
+                if attributes.in_graveyard {
+                    if !parents.is_empty() {
+                        fsck.error(FsckError::ZombieSymlink(
+                            store_id,
+                            *object_id,
+                            parents.clone(),
+                        ))?;
+                    }
+                } else if parents.is_empty() {
+                    fsck.warning(FsckWarning::OrphanedObject(store_id, *object_id))?;
+                }
             }
             ScannedObject::Tombstone => {
                 tombstones += 1;

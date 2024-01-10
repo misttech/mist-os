@@ -2128,7 +2128,7 @@ async fn test_project_accounting() {
 async fn test_zombie_file() {
     let mut test = FsckTest::new().await;
 
-    let (store_id, object_id) = {
+    let (store_id, object_id, root_object_id) = {
         let fs = test.filesystem();
         let root_volume = root_volume(fs.clone()).await.unwrap();
         let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
@@ -2156,7 +2156,55 @@ async fn test_zombie_file() {
             .expect("new_transaction failed");
         store.add_to_graveyard(&mut transaction, handle.object_id());
         transaction.commit().await.expect("commit failed");
-        (store.store_object_id(), handle.object_id())
+        (store.store_object_id(), handle.object_id(), root_directory.object_id())
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        &test.errors()[..],
+        [
+            FsckIssue::Error(FsckError::RefCountMismatch(object_id_1, 2, 1)),
+            FsckIssue::Error(FsckError::ZombieFile(_, object_id_2, root_oids)),
+        ] if object_id == *object_id_1 && object_id == *object_id_2 && root_oids == &[root_object_id]
+    );
+}
+
+#[fuchsia::test]
+async fn test_zombie_dir() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, object_id, root_object_id) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let handle;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        handle = root_directory
+            .create_child_dir(&mut transaction, "child_dir", None)
+            .await
+            .expect("create_child_dir failed");
+        transaction.commit().await.expect("commit failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        store.add_to_graveyard(&mut transaction, handle.object_id());
+        transaction.commit().await.expect("commit failed");
+        (store.store_object_id(), handle.object_id(), root_directory.object_id())
     };
 
     test.remount().await.expect("Remount failed");
@@ -2166,8 +2214,53 @@ async fn test_zombie_file() {
     assert_matches!(
         test.errors()[..],
         [
-            FsckIssue::Error(FsckError::RefCountMismatch(object_id_1, 2, 1)),
-            FsckIssue::Error(FsckError::ZombieFile(_, object_id_2, _)),
-        ] if object_id == object_id_1 && object_id == object_id_2
+            FsckIssue::Error(FsckError::ZombieDir(_, object_id_1, root_oid)),
+        ] if object_id == object_id_1 && root_oid == root_object_id
+    );
+}
+
+#[fuchsia::test]
+async fn test_zombie_symlink() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, object_id, root_object_id) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let symlink_object_id = root_directory
+            .create_symlink(&mut transaction, b"target", "child_symlink")
+            .await
+            .expect("create_symlink failed");
+        transaction.commit().await.expect("commit failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        store.add_to_graveyard(&mut transaction, symlink_object_id);
+        transaction.commit().await.expect("commit failed");
+        (store.store_object_id(), symlink_object_id, root_directory.object_id())
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        &test.errors()[..],
+        [
+            FsckIssue::Error(FsckError::ZombieSymlink(_, object_id_1, root_oid)),
+        ] if object_id == *object_id_1 && root_oid == &[root_object_id]
     );
 }

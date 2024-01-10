@@ -382,13 +382,6 @@ impl FxFilesystemBuilder {
             transaction_limit_event: Event::new(),
         });
 
-        if let Some(fsck_after_every_transaction) = fsck_after_every_transaction {
-            fsck_after_every_transaction
-                .fs
-                .set(Arc::downgrade(&filesystem))
-                .unwrap_or_else(|_| unreachable!());
-        }
-
         filesystem.journal.set_trace(self.trace);
         if self.format {
             filesystem.journal.init_empty(filesystem.clone()).await?;
@@ -433,6 +426,14 @@ impl FxFilesystemBuilder {
                     filesystem.graveyard.initial_reap(&store).await?;
                 }
             }
+        }
+
+        // This must be after we've formatted the filesystem; it will fail during format otherwise.
+        if let Some(fsck_after_every_transaction) = fsck_after_every_transaction {
+            fsck_after_every_transaction
+                .fs
+                .set(Arc::downgrade(&filesystem))
+                .unwrap_or_else(|_| unreachable!());
         }
 
         filesystem.closed.store(false, Ordering::SeqCst);

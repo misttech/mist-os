@@ -784,6 +784,8 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
 ) -> Result<ReplacedChild, Error> {
     let deleted_id_and_descriptor = dst.0.lookup(dst.1).await?;
     let store_id = dst.0.store().store_object_id();
+    // There might be optimizations here that allow us to skip the graveyard where we can delete an
+    // object in a single transaction (which should be the common case).
     let result = match deleted_id_and_descriptor {
         Some((old_id, ObjectDescriptor::File | ObjectDescriptor::Symlink)) => {
             let was_last_ref = dst.0.store().adjust_refs(transaction, old_id, -1).await?;
@@ -799,6 +801,8 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             if dir.has_children().await? {
                 bail!(FxfsError::NotEmpty);
             }
+            // Directories might have extended attributes which might require multiple transactions
+            // to delete, so we delete directories via the graveyard.
             dst.0.store().add_to_graveyard(transaction, old_id);
             dst.0.store().filesystem().graveyard().queue_tombstone(store_id, old_id);
             sub_dirs_delta -= 1;

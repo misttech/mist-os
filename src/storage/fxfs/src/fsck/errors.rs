@@ -260,6 +260,8 @@ pub enum FsckError {
     MissingKey(u64, u64, u64),
     DuplicateKey(u64, u64, u64),
     ZombieFile(u64, u64, Vec<u64>),
+    ZombieDir(u64, u64, u64),
+    ZombieSymlink(u64, u64, Vec<u64>),
     InconsistentVerifiedFile(u64, u64, bool),
     NonFileMarkedAsVerified(u64, u64),
 }
@@ -423,15 +425,27 @@ impl FsckError {
             }
             FsckError::ZombieFile(store_id, object_id, parent_object_ids) => {
                 format!(
-                    "Object {} in store {} is in graveyard but still has links from {:?}",
-                    store_id, object_id, parent_object_ids
+                    "File {object_id} in store {store_id} is in graveyard but still has links \
+                     from {parent_object_ids:?}",
+                )
+            }
+            FsckError::ZombieDir(store_id, object_id, parent_object_id) => {
+                format!(
+                    "Directory {object_id} in store {store_id} is in graveyard but still has \
+                     a link from {parent_object_id}",
+                )
+            }
+            FsckError::ZombieSymlink(store_id, object_id, parent_object_ids) => {
+                format!(
+                    "Symlink {object_id} in store {store_id} is in graveyard but still has \
+                     links from {parent_object_ids:?}",
                 )
             }
             FsckError::InconsistentVerifiedFile(store_id, object_id, is_verified) => {
                 if *is_verified {
                     format!(
-                        "Object {} in store {} is marked as fsverity-enabled but is missing a merkle
-                            attribute",
+                        "Object {} in store {} is marked as fsverity-enabled but is missing a \
+                         merkle attribute",
                         store_id, object_id
                     )
                 } else {
@@ -566,6 +580,12 @@ impl FsckError {
             }
             FsckError::ZombieFile(store_id, oid, parent_oids) => {
                 error!(store_id, oid, ?parent_oids, "Links exist to file in graveyard")
+            }
+            FsckError::ZombieDir(store_id, oid, parent_oid) => {
+                error!(store_id, oid, parent_oid, "A link exists to directory in graveyard")
+            }
+            FsckError::ZombieSymlink(store_id, oid, parent_oids) => {
+                error!(store_id, oid, ?parent_oids, "Links exists to symlink in graveyard")
             }
             FsckError::InconsistentVerifiedFile(store_id, oid, is_verified) => {
                 error!(store_id, oid, ?is_verified, "Verified file inconsistency")
