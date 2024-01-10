@@ -10,7 +10,8 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_developer_remotecontrol_connector as connector,
-    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as io, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_io as io,
+    fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_zircon as zx,
     futures::prelude::*,
@@ -340,17 +341,32 @@ async fn check_entry_exists(
     dir: &io::DirectoryProxy,
     capability_name: &str,
 ) -> Result<(), rcs::ConnectCapabilityError> {
-    let mut entries = fuchsia_fs::directory::readdir_recursive(dir, None);
-    while let Some(entry) = entries
-        .try_next()
-        .await
-        .map_err(|_err| rcs::ConnectCapabilityError::CapabilityConnectFailed)?
-    {
-        if entry.name == capability_name {
-            return Ok(());
+    let dir_idx = capability_name.rfind('/');
+    let (capability_name, entries) = match dir_idx {
+        Some(dir_idx) => {
+            let dirname = &capability_name[0..dir_idx];
+            let basename = &capability_name[dir_idx + 1..];
+            let nested_dir =
+                fuchsia_fs::directory::open_directory(dir, dirname, fio::OpenFlags::RIGHT_READABLE)
+                    .await
+                    .map_err(|_| rcs::ConnectCapabilityError::NoMatchingCapabilities)?;
+            let entries = fuchsia_fs::directory::readdir(&nested_dir)
+                .await
+                .map_err(|_| rcs::ConnectCapabilityError::CapabilityConnectFailed)?;
+            (basename, entries)
         }
+        None => {
+            let entries = fuchsia_fs::directory::readdir(dir)
+                .await
+                .map_err(|_| rcs::ConnectCapabilityError::CapabilityConnectFailed)?;
+            (capability_name, entries)
+        }
+    };
+    if entries.iter().any(|e| e.name == capability_name) {
+        Ok(())
+    } else {
+        Err(rcs::ConnectCapabilityError::NoMatchingCapabilities)
     }
-    Err(rcs::ConnectCapabilityError::NoMatchingCapabilities)
 }
 
 #[cfg(test)]
@@ -721,6 +737,32 @@ mod tests {
                 Moniker::try_from("./core/my_component").unwrap(),
                 dir_type,
                 "fuchsia.not.exposed".to_string(),
+                server,
+                io::OpenFlags::RIGHT_READABLE,
+                lifecycle,
+                query,
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(error, rcs::ConnectCapabilityError::NoMatchingCapabilities);
+        }
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_connect_to_capability_not_available_in_subdirectory() -> Result<()> {
+        for dir_type in vec![
+            fsys::OpenDirType::ExposedDir,
+            fsys::OpenDirType::NamespaceDir,
+            fsys::OpenDirType::OutgoingDir,
+        ] {
+            let (_client, server) = zx::Channel::create();
+            let lifecycle = setup_fake_lifecycle_controller();
+            let query = setup_fake_realm_query(dir_type);
+            let error = connect_to_capability_at_moniker(
+                Moniker::try_from("./core/my_component").unwrap(),
+                dir_type,
+                "svc/fuchsia.not.exposed".to_string(),
                 server,
                 io::OpenFlags::RIGHT_READABLE,
                 lifecycle,

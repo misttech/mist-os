@@ -90,11 +90,21 @@ impl DirTree {
     fn add_capability(
         &mut self,
         path: cm_types::Path,
-        _type_name: CapabilityTypeName,
+        type_name: CapabilityTypeName,
         routing_fn: RoutingFn,
     ) {
-        // TODO(https://fxbug.dev/126066): Don't set this to Unknown, set it based on the type_name.
-        let dirent_type = fio::DirentType::Unknown;
+        let dirent_type = match type_name {
+            CapabilityTypeName::Directory => fio::DirentType::Directory,
+            CapabilityTypeName::EventStream => fio::DirentType::Service,
+            CapabilityTypeName::Protocol => fio::DirentType::Service,
+            CapabilityTypeName::Service => fio::DirentType::Directory,
+            CapabilityTypeName::Storage => fio::DirentType::Directory,
+            CapabilityTypeName::Dictionary => fio::DirentType::Service,
+            // The below don't appear in exposed or used dir
+            CapabilityTypeName::Resolver
+            | CapabilityTypeName::Runner
+            | CapabilityTypeName::Config => fio::DirentType::Unknown,
+        };
         let tree = self.to_directory_node(&path);
         tree.broker_nodes.insert(path.basename().to_string(), (routing_fn, dirent_type));
     }
@@ -220,7 +230,7 @@ mod tests {
             .into_proxy()
             .expect("failed to create directory proxy");
         assert_eq!(
-            vec!["bar-dir", "hippo-dir", "hippo-proto", "whale-svc"],
+            vec!["bar-dir/hello", "hippo-dir/hello", "hippo-proto", "whale-svc/default/echo"],
             test_helpers::list_directory_recursive(&expose_dir_proxy).await
         );
 

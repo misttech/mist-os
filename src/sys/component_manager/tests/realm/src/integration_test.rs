@@ -175,11 +175,11 @@ pub async fn echo_server() {
         vec![
             fuchsia_fs::directory::DirEntry {
                 name: "fidl.examples.routing.echo.Echo".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Unknown,
+                kind: fuchsia_fs::directory::DirentKind::Service,
             },
             fuchsia_fs::directory::DirEntry {
                 name: "fuchsia.component.Binder".to_string(),
-                kind: fuchsia_fs::directory::DirentKind::Unknown,
+                kind: fuchsia_fs::directory::DirentKind::Service,
             },
         ]
     );
