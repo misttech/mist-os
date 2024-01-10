@@ -133,9 +133,6 @@ Steps 1-3 are the same as for non-perfcompare Fuchsia try builders.
 
 *   CLs that use `patches.json` or that change dependencies in Jiri
     manifest files are not supported yet, as mentioned above.
-*   Perfcompare treats all metrics as being times, so it will list
-    them as "faster" or "slower" if they have changed, even when that
-    is not appropriate (e.g. for units of "megabytes").
 
 ## How to run performance comparisons locally
 
