@@ -22,28 +22,12 @@ use {
         fs::{create_dir_all, set_permissions, Permissions},
         io::{BufWriter, Write},
         os::unix::fs::PermissionsExt,
-        path::{Path, PathBuf},
+        path::PathBuf,
     },
 };
 
-mod boto;
-
 const FILE_NAME: &str = "credentials.json";
 const VERSION_1_LABEL: &str = "1";
-
-/// We are using client id of gcloud app. This value can be gotten by `gcloud config get auth/client_id`
-const BOTO_CLIENT_ID: &str = "32555940559.apps.googleusercontent.com";
-
-/// For a web site, a client secret is kept locked away in a secure server. This
-/// is not a web site and the value is needed, so a non-secret "secret" is used.
-///
-/// "Google OAuth2 clients always have a secret, even if the client is an
-/// installed application/utility such as gsutil.  Of course, in such cases the
-/// "secret" is actually publicly known; security depends entirely on the
-/// secrecy of refresh tokens, which effectively become bearer tokens."
-const BOTO_CLIENT_SECRET: &str = "ZmssLNjJy2998hD4CTg2ejr2";
-
-const GCLOUD_PATH: &str = ".config/gcloud/application_default_credentials.json";
 
 /// This format matches that of the gcloud application_default_credentials.json,
 /// which eases the transition for zxdb and symbolizer. The format may evolved
@@ -118,9 +102,6 @@ impl Credentials {
         let instance = if let Ok(instance) = load_from_home_data() {
             tracing::debug!("Load credential from home data");
             instance
-        } else if let Ok(instance) = legacy_read().await {
-            tracing::debug!("Get credential through legacy_read");
-            instance
         } else {
             tracing::debug!("Create new credential");
             Credentials::new()
@@ -156,49 +137,6 @@ impl Credentials {
             refresh_token: self.oauth2.refresh_token.clone(),
         }
     }
-}
-
-/// Get the oauth2 refresh token from the credentials file.
-///
-/// This is a handy wrapper for creating a Credentials object. It also handles
-/// the soft-transition from using boto files.
-///
-/// Alert: The refresh token is considered a private secret for the user. Do
-///        not print the token to a log or otherwise disclose it.
-async fn legacy_read() -> Result<Credentials> {
-    // TODO(https://fxbug.dev/89584): Change to using ffx client Id and consent screen.
-    let mut credentials = Credentials::new();
-    use home::home_dir;
-    let boto_path = if let Ok(Some(boto_path)) =
-        ffx_config::query("flash.gcs.token").get_file::<Option<PathBuf>>().await
-    {
-        tracing::debug!("legacy_read: trying flash.gcs.token at {:?}", boto_path);
-        boto_path
-    } else {
-        tracing::debug!("legacy_read: trying $HOME/.boto");
-        Path::new(&home_dir().expect("getting home dir")).join(".boto")
-    };
-    if let Ok(token) = boto::read_boto_refresh_token(&boto_path) {
-        // Do not use the client ID/secret from the gcs lib because those may
-        // change and this is explicitly about the .boto file (so it should not
-        // change).
-        credentials.oauth2.client_id = BOTO_CLIENT_ID.to_string();
-        credentials.oauth2.client_secret = BOTO_CLIENT_SECRET.to_string();
-        credentials.oauth2.refresh_token = token.to_string();
-        credentials.save().await?;
-        return Ok(credentials);
-    }
-    tracing::debug!("legacy_read: trying gcloud at $HOME/{}", GCLOUD_PATH);
-    let path =
-        Path::new(&home_dir().expect("getting application_default_credentials")).join(GCLOUD_PATH);
-    if let Ok(data) = std::fs::read_to_string(&path) {
-        if let Ok(oauth) = serde_json::from_str::<OAuth2Credentials>(&data) {
-            credentials.oauth2 = oauth.clone();
-            credentials.save().await?;
-            return Ok(credentials);
-        }
-    }
-    Err(anyhow!("Unable to find legacy credentials"))
 }
 
 fn load_from_home_data() -> Result<Credentials> {
