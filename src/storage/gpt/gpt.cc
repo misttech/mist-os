@@ -36,7 +36,6 @@
 #include "src/lib/utf_conversion/utf_conversion.h"
 #include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/block_client/cpp/reader.h"
-#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/block_client/cpp/writer.h"
 
 namespace gpt {

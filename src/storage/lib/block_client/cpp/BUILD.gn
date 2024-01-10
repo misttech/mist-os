@@ -15,10 +15,19 @@ config("migration") {
   include_dirs = [ "include" ]
 }
 
+# Contains just the BlockDevice interface, but not the concrete implementation (RemoteBlockDevice).
+# This also includes Reader and Writer which are simple wrappers around the interface.
 source_set("interface") {
-  sources = [ "block_device.h" ]
+  sources = [
+    "block_device.cc",
+    "block_device.h",
+    "reader.cc",
+    "reader.h",
+    "writer.cc",
+    "writer.h",
+  ]
   public_deps = [
-    # For storage/buffer/vmoid_registry.h
+    # For storage/buffer/...
     "//zircon/system/ulib/storage/buffer",
 
     # For fidl/fuchsia.../wire.h
@@ -28,24 +37,23 @@ source_set("interface") {
 
     # For lib/zx/...
     "//zircon/system/ulib/zx",
+
+    # For lib/fzl/owned-vmo-mapper.h
+    "//zircon/system/ulib/fzl",
   ]
+  deps = [ "//zircon/third_party/ulib/safemath" ]
 }
 
 static_library("cpp") {
   public = [
     "block_group_registry.h",
     "client.h",
-    "reader.h",
     "remote_block_device.h",
-    "writer.h",
   ]
   sources = [
-    "block_device.cc",
     "block_group_registry.cc",
     "client.cc",
-    "reader.cc",
     "remote_block_device.cc",
-    "writer.cc",
   ]
 
   public_configs = [ ":migration" ]
@@ -64,9 +72,6 @@ static_library("cpp") {
 
     # client.h has #include <lib/zx/fifo.h>.
     "//zircon/system/ulib/zx",
-
-    # reader.h has #include <lib/fzl/owned-vmo-mapper.h>
-    "//zircon/system/ulib/fzl",
   ]
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
