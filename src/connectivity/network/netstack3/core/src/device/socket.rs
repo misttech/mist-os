@@ -1098,6 +1098,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
+        context::ContextProvider,
         device::{
             testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             Id,
@@ -1143,6 +1144,13 @@ mod tests {
     #[derivative(Default(bound = ""))]
     struct FakeBindingsCtx<D> {
         sent: Vec<(DeviceSocketMetadata<D>, Vec<u8>)>,
+    }
+
+    impl<D> ContextProvider for FakeBindingsCtx<D> {
+        type Context = Self;
+        fn context(&mut self) -> &mut Self::Context {
+            self
+        }
     }
 
     impl<D: Id> DeviceSocketTypes for FakeBindingsCtx<D> {
@@ -1193,7 +1201,7 @@ mod tests {
     /// A trait providing a shortcut to instantiate a [`DeviceSocketApi`] from a
     /// context.
     trait DeviceSocketApiExt: crate::context::ContextPair + Sized {
-        fn device_socket_api(self) -> DeviceSocketApi<Self> {
+        fn device_socket_api(&mut self) -> DeviceSocketApi<&mut Self> {
             DeviceSocketApi::new(self)
         }
     }

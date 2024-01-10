@@ -419,6 +419,17 @@ pub trait ContextPair {
     }
 }
 
+impl<'a, C> ContextPair for &'a mut C
+where
+    C: ContextPair,
+{
+    type CoreContext = C::CoreContext;
+    type BindingsContext = C::BindingsContext;
+    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
+        C::contexts(self)
+    }
+}
+
 /// A type that provides a context implementation.
 ///
 /// This trait allows for [`CtxPair`] to hold context implementations
@@ -1381,6 +1392,13 @@ pub(crate) mod testutil {
         state: State,
     }
 
+    impl<TimerId, Event: Debug, State> ContextProvider for FakeBindingsCtx<TimerId, Event, State> {
+        type Context = Self;
+        fn context(&mut self) -> &mut Self::Context {
+            self
+        }
+    }
+
     impl<TimerId, Event: Debug, State: Default> Default for FakeBindingsCtx<TimerId, Event, State> {
         fn default() -> Self {
             Self {
@@ -1674,6 +1692,14 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
+    impl<Outer, Inner> ContextProvider for Wrapped<Outer, Inner> {
+        type Context = Self;
+        fn context(&mut self) -> &mut Self::Context {
+            self
+        }
+    }
+
+    #[cfg(test)]
     pub(crate) type WrappedFakeCoreCtx<Outer, S, Meta, DeviceId> =
         Wrapped<Outer, FakeCoreCtx<S, Meta, DeviceId>>;
 
@@ -1706,6 +1732,15 @@ pub(crate) mod testutil {
         pub(crate) state: S,
         pub(crate) frames: FakeFrameCtx<Meta>,
         _devices_marker: PhantomData<DeviceId>,
+    }
+
+    #[cfg(test)]
+    impl<S, Meta, DeviceId> ContextProvider for FakeCoreCtx<S, Meta, DeviceId> {
+        type Context = Self;
+
+        fn context(&mut self) -> &mut Self::Context {
+            self
+        }
     }
 
     #[cfg(test)]

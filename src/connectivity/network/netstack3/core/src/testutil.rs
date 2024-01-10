@@ -149,16 +149,6 @@ where
     }
 }
 
-impl<'a, CC, BC> crate::context::ContextPair for &'a mut ContextPair<CC, BC> {
-    type CoreContext = CC;
-    type BindingsContext = BC;
-
-    fn contexts(&mut self) -> (&mut CC, &mut BC) {
-        let ContextPair { core_ctx, bindings_ctx } = self;
-        (core_ctx, bindings_ctx)
-    }
-}
-
 /// Context available during the execution of the netstack.
 pub type Ctx<BT> = ContextPair<SyncCtx<BT>, BT>;
 

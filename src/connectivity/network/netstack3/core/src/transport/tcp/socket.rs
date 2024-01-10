@@ -3632,7 +3632,7 @@ mod tests {
                 FakeNetworkContext, FakeTimerCtx, InstantAndData, PendingFrameData, StepResult,
                 WithFakeFrameContext, WithFakeTimerContext, WrappedFakeCoreCtx,
             },
-            InstantContext as _, SendFrameContext,
+            ContextProvider, InstantContext as _, SendFrameContext,
         },
         device::{
             link::LinkDevice,
@@ -3838,6 +3838,13 @@ mod tests {
     struct TcpBindingsCtx<D: FakeStrongDeviceId> {
         rng: FakeCryptoRng<XorShiftRng>,
         timers: FakeTimerCtx<TimerId<D::Weak, Self>>,
+    }
+
+    impl<D: FakeStrongDeviceId> ContextProvider for TcpBindingsCtx<D> {
+        type Context = Self;
+        fn context(&mut self) -> &mut Self::Context {
+            self
+        }
     }
 
     impl<D: LinkDevice + FakeStrongDeviceId> LinkResolutionContext<D> for TcpBindingsCtx<D> {
@@ -4436,7 +4443,7 @@ mod tests {
 
     /// A trait providing a shortcut to instantiate a [`TcpApi`] from a context.
     trait TcpApiExt: crate::context::ContextPair + Sized {
-        fn tcp_api<I>(self) -> TcpApi<I, Self> {
+        fn tcp_api<I>(&mut self) -> TcpApi<I, &mut Self> {
             TcpApi::new(self)
         }
     }
