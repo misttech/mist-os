@@ -117,11 +117,11 @@ fn handle_hci_device_event(
         }
         WatchEvent::REMOVE_FILE => {
             info!("Removing snoop channel for hci device: \"{path}\"");
-            // TODO(belgum): What should be done with the logged packets in this case?
-            //               Find out how to remove snooper from ConcurrentTask (perhaps cancel
-            //               and wake)
-            //               Can possibly reopen device logs for devices that are on disk that
-            //               were evicted from the packet logs collection in the past.
+            // TODO(https://fxbug.dev/319447676):
+            // What should be done with the logged packets in this case?
+            // Find out how to remove snooper from ConcurrentTask (perhaps cancel and wake)
+            // Can possibly reopen device logs for devices that are on disk that were evicted from
+            // the packet logs collection in the past.
         }
         _ => (),
     }

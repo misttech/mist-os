@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context as _, Error};
+use fidl::endpoints::Proxy;
 use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopPacket as FidlSnoopPacket, Timestamp};
 use fidl_fuchsia_hardware_bluetooth::HciMarker as HardwareHciMarker;
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, Channel, MessageBuf};
-use futures::executor::block_on;
+use fuchsia_zircon::{self as zx, Channel, DurationNum, MessageBuf};
 use futures::Stream;
 use std::{
     marker::Unpin,
@@ -112,6 +112,7 @@ impl CreatedAt for SnoopPacket {
 
 /// A Snooper provides a `Stream` associated with the snoop channel for a single HCI device. This
 /// stream can be polled for `SnoopPacket`s coming off the channel.
+#[derive(Debug)]
 pub(crate) struct Snooper {
     pub device_name: String,
     pub chan: fuchsia_async::Channel,
@@ -126,11 +127,15 @@ impl Snooper {
         >(dir, path)
         .context("failed to open bt-hci device")?;
 
+        let client_end =
+            hci.into_client_end().map_err(|_proxy| format_err!("failed to make sync proxy"))?;
+        let sync_hci = client_end.into_sync_proxy();
+
         let (ours, theirs) = Channel::create();
-        let res = block_on(hci.open_snoop_channel(theirs))
+        let res = sync_hci
+            .open_snoop_channel(theirs, fasync::Time::after(3.seconds()).into())
             .context("open snoop channel request")?
             .map_err(|e| format_err!("Failed with error: {}", e));
-
         match res {
             Ok(()) => Snooper::from_channel(ours, path),
             Err(e) => Err(format_err!("Failed to open snoop channel {}", e)),
@@ -189,6 +194,14 @@ mod tests {
         let (channel, _) = Channel::create();
         let snooper = Snooper::from_channel(channel, "c").unwrap();
         assert_eq!(snooper.device_name, "c");
+    }
+
+    #[test]
+    fn test_from_directory_proxy_timeout() {
+        let _exec = fasync::TestExecutor::new();
+        let (proxy, _requests) =
+            fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_io::DirectoryMarker>().unwrap();
+        let _ = Snooper::new(&proxy, "foo").expect_err("should have timed out");
     }
 
     #[test]
