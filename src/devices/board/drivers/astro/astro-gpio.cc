@@ -142,24 +142,19 @@ zx_status_t Astro::GpioInit() {
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('GPIO');
-  auto result = pbus_.buffer(arena)->ProtocolNodeAdd(ZX_PROTOCOL_GPIO_IMPL,
-                                                     fidl::ToWire(fidl_arena, gpio_dev));
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: ProtocolNodeAdd Gpio(gpio_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: NodeAdd Gpio(gpio_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
-  gpio_impl_ = ddk::GpioImplProtocolClient(parent());
-  if (!gpio_impl_.is_valid()) {
-    zxlogf(ERROR, "%s: GpioImplProtocolClient failed", __func__);
-    return ZX_ERR_INTERNAL;
-  }
+  gpio_init_steps_.clear();
 
 #ifdef GPIO_TEST
   static const pbus_gpio_t gpio_test_gpios[] = {{

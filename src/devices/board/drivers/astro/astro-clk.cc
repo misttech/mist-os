@@ -93,6 +93,8 @@ zx_status_t Astro::ClkInit() {
     return result->error_value();
   }
 
+  clock_init_steps_.clear();
+
   return ZX_OK;
 }
 

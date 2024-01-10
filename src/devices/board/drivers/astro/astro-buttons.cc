@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
@@ -27,6 +28,9 @@
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
+constexpr uint32_t kPullUp = static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kPullUp);
+constexpr uint32_t kNoPull = static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+
 // clang-format off
 static const buttons_button_config_t buttons[] = {
     {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP,   0, 0, 0},
@@ -36,10 +40,10 @@ static const buttons_button_config_t buttons[] = {
 };
 // No need for internal pull, external pull-ups used.
 static const buttons_gpio_config_t gpios[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_PULL_UP}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_PULL_UP}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_NO_PULL}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT, 0                         , {.interrupt = {GPIO_NO_PULL}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {kPullUp}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {kPullUp}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {kNoPull}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0                         , {.interrupt = {kNoPull}}},
 };
 // clang-format on
 
