@@ -226,7 +226,8 @@ zx_status_t SdmmcDevice::SdmmcStopTransmission(uint32_t* status) {
   return st;
 }
 
-zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t state) {
+zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t desired_state) {
+  uint32_t current_state = 0;
   for (uint32_t i = 0; i < kTryAttempts; i++) {
     sdmmc_req_t req = {};
     req.cmd_idx = SDMMC_SEND_STATUS;
@@ -235,10 +236,12 @@ zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t state) {
     req.suppress_error_messages = i < (kTryAttempts - 1);
     uint32_t response[4];
     zx_status_t st = Request(req, response);
-    if (st == ZX_OK && MMC_STATUS_CURRENT_STATE(response[0]) == state) {
+    current_state = MMC_STATUS_CURRENT_STATE(response[0]);
+    if (st == ZX_OK && current_state == desired_state) {
       return ZX_OK;
     }
   }
+  zxlogf(ERROR, "Failed to wait for state %u (got state %u).", desired_state, current_state);
   return ZX_ERR_TIMED_OUT;
 }
 

@@ -57,7 +57,7 @@ class SdmmcDevice {
   zx_status_t SdmmcGoIdle();
   zx_status_t SdmmcSendStatus(uint32_t* status);
   zx_status_t SdmmcStopTransmission(uint32_t* status = nullptr);
-  zx_status_t SdmmcWaitForState(uint32_t state);
+  zx_status_t SdmmcWaitForState(uint32_t desired_state);
   // Retries a collection of IO requests by recursively calling itself (|retries| is used to track
   // the retry count). STOP_TRANSMISSION is issued after every attempt that results in an error, but
   // not after the request succeeds. Invokes |callback| with the final status and retry count.
