@@ -96,7 +96,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
         if first_resolve {
             {
                 let mut state = component.lock_state().await;
-                let component_input_dict = match state.deref_mut() {
+                let (instance_token_state, component_input_dict) = match state.deref_mut() {
                     InstanceState::Resolved(_) => {
                         panic!("Component was marked Resolved during Resolve action?");
                     }
@@ -108,14 +108,13 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                             moniker: component.moniker.clone(),
                         });
                     }
-                    InstanceState::Unresolved(unresolved_state) => {
-                        unresolved_state.component_input_dict.clone()
-                    }
+                    InstanceState::Unresolved(unresolved_state) => unresolved_state.to_resolved(),
                 };
                 let resolved_state = ResolvedInstanceState::new(
                     component,
                     component_info.clone(),
                     component_address,
+                    instance_token_state,
                     component_input_dict,
                 )
                 .await?;

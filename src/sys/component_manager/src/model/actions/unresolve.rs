@@ -5,7 +5,7 @@
 use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet, ShutdownAction, ShutdownType},
-        component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
+        component::{ComponentInstance, InstanceState},
         error::UnresolveActionError,
         hooks::{Event, EventPayload},
     },
@@ -72,8 +72,8 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
         let mut state = component.lock_state().await;
         match state.deref_mut() {
             InstanceState::Resolved(resolved_state) => {
-                let dict = resolved_state.component_input_dict.clone();
-                state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(dict)));
+                let next = InstanceState::Unresolved(resolved_state.to_unresolved());
+                state.set(next);
                 true
             }
             InstanceState::Destroyed => {

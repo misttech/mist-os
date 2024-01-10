@@ -19,6 +19,7 @@ pub(crate) mod resolver;
 pub(crate) mod routing;
 pub(crate) mod routing_fns;
 pub(crate) mod storage;
+pub(crate) mod token;
 
 mod exposed_dir;
 

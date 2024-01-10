@@ -180,6 +180,7 @@ mod tests {
             error::ModelError,
             model::{Model, ModelParams},
             testing::mocks::MockResolver,
+            token::InstanceRegistry,
         },
         ::routing::environment::DebugRegistration,
         assert_matches::assert_matches,
@@ -302,17 +303,20 @@ mod tests {
         };
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
-        let model = Model::new(ModelParams {
-            runtime_config: Arc::new(RuntimeConfig::default()),
-            root_component_url: "test:///root".to_string(),
-            root_environment: Environment::new_root(
-                &top_instance,
-                RunnerRegistry::new(runners),
-                resolvers,
-                debug_registry,
-            ),
-            top_instance,
-        })
+        let model = Model::new(
+            ModelParams {
+                runtime_config: Arc::new(RuntimeConfig::default()),
+                root_component_url: "test:///root".to_string(),
+                root_environment: Environment::new_root(
+                    &top_instance,
+                    RunnerRegistry::new(runners),
+                    resolvers,
+                    debug_registry,
+                ),
+                top_instance,
+            },
+            InstanceRegistry::new(),
+        )
         .await
         .unwrap();
         model.discover_root_component(Dict::new()).await;
@@ -400,17 +404,20 @@ mod tests {
         };
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
-        let model = Model::new(ModelParams {
-            runtime_config: Arc::new(RuntimeConfig::default()),
-            root_component_url: "test:///root".to_string(),
-            root_environment: Environment::new_root(
-                &top_instance,
-                RunnerRegistry::new(runners),
-                resolvers,
-                DebugRegistry::default(),
-            ),
-            top_instance,
-        })
+        let model = Model::new(
+            ModelParams {
+                runtime_config: Arc::new(RuntimeConfig::default()),
+                root_component_url: "test:///root".to_string(),
+                root_environment: Environment::new_root(
+                    &top_instance,
+                    RunnerRegistry::new(runners),
+                    resolvers,
+                    DebugRegistry::default(),
+                ),
+                top_instance,
+            },
+            InstanceRegistry::new(),
+        )
         .await?;
         model.discover_root_component(Dict::new()).await;
         let component =
@@ -501,17 +508,20 @@ mod tests {
         };
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
-        let model = Model::new(ModelParams {
-            runtime_config: Arc::new(RuntimeConfig::default()),
-            root_component_url: "test:///root".to_string(),
-            root_environment: Environment::new_root(
-                &top_instance,
-                RunnerRegistry::new(runners),
-                resolvers,
-                DebugRegistry::default(),
-            ),
-            top_instance,
-        })
+        let model = Model::new(
+            ModelParams {
+                runtime_config: Arc::new(RuntimeConfig::default()),
+                root_component_url: "test:///root".to_string(),
+                root_environment: Environment::new_root(
+                    &top_instance,
+                    RunnerRegistry::new(runners),
+                    resolvers,
+                    DebugRegistry::default(),
+                ),
+                top_instance,
+            },
+            InstanceRegistry::new(),
+        )
         .await?;
         model.discover_root_component(Dict::new()).await;
         // Add instance to collection.
@@ -604,17 +614,20 @@ mod tests {
         };
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
-        let model = Model::new(ModelParams {
-            runtime_config: Arc::new(RuntimeConfig::default()),
-            root_component_url: "test:///root".to_string(),
-            root_environment: Environment::new_root(
-                &top_instance,
-                RunnerRegistry::new(runners),
-                resolvers,
-                debug_registry,
-            ),
-            top_instance,
-        })
+        let model = Model::new(
+            ModelParams {
+                runtime_config: Arc::new(RuntimeConfig::default()),
+                root_component_url: "test:///root".to_string(),
+                root_environment: Environment::new_root(
+                    &top_instance,
+                    RunnerRegistry::new(runners),
+                    resolvers,
+                    debug_registry,
+                ),
+                top_instance,
+            },
+            InstanceRegistry::new(),
+        )
         .await
         .unwrap();
         model.discover_root_component(Dict::new()).await;
@@ -677,17 +690,20 @@ mod tests {
             registry
         };
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
-        let model = Model::new(ModelParams {
-            runtime_config: Arc::new(RuntimeConfig::default()),
-            root_component_url: "test:///root".to_string(),
-            root_environment: Environment::new_root(
-                &top_instance,
-                RunnerRegistry::default(),
-                registry,
-                DebugRegistry::default(),
-            ),
-            top_instance,
-        })
+        let model = Model::new(
+            ModelParams {
+                runtime_config: Arc::new(RuntimeConfig::default()),
+                root_component_url: "test:///root".to_string(),
+                root_environment: Environment::new_root(
+                    &top_instance,
+                    RunnerRegistry::default(),
+                    registry,
+                    DebugRegistry::default(),
+                ),
+                top_instance,
+            },
+            InstanceRegistry::new(),
+        )
         .await?;
         model.discover_root_component(Dict::new()).await;
         assert_matches!(

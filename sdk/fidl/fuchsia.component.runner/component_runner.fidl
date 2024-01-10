@@ -123,6 +123,18 @@ type ComponentStartInfo = resource table {
     /// they drop the other side of the eventpair, which is sent in the payload of
     /// the DebugStarted event in fuchsia.component.events.
     8: break_on_start zx.Handle:EVENTPAIR;
+
+    /// An opaque token that represents the component instance.
+    ///
+    /// The `fuchsia.component/Introspector` protocol may be used to get the
+    /// string moniker of the instance from this token.
+    ///
+    /// Runners may publish this token as part of diagnostics information, to
+    /// identify the running component without knowing its moniker.
+    ///
+    /// The token is invalidated when the component instance is destroyed.
+    @available(added=HEAD)
+    9: component_instance zx.Handle:EVENT;
 };
 
 /// A protocol for binding and controlling the lifetime of a component instance

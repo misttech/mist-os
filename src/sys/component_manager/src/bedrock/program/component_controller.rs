@@ -105,6 +105,20 @@ impl<'a> ComponentController {
         }
         epitaph_sender.take().map(|sender| sender.send(zx::Status::PEER_CLOSED).unwrap_or(()));
     }
+
+    /// Get the KOID of the `ComponentController` FIDL server endpoint.
+    #[cfg(test)]
+    pub fn peer_koid(&self) -> zx::Koid {
+        use fidl::endpoints::Proxy;
+        use zx::AsHandleRef;
+
+        self.inner
+            .as_channel()
+            .as_handle_ref()
+            .basic_info()
+            .expect("basic info should not require any rights")
+            .related_koid
+    }
 }
 
 #[cfg(test)]

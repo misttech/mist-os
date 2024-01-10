@@ -110,6 +110,7 @@ mod tests {
             ns: Some(vec![]),
             outgoing_dir: None,
             runtime_dir: None,
+            component_instance: Some(zx::Event::create()),
             ..Default::default()
         }
     }

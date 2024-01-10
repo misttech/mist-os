@@ -10,6 +10,7 @@ use {
         },
         model::component::WeakComponentInstance,
         model::error::ModelError,
+        model::token::InstanceRegistry,
     },
     ::routing::policy::GlobalPolicyChecker,
     cm_config::{AbiRevisionPolicy, RuntimeConfig},
@@ -27,11 +28,15 @@ pub struct ModelContext {
     builtin_capabilities: Mutex<Option<Vec<Box<dyn BuiltinCapability>>>>,
     framework_capabilities: Mutex<Option<Vec<Box<dyn FrameworkCapability>>>>,
     derived_capabilities: Mutex<Option<Vec<Box<dyn DerivedCapability>>>>,
+    instance_registry: Arc<InstanceRegistry>,
 }
 
 impl ModelContext {
     /// Constructs a new ModelContext from a RuntimeConfig.
-    pub fn new(runtime_config: Arc<RuntimeConfig>) -> Result<Self, ModelError> {
+    pub fn new(
+        runtime_config: Arc<RuntimeConfig>,
+        instance_registry: Arc<InstanceRegistry>,
+    ) -> Result<Self, ModelError> {
         Ok(Self {
             component_id_index: match &runtime_config.component_id_index_path {
                 Some(path) => component_id_index::Index::from_fidl_file(&path)?,
@@ -42,13 +47,15 @@ impl ModelContext {
             builtin_capabilities: Mutex::new(None),
             framework_capabilities: Mutex::new(None),
             derived_capabilities: Mutex::new(None),
+            instance_registry,
         })
     }
 
     #[cfg(test)]
     pub fn new_for_test() -> Self {
         let runtime_config = Arc::new(RuntimeConfig::default());
-        Self::new(runtime_config).unwrap()
+        let instance_registry = InstanceRegistry::new();
+        Self::new(runtime_config, instance_registry).unwrap()
     }
 
     /// Returns the runtime policy checker for the model.
@@ -66,6 +73,10 @@ impl ModelContext {
 
     pub fn abi_revision_policy(&self) -> &AbiRevisionPolicy {
         &self.runtime_config.abi_revision_policy
+    }
+
+    pub fn instance_registry(&self) -> &Arc<InstanceRegistry> {
+        &self.instance_registry
     }
 
     pub async fn init_internal_capabilities(

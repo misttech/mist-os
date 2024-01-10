@@ -86,7 +86,10 @@ impl Action for StartAction {
 
 struct StartContext {
     runner: Option<RemoteRunner>,
-    start_info: StartInfo,
+    url: String,
+    namespace_builder: NamespaceBuilder,
+    numbered_handles: Vec<fprocess::HandleInfo>,
+    encoded_config: Option<fmem::Data>,
 }
 
 async fn do_start(
@@ -137,29 +140,36 @@ async fn do_start(
     }
 
     // Generate the Runtime which will be set in the Execution.
-    let (pending_runtime, start_info, break_on_start) = make_execution_runtime(
+    let decl = &resolved_component.decl;
+    let pending_runtime = make_execution_runtime(
         &component,
         component.policy_checker(),
-        resolved_component.resolved_url.clone(),
-        &resolved_component.decl,
-        resolved_component.config.clone(),
-        namespace_builder,
+        decl,
         start_reason.clone(),
         execution_controller_task,
-        numbered_handles,
     )
     .await?;
 
-    let start_context = StartContext { runner, start_info };
+    let encoded_config = match resolved_component.config.clone() {
+        Some(mut config) => {
+            if has_config_capabilities(decl) {
+                update_config_with_capabilities(&mut config, decl, &component).await?;
+                update_component_config(&component, config.clone()).await?;
+            }
+            Some(encode_config(config, &component.moniker).await?)
+        }
+        None => None,
+    };
 
-    start_component(
-        &component,
-        resolved_component.decl,
-        pending_runtime,
-        start_context,
-        break_on_start,
-    )
-    .await
+    let start_context = StartContext {
+        runner,
+        url: resolved_component.resolved_url.clone(),
+        namespace_builder,
+        numbered_handles,
+        encoded_config,
+    };
+
+    start_component(&component, resolved_component.decl, pending_runtime, start_context).await
 }
 
 /// Set the Runtime in the Execution and start the exit watcher. From component manager's
@@ -172,10 +182,9 @@ async fn start_component(
     decl: ComponentDecl,
     mut pending_runtime: ComponentRuntime,
     start_context: StartContext,
-    break_on_start: zx::EventPair,
 ) -> Result<fsys::StartResult, StartActionError> {
     let _actions = component.lock_actions().await;
-    let state = component.lock_state().await;
+    let mut state = component.lock_state().await;
     let mut execution = component.lock_execution().await;
 
     if let Some(r) = should_return_early(&state, &execution, &component.moniker) {
@@ -183,15 +192,34 @@ async fn start_component(
     }
 
     let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
+    let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
 
-    let StartContext { runner, start_info } = start_context;
+    let StartContext { runner, url, namespace_builder, numbered_handles, encoded_config } =
+        start_context;
     if let Some(runner) = runner {
+        let moniker = &component.moniker;
+        let component_instance = state
+            .instance_token(moniker, &component.context)
+            .ok_or(StartActionError::InstanceDestroyed { moniker: moniker.clone() })?;
+
+        let start_info = StartInfo {
+            resolved_url: url,
+            program: decl
+                .program
+                .as_ref()
+                .map(|p| p.info.clone())
+                .unwrap_or_else(|| fdata::Dictionary::default()),
+            namespace: namespace_builder,
+            numbered_handles,
+            encoded_config,
+            break_on_start: Some(break_on_start_left),
+            component_instance,
+        };
+
         pending_runtime.set_program(
-            Program::start(component.moniker.clone(), &runner, start_info, diagnostics_sender)
-                .map_err(|err| StartActionError::StartProgramError {
-                    moniker: component.moniker.clone(),
-                    err,
-                })?,
+            Program::start(&runner, start_info, diagnostics_sender).map_err(|err| {
+                StartActionError::StartProgramError { moniker: moniker.clone(), err }
+            })?,
             component.as_weak(),
         );
     }
@@ -224,7 +252,10 @@ async fn start_component(
         .hooks
         .dispatch(&Event::new_with_timestamp(
             component,
-            EventPayload::DebugStarted { runtime_dir, break_on_start: Arc::new(break_on_start) },
+            EventPayload::DebugStarted {
+                runtime_dir,
+                break_on_start: Arc::new(break_on_start_right),
+            },
             timestamp,
         ))
         .await;
@@ -400,14 +431,10 @@ async fn encode_config(
 async fn make_execution_runtime(
     component: &Arc<ComponentInstance>,
     checker: &GlobalPolicyChecker,
-    url: String,
     decl: &cm_rust::ComponentDecl,
-    config: Option<ConfigFields>,
-    namespace_builder: NamespaceBuilder,
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
-    numbered_handles: Vec<fprocess::HandleInfo>,
-) -> Result<(ComponentRuntime, StartInfo, zx::EventPair), StartActionError> {
+) -> Result<ComponentRuntime, StartActionError> {
     // TODO(https://fxbug.dev/120713): Consider moving this check to ComponentInstance::add_child
     match component.on_terminate {
         fdecl::OnTerminate::Reboot => {
@@ -433,34 +460,7 @@ async fn make_execution_runtime(
         None
     };
 
-    let encoded_config = match config {
-        Some(mut config) => {
-            if has_config_capabilities(decl) {
-                update_config_with_capabilities(&mut config, decl, component).await?;
-                update_component_config(component, config.clone()).await?;
-            }
-            Some(encode_config(config, &component.moniker).await?)
-        }
-        None => None,
-    };
-
-    let runtime = ComponentRuntime::new(start_reason, execution_controller_task, logger);
-    let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
-
-    let start_info = StartInfo {
-        resolved_url: url,
-        program: decl
-            .program
-            .as_ref()
-            .map(|p| p.info.clone())
-            .unwrap_or_else(|| fdata::Dictionary::default()),
-        namespace: namespace_builder,
-        numbered_handles,
-        encoded_config,
-        break_on_start: Some(break_on_start_left),
-    };
-
-    Ok((runtime, start_info, break_on_start_right))
+    Ok(ComponentRuntime::new(start_reason, execution_controller_task, logger))
 }
 
 /// Returns the UseProtocolDecl for the LogSink protocol, if any.
@@ -796,6 +796,7 @@ mod tests {
             &child,
             resolved_component,
             ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
+            Default::default(),
             Dict::new(),
         )
         .await

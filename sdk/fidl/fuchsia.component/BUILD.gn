@@ -13,6 +13,7 @@ fidl("fuchsia.component") {
     "controller.fidl",
     "error.fidl",
     "events.fidl",
+    "introspector.fidl",
     "namespace.fidl",
     "overview.fidl",
     "realm.fidl",

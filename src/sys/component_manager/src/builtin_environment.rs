@@ -50,6 +50,7 @@ use {
         framework::{
             binder::BinderFrameworkCapability,
             factory::FactoryFrameworkCapability,
+            introspector::IntrospectorFrameworkCapability,
             lifecycle_controller::{LifecycleController, LifecycleControllerFrameworkCapability},
             namespace::NamespaceFrameworkCapability,
             pkg_dir::PkgDirectoryFrameworkCapability,
@@ -73,6 +74,7 @@ use {
             model::{Model, ModelParams},
             resolver::{box_arc_resolver, ResolverRegistry},
             storage::admin_protocol::StorageAdminDerivedCapability,
+            token::InstanceRegistry,
         },
         root_stop_notifier::RootStopNotifier,
         sandbox_util::{new_terminating_router, DictExt, LaunchTaskOnReceive},
@@ -128,6 +130,7 @@ pub struct BuiltinEnvironmentBuilder {
     add_environment_resolvers: bool,
     inspector: Option<Inspector>,
     crash_records: CrashRecords,
+    instance_registry: Arc<InstanceRegistry>,
 }
 
 impl Default for BuiltinEnvironmentBuilder {
@@ -142,6 +145,7 @@ impl Default for BuiltinEnvironmentBuilder {
             add_environment_resolvers: false,
             inspector: None,
             crash_records: CrashRecords::new(),
+            instance_registry: InstanceRegistry::new(),
         }
     }
 }
@@ -212,6 +216,7 @@ impl BuiltinEnvironmentBuilder {
                 launcher_connector,
                 utc_clock: self.utc_clock.clone(),
                 crash_records: self.crash_records.clone(),
+                instance_registry: self.instance_registry.clone(),
             },
         ));
         Ok(self.add_runner("builtin".parse().unwrap(), runner))
@@ -341,7 +346,7 @@ impl BuiltinEnvironmentBuilder {
             runtime_config: Arc::clone(&runtime_config),
             top_instance,
         };
-        let model = Model::new(params).await?;
+        let model = Model::new(params, self.instance_registry).await?;
 
         // Wrap BuiltinRunnerFactory in BuiltinRunner now that we have the definite RuntimeConfig.
         let builtin_runners = self
@@ -973,6 +978,9 @@ impl BuiltinEnvironment {
             vec![Box::new(EventSourceFactoryCapability::new(event_source_factory.clone()))];
         let mut framework_capabilities: Vec<Box<dyn FrameworkCapability>> = vec![
             Box::new(RealmFrameworkCapability::new(Arc::downgrade(&model), runtime_config.clone())),
+            Box::new(IntrospectorFrameworkCapability {
+                instance_registry: model.context().instance_registry().clone(),
+            }),
             Box::new(BinderFrameworkCapability::new()),
             Box::new(FactoryFrameworkCapability::new()),
             Box::new(NamespaceFrameworkCapability::new()),

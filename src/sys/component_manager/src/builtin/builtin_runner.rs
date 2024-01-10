@@ -24,7 +24,9 @@ use vfs::execution_scope::ExecutionScope;
 use zx::{AsHandleRef, HandleBased, Task};
 
 use crate::{
-    bedrock::program, builtin::runner::BuiltinRunnerFactory, sandbox_util,
+    builtin::runner::BuiltinRunnerFactory,
+    model::token::{InstanceRegistry, InstanceToken},
+    sandbox_util,
     sandbox_util::LaunchTaskOnReceive,
 };
 
@@ -48,6 +50,8 @@ pub struct BuiltinRunner {
 }
 
 /// Pure data type holding some resources needed by the ELF runner.
+// TODO(https://fxbug.dev/318697539): Most of this should be replaced by
+// capabilities in the incoming namespace of the ELF runner component.
 pub struct ElfRunnerResources {
     /// Job policy requests in the program block of ELF components will be checked against
     /// the provided security policy.
@@ -55,6 +59,7 @@ pub struct ElfRunnerResources {
     pub launcher_connector: fn() -> elf_runner::process_launcher::Connector,
     pub utc_clock: Option<Arc<Clock>>,
     pub crash_records: CrashRecords,
+    pub instance_registry: Arc<InstanceRegistry>,
 }
 
 #[derive(Debug, Error)]
@@ -290,23 +295,27 @@ impl Inner {
         mut stream: fcrunner::ComponentRunnerRequestStream,
     ) -> Result<(), anyhow::Error> {
         while let Ok(Some(request)) = stream.try_next().await {
-            let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } = request;
-            let koid = controller
-                .as_handle_ref()
-                .basic_info()
-                .expect("basic info should not require any rights")
-                .koid;
-            // TODO(https://fxbug.dev/309122518): Once crash introspection no longer relies on monikers,
-            // we can run components without knowing their moniker, by assigning a least privileged
-            // job policy.
-            let Some(target_moniker) = program::moniker_from_controller_koid(koid) else {
+            let fcrunner::ComponentRunnerRequest::Start { mut start_info, controller, .. } =
+                request;
+            let Some(token) = start_info.component_instance.take() else {
                 warn!(
-                    "One can only call the ComponentRunner protocol of an ELF runner \
-                    using a ComponentController server endpoint received from component_manager"
+                    "When calling the ComponentRunner protocol of an ELF runner, \
+                    one must provide the ComponentStartInfo.component_instance field."
+                );
+                _ = controller.close_with_epitaph(zx::Status::INVALID_ARGS);
+                continue;
+            };
+            let token = InstanceToken::from(token);
+            let Some(target_moniker) = self.resources.instance_registry.get(&token) else {
+                warn!(
+                    "The provided ComponentStartInfo.component_instance  token is invalid. \
+                    The component has either already been destroyed, or the token is not minted by \
+                    component_manager."
                 );
                 _ = controller.close_with_epitaph(zx::Status::NOT_SUPPORTED);
                 continue;
             };
+            start_info.component_instance = Some(token.into());
             let checker = ScopedPolicyChecker::new(
                 self.resources.security_policy.clone(),
                 target_moniker.clone(),
@@ -367,11 +376,13 @@ mod tests {
         let launcher_connector: fn() -> elf_runner::process_launcher::Connector =
             || Box::new(elf_runner::process_launcher::NamespaceConnector {});
         let crash_records = CrashRecords::new();
+        let instance_registry = InstanceRegistry::new();
         let elf_runner_resources = ElfRunnerResources {
             security_policy,
             launcher_connector,
             utc_clock: None,
             crash_records,
+            instance_registry,
         };
         Arc::new(BuiltinRunner::new(task_group, elf_runner_resources))
     }
@@ -407,7 +418,7 @@ mod tests {
     async fn start_stop_elf_runner() {
         let builtin_runner = make_builtin_runner();
         let (client, server_end) = fidl::endpoints::create_proxy().unwrap();
-        builtin_runner.get_scoped_runner(make_scoped_policy_checker(), server_end);
+        builtin_runner.clone().get_scoped_runner(make_scoped_policy_checker(), server_end);
         let (elf_runner_controller, server_end) = fidl::endpoints::create_proxy().unwrap();
 
         // Start the ELF runner.
@@ -438,6 +449,9 @@ mod tests {
         namespace
             .add_entry(Box::new(Directory::new(pkg, None)), &Path::new("/pkg").unwrap())
             .unwrap();
+
+        let moniker = Moniker::try_from(vec!["signal_then_hang"]).unwrap();
+        let token = builtin_runner.elf_runner_resources.instance_registry.add_for_tests(moniker);
         let start_info = StartInfo {
             resolved_url: "fuchsia://signal-then-hang.cm".to_string(),
             program: Dictionary {
@@ -462,17 +476,12 @@ mod tests {
             }],
             encoded_config: None,
             break_on_start: None,
+            component_instance: token,
         };
 
         let elf_runner = RemoteRunner::new(component_runner);
         let (diagnostics_sender, _) = oneshot::channel();
-        let program = Program::start(
-            Moniker::try_from(vec!["signal_then_hang"]).unwrap(),
-            &elf_runner,
-            start_info,
-            diagnostics_sender,
-        )
-        .unwrap();
+        let program = Program::start(&elf_runner, start_info, diagnostics_sender).unwrap();
 
         // Wait for the ELF component to signal on the channel.
         let signals = fasync::OnSignals::new(&ch2, zx::Signals::USER_0).await.unwrap();

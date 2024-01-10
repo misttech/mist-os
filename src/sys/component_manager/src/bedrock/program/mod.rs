@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::runner::RemoteRunner;
+use crate::{model::token::InstanceToken, runner::RemoteRunner};
 use fidl::endpoints;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component_runner as fcrunner;
@@ -19,12 +19,9 @@ use futures::{
     future::{BoxFuture, Either},
     FutureExt,
 };
-use lazy_static::lazy_static;
-use moniker::Moniker;
 use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
-use std::{collections::HashMap, sync::Mutex};
+use std::sync::Mutex;
 use thiserror::Error;
-use zx::{AsHandleRef, Koid};
 
 mod component_controller;
 use component_controller::ComponentController;
@@ -35,9 +32,6 @@ use component_controller::ComponentController;
 /// and may eventually terminate.
 pub struct Program {
     controller: ComponentController,
-
-    /// The KOID of the controller server endpoint.
-    koid: Koid,
 
     /// The outgoing directory of the program.
     outgoing_dir: fio::DirectoryProxy,
@@ -71,26 +65,16 @@ impl Program {
     /// TODO(https://fxbug.dev/122024): Since diagnostic information is only available once,
     /// the framework should be the one that get it. That's another reason to limit this API.
     pub fn start(
-        moniker: Moniker,
         runner: &RemoteRunner,
         start_info: StartInfo,
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
     ) -> Result<Program, StartError> {
         let (controller, server_end) =
             endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
-        let koid = server_end
-            .as_handle_ref()
-            .basic_info()
-            .expect("basic info should not require any rights")
-            .koid;
-        MONIKER_LOOKUP.add(koid, moniker);
-
         let (outgoing_dir, outgoing_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-
         let (runtime_dir, runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-
         let (start_info, fut) = start_info.into_fidl(outgoing_server, runtime_server)?;
 
         runner.start(start_info, server_end);
@@ -104,7 +88,6 @@ impl Program {
         });
         Ok(Program {
             controller,
-            koid,
             outgoing_dir,
             runtime_dir,
             _send_diagnostics: send_diagnostics,
@@ -215,8 +198,8 @@ impl Program {
 
     /// Gets a [`Koid`] that will uniquely identify this program.
     #[cfg(test)]
-    pub fn koid(&self) -> Koid {
-        self.koid
+    pub fn koid(&self) -> zx::Koid {
+        self.controller.peer_koid()
     }
 
     /// Creates a program that does nothing but let us intercept requests to control its lifecycle.
@@ -224,12 +207,6 @@ impl Program {
     pub fn mock_from_controller(
         controller: endpoints::ClientEnd<fcrunner::ComponentControllerMarker>,
     ) -> Program {
-        let koid = controller
-            .as_handle_ref()
-            .basic_info()
-            .expect("basic info should not require any rights")
-            .related_koid;
-
         let controller = ComponentController::new(controller.into_proxy().unwrap());
         let (outgoing_dir, _outgoing_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -238,54 +215,12 @@ impl Program {
         let send_diagnostics = Task::spawn(async {});
         Program {
             controller,
-            koid,
             outgoing_dir,
             runtime_dir,
             _send_diagnostics: send_diagnostics,
             namespace_task: Mutex::new(None),
         }
     }
-}
-
-impl Drop for Program {
-    fn drop(&mut self) {
-        MONIKER_LOOKUP.remove(self.koid);
-    }
-}
-
-struct MonikerLookup {
-    koid_to_moniker: Mutex<HashMap<Koid, Moniker>>,
-}
-
-impl MonikerLookup {
-    fn new() -> Self {
-        Self { koid_to_moniker: Mutex::new(HashMap::new()) }
-    }
-
-    fn add(&self, koid: Koid, moniker: Moniker) {
-        self.koid_to_moniker.lock().unwrap().insert(koid, moniker);
-    }
-
-    fn get(&self, koid: Koid) -> Option<Moniker> {
-        self.koid_to_moniker.lock().unwrap().get(&koid).cloned()
-    }
-
-    fn remove(&self, koid: Koid) {
-        self.koid_to_moniker.lock().unwrap().remove(&koid);
-    }
-}
-
-lazy_static! {
-    static ref MONIKER_LOOKUP: MonikerLookup = MonikerLookup::new();
-}
-
-/// Looks up the moniker of a component based on the KOID of the `ComponentController`
-/// server endpoint given to its runner.
-///
-/// If this method returns `None`, then the `ComponentController` server endpoint is
-/// not minted by component_manager as part of starting a component.
-pub fn moniker_from_controller_koid(koid: Koid) -> Option<Moniker> {
-    MONIKER_LOOKUP.get(koid)
 }
 
 #[derive(Debug, PartialEq)]
@@ -397,6 +332,17 @@ pub struct StartInfo {
     /// they drop the other side of the eventpair, which is sent in the payload of
     /// the DebugStarted event in fuchsia.component.events.
     pub break_on_start: Option<zx::EventPair>,
+
+    /// An opaque token that represents the component instance.
+    ///
+    /// The `fuchsia.component/Introspector` protocol may be used to get the
+    /// string moniker of the instance from this token.
+    ///
+    /// Runners may publish this token as part of diagnostics information, to
+    /// identify the running component without knowing its moniker.
+    ///
+    /// The token is invalidated when the component instance is destroyed.
+    pub component_instance: InstanceToken,
 }
 
 impl StartInfo {
@@ -416,6 +362,7 @@ impl StartInfo {
                 numbered_handles: Some(self.numbered_handles),
                 encoded_config: self.encoded_config,
                 break_on_start: self.break_on_start,
+                component_instance: Some(self.component_instance.into()),
                 ..Default::default()
             },
             fut,

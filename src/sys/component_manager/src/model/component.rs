@@ -29,6 +29,7 @@ use {
             self,
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
+        token::{InstanceToken, InstanceTokenState},
     },
     crate::sandbox_util::{new_terminating_router, DictExt, LaunchTaskOnReceive},
     ::namespace::Entry as NamespaceEntry,
@@ -367,7 +368,7 @@ pub struct ComponentInstance {
     /// Configuration overrides provided by the parent component.
     config_parent_overrides: Option<Vec<cm_rust::ConfigOverride>>,
 
-    /// The context this instance is under.
+    /// The context shared across the model.
     pub context: Arc<ModelContext>,
 
     // These locks must be taken in the order declared if held simultaneously.
@@ -1214,6 +1215,24 @@ impl InstanceState {
             }
         }
     }
+
+    /// Requests a token that represents this component instance, minting it if needed.
+    ///
+    /// If the component instance is destroyed or not discovered, returns `None`.
+    pub fn instance_token(
+        &mut self,
+        moniker: &Moniker,
+        context: &Arc<ModelContext>,
+    ) -> Option<InstanceToken> {
+        match self {
+            InstanceState::New => None,
+            InstanceState::Unresolved(unresolved) => {
+                Some(unresolved.instance_token(moniker, context))
+            }
+            InstanceState::Resolved(resolved) => Some(resolved.instance_token(moniker, context)),
+            InstanceState::Destroyed => None,
+        }
+    }
 }
 
 impl fmt::Debug for InstanceState {
@@ -1229,13 +1248,28 @@ impl fmt::Debug for InstanceState {
 }
 
 pub struct UnresolvedInstanceState {
+    /// Caches an instance token.
+    instance_token_state: InstanceTokenState,
+
     /// The dict containing all capabilities that the parent wished to provide to us.
     pub component_input_dict: Dict,
 }
 
 impl UnresolvedInstanceState {
     pub fn new(component_input_dict: Dict) -> Self {
-        Self { component_input_dict }
+        Self { instance_token_state: Default::default(), component_input_dict }
+    }
+
+    fn instance_token(&mut self, moniker: &Moniker, context: &Arc<ModelContext>) -> InstanceToken {
+        self.instance_token_state.set(moniker, context)
+    }
+
+    /// Returns relevant information and prepares to enter the resolved state.
+    pub fn to_resolved(&mut self) -> (InstanceTokenState, Dict) {
+        (
+            std::mem::replace(&mut self.instance_token_state, Default::default()),
+            self.component_input_dict.clone(),
+        )
     }
 }
 
@@ -1284,6 +1318,9 @@ impl shutdown::Component for ResolvedInstanceState {
 pub struct ResolvedInstanceState {
     /// Weak reference to the component that owns this state.
     weak_component: WeakComponentInstance,
+
+    /// Caches an instance token.
+    instance_token_state: InstanceTokenState,
 
     /// The ExecutionScope for this component. Pseudo directories should be hosted with this
     /// scope to tie their life-time to that of the component.
@@ -1357,6 +1394,7 @@ impl ResolvedInstanceState {
         component: &Arc<ComponentInstance>,
         resolved_component: Component,
         address: ComponentAddress,
+        instance_token_state: InstanceTokenState,
         component_input_dict: Dict,
     ) -> Result<Self, ResolveActionError> {
         let weak_component = WeakComponentInstance::new(component);
@@ -1405,6 +1443,7 @@ impl ResolvedInstanceState {
 
         let mut state = Self {
             weak_component,
+            instance_token_state,
             execution_scope: ExecutionScope::new(),
             resolved_component,
             children: HashMap::new(),
@@ -1543,6 +1582,21 @@ impl ResolvedInstanceState {
     #[cfg(test)]
     pub fn decl_as_mut(&mut self) -> &mut ComponentDecl {
         &mut self.resolved_component.decl
+    }
+
+    /// Returns relevant information and prepares to enter the unresolved state.
+    pub fn to_unresolved(&mut self) -> UnresolvedInstanceState {
+        UnresolvedInstanceState {
+            instance_token_state: std::mem::replace(
+                &mut self.instance_token_state,
+                Default::default(),
+            ),
+            component_input_dict: self.component_input_dict.clone(),
+        }
+    }
+
+    fn instance_token(&mut self, moniker: &Moniker, context: &Arc<ModelContext>) -> InstanceToken {
+        self.instance_token_state.set(moniker, context)
     }
 
     /// This component's `ExecutionScope`.
@@ -3026,6 +3080,7 @@ pub mod tests {
             &comp,
             resolved_component,
             ComponentAddress::from(&comp.component_url, &comp).await.unwrap(),
+            Default::default(),
             Dict::new(),
         )
         .await

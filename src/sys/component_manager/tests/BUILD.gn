@@ -34,6 +34,7 @@ group("hermetic_tests") {
     "dynamic_offers:tests",
     "elf_runner:tests",
     "events:events_integration_test",
+    "introspector:tests",
     "lifecycle_controller:tests",
     "namespace_capabilities:tests",
     "panic-test:component_manager_panic_test",

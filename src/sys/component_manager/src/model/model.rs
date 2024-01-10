@@ -9,6 +9,7 @@ use {
         context::ModelContext,
         environment::Environment,
         error::ModelError,
+        token::InstanceRegistry,
     },
     cm_config::RuntimeConfig,
     moniker::{Moniker, MonikerBase},
@@ -42,13 +43,17 @@ pub struct Model {
     /// The instance representing the root component. Owned by `top_instance`, but cached here for
     /// efficiency.
     root: Arc<ComponentInstance>,
+    /// The context shared across the model.
     context: Arc<ModelContext>,
 }
 
 impl Model {
     /// Creates a new component model and initializes its topology.
-    pub async fn new(params: ModelParams) -> Result<Arc<Model>, ModelError> {
-        let context = Arc::new(ModelContext::new(params.runtime_config)?);
+    pub async fn new(
+        params: ModelParams,
+        instance_registry: Arc<InstanceRegistry>,
+    ) -> Result<Arc<Model>, ModelError> {
+        let context = Arc::new(ModelContext::new(params.runtime_config, instance_registry)?);
         let root = ComponentInstance::new_root(
             params.root_environment,
             context.clone(),
