@@ -21,6 +21,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
     fdf::Dispatcher& softmac_bridge_server_dispatcher, std::unique_ptr<StartStaCompleter> completer,
     DeviceInterface* device,
     fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client) {
+  WLAN_TRACE_DURATION();
   auto softmac_bridge = std::unique_ptr<SoftmacBridge>(new SoftmacBridge(
       device,
       std::forward<fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>>(softmac_client)));
@@ -103,6 +104,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
 }
 
 zx_status_t SoftmacBridge::StopSta(std::unique_ptr<StopStaCompleter> completer) {
+  WLAN_TRACE_DURATION();
   if (rust_handle_ == nullptr) {
     lerror("Failed to call stop_sta()! Encountered NULL rust_handle_");
     return ZX_ERR_BAD_STATE;
@@ -127,6 +129,7 @@ zx_status_t SoftmacBridge::StopSta(std::unique_ptr<StopStaCompleter> completer) 
 }
 
 SoftmacBridge::~SoftmacBridge() {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   if (rust_handle_ == nullptr) {
     lerror("Failed to call delete_sta()! Encountered NULL rust_handle_");
@@ -135,6 +138,7 @@ SoftmacBridge::~SoftmacBridge() {
 }
 
 void SoftmacBridge::Query(QueryCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::Query> dispatcher = [](const auto& arena,
                                                                        const auto& softmac_client) {
     return softmac_client.sync().buffer(arena)->Query();
@@ -143,6 +147,7 @@ void SoftmacBridge::Query(QueryCompleter::Sync& completer) {
 }
 
 void SoftmacBridge::QueryDiscoverySupport(QueryDiscoverySupportCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QueryDiscoverySupport> dispatcher =
       [](const auto& arena, const auto& client) {
         return client.sync().buffer(arena)->QueryDiscoverySupport();
@@ -151,6 +156,7 @@ void SoftmacBridge::QueryDiscoverySupport(QueryDiscoverySupportCompleter::Sync& 
 }
 
 void SoftmacBridge::QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QueryMacSublayerSupport> dispatcher =
       [](const auto& arena, const auto& client) {
         return client.sync().buffer(arena)->QueryMacSublayerSupport();
@@ -159,6 +165,7 @@ void SoftmacBridge::QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sy
 }
 
 void SoftmacBridge::QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QuerySecuritySupport> dispatcher =
       [](const auto& arena, const auto& client) {
         return client.sync().buffer(arena)->QuerySecuritySupport();
@@ -168,6 +175,7 @@ void SoftmacBridge::QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& co
 
 void SoftmacBridge::QuerySpectrumManagementSupport(
     QuerySpectrumManagementSupportCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::QuerySpectrumManagementSupport> dispatcher =
       [](const auto& arena, const auto& client) {
         return client.sync().buffer(arena)->QuerySpectrumManagementSupport();
@@ -177,6 +185,7 @@ void SoftmacBridge::QuerySpectrumManagementSupport(
 
 void SoftmacBridge::SetChannel(SetChannelRequestView request,
                                SetChannelCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::SetChannel> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->SetChannel(*request);
@@ -186,6 +195,7 @@ void SoftmacBridge::SetChannel(SetChannelRequestView request,
 
 void SoftmacBridge::NotifyAssociationComplete(NotifyAssociationCompleteRequestView request,
                                               NotifyAssociationCompleteCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::NotifyAssociationComplete> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->NotifyAssociationComplete(request->assoc_cfg);
@@ -195,6 +205,7 @@ void SoftmacBridge::NotifyAssociationComplete(NotifyAssociationCompleteRequestVi
 
 void SoftmacBridge::ClearAssociation(ClearAssociationRequestView request,
                                      ClearAssociationCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::ClearAssociation> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->ClearAssociation(*request);
@@ -204,6 +215,7 @@ void SoftmacBridge::ClearAssociation(ClearAssociationRequestView request,
 
 void SoftmacBridge::StartPassiveScan(StartPassiveScanRequestView request,
                                      StartPassiveScanCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::StartPassiveScan> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->StartPassiveScan(*request);
@@ -213,6 +225,7 @@ void SoftmacBridge::StartPassiveScan(StartPassiveScanRequestView request,
 
 void SoftmacBridge::StartActiveScan(StartActiveScanRequestView request,
                                     StartActiveScanCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::StartActiveScan> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->StartActiveScan(*request);
@@ -222,6 +235,7 @@ void SoftmacBridge::StartActiveScan(StartActiveScanRequestView request,
 
 void SoftmacBridge::CancelScan(CancelScanRequestView request,
                                CancelScanCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::CancelScan> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->CancelScan(*request);
@@ -230,6 +244,7 @@ void SoftmacBridge::CancelScan(CancelScanRequestView request,
 }
 
 void SoftmacBridge::JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::JoinBss> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->JoinBss(request->join_request);
@@ -239,6 +254,7 @@ void SoftmacBridge::JoinBss(JoinBssRequestView request, JoinBssCompleter::Sync& 
 
 void SoftmacBridge::EnableBeaconing(EnableBeaconingRequestView request,
                                     EnableBeaconingCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::EnableBeaconing> dispatcher =
       [request](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->EnableBeaconing(*request);
@@ -247,6 +263,7 @@ void SoftmacBridge::EnableBeaconing(EnableBeaconingRequestView request,
 }
 
 void SoftmacBridge::DisableBeaconing(DisableBeaconingCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::DisableBeaconing> dispatcher =
       [](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->DisableBeaconing();
@@ -255,6 +272,7 @@ void SoftmacBridge::DisableBeaconing(DisableBeaconingCompleter::Sync& completer)
 }
 
 void SoftmacBridge::QueueEthFrameTx(eth::BorrowedOperation<> op) {
+  WLAN_TRACE_DURATION();
   if (rust_handle_ == nullptr) {
     op.Complete(ZX_ERR_BAD_STATE);
     return;
@@ -267,6 +285,7 @@ void SoftmacBridge::QueueEthFrameTx(eth::BorrowedOperation<> op) {
 template <typename FidlMethod>
 fidl::WireResultUnwrapType<FidlMethod> SoftmacBridge::FlattenAndLogError(
     const std::string& method_name, fdf::WireUnownedResult<FidlMethod> result) {
+  WLAN_TRACE_DURATION();
   if (!result.ok()) {
     lerror("%s failed (FIDL error %s)", method_name.c_str(), result.status_string());
     return fit::error(result.status());
@@ -286,6 +305,7 @@ fidl::WireResultUnwrapType<FidlMethod> SoftmacBridge::FlattenAndLogError(
 template <typename Completer, typename FidlMethod>
 void SoftmacBridge::DispatchAndComplete(const std::string& method_name,
                                         Dispatcher<FidlMethod> dispatcher, Completer& completer) {
+  WLAN_TRACE_DURATION();
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
@@ -298,6 +318,7 @@ void SoftmacBridge::DispatchAndComplete(const std::string& method_name,
 }
 
 wlansoftmac_in_buf_t SoftmacBridge::IntoRustInBuf(std::unique_ptr<Buffer> owned_buffer) {
+  WLAN_TRACE_DURATION();
   auto* buffer = owned_buffer.release();
   return wlansoftmac_in_buf_t{
       .free_buffer = [](void* raw) { std::unique_ptr<Buffer>(static_cast<Buffer*>(raw)).reset(); },

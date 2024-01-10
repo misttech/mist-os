@@ -4,12 +4,14 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_LOG_CPP_INCLUDE_COMMON_WLAN_DRIVERS_LOG_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_LOG_CPP_INCLUDE_COMMON_WLAN_DRIVERS_LOG_H_
 
+#include <lib/stdcompat/source_location.h>
+#include <lib/trace/event.h>
 #include <zircon/compiler.h>
 
 #include <wlan/drivers/internal/macro_helpers.h>
 #include <wlan/drivers/internal/throttle_counter.h>
 
-// TODO(https://fxbug.dev/81914) - Add support for log level fatal i.e. lfatal().
+// TODO(https://fxbug.dev/81914): Add support for log level fatal i.e. lfatal().
 #define lerror(fmt, ...) (wlan_drivers_log_internal(ERROR, 0, NULL, fmt, ##__VA_ARGS__))
 #define lwarn(fmt, ...) (wlan_drivers_log_internal(WARNING, 0, NULL, fmt, ##__VA_ARGS__))
 #define linfo(fmt, ...) (wlan_drivers_log_internal(INFO, 0, NULL, fmt, ##__VA_ARGS__))
@@ -40,8 +42,8 @@
 #define lthrottle_trace(filter, tag, fmt...) \
   wlan_drivers_lthrottle_internal(LOG_THROTTLE_EVENTS_PER_SEC, TRACE, filter, tag, fmt)
 
-// ToDo (https://fxbug.dev/82722) - Remove lthrottle_log_if() in favor of throttle macros that provide
-// additional information on how many times the logs got throttled.
+// TODO(https://fxbug.dev/82722): Remove lthrottle_log_if() in favor of throttle macros that
+// provide additional information on how many times the logs got throttled.
 #define lthrottle_log_if(events_per_second, condition, log) \
   do {                                                      \
     if (condition) {                                        \
@@ -57,6 +59,12 @@
       }                                                     \
     }                                                       \
   } while (0)
+
+#define WLAN_TRACE_DURATION(args...)                                        \
+  {                                                                         \
+    auto function_name = cpp20::source_location::current().function_name(); \
+    TRACE_DURATION("wlan", function_name, args);                            \
+  }
 
 #define FMT_MAC "%02x:%02x:%02x:%02x:%02x:%02x"
 #define FMT_MAC_ARGS(arr) (arr)[0], (arr)[1], (arr)[2], (arr)[3], (arr)[4], (arr)[5]

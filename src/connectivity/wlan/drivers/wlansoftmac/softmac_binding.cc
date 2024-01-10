@@ -50,6 +50,7 @@ namespace wlan::drivers::wlansoftmac {
 SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher)
     : device_(device),
       main_driver_dispatcher_(std::forward<fdf::UnownedDispatcher>(main_driver_dispatcher)) {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
@@ -122,6 +123,7 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
 zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(
     zx_device_t* device,
     fdf::UnownedDispatcher&& main_driver_dispatcher) __TA_NO_THREAD_SAFETY_ANALYSIS {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Binding...");
   auto softmac_binding = std::unique_ptr<SoftmacBinding>(
@@ -147,6 +149,7 @@ zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(
 // ddk ethernet_impl_protocol_ops methods
 
 void SoftmacBinding::Init() {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Initializing...");
 
@@ -199,6 +202,7 @@ void SoftmacBinding::Init() {
 
 // See lib/ddk/device.h for documentation on when this method is called.
 void SoftmacBinding::Unbind() {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   auto softmac_bridge = softmac_bridge_.release();
   auto stop_sta_returned = std::make_unique<libsync::Completion>();
@@ -221,11 +225,13 @@ void SoftmacBinding::Unbind() {
 
 // See lib/ddk/device.h for documentation on when this method is called.
 void SoftmacBinding::Release() {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   delete this;
 }
 
 zx_status_t SoftmacBinding::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   if (info == nullptr)
     return ZX_ERR_INVALID_ARGS;
@@ -269,6 +275,7 @@ zx_status_t SoftmacBinding::EthernetImplQuery(uint32_t options, ethernet_info_t*
 }
 
 zx_status_t SoftmacBinding::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   ZX_DEBUG_ASSERT(ifc != nullptr);
 
@@ -281,6 +288,7 @@ zx_status_t SoftmacBinding::EthernetImplStart(const ethernet_ifc_protocol_t* ifc
 }
 
 void SoftmacBinding::EthernetImplStop() {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
 
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
@@ -292,12 +300,14 @@ void SoftmacBinding::EthernetImplStop() {
 
 void SoftmacBinding::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
                                          ethernet_impl_queue_tx_callback callback, void* cookie) {
+  WLAN_TRACE_DURATION();
   eth::BorrowedOperation<> op(netbuf, callback, cookie, sizeof(ethernet_netbuf_t));
   softmac_bridge_->QueueEthFrameTx(std::move(op));
 }
 
 zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
                                                  const uint8_t* data_buffer, size_t data_size) {
+  WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   if (param == ETHERNET_SETPARAM_PROMISC) {
     // See https://fxbug.dev/28881: In short, the bridge mode doesn't require WLAN
@@ -314,11 +324,13 @@ zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
 }
 
 void SoftmacBinding::EthernetImplGetBti(zx_handle_t* out_bti) {
+  WLAN_TRACE_DURATION();
   lerror("WLAN does not support ETHERNET_FEATURE_DMA");
 }
 
 zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                                   zx::channel* out_sme_channel) {
+  WLAN_TRACE_DURATION();
   debugf("Start");
 
   auto arena = fdf::Arena::Create(0, 0);
@@ -377,6 +389,7 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* i
 }
 
 zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) {
+  WLAN_TRACE_DURATION();
   if (eth_frame.size() > ETH_FRAME_MAX_SIZE) {
     lerror("Attempted to deliver an ethernet frame of invalid length: %zu", eth_frame.size());
     return ZX_ERR_INVALID_ARGS;
@@ -390,6 +403,7 @@ zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame
 }
 
 zx_status_t SoftmacBinding::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) {
+  WLAN_TRACE_DURATION();
   ZX_DEBUG_ASSERT(used_buffer.size() <= std::numeric_limits<uint16_t>::max());
 
   auto arena = fdf::Arena::Create(0, 0);
@@ -421,6 +435,7 @@ zx_status_t SoftmacBinding::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_in
 }
 
 zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) {
+  WLAN_TRACE_DURATION();
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
   if (ethernet_proxy_.is_valid()) {
     ethernet_proxy_.Status(status);
@@ -429,6 +444,7 @@ zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) {
 }
 
 zx_status_t SoftmacBinding::InstallKey(wlan_key_configuration_t* key_config) {
+  WLAN_TRACE_DURATION();
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
@@ -457,6 +473,7 @@ zx_status_t SoftmacBinding::InstallKey(wlan_key_configuration_t* key_config) {
 
 void SoftmacBinding::Recv(RecvRequestView request, fdf::Arena& arena,
                           RecvCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   wlan_rx_packet_t rx_packet;
 
   {
@@ -492,6 +509,7 @@ void SoftmacBinding::Recv(RecvRequestView request, fdf::Arena& arena,
 
 void SoftmacBinding::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
                                     ReportTxResultCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   wlan_tx_result_t tx_result;
   zx_status_t status = ConvertTxStatus(request->tx_result, &tx_result);
   if (status != ZX_OK) {
@@ -504,6 +522,7 @@ void SoftmacBinding::ReportTxResult(ReportTxResultRequestView request, fdf::Aren
 }
 void SoftmacBinding::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
                                         NotifyScanCompleteCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
   wlan_softmac_ifc_protocol_->ops->notify_scan_complete(wlan_softmac_ifc_protocol_->ctx,
                                                         request->status(), request->scan_id());
   completer.buffer(arena).Reply();
