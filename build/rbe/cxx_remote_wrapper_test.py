@@ -132,7 +132,12 @@ class CxxRemoteActionTests(unittest.TestCase):
         with mock.patch.object(
             cxx_remote_wrapper, "check_missing_remote_tools"
         ) as mock_check:
-            self.assertEqual(c.prepare(), 0)
+            with mock.patch.object(
+                fuchsia,
+                "remote_clang_compiler_toolchain_inputs",
+                return_value=iter([]),
+            ) as mock_tc_inputs:
+                self.assertEqual(c.prepare(), 0)
         self.assertEqual(
             c.remote_action.inputs_relative_to_project_root,
             [fake_builddir / source],
@@ -230,20 +235,25 @@ class CxxRemoteActionTests(unittest.TestCase):
         with mock.patch.object(
             cxx_remote_wrapper, "check_missing_remote_tools"
         ) as mock_check:
-            with mock.patch.object(os, "curdir", fake_cwd):
-                with mock.patch.object(
-                    remote_action, "PROJECT_ROOT", fake_root
-                ):
-                    c = cxx_remote_wrapper.CxxRemoteAction(
-                        ["--"] + command,
-                        host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
-                        auto_reproxy=False,
-                    )
-                    self.assertEqual(c.prepare(), 0)
-                    self.assertEqual(c.remote_action.exec_root, fake_root)
-                    self.assertEqual(
-                        c.remote_action.build_subdir, fake_builddir
-                    )
+            with mock.patch.object(
+                fuchsia,
+                "remote_clang_compiler_toolchain_inputs",
+                return_value=iter([]),
+            ) as mock_tc_inputs:
+                with mock.patch.object(os, "curdir", fake_cwd):
+                    with mock.patch.object(
+                        remote_action, "PROJECT_ROOT", fake_root
+                    ):
+                        c = cxx_remote_wrapper.CxxRemoteAction(
+                            ["--"] + command,
+                            host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+                            auto_reproxy=False,
+                        )
+                        self.assertEqual(c.prepare(), 0)
+                        self.assertEqual(c.remote_action.exec_root, fake_root)
+                        self.assertEqual(
+                            c.remote_action.build_subdir, fake_builddir
+                        )
 
     def test_clang_crash_diagnostics_dir(self):
         fake_root = Path("/usr/project")
@@ -274,7 +284,13 @@ class CxxRemoteActionTests(unittest.TestCase):
                     host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
                     auto_reproxy=False,
                 )
-                self.assertEqual(c.prepare(), 0)
+                with mock.patch.object(
+                    fuchsia,
+                    "remote_clang_compiler_toolchain_inputs",
+                    return_value=iter([]),
+                ) as mock_tc_inputs:
+                    self.assertEqual(c.prepare(), 0)
+
                 self.assertTrue(c.cxx_action.compiler_is_clang)
                 self.assertEqual(c.remote_action.exec_root, fake_root)
                 self.assertEqual(c.remote_action.build_subdir, fake_builddir)
@@ -286,6 +302,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                     c.remote_action.output_dirs_relative_to_project_root,
                     [fake_builddir / crash_dir],
                 )
+                mock_tc_inputs.assert_called_once()
 
     def test_remote_flag_back_propagating(self):
         compiler = Path("clang++")
@@ -323,7 +340,12 @@ class CxxRemoteActionTests(unittest.TestCase):
         with mock.patch.object(
             cxx_remote_wrapper, "check_missing_remote_tools"
         ) as mock_check:
-            self.assertEqual(c.prepare(), 0)
+            with mock.patch.object(
+                fuchsia,
+                "remote_clang_compiler_toolchain_inputs",
+                return_value=iter([]),
+            ) as mock_tc_inputs:
+                self.assertEqual(c.prepare(), 0)
         # check that rewrapper option sees --foo=bar
         remote_action_command = c.remote_action.launch_command
         prefix, sep, wrapped_command = cl_utils.partition_sequence(
