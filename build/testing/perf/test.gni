@@ -90,10 +90,11 @@ template("python_perf_test") {
       forward_variables_from(invoker,
                              [
                                "main_source",
+                               "params",
                                "params_source",
-                               "params_source_deps",
                                "timeout_secs",
                              ])
+
       if (defined(invoker.libraries)) {
         libraries = invoker.libraries
       }
@@ -195,41 +196,35 @@ template("fuchsia_component_perf_test") {
     _package_name = get_label_info(invoker.package, "name")
   }
 
-  _config_file = "${target_gen_dir}/${target_name}_config.json"
-  generated_file("${target_name}_generated_config") {
-    output_conversion = "json"
-    _package = _package_name
-    _component = invoker.component_name
-    contents = {
-      ffx_test_url =
-          "fuchsia-pkg://fuchsia.com/${_package}#meta/${_component}.cm"
+  _package = _package_name
+  _component = invoker.component_name
+  _params = {
+    ffx_test_url = "fuchsia-pkg://fuchsia.com/${_package}#meta/${_component}.cm"
 
-      if (defined(invoker.expected_metric_names_filepath)) {
-        expected_metric_names_filepath = invoker.expected_metric_names_filepath
-      }
-
-      if (defined(invoker.process_runs)) {
-        process_runs = invoker.process_runs
-      }
-
-      ffx_test_args = []
-
-      if (defined(invoker.test_type)) {
-        ffx_test_args += [
-          "--realm",
-          type_moniker_map[invoker.test_type],
-        ]
-      }
-
-      if (defined(invoker.test_component_args)) {
-        test_component_args = invoker.test_component_args
-      }
-
-      if (defined(invoker.results_path_test_arg)) {
-        results_path_test_arg = invoker.results_path_test_arg
-      }
+    if (defined(invoker.expected_metric_names_filepath)) {
+      expected_metric_names_filepath = invoker.expected_metric_names_filepath
     }
-    outputs = [ _config_file ]
+
+    if (defined(invoker.process_runs)) {
+      process_runs = invoker.process_runs
+    }
+
+    ffx_test_args = []
+
+    if (defined(invoker.test_type)) {
+      ffx_test_args += [
+        "--realm",
+        type_moniker_map[invoker.test_type],
+      ]
+    }
+
+    if (defined(invoker.test_component_args)) {
+      test_component_args = invoker.test_component_args
+    }
+
+    if (defined(invoker.results_path_test_arg)) {
+      results_path_test_arg = invoker.results_path_test_arg
+    }
   }
 
   python_perf_test(target_name) {
@@ -238,8 +233,7 @@ template("fuchsia_component_perf_test") {
     expected_metric_names_filepaths = [ invoker.expected_metric_names_filepath ]
     main_source =
         "//src/performance/lib/perf_test/fuchsia_component_perf_test.py"
-    params_source = _config_file
-    params_source_deps = [ ":${target_name}_generated_config" ]
+    params = _params
     libraries = [
       "//src/performance/lib/perf_publish",
       "//src/testing/end_to_end/honeydew",
