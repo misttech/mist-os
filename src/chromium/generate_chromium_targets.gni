@@ -69,10 +69,7 @@ template("generate_fuchsia_web_targets") {
       #  out-of-tree tests to depend on it, though that is discouraged.)
       "//vendor/*",
     ]
-    deps = [
-      ":tzdata_for_web_engine",
-      ":web_engine_pkg",
-    ]
+    deps = [ ":web_engine_pkg" ]
   }
 
   # Used by integration tests to indicate they need WebEngine, specifically the
@@ -111,11 +108,6 @@ template("generate_fuchsia_web_targets") {
   core_shard("web_context_provider_core_shard") {
     visibility += [ ":web_engine_PKG" ]
     shard_file = "config/web_context_provider.core_shard.cml"
-  }
-
-  icu_tzdata_config_data("tzdata_for_web_engine") {
-    visibility += [ ":web_engine" ]
-    for_pkg = "web_engine"
   }
 }
 
@@ -237,14 +229,7 @@ if (is_host) {
       log_settings = {
         max_severity = "ERROR"
       }
-      deps = [
-        ":chromium_test_base_deps",
-
-        # The targets below have exactly the same contents, so will not be taking
-        # extra storage in configurations that use them both.
-        ":tzdata_for_base_unittests",
-        ":tzdata_for_media_unittests",
-      ]
+      deps = [ ":chromium_test_base_deps" ]
     }
 
     prebuilt_test_manifest("chromium_web_engine_tests") {
@@ -254,16 +239,6 @@ if (is_host) {
         max_severity = "ERROR"
       }
       deps = [ ":chromium_test_base_deps" ]
-    }
-
-    icu_tzdata_config_data("tzdata_for_base_unittests") {
-      for_pkg = "base_unittests"
-      testonly = true
-    }
-
-    icu_tzdata_config_data("tzdata_for_media_unittests") {
-      for_pkg = "media_unittests"
-      testonly = true
     }
 
     # This target is provided for use by //src:test* targets. Dependencies on
