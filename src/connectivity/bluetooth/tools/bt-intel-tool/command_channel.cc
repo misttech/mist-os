@@ -21,8 +21,7 @@
 
 namespace {
 
-zx::channel GetCommandChannel(
-    const fidl::WireSyncClient<fuchsia_hardware_bluetooth::FullHci>& client) {
+zx::channel GetCommandChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci>& client) {
   zx::channel ours, theirs;
   if (zx_status_t status = zx::channel::create(0, &ours, &theirs); status != ZX_OK) {
     std::cerr << "CommandChannel: Failed to create channel: %s\n"
@@ -45,7 +44,7 @@ zx::channel GetCommandChannel(
   return ours;
 }
 
-zx::channel GetAclChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth::FullHci>& client) {
+zx::channel GetAclChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci>& client) {
   zx::channel ours, theirs;
   if (zx_status_t status = zx::channel::create(0, &ours, &theirs); status != ZX_OK) {
     std::cerr << "CommandChannel: Failed to create channel: %s\n"
@@ -70,7 +69,7 @@ zx::channel GetAclChannel(const fidl::WireSyncClient<fuchsia_hardware_bluetooth:
 
 }  // namespace
 
-CommandChannel::CommandChannel(fidl::ClientEnd<fuchsia_hardware_bluetooth::FullHci> device)
+CommandChannel::CommandChannel(fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> device)
     : valid_(false), event_callback_(nullptr), client_(std::move(device)) {
   cmd_channel_ = GetCommandChannel(client_);
   cmd_channel_wait_.set_object(cmd_channel_.get());

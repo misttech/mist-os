@@ -20,9 +20,9 @@
 
 namespace bt::fidl::testing {
 
-class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::FullHci_TestBase {
+class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_TestBase {
  public:
-  FakeHciServer(::fidl::InterfaceRequest<fuchsia::hardware::bluetooth::FullHci> request,
+  FakeHciServer(::fidl::InterfaceRequest<fuchsia::hardware::bluetooth::Hci> request,
                 async_dispatcher_t* dispatcher)
       : dispatcher_(dispatcher) {
     binding_.Bind(std::move(request));
@@ -115,7 +115,7 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::FullHc
     command_wait_.Begin(dispatcher_);
   }
 
-  ::fidl::Binding<fuchsia::hardware::bluetooth::FullHci> binding_{this};
+  ::fidl::Binding<fuchsia::hardware::bluetooth::Hci> binding_{this};
 
   zx::channel command_channel_;
   std::vector<bt::DynamicByteBuffer> commands_received_;

@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_bluetooth_snoop::{PacketType, SnoopPacket as FidlSnoopPacket, Timestamp};
-use fidl_fuchsia_hardware_bluetooth::FullHciMarker as HardwareHciMarker;
+use fidl_fuchsia_hardware_bluetooth::HciMarker as HardwareHciMarker;
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Channel, MessageBuf};

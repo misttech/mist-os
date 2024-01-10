@@ -47,7 +47,7 @@ std::unique_ptr<BtHostComponent> BtHostComponent::CreateForTesting(async_dispatc
   return host;
 }
 
-bool BtHostComponent::Initialize(fuchsia::hardware::bluetooth::FullHciHandle hci_handle,
+bool BtHostComponent::Initialize(fuchsia::hardware::bluetooth::HciHandle hci_handle,
                                  InitCallback init_cb, ErrorCallback error_cb) {
   std::unique_ptr<bt::controllers::FidlController> controller =
       std::make_unique<bt::controllers::FidlController>(std::move(hci_handle),

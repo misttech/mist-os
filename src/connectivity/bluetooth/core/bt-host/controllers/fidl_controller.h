@@ -19,7 +19,7 @@ class FidlController final : public pw::bluetooth::Controller {
   using PwStatusCallback = pw::Callback<void(pw::Status)>;
 
   // |dispatcher| must outlive this object.
-  FidlController(fuchsia::hardware::bluetooth::FullHciHandle hci, async_dispatcher_t* dispatcher);
+  FidlController(fuchsia::hardware::bluetooth::HciHandle hci, async_dispatcher_t* dispatcher);
 
   ~FidlController() override;
 
@@ -65,8 +65,8 @@ class FidlController final : public pw::bluetooth::Controller {
 
   // hci_handle_ holds the Hci channel until Initialize() is called, at which point hci_ is bound to
   // the channel. This prevents errors from being lost before initialization.
-  fuchsia::hardware::bluetooth::FullHciHandle hci_handle_;
-  fuchsia::hardware::bluetooth::FullHciPtr hci_;
+  fuchsia::hardware::bluetooth::HciHandle hci_handle_;
+  fuchsia::hardware::bluetooth::HciPtr hci_;
 
   async_dispatcher_t* dispatcher_;
 

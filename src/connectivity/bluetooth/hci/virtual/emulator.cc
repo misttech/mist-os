@@ -100,7 +100,7 @@ constexpr zx_protocol_device_t bt_hci_device_ops = {
     .message =
         [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
           logf(TRACE, "HciMessage\n");
-          fidl::WireDispatch<fuchsia_hardware_bluetooth::FullHci>(
+          fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
               DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
               ddk::FromDeviceFIDLTransaction(txn));
         },
@@ -636,7 +636,7 @@ void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& complete
 }
 
 void EmulatorDevice::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   ZX_PANIC("Unknown method in HCI request");
 }

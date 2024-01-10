@@ -178,7 +178,7 @@ impl fmt::Display for EventPacket {
 
 fn open_command_channel(device_path: &str) -> Result<Channel, Error> {
     let interface = fuchsia_component::client::connect_to_protocol_at_path::<
-        fidl_fuchsia_hardware_bluetooth::FullHciMarker,
+        fidl_fuchsia_hardware_bluetooth::HciMarker,
     >(device_path)?;
     let (ours, theirs) = Channel::create();
     let res = block_on(interface.open_command_channel(theirs))

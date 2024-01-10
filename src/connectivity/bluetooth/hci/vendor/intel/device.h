@@ -57,11 +57,20 @@ class Device : public DeviceType, public ddk::BtHciProtocol<Device, ddk::base_pr
 
  private:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
-                          OpenCommandChannelCompleter::Sync& completer);
+                          OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                          OpenAclDataChannelCompleter::Sync& completer);
+                          OpenAclDataChannelCompleter::Sync& completer) override;
+  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                          OpenScoDataChannelCompleter::Sync& completer) override;
+  void ConfigureSco(ConfigureScoRequestView request,
+                    ConfigureScoCompleter::Sync& completer) override;
+  void ResetSco(ResetScoCompleter::Sync& completer) override;
+  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                          OpenIsoDataChannelCompleter::Sync& completer) override;
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                        OpenSnoopChannelCompleter::Sync& completer);
+                        OpenSnoopChannelCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   zx_status_t LoadSecureFirmware(zx::channel* cmd, zx::channel* acl);
   zx_status_t LoadLegacyFirmware(zx::channel* cmd, zx::channel* acl);

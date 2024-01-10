@@ -26,9 +26,8 @@ namespace bt_hci_virtual {
 // This driver is greatly taken from the bt_transport_uart driver. The key differences are that this
 // doesn't bind to service device but to a zx::channel as a virtual loopback UART device.
 class LoopbackDevice;
-using LoopbackDeviceType =
-    ddk::Device<LoopbackDevice, ddk::GetProtocolable, ddk::Unbindable,
-                ddk::Messageable<fuchsia_hardware_bluetooth::FullHci>::Mixin>;
+using LoopbackDeviceType = ddk::Device<LoopbackDevice, ddk::GetProtocolable, ddk::Unbindable,
+                                       ddk::Messageable<fuchsia_hardware_bluetooth::Hci>::Mixin>;
 
 class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<LoopbackDevice> {
  public:
@@ -60,9 +59,8 @@ class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<Loop
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
 
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // DDK Mixins
   void DdkUnbind(ddk::UnbindTxn txn);

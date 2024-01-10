@@ -18,7 +18,7 @@
 // returning complete and valid event packets on to the event handler set.
 class CommandChannel {
  public:
-  explicit CommandChannel(fidl::ClientEnd<fuchsia_hardware_bluetooth::FullHci> device);
+  explicit CommandChannel(fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> device);
   ~CommandChannel();
 
   // Indicates whether this channel is valid.  This should be checked after
@@ -56,7 +56,7 @@ class CommandChannel {
 
   bool valid_;
   EventCallback event_callback_;
-  fidl::WireSyncClient<fuchsia_hardware_bluetooth::FullHci> client_;
+  fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci> client_;
   zx::channel cmd_channel_;
   async::WaitMethod<CommandChannel, &CommandChannel::OnCmdChannelReady> cmd_channel_wait_{this};
   zx::channel acl_channel_;

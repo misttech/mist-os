@@ -120,15 +120,47 @@ zx_status_t Device::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
 
 void Device::OpenCommandChannel(OpenCommandChannelRequestView request,
                                 OpenCommandChannelCompleter::Sync& completer) {
-  BtHciOpenCommandChannel(std::move(request->channel));
+  if (zx_status_t status = BtHciOpenCommandChannel(std::move(request->channel)); status != ZX_OK) {
+    completer.ReplyError(status);
+  }
+  completer.ReplySuccess();
 }
 void Device::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                 OpenAclDataChannelCompleter::Sync& completer) {
-  BtHciOpenAclDataChannel(std::move(request->channel));
+  if (zx_status_t status = BtHciOpenAclDataChannel(std::move(request->channel)); status != ZX_OK) {
+    completer.ReplyError(status);
+  }
+  completer.ReplySuccess();
+}
+void Device::OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                                OpenScoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void Device::ConfigureSco(ConfigureScoRequestView request, ConfigureScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void Device::ResetSco(ResetScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void Device::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                                OpenIsoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                               OpenSnoopChannelCompleter::Sync& completer) {
-  BtHciOpenSnoopChannel(std::move(request->channel));
+  if (zx_status_t status = BtHciOpenSnoopChannel(std::move(request->channel)); status != ZX_OK) {
+    completer.ReplyError(status);
+  }
+  completer.ReplySuccess();
+}
+void Device::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_PANIC("Unknown method in HCI request");
 }
 
 zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {

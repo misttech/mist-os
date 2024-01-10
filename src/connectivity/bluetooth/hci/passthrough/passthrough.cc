@@ -40,8 +40,17 @@ class PassthroughDevice : public PassthroughDeviceType {
                           OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
                           OpenAclDataChannelCompleter::Sync& completer) override;
+  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                          OpenScoDataChannelCompleter::Sync& completer) override;
+  void ConfigureSco(ConfigureScoRequestView request,
+                    ConfigureScoCompleter::Sync& completer) override;
+  void ResetSco(ResetScoCompleter::Sync& completer) override;
+  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                          OpenIsoDataChannelCompleter::Sync& completer) override;
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
   bt_hci_protocol_t hci;
 };
 
@@ -63,24 +72,56 @@ void PassthroughDevice::OpenCommandChannel(OpenCommandChannelRequestView request
                                            OpenCommandChannelCompleter::Sync& completer) {
   if (zx_status_t status = bt_hci_open_command_channel(&this->hci, request->channel.release());
       status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
 }
 
 void PassthroughDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                            OpenAclDataChannelCompleter::Sync& completer) {
   if (zx_status_t status = bt_hci_open_acl_data_channel(&this->hci, request->channel.release());
       status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
+}
+
+void PassthroughDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                                           OpenScoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void PassthroughDevice::ConfigureSco(ConfigureScoRequestView request,
+                                     ConfigureScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void PassthroughDevice::ResetSco(ResetScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void PassthroughDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                                           OpenIsoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 void PassthroughDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                                          OpenSnoopChannelCompleter::Sync& completer) {
   if (zx_status_t status = bt_hci_open_snoop_channel(&this->hci, request->channel.release());
       status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
+}
+
+void PassthroughDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_PANIC("Unknown method in HCI request");
 }
 
 zx_status_t PassthroughDevice::Bind(void* ctx, zx_device_t* device) {

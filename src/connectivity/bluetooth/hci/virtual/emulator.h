@@ -33,7 +33,7 @@ namespace bt_hci_virtual {
 enum class Channel { ACL, COMMAND, SNOOP, EMULATOR };
 
 class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
-                       public fidl::WireServer<fuchsia_hardware_bluetooth::FullHci>,
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Emulator> {
  public:
   explicit EmulatorDevice(zx_device_t* device);
@@ -59,9 +59,8 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
 
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
 

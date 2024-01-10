@@ -36,7 +36,7 @@ class HostComponentTest : public TestingBase {
     TestingBase::TearDown();
   }
 
-  fuchsia::hardware::bluetooth::FullHciHandle hci() { return std::move(hci_); }
+  fuchsia::hardware::bluetooth::HciHandle hci() { return std::move(hci_); }
 
  protected:
   BtHostComponent* host() const { return host_.get(); }
@@ -46,7 +46,7 @@ class HostComponentTest : public TestingBase {
  private:
   std::unique_ptr<BtHostComponent> host_;
 
-  fuchsia::hardware::bluetooth::FullHciHandle hci_;
+  fuchsia::hardware::bluetooth::HciHandle hci_;
 
   std::optional<bt::fidl::testing::FakeHciServer> fake_hci_server_;
 

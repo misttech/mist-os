@@ -14,7 +14,7 @@ using namespace bt;
 
 namespace bthost {
 
-fuchsia::hardware::bluetooth::FullHciHandle CreateHciHandle(const std::string& device_path) {
+fuchsia::hardware::bluetooth::HciHandle CreateHciHandle(const std::string& device_path) {
   zx::channel client, server;
   zx_status_t status = zx::channel::create(0, &client, &server);
   if (status != ZX_OK) {
@@ -28,7 +28,7 @@ fuchsia::hardware::bluetooth::FullHciHandle CreateHciHandle(const std::string& d
     return nullptr;
   }
 
-  fuchsia::hardware::bluetooth::FullHciHandle hci_handle(std::move(client));
+  fuchsia::hardware::bluetooth::HciHandle hci_handle(std::move(client));
   return hci_handle;
 }
 

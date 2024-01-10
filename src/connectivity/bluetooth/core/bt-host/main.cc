@@ -75,7 +75,7 @@ int main() {
     // not cause use after free in Adapter with integration tests
     lifecycle_handler.Stop();
   };
-  fuchsia::hardware::bluetooth::FullHciHandle hci_handle =
+  fuchsia::hardware::bluetooth::HciHandle hci_handle =
       bthost::CreateHciHandle(config.device_path());
   if (!hci_handle) {
     bt_log(ERROR, "bt-host", "Failed to create HciHandle; cannot initialize bt-host");

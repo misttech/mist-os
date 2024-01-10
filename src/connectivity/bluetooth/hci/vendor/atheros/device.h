@@ -53,14 +53,17 @@ class Device : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
                           OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
                           OpenAclDataChannelCompleter::Sync& completer) override;
+  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                          OpenScoDataChannelCompleter::Sync& completer) override;
+  void ConfigureSco(ConfigureScoRequestView request,
+                    ConfigureScoCompleter::Sync& completer) override;
+  void ResetSco(ResetScoCompleter::Sync& completer) override;
+  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                          OpenIsoDataChannelCompleter::Sync& completer) override;
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
-  static zx_status_t OpenScoChannel(void* ctx, zx_handle_t channel);
-  static zx_status_t OpenIsoChannel(void* ctx, zx_handle_t channel);
-  static void ConfigureSco(void* ctx, sco_coding_format_t coding_format, sco_encoding_t encoding,
-                           sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
-                           void* cookie);
-  static void ResetSco(void* ctx, bt_hci_reset_sco_callback callback, void* cookie);
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Informs the device manager that device initialization has failed,
   // which will unbind the device, and leaves an error on the kernel log

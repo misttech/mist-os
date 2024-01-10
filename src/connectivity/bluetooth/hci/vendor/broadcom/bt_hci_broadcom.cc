@@ -151,7 +151,7 @@ void BtHciBroadcom::OpenSnoopChannel(OpenSnoopChannelRequestView request,
 }
 
 void BtHciBroadcom::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   ZX_PANIC("Unknown method in HCI request");
 }

@@ -328,38 +328,55 @@ void Device::OpenCommandChannel(OpenCommandChannelRequestView request,
                                 OpenCommandChannelCompleter::Sync& completer) {
   if (zx_status_t status = bt_hci_open_command_channel(&hci_, request->channel.release());
       status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
 }
 
 void Device::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                 OpenAclDataChannelCompleter::Sync& completer) {
   if (zx_status_t status = bt_hci_open_acl_data_channel(&hci_, request->channel.release());
       status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
+}
+
+void Device::OpenScoDataChannel(OpenScoDataChannelRequestView request,
+                                OpenScoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Device::ConfigureSco(ConfigureScoRequestView request, ConfigureScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Device::ResetSco(ResetScoCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Device::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
+                                OpenIsoDataChannelCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                               OpenSnoopChannelCompleter::Sync& completer) {
   if (zx_status_t status = bt_hci_open_snoop_channel(&hci_, request->channel.release());
       status != ZX_OK) {
-    completer.Close(status);
+    completer.ReplyError(status);
   }
+  completer.ReplySuccess();
 }
 
-zx_status_t Device::OpenScoChannel(void* ctx, zx_handle_t channel) { return ZX_ERR_NOT_SUPPORTED; }
-
-zx_status_t Device::OpenIsoChannel(void* ctx, zx_handle_t channel) { return ZX_ERR_NOT_SUPPORTED; }
-
-void Device::ConfigureSco(void* ctx, sco_coding_format_t coding_format, sco_encoding_t encoding,
-                          sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
-                          void* cookie) {
-  callback(cookie, ZX_ERR_NOT_SUPPORTED);
-}
-
-void Device::ResetSco(void* ctx, bt_hci_reset_sco_callback callback, void* cookie) {
-  callback(cookie, ZX_ERR_NOT_SUPPORTED);
+void Device::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_PANIC("Unknown method in HCI request");
 }
 
 }  // namespace btatheros

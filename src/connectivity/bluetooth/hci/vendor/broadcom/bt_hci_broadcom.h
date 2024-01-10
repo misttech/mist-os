@@ -22,7 +22,7 @@ namespace bt_hci_broadcom {
 class BtHciBroadcom;
 using BtHciBroadcomType =
     ddk::Device<BtHciBroadcom, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable,
-                ddk::Messageable<fuchsia_hardware_bluetooth::FullHci>::Mixin>;
+                ddk::Messageable<fuchsia_hardware_bluetooth::Hci>::Mixin>;
 
 class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtHciBroadcom> {
  public:
@@ -69,9 +69,8 @@ class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtH
   void OpenSnoopChannel(OpenSnoopChannelRequestView request,
                         OpenSnoopChannelCompleter::Sync& completer) override;
 
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::FullHci> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Truly private, internal helper methods:
 
