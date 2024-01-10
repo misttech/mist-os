@@ -144,7 +144,7 @@ use magma::{
     virtio_magma_virt_connection_get_image_info_resp_t, virtmagma_buffer_set_name_wrapper,
     MAGMA_CACHE_POLICY_CACHED, MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, MAGMA_POLL_CONDITION_SIGNALED,
     MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_MEMORY_ERROR,
-    MAGMA_STATUS_OK,
+    MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name};
@@ -995,13 +995,34 @@ impl FileOps for MagmaFile {
                             0
                         };
 
+                        // Force EINTR every second to allow signals to interrupt the wait.
+                        // TODO(fxbug.dev/42080364): Only interrupt the wait when needed.
+                        let capped_rel_timeout_ns = std::cmp::min(rel_timeout_ns, 1_000_000_000);
+
                         status = unsafe {
                             magma_poll(
                                 &mut magma_items[0] as *mut magma_poll_item,
                                 magma_items.len() as u32,
-                                rel_timeout_ns,
+                                capped_rel_timeout_ns,
                             )
                         };
+                        let current_time = zx::Time::get_monotonic().into_nanos();
+
+                        // Check if the wait timed out before the user-requested timeout.
+                        if status == MAGMA_STATUS_TIMED_OUT
+                            && (control.timeout_ns == std::u64::MAX
+                                || (current_time as u64) < abs_timeout_ns)
+                        {
+                            if control.timeout_ns != std::u64::MAX {
+                                // Update relative deadline.
+                                let mut control = control;
+                                control.timeout_ns = abs_timeout_ns - (current_time as u64);
+                                let request_address = UserAddress::from(command.request_address);
+                                let _ = current_task
+                                    .write_object(UserRef::new(request_address), &control);
+                            }
+                            return Err(errno!(EINTR));
+                        }
                     }
                 }
 

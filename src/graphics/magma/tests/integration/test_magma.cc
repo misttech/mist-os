@@ -815,6 +815,46 @@ class TestConnection {
 #endif
   }
 
+  void PollLongDeadline(bool forever_deadline) {
+    ASSERT_TRUE(connection_);
+
+    magma_poll_item_t item{.type = MAGMA_POLL_TYPE_SEMAPHORE,
+                           .condition = MAGMA_POLL_CONDITION_SIGNALED};
+
+    magma_semaphore_id_t id;
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_semaphore(connection_, &item.semaphore, &id));
+    EXPECT_NE(0u, id);
+
+    auto start_time = std::chrono::steady_clock::now();
+
+    constexpr std::chrono::seconds kSignalDelay(10);
+
+    // The sleep may wake up early due to slack, so allow for that.
+    constexpr std::chrono::milliseconds kSignalSlack(100);
+
+    std::thread signal_thread([&]() {
+      std::this_thread::sleep_for(kSignalDelay);
+      magma_semaphore_signal(item.semaphore);
+    });
+
+    constexpr uint32_t kTimeoutS = 200;
+    constexpr uint64_t kNsPerS = 1000000000;
+
+    magma_status_t status =
+        magma_poll(&item, 1, forever_deadline ? UINT64_MAX : kTimeoutS * kNsPerS);
+    auto end_time = std::chrono::steady_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+    EXPECT_LE(kSignalDelay - kSignalSlack, duration) << duration.count();
+
+    EXPECT_EQ(status, MAGMA_STATUS_OK);
+    EXPECT_EQ(item.result, MAGMA_POLL_CONDITION_SIGNALED);
+    signal_thread.join();
+    magma_connection_release_semaphore(connection_, item.semaphore);
+  }
+
   static void CheckNativeHandle(magma_handle_t handle, bool expect_signaled) {
 #if defined(__Fuchsia__)
     zx_handle_t zx_handle = handle;
@@ -1638,6 +1678,12 @@ INSTANTIATE_TEST_SUITE_P(MagmaPoll, MagmaPoll, ::testing::Values(0, 1, 2, 3));
 TEST_F(Magma, PollWithTestChannel) { TestConnection().PollWithTestChannel(); }
 
 TEST_F(Magma, PollChannelClosed) { TestConnection().PollChannelClosed(); }
+
+TEST_F(Magma, PollLongDeadline) { TestConnection().PollLongDeadline(/*forever_deadline=*/false); }
+
+TEST_F(Magma, PollInfiniteDeadline) {
+  TestConnection().PollLongDeadline(/*forever_deadline=*/true);
+}
 
 TEST_F(Magma, Sysmem) {
   TestConnection test;
