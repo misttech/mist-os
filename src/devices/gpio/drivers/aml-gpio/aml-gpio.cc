@@ -17,7 +17,6 @@
 #include "a1-blocks.h"
 #include "a113-blocks.h"
 #include "a5-blocks.h"
-#include "fidl/fuchsia.hardware.platform.bus/cpp/markers.h"
 #include "s905d2-blocks.h"
 
 namespace {
@@ -57,23 +56,6 @@ enum {
 
 zx_status_t AmlGpio::Create(void* ctx, zx_device_t* parent) {
   zx_status_t status;
-
-  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, " create endpoints failed");
-    return endpoints.error_value();
-  }
-
-  bool has_pbus = true;
-
-  status = device_connect_runtime_protocol(
-      parent, fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
-      fuchsia_hardware_platform_bus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    zxlogf(WARNING, "Failed to connect to platform bus");
-    has_pbus = false;
-  }
 
   ddk::PDevFidl pdev(parent);
   std::optional<fdf::MmioBuffer> mmio_gpio, mmio_gpio_a0, mmio_interrupt;
@@ -151,11 +133,6 @@ zx_status_t AmlGpio::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (has_pbus) {
-    device->Bind(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>(
-        std::move(endpoints->client)));
-  }
-
   if (auto status = device->DdkAdd(ddk::DeviceAddArgs("aml-gpio")
                                        .set_proto_id(ZX_PROTOCOL_GPIO_IMPL)
                                        .forward_metadata(parent, DEVICE_METADATA_GPIO_PINS)
@@ -168,18 +145,6 @@ zx_status_t AmlGpio::Create(void* ctx, zx_device_t* parent) {
   [[maybe_unused]] auto* unused = device.release();
 
   return ZX_OK;
-}
-
-void AmlGpio::Bind(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus) {
-  gpio_impl_protocol_t gpio_proto = {
-      .ops = &gpio_impl_protocol_ops_,
-      .ctx = this,
-  };
-
-  fdf::Arena arena('GPIO');
-  [[maybe_unused]] auto unused = pbus.buffer(arena)->RegisterProtocol(
-      ZX_PROTOCOL_GPIO_IMPL, fidl::VectorView<uint8_t>::FromExternal(
-                                 reinterpret_cast<uint8_t*>(&gpio_proto), sizeof(gpio_proto)));
 }
 
 zx_status_t AmlGpio::AmlPinToBlock(const uint32_t pin, const AmlGpioBlock** out_block,
