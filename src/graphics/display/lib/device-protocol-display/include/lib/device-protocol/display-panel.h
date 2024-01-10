@@ -31,9 +31,6 @@
 const display_setting_t kDisplaySettingTV070WSM_FT = {
     .lane_num = 4,
     .bit_rate_max = 360,
-    // The vendor-provided configuration hard-coded this to 8. This is not
-    // necessary, because our clocking code produces the same value.
-    .clock_factor = 0,
     .lcd_clock = 44250000,
     .h_active = 600,
     .v_active = 1024,
@@ -49,9 +46,6 @@ const display_setting_t kDisplaySettingTV070WSM_FT = {
 const display_setting_t kDisplaySettingP070ACB_FT = {
     .lane_num = 4,
     .bit_rate_max = 400,
-    // The vendor-provided configuration hard-coded this to 8. This is not
-    // necessary, because our clocking code produces the same value.
-    .clock_factor = 0,
     .lcd_clock = 49434000,
     .h_active = 600,
     .v_active = 1024,
@@ -67,9 +61,6 @@ const display_setting_t kDisplaySettingP070ACB_FT = {
 const display_setting_t kDisplaySettingG101B158_FT = {
     .lane_num = 4,
     .bit_rate_max = 566,
-    // The vendor-provided configuration hard-coded this to 8. This is not
-    // necessary, because our clocking code produces the same value.
-    .clock_factor = 0,
     .lcd_clock = 70701600,
     .h_active = 800,
     .v_active = 1280,
@@ -85,9 +76,6 @@ const display_setting_t kDisplaySettingG101B158_FT = {
 const display_setting_t kDisplaySettingTV101WXM_FT = {
     .lane_num = 4,
     .bit_rate_max = 566,
-    // The vendor-provided configuration hard-coded this to 8. This is not
-    // necessary, because our clocking code produces the same value.
-    .clock_factor = 0,
     .lcd_clock = 70701600,
     .h_active = 800,
     .v_active = 1280,
@@ -103,7 +91,6 @@ const display_setting_t kDisplaySettingTV101WXM_FT = {
 const display_setting_t kDisplaySettingKD070D82_FT = {
     .lane_num = 4,
     .bit_rate_max = 400,
-    .clock_factor = 0,  // auto
     .lcd_clock = 49434000,
     .h_active = 600,
     .v_active = 1024,
@@ -119,7 +106,6 @@ const display_setting_t kDisplaySettingKD070D82_FT = {
 const display_setting_t kDisplaySettingTV070WSM_ST7703I = {
     .lane_num = 4,
     .bit_rate_max = 400,
-    .clock_factor = 0,
     .lcd_clock = 44226000,
     .h_active = 600,
     .v_active = 1024,
@@ -138,7 +124,6 @@ const display_setting_t kDisplaySettingTV070WSM_ST7703I = {
 const display_setting_t kDisplaySettingMTF050FHDI_03 = {
     .lane_num = 4,
     .bit_rate_max = 1000,
-    .clock_factor = 0,
     .lcd_clock = 120'000'000,
     .h_active = 1080,
     .v_active = 1920,

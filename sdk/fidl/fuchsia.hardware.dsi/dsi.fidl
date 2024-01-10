@@ -32,7 +32,7 @@ type ColorCode = strict enum : uint8 {
 type DisplaySetting = table {
     1: lane_num uint32;
     2: bit_rate_max uint32;
-    3: clock_factor uint32;
+    3: reserved;
     4: lcd_clock uint32;
     5: h_active uint32;
     6: v_active uint32;

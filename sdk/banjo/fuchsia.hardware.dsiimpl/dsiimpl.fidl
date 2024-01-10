@@ -30,7 +30,6 @@ type ColorCode = strict enum : uint8 {
 type DisplaySetting = struct {
     lane_num uint32;
     bit_rate_max uint32;
-    clock_factor uint32;
     lcd_clock uint32;
     h_active uint32;
     v_active uint32;

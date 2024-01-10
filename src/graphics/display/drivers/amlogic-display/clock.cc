@@ -61,7 +61,6 @@ void DumpDisplaySettings(const display_setting_t& settings) {
   zxlogf(INFO, "Dumping display_setting structure:");
   zxlogf(INFO, "#############################");
   zxlogf(INFO, "lcd_clock = 0x%x (%u)", settings.lcd_clock, settings.lcd_clock);
-  zxlogf(INFO, "clock_factor = 0x%x (%u)", settings.clock_factor, settings.clock_factor);
   zxlogf(INFO, "h_period = 0x%x (%u)", settings.h_period, settings.h_period);
   zxlogf(INFO, "h_active = 0x%x (%u)", settings.h_active, settings.h_active);
   zxlogf(INFO, "hsync_bp = 0x%x (%u)", settings.hsync_bp, settings.hsync_bp);
@@ -158,9 +157,6 @@ zx::result<PllConfig> Clock::GenerateHPLL(const display_setting_t& d) {
   // kMaxClockFactor (both inclusive).
   uint32_t clock_factor_min = kMinClockFactor;
   uint32_t clock_factor_max = kMaxClockFactor;
-  if (d.clock_factor) {
-    clock_factor_min = clock_factor_max = d.clock_factor;
-  }
 
   for (uint32_t clock_factor = clock_factor_min; clock_factor <= clock_factor_max; clock_factor++) {
     pll_cfg.clock_factor = clock_factor;

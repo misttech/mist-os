@@ -372,8 +372,6 @@ void Vout::Dump() {
       zxlogf(INFO, "lane_num = 0x%x (%u)", dsi_.disp_setting.lane_num, dsi_.disp_setting.lane_num);
       zxlogf(INFO, "bit_rate_max = 0x%x (%u)", dsi_.disp_setting.bit_rate_max,
              dsi_.disp_setting.bit_rate_max);
-      zxlogf(INFO, "clock_factor = 0x%x (%u)", dsi_.disp_setting.clock_factor,
-             dsi_.disp_setting.clock_factor);
       return;
     case VoutType::kHdmi:
       zxlogf(INFO, "horizontal_active_px = %d", hdmi_.current_display_timing_.horizontal_active_px);
