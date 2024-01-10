@@ -39,7 +39,7 @@ class DsiHost {
 
   // Production code should prefer using the `Create()` factory method.
   //
-  // `panel_config` must be non-null and must overlive the `DsiHost` instance.
+  // `panel_config` must be non-null and must outlive the `DsiHost` instance.
   DsiHost(zx_device_t* parent, uint32_t panel_type, const PanelConfig* panel_config,
           fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_gpio);
 
