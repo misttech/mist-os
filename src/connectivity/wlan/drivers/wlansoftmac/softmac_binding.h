@@ -145,9 +145,6 @@ class SoftmacBinding : public DeviceInterface,
 
   // Preallocated buffer for small frames
   uint8_t pre_alloc_recv_buffer_[PRE_ALLOC_RECV_BUFFER_SIZE];
-
-  // Lock for Rec() function to make it thread safe.
-  std::mutex rx_lock_;
 };
 
 }  // namespace wlan::drivers::wlansoftmac
