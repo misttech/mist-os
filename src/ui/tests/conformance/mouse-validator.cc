@@ -55,7 +55,10 @@ struct MousePuppet {
   MouseListener mouse_listener;
 };
 
-class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest {
+using device_pixel_ratio = float;
+
+class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
+                             public ::testing::WithParamInterface<device_pixel_ratio> {
  public:
   ~MouseConformanceTest() override = default;
 
@@ -122,6 +125,7 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest {
       creation_args.set_mouse_listener(puppet_.mouse_listener.NewBinding());
       creation_args.set_flatland_client(std::move(flatland));
       creation_args.set_keyboard_client(std::move(keyboard));
+      creation_args.set_device_pixel_ratio(GetParam());
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
@@ -176,7 +180,9 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest {
   uint32_t display_height_ = 0;
 };
 
-TEST_F(MouseConformanceTest, SimpleClick) {
+INSTANTIATE_TEST_SUITE_P(/*no prefix*/, MouseConformanceTest, ::testing::Values(1.0, 2.0));
+
+TEST_P(MouseConformanceTest, SimpleClick) {
   // Inject click with no mouse movement.
   // Left button down.
   SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},

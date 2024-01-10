@@ -105,6 +105,8 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                             Some(keyboard_listener.into_proxy().expect("failed to generate proxy"))
                         }
                     };
+                    let device_pixel_ratio =
+                        payload.device_pixel_ratio.expect("missing device_pixel_ratio");
 
                     let view = view::View::new(
                         flatland,
@@ -113,6 +115,7 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                         touch_listener,
                         mouse_listener,
                         keyboard_listener,
+                        device_pixel_ratio,
                     )
                     .await;
 

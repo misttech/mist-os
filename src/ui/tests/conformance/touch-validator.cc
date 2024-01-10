@@ -119,7 +119,10 @@ struct TouchPuppet {
   TouchListener touch_listener;
 };
 
-class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest {
+using device_pixel_ratio = float;
+
+class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest,
+                             public ::testing::WithParamInterface<device_pixel_ratio> {
  public:
   ~TouchConformanceTest() override = default;
 
@@ -205,6 +208,7 @@ class SingleViewTouchConformanceTest : public TouchConformanceTest {
       creation_args.set_touch_listener(puppet_->touch_listener.NewBinding());
       creation_args.set_flatland_client(std::move(flatland));
       creation_args.set_keyboard_client(std::move(keyboard));
+      creation_args.set_device_pixel_ratio(GetParam());
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
@@ -215,7 +219,10 @@ class SingleViewTouchConformanceTest : public TouchConformanceTest {
   std::unique_ptr<TouchPuppet> puppet_;
 };
 
-TEST_F(SingleViewTouchConformanceTest, SimpleTap) {
+INSTANTIATE_TEST_SUITE_P(/*no prefix*/, SingleViewTouchConformanceTest,
+                         ::testing::Values(1.0, 2.0));
+
+TEST_P(SingleViewTouchConformanceTest, SimpleTap) {
   const auto kTapX = 3 * display_width_as_int() / 4;
   const auto kTapY = display_height_as_int() / 4;
 
@@ -247,7 +254,7 @@ TEST_F(SingleViewTouchConformanceTest, SimpleTap) {
 // Send input report contains 3 contacts and then release all of them to
 // simultate multi touch down on touchscreen. UI client expects 3 touch
 // add events, and 3 touch remove events.
-TEST_F(SingleViewTouchConformanceTest, MultiTap) {
+TEST_P(SingleViewTouchConformanceTest, MultiTap) {
   const int kTap1X = 3 * display_width_as_int() / 4;
   const int kTapY = display_height_as_int() / 4;
   const int kTap0X = kTap1X - 5;
@@ -292,7 +299,7 @@ TEST_F(SingleViewTouchConformanceTest, MultiTap) {
 // 2 finger contact then move apart horizontally to simulate pinch zoom.
 // UI Client expects touch add, touch change and touch remove for
 // 2 fingers.
-TEST_F(SingleViewTouchConformanceTest, Pinch) {
+TEST_P(SingleViewTouchConformanceTest, Pinch) {
   const int kTapX = 3 * display_width_as_int() / 4;
   const int kTapY = display_height_as_int() / 4;
 
@@ -389,6 +396,7 @@ class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
       creation_args.set_touch_listener(parent_puppet_->touch_listener.NewBinding());
       creation_args.set_flatland_client(std::move(flatland));
       creation_args.set_keyboard_client(std::move(keyboard));
+      creation_args.set_device_pixel_ratio(GetParam());
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
@@ -432,6 +440,7 @@ class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
       creation_args.set_touch_listener(child_puppet_->touch_listener.NewBinding());
       creation_args.set_flatland_client(std::move(flatland));
       creation_args.set_keyboard_client(std::move(keyboard));
+      creation_args.set_device_pixel_ratio(GetParam());
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
@@ -443,7 +452,10 @@ class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
   std::unique_ptr<TouchPuppet> child_puppet_;
 };
 
-TEST_F(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
+INSTANTIATE_TEST_SUITE_P(/*no prefix*/, EmbeddedViewTouchConformanceTest,
+                         ::testing::Values(1.0, 2.0));
+
+TEST_P(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
   const auto kTapX = 3 * display_width_as_int() / 4;
   const auto kTapY = 3 * display_height_as_int() / 4;
 
@@ -481,7 +493,7 @@ TEST_F(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
 // Send input report contains 3 contacts and then release all of them to
 // simultate multi touch down on touchscreen. Embedded view expects 3 touch
 // add events, and 3 touch remove events. And no events on parenet view.
-TEST_F(EmbeddedViewTouchConformanceTest, EmbeddedViewMultiTap) {
+TEST_P(EmbeddedViewTouchConformanceTest, EmbeddedViewMultiTap) {
   const int kTap1X = 3 * display_width_as_int() / 4;
   const int kTapY = 3 * display_height_as_int() / 4;
   const int kTap0X = kTap1X - 5;
@@ -534,7 +546,7 @@ TEST_F(EmbeddedViewTouchConformanceTest, EmbeddedViewMultiTap) {
 // 2 finger contact then move apart horizontally to simulate pinch zoom.
 // Embededd view expects touch add, touch change and touch remove for
 // 2 fingers.
-TEST_F(EmbeddedViewTouchConformanceTest, Pinch) {
+TEST_P(EmbeddedViewTouchConformanceTest, Pinch) {
   const int kTapX = 3 * display_width_as_int() / 4;
   const int kTapY = 3 * display_height_as_int() / 4;
 

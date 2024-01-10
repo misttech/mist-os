@@ -117,6 +117,7 @@ impl View {
         touch_input_listener: Option<test_input::TouchInputListenerProxy>,
         mouse_input_listener: Option<test_input::MouseInputListenerProxy>,
         keyboard_input_listener: Option<test_input::KeyboardInputListenerProxy>,
+        device_pixel_ratio: f32,
     ) -> Rc<RefCell<Self>> {
         let flatland = Rc::new(flatland);
         let (presentation_sender, presentation_receiver) = mpsc::unbounded();
@@ -167,7 +168,7 @@ impl View {
             id_generator,
             root_transform_id,
             logical_size: fmath::SizeU { width: 0, height: 0 },
-            device_pixel_ratio: 1.0,
+            device_pixel_ratio,
             connected_to_display: false,
             touch_watcher_task: OnceCell::new(),
             view_parameters: None,
