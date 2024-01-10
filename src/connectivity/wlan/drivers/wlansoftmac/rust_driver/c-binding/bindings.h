@@ -78,11 +78,6 @@ typedef struct {
    * Reports the current status to the ethernet driver.
    */
   int32_t (*set_ethernet_status)(void *device, uint32_t status);
-  /**
-   * Set a key on the device.
-   * |key| is mutable because the underlying API does not take a const wlan_key_configuration_t.
-   */
-  int32_t (*set_key)(void *device, wlan_key_configuration_t *key);
 } rust_device_interface_t;
 
 /**

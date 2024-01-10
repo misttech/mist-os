@@ -278,7 +278,7 @@ impl<D: DeviceOps> Ap<D> {
     /// The MLME should set the keys on the PHY.
     pub fn handle_mlme_setkeys_req(&mut self, req: fidl_mlme::SetKeysRequest) -> Result<(), Error> {
         if let Some(bss) = self.bss.as_mut() {
-            bss.handle_mlme_setkeys_req(&mut self.ctx, &req.keylist[..])
+            bss.handle_mlme_setkeys_req(&mut self.ctx, req.keylist)
         } else {
             Err(Error::Status(format!("cannot set keys on unstarted BSS"), zx::Status::BAD_STATE))
         }
@@ -469,7 +469,8 @@ mod tests {
             test_utils::MockWlanRxInfo,
         },
         banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_softmac as fidl_softmac,
+        fuchsia_async as fasync,
         futures::task::Poll,
         ieee80211::MacAddrBytes,
         lazy_static::lazy_static,
@@ -1072,16 +1073,20 @@ mod tests {
             }],
         })
         .expect("expected Ap::handle_mlme_setkeys_req OK");
-        assert_eq!(fake_device_state.lock().unwrap().keys.len(), 1);
-        let key = &fake_device_state.lock().unwrap().keys[0];
-        assert_eq!(key.protection, crate::key::Protection::RX_TX);
-        assert_eq!(key.cipher_oui, [1, 2, 3]);
-        assert_eq!(key.cipher_type, 4);
-        assert_eq!(key.key_type, crate::key::KeyType::PAIRWISE);
-        assert_eq!(key.peer_addr, [5; 6].into());
-        assert_eq!(key.key_idx, 6);
-        assert_eq!(key.key[0..key.key_len as usize], [1, 2, 3, 4, 5, 6, 7]);
-        assert_eq!(key.rsc, 8);
+        assert_eq!(
+            fake_device_state.lock().unwrap().keys,
+            vec![fidl_softmac::WlanKeyConfiguration {
+                protection: Some(fidl_softmac::WlanProtection::RxTx),
+                cipher_oui: Some([1, 2, 3]),
+                cipher_type: Some(4),
+                key_type: Some(fidl_common::WlanKeyType::Pairwise),
+                peer_addr: Some([5; 6]),
+                key_idx: Some(6),
+                key: Some(vec![1, 2, 3, 4, 5, 6, 7]),
+                rsc: Some(8),
+                ..Default::default()
+            }]
+        );
     }
 
     #[test]

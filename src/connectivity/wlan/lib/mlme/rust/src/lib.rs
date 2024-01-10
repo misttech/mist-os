@@ -20,7 +20,6 @@ mod ddk_converter;
 pub mod device;
 pub mod disconnect;
 pub mod error;
-pub mod key;
 mod logger;
 mod minstrel;
 #[allow(unused)] // TODO(https://fxbug.dev/79543): Remove annotation once used.

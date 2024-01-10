@@ -2331,9 +2331,9 @@ mod tests {
 
         let sent_key = crate::test_utils::fake_key((*BSSID).into());
         let received_key = &m.fake_device_state.lock().unwrap().keys[0];
-        assert_eq!(received_key.key[0..received_key.key_len as usize], sent_key.key);
-        assert_eq!(received_key.key_idx, sent_key.key_id as u8);
-        assert_eq!(received_key.key_type, crate::key::KeyType::PAIRWISE,);
+        assert_eq!(received_key.key, Some(sent_key.key));
+        assert_eq!(received_key.key_idx, Some(sent_key.key_id as u8));
+        assert_eq!(received_key.key_type, Some(fidl_common::WlanKeyType::Pairwise));
     }
 
     #[test]

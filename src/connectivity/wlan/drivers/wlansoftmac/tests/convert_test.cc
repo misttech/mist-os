@@ -22,16 +22,12 @@ namespace wlan_ieee80211 = fuchsia_wlan_ieee80211::wire;
 
 // Fake metadata -- general
 static constexpr uint8_t kFakeMacAddr[wlan_ieee80211::kMacAddrLen] = {6, 5, 4, 3, 2, 2};
-static constexpr uint8_t kFakeOui[wlan_ieee80211::kOuiLen] = {9, 7, 1};
 static constexpr uint8_t kFakeChannel = 15;
-static constexpr uint8_t kFakeKey[wlan_ieee80211::kMaxKeyLen] = {
-    6, 9, 3, 9, 9, 3, 7, 5, 1, 0, 5, 8, 2, 0, 9, 7, 4, 9, 4, 4, 5, 9, 2, 3, 0, 7, 8, 1, 6, 4, 0, 6};
 static constexpr size_t kFakePacketSize = 50;
 
 static constexpr uint8_t kRandomPopulaterUint8 = 118;
 static constexpr uint16_t kRandomPopulaterUint16 = 53535;
 static constexpr uint32_t kRandomPopulaterUint32 = 4062722468;
-static constexpr uint64_t kRandomPopulaterUint64 = 1518741085930693;
 static constexpr int8_t kRandomPopulaterInt8 = -95;
 static constexpr int16_t kRandomPopulaterInt16 = -24679;
 
@@ -39,9 +35,6 @@ static constexpr int16_t kRandomPopulaterInt16 = -24679;
 static constexpr wlan_common::WlanPhyType kFakeFidlPhyType = wlan_common::WlanPhyType::kErp;
 static constexpr wlan_common::ChannelBandwidth kFakeFidlChannelBandwidth =
     wlan_common::ChannelBandwidth::kCbw160;
-static constexpr wlan_softmac::WlanProtection kFakeFidlProtection =
-    wlan_softmac::WlanProtection::kRxTx;
-static constexpr wlan_common::WlanKeyType kFakeFidlKeyType = wlan_common::WlanKeyType::kGroup;
 static constexpr wlan_common::WlanTxResultCode kFakeFidlTxResultCode =
     wlan_common::WlanTxResultCode::kSuccess;
 static constexpr wlan_softmac::WlanRxInfoFlags kFakeRxFlags =
@@ -52,8 +45,6 @@ static constexpr wlan_softmac::WlanRxInfoValid kFakeRxValid =
 // Fake metadata -- banjo
 static constexpr uint32_t kFakeBanjoPhyType = WLAN_PHY_TYPE_ERP;
 static constexpr uint32_t kFakeBanjoChannelBandwidth = CHANNEL_BANDWIDTH_CBW160;
-static constexpr uint8_t kFakeBanjoProtection = WLAN_PROTECTION_RX_TX;
-static constexpr uint8_t kFakeBanjoKeyType = WLAN_KEY_TYPE_GROUP;
 static constexpr uint8_t kFakeBanjoTxResultCode = WLAN_TX_RESULT_CODE_SUCCESS;
 
 /* Test cases*/
@@ -189,57 +180,6 @@ TEST_F(ConvertTest, ToFidlTxPacket) {
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, ConvertTxPacket(data_in, kFakePacketSize, info_in, &out));
 
   free(data_in);
-}
-
-TEST_F(ConvertTest, ToFidlKeyConfig) {
-  log::Instance::Init(0);
-  // Create tmp non-const key from const key.
-  uint8_t TmpKey[wlan_ieee80211::kMaxKeyLen];
-  memcpy(TmpKey, kFakeKey, wlan_ieee80211::kMaxKeyLen);
-
-  // Populate wlan_key_configuration_t
-  wlan_key_configuration_t in = {
-      .protection = kFakeBanjoProtection,
-      .cipher_type = kRandomPopulaterUint8,
-      .key_type = kFakeBanjoKeyType,
-      .key_idx = kRandomPopulaterUint8,
-      .key_list = TmpKey,
-      .key_count = wlan_ieee80211::kMaxKeyLen,
-      .rsc = kRandomPopulaterUint64,
-  };
-
-  for (size_t i = 0; i < wlan_ieee80211::kOuiLen; i++) {
-    in.cipher_oui[i] = kFakeOui[i];
-  }
-
-  for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
-    in.peer_addr[i] = kFakeMacAddr[i];
-  }
-
-  // Conduct conversion
-  fidl::Arena arena;
-  wlan_softmac::WlanKeyConfiguration out;
-  EXPECT_EQ(ZX_OK, ConvertKeyConfig(in, &out, arena));
-
-  // Verify outputs
-  EXPECT_EQ(kFakeFidlProtection, out.protection());
-  EXPECT_EQ(kRandomPopulaterUint8, out.cipher_type());
-  EXPECT_EQ(kFakeFidlKeyType, out.key_type());
-  EXPECT_EQ(kRandomPopulaterUint8, out.key_idx());
-  EXPECT_EQ(kRandomPopulaterUint64, out.rsc());
-
-  for (size_t i = 0; i < wlan_ieee80211::kOuiLen; i++) {
-    EXPECT_EQ(kFakeOui[i], out.cipher_oui().data()[i]);
-  }
-
-  for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
-    EXPECT_EQ(kFakeMacAddr[i], out.peer_addr().data()[i]);
-  }
-
-  EXPECT_EQ(wlan_ieee80211::kMaxKeyLen, out.key().count());
-  for (size_t i = 0; i < wlan_ieee80211::kMaxKeyLen; i++) {
-    EXPECT_EQ(kFakeKey[i], out.key().data()[i]);
-  }
 }
 
 }  // namespace

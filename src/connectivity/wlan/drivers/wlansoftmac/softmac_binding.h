@@ -55,7 +55,6 @@ class SoftmacBinding : public DeviceInterface,
       __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) final;
   zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
-  zx_status_t InstallKey(wlan_key_configuration_t* key_config) final;
   fbl::RefPtr<DeviceState> GetState() final;
 
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;

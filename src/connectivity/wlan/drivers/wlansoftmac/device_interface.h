@@ -49,7 +49,6 @@ class DeviceInterface {
   virtual zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) = 0;
 
   virtual zx_status_t SetEthernetStatus(uint32_t status) = 0;
-  virtual zx_status_t InstallKey(wlan_key_configuration_t* key_config) = 0;
 
   virtual fbl::RefPtr<DeviceState> GetState() = 0;
 };

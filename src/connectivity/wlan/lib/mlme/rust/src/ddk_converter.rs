@@ -21,6 +21,29 @@ macro_rules! zeroed_array_from_prefix {
     }};
 }
 
+pub fn softmac_key_configuration_from_mlme(
+    key_descriptor: fidl_mlme::SetKeyDescriptor,
+) -> fidl_softmac::WlanKeyConfiguration {
+    fidl_softmac::WlanKeyConfiguration {
+        protection: Some(fidl_softmac::WlanProtection::RxTx),
+        cipher_oui: Some(key_descriptor.cipher_suite_oui),
+        cipher_type: Some(fidl_ieee80211::CipherSuiteType::into_primitive(
+            key_descriptor.cipher_suite_type,
+        ) as u8),
+        key_type: Some(match key_descriptor.key_type {
+            fidl_mlme::KeyType::Pairwise => fidl_common::WlanKeyType::Pairwise,
+            fidl_mlme::KeyType::PeerKey => fidl_common::WlanKeyType::Peer,
+            fidl_mlme::KeyType::Igtk => fidl_common::WlanKeyType::Igtk,
+            fidl_mlme::KeyType::Group => fidl_common::WlanKeyType::Group,
+        }),
+        peer_addr: Some(key_descriptor.address),
+        key_idx: Some(key_descriptor.key_id as u8),
+        key: Some(key_descriptor.key),
+        rsc: Some(key_descriptor.rsc),
+        ..Default::default()
+    }
+}
+
 pub fn mlme_band_cap_from_softmac(
     band_cap: fidl_softmac::WlanSoftmacBandCapability,
 ) -> Result<fidl_mlme::BandCapability, anyhow::Error> {

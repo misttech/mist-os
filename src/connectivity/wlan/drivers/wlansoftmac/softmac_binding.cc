@@ -443,34 +443,6 @@ zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) {
   return ZX_OK;
 }
 
-zx_status_t SoftmacBinding::InstallKey(wlan_key_configuration_t* key_config) {
-  WLAN_TRACE_DURATION();
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
-  fidl::Arena fidl_arena;
-  fuchsia_wlan_softmac::wire::WlanKeyConfiguration fidl_key_config;
-  zx_status_t status = ConvertKeyConfig(*key_config, &fidl_key_config, fidl_arena);
-  if (status != ZX_OK) {
-    lerror("WlanKeyConfiguration conversion failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  auto result = client_.sync().buffer(*std::move(arena))->InstallKey(fidl_key_config);
-  if (!result.ok()) {
-    lerror("InstallKey failed (FIDL error %s)", result.status_string());
-    return result.status();
-  }
-  if (result->is_error()) {
-    lerror("InstallKey failed (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  return ZX_OK;
-}
-
 void SoftmacBinding::Recv(RecvRequestView request, fdf::Arena& arena,
                           RecvCompleter::Sync& completer) {
   WLAN_TRACE_DURATION();

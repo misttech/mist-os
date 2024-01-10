@@ -46,9 +46,6 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
       .set_ethernet_status = [](void* device_interface, uint32_t status) -> zx_status_t {
         return AsDeviceInterface(device_interface)->SetEthernetStatus(status);
       },
-      .set_key = [](void* device_interface, wlan_key_configuration_t* key) -> zx_status_t {
-        return AsDeviceInterface(device_interface)->InstallKey(key);
-      },
   };
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
@@ -267,6 +264,16 @@ void SoftmacBridge::DisableBeaconing(DisableBeaconingCompleter::Sync& completer)
   Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::DisableBeaconing> dispatcher =
       [](const auto& arena, const auto& softmac_client) {
         return softmac_client.sync().buffer(arena)->DisableBeaconing();
+      };
+  DispatchAndComplete(__func__, dispatcher, completer);
+}
+
+void SoftmacBridge::InstallKey(InstallKeyRequestView request,
+                               InstallKeyCompleter::Sync& completer) {
+  WLAN_TRACE_DURATION();
+  Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::InstallKey> dispatcher =
+      [request](const auto& arena, const auto& softmac_client) {
+        return softmac_client.sync().buffer(arena)->InstallKey(*request);
       };
   DispatchAndComplete(__func__, dispatcher, completer);
 }

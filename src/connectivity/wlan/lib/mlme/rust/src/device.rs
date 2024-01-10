@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{buffer::OutBuf, common::mac::WlanGi, error::Error, key},
+    crate::{buffer::OutBuf, common::mac::WlanGi, error::Error},
     anyhow::format_err,
     banjo_fuchsia_wlan_common as banjo_common,
     banjo_fuchsia_wlan_softmac::{self as banjo_wlan_softmac, WlanRxPacket, WlanTxPacket},
@@ -244,9 +244,7 @@ pub trait DeviceOps {
     fn set_ethernet_down(&mut self) -> Result<(), zx::Status> {
         self.set_ethernet_status(LinkStatus::DOWN)
     }
-
     fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status>;
-    fn set_key(&mut self, key: key::KeyConfig) -> Result<(), zx::Status>;
     fn start_passive_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest,
@@ -265,6 +263,10 @@ pub trait DeviceOps {
         request: fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest,
     ) -> Result<(), zx::Status>;
     fn disable_beaconing(&mut self) -> Result<(), zx::Status>;
+    fn install_key(
+        &mut self,
+        key_configuration: &fidl_softmac::WlanKeyConfiguration,
+    ) -> Result<(), zx::Status>;
     fn notify_association_complete(
         &mut self,
         assoc_cfg: fidl_softmac::WlanAssociationConfig,
@@ -462,33 +464,6 @@ impl DeviceOps for Device {
             .map_err(zx::Status::from_raw)
     }
 
-    fn set_key(&mut self, key: key::KeyConfig) -> Result<(), zx::Status> {
-        let mut banjo_key = banjo_wlan_softmac::WlanKeyConfiguration {
-            protection: match key.protection {
-                key::Protection::NONE => banjo_wlan_softmac::WlanProtection::NONE,
-                key::Protection::RX => banjo_wlan_softmac::WlanProtection::RX,
-                key::Protection::TX => banjo_wlan_softmac::WlanProtection::TX,
-                key::Protection::RX_TX => banjo_wlan_softmac::WlanProtection::RX_TX,
-                _ => return Err(zx::Status::INVALID_ARGS),
-            },
-            cipher_oui: key.cipher_oui,
-            cipher_type: key.cipher_type,
-            key_type: match key.key_type {
-                key::KeyType::PAIRWISE => banjo_common::WlanKeyType::PAIRWISE,
-                key::KeyType::GROUP => banjo_common::WlanKeyType::GROUP,
-                key::KeyType::IGTK => banjo_common::WlanKeyType::IGTK,
-                key::KeyType::PEER => banjo_common::WlanKeyType::PEER,
-                _ => return Err(zx::Status::INVALID_ARGS),
-            },
-            peer_addr: key.peer_addr.to_array(),
-            key_idx: key.key_idx,
-            key_list: key.key.as_ptr(),
-            key_count: usize::from(key.key_len),
-            rsc: key.rsc,
-        };
-        zx::ok((self.raw_device.set_key)(self.raw_device.device, &mut banjo_key))
-    }
-
     fn start_passive_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest,
@@ -544,6 +519,19 @@ impl DeviceOps for Device {
             .disable_beaconing(zx::Time::INFINITE)
             .map_err(|error| {
                 error!("DisableBeaconing failed with FIDL error: {:?}", error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(zx::Status::from_raw)
+    }
+
+    fn install_key(
+        &mut self,
+        key_configuration: &fidl_softmac::WlanKeyConfiguration,
+    ) -> Result<(), zx::Status> {
+        self.wlan_softmac_bridge_proxy
+            .install_key(&key_configuration, zx::Time::INFINITE)
+            .map_err(|error| {
+                error!("FIDL error during InstallKey: {:?}", error);
                 zx::Status::INTERNAL
             })?
             .map_err(zx::Status::from_raw)
@@ -704,12 +692,6 @@ pub struct DeviceInterface {
     ) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
-    /// Set a key on the device.
-    /// |key| is mutable because the underlying API does not take a const wlan_key_configuration_t.
-    set_key: extern "C" fn(
-        device: *mut c_void,
-        key: *mut banjo_wlan_softmac::WlanKeyConfiguration,
-    ) -> i32,
 }
 
 pub mod test_utils {
@@ -863,7 +845,7 @@ pub mod test_utils {
         pub usme_bootstrap_server_end:
             Option<fidl::endpoints::ServerEnd<fidl_sme::UsmeBootstrapMarker>>,
         pub wlan_channel: fidl_common::WlanChannel,
-        pub keys: Vec<key::KeyConfig>,
+        pub keys: Vec<fidl_softmac::WlanKeyConfiguration>,
         pub next_scan_id: u64,
         pub captured_passive_scan_request:
             Option<fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest>,
@@ -878,7 +860,7 @@ pub mod test_utils {
         pub link_status: LinkStatus,
         pub assocs: std::collections::HashMap<MacAddr, fidl_softmac::WlanAssociationConfig>,
         pub buffer_provider: BufferProvider,
-        pub set_key_results: VecDeque<Result<(), zx::Status>>,
+        pub install_key_results: VecDeque<Result<(), zx::Status>>,
     }
 
     impl FakeDevice {
@@ -940,7 +922,7 @@ pub mod test_utils {
                 link_status: LinkStatus::DOWN,
                 assocs: std::collections::HashMap::new(),
                 buffer_provider: FakeBufferProvider::new(),
-                set_key_results: VecDeque::new(),
+                install_key_results: VecDeque::new(),
             }));
             (FakeDevice { state: state.clone() }, state)
         }
@@ -1035,12 +1017,6 @@ pub mod test_utils {
             Ok(())
         }
 
-        fn set_key(&mut self, key: key::KeyConfig) -> Result<(), zx::Status> {
-            let mut state = self.state.lock().unwrap();
-            state.keys.push(key.clone());
-            state.set_key_results.pop_front().unwrap_or(Ok(()))
-        }
-
         fn start_passive_scan(
             &mut self,
             request: &fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest,
@@ -1106,6 +1082,15 @@ pub mod test_utils {
         fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
             self.state.lock().unwrap().beacon_config = None;
             Ok(())
+        }
+
+        fn install_key(
+            &mut self,
+            key_configuration: &fidl_softmac::WlanKeyConfiguration,
+        ) -> Result<(), zx::Status> {
+            let mut state = self.state.lock().unwrap();
+            state.keys.push(key_configuration.clone());
+            state.install_key_results.pop_front().unwrap_or(Ok(()))
         }
 
         fn notify_association_complete(
@@ -1506,21 +1491,20 @@ mod tests {
     }
 
     #[test]
-    fn set_key() {
+    fn install_key() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device
-            .set_key(key::KeyConfig {
-                bssid: 1,
-                protection: key::Protection::NONE,
-                cipher_oui: [3, 4, 5],
-                cipher_type: 6,
-                key_type: key::KeyType::PAIRWISE,
-                peer_addr: [8; 6].into(),
-                key_idx: 9,
-                key_len: 10,
-                key: [11; 32],
-                rsc: 12,
+            .install_key(&fidl_softmac::WlanKeyConfiguration {
+                protection: Some(fidl_softmac::WlanProtection::None),
+                cipher_oui: Some([3, 4, 5]),
+                cipher_type: Some(6),
+                key_type: Some(fidl_common::WlanKeyType::Pairwise),
+                peer_addr: Some([8; 6]),
+                key_idx: Some(9),
+                key: Some(vec![11; 32]),
+                rsc: Some(12),
+                ..Default::default()
             })
             .expect("error setting key");
         assert_eq!(fake_device_state.lock().unwrap().keys.len(), 1);

@@ -14,11 +14,10 @@ use {
         client::{
             lost_bss::LostBssCounter, BoundClient, Client, Context, ParsedAssociateResp, TimedEvent,
         },
-        ddk_converter as ddk,
+        ddk_converter::{get_rssi_dbm, softmac_key_configuration_from_mlme},
         device::DeviceOps,
         disconnect::LocallyInitiated,
         error::Error,
-        key::KeyConfig,
     },
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
@@ -600,7 +599,7 @@ impl Associated {
     }
 
     fn extract_and_record_signal_dbm(&mut self, rx_info: banjo_wlan_softmac::WlanRxInfo) {
-        ddk::get_rssi_dbm(rx_info)
+        get_rssi_dbm(rx_info)
             .map(|rssi_dbm| self.0.signal_strength_average.add(DecibelMilliWatt(rssi_dbm)));
     }
 
@@ -788,15 +787,20 @@ impl Associated {
         }
         let results = req
             .keylist
-            .iter()
-            .map(|key_desc| match sta.ctx.device.set_key(KeyConfig::from(key_desc)) {
-                Ok(()) => fidl_mlme::SetKeyResult {
-                    key_id: key_desc.key_id,
-                    status: zx::Status::OK.into_raw(),
-                },
-                Err(e) => {
-                    error!("failed to set key: {}", e);
-                    fidl_mlme::SetKeyResult { key_id: key_desc.key_id, status: e.into_raw() }
+            .into_iter()
+            .map(|key_descriptor| {
+                let key_id = key_descriptor.key_id;
+
+                match sta
+                    .ctx
+                    .device
+                    .install_key(&softmac_key_configuration_from_mlme(key_descriptor))
+                {
+                    Ok(()) => fidl_mlme::SetKeyResult { key_id, status: zx::Status::OK.into_raw() },
+                    Err(e) => {
+                        error!("failed to set key: {}", e);
+                        fidl_mlme::SetKeyResult { key_id, status: e.into_raw() }
+                    }
                 }
             })
             .collect();
@@ -3622,15 +3626,20 @@ mod tests {
             fidl_mlme::SetKeyResult { key_id: 6, status: zx::Status::OK.into_raw() }
         );
 
-        let key = &m.fake_device_state.lock().unwrap().keys[0];
-        assert_eq!(key.protection, crate::key::Protection::RX_TX,);
-        assert_eq!(key.cipher_oui, [1, 2, 3]);
-        assert_eq!(key.cipher_type, 4);
-        assert_eq!(key.key_type, crate::key::KeyType::PAIRWISE,);
-        assert_eq!(key.peer_addr, (*BSSID).into());
-        assert_eq!(key.key_idx, 6);
-        assert_eq!(key.key[0..key.key_len as usize], [1, 2, 3, 4, 5, 6, 7]);
-        assert_eq!(key.rsc, 8);
+        assert_eq!(
+            m.fake_device_state.lock().unwrap().keys,
+            vec![fidl_softmac::WlanKeyConfiguration {
+                protection: Some(fidl_softmac::WlanProtection::RxTx),
+                cipher_oui: Some([1, 2, 3]),
+                cipher_type: Some(4),
+                key_type: Some(fidl_common::WlanKeyType::Pairwise),
+                peer_addr: Some((*BSSID).to_array()),
+                key_idx: Some(6),
+                key: Some(vec![1, 2, 3, 4, 5, 6, 7]),
+                rsc: Some(8),
+                ..Default::default()
+            }]
+        );
     }
 
     #[test]
@@ -3644,8 +3653,12 @@ mod tests {
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        m.fake_device_state.lock().unwrap().set_key_results.push_back(Err(zx::Status::BAD_STATE));
-        m.fake_device_state.lock().unwrap().set_key_results.push_back(Ok(()));
+        m.fake_device_state
+            .lock()
+            .unwrap()
+            .install_key_results
+            .push_back(Err(zx::Status::BAD_STATE));
+        m.fake_device_state.lock().unwrap().install_key_results.push_back(Ok(()));
         // Create a SetKeysReq with one success and one failure.
         let mut set_keys_req = fake_set_keys_req((*BSSID).into());
         match &mut set_keys_req {

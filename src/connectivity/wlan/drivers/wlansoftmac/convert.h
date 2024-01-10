@@ -24,9 +24,6 @@ zx_status_t ConvertTxStatus(const fuchsia_wlan_common::wire::WlanTxResult& in,
 zx_status_t ConvertTxPacket(const uint8_t* data_in, size_t data_len_in,
                             const wlan_tx_info_t& info_in,
                             fuchsia_wlan_softmac::wire::WlanTxPacket* out);
-zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
-                             fuchsia_wlan_softmac::wire::WlanKeyConfiguration* out,
-                             fidl::AnyArena& arena);
 
 }  // namespace wlan
 

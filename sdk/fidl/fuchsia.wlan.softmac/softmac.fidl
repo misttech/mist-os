@@ -561,6 +561,16 @@ closed protocol WlanSoftmacBridge {
     @selector("fuchsia.wlan.softmac/WlanSoftmac.DisableBeaconing")
     strict DisableBeaconing() -> () error zx.Status;
 
+    /// Install a key for encryption when transmitting or receiving protected
+    /// frames.
+    ///
+    /// Common errors include:
+    ///   ZX_ERR_INVALID_ARGS: The given config does not specify a valid key.
+    ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given cipher.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.InstallKey")
+    strict InstallKey(WlanKeyConfiguration) -> () error zx.Status;
+
     /// Notifies the device of a successful association and configures
     /// additional parameters necessary to participate in that association.
     ///
@@ -809,7 +819,7 @@ closed protocol WlanSoftmac {
     /// Common errors include:
     ///   ZX_ERR_INVALID_ARGS: The given config does not specify a valid key.
     ///   ZX_ERR_NOT_SUPPORTED: The device does not support the given cipher.
-    @available(added=15)
+    @available(added=15, removed=HEAD)
     strict InstallKey(WlanKeyConfiguration) -> () error zx.Status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.

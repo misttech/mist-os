@@ -10,9 +10,9 @@ use {
             BeaconOffloadParams, BufferedFrame, Context, Rejection, TimedEvent,
         },
         buffer::{InBuf, OutBuf},
+        ddk_converter::softmac_key_configuration_from_mlme,
         device::{self, DeviceOps},
         error::Error,
-        key::KeyConfig,
         WlanTxPacketExt as _,
     },
     anyhow::format_err,
@@ -144,7 +144,7 @@ impl InfraBss {
     pub fn handle_mlme_setkeys_req<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        keylist: &[fidl_mlme::SetKeyDescriptor],
+        keylist: Vec<fidl_mlme::SetKeyDescriptor>,
     ) -> Result<(), Error> {
         fn key_type_name(key_type: fidl_mlme::KeyType) -> impl Display {
             match key_type {
@@ -162,11 +162,16 @@ impl InfraBss {
             ));
         }
 
-        for key_desc in keylist {
-            let key_type = key_desc.key_type;
-            ctx.device.set_key(KeyConfig::from(key_desc)).map_err(|status| {
-                Error::Status(format!("failed to set {} on PHY", key_type_name(key_type)), status)
-            })?;
+        for key_descriptor in keylist.into_iter() {
+            let key_type = key_descriptor.key_type;
+            ctx.device.install_key(&softmac_key_configuration_from_mlme(key_descriptor)).map_err(
+                |status| {
+                    Error::Status(
+                        format!("failed to set {} on PHY", key_type_name(key_type)),
+                        status,
+                    )
+                },
+            )?;
         }
         Ok(())
     }
@@ -2016,7 +2021,7 @@ mod tests {
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.handle_mlme_setkeys_req(
             &mut ctx,
-            &[fidl_mlme::SetKeyDescriptor {
+            vec![fidl_mlme::SetKeyDescriptor {
                 cipher_suite_oui: [1, 2, 3],
                 cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4),
                 key_type: fidl_mlme::KeyType::Pairwise,
@@ -2024,19 +2029,23 @@ mod tests {
                 key_id: 6,
                 key: vec![1, 2, 3, 4, 5, 6, 7],
                 rsc: 8,
-            }][..],
+            }],
         )
         .expect("expected InfraBss::handle_mlme_setkeys_req OK");
-        assert_eq!(fake_device_state.lock().unwrap().keys.len(), 1);
-        let key = &fake_device_state.lock().unwrap().keys[0];
-        assert_eq!(key.protection, crate::key::Protection::RX_TX);
-        assert_eq!(key.cipher_oui, [1, 2, 3]);
-        assert_eq!(key.cipher_type, 4);
-        assert_eq!(key.key_type, crate::key::KeyType::PAIRWISE);
-        assert_eq!(key.peer_addr, [5; 6].into());
-        assert_eq!(key.key_idx, 6);
-        assert_eq!(key.key[0..key.key_len as usize], [1, 2, 3, 4, 5, 6, 7]);
-        assert_eq!(key.rsc, 8);
+        assert_eq!(
+            fake_device_state.lock().unwrap().keys,
+            vec![fidl_softmac::WlanKeyConfiguration {
+                protection: Some(fidl_softmac::WlanProtection::RxTx),
+                cipher_oui: Some([1, 2, 3]),
+                cipher_type: Some(4),
+                key_type: Some(fidl_common::WlanKeyType::Pairwise),
+                peer_addr: Some([5; 6]),
+                key_idx: Some(6),
+                key: Some(vec![1, 2, 3, 4, 5, 6, 7]),
+                rsc: Some(8),
+                ..Default::default()
+            }]
+        );
     }
 
     #[test]
@@ -2048,7 +2057,7 @@ mod tests {
         assert_variant!(
             bss.handle_mlme_setkeys_req(
                 &mut ctx,
-                &[fidl_mlme::SetKeyDescriptor {
+                vec![fidl_mlme::SetKeyDescriptor {
                     cipher_suite_oui: [1, 2, 3],
                     cipher_suite_type:
                         fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4),
@@ -2057,7 +2066,7 @@ mod tests {
                     key_id: 6,
                     key: vec![1, 2, 3, 4, 5, 6, 7],
                     rsc: 8,
-                }][..]
+                }]
             )
             .expect_err("expected InfraBss::handle_mlme_setkeys_req error"),
             Error::Status(_, zx::Status::BAD_STATE)

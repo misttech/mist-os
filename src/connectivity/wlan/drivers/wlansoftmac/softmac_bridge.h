@@ -50,6 +50,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void EnableBeaconing(EnableBeaconingRequestView request,
                        EnableBeaconingCompleter::Sync& completer) final;
   void DisableBeaconing(DisableBeaconingCompleter::Sync& completer) final;
+  void InstallKey(InstallKeyRequestView request, InstallKeyCompleter::Sync& completer) final;
   void QueueEthFrameTx(eth::BorrowedOperation<> op);
 
  private:
