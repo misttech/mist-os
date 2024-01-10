@@ -31,20 +31,21 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
       .start = [](void* device_interface, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                   zx_handle_t* out_sme_channel) -> zx_status_t {
         zx::channel channel;
-        zx_status_t result = AsDeviceInterface(device_interface)->Start(ifc, &channel);
+        zx_status_t result = DeviceInterface::from(device_interface)->Start(ifc, &channel);
         *out_sme_channel = channel.release();
         return result;
       },
       .deliver_eth_frame = [](void* device_interface, const uint8_t* data,
                               size_t len) -> zx_status_t {
-        return AsDeviceInterface(device_interface)->DeliverEthernet({data, len});
+        return DeviceInterface::from(device_interface)->DeliverEthernet({data, len});
       },
       .queue_tx = [](void* device_interface, uint32_t options, wlansoftmac_out_buf_t buf,
                      wlan_tx_info_t tx_info) -> zx_status_t {
-        return AsDeviceInterface(device_interface)->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
+        return DeviceInterface::from(device_interface)
+            ->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
       },
       .set_ethernet_status = [](void* device_interface, uint32_t status) -> zx_status_t {
-        return AsDeviceInterface(device_interface)->SetEthernetStatus(status);
+        return DeviceInterface::from(device_interface)->SetEthernetStatus(status);
       },
   };
 

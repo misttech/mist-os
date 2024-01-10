@@ -44,7 +44,7 @@ class SoftmacBinding : public DeviceInterface,
       zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher);
   ~SoftmacBinding() override = default;
 
-  static constexpr inline SoftmacBinding* AsSoftmacBinding(void* ctx) {
+  static constexpr inline SoftmacBinding* from(void* ctx) {
     return static_cast<SoftmacBinding*>(ctx);
   }
 
@@ -89,30 +89,32 @@ class SoftmacBinding : public DeviceInterface,
 
   const zx_protocol_device_t eth_device_ops_ = {
       .version = DEVICE_OPS_VERSION,
-      .init = [](void* ctx) { AsSoftmacBinding(ctx)->Init(); },
-      .unbind = [](void* ctx) { AsSoftmacBinding(ctx)->Unbind(); },
-      .release = [](void* ctx) { AsSoftmacBinding(ctx)->Release(); },
+      .init = [](void* ctx) { SoftmacBinding::from(ctx)->Init(); },
+      .unbind = [](void* ctx) { SoftmacBinding::from(ctx)->Unbind(); },
+      .release = [](void* ctx) { SoftmacBinding::from(ctx)->Release(); },
   };
 
   const ethernet_impl_protocol_ops_t ethernet_impl_ops_ = {
       .query = [](void* ctx, uint32_t options, ethernet_info_t* info) -> zx_status_t {
-        return AsSoftmacBinding(ctx)->EthernetImplQuery(options, info);
+        return SoftmacBinding::from(ctx)->EthernetImplQuery(options, info);
       },
-      .stop = [](void* ctx) { AsSoftmacBinding(ctx)->EthernetImplStop(); },
+      .stop = [](void* ctx) { SoftmacBinding::from(ctx)->EthernetImplStop(); },
       .start = [](void* ctx, const ethernet_ifc_protocol_t* ifc) -> zx_status_t {
-        return AsSoftmacBinding(ctx)->EthernetImplStart(ifc);
+        return SoftmacBinding::from(ctx)->EthernetImplStart(ifc);
       },
       .queue_tx =
           [](void* ctx, uint32_t options, ethernet_netbuf_t* netbuf,
              ethernet_impl_queue_tx_callback callback, void* cookie) {
-            AsSoftmacBinding(ctx)->EthernetImplQueueTx(options, netbuf, callback, cookie);
+            SoftmacBinding::from(ctx)->EthernetImplQueueTx(options, netbuf, callback, cookie);
           },
       .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data_buffer,
                       size_t data_size) -> zx_status_t {
         return SoftmacBinding::EthernetImplSetParam(param, value, data_buffer, data_size);
       },
-      .get_bti = [](void* ctx,
-                    zx_handle_t* out_bti) { SoftmacBinding::EthernetImplGetBti(out_bti); },
+      .get_bti =
+          [](void* ctx, zx_handle_t* out_bti) {
+            SoftmacBinding::from(ctx)->EthernetImplGetBti(out_bti);
+          },
   };
 
   std::mutex ethernet_proxy_lock_;

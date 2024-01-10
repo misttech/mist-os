@@ -87,9 +87,6 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   DeviceInterface* device_interface_;
   wlansoftmac_handle_t* rust_handle_;
 
-  static DeviceInterface* AsDeviceInterface(void* device_interface) {
-    return static_cast<DeviceInterface*>(device_interface);
-  }
   static wlansoftmac_in_buf_t IntoRustInBuf(std::unique_ptr<Buffer> owned_buffer);
   wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
       .get_buffer = [](size_t min_len) -> wlansoftmac_in_buf_t {
