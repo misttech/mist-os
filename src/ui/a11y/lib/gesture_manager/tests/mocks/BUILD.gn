@@ -16,5 +16,6 @@ source_set("mocks") {
   deps = [
     "//sdk/fidl/fuchsia.accessibility.gesture:fuchsia.accessibility.gesture_hlcpp",
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/syslog/cpp",
   ]
 }
