@@ -65,16 +65,14 @@ def normalize_file_in_config(
         for config_node in config_nodes:
             if element in config_node and config_node[element] is not None:
                 if is_list:
-                    assert (
-                        isinstance(config_node[element], list),
-                        f"The element {element} is NOT a list, but [] was specified",
-                    )
+                    assert isinstance(
+                        config_node[element], list
+                    ), f"The element {element} is NOT a list, but [] was specified"
                     new_config_nodes += config_node[element]
                 else:
-                    assert (
-                        not isinstance(config_node[element], list),
-                        f"The element {element} is a list, but [] was NOT specified",
-                    )
+                    assert not isinstance(
+                        config_node[element], list
+                    ), f"The element {element} is a list, but [] was NOT specified"
                     new_config_nodes.append(config_node[element])
             else:
                 # It's not here, so exit early.
@@ -90,16 +88,14 @@ def normalize_file_in_config(
         if item_name in config_node and config_node[item_name] is not None:
             # External dependencies can be found by navigating into output_base.
             if is_list:
-                assert (
-                    isinstance(config_node[item_name], list),
-                    f"The element {item_name} is NOT a list, but [] was specified",
-                )
+                assert isinstance(
+                    config_node[item_name], list
+                ), f"The element {item_name} is NOT a list, but [] was specified"
                 item_values = config_node[item_name]
             else:
-                assert (
-                    not isinstance(config_node[item_name], list),
-                    f"The element {item_name} is a list, but [] was NOT specified",
-                )
+                assert not isinstance(
+                    config_node[item_name], list
+                ), f"The element {item_name} is a list, but [] was NOT specified"
                 item_values = [config_node[item_name]]
             new_item_values = []
             for item_value in item_values:
