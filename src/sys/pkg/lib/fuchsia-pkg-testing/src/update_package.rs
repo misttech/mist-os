@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {serde_json::json, update_package::UpdatePackage};
+use serde_json::json;
 
-/// A mocked update package for testing.
-pub struct TestUpdatePackage {
-    update_pkg: UpdatePackage,
+/// A fake `update_package::UpdatePackage` backed by a temp dir.
+pub struct FakeUpdatePackage {
+    update_pkg: update_package::UpdatePackage,
     temp_dir: tempfile::TempDir,
     packages: Vec<String>,
 }
 
-impl TestUpdatePackage {
+impl FakeUpdatePackage {
     /// Creates a new TestUpdatePackage with nothing in it.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -21,7 +21,11 @@ impl TestUpdatePackage {
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
         .expect("temp dir to open");
-        Self { temp_dir, update_pkg: UpdatePackage::new(update_pkg_proxy), packages: vec![] }
+        Self {
+            temp_dir,
+            update_pkg: update_package::UpdatePackage::new(update_pkg_proxy),
+            packages: vec![],
+        }
     }
 
     /// Adds a file to the update package, panics on error.
@@ -62,8 +66,8 @@ impl TestUpdatePackage {
     }
 }
 
-impl std::ops::Deref for TestUpdatePackage {
-    type Target = UpdatePackage;
+impl std::ops::Deref for FakeUpdatePackage {
+    type Target = update_package::UpdatePackage;
 
     fn deref(&self) -> &Self::Target {
         &self.update_pkg

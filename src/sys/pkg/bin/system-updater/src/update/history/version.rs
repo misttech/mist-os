@@ -286,7 +286,7 @@ mod tests {
         ::version::Version as SemanticVersion,
         fidl_fuchsia_paver::Configuration,
         fuchsia_hash::Hash,
-        fuchsia_pkg_testing::{make_epoch_json, TestUpdatePackage},
+        fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage},
         fuchsia_zircon::Vmo,
         mock_paver::{hooks as mphooks, MockPaverServiceBuilder},
         pretty_assertions::assert_eq,
@@ -295,7 +295,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn version_for_invalid_update_package() {
-        let update_pkg = TestUpdatePackage::new();
+        let update_pkg = FakeUpdatePackage::new();
         assert_eq!(
             Version::for_update_package(&update_pkg).await,
             Version { epoch: "0".to_string(), ..Version::default() }
@@ -304,7 +304,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn version_for_valid_update_package_v1() {
-        let update_pkg = TestUpdatePackage::new()
+        let update_pkg = FakeUpdatePackage::new()
             .hash("2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4")
             .await
             .add_package("fuchsia-pkg://fuchsia.test/system_image/0?hash=838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67")
@@ -365,7 +365,7 @@ mod tests {
             .clone()
             .build();
 
-        let update_pkg = TestUpdatePackage::new()
+        let update_pkg = FakeUpdatePackage::new()
             .hash("2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4")
             .await
             .add_package("fuchsia-pkg://fuchsia.com/system_image/0?hash=838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67")
@@ -410,7 +410,7 @@ mod tests {
             .clone()
             .build();
 
-        let update_pkg = TestUpdatePackage::new()
+        let update_pkg = FakeUpdatePackage::new()
             .hash("2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4")
             .await
             .add_package("fuchsia-pkg://fuchsia.com/system_image/0?hash=838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67")
@@ -455,7 +455,7 @@ mod tests {
             .clone()
             .build();
 
-        let update_pkg = TestUpdatePackage::new()
+        let update_pkg = FakeUpdatePackage::new()
             .hash("2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4")
             .await
             .add_package("fuchsia-pkg://fuchsia.com/system_image/0?hash=838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67")
@@ -510,7 +510,7 @@ mod tests {
             .clone()
             .build();
 
-        let update_pkg = TestUpdatePackage::new()
+        let update_pkg = FakeUpdatePackage::new()
             .hash("2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4")
             .await
             .add_package("fuchsia-pkg://fuchsia.com/system_image/0?hash=838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67")

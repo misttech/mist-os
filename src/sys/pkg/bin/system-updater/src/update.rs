@@ -1514,7 +1514,7 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         fuchsia_async as fasync,
-        fuchsia_pkg_testing::{make_epoch_json, TestUpdatePackage},
+        fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage},
         fuchsia_zircon::Status,
     };
 
@@ -1530,7 +1530,7 @@ mod tests {
     async fn validate_epoch_success() {
         let source = make_epoch_json(1);
         let target = make_epoch_json(2);
-        let p = TestUpdatePackage::new().add_file("epoch.json", target).await;
+        let p = FakeUpdatePackage::new().add_file("epoch.json", target).await;
 
         let res = validate_epoch(&source, &p).await;
 
@@ -1541,7 +1541,7 @@ mod tests {
     async fn validate_epoch_fail_unsupported_downgrade() {
         let source = make_epoch_json(2);
         let target = make_epoch_json(1);
-        let p = TestUpdatePackage::new().add_file("epoch.json", target).await;
+        let p = FakeUpdatePackage::new().add_file("epoch.json", target).await;
 
         let res = validate_epoch(&source, &p).await;
 
@@ -1550,7 +1550,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn validate_epoch_fail_parse_source() {
-        let p = TestUpdatePackage::new().add_file("epoch.json", make_epoch_json(1)).await;
+        let p = FakeUpdatePackage::new().add_file("epoch.json", make_epoch_json(1)).await;
 
         let res = validate_epoch("invalid source epoch.json", &p).await;
 
@@ -1562,7 +1562,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn validate_epoch_fail_parse_target() {
-        let p = TestUpdatePackage::new()
+        let p = FakeUpdatePackage::new()
             .add_file("epoch.json", "invalid target epoch.json".to_string())
             .await;
 
@@ -1573,7 +1573,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn validate_epoch_target_defaults_to_zero() {
-        let p = TestUpdatePackage::new();
+        let p = FakeUpdatePackage::new();
 
         assert_matches!(
             validate_epoch(&make_epoch_json(1), &p).await,
