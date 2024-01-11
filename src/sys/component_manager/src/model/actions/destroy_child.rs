@@ -7,7 +7,6 @@ use {
         actions::{Action, ActionKey, ActionSet, DestroyAction},
         component::{ComponentInstance, InstanceState},
         error::DestroyActionError,
-        hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
     cm_moniker::IncarnationId,
@@ -72,24 +71,6 @@ async fn do_destroy_child(
 
         // Wait for the child component to be destroyed
         ActionSet::register(child.clone(), DestroyAction::new()).await?;
-
-        // Remove the child component from the parent's list of children
-        {
-            let mut state = component.lock_state().await;
-            match *state {
-                InstanceState::Resolved(ref mut s) => {
-                    s.remove_child(moniker);
-                }
-                InstanceState::Destroyed => {}
-                InstanceState::New | InstanceState::Unresolved(_) => {
-                    panic!("do_purge_child: not resolved");
-                }
-            }
-        }
-
-        // Send the Destroyed event for the component
-        let event = Event::new(&child, EventPayload::Destroyed);
-        component.hooks.dispatch(&event).await;
     }
 
     Ok(())

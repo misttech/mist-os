@@ -10,12 +10,15 @@ use {
         },
         component::{ComponentInstance, InstanceState, StartReason},
         error::DestroyActionError,
+        hooks::{Event, EventPayload},
     },
+    ::routing::component_instance::ExtendedInstanceInterface,
     async_trait::async_trait,
     futures::{
         future::{join_all, BoxFuture},
         Future,
     },
+    moniker::MonikerBase,
     sandbox::Dict,
     std::sync::Arc,
 };
@@ -111,6 +114,19 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
     // Only consider the component fully destroyed once it's no longer executing any lifecycle
     // transitions.
     component.lock_state().await.set(InstanceState::Destroyed);
+
+    // Send the Destroyed event for the component
+    let event = Event::new(&component, EventPayload::Destroyed);
+    component.hooks.dispatch(&event).await;
+
+    // Remove this component from the parent's list of children
+    if let Ok(ExtendedInstanceInterface::Component(parent)) = component.parent.upgrade() {
+        if let Ok(mut resolved_state) = parent.lock_resolved_state().await {
+            if let Some(child_name) = component.moniker.leaf() {
+                resolved_state.remove_child(child_name)
+            }
+        }
+    }
 
     Ok(())
 }
