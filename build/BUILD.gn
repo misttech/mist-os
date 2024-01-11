@@ -356,7 +356,6 @@ group("config_data_template_allowlist") {
   visibility = [
     "//build/images/*",
     "//src/cast:cast_runner_config",
-    "//src/chromium:*",
     "//src/cobalt/bin/app:*",
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:config-default",
     "//src/connectivity/policy/netcfg:config-default",
