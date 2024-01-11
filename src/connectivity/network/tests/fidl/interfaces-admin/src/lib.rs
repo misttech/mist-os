@@ -22,7 +22,7 @@ use fuchsia_async::{
     net::{DatagramSocket, UdpSocket},
     TimeoutExt as _,
 };
-use fuchsia_zircon as zx;
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip, std_ip_v6, std_socket_addr};
@@ -42,7 +42,6 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use std::ops::Not as _;
 use test_case::test_case;
-use zx::AsHandleRef;
 
 #[netstack_test]
 async fn address_deprecation<N: Netstack>(name: &str) {

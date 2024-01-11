@@ -1094,6 +1094,10 @@ func (ifs *ifState) onDownLocked(name string, closed bool) {
 			bridgedIfs.mu.Unlock()
 		}
 
+		if err := ifs.authorizationToken.Close(); err != nil {
+			_ = syslog.Warnf("error closing authorization token for NIC %s: %s", name, err)
+		}
+
 		ifs.ns.onInterfaceRemoveLocked(ifs.nicid)
 	} else {
 		if err := ifs.ns.stack.DisableNIC(ifs.nicid); err != nil {
