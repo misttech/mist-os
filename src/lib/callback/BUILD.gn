@@ -18,6 +18,7 @@ source_set("callback") {
 
   public_deps = [
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/trace",
