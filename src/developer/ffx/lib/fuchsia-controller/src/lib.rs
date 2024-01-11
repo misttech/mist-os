@@ -550,7 +550,7 @@ mod test {
         // the tests, this must be changed so that each data buffer is declared
         // in each individual test (either that or just a re-design of the
         // library context).
-        let raw = unsafe { &mut SCRATCH as *mut u8 };
+        let raw = unsafe { std::ptr::addr_of_mut!(SCRATCH) as *mut u8 };
         let mut ctx: *const LibContext = std::ptr::null_mut();
         unsafe {
             create_ffx_lib_context(&mut ctx, raw, 1024);
