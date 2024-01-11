@@ -17,10 +17,10 @@ use {
         context::ModelContext,
         environment::Environment,
         error::{
-            AddChildError, AddDynamicChildError, ComponentProviderError, CreateNamespaceError,
-            DestroyActionError, DiscoverActionError, DynamicOfferError, ModelError,
+            ActionError, AddChildError, AddDynamicChildError, ComponentProviderError,
+            CreateNamespaceError, DestroyActionError, DynamicOfferError, ModelError,
             OpenExposedDirError, OpenOutgoingDirError, RebootError, ResolveActionError,
-            StartActionError, StopActionError, StructuredConfigError, UnresolveActionError,
+            StartActionError, StopActionError, StructuredConfigError,
         },
         exposed_dir::ExposedDir,
         hooks::{CapabilityReceiver, Event, EventPayload, Hooks},
@@ -483,8 +483,7 @@ impl ComponentInstance {
     // TODO(b/309656051): Remove this method from ComponentInstance's public API
     pub async fn lock_resolved_state<'a>(
         self: &'a Arc<Self>,
-    ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ResolveActionError>
-    {
+    ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ActionError> {
         fn get_resolved(s: &mut InstanceState) -> &mut ResolvedInstanceState {
             match s {
                 InstanceState::Resolved(s) => s,
@@ -500,7 +499,8 @@ impl ComponentInstance {
                 InstanceState::Destroyed => {
                     return Err(ResolveActionError::InstanceDestroyed {
                         moniker: self.moniker.clone(),
-                    });
+                    }
+                    .into());
                 }
                 InstanceState::New | InstanceState::Unresolved(_) => {}
             }
@@ -509,7 +509,9 @@ impl ComponentInstance {
         self.resolve().await?;
         let state = self.state.lock().await;
         if let InstanceState::Destroyed = *state {
-            return Err(ResolveActionError::InstanceDestroyed { moniker: self.moniker.clone() });
+            return Err(
+                ResolveActionError::InstanceDestroyed { moniker: self.moniker.clone() }.into()
+            );
         }
         Ok(MutexGuard::map(state, get_resolved))
     }
@@ -517,14 +519,14 @@ impl ComponentInstance {
     /// Resolves the component declaration, populating `ResolvedInstanceState` as necessary. A
     /// `Resolved` event is dispatched if the instance was not previously resolved or an error
     /// occurs.
-    pub async fn resolve(self: &Arc<Self>) -> Result<Component, ResolveActionError> {
+    pub async fn resolve(self: &Arc<Self>) -> Result<Component, ActionError> {
         ActionSet::register(self.clone(), ResolveAction::new()).await
     }
 
     /// Unresolves the component using an UnresolveAction. The component will be shut down, then
     /// reset to the Discovered state without being destroyed. An Unresolved event is dispatched on
     /// success or error.
-    pub async fn unresolve(self: &Arc<Self>) -> Result<(), UnresolveActionError> {
+    pub async fn unresolve(self: &Arc<Self>) -> Result<(), ActionError> {
         ActionSet::register(self.clone(), UnresolveAction::new()).await
     }
 
@@ -603,7 +605,7 @@ impl ComponentInstance {
                 .await
                 .map_err(|err| {
                     debug!(%err, moniker=%child.moniker, "failed to start component instance");
-                    AddDynamicChildError::StartSingleRun { err }
+                    AddDynamicChildError::ActionError { err }
                 })?;
         }
 
@@ -615,7 +617,7 @@ impl ComponentInstance {
     pub async fn remove_dynamic_child(
         self: &Arc<Self>,
         child_moniker: &ChildName,
-    ) -> Result<(), DestroyActionError> {
+    ) -> Result<(), ActionError> {
         let incarnation = {
             let state = self.lock_state().await;
             let state = match *state {
@@ -623,14 +625,15 @@ impl ComponentInstance {
                 _ => {
                     return Err(DestroyActionError::InstanceNotResolved {
                         moniker: self.moniker.clone(),
-                    })
+                    }
+                    .into())
                 }
             };
             if let Some(c) = state.get_child(&child_moniker) {
                 c.incarnation_id()
             } else {
                 let moniker = self.moniker.child(child_moniker.clone());
-                return Err(DestroyActionError::InstanceNotFound { moniker });
+                return Err(DestroyActionError::InstanceNotFound { moniker }.into());
             }
         };
         self.destroy_child(child_moniker.clone(), incarnation).await
@@ -638,7 +641,7 @@ impl ComponentInstance {
 
     /// Stops this component.
     #[cfg(test)]
-    pub async fn stop(self: &Arc<Self>) -> Result<(), StopActionError> {
+    pub async fn stop(self: &Arc<Self>) -> Result<(), ActionError> {
         ActionSet::register(self.clone(), StopAction::new(false)).await
     }
 
@@ -647,7 +650,7 @@ impl ComponentInstance {
     pub async fn shutdown(
         self: &Arc<Self>,
         shutdown_type: ShutdownType,
-    ) -> Result<(), StopActionError> {
+    ) -> Result<(), ActionError> {
         ActionSet::register(self.clone(), ShutdownAction::new(shutdown_type)).await
     }
 
@@ -729,7 +732,7 @@ impl ComponentInstance {
         // When the component is stopped, any child instances in collections must be destroyed.
         self.destroy_dynamic_children()
             .await
-            .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err })?;
+            .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
         if was_running {
             let event = Event::new(self, EventPayload::Stopped { status: stop_result });
             self.hooks.dispatch(&event).await;
@@ -836,7 +839,7 @@ impl ComponentInstance {
     }
 
     /// Registers actions to destroy all dynamic children of collections belonging to this instance.
-    async fn destroy_dynamic_children(self: &Arc<Self>) -> Result<(), DestroyActionError> {
+    async fn destroy_dynamic_children(self: &Arc<Self>) -> Result<(), ActionError> {
         let moniker_incarnations: Vec<_> = {
             let state = self.lock_state().await;
             let state = match *state {
@@ -863,7 +866,7 @@ impl ComponentInstance {
         self: &Arc<Self>,
         moniker: ChildName,
         incarnation: IncarnationId,
-    ) -> Result<(), DestroyActionError> {
+    ) -> Result<(), ActionError> {
         // The child may not exist or may already be deleted by a previous DeleteChild action.
         let child = {
             let state = self.lock_state().await;
@@ -981,14 +984,14 @@ impl ComponentInstance {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         numbered_handles: Vec<fprocess::HandleInfo>,
         additional_namespace_entries: Vec<NamespaceEntry>,
-    ) -> Result<fsys::StartResult, StartActionError> {
+    ) -> Result<fsys::StartResult, ActionError> {
         // Skip starting a component instance that was already started. It's important to bail out
         // here so we don't waste time starting eager children more than once.
         {
             let state = self.lock_state().await;
             let execution = self.lock_execution().await;
             if let Some(res) = start::should_return_early(&state, &execution, &self.moniker) {
-                return res;
+                return res.map_err(Into::into);
             }
         }
         ActionSet::register(
@@ -1015,7 +1018,8 @@ impl ComponentInstance {
                 InstanceState::Destroyed => {
                     return Err(StartActionError::InstanceDestroyed {
                         moniker: self.moniker.clone(),
-                    });
+                    }
+                    .into());
                 }
                 InstanceState::New | InstanceState::Unresolved(_) => {
                     panic!("start: not resolved")
@@ -1023,7 +1027,7 @@ impl ComponentInstance {
             }
         };
         Self::start_eager_children_recursive(eager_children).await.or_else(|e| match e {
-            StartActionError::InstanceShutDown { .. } => Ok(()),
+            ActionError::StartError { err: StartActionError::InstanceShutDown { .. } } => Ok(()),
             _ => Err(StartActionError::EagerStartError {
                 moniker: self.moniker.clone(),
                 err: Box::new(e),
@@ -1036,7 +1040,7 @@ impl ComponentInstance {
     // This function recursively calls `start`, so it returns a BoxFuture,
     fn start_eager_children_recursive<'a>(
         instances_to_bind: Vec<Arc<ComponentInstance>>,
-    ) -> BoxFuture<'a, Result<(), StartActionError>> {
+    ) -> BoxFuture<'a, Result<(), ActionError>> {
         let f = async move {
             let futures: Vec<_> = instances_to_bind
                 .iter()
@@ -1877,10 +1881,8 @@ impl ResolvedInstanceState {
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         dict: Dict,
-    ) -> Result<
-        (Arc<ComponentInstance>, BoxFuture<'static, Result<(), DiscoverActionError>>),
-        AddChildError,
-    > {
+    ) -> Result<(Arc<ComponentInstance>, BoxFuture<'static, Result<(), ActionError>>), AddChildError>
+    {
         let (child, dict) = self
             .add_child_internal(component, child, collection, dynamic_offers, controller, dict)
             .await?;

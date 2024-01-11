@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet},
         component::{ComponentInstance, InstanceState, ResolvedInstanceState},
-        error::StopActionError,
+        error::ActionError,
     },
     async_trait::async_trait,
     cm_rust::{
@@ -52,8 +52,8 @@ impl ShutdownAction {
 
 #[async_trait]
 impl Action for ShutdownAction {
-    type Output = Result<(), StopActionError>;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
+    type Output = ();
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
         do_shutdown(component, self.shutdown_type).await
     }
     fn key(&self) -> ActionKey {
@@ -64,7 +64,7 @@ impl Action for ShutdownAction {
 async fn shutdown_component(
     target: ShutdownInfo,
     shutdown_type: ShutdownType,
-) -> Result<ComponentRef, StopActionError> {
+) -> Result<ComponentRef, ActionError> {
     match target.ref_ {
         ComponentRef::Self_ => {
             // TODO: Put `self` in a "shutting down" state so that if it creates
@@ -146,7 +146,7 @@ impl ShutdownJob {
     /// Perform shutdown of the Component that was used to create this ShutdownJob A Component must
     /// wait to shut down until all its children are shut down.  The shutdown procedure looks at
     /// the children, if any, and determines the dependency relationships of the children.
-    pub async fn execute(&mut self) -> Result<(), StopActionError> {
+    pub async fn execute(&mut self) -> Result<(), ActionError> {
         // Relationship maps are maintained to track dependencies. A map is
         // maintained both from a Component to its dependents and from a Component to
         // that Component's dependencies. With this dependency tracking, the
@@ -249,7 +249,7 @@ impl ShutdownJob {
 async fn do_shutdown(
     component: &Arc<ComponentInstance>,
     shutdown_type: ShutdownType,
-) -> Result<(), StopActionError> {
+) -> Result<(), ActionError> {
     {
         let state = component.lock_state().await;
         {
@@ -855,6 +855,7 @@ mod tests {
         crate::model::{
             actions::{test_utils::is_unresolved, StopAction},
             component::StartReason,
+            error::StopActionError,
             testing::{
                 test_helpers::{
                     component_decl_with_test_runner, default_component_decl,
@@ -4529,7 +4530,8 @@ mod tests {
             let mut actions = component_d.lock_actions().await;
             actions.mock_result(
                 ActionKey::Shutdown,
-                Err(StopActionError::GetParentFailed) as Result<(), StopActionError>,
+                Err(ActionError::StopError { err: StopActionError::GetParentFailed })
+                    as Result<(), ActionError>,
             );
         }
 

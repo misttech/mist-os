@@ -224,7 +224,7 @@ impl RealmCapabilityHost {
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         component.remove_dynamic_child(&child_moniker).await.map_err(|error| {
             debug!(%error, ?child, "remove_dynamic_child() failed");
-            error.into()
+            error
         })?;
         Ok(())
     }

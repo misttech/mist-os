@@ -5,7 +5,10 @@
 use {
     crate::model::{
         component::StartReason,
-        error::{CreateNamespaceError, ModelError, RouteAndOpenCapabilityError, StartActionError},
+        error::{
+            ActionError, CreateNamespaceError, ModelError, RouteAndOpenCapabilityError,
+            StartActionError,
+        },
         routing::{route_and_open_capability, OpenOptions},
         testing::routing_test_helpers::*,
     },
@@ -557,10 +560,12 @@ async fn use_restricted_storage_start_failure() {
         test.start_instance(&Moniker::parse_str("/parent_consumer/child_consumer").unwrap()).await;
     assert_matches!(
         child_bind_result,
-        Err(ModelError::StartActionError {
-            err: StartActionError::CreateNamespaceError {
-                moniker,
-                err: CreateNamespaceError::InstanceNotInInstanceIdIndex(_),
+        Err(ModelError::ActionError {
+            err: ActionError::StartError {
+                err: StartActionError::CreateNamespaceError {
+                    moniker,
+                    err: CreateNamespaceError::InstanceNotInInstanceIdIndex(_),
+                }
             }
         }) if moniker == Moniker::try_from(vec!["parent_consumer", "child_consumer"]).unwrap()
     );

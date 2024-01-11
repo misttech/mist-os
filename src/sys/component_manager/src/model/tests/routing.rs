@@ -19,7 +19,8 @@ use {
             actions::{ActionSet, DestroyAction, ShutdownAction, ShutdownType},
             component::StartReason,
             error::{
-                ModelError, ResolveActionError, RouteAndOpenCapabilityError, StartActionError,
+                ActionError, ModelError, ResolveActionError, RouteAndOpenCapabilityError,
+                StartActionError,
             },
             routing::{Route, RouteRequest, RouteSource, RoutingError},
             testing::{routing_test_helpers::*, test_helpers::*},
@@ -1857,8 +1858,11 @@ async fn use_runner_from_environment_not_found() {
     // Bind "b". We expect it to fail because routing failed.
     let err = universe.start_instance(&vec!["b"].try_into().unwrap()).await.unwrap_err();
     let err = match err {
-        ModelError::StartActionError {
-            err: StartActionError::ResolveRunnerError { err, moniker, .. },
+        ModelError::ActionError {
+            err:
+                ActionError::StartError {
+                    err: StartActionError::ResolveRunnerError { err, moniker, .. },
+                },
         } if moniker == vec!["b"].try_into().unwrap() => err,
         err => panic!("Unexpected error trying to start b: {}", err),
     };
@@ -2330,11 +2334,14 @@ async fn resolver_is_not_available() {
         // Bind "c". We expect to see a failure that the scheme is not registered.
         async move {
             match universe.start_instance(&vec!["c"].try_into().unwrap()).await {
-                Err(ModelError::ResolveActionError {
+                Err(ModelError::ActionError {
                     err:
-                        ResolveActionError::ResolverError {
-                            url,
-                            err: ResolverError::SchemeNotRegistered,
+                        ActionError::ResolveError {
+                            err:
+                                ResolveActionError::ResolverError {
+                                    url,
+                                    err: ResolverError::SchemeNotRegistered,
+                                },
                         },
                 }) => {
                     assert_eq!(url, "base://c");
@@ -2432,11 +2439,14 @@ async fn resolver_component_decl_is_validated() {
         // Bind "b". We expect to see a ResolverError.
         async move {
             match universe.start_instance(&vec!["b"].try_into().unwrap()).await {
-                Err(ModelError::ResolveActionError {
+                Err(ModelError::ActionError {
                     err:
-                        ResolveActionError::ResolverError {
-                            url,
-                            err: ResolverError::ManifestInvalid(_),
+                        ActionError::ResolveError {
+                            err:
+                                ResolveActionError::ResolverError {
+                                    url,
+                                    err: ResolverError::ManifestInvalid(_),
+                                },
                         },
                 }) => {
                     assert_eq!(url, "base://b");

@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
-        error::DiscoverActionError,
+        error::{ActionError, DiscoverActionError},
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
@@ -29,9 +29,9 @@ impl DiscoverAction {
 
 #[async_trait]
 impl Action for DiscoverAction {
-    type Output = Result<(), DiscoverActionError>;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
-        do_discover(component, self.dict).await
+    type Output = ();
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
+        do_discover(component, self.dict).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
         ActionKey::Discover

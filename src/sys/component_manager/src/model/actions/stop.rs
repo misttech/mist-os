@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::ComponentInstance,
-        error::StopActionError,
+        error::ActionError,
     },
     async_trait::async_trait,
     std::sync::Arc,
@@ -25,9 +25,9 @@ impl StopAction {
 
 #[async_trait]
 impl Action for StopAction {
-    type Output = Result<(), StopActionError>;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
-        component.stop_instance_internal(self.shut_down).await
+    type Output = ();
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
+        component.stop_instance_internal(self.shut_down).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
         ActionKey::Stop

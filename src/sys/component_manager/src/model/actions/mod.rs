@@ -67,7 +67,7 @@ pub use {
 };
 
 use {
-    crate::model::{component::ComponentInstance, error::StopActionError},
+    crate::model::{component::ComponentInstance, error::ActionError},
     async_trait::async_trait,
     fuchsia_async as fasync,
     futures::{
@@ -91,7 +91,7 @@ use {
 #[async_trait]
 pub trait Action: Send + Sync + 'static {
     type Output: Send + Sync + Clone + Debug;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output;
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError>;
     fn key(&self) -> ActionKey;
 }
 
@@ -123,14 +123,14 @@ pub struct ActionSet {
 #[derive(Debug)]
 pub struct ActionNotifier<Output: Send + Sync + Clone + Debug> {
     /// The inner future.
-    fut: Shared<BoxFuture<'static, Output>>,
-    /// How many clones of this ActionNotifer are live, useful for testing.
+    fut: Shared<BoxFuture<'static, Result<Output, ActionError>>>,
+    /// How many clones of this ActionNotifier are live, useful for testing.
     refcount: Arc<AtomicUsize>,
 }
 
 impl<Output: Send + Sync + Clone + Debug> ActionNotifier<Output> {
     /// Instantiate an `ActionNotifier` wrapping `fut`.
-    pub fn new(fut: BoxFuture<'static, Output>) -> Self {
+    pub fn new(fut: BoxFuture<'static, Result<Output, ActionError>>) -> Self {
         Self { fut: fut.shared(), refcount: Arc::new(AtomicUsize::new(1)) }
     }
 }
@@ -149,7 +149,7 @@ impl<Output: Send + Sync + Clone + Debug> Drop for ActionNotifier<Output> {
 }
 
 impl<Output: Send + Sync + Clone + Debug> Future for ActionNotifier<Output> {
-    type Output = Output;
+    type Output = Result<Output, ActionError>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let fut = Pin::new(&mut self.fut);
         fut.poll(cx)
@@ -161,15 +161,18 @@ pub(crate) struct ActionTask<A>
 where
     A: Action,
 {
-    tx: oneshot::Sender<A::Output>,
-    fut: BoxFuture<'static, A::Output>,
+    tx: oneshot::Sender<Result<A::Output, ActionError>>,
+    fut: BoxFuture<'static, Result<A::Output, ActionError>>,
 }
 
 impl<A> ActionTask<A>
 where
     A: Action,
 {
-    fn new(tx: oneshot::Sender<A::Output>, fut: BoxFuture<'static, A::Output>) -> Self {
+    fn new(
+        tx: oneshot::Sender<Result<A::Output, ActionError>>,
+        fut: BoxFuture<'static, Result<A::Output, ActionError>>,
+    ) -> Self {
         Self { tx, fut }
     }
 
@@ -192,11 +195,11 @@ impl ActionSet {
     }
 
     #[cfg(test)]
-    pub fn mock_result<O>(&mut self, key: ActionKey, result: O)
+    pub fn mock_result<O>(&mut self, key: ActionKey, result: Result<O, ActionError>)
     where
         O: Send + Sync + Clone + Debug + 'static,
     {
-        let notifier = ActionNotifier::new(async move { result }.boxed());
+        let notifier: ActionNotifier<O> = ActionNotifier::new(async move { result }.boxed());
         self.rep.insert(key, Box::new(notifier));
     }
 
@@ -222,7 +225,10 @@ impl ActionSet {
 
     /// Registers an action in the set, returning when the action is finished (which may represent
     /// a task that's already running for this action).
-    pub async fn register<A>(component: Arc<ComponentInstance>, action: A) -> A::Output
+    pub async fn register<A>(
+        component: Arc<ComponentInstance>,
+        action: A,
+    ) -> Result<A::Output, ActionError>
     where
         A: Action,
     {
@@ -242,7 +248,7 @@ impl ActionSet {
         &mut self,
         component: &Arc<ComponentInstance>,
         action: A,
-    ) -> impl Future<Output = A::Output>
+    ) -> impl Future<Output = Result<A::Output, ActionError>>
     where
         A: Action,
     {
@@ -254,7 +260,7 @@ impl ActionSet {
     }
 
     /// Returns a future that waits for the given action to complete, if one exists.
-    pub fn wait<A>(&self, action: A) -> Option<impl Future<Output = A::Output>>
+    pub fn wait<A>(&self, action: A) -> Option<impl Future<Output = Result<A::Output, ActionError>>>
     where
         A: Action,
     {
@@ -321,7 +327,7 @@ impl ActionSet {
 
         let (tx, rx) = oneshot::channel();
         let task = ActionTask::new(tx, action_fut);
-        let notifier = ActionNotifier::new(
+        let notifier: ActionNotifier<A::Output> = ActionNotifier::new(
             async move {
                 match rx.await {
                     Ok(res) => res,
@@ -358,7 +364,7 @@ impl ActionSet {
 
         if let Some(prereq_action) = prereq_action {
             let prereq_action = prereq_action
-                .downcast_ref::<ActionNotifier<Result<(), StopActionError>>>()
+                .downcast_ref::<ActionNotifier<()>>()
                 .expect("action notifier has unexpected type")
                 .clone();
             async move {
@@ -377,6 +383,7 @@ pub mod tests {
         super::*,
         crate::model::{
             actions::{destroy::DestroyAction, shutdown::ShutdownAction},
+            error::StopActionError,
             testing::test_helpers::ActionsTest,
         },
         assert_matches::assert_matches,
@@ -386,8 +393,8 @@ pub mod tests {
     async fn register_action_in_new_task<A>(
         action: A,
         component: Arc<ComponentInstance>,
-        responder: oneshot::Sender<A::Output>,
-        res: A::Output,
+        responder: oneshot::Sender<Result<A::Output, ActionError>>,
+        res: Result<A::Output, ActionError>,
     ) where
         A: Action,
     {
@@ -431,7 +438,7 @@ pub mod tests {
             ShutdownAction::new(ShutdownType::Instance),
             component.clone(),
             tx2,
-            Err(StopActionError::GetParentFailed), // Some random error.
+            Err(ActionError::StopError { err: StopActionError::GetParentFailed }), // Some random error.
         )
         .await;
         let (tx3, rx3) = oneshot::channel();
@@ -445,7 +452,7 @@ pub mod tests {
         ActionSet::finish(&component, &ActionKey::Shutdown).await;
         assert_matches!(
             rx2.await.expect("Unable to receive result of Notification"),
-            Err(StopActionError::GetParentFailed)
+            Err(ActionError::StopError { err: StopActionError::GetParentFailed })
         );
     }
 }

@@ -177,7 +177,7 @@ mod tests {
         crate::model::{
             component::StartReason,
             context::ModelContext,
-            error::ModelError,
+            error::{ActionError, ModelError},
             model::{Model, ModelParams},
             testing::mocks::MockResolver,
             token::InstanceRegistry,
@@ -708,7 +708,7 @@ mod tests {
         model.discover_root_component(Dict::new()).await;
         assert_matches!(
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await,
-            Err(ModelError::ResolveActionError { .. })
+            Err(ModelError::ActionError { err: ActionError::ResolveError { .. } })
         );
         Ok(())
     }

@@ -8,7 +8,7 @@ use {
         model::{
             actions::{ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction},
             component::{ComponentInstance, InstanceState, StartReason},
-            error::{ModelError, StartActionError},
+            error::{ActionError, ModelError, StartActionError},
             events::registry::EventSubscription,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
@@ -483,13 +483,15 @@ async fn reboot_on_terminate_disallowed() {
     let res =
         test.model.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await;
     let expected_moniker = Moniker::try_from(vec!["system"]).unwrap();
-    assert_matches!(res, Err(ModelError::StartActionError {
-        err: StartActionError::RebootOnTerminateForbidden {
-            err: PolicyError::ChildPolicyDisallowed {
-                policy,
-                moniker: m2
-            },
-            moniker: m1
+    assert_matches!(res, Err(ModelError::ActionError {
+        err: ActionError::StartError {
+            err: StartActionError::RebootOnTerminateForbidden {
+                err: PolicyError::ChildPolicyDisallowed {
+                    policy,
+                    moniker: m2
+                },
+                moniker: m1
+            }
         }
     }) if &policy == "reboot_on_terminate" && m1 == expected_moniker && m2 == expected_moniker);
 }

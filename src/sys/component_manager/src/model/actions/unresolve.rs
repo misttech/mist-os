@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet, ShutdownAction, ShutdownType},
         component::{ComponentInstance, InstanceState},
-        error::UnresolveActionError,
+        error::{ActionError, UnresolveActionError},
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
@@ -27,8 +27,8 @@ impl UnresolveAction {
 
 #[async_trait]
 impl Action for UnresolveAction {
-    type Output = Result<(), UnresolveActionError>;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
+    type Output = ();
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
         do_unresolve(component).await
     }
     fn key(&self) -> ActionKey {
@@ -38,12 +38,14 @@ impl Action for UnresolveAction {
 
 // Implement the UnresolveAction by resetting the state from unresolved to unresolved and emitting
 // an Unresolved event. Unresolve the component's resolved children if any.
-async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), UnresolveActionError> {
+async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
     // Shut down the component, preventing new starts or resolves during the UnresolveAction.
     ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance)).await?;
 
     if component.lock_execution().await.runtime.is_some() {
-        return Err(UnresolveActionError::InstanceRunning { moniker: component.moniker.clone() });
+        return Err(
+            UnresolveActionError::InstanceRunning { moniker: component.moniker.clone() }.into()
+        );
     }
 
     let children: Vec<Arc<ComponentInstance>> = {
@@ -52,7 +54,8 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
             InstanceState::Destroyed => {
                 return Err(UnresolveActionError::InstanceDestroyed {
                     moniker: component.moniker.clone(),
-                })
+                }
+                .into())
             }
             InstanceState::Unresolved(_) | InstanceState::New => return Ok(()),
         }
@@ -79,7 +82,8 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
             InstanceState::Destroyed => {
                 return Err(UnresolveActionError::InstanceDestroyed {
                     moniker: component.moniker.clone(),
-                })
+                }
+                .into())
             }
             InstanceState::Unresolved(_) | InstanceState::New => return Ok(()),
         }
@@ -100,7 +104,7 @@ pub mod tests {
             actions::test_utils::{is_destroyed, is_discovered, is_resolved},
             actions::{ActionSet, ShutdownAction, ShutdownType, UnresolveAction},
             component::{ComponentInstance, StartReason},
-            error::UnresolveActionError,
+            error::{ActionError, UnresolveActionError},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
@@ -349,7 +353,9 @@ pub mod tests {
         // the collection is stopped. Then it's an error to unresolve a Destroyed component.
         assert_matches!(
             ActionSet::register(component_a.clone(), UnresolveAction::new()).await,
-            Err(UnresolveActionError::InstanceDestroyed { .. })
+            Err(ActionError::UnresolveError {
+                err: UnresolveActionError::InstanceDestroyed { .. }
+            })
         );
         // Still Destroyed.
         assert!(is_destroyed(&component_a).await);

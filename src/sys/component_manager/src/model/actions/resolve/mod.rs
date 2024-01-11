@@ -11,7 +11,7 @@ use {
             Component, ComponentInstance, InstanceState, ResolvedInstanceState,
             WeakComponentInstance,
         },
-        error::ResolveActionError,
+        error::{ActionError, ResolveActionError},
         hooks::{Event, EventPayload},
         resolver::Resolver,
     },
@@ -32,9 +32,9 @@ impl ResolveAction {
 
 #[async_trait]
 impl Action for ResolveAction {
-    type Output = Result<Component, ResolveActionError>;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
-        do_resolve(component).await
+    type Output = Component;
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
+        do_resolve(component).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
         ActionKey::Resolve
@@ -155,7 +155,7 @@ pub mod tests {
                 ActionSet, ResolveAction, ShutdownAction, ShutdownType, StartAction, StopAction,
             },
             component::StartReason,
-            error::ResolveActionError,
+            error::{ActionError, ResolveActionError},
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,
@@ -207,7 +207,7 @@ pub mod tests {
         // Error to resolve a shut-down component.
         assert_matches!(
             ActionSet::register(component_a.clone(), ResolveAction::new()).await,
-            Err(ResolveActionError::InstanceShutDown { .. })
+            Err(ActionError::ResolveError { err: ResolveActionError::InstanceShutDown { .. } })
         );
         assert!(is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);

@@ -10,7 +10,7 @@ use {
         component::{
             ComponentInstance, ComponentRuntime, ExecutionState, InstanceState, StartReason,
         },
-        error::{CreateNamespaceError, StartActionError, StructuredConfigError},
+        error::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
         namespace::create_namespace,
         routing::{route_and_open_capability, OpenOptions, RouteRequest},
@@ -67,8 +67,8 @@ impl StartAction {
 
 #[async_trait]
 impl Action for StartAction {
-    type Output = Result<fsys::StartResult, StartActionError>;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
+    type Output = fsys::StartResult;
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
         do_start(
             component,
             &self.start_reason,
@@ -77,6 +77,7 @@ impl Action for StartAction {
             self.additional_namespace_entries,
         )
         .await
+        .map_err(Into::into)
     }
 
     fn key(&self) -> ActionKey {
@@ -100,16 +101,21 @@ async fn do_start(
     additional_namespace_entries: Vec<NamespaceEntry>,
 ) -> Result<fsys::StartResult, StartActionError> {
     // Resolve the component.
-    let resolved_component = component.resolve().await.map_err(|err| {
-        StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
-    })?;
+    let resolved_component =
+        component.resolve().await.map_err(|err| StartActionError::ResolveActionError {
+            moniker: component.moniker.clone(),
+            err: Box::new(err),
+        })?;
 
     // Find the runner to use.
     let runner = {
         // Obtain the runner declaration under a short lock, as `open_runner` may lock the
         // resolved state re-entrantly.
         let resolved_state = component.lock_resolved_state().await.map_err(|err| {
-            StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
+            StartActionError::ResolveActionError {
+                moniker: component.moniker.clone(),
+                err: Box::new(err),
+            }
         })?;
         resolved_state.decl().get_runner()
     };

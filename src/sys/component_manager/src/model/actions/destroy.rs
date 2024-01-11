@@ -9,7 +9,7 @@ use {
             ShutdownType, StartAction,
         },
         component::{ComponentInstance, InstanceState, StartReason},
-        error::DestroyActionError,
+        error::{ActionError, DestroyActionError},
         hooks::{Event, EventPayload},
     },
     ::routing::component_instance::ExtendedInstanceInterface,
@@ -34,16 +34,16 @@ impl DestroyAction {
 
 #[async_trait]
 impl Action for DestroyAction {
-    type Output = Result<(), DestroyActionError>;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
-        do_destroy(component).await
+    type Output = ();
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
+        do_destroy(component).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
         ActionKey::Destroy
     }
 }
 
-async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyActionError> {
+async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
     // Do nothing if already destroyed.
     {
         if let InstanceState::Destroyed = *component.lock_state().await {
@@ -128,9 +128,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
     Ok(())
 }
 
-fn ok_or_first_error(
-    results: Vec<Result<(), DestroyActionError>>,
-) -> Result<(), DestroyActionError> {
+fn ok_or_first_error(results: Vec<Result<(), ActionError>>) -> Result<(), ActionError> {
     results.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))
 }
 
@@ -144,7 +142,6 @@ pub mod tests {
                 ActionNotifier, ShutdownAction,
             },
             component::{Component, StartReason},
-            error::{DiscoverActionError, ResolveActionError, StartActionError},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::{
@@ -317,11 +314,11 @@ pub mod tests {
     pub struct MockAction<O: Send + Sync + Clone + Debug + 'static> {
         rx: mpsc::Receiver<()>,
         key: ActionKey,
-        result: O,
+        result: Result<O, ActionError>,
     }
 
     impl<O: Send + Sync + Clone + Debug + 'static> MockAction<O> {
-        pub fn new(key: ActionKey, result: O) -> (Self, mpsc::Sender<()>) {
+        pub fn new(key: ActionKey, result: Result<O, ActionError>) -> (Self, mpsc::Sender<()>) {
             let (tx, rx) = mpsc::channel::<()>(0);
             let action = Self { rx, key, result };
             (action, tx)
@@ -332,7 +329,7 @@ pub mod tests {
     impl<O: Send + Sync + Clone + Debug + 'static> Action for MockAction<O> {
         type Output = O;
 
-        async fn handle(mut self, _: &Arc<ComponentInstance>) -> O {
+        async fn handle(mut self, _: &Arc<ComponentInstance>) -> Result<O, ActionError> {
             self.rx.next().await.unwrap();
             self.result
         }
@@ -370,8 +367,10 @@ pub mod tests {
         event_stream
     }
 
-    async fn run_destroy_waits_test<O>(mock_action_key: ActionKey, mock_action_result: O)
-    where
+    async fn run_destroy_waits_test<O>(
+        mock_action_key: ActionKey,
+        mock_action_result: Result<O, ActionError>,
+    ) where
         O: Send + Sync + Clone + Debug + 'static,
     {
         let components = vec![
@@ -443,7 +442,7 @@ pub mod tests {
             ActionKey::Discover,
             // The mocked action must return a result, even though the result is not used
             // by the Destroy action.
-            Ok(()) as Result<(), DiscoverActionError>,
+            Ok(()) as Result<(), ActionError>,
         )
         .await;
     }
@@ -461,7 +460,7 @@ pub mod tests {
                 package: None,
                 config: None,
                 abi_revision: None,
-            }) as Result<Component, ResolveActionError>,
+            }) as Result<Component, ActionError>,
         )
         .await;
     }
@@ -472,7 +471,7 @@ pub mod tests {
             ActionKey::Start,
             // The mocked action must return a result, even though the result is not used
             // by the Destroy action.
-            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, StartActionError>,
+            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, ActionError>,
         )
         .await;
     }
@@ -506,7 +505,7 @@ pub mod tests {
         let mock_action_key = ActionKey::Start;
         let (mock_action, mut mock_action_unblocker) = MockAction::new(
             mock_action_key.clone(),
-            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, StartActionError>,
+            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, ActionError>,
         );
 
         // Spawn a mock action on 'a' that stalls
@@ -530,7 +529,7 @@ pub mod tests {
             // Check the reference count on the notifier of the mock action
             let rx = &actions.rep[&mock_action_key];
             let rx = rx
-                .downcast_ref::<ActionNotifier<Result<fsys::StartResult, StartActionError>>>()
+                .downcast_ref::<ActionNotifier<fsys::StartResult>>()
                 .expect("action notifier has unexpected type");
             let refcount = rx.refcount.load(Ordering::Relaxed);
 
@@ -924,8 +923,11 @@ pub mod tests {
             let mut actions = component_d.lock_actions().await;
             actions.mock_result(
                 ActionKey::Destroy,
-                Err(DestroyActionError::InstanceNotFound { moniker: component_d.moniker.clone() })
-                    as Result<(), DestroyActionError>,
+                Err(ActionError::DestroyError {
+                    err: DestroyActionError::InstanceNotFound {
+                        moniker: component_d.moniker.clone(),
+                    },
+                }) as Result<(), ActionError>,
             );
         }
 

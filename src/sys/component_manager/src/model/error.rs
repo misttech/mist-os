@@ -90,6 +90,11 @@ pub enum ModelError {
         #[from]
         err: component_id_index::IndexError,
     },
+    #[error("error with action: {}", err)]
+    ActionError {
+        #[from]
+        err: ActionError,
+    },
     #[error("error with resolve action: {err}")]
     ResolveActionError {
         #[from]
@@ -224,25 +229,15 @@ pub enum AddDynamicChildError {
     NameTooLong { max_len: usize },
     #[error("collection {} does not allow dynamic offers", collection_name)]
     DynamicOffersNotAllowed { collection_name: String },
-    #[error("failed to start child in single-run collection: {}", err)]
-    StartSingleRun {
-        #[source]
-        err: StartActionError,
+    #[error("action failed on child: {}", err)]
+    ActionError {
+        #[from]
+        err: ActionError,
     },
     #[error("failed to add child to parent: {}", err)]
     AddChildError {
         #[from]
         err: AddChildError,
-    },
-    #[error("failed to discover child: {}", err)]
-    DiscoverActionError {
-        #[from]
-        err: DiscoverActionError,
-    },
-    #[error("failed to resolve parent: {}", err)]
-    ResolveActionError {
-        #[from]
-        err: ResolveActionError,
     },
 }
 
@@ -263,7 +258,7 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
             AddDynamicChildError::DynamicOffersNotAllowed { .. } => {
                 fcomponent::Error::InvalidArguments
             }
-            AddDynamicChildError::StartSingleRun { err } => err.into(),
+            AddDynamicChildError::ActionError { err } => err.into(),
             AddDynamicChildError::NameTooLong { .. } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
@@ -271,8 +266,6 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
             AddDynamicChildError::AddChildError { err: AddChildError::ChildNameInvalid { .. } } => {
                 fcomponent::Error::InvalidArguments
             }
-            AddDynamicChildError::DiscoverActionError { .. } => fcomponent::Error::Internal,
-            AddDynamicChildError::ResolveActionError { .. } => fcomponent::Error::Internal,
         }
     }
 }
@@ -284,8 +277,6 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
             AddDynamicChildError::CollectionNotFound { .. } => {
                 fsys::CreateError::CollectionNotFound
             }
-            AddDynamicChildError::DiscoverActionError { .. } => fsys::CreateError::Internal,
-            AddDynamicChildError::ResolveActionError { .. } => fsys::CreateError::Internal,
             AddDynamicChildError::EagerStartupUnsupported => {
                 fsys::CreateError::EagerStartupForbidden
             }
@@ -296,7 +287,7 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
             AddDynamicChildError::DynamicOffersNotAllowed { .. } => {
                 fsys::CreateError::DynamicOffersForbidden
             }
-            AddDynamicChildError::StartSingleRun { .. } => fsys::CreateError::Internal,
+            AddDynamicChildError::ActionError { .. } => fsys::CreateError::Internal,
             AddDynamicChildError::NameTooLong { .. } => fsys::CreateError::BadChildDecl,
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
@@ -338,6 +329,116 @@ pub enum DynamicOfferError {
     SourceNotFound { offer: cm_rust::OfferDecl },
     #[error("unknown offer type in dynamic offers")]
     UnknownOfferType,
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum ActionError {
+    #[error("discover action error: {}", err)]
+    DiscoverError {
+        #[from]
+        err: DiscoverActionError,
+    },
+
+    #[error("resolve action error: {}", err)]
+    ResolveError {
+        #[from]
+        err: ResolveActionError,
+    },
+
+    #[error("unresolve action error: {}", err)]
+    UnresolveError {
+        #[from]
+        err: UnresolveActionError,
+    },
+
+    #[error("start action error: {}", err)]
+    StartError {
+        #[from]
+        err: StartActionError,
+    },
+
+    #[error("stop action error: {}", err)]
+    StopError {
+        #[from]
+        err: StopActionError,
+    },
+
+    #[error("destroy action error: {}", err)]
+    DestroyError {
+        #[from]
+        err: DestroyActionError,
+    },
+}
+
+impl ActionError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            ActionError::DiscoverError { .. } => zx::Status::INTERNAL,
+            ActionError::ResolveError { err } => err.as_zx_status(),
+            ActionError::UnresolveError { .. } => zx::Status::INTERNAL,
+            ActionError::StartError { err } => err.as_zx_status(),
+            ActionError::StopError { .. } => zx::Status::INTERNAL,
+            ActionError::DestroyError { .. } => zx::Status::INTERNAL,
+        }
+    }
+}
+
+impl From<ActionError> for fcomponent::Error {
+    fn from(err: ActionError) -> Self {
+        match err {
+            ActionError::DiscoverError { .. } => fcomponent::Error::Internal,
+            ActionError::ResolveError { .. } => fcomponent::Error::Internal,
+            ActionError::UnresolveError { .. } => fcomponent::Error::Internal,
+            ActionError::StartError { err } => err.into(),
+            ActionError::StopError { err } => err.into(),
+            ActionError::DestroyError { err } => err.into(),
+        }
+    }
+}
+
+impl From<ActionError> for fsys::ResolveError {
+    fn from(err: ActionError) -> Self {
+        match err {
+            ActionError::ResolveError { err } => err.into(),
+            _ => fsys::ResolveError::Internal,
+        }
+    }
+}
+
+impl From<ActionError> for fsys::UnresolveError {
+    fn from(err: ActionError) -> Self {
+        match err {
+            ActionError::UnresolveError { err } => err.into(),
+            _ => fsys::UnresolveError::Internal,
+        }
+    }
+}
+
+impl From<ActionError> for fsys::StartError {
+    fn from(err: ActionError) -> Self {
+        match err {
+            ActionError::StartError { err } => err.into(),
+            _ => fsys::StartError::Internal,
+        }
+    }
+}
+
+impl From<ActionError> for fsys::StopError {
+    fn from(err: ActionError) -> Self {
+        match err {
+            ActionError::StopError { err } => err.into(),
+            _ => fsys::StopError::Internal,
+        }
+    }
+}
+
+impl From<ActionError> for fsys::DestroyError {
+    fn from(err: ActionError) -> Self {
+        match err {
+            ActionError::DestroyError { err } => err.into(),
+            _ => fsys::DestroyError::Internal,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Error)]
@@ -502,7 +603,7 @@ pub enum ComponentProviderError {
     #[error("failed to start source instance: {err}")]
     SourceStartError {
         #[from]
-        err: StartActionError,
+        err: ActionError,
     },
     #[error("failed to open source instance outgoing dir: {err}")]
     OpenOutgoingDirError {
@@ -641,7 +742,7 @@ pub enum StartActionError {
     ResolveActionError {
         moniker: Moniker,
         #[source]
-        err: ResolveActionError,
+        err: Box<ActionError>,
     },
     #[error("Couldn't start `{moniker}` because the runner `{runner}` couldn't resolve: {err}")]
     ResolveRunnerError {
@@ -678,7 +779,7 @@ pub enum StartActionError {
     EagerStartError {
         moniker: Moniker,
         #[source]
-        err: Box<StartActionError>,
+        err: Box<ActionError>,
     },
 }
 
@@ -703,7 +804,7 @@ impl StartActionError {
 impl Into<fsys::StartError> for StartActionError {
     fn into(self) -> fsys::StartError {
         match self {
-            StartActionError::ResolveActionError { err, .. } => err.into(),
+            StartActionError::ResolveActionError { err, .. } => (*err).into(),
             StartActionError::InstanceDestroyed { .. } => fsys::StartError::InstanceNotFound,
             StartActionError::InstanceShutDown { .. } => fsys::StartError::InstanceNotFound,
             _ => fsys::StartError::Internal,
@@ -733,7 +834,7 @@ pub enum StopActionError {
     #[error("failed to get parent instance")]
     GetParentFailed,
     #[error("failed to destroy dynamic children: {err}")]
-    DestroyDynamicChildrenFailed { err: DestroyActionError },
+    DestroyDynamicChildrenFailed { err: Box<ActionError> },
 }
 
 // This is implemented for fuchsia.sys2.LifecycleController protocol.
@@ -775,7 +876,7 @@ pub enum DestroyActionError {
     #[error("failed to shutdown component: {}", err)]
     ShutdownFailed {
         #[source]
-        err: Box<StopActionError>,
+        err: Box<ActionError>,
     },
     #[error("could not find instance with moniker {}", moniker)]
     InstanceNotFound { moniker: Moniker },

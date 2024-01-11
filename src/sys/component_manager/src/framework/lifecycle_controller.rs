@@ -65,7 +65,7 @@ impl LifecycleController {
         instance.start(&StartReason::Debug, None, vec![], vec![]).await.map(|_| ()).map_err(
             |error| {
                 warn!(%moniker, %error, "failed to start instance");
-                error.into()
+                error
             },
         )?;
         instance.scope_to_runtime(binder.into_channel()).await;
@@ -82,7 +82,7 @@ impl LifecycleController {
         let instance = model.find(&moniker).await.ok_or(fsys::StopError::InstanceNotFound)?;
         ActionSet::register(instance.clone(), StopAction::new(false)).await.map_err(|error| {
             warn!(%moniker, %error, "failed to stop instance");
-            error.into()
+            error
         })?;
         Ok(())
     }
@@ -97,7 +97,7 @@ impl LifecycleController {
         let component = model.find(&moniker).await.ok_or(fsys::UnresolveError::InstanceNotFound)?;
         component.unresolve().await.map_err(|error| {
             warn!(%moniker, %error, "failed to unresolve instance");
-            error.into()
+            error
         })?;
         Ok(())
     }
