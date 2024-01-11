@@ -402,7 +402,7 @@ pub trait PagerBacked: Sync + Send + Sized + 'static {
 }
 
 /// A generic page_in implementation that supplies pages using block-aligned reads.
-pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
+pub fn default_page_in<P: PagerBacked>(this: Arc<P>, range: Range<u64>) {
     fxfs_trace::duration!(
         "start-page-in",
         "offset" => range.start,
@@ -425,14 +425,28 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
     } else {
         round_down(READ_AHEAD_SIZE, read_alignment)
     };
+
+    // Two important subtleties to consider in this space:
+    //
+    // `byte_size` is the official size of the object. VMOs are page-aligned so `aligned_size` is
+    // the "offical" page length of the object. This may be smaller than Vmo::get_size because
+    // these two things are not updated atomically. The reverse is not true -- We do not currently
+    // ever shrink a VMO's size. We also do not update byte_size (self.handle.get_size()) if
+    // an independent handle is used to grow a file. This means the VMO's size should always be
+    // strictly equal or bigger than `byte_size`.
+    //
+    // It is valid to supply more pages than asked, but supplying pages outside of the VMO range
+    // will trigger OUT_OF_RANGE errors and the call will fail without supplying anything.
+    // We must supply the range requested under all circumstances to unblock any page misses but
+    // we should take care to never supply additional pages beyond the object length (`byte_size`)
+    // as there is a chance that we might serve a range outside of the VMO and fail to supply
+    // anything at all.
+
     let aligned_size = round_up(this.byte_size(), read_alignment).unwrap();
-    range = round_down(range.start, readahead_alignment)
-        ..round_up(range.end, readahead_alignment).unwrap();
-    if range.end > aligned_size {
-        range.end = aligned_size;
-    }
 
     // Zero-pad the tail if requested range exceeds the size of the thing we're reading.
+    // This can happen when we truncate and there are outstanding pager requests that the kernel
+    // was not able to cancel in time.
     let mut offset = std::cmp::max(range.start, aligned_size);
     while offset < range.end {
         let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
@@ -440,12 +454,14 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
         offset = end;
     }
 
+    let mut readahead_range = round_down(range.start, readahead_alignment)
+        ..std::cmp::min(round_up(range.end, readahead_alignment).unwrap(), aligned_size);
     // Read in chunks of 128 KiB.
     let read_size = round_up(128 * 1024, read_alignment).unwrap();
-
-    while range.start < range.end {
-        let read_range = range.start..std::cmp::min(range.end, range.start + read_size);
-        range.start += read_size;
+    while readahead_range.start < readahead_range.end {
+        let read_range = readahead_range.start
+            ..std::cmp::min(readahead_range.end, readahead_range.start + read_size);
+        readahead_range.start += read_size;
 
         let this = this.clone();
         this.clone().pager().spawn(page_in_chunk(this, read_range, ref_guard.clone()));
