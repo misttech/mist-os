@@ -23,6 +23,7 @@
 #include <lib/image-format/image_format.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/result.h>
+#include <zircon/process.h>
 #include <zircon/status.h>
 #include <zircon/threads.h>
 
@@ -43,7 +44,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace goldfish {
@@ -270,6 +270,13 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
   }
 }
 
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
 zx_status_t Display::InitSysmemAllocatorClientLocked() {
   auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
   if (!endpoints.is_ok()) {
@@ -284,10 +291,10 @@ zx_status_t Display::InitSysmemAllocatorClientLocked() {
     return connect_result.status();
   }
   sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
-
+  auto pid = GetKoid(zx_process_self());
   std::string debug_name = fxl::StringPrintf("goldfish-display");
-  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
-      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
+  auto set_debug_status =
+      sysmem_allocator_client_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name), pid);
   if (!set_debug_status.ok()) {
     zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
     return set_debug_status.status();
