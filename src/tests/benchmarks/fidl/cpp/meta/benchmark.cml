@@ -4,12 +4,6 @@
 {
     include: [ "//src/tests/benchmarks/fidl/meta/benchmark.shard.cml" ],
     program: {
-        binary: "bin/rust_fidl_microbenchmarks",
+        binary: "bin/cpp_fidl_microbenchmarks",
     },
-    use: [
-        {
-            storage: "tmp",
-            path: "/tmp",
-        },
-    ],
 }

@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/tests/benchmarks/fidl/meta/benchmark.shard.cml" ],
-    program: {
-        binary: "bin/rust_fidl_microbenchmarks",
-    },
+    include: [
+        "sys/testing/elf_test_runner.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     use: [
         {
-            storage: "tmp",
-            path: "/tmp",
+            storage: "custom_artifacts",
+            path: "/custom_artifacts",
         },
     ],
 }

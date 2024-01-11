@@ -7,7 +7,6 @@ import("//build/testing/perf/test.gni")
 group("benchmarks-under-migration") {
   testonly = true
   deps = [
-    "cpp",
     "driver_cpp",
     "driver_llcpp",
     "fidlc:fidlc_microbenchmarks",
@@ -19,10 +18,14 @@ group("benchmarks-under-migration") {
   ]
 }
 
-_tests = [ "rust" ]
+_tests = [
+  "cpp",
+  "rust",
+]
 
 _benchmarks = []
 _test_packages = []
+
 foreach(test, _tests) {
   _benchmark_name = "fidl_microbenchmarks_${test}"
 
@@ -30,7 +33,17 @@ foreach(test, _tests) {
     package = "${test}:fidl_microbenchmarks_${test}"
     component_name = "benchmark"
     expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.fidl_microbenchmarks.${test}.txt"
-    process_runs = 1
+
+    if (test == "rust") {
+      process_runs = 1
+    } else {
+      process_runs = 6
+      results_path_test_arg = "--out"
+      test_component_args = [
+        "-p",
+        "--quiet",
+      ]
+    }
   }
 
   _test_packages += [ "${test}:fidl_microbenchmarks_${test}" ]
