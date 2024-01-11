@@ -129,15 +129,17 @@ zx_status_t Astro::ButtonsInit() {
   fuchsia_driver_framework::CompositeNodeSpec buttonComposite = {
       {.name = "astro-buttons", .parents = std::move(parents)}};
 
-  fdf::WireUnownedResult status =
+  fdf::WireUnownedResult result =
       pbus_.buffer(buttons_arena)
           ->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev),
                                  fidl::ToWire(fidl_arena, buttonComposite));
-
-  if (status->is_error() || status.value().is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec failed: %s", __func__,
-           status.FormatDescription().c_str());
-    return ZX_ERR_INTERNAL;
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec error: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
   return ZX_OK;
