@@ -84,14 +84,4 @@ if (current_toolchain == default_toolchain) {
       "Sherlock",
     ]
   }
-
-  kernel_zbi_test("cuckoo-build-only-zbi") {
-    deps = [ "data-publisher:early-boot-data-publisher-bin" ]
-    device_types = []
-  }
-
-  cuckoo_kernel_zbi_test("cuckoo-build-only") {
-    kernel_zbi = ":cuckoo-build-only-zbi"
-    kernel_image_name = "cuckoo-build-only-zbi"
-  }
 }

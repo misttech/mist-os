@@ -57,24 +57,15 @@ if (is_fuchsia) {
 
   # Generate a kernel_zbi test with the executable as a test.
   kernel_zbi_test("standalone-coverage-zbi") {
+    generate_cuckoo = true
     deps = [ ":standalone-main-bin" ]
 
-    # The empty device list prevents this image from being launched by infra
-    # as an individual shard. The sole purpose of this image is to be launched
-    # by the host interaction test.
+    # TODO(https://fxbug.dev/115209): This ZBI is not actually a ZBI test, but relies
+    # on the specification just for the `images` metadata implicitly set by
+    # `zbi_test()` and not `zbi()`. Investigate whether we can have `zbi()`
+    # targets set this metadata and update this target accordingly - and
+    # disable the ZBI from being booted as a ZBI test for now.
     disabled = true
-  }
-}
-
-if (current_toolchain == default_toolchain) {
-  # Generate a cuckoo image that will proceed to boot to a fully working system
-  # after running the test, and be ready to exfiltrate the data.
-  cuckoo_kernel_zbi_test("cuckoo-standalone-coverage-test") {
-    kernel_zbi = ":standalone-coverage-zbi"
-    kernel_image_name = "standalone-coverage-zbi"
-
-    # Prevents the collector test from being run as part of infra.
-    environments = []
   }
 }
 
@@ -82,8 +73,8 @@ if (is_host) {
   coverage_verification_test("standalone-coverage-verification-test") {
     instrumented_target = ":standalone-main-bin($target_toolchain)"
     assembled_system =
-        ":cuckoo-standalone-coverage-test_zbi($default_toolchain)"
-    test_uri = "fuchsia-pkg://fuchsia.com/cuckoo-standalone-coverage-test_test#meta/cuckoo-standalone-coverage-test_test.cm"
+        ":standalone-coverage-zbi.cuckoo.assembled_system($default_toolchain)"
+    test_uri = "fuchsia-pkg://fuchsia.com/standalone-coverage-zbi.cuckoo.test#meta/standalone-coverage-zbi.cuckoo.test.cm"
     expectations = [
       {
         source = "//src/lib/llvm-profdata/coverage-example.cc"
