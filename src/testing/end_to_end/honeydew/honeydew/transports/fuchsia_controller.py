@@ -10,7 +10,7 @@ import logging
 import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types, errors
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports import ffx
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -24,15 +24,18 @@ class FuchsiaController:
 
     Args:
         device_name: Fuchsia device name.
+        ffx_transport: ffx.FFX object.
         device_ip: Fuchsia device IP Address.
     """
 
     def __init__(
         self,
         device_name: str,
+        ffx_transport: ffx.FFX,
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
     ) -> None:
         self._name: str = device_name
+
         self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
             device_ip
         )
@@ -41,8 +44,10 @@ class FuchsiaController:
             self._target = str(self._ip_address)
         else:
             self._target = self._name
-        self.ctx: fuchsia_controller.Context
 
+        self._ffx_transport: ffx.FFX = ffx_transport
+
+        self.ctx: fuchsia_controller.Context
         self.create_context()
 
     def create_context(self) -> None:
@@ -54,7 +59,7 @@ class FuchsiaController:
             errors.FuchsiaControllerConnectionError: If target is not ready.
         """
         try:
-            ffx_config: custom_types.FFXConfig = ffx_transport.get_config()
+            ffx_config: custom_types.FFXConfig = self._ffx_transport.config
 
             # To run Fuchsia-Controller in isolation
             isolate_dir: fuchsia_controller.IsolateDir | None = (
@@ -65,7 +70,7 @@ class FuchsiaController:
             config: dict[str, str] = {}
             if ffx_config.logs_dir:
                 config["log.dir"] = ffx_config.logs_dir
-                config["log.level"] = "debug"
+                config["log.level"] = ffx_config.logs_level
 
             # Do not autostart the daemon if it is not running.
             # If Fuchsia-Controller need to start a daemon then it needs to know

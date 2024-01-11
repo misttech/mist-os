@@ -11,6 +11,7 @@ import unittest
 from typing import Any
 from unittest import mock
 
+import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
 from honeydew import custom_types, errors
@@ -27,6 +28,12 @@ _SSH_PORT = 8022
 _TARGET_SSH_ADDRESS = custom_types.TargetSshAddress(
     ip=_SSH_ADDRESS, port=_SSH_PORT
 )
+
+_ISOLATE_DIR: str = "/tmp/isolate"
+_LOGS_DIR: str = "/tmp/logs"
+_BINARY_PATH: str = "ffx"
+_LOGS_LEVEL: str = "debug"
+_MDNS_ENABLED: bool = False
 
 _FFX_TARGET_SHOW_OUTPUT: bytes = (
     r'[{"title":"Target","label":"target","description":"",'
@@ -119,7 +126,14 @@ _FFX_TARGET_LIST_JSON: list[dict[str, Any]] = [
 
 _INPUT_ARGS: dict[str, Any] = {
     "target_name": _TARGET_NAME,
-    "target_ip": _IPV6_OBJ,
+    "target_ip_port": _TARGET_SSH_ADDRESS,
+    "ffx_config": custom_types.FFXConfig(
+        isolate_dir=fuchsia_controller.IsolateDir(_ISOLATE_DIR),
+        logs_dir=_LOGS_DIR,
+        binary_path=_BINARY_PATH,
+        logs_level=_LOGS_LEVEL,
+        mdns_enabled=_MDNS_ENABLED,
+    ),
     "run_cmd": ffx._FFX_CMDS["TARGET_SHOW"],
 }
 
@@ -148,64 +162,183 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     return f"{test_func_name}_with_{test_label}"
 
 
-_FUCHSIA_DIR_PATH = "mock_fuchsia_dir"
+class FfxConfigTests(unittest.TestCase):
+    """Unit tests for honeydew.transports.ffx.FfxConfig"""
 
-
-def _mock_no_fuchsia_dir():
-    return mock.patch.dict(os.environ, {"FUCHSIA_DIR": ""}, clear=False)
-
-
-def _mock_fuchsia_dir():
-    return mock.patch.dict(
-        os.environ, {"FUCHSIA_DIR": _FUCHSIA_DIR_PATH}, clear=False
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_call",
+        autospec=True,
     )
+    def test_setup(self, mock_subprocess_check_call) -> None:
+        """Test case for ffx.FfxConfig.setup()"""
+
+        ffx_config = ffx.FfxConfig()
+
+        with mock.patch.dict(
+            os.environ, {"FUCHSIA_DIR": "mock_fuchsia_dir"}, clear=False
+        ):
+            ffx_config.setup(
+                binary_path=_BINARY_PATH,
+                isolate_dir=_ISOLATE_DIR,
+                logs_dir=_LOGS_DIR,
+                logs_level=_LOGS_LEVEL,
+                enable_mdns=_MDNS_ENABLED,
+            )
+
+        mock_subprocess_check_call.assert_called()
+
+        # Calling setup() again should fail
+        with self.assertRaises(errors.FfxConfigError):
+            ffx_config.setup(
+                binary_path=_BINARY_PATH,
+                isolate_dir=_ISOLATE_DIR,
+                logs_dir=_LOGS_DIR,
+                logs_level=_LOGS_LEVEL,
+                enable_mdns=_MDNS_ENABLED,
+            )
+
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_call",
+        side_effect=subprocess.CalledProcessError(
+            returncode=5,
+            cmd="cmd",
+            output="output",
+        ),
+        autospec=True,
+    )
+    def test_setup_raises_ffx_config_error(
+        self, mock_subprocess_check_call
+    ) -> None:
+        """Test case for ffx.FfxConfig.setup() raises FfxConfigError"""
+
+        ffx_config = ffx.FfxConfig()
+
+        with self.assertRaises(errors.FfxConfigError):
+            ffx_config.setup(
+                binary_path=_BINARY_PATH,
+                isolate_dir=_ISOLATE_DIR,
+                logs_dir=_LOGS_DIR,
+                logs_level=_LOGS_LEVEL,
+                enable_mdns=_MDNS_ENABLED,
+            )
+
+        mock_subprocess_check_call.assert_called()
+
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_call",
+        side_effect=subprocess.TimeoutExpired(cmd="cmd", timeout=5),
+        autospec=True,
+    )
+    def test_setup_raises_timeout_error(
+        self, mock_subprocess_check_call
+    ) -> None:
+        """Test case for ffx.FfxConfig.setup() raises subprocess.TimeoutExpired"""
+
+        ffx_config = ffx.FfxConfig()
+
+        with self.assertRaises(subprocess.TimeoutExpired):
+            ffx_config.setup(
+                binary_path=_BINARY_PATH,
+                isolate_dir=_ISOLATE_DIR,
+                logs_dir=_LOGS_DIR,
+                logs_level=_LOGS_LEVEL,
+                enable_mdns=_MDNS_ENABLED,
+            )
+
+        mock_subprocess_check_call.assert_called()
+
+    @mock.patch.object(
+        ffx.FfxConfig,
+        "_run",
+        autospec=True,
+    )
+    def test_close(self, mock_ffx_config_run) -> None:
+        """Test case for ffx.FfxConfig.close()"""
+
+        ffx_config = ffx.FfxConfig()
+
+        # Call setup first before calling close
+        ffx_config.setup(
+            binary_path=_BINARY_PATH,
+            isolate_dir=_ISOLATE_DIR,
+            logs_dir=_LOGS_DIR,
+            logs_level=_LOGS_LEVEL,
+            enable_mdns=_MDNS_ENABLED,
+        )
+        mock_ffx_config_run.assert_called()
+
+        ffx_config.close()
+
+    def test_close_without_setup(self) -> None:
+        """Test case for ffx.FfxConfig.close() without calling
+        ffx.FfxConfig.setup()"""
+
+        ffx_config = ffx.FfxConfig()
+
+        # Calling setup() again should fail
+        with self.assertRaises(errors.FfxConfigError):
+            ffx_config.close()
+
+    @mock.patch.object(
+        ffx.FfxConfig,
+        "_run",
+        autospec=True,
+    )
+    def test_get_config(self, mock_ffx_config_run) -> None:
+        """Test case for ffx.FfxConfig.get_config()"""
+
+        ffx_config = ffx.FfxConfig()
+
+        # Call setup first before calling close
+        ffx_config.setup(
+            binary_path=_BINARY_PATH,
+            isolate_dir=_ISOLATE_DIR,
+            logs_dir=_LOGS_DIR,
+            logs_level=_LOGS_LEVEL,
+            enable_mdns=_MDNS_ENABLED,
+        )
+        mock_ffx_config_run.assert_called()
+
+        self.assertEqual(
+            str(ffx_config.get_config()), str(_INPUT_ARGS["ffx_config"])
+        )
+
+    def test_get_config_without_setup(self) -> None:
+        """Test case for ffx.FfxConfig.get_config() without calling
+        ffx.FfxConfig.setup()"""
+
+        ffx_config = ffx.FfxConfig()
+
+        # Calling setup() again should fail
+        with self.assertRaises(errors.FfxConfigError):
+            ffx_config.get_config()
 
 
-class FfxCliTests(unittest.TestCase):
-    """Unit tests for honeydew.transports.ffx.py."""
+class FfxTests(unittest.TestCase):
+    """Unit tests for honeydew.transports.ffx.FFX"""
 
     def setUp(self) -> None:
         super().setUp()
 
         self.ffx_obj_with_ip = ffx.FFX(
             target_name=_INPUT_ARGS["target_name"],
-            target_ip=_INPUT_ARGS["target_ip"],
+            target_ip_port=_INPUT_ARGS["target_ip_port"],
+            config=_INPUT_ARGS["ffx_config"],
         )
         self.ffx_obj_wo_ip = ffx.FFX(
             target_name=_INPUT_ARGS["target_name"],
+            config=_INPUT_ARGS["ffx_config"],
         )
-
-    def test_ffx_setup(self) -> None:
-        """Test case for ffx.setup()."""
-        ffx.setup(binary_path="ffx", logs_dir="/tmp/ffx_logs/")
-
-        # calling setup again should fail
-        with self.assertRaises(errors.FfxCommandError):
-            ffx.setup(binary_path="ffx", logs_dir="/tmp/ffx_logs_2/")
-
-    def test_ffx_get_config(self) -> None:
-        """Test case for ffx.get_config()."""
-        # Ensure ffx.get_config() will return valid FFXConfig when called after
-        # ffx.setup()
-        ffx.setup(binary_path="ffx", logs_dir="/tmp/ffx_logs/")
-        ffx_config = ffx.get_config()
-        self.assertEqual(ffx_config.logs_dir, "/tmp/ffx_logs/")
-
-        # Ensure ffx.get_config() will return empty FFXConfig when called after
-        # ffx.close()
-        ffx.close()
-        ffx_config = ffx.get_config()
-        self.assertEqual(ffx_config, custom_types.FFXConfig())
-
-    def test_ffx_close(self) -> None:
-        """Test case for ffx.close()."""
-        ffx.close()
 
     def test_ffx_init_with_ip_as_target_name(self) -> None:
         """Test case for ffx.FFX() when called with target_name=<ip>."""
         with self.assertRaises(ValueError):
             self.ffx_obj_with_ip = ffx.FFX(
                 target_name=_IPV6,
+                config=_INPUT_ARGS["ffx_config"],
             )
 
     @mock.patch.object(ffx.FFX, "wait_for_rcs_connection", autospec=True)
@@ -390,79 +523,18 @@ class FfxCliTests(unittest.TestCase):
     )
     def test_ffx_run(self, mock_subprocess_check_output) -> None:
         """Test case for ffx.run()"""
-        with _mock_no_fuchsia_dir():
-            self.assertEqual(
-                self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
-                _EXPECTED_VALUES["ffx_target_show_output"],
-            )
-
-        mock_subprocess_check_output.assert_called_with(
-            [
-                "ffx",
-                "-t",
-                _IPV6,
-                "--config",
-                '{"discovery": {"mdns": {"enabled": false}}}',
-            ]
-            + ffx._FFX_CMDS["TARGET_SHOW"],
-            stderr=subprocess.STDOUT,
-            timeout=10,
+        self.assertEqual(
+            self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
+            _EXPECTED_VALUES["ffx_target_show_output"],
         )
 
-    @mock.patch.object(
-        ffx.subprocess,
-        "check_output",
-        return_value=_MOCK_ARGS["ffx_target_show_output"],
-        autospec=True,
-    )
-    def test_ffx_run_with_fuchsia_dir(
-        self, mock_subprocess_check_output
-    ) -> None:
-        """Test case for ffx.run() when FUCHSIA_DIR is present in env, which will add a host-tools flag"""
-
-        with _mock_fuchsia_dir():
-            self.assertEqual(
-                self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
-                _EXPECTED_VALUES["ffx_target_show_output"],
-            )
-
         mock_subprocess_check_output.assert_called_with(
             [
-                "ffx",
+                _BINARY_PATH,
                 "-t",
                 _IPV6,
-                "-c",
-                f"ffx.subtool-search-paths={_FUCHSIA_DIR_PATH}/out/default/host-tools",
-                "--config",
-                '{"discovery": {"mdns": {"enabled": false}}}',
-            ]
-            + ffx._FFX_CMDS["TARGET_SHOW"],
-            stderr=subprocess.STDOUT,
-            timeout=10,
-        )
-
-    @mock.patch.object(
-        ffx.subprocess,
-        "check_output",
-        return_value=_MOCK_ARGS["ffx_target_show_output"],
-        autospec=True,
-    )
-    def test_ffx_run_with_mdns(self, mock_subprocess_check_output) -> None:
-        """Test case for ffx.run() where ffx object is created without target_ip
-        which means we need to set mdns to true."""
-        with _mock_no_fuchsia_dir():
-            self.assertEqual(
-                self.ffx_obj_wo_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
-                _EXPECTED_VALUES["ffx_target_show_output"],
-            )
-
-        mock_subprocess_check_output.assert_called_with(
-            [
-                "ffx",
-                "-t",
-                _TARGET_NAME,
-                "--config",
-                '{"discovery": {"mdns": {"enabled": true}}}',
+                "--isolate-dir",
+                _ISOLATE_DIR,
             ]
             + ffx._FFX_CMDS["TARGET_SHOW"],
             stderr=subprocess.STDOUT,
@@ -485,21 +557,21 @@ class FfxCliTests(unittest.TestCase):
         self, mock_subprocess_check_output, mock_subprocess_check_call
     ) -> None:
         """Test case for ffx.run()"""
-        with _mock_no_fuchsia_dir():
-            self.assertEqual(
-                self.ffx_obj_with_ip.run(
-                    cmd=["test", "run", "my-test"], capture_output=False
-                ),
-                "",
-            )
+        self.assertEqual(
+            self.ffx_obj_with_ip.run(
+                cmd=["test", "run", "my-test"], capture_output=False
+            ),
+            "",
+        )
+
         mock_subprocess_check_output.assert_not_called()
         mock_subprocess_check_call.assert_called_with(
             [
-                "ffx",
+                _BINARY_PATH,
                 "-t",
                 _IPV6,
-                "--config",
-                '{"discovery": {"mdns": {"enabled": false}}}',
+                "--isolate-dir",
+                _ISOLATE_DIR,
                 "test",
                 "run",
                 "my-test",
@@ -515,23 +587,23 @@ class FfxCliTests(unittest.TestCase):
     )
     def test_ffx_run_test_component(self, mock_subprocess_check_call) -> None:
         """Test case for ffx.run()"""
-        with _mock_no_fuchsia_dir():
-            self.assertEqual(
-                self.ffx_obj_with_ip.run_test_component(
-                    "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
-                    ffx_test_args=["--foo", "bar"],
-                    test_component_args=["baz", "--x", "2"],
-                    capture_output=False,
-                ),
-                "",
-            )
+        self.assertEqual(
+            self.ffx_obj_with_ip.run_test_component(
+                "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
+                ffx_test_args=["--foo", "bar"],
+                test_component_args=["baz", "--x", "2"],
+                capture_output=False,
+            ),
+            "",
+        )
+
         mock_subprocess_check_call.assert_called_with(
             [
-                "ffx",
+                _BINARY_PATH,
                 "-t",
                 _IPV6,
-                "--config",
-                mock.ANY,
+                "--isolate-dir",
+                _ISOLATE_DIR,
                 "test",
                 "run",
                 "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
@@ -553,24 +625,23 @@ class FfxCliTests(unittest.TestCase):
     )
     def test_ffx_popen(self, mock_subprocess_popen_call) -> None:
         """Test case for ffx.popen()"""
-        with _mock_no_fuchsia_dir():
-            self.assertEqual(
-                self.ffx_obj_with_ip.popen(
-                    cmd=["a", "b", "c"],
-                    # Popen forwards arbitrary kvargs to subprocess.Popen
-                    text=True,  # example kvarg
-                    stdout="abc",  # another example kvarg
-                ),
-                None,
-            )
+        self.assertEqual(
+            self.ffx_obj_with_ip.popen(
+                cmd=["a", "b", "c"],
+                # Popen forwards arbitrary kvargs to subprocess.Popen
+                text=True,  # example kvarg
+                stdout="abc",  # another example kvarg
+            ),
+            None,
+        )
 
         mock_subprocess_popen_call.assert_called_with(
             [
-                "ffx",
+                _BINARY_PATH,
                 "-t",
                 _IPV6,
-                "--config",
-                '{"discovery": {"mdns": {"enabled": false}}}',
+                "--isolate-dir",
+                _ISOLATE_DIR,
             ]
             + ["a", "b", "c"],
             text=True,
@@ -663,10 +734,7 @@ class FfxCliTests(unittest.TestCase):
     @mock.patch.object(ffx.subprocess, "check_output", autospec=True)
     def test_add_target(self, mock_subprocess_check_output) -> None:
         """Test case for ffx_cli.add_target()."""
-        ip_port: custom_types.IpPort = (
-            custom_types.IpPort.create_using_ip_and_port("127.0.0.1:8082")
-        )
-        ffx.FFX.add_target(target_ip_port=ip_port)
+        self.ffx_obj_with_ip.add_target()
 
         mock_subprocess_check_output.assert_called_once()
 
@@ -700,9 +768,6 @@ class FfxCliTests(unittest.TestCase):
         self, parameterized_dict, mock_subprocess_check_output
     ) -> None:
         """Verify ffx_cli.add_target raise exception in failure cases."""
-        ip_port: custom_types.IpPort = (
-            custom_types.IpPort.create_using_ip_and_port("127.0.0.1:8082")
-        )
         mock_subprocess_check_output.side_effect = parameterized_dict[
             "side_effect"
         ]
@@ -710,7 +775,7 @@ class FfxCliTests(unittest.TestCase):
         expected = parameterized_dict["expected"]
 
         with self.assertRaises(expected):
-            ffx.FFX.add_target(target_ip_port=ip_port)
+            self.ffx_obj_with_ip.add_target()
 
         mock_subprocess_check_output.assert_called_once()
 

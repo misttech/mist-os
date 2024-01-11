@@ -16,6 +16,31 @@ import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types, errors
 
+_FFX_BINARY: str = "ffx"
+
+_FFX_CONFIG_CMDS: dict[str, list[str]] = {
+    "LOG_DIR": [
+        "config",
+        "set",
+        "log.dir",
+    ],
+    "LOG_LEVEL": [
+        "config",
+        "set",
+        "log.level",
+    ],
+    "MDNS": [
+        "config",
+        "set",
+        "discovery.mdns.enabled",
+    ],
+    "SUB_TOOLS_PATH": [
+        "config",
+        "set",
+        "ffx.subtool-search-paths",
+    ],
+}
+
 _FFX_CMDS: dict[str, list[str]] = {
     "TARGET_ADD": ["target", "add"],
     "TARGET_SHOW": ["target", "show", "--json"],
@@ -36,78 +61,165 @@ _TIMEOUTS: dict[str, float] = {
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_ABS_BINARY_PATH: str = "ffx"
-_ISOLATE_DIR: fuchsia_controller.IsolateDir | None = None
-_LOGS_DIR: str | None = None
+_FFX_LOGS_LEVEL: str = "debug"
 
 _DEVICE_NOT_CONNECTED: str = "Timeout attempting to reach target"
 
 
-def setup(binary_path: str, logs_dir: str) -> None:
-    """Set up method.
+class FfxConfig:
+    """Provides methods to configure FFX."""
 
-    It does the following:
-    * Creates a new isolation dir needed to run FFX in isolation mode.
-      This results in spawning a new FFX daemon.
-    * Initializes a directory for storing FFX logs (ffx.log and ffx.daemon.log).
-    * Registers FFX isolation dir clean up to run on normal program termination.
+    def __init__(self) -> None:
+        self._setup_done: bool = False
 
-    Args:
-        binary_path: absolute path to the FFX binary.
-        logs_dir: Directory for storing FFX logs (ffx.log and ffx.daemon.log).
-                  If not passed, FFX logs will not be stored.
+    def setup(
+        self,
+        binary_path: str | None,
+        isolate_dir: str | None,
+        logs_dir: str,
+        logs_level: str | None,
+        enable_mdns: bool,
+    ) -> None:
+        """Sets up configuration need to be used while running FFX command.
 
-    Raises:
-        errors.FfxCommandError: If this method is called more than once.
+        Args:
+            binary_path: absolute path to the FFX binary.
+            isolate_dir: Directory that will be passed to `--isolate-dir`
+                arg of FFX
+            logs_dir: Directory that will be passed to `--config log.dir`
+                arg of FFX
+            logs_level: logs level that will be passed to `--config log.level`
+                arg of FFX
+            enable_mdns: Whether or not mdns need to be enabled. This will be
+                passed to `--config discovery.mdns.enabled` arg of FFX
 
-    Note:
-    * This method should be called only once to ensure daemon logs are going to
-      single location.
-    * If this method is not called then FFX logs will not be saved and will use
-      the system level FFX daemon (instead of spawning new one using isolation).
-    * FFX daemon clean up is already handled by this method though users can
-      manually call close() to clean up earlier in the process if necessary.
-    """
-    global _ISOLATE_DIR
-    global _LOGS_DIR
-    global _ABS_BINARY_PATH
+        Raises:
+            errors.FfxCommandError: In case of failure.
 
-    _ABS_BINARY_PATH = binary_path
+        Note:
+            * This method should be called only once to ensure daemon logs are
+              going to single location.
+            * If this method is not called then FFX logs will not be saved and
+              will use the system level FFX daemon (instead of spawning new one
+              using isolation).
+            * FFX daemon clean up is already handled by this method though users
+              can manually call close() to clean up earlier in the process if
+              necessary.
+        """
+        if self._setup_done:
+            raise errors.FfxConfigError("setup has already been called once.")
 
-    if _ISOLATE_DIR or _LOGS_DIR:
-        raise errors.FfxCommandError("setup has already been called once.")
+        # Prevent FFX daemon leaks by ensuring clean up occurs upon normal
+        # program termination.
+        atexit.register(self._atexit_callback)
 
-    _ISOLATE_DIR = fuchsia_controller.IsolateDir()
-    _LOGGER.debug("ffx isolation dir is: '%s'", _ISOLATE_DIR.directory())
-    # Prevent FFX daemon leaks by ensuring clean up occurs upon normal
-    # program termination.
-    atexit.register(close)
+        self._ffx_binary: str = _FFX_BINARY
+        if binary_path:
+            self._ffx_binary = binary_path
 
-    _LOGS_DIR = logs_dir
-    _LOGGER.debug("ffx logs dir is '%s'", _LOGS_DIR)
+        self._isolate_dir: fuchsia_controller.IsolateDir = (
+            fuchsia_controller.IsolateDir(isolate_dir)
+        )
 
+        self._logs_dir: str = logs_dir
+        self._logs_level: str = logs_level if logs_level else _FFX_LOGS_LEVEL
+        self._mdns_enabled: bool = enable_mdns
 
-def close() -> None:
-    """Clean up method.
+        self._run(_FFX_CONFIG_CMDS["LOG_DIR"] + [self._logs_dir])
+        self._run(_FFX_CONFIG_CMDS["LOG_LEVEL"] + [self._logs_level])
+        self._run(_FFX_CONFIG_CMDS["MDNS"] + [str(self._mdns_enabled).lower()])
 
-    It does the following:
-    * Deletes the isolation directory created during `setup()`
-    """
-    global _ISOLATE_DIR
-    global _LOGS_DIR
+        # TODO(b/319659911): Send `subtool-search-paths` as part of `ffx_config`
+        # from mobly controller to honeydew
+        fuchsia_dir: str | None = os.getenv("FUCHSIA_DIR")
+        if fuchsia_dir:
+            host_tools_path: str = os.path.join(
+                fuchsia_dir, "out/default/host-tools"
+            )
+            self._run(_FFX_CONFIG_CMDS["SUB_TOOLS_PATH"] + [host_tools_path])
 
-    # Setting `_ISOLATE_DIR = None` will delete the `_ISOLATE_DIR.directory()`
-    _ISOLATE_DIR = None
-    _LOGS_DIR = None
+        self._setup_done = True
 
+    def close(self) -> None:
+        """Clean up method.
 
-def get_config() -> custom_types.FFXConfig:
-    """Returns the FFX configuration information.
+        Raises:
+            errors.FfxConfigError: When called before calling `FfxConfig.setup`
+        """
+        if self._setup_done is False:
+            raise errors.FfxConfigError("close called before calling setup.")
 
-    Returns:
-        custom_types.FFXConfig
-    """
-    return custom_types.FFXConfig(isolate_dir=_ISOLATE_DIR, logs_dir=_LOGS_DIR)
+        # Setting to None will delete the `self._isolate_dir.directory()`
+        self._isolate_dir = None
+
+        self._setup_done = False
+
+    def get_config(self) -> custom_types.FFXConfig:
+        """Returns the FFX configuration information that has been set.
+
+        Returns:
+            custom_types.FFXConfig
+
+        Raises:
+            errors.FfxConfigError: When called before calling `FfxConfig.setup`
+        """
+        if self._setup_done is False:
+            raise errors.FfxConfigError(
+                "get_config called before calling setup."
+            )
+
+        return custom_types.FFXConfig(
+            binary_path=self._ffx_binary,
+            isolate_dir=self._isolate_dir,
+            logs_dir=self._logs_dir,
+            logs_level=self._logs_level,
+            mdns_enabled=self._mdns_enabled,
+        )
+
+    def _atexit_callback(self) -> None:
+        try:
+            self.close()
+        except errors.FfxConfigError:
+            pass
+
+    def _run(
+        self,
+        cmd: list[str],
+        timeout: float | None = _TIMEOUTS["FFX_CLI"],
+    ) -> None:
+        """Executes `ffx {cmd}`.
+
+        Args:
+            cmd: FFX command to run.
+            timeout: Timeout to wait for the ffx command to return.
+
+        Raises:
+            subprocess.TimeoutExpired: In case of FFX command timeout.
+            errors.FfxConfigError: In case of any other FFX command failure.
+        """
+        ffx_args: list[str] = []
+        ffx_args.extend(["--isolate-dir", self._isolate_dir.directory()])
+        ffx_cmd: list[str] = [self._ffx_binary] + ffx_args + cmd
+
+        try:
+            _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
+            subprocess.check_call(ffx_cmd, timeout=timeout)
+            _LOGGER.debug("`%s` finished executing", " ".join(ffx_cmd))
+            return
+        except subprocess.TimeoutExpired as err:
+            _LOGGER.debug(err, exc_info=True)
+            raise
+        except subprocess.CalledProcessError as err:
+            message: str = (
+                f"Command '{ffx_cmd}' failed. returncode = {err.returncode}"
+            )
+            if err.stdout:
+                message += f", stdout = {err.stdout}"
+            if err.stderr:
+                message += f", stderr = {err.stderr}."
+            _LOGGER.debug(message)
+
+            raise errors.FfxConfigError(f"`{ffx_cmd}` command failed") from err
 
 
 class FFX:
@@ -115,7 +227,7 @@ class FFX:
 
     Args:
         target_name: Fuchsia device name.
-        target_ip: Fuchsia device IP address.
+        target_ip_port: Fuchsia device IP address and port.
 
         Note: When target_ip is provided, it will be used instead of target_name
         while running ffx commands (ex: `ffx -t <target_ip> <command>`).
@@ -124,7 +236,8 @@ class FFX:
     def __init__(
         self,
         target_name: str,
-        target_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+        config: custom_types.FFXConfig,
+        target_ip_port: custom_types.IpPort | None = None,
     ) -> None:
         invalid_target_name: bool = False
         try:
@@ -137,35 +250,38 @@ class FFX:
                 f"{target_name=} is an IP address instead of target name"
             )
 
+        self.config: custom_types.FFXConfig = config
+
         self._target_name: str = target_name
-        self._target_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
-            target_ip
-        )
+
+        self._target_ip_port: custom_types.IpPort | None = target_ip_port
+
         self._target: ipaddress.IPv4Address | ipaddress.IPv6Address | str
-        if self._target_ip:
-            self._target = self._target_ip
+        if self._target_ip_port:
+            self._target = self._target_ip_port.ip
         else:
             self._target = self._target_name
 
-    @staticmethod
     def add_target(
-        target_ip_port: custom_types.IpPort,
+        self,
         timeout: float = _TIMEOUTS["FFX_CLI"],
     ) -> None:
         """Adds a target to the ffx collection
 
         Args:
-            target: Target IpPort.
+            timeout: How long in seconds to wait for FFX command to complete.
 
         Raises:
             subprocess.TimeoutExpired: In case of timeout
             errors.FfxCommandError: In case of failure.
         """
-        cmd: list[str] = FFX._generate_ffx_cmd(
-            target=None, cmd=_FFX_CMDS["TARGET_ADD"]
+        cmd: list[str] = self._generate_ffx_cmd(
+            cmd=_FFX_CMDS["TARGET_ADD"], include_target=False
         )
-        cmd.append(str(target_ip_port))
+        cmd.append(str(self._target_ip_port))
+
         try:
+            _LOGGER.debug("Adding target '%s'", self._target_ip_port)
             _LOGGER.debug("Executing command `%s`", " ".join(cmd))
             output: str = subprocess.check_output(
                 cmd, stderr=subprocess.STDOUT, timeout=timeout
@@ -435,7 +551,7 @@ class FFX:
         """
         exceptions_to_skip = tuple(exceptions_to_skip or [])
 
-        ffx_cmd: list[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
+        ffx_cmd: list[str] = self._generate_ffx_cmd(cmd=cmd)
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
             if capture_output:
@@ -496,8 +612,7 @@ class FFX:
         Returns:
             The Popen object of `ffx -t {target} {cmd}`.
         """
-
-        ffx_cmd: list[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
+        ffx_cmd: list[str] = self._generate_ffx_cmd(cmd=cmd)
         _LOGGER.info("Opening ffx process `%s`...", " ".join(ffx_cmd))
         return subprocess.Popen(ffx_cmd, **kwargs)
 
@@ -631,72 +746,10 @@ class FFX:
             ) from err
 
     # List all private methods in alphabetical order
-    @staticmethod
-    def _generate_ffx_args(
-        target: str | ipaddress.IPv4Address | ipaddress.IPv6Address | None,
-    ) -> list[str]:
-        """Generates all the arguments that need to be used with FFX command.
-
-        Args:
-            target: target name or ipaddress.
-
-        Returns:
-            List of FFX arguments.
-        """
-        ffx_args: list[str] = []
-
-        # Do not change this sequence
-        if target:
-            ffx_args.extend(["-t", f"{target}"])
-
-        # To run FFX in isolation mode
-        if _ISOLATE_DIR:
-            ffx_args.extend(["--isolate-dir", _ISOLATE_DIR.directory()])
-
-        # Search path for ffx plugins. But tests need to depend on the plugin target
-        # to have it built.
-        # TODO(b/316198820): Refactor into "ffx config set <config>" too,
-        # and read from commandline to support OOT workflow too.
-        fuchsia_dir = os.getenv("FUCHSIA_DIR")
-        if fuchsia_dir:
-            host_tools_path = os.path.join(
-                fuchsia_dir, "out/default/host-tools"
-            )
-            ffx_args.extend(
-                [
-                    "-c",
-                    f"ffx.subtool-search-paths={host_tools_path}",
-                ]
-            )
-
-        # TODO(b/316198820): Consider using "ffx config set <config>" for below
-        config: dict[str, Any] = {}
-
-        # To collect FFX logs
-        if _LOGS_DIR:
-            config["log"] = {"dir": _LOGS_DIR, "level": "debug"}
-
-        if isinstance(target, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
-            config["discovery"] = {
-                "mdns": {
-                    "enabled": False,
-                },
-            }
-        else:
-            config["discovery"] = {
-                "mdns": {
-                    "enabled": True,
-                },
-            }
-
-        ffx_args.extend(["--config", json.dumps(config)])
-
-        return ffx_args
-
-    @staticmethod
     def _generate_ffx_cmd(
+        self,
         cmd: list[str],
-        target: str | ipaddress.IPv4Address | ipaddress.IPv6Address | None,
+        include_target: bool = True,
     ) -> list[str]:
         """Generates the FFX command that need to be passed
         subprocess.check_output.
@@ -708,8 +761,15 @@ class FFX:
         Returns:
             FFX command to be run as list of string.
         """
-        ffx_args: list[str] = FFX._generate_ffx_args(target)
-        return [_ABS_BINARY_PATH] + ffx_args + cmd
+        ffx_args: list[str] = []
+
+        if include_target:
+            ffx_args.extend(["-t", f"{self._target}"])
+
+        # To run FFX in isolation mode
+        ffx_args.extend(["--isolate-dir", self.config.isolate_dir.directory()])
+
+        return [self.config.binary_path] + ffx_args + cmd
 
     def _get_label_entry(
         self, data: list[dict[str, Any]], label_value: str

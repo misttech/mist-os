@@ -13,7 +13,7 @@ from unittest import mock
 from parameterized import parameterized
 
 from honeydew import custom_types, errors
-from honeydew.transports import ssh
+from honeydew.transports import ffx, ssh
 
 _IPV4: str = "11.22.33.44"
 _IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
@@ -53,15 +53,19 @@ class SshTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
+        self.ffx_obj = mock.MagicMock(spec=ffx.FFX)
+
         self.ssh_obj_wo_ip = ssh.SSH(
             device_name=_INPUT_ARGS["device_name"],
             private_key=_INPUT_ARGS["ssh_private_key"],
+            ffx_transport=self.ffx_obj,
         )
 
         self.ssh_obj_with_ip = ssh.SSH(
             device_name=_INPUT_ARGS["device_name"],
             private_key=_INPUT_ARGS["ssh_private_key"],
             device_ip=_INPUT_ARGS["device_ip_v4"],
+            ffx_transport=self.ffx_obj,
         )
 
     @mock.patch("time.sleep", autospec=True)
@@ -102,22 +106,16 @@ class SshTests(unittest.TestCase):
         return_value=b"some output",
         autospec=True,
     )
-    @mock.patch.object(
-        ssh.ffx_transport.FFX,
-        "get_target_ssh_address",
-        return_value=_MOCK_ARGS["target_ssh_address"],
-        autospec=True,
-    )
-    def test_ssh_run_wo_device_ip(
-        self, mock_get_target_ssh_address, mock_check_output
-    ) -> None:
+    def test_ssh_run_wo_device_ip(self, mock_check_output) -> None:
         """Testcase for SSH.run() when called using SSH object created without
         device_ip argument."""
+        self.ffx_obj.get_target_ssh_address.return_value = _MOCK_ARGS[
+            "target_ssh_address"
+        ]
         self.assertEqual(
             self.ssh_obj_wo_ip.run(command="some_command"), "some output"
         )
 
-        mock_get_target_ssh_address.assert_called()
         mock_check_output.assert_called()
 
     @mock.patch.object(
@@ -126,21 +124,13 @@ class SshTests(unittest.TestCase):
         return_value=b"some output",
         autospec=True,
     )
-    @mock.patch.object(
-        ssh.ffx_transport.FFX,
-        "get_target_ssh_address",
-        autospec=True,
-    )
-    def test_ssh_run_with_device_ip(
-        self, mock_get_target_ssh_address, mock_check_output
-    ) -> None:
+    def test_ssh_run_with_device_ip(self, mock_check_output) -> None:
         """Testcase for SSH.run() when called using SSH object created with
         device_ip argument."""
         self.assertEqual(
             self.ssh_obj_with_ip.run(command="some_command"), "some output"
         )
 
-        mock_get_target_ssh_address.assert_not_called()
         mock_check_output.assert_called()
 
     @parameterized.expand(
@@ -166,20 +156,16 @@ class SshTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(ssh.subprocess, "check_output", autospec=True)
-    @mock.patch.object(
-        ssh.ffx_transport.FFX,
-        "get_target_ssh_address",
-        return_value=_MOCK_ARGS["target_ssh_address"],
-        autospec=True,
-    )
     def test_ssh_run_exception(
-        self, parameterized_dict, mock_get_target_ssh_address, mock_check_output
+        self, parameterized_dict, mock_check_output
     ) -> None:
         """Testcase for SSH.run() raising errors.SSHCommandError exception"""
+        self.ffx_obj.get_target_ssh_address.return_value = _MOCK_ARGS[
+            "target_ssh_address"
+        ]
         mock_check_output.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(errors.SSHCommandError):
             self.ssh_obj_wo_ip.run(command="some_command")
 
-        mock_get_target_ssh_address.assert_called()
         mock_check_output.assert_called()

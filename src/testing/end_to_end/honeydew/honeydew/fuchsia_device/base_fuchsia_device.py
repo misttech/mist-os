@@ -46,18 +46,29 @@ class BaseFuchsiaDevice(
     def __init__(
         self,
         device_name: str,
-        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+        ffx_config: custom_types.FFXConfig,
+        device_ip_port: custom_types.IpPort | None = None,
         ssh_private_key: str | None = None,
         ssh_user: str | None = None,
     ) -> None:
         _LOGGER.debug("Initializing FuchsiaDevice")
         self._name: str = device_name
+
+        self._ffx_config: custom_types.FFXConfig = ffx_config
+
+        self._ip_address_port: custom_types.IpPort | None = device_ip_port
+
         self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
-            device_ip
+            None
         )
+        if self._ip_address_port:
+            self._ip_address = self._ip_address_port.ip
+
         self._ssh_private_key: str | None = ssh_private_key
         self._ssh_user: str | None = ssh_user
+
         self._on_device_boot_fns: list[Callable[[], None]] = []
+
         self.health_check()
 
     # List all the persistent properties in alphabetical order
@@ -149,6 +160,7 @@ class BaseFuchsiaDevice(
             device_name=self.device_name,
             device_ip=self._ip_address,
             reboot_affordance=self,
+            ffx_transport=self.ffx,
         )
         return fastboot_obj
 
@@ -163,7 +175,9 @@ class BaseFuchsiaDevice(
             errors.FfxCommandError: Failed to instantiate.
         """
         ffx_obj: ffx_transport.FFX = ffx_transport.FFX(
-            target_name=self.device_name, target_ip=self._ip_address
+            target_name=self.device_name,
+            config=self._ffx_config,
+            target_ip_port=self._ip_address_port,
         )
         return ffx_obj
 
@@ -185,6 +199,7 @@ class BaseFuchsiaDevice(
             device_ip=self._ip_address,
             username=self._ssh_user,
             private_key=self._ssh_private_key,
+            ffx_transport=self.ffx,
         )
         return ssh_obj
 

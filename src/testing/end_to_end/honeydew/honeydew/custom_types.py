@@ -156,8 +156,20 @@ class FFXConfig:
         logs_dir: FFX logs directory
     """
 
-    isolate_dir: fuchsia_controller.IsolateDir | None = None
-    logs_dir: str | None = None
+    binary_path: str
+    isolate_dir: fuchsia_controller.IsolateDir
+    logs_dir: str
+    logs_level: str
+    mdns_enabled: bool
+
+    def __str__(self) -> str:
+        return (
+            f"binary_path={self.binary_path}, "
+            f"isolate_dir={self.isolate_dir.directory()}, "
+            f"logs_dir={self.logs_dir}, "
+            f"logs_level={self.logs_level}, "
+            f"mdns_enabled={self.mdns_enabled}"
+        )
 
 
 @dataclass

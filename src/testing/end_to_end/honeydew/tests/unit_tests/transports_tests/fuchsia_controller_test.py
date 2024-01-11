@@ -34,6 +34,9 @@ _MOCK_ARGS: dict[str, Any] = {
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
+        binary_path="/bin/ffx",
+        logs_level="debug",
+        mdns_enabled=False,
     ),
 }
 
@@ -42,61 +45,44 @@ _MOCK_ARGS: dict[str, Any] = {
 class FuchsiaControllerTests(unittest.TestCase):
     """Unit tests for honeydew.transports.fuchsia_controller.py."""
 
-    @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller.Context,
-        "target_wait",
-        autospec=True,
-    )
-    @mock.patch.object(
-        ffx_transport,
-        "get_config",
-        return_value=custom_types.FFXConfig(
-            isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
-            logs_dir=_MOCK_ARGS["ffx_config"].logs_dir,
-        ),
-        autospec=True,
-    )
-    def setUp(self, mock_get_config, mock_target_wait) -> None:
+    def setUp(self) -> None:
         super().setUp()
 
-        self.fuchsia_controller_obj_wo_device_ip = (
-            fuchsia_controller_transport.FuchsiaController(
-                device_name=_INPUT_ARGS["device_name"],
-            )
-        )
-        mock_get_config.assert_called_once()
-        mock_target_wait.assert_called_once()
+        self.ffx_obj = mock.MagicMock(spec=ffx_transport.FFX)
+        self.ffx_obj.config = _MOCK_ARGS["ffx_config"]
 
-        mock_get_config.reset_mock()
-        mock_target_wait.reset_mock()
-        self.fuchsia_controller_obj_with_device_ip = (
-            fuchsia_controller_transport.FuchsiaController(
-                device_name=_INPUT_ARGS["device_name"],
-                device_ip=_INPUT_ARGS["device_ip_v4"],
+        with mock.patch.object(
+            fuchsia_controller_transport.fuchsia_controller.Context,
+            "target_wait",
+            autospec=True,
+        ) as mock_target_wait:
+            self.fuchsia_controller_obj_wo_device_ip = (
+                fuchsia_controller_transport.FuchsiaController(
+                    device_name=_INPUT_ARGS["device_name"],
+                    ffx_transport=self.ffx_obj,
+                )
             )
-        )
-        mock_get_config.assert_called_once()
-        mock_target_wait.assert_called_once()
+            mock_target_wait.assert_called_once()
+
+            mock_target_wait.reset_mock()
+            self.fuchsia_controller_obj_with_device_ip = (
+                fuchsia_controller_transport.FuchsiaController(
+                    device_name=_INPUT_ARGS["device_name"],
+                    device_ip=_INPUT_ARGS["device_ip_v4"],
+                    ffx_transport=self.ffx_obj,
+                )
+            )
+            mock_target_wait.assert_called_once()
 
     @mock.patch.object(
         fuchsia_controller_transport.fuchsia_controller.Context,
         "target_wait",
         autospec=True,
     )
-    @mock.patch.object(
-        ffx_transport,
-        "get_config",
-        return_value=custom_types.FFXConfig(
-            isolate_dir=_MOCK_ARGS["ffx_config"].isolate_dir,
-            logs_dir=_MOCK_ARGS["ffx_config"].logs_dir,
-        ),
-        autospec=True,
-    )
-    def test_create_context(self, mock_get_config, mock_target_wait) -> None:
+    def test_create_context(self, mock_target_wait) -> None:
         """Test case for fuchsia_controller_transport.create_context()."""
         self.fuchsia_controller_obj_with_device_ip.create_context()
 
-        mock_get_config.assert_called_once()
         mock_target_wait.assert_called_once()
 
     @mock.patch.object(

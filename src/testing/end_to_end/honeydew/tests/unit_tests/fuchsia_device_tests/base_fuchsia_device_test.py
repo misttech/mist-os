@@ -9,6 +9,7 @@ import unittest
 from typing import Any
 from unittest import mock
 
+import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
 from honeydew import custom_types, errors
@@ -19,10 +20,17 @@ from honeydew.interfaces.device_classes import (
 from honeydew.interfaces.device_classes import transports_capable
 
 # pylint: disable=protected-access
-_INPUT_ARGS: dict[str, str] = {
+_INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
     "ssh_private_key": "/tmp/.ssh/pkey",
     "ssh_user": "root",
+    "ffx_config": custom_types.FFXConfig(
+        isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
+        logs_dir="/tmp/logs",
+        binary_path="/bin/ffx",
+        logs_level="debug",
+        mdns_enabled=False,
+    ),
 }
 
 _MOCK_ARGS: dict[str, str] = {
@@ -45,31 +53,31 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 class BaseFuchsiaDeviceTests(unittest.TestCase):
     """Unit tests for honeydew.fuchsia_device.base_fuchsia_device.py."""
 
-    @mock.patch(
-        # pylint: disable=line-too-long
-        "honeydew.fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
-        set(),
-    )
-    @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX, "check_connection", autospec=True
-    )
-    @mock.patch.object(
-        base_fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True
-    )
-    def setUp(
-        self, mock_ssh_check_connection, mock_ffx_check_connection
-    ) -> None:
+    def setUp(self) -> None:
         super().setUp()
 
-        # pylint: disable=abstract-class-instantiated
-        # pylint: disable=line-too-long
-        self.fd_obj = base_fuchsia_device.BaseFuchsiaDevice(
-            device_name=_INPUT_ARGS["device_name"],
-            ssh_private_key=_INPUT_ARGS["ssh_private_key"],
-        )  # type: ignore[abstract]
+        with mock.patch.object(
+            base_fuchsia_device.ssh_transport.SSH,
+            "check_connection",
+            autospec=True,
+        ) as mock_ssh_check_connection, mock.patch.object(
+            base_fuchsia_device.ffx_transport.FFX,
+            "check_connection",
+            autospec=True,
+        ) as mock_ffx_check_connection, mock.patch(
+            # pylint: disable=line-too-long
+            "honeydew.fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
+            set(),
+        ):
+            # pylint: disable=abstract-class-instantiated
+            self.fd_obj = base_fuchsia_device.BaseFuchsiaDevice(
+                device_name=_INPUT_ARGS["device_name"],
+                ssh_private_key=_INPUT_ARGS["ssh_private_key"],
+                ffx_config=_INPUT_ARGS["ffx_config"],
+            )  # type: ignore[abstract]
 
-        mock_ffx_check_connection.assert_called()
-        mock_ssh_check_connection.assert_called()
+            mock_ffx_check_connection.assert_called()
+            mock_ssh_check_connection.assert_called()
 
     # # List all the tests related to __init__ in alphabetical order
     @parameterized.expand(
@@ -128,6 +136,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         _ = base_fuchsia_device.BaseFuchsiaDevice(
             device_name=device_name,
             ssh_private_key=ssh_private_key,
+            ffx_config=_INPUT_ARGS["ffx_config"],
             **optional_params,
         )  # type: ignore[abstract]
 

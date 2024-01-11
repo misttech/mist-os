@@ -5,8 +5,7 @@
 """Mobly Controller for Fuchsia Device"""
 
 import logging
-import ipaddress
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import honeydew
 from honeydew import custom_types, transports
@@ -19,6 +18,8 @@ from honeydew.utils import properties
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+_FFX_CONFIG_OBJ: ffx.FfxConfig = ffx.FfxConfig()
 
 
 def create(
@@ -39,8 +40,7 @@ def create(
             * ssh_user - Username to be used to SSH into fuchsia device.
             * transport - Transport to be used to perform the host-target
                 interactions.
-            * ffx_path - Abosolute path to FFX binary to use for the device.
-
+            * ffx_path - Absolute path to FFX binary to use for the device.
     Returns:
         A list of FuchsiaDevice objects.
     """
@@ -49,13 +49,32 @@ def create(
         configs,
     )
 
-    test_logs_dir: Optional[str] = _get_log_directory()
+    test_logs_dir: str = _get_log_directory()
     ffx_path: str = _get_ffx_path(configs)
-    if test_logs_dir:
-        # Call `ffx.setup` before calling `create_device` as
-        # `create_device` results in calling an FFX command and we
-        # don't want to miss those FFX logs
-        ffx.setup(binary_path=ffx_path, logs_dir=f"{test_logs_dir}/ffx/")
+
+    # Call `FfxConfig.setup` before calling `create_device` as
+    # `create_device` results in calling an FFX command and we
+    # don't want to miss those FFX logs
+
+    # Note - As of now same FFX Config is used across all fuchsia devices.
+    # This means we will have one FFX daemon running which will talk to all
+    # fuchsia devices in the testbed.
+    # This is okay for in-tree use cases but may not work for OOT cases where
+    # each fuchsia device may be running different build that require different
+    # FFX version.
+    # This will also not work if you have 2 devices in testbed with one uses
+    # device_ip and one uses device_name for FFX commands. This should not
+    # happen in our setups though as we will either have mdns enabled or
+    # disabled on host.
+    # Right fix for all such cases is to use separate ffx config per device.
+    # This support will be added when needed in future.
+    _FFX_CONFIG_OBJ.setup(
+        binary_path=ffx_path,
+        isolate_dir=None,
+        logs_dir=f"{test_logs_dir}/ffx/",
+        logs_level=None,
+        enable_mdns=_enable_mdns(configs),
+    )
 
     fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice] = []
     for config in configs:
@@ -64,6 +83,7 @@ def create(
             honeydew.create_device(
                 device_name=device_config["name"],
                 transport=device_config["transport"],
+                ffx_config=_FFX_CONFIG_OBJ.get_config(),
                 device_ip_port=device_config.get("device_ip_port"),
                 ssh_private_key=device_config.get("ssh_private_key"),
                 ssh_user=device_config.get("ssh_user"),
@@ -85,10 +105,11 @@ def destroy(
     for fuchsia_device in fuchsia_devices:
         fuchsia_device.close()
 
-    # Call `ffx.close` manually even though it's already registered for clean up
-    # in `ffx.setup` in order to minimize chance of FFX daemon leak in the event
-    # that SIGKILL/SIGTERM is received between `destroy` and test program exit.
-    ffx.close()
+    # Call `FfxConfig.close` manually even though it's already registered for
+    # clean up in `FfxConfig.setup` in order to minimize chance of FFX daemon
+    # leak in the event that SIGKILL/SIGTERM is received between `destroy` and
+    # test program exit.
+    _FFX_CONFIG_OBJ.close()
 
 
 def get_info(
@@ -141,6 +162,14 @@ def _get_fuchsia_device_info(
             pass
 
     return device_info
+
+
+def _enable_mdns(configs: List[Dict[str, Any]]) -> bool:
+    for config in configs:
+        device_config: Dict[str, Any] = _parse_device_config(config)
+        if not device_config.get("device_ip_port"):
+            return True
+    return False
 
 
 def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
@@ -224,17 +253,16 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
     return device_config
 
 
-def _get_log_directory() -> Optional[str]:
+def _get_log_directory() -> str:
     """Returns the path to the directory where logs should be stored.
 
     Returns:
-        Directory path, or None.
+        Directory path.
     """
     # TODO(https://fxbug.dev/128450): Read log path from config once this issue is fixed
     return getattr(
         logging,
         "log_path",  # Set by Mobly in base_test.BaseTestClass.run.
-        None,
     )
 
 

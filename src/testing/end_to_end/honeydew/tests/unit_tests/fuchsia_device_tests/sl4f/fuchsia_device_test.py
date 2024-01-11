@@ -9,6 +9,7 @@ import unittest
 from typing import Any
 from unittest import mock
 
+import fuchsia_controller_py as fuchsia_controller
 from parameterized import parameterized
 
 from honeydew import custom_types
@@ -20,10 +21,17 @@ from honeydew.interfaces.device_classes import (
 )
 from honeydew.interfaces.device_classes import transports_capable
 
-_INPUT_ARGS: dict[str, str] = {
+_INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
     "ssh_private_key": "/tmp/.ssh/pkey",
     "ssh_user": "root",
+    "ffx_config": custom_types.FFXConfig(
+        isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
+        logs_dir="/tmp/logs",
+        binary_path="/bin/ffx",
+        logs_level="debug",
+        mdns_enabled=False,
+    ),
 }
 
 _MOCK_DEVICE_PROPERTIES: dict[str, dict[str, str]] = {
@@ -60,36 +68,34 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         self.fd_obj: fuchsia_device.FuchsiaDevice
         super().__init__(*args, **kwargs)
 
-    @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX, "check_connection", autospec=True
-    )
-    @mock.patch.object(
-        base_fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True
-    )
-    @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F, "check_connection", autospec=True
-    )
-    @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True
-    )
-    def setUp(
-        self,
-        mock_sl4f_start_server,
-        mock_sl4f_check_connection,
-        mock_ssh_check_connection,
-        mock_ffx_check_connection,
-    ) -> None:
+    def setUp(self) -> None:
         super().setUp()
 
-        self.fd_obj = fuchsia_device.FuchsiaDevice(
-            device_name=_INPUT_ARGS["device_name"],
-            ssh_private_key=_INPUT_ARGS["ssh_private_key"],
-        )
+        with mock.patch.object(
+            fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True
+        ) as mock_sl4f_start_server, mock.patch.object(
+            fuchsia_device.sl4f_transport.SL4F,
+            "check_connection",
+            autospec=True,
+        ) as mock_sl4f_check_connection, mock.patch.object(
+            base_fuchsia_device.ssh_transport.SSH,
+            "check_connection",
+            autospec=True,
+        ) as mock_ssh_check_connection, mock.patch.object(
+            base_fuchsia_device.ffx_transport.FFX,
+            "check_connection",
+            autospec=True,
+        ) as mock_ffx_check_connection:
+            self.fd_obj = fuchsia_device.FuchsiaDevice(
+                device_name=_INPUT_ARGS["device_name"],
+                ssh_private_key=_INPUT_ARGS["ssh_private_key"],
+                ffx_config=_INPUT_ARGS["ffx_config"],
+            )
 
-        mock_ffx_check_connection.assert_called()
-        mock_ssh_check_connection.assert_called()
-        mock_sl4f_start_server.assert_called()
-        mock_sl4f_check_connection.assert_called()
+            mock_ffx_check_connection.assert_called()
+            mock_ssh_check_connection.assert_called()
+            mock_sl4f_start_server.assert_called()
+            mock_sl4f_check_connection.assert_called()
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""

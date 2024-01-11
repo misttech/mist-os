@@ -11,7 +11,7 @@ import time
 from typing import Any
 
 from honeydew import custom_types, errors
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports import ffx
 
 _DEFAULTS: dict[str, Any] = {
     "USERNAME": "fuchsia",
@@ -52,6 +52,8 @@ class SSH:
         private_key: Absolute path to the SSH private key file needed to SSH
             into fuchsia device.
 
+        ffx_transport: ffx.FFX object.
+
         device_ip: Fuchsia device IP Address.
 
         username: Username to be used to SSH into fuchsia device.
@@ -62,6 +64,7 @@ class SSH:
         self,
         device_name: str,
         private_key: str,
+        ffx_transport: ffx.FFX,
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
         username: str | None = None,
     ) -> None:
@@ -71,6 +74,8 @@ class SSH:
         )
         self._private_key: str = private_key
         self._username: str = username or _DEFAULTS["USERNAME"]
+
+        self._ffx_transport: ffx.FFX = ffx_transport
 
     def check_connection(
         self, timeout: float = _TIMEOUTS["CONNECTION"]
@@ -126,11 +131,8 @@ class SSH:
                 command=command,
             )
         else:
-            ffx = ffx_transport.FFX(
-                target_name=self._name, target_ip=self._ip_address
-            )
             target_ssh_address: custom_types.TargetSshAddress = (
-                ffx.get_target_ssh_address()
+                self._ffx_transport.get_target_ssh_address()
             )
 
             ssh_command = _SSH_COMMAND_WITH_PORT.format(

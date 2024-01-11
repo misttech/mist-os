@@ -12,7 +12,7 @@ from unittest import mock
 from parameterized import parameterized
 
 from honeydew import custom_types, errors
-from honeydew.transports import sl4f
+from honeydew.transports import ffx, sl4f
 
 # pylint: disable=protected-access
 
@@ -102,23 +102,32 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 class Sl4fTests(unittest.TestCase):
     """Unit tests for honeydew.transports.sl4f.py."""
 
-    @mock.patch.object(sl4f.SL4F, "start_server", autospec=True)
-    def setUp(self, mock_sl4f_start_server) -> None:
+    def setUp(self) -> None:
         super().setUp()
 
-        self.sl4f_obj_wo_ip = sl4f.SL4F(device_name=_INPUT_ARGS["device_name"])
+        self.ffx_obj = mock.MagicMock(spec=ffx.FFX)
 
-        self.sl4f_obj_with_ipv4 = sl4f.SL4F(
-            device_name=_INPUT_ARGS["device_name"],
-            device_ip=_INPUT_ARGS["device_ip_v4"],
-        )
+        with mock.patch.object(
+            sl4f.SL4F, "start_server", autospec=True
+        ) as mock_sl4f_start_server:
+            self.sl4f_obj_wo_ip = sl4f.SL4F(
+                device_name=_INPUT_ARGS["device_name"],
+                ffx_transport=self.ffx_obj,
+            )
 
-        self.sl4f_obj_with_ipv6 = sl4f.SL4F(
-            device_name=_INPUT_ARGS["device_name"],
-            device_ip=_INPUT_ARGS["device_ip_v6"],
-        )
+            self.sl4f_obj_with_ipv4 = sl4f.SL4F(
+                device_name=_INPUT_ARGS["device_name"],
+                device_ip=_INPUT_ARGS["device_ip_v4"],
+                ffx_transport=self.ffx_obj,
+            )
 
-        self.assertEqual(mock_sl4f_start_server.call_count, 3)
+            self.sl4f_obj_with_ipv6 = sl4f.SL4F(
+                device_name=_INPUT_ARGS["device_name"],
+                device_ip=_INPUT_ARGS["device_ip_v6"],
+                ffx_transport=self.ffx_obj,
+            )
+
+            self.assertEqual(mock_sl4f_start_server.call_count, 3)
 
     @parameterized.expand(
         [
@@ -314,26 +323,17 @@ class Sl4fTests(unittest.TestCase):
         mock_send_http_request.assert_called_once()
 
     @mock.patch.object(sl4f.SL4F, "check_connection", autospec=True)
-    @mock.patch.object(sl4f.ffx_transport.FFX, "run", autospec=True)
-    def test_start_server(self, mock_ffx_run, mock_check_connection) -> None:
+    def test_start_server(self, mock_check_connection) -> None:
         """Testcase for SL4F.start_server()"""
         self.sl4f_obj_wo_ip.start_server()
 
-        mock_ffx_run.assert_called()
         mock_check_connection.assert_called()
 
-    @mock.patch.object(
-        sl4f.ffx_transport.FFX,
-        "run",
-        side_effect=errors.FfxCommandError("error"),
-        autospec=True,
-    )
-    def test_start_server_exception(self, mock_ffx_run) -> None:
+    def test_start_server_exception(self) -> None:
         """Testcase for SL4F.start_server() raising exception"""
+        self.ffx_obj.run.side_effect = errors.FfxCommandError("error")
         with self.assertRaises(errors.Sl4fError):
             self.sl4f_obj_wo_ip.start_server()
-
-        mock_ffx_run.assert_called()
 
     @parameterized.expand(
         [
@@ -369,15 +369,12 @@ class Sl4fTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(
-        sl4f.ffx_transport.FFX, "get_target_ssh_address", autospec=True
-    )
     def test_get_sl4f_server_address_without_device_ip(
-        self, parameterized_dict, mock_get_target_ssh_address
+        self, parameterized_dict
     ) -> None:
         """Testcase for SL4F._get_sl4f_server_address() when called using SL4F
         object created without device_ip argument."""
-        mock_get_target_ssh_address.return_value = parameterized_dict[
+        self.ffx_obj.get_target_ssh_address.return_value = parameterized_dict[
             "target_ssh_address"
         ]
 
@@ -385,8 +382,6 @@ class Sl4fTests(unittest.TestCase):
             self.sl4f_obj_wo_ip._get_sl4f_server_address(),
             parameterized_dict["expected_sl4f_address"],
         )
-
-        mock_get_target_ssh_address.assert_called()
 
     def test_get_sl4f_server_address_with_device_ip(self) -> None:
         """Testcase for SL4F._get_sl4f_server_address() when called using SL4F

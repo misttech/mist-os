@@ -10,7 +10,7 @@ import time
 from typing import Any, Iterable, Type
 
 from honeydew import custom_types, errors
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports import ffx
 from honeydew.utils import http_utils, properties
 
 _TIMEOUTS: dict[str, float] = {
@@ -45,6 +45,7 @@ class SL4F:
 
     Args:
         device_name: Fuchsia device name.
+        ffx_transport: ffx.FFX object.
         device_ip: Fuchsia device IP Address.
 
     Raises:
@@ -54,15 +55,14 @@ class SL4F:
     def __init__(
         self,
         device_name: str,
+        ffx_transport: ffx.FFX,
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
     ) -> None:
         self._name: str = device_name
         self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
             device_ip
         )
-        self._ffx = ffx_transport.FFX(
-            target_name=self._name, target_ip=self._ip_address
-        )
+        self._ffx_transport: ffx.FFX = ffx_transport
 
         self.start_server()
 
@@ -200,7 +200,7 @@ class SL4F:
         _LOGGER.info("Starting SL4F server on %s...", self._name)
 
         try:
-            self._ffx.run(cmd=_FFX_CMDS["START_SL4F"])
+            self._ffx_transport.run(cmd=_FFX_CMDS["START_SL4F"])
         except Exception as err:  # pylint: disable=broad-except
             raise errors.Sl4fError(err) from err
 
@@ -222,7 +222,7 @@ class SL4F:
         if self._ip_address:
             sl4f_server_ip = self._ip_address
         else:
-            sl4f_server_ip = self._ffx.get_target_ssh_address().ip
+            sl4f_server_ip = self._ffx_transport.get_target_ssh_address().ip
 
         # Device addr is localhost, assume that means that ports were forwarded
         # from a remote workstation/laptop with a device attached.

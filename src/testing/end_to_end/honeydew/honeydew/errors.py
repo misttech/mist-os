@@ -79,6 +79,10 @@ class FastbootConnectionError(TransportConnectionError):
     """Raised when Fastboot transport's check_connection fails."""
 
 
+class FfxConfigError(HoneyDewError):
+    """Raised by ffx.FfxConfig class."""
+
+
 class HoneyDewTimeoutError(HoneyDewError):
     """Exception for timeout based raised by HoneyDew."""
 

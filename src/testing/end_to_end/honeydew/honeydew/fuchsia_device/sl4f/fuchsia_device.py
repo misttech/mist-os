@@ -5,7 +5,6 @@
 """FuchsiaDevice abstract base class implementation using SL4F."""
 
 import base64
-import ipaddress
 import logging
 from http.client import RemoteDisconnected
 from typing import Any
@@ -95,11 +94,14 @@ class FuchsiaDevice(
     def __init__(
         self,
         device_name: str,
-        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+        ffx_config: custom_types.FFXConfig,
+        device_ip_port: custom_types.IpPort | None = None,
         ssh_private_key: str | None = None,
         ssh_user: str | None = None,
     ) -> None:
-        super().__init__(device_name, device_ip, ssh_private_key, ssh_user)
+        super().__init__(
+            device_name, ffx_config, device_ip_port, ssh_private_key, ssh_user
+        )
         _LOGGER.debug("Initialized SL4F-based FuchsiaDevice")
 
     # List all the transports in alphabetical order
@@ -114,7 +116,9 @@ class FuchsiaDevice(
             errors.Sl4fError: Failed to instantiate.
         """
         sl4f_obj: sl4f_transport.SL4F = sl4f_transport.SL4F(
-            device_name=self.device_name, device_ip=self._ip_address
+            device_name=self.device_name,
+            device_ip=self._ip_address,
+            ffx_transport=self.ffx,
         )
         return sl4f_obj
 

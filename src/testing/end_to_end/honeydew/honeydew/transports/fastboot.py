@@ -11,7 +11,7 @@ from typing import Any, Iterable, Type
 
 from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports import ffx
 from honeydew.utils import common, properties
 
 _FASTBOOT_CMDS: dict[str, list[str]] = {
@@ -40,6 +40,7 @@ class Fastboot:
     Args:
         device_name: Fuchsia device name.
         reboot_affordance: Object to RebootCapableDevice implementation.
+        ffx_transport: ffx.FFX object.
         device_ip: Fuchsia device IP Address.
         fastboot_node_id: Fastboot Node ID.
 
@@ -51,6 +52,7 @@ class Fastboot:
         self,
         device_name: str,
         reboot_affordance: affordances_capable.RebootCapableDevice,
+        ffx_transport: ffx.FFX,
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
         fastboot_node_id: str | None = None,
     ) -> None:
@@ -61,9 +63,7 @@ class Fastboot:
         self._reboot_affordance: affordances_capable.RebootCapableDevice = (
             reboot_affordance
         )
-        self._ffx: ffx_transport.FFX = ffx_transport.FFX(
-            target_name=self._device_name, target_ip=self._device_ip
-        )
+        self._ffx_transport: ffx.FFX = ffx_transport
         self._get_fastboot_node(fastboot_node_id)
 
     # List all the public properties in alphabetical order
@@ -94,7 +94,7 @@ class Fastboot:
             ) from err
 
         try:
-            self._ffx.run(
+            self._ffx_transport.run(
                 cmd=_FFX_CMDS["BOOT_TO_FASTBOOT_MODE"],
                 exceptions_to_skip=[subprocess.CalledProcessError],
             )
@@ -259,7 +259,7 @@ class Fastboot:
         _LOGGER.info("Waiting for %s to go fuchsia mode...", self._device_name)
 
         try:
-            self._ffx.wait_for_rcs_connection(timeout=timeout)
+            self._ffx_transport.wait_for_rcs_connection(timeout=timeout)
             _LOGGER.info("%s is in fuchsia mode...", self._device_name)
         except errors.HoneyDewTimeoutError as err:
             raise errors.FuchsiaDeviceError(
@@ -318,7 +318,7 @@ class Fastboot:
         Raises:
             errors.FfxCommandError: If target is not connected to host.
         """
-        for target in self._ffx.get_target_list():
+        for target in self._ffx_transport.get_target_list():
             if target["nodename"] == self._device_name:
                 return target
         raise errors.FfxCommandError(

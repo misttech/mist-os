@@ -33,25 +33,20 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 class TracingFCTests(unittest.TestCase):
     """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
-    @mock.patch.object(
-        fc_transport.fuchsia_controller, "Context", autospec=True
-    )
-    def setUp(self, _mock_fc_context) -> None:
+    def setUp(self) -> None:
         super().setUp()
-        self.device_name: str = "fuchsia-emulator"
-        self.fuchsia_controller: fc_transport.FuchsiaController = (
-            fc_transport.FuchsiaController(device_name=self.device_name)
-        )
         self.reboot_affordance_obj = mock.MagicMock(
             spec=affordances_capable.RebootCapableDevice
         )
-        self.tracing_obj = fc_tracing.Tracing(
-            device_name=self.device_name,
-            fuchsia_controller=self.fuchsia_controller,
-            reboot_affordance=self.reboot_affordance_obj,
+        self.fc_transport_obj = mock.MagicMock(
+            spec=fc_transport.FuchsiaController
         )
 
-        self.fuchsia_controller.create_context()
+        self.tracing_obj = fc_tracing.Tracing(
+            device_name="fuchsia-emulator",
+            fuchsia_controller=self.fc_transport_obj,
+            reboot_affordance=self.reboot_affordance_obj,
+        )
 
     @parameterized.expand(
         [
