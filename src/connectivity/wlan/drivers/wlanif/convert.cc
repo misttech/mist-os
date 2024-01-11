@@ -17,9 +17,6 @@
 
 #include <wlan/common/band.h>
 #include <wlan/common/ieee80211_codes.h>
-#include <wlan/drivers/log.h>
-
-#include "debug.h"
 
 namespace wlanif {
 

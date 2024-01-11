@@ -8,7 +8,6 @@ import("//build/drivers.gni")
 
 all_hdrs = [
   "device.h",
-  "driver.h",
   "debug.h",
   "fullmac_mlme.h",
   "convert.h",
@@ -16,13 +15,14 @@ all_hdrs = [
 
 all_src = [
   "device.cc",
-  "driver.cc",
   "fullmac_mlme.cc",
   "convert.cc",
 ]
 
 all_deps = [
   ":wlanif_bind",
+  "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+  "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
   "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_hlcpp",
   "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_banjo_cpp",
@@ -30,12 +30,16 @@ all_deps = [
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_hlcpp",
   "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
-  "//src/connectivity/wlan/drivers/lib/log/cpp",
+  "//sdk/lib/driver/compat/cpp",
+  "//sdk/lib/driver/compat/cpp:symbols",
+  "//sdk/lib/driver/component/cpp",
+  "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
   "//src/connectivity/wlan/lib/common/cpp:common",
   "//src/connectivity/wlan/lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c",
   "//src/devices/lib/driver",
   "//src/devices/lib/driver:driver_runtime",
-  "//src/lib/ddk",
+  "//zircon/system/ulib/sync",
+  "//zircon/system/ulib/sync:sync-cpp",
 
   # TODO(https://fxbug.dev/38599): The fdio dependency here is purely due to
   # a problem with transitive Rust static library dependencies when linking

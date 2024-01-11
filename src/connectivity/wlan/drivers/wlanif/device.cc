@@ -11,7 +11,10 @@
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 #include <fuchsia/wlan/stats/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <net/ethernet.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -19,14 +22,13 @@
 #include <memory>
 
 #include <wlan/common/ieee80211_codes.h>
-#include <wlan/drivers/log.h>
 
 #include "convert.h"
 #include "debug.h"
-#include "driver.h"
 #include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
 #include "fuchsia/wlan/common/c/banjo.h"
 #include "fuchsia/wlan/common/cpp/fidl.h"
+#include "wlan/drivers/log_instance.h"
 #include "zircon/system/public/zircon/assert.h"
 
 namespace wlanif {
@@ -36,81 +38,12 @@ namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
 namespace wlan_mlme = ::fuchsia::wlan::mlme;
 namespace wlan_stats = ::fuchsia::wlan::stats;
 
-Device::Device(zx_device_t* device) : ddk::Device<Device, ddk::Unbindable>(device) {
+Device::Device(fdf::DriverStartArgs start_args,
+               fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : DriverBase("wlanif", std::move(start_args), std::move(driver_dispatcher)),
+      parent_node_(fidl::WireClient(std::move(node()), dispatcher())) {
+  wlan::drivers::log::Instance::Init(0);
   ltrace_fn();
-
-  {
-    // Create a dispatcher to wait on the runtime channel
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_ifc_server",
-        [&](fdf_dispatcher_t*) { client_dispatcher_.ShutdownAsync(); });
-
-    ZX_ASSERT_MSG(!dispatcher.is_error(), "Creating server dispatcher error : %s",
-                  zx_status_get_string(dispatcher.status_value()));
-
-    server_dispatcher_ = *std::move(dispatcher);
-  }
-  {
-    // This dispatcher is used to make requests to the vendor driver over WlanFullmacImpl on the
-    // driver transport.
-    auto dispatcher =
-        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-                                            "wlan_fullmac_impl_client", [&](fdf_dispatcher_t*) {
-                                              if (unbind_txn_) {
-                                                unbind_txn_->Reply();
-                                                unbind_txn_.reset();
-                                              }
-                                            });
-    ZX_ASSERT_MSG(!dispatcher.is_error(), "Creating client dispatcher error : %s",
-                  zx_status_get_string(dispatcher.status_value()));
-
-    client_dispatcher_ = *std::move(dispatcher);
-  }
-
-  // Establish the connection among histogram data lists, assuming each histogram list only contains
-  // one histogram for now, will assert it in GetIfaceHistogramStats();
-  noise_floor_histograms_.noise_floor_samples_list = noise_floor_buckets_;
-  rssi_histograms_.rssi_samples_list = rssi_buckets_;
-  rx_rate_index_histograms_.rx_rate_index_samples_list = rx_rate_index_buckets_;
-  snr_histograms_.snr_samples_list = snr_buckets_;
-}
-
-// Reserve this version of constructor for testing purpose.
-Device::Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client)
-    : ddk::Device<Device, ddk::Unbindable>(device) {
-  {
-    // Create a dispatcher to wait on the runtime channel
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_ifc_server",
-        [&](fdf_dispatcher_t*) { client_dispatcher_.ShutdownAsync(); });
-
-    ZX_ASSERT_MSG(!dispatcher.is_error(), "Creating server dispatcher error : %s",
-                  zx_status_get_string(dispatcher.status_value()));
-
-    server_dispatcher_ = *std::move(dispatcher);
-  }
-  {
-    // This dispatcher is used to make requests to the vendor driver over WlanFullmacImpl on the
-    // driver transport.
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_impl_client",
-        [&](fdf_dispatcher_t*) {
-          if (unbind_txn_) {
-            unbind_txn_->Reply();
-          } else {
-            lerror("No unbind_txn_ found, this should never happen.");
-          }
-        });
-
-    ZX_ASSERT_MSG(!dispatcher.is_error(), "Creating client dispatcher error : %s",
-                  zx_status_get_string(dispatcher.status_value()));
-
-    client_dispatcher_ = *std::move(dispatcher);
-  }
-
-  client_ = fdf::WireSharedClient<fuchsia_wlan_fullmac::WlanFullmacImpl>(std::move(client),
-                                                                         client_dispatcher_.get());
-
   // Establish the connection among histogram data lists, assuming each histogram list only contains
   // one histogram for now, will assert it in GetIfaceHistogramStats();
   noise_floor_histograms_.noise_floor_samples_list = noise_floor_buckets_;
@@ -124,10 +57,65 @@ Device::~Device() { ltrace_fn(); }
 void Device::InitMlme() {
   mlme_ = std::make_unique<FullmacMlme>(this);
   ZX_DEBUG_ASSERT(mlme_ != nullptr);
-  mlme_->Init();
+  if (mlme_->Init() != ZX_OK) {
+    mlme_.reset();
+  }
 }
 
-zx_status_t Device::AddDevice() { return DdkAdd(::ddk::DeviceAddArgs("wlanif")); }
+zx::result<> Device::Start() {
+  {
+    // Create a dispatcher to wait on the runtime channel
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                            "wlan_fullmac_ifc_server", [&](fdf_dispatcher_t*) {});
+
+    if (dispatcher.is_error()) {
+      lerror("Creating server dispatcher error : %s",
+             zx_status_get_string(dispatcher.status_value()));
+      return zx::error(dispatcher.status_value());
+    }
+    server_dispatcher_ = *std::move(dispatcher);
+  }
+  {
+    // Create a dispatcher to wait on the runtime channel
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                            "wlan_fullmac_ifc_client", [&](fdf_dispatcher_t*) {});
+
+    if (dispatcher.is_error()) {
+      lerror("Creating client dispatcher error : %s",
+             zx_status_get_string(dispatcher.status_value()));
+      return zx::error(dispatcher.status_value());
+    }
+    client_dispatcher_ = *std::move(dispatcher);
+  }
+  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImpl>();
+  if (endpoints.is_error()) {
+    lerror("Creating end point error: %s", zx_status_get_string(endpoints.status_value()));
+    return zx::error(endpoints.status_value());
+  }
+
+  zx_status_t status;
+  if ((status = ConnectToWlanFullmacImpl()) != ZX_OK) {
+    lerror("Failed connecting to wlan fullmac impl driver: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  if ((status = Bind()) != ZX_OK) {
+    lerror("Failed adding wlan fullmac device: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  return zx::ok();
+}
+
+void Device::PrepareStop(fdf::PrepareStopCompleter completer) {
+  client_.AsyncTeardown();
+  if (mlme_.get()) {
+    mlme_->StopMainLoop();
+  }
+  completer(zx::ok());
+}
 
 zx_status_t Device::Bind() {
   ltrace_fn();
@@ -135,7 +123,7 @@ zx_status_t Device::Bind() {
   // device immediately
 
   // Connect to the device which serves WlanFullmacImpl protocol service.
-  zx_status_t status;
+  zx_status_t status = ZX_OK;
 
   auto mac_sublayer_arena = fdf::Arena::Create(0, 0);
   if (mac_sublayer_arena.is_error()) {
@@ -162,48 +150,27 @@ zx_status_t Device::Bind() {
   }
 
   InitMlme();
-
-  status = AddDevice();
-  if (status != ZX_OK) {
-    lerror("could not add ethernet_impl device: %s\n", zx_status_get_string(status));
-  }
-
   return status;
 }
 
 zx_status_t Device::ConnectToWlanFullmacImpl() {
   zx::result<fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl>> client_end =
-      DdkConnectRuntimeProtocol<fuchsia_wlan_fullmac::Service::WlanFullmacImpl>();
+      incoming()->Connect<fuchsia_wlan_fullmac::Service::WlanFullmacImpl>();
   if (client_end.is_error()) {
-    lerror("DDdkConnectRuntimeProtocol failed: %s", client_end.status_string());
+    lerror("Connect to FullmacImpl failed: %s", client_end.status_string());
     return client_end.status_value();
   }
 
-  client_ = fdf::WireSharedClient(*std::move(client_end), client_dispatcher_.get());
+  client_ = fdf::WireSharedClient(std::move(client_end.value()), client_dispatcher_.get());
+  if (!client_.is_valid()) {
+    lerror("WlanFullmacImpl Client is not valid");
+    return ZX_ERR_BAD_HANDLE;
+  }
   return ZX_OK;
 }
 
-void Device::DdkUnbind(::ddk::UnbindTxn txn) {
-  ltrace_fn();
-  unbind_txn_ = std::move(txn);
-  if (mlme_) {
-    mlme_->StopMainLoop();
-  }
-
-  // Rather than shutting down both the server and client dispatchers at the same time here, we
-  // chain them. When the server dispatcher is fully shutdown, it calls
-  // client_dispatcher_.ShutdownAsync() in its shutdown callback. We do this so that we can can
-  // reply to unbind_txn_ after both dispatchers are fully shut down.
-  server_dispatcher_.ShutdownAsync();
-}
-
-void Device::DdkRelease() {
-  ltrace_fn();
-  delete this;
-}
-
-zx_status_t Device::Start(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
-                          zx::channel* out_sme_channel) {
+zx_status_t Device::StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
+                                 zx::channel* out_sme_channel) {
   // We manually populate the protocol ops here so that we can verify at compile time that our rust
   // bindings have the expected parameters.
   wlan_fullmac_impl_ifc_protocol_ops_.reset(new wlan_fullmac_impl_ifc_protocol_ops_t{
@@ -532,8 +499,8 @@ void Device::DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req) {
 
   size_t num_keys = req->num_keys;
   if (num_keys > fuchsia_wlan_fullmac::wire::kWlanMaxKeylistSize) {
-    lwarn("truncating key list from %zu to %d members\n", num_keys,
-          fuchsia_wlan_fullmac::wire::kWlanMaxKeylistSize);
+    FDF_LOG(WARNING, "truncating key list from %zu to %d members\n", num_keys,
+            fuchsia_wlan_fullmac::wire::kWlanMaxKeylistSize);
     delete_key_req.num_keys = fuchsia_wlan_fullmac::wire::kWlanMaxKeylistSize;
   } else {
     delete_key_req.num_keys = num_keys;
@@ -992,3 +959,4 @@ void Device::OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& are
 }
 
 }  // namespace wlanif
+FUCHSIA_DRIVER_EXPORT(::wlanif::Device);

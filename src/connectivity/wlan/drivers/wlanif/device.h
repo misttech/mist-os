@@ -5,42 +5,55 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_DEVICE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_DEVICE_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 #include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/binding.h>
+#include <lib/sync/cpp/completion.h>
+#include <lib/zx/result.h>
+#include <zircon/types.h>
 
 #include <memory>
 #include <mutex>
 
-#include <ddktl/device.h>
+#include <sdk/lib/driver/logging/cpp/logger.h>
 
 #include "fuchsia/wlan/common/c/banjo.h"
 #include "fullmac_mlme.h"
 
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}
+
 namespace wlanif {
 
-class Device : public ddk::Device<Device, ddk::Unbindable>,
-               public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
+class Device final : public fdf::DriverBase,
+                     public fidl::WireAsyncEventHandler<fdf::NodeController>,
+                     public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
  public:
-  Device(zx_device_t* device);
-  // Reserve this version of constructor for testing purpose.
-  Device(zx_device_t* device, fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client);
+  explicit Device(fdf::DriverStartArgs start_args,
+                  fdf::UnownedSynchronizedDispatcher driver_dispatcher);
   ~Device();
 
   zx_status_t Bind();
   zx_status_t ConnectToWlanFullmacImpl();
 
-  // Ddktl protocol implementations.
-  void DdkUnbind(::ddk::UnbindTxn txn);
-  void DdkRelease();
+  static constexpr const char* Name() { return "wlanif"; }
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   void InitMlme();
-  zx_status_t AddDevice();
 
-  zx_status_t Start(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc, zx::channel* out_sme_channel);
+  zx_status_t StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
+                           zx::channel* out_sme_channel);
 
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
   void StartScan(const wlan_fullmac_impl_start_scan_request_t* req);
   void Connect(const wlan_fullmac_impl_connect_request_t* req);
   void Reconnect(const wlan_fullmac_impl_reconnect_request_t* req);
@@ -108,6 +121,9 @@ class Device : public ddk::Device<Device, ddk::Unbindable>,
   void OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
                        OnWmmStatusRespCompleter::Sync& completer) override;
 
+ protected:
+  void Shutdown();
+
  private:
   // Storage of histogram data.
   wlan_fullmac_hist_bucket_t
@@ -140,7 +156,7 @@ class Device : public ddk::Device<Device, ddk::Unbindable>,
   // Dispatcher for being a FIDL server firing replies to WlanIf device
   fdf::Dispatcher server_dispatcher_;
 
-  std::optional<::ddk::UnbindTxn> unbind_txn_;
+  fidl::WireClient<fdf::Node> parent_node_;
 };
 
 }  // namespace wlanif

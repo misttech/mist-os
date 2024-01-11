@@ -4,8 +4,6 @@
 
 import("//build/bind/bind.gni")
 import("//build/components.gni")
-import("//build/drivers.gni")
-import("//build/test.gni")
 
 bind_test("wlanif_bind_test") {
   rules = "//src/connectivity/wlan/drivers/wlanif/wlanif.bind"
@@ -13,42 +11,41 @@ bind_test("wlanif_bind_test") {
   deps = [ "//src/devices/bind/fuchsia.wlan" ]
 }
 
-test("device_unittest") {
+executable("device_unittest") {
   output_name = "wlanif_device_unittest"
+  testonly = true
 
   sources = [
     "device_unittest.cc",
     "test_bss.cc",
     "test_bss.h",
   ]
-
   deps = [
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
     "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_hlcpp",
+    "//sdk/lib/async_patterns/testing/cpp:cpp",
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//sdk/lib/sys/cpp/testing:cpp",
     "//src/connectivity/wlan/drivers/wlanif:lib_source",
-    "//src/devices/lib/driver",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
+    "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-test("convert_unittest") {
+executable("convert_unittest") {
   output_name = "wlanif_convert_unittest"
-
+  testonly = true
   sources = [ "convert_unittest.cc" ]
-
   deps = [
-    "//src/connectivity/wlan/drivers/lib/log/cpp/test:log_overrides",
     "//src/connectivity/wlan/drivers/wlanif:lib_source",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",

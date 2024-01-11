@@ -4,8 +4,11 @@
 
 #include "fullmac_mlme.h"
 
+#include <lib/driver/logging/cpp/logger.h>
+
 #include <wlan/common/logging.h>
 
+#include "debug.h"
 #include "device.h"
 #include "fuchsia/wlan/common/c/banjo.h"
 #include "src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h"
@@ -19,7 +22,7 @@ FullmacMlme::FullmacMlme(Device *device)
   debugfn();
 }
 
-void FullmacMlme::Init() {
+zx_status_t FullmacMlme::Init() {
   debugfn();
 
   auto rust_device = rust_fullmac_device_interface_t{
@@ -27,7 +30,7 @@ void FullmacMlme::Init() {
       .start = [](void *device, const rust_wlan_fullmac_ifc_protocol_copy_t *ifc,
                   zx_handle_t *out_sme_channel) -> zx_status_t {
         zx::channel channel;
-        zx_status_t result = DEVICE(device)->Start(ifc, &channel);
+        zx_status_t result = DEVICE(device)->StartFullmac(ifc, &channel);
         *out_sme_channel = channel.release();
         return result;
       },
@@ -119,6 +122,13 @@ void FullmacMlme::Init() {
 
   };
   rust_mlme_ = RustFullmacMlme(start_fullmac_mlme(rust_device), delete_fullmac_mlme);
+  // This check is specifically needed for unit tests (where it always fails) so
+  // StopMainLoop() is not called during release.
+  if (!rust_mlme_.get()) {
+    lerror("rust mlme is not valid");
+    return ZX_ERR_BAD_HANDLE;
+  }
+  return ZX_OK;
 }
 
 void FullmacMlme::StopMainLoop() { stop_fullmac_mlme(rust_mlme_.get()); }

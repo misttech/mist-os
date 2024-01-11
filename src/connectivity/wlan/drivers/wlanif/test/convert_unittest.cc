@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 #include <gtest/gtest.h>
+#include <sdk/lib/driver/logging/cpp/logger.h>
 #include <src/connectivity/wlan/drivers/wlanif/convert.h>
-#include <wlan/drivers/log_instance.h>
-#include <wlan/drivers/test/log_overrides.h>
 
 #include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
 #include "fuchsia/wlan/common/c/banjo.h"
@@ -91,7 +90,10 @@ static constexpr uint8_t kFakeBanjoScanResult = WLAN_SCAN_RESULT_INVALID_ARGS;
 static constexpr uint16_t kFakeBanjoStatusCode = STATUS_CODE_TDLS_REJECTED;
 static constexpr uint8_t kFakeBanjoEapolResult = WLAN_EAPOL_RESULT_TRANSMISSION_FAILURE;
 
-class ConvertTest : public LogTest {};
+class ConvertTest : public ::testing::Test {
+  void SetUp() override {}
+  void TearDown() override {}
+};
 
 /* Tests for to-FIDL conversions */
 
@@ -236,7 +238,9 @@ TEST_F(ConvertTest, ToFidlAssocResult) {
 /* Tests for to-banjo conversions */
 
 TEST_F(ConvertTest, ToBanjoQueryInfo) {
-  log::Instance::Init(0);
+  fdf::Logger logger("test", FUCHSIA_LOG_INFO, zx::socket{},
+                     fidl::WireClient<fuchsia_logger::LogSink>{});
+  fdf::Logger::SetGlobalInstance(&logger);
   fidl::Arena arena;
   wlan_fullmac::WlanFullmacQueryInfo in;
 

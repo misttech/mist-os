@@ -22,7 +22,7 @@ class FullmacMlme {
  public:
   explicit FullmacMlme(Device* device);
   ~FullmacMlme() = default;
-  void Init();
+  zx_status_t Init();
   void StopMainLoop();
 
  private:
