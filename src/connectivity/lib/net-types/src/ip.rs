@@ -68,9 +68,9 @@ pub use net_types_macros::GenericOverIp;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
 use crate::{
-    sealed, LinkLocalAddr, LinkLocalAddress, LinkLocalMulticastAddr, LinkLocalUnicastAddr,
-    MappedAddress, MulticastAddr, MulticastAddress, NonMappedAddr, Scope, ScopeableAddress,
-    SpecifiedAddr, SpecifiedAddress, UnicastAddr, UnicastAddress, Witness,
+    sealed, LinkLocalAddr, LinkLocalAddress, MappedAddress, MulticastAddr, MulticastAddress,
+    NonMappedAddr, Scope, ScopeableAddress, SpecifiedAddr, SpecifiedAddress, UnicastAddr,
+    UnicastAddress, Witness,
 };
 
 // NOTE on passing by reference vs by value: Clippy advises us to pass IPv4
@@ -1355,7 +1355,7 @@ impl ScopeableAddress for IpAddr {
 /// - `From<$witness<$ipaddr>> for $ipaddr`
 /// - `TryFrom<$ipaddr> for $witness<$ipaddr>`
 macro_rules! impl_from_witness {
-    ($witness:ident) => {
+    ($witness:ident, $witness_trait:ident) => {
         impl From<IpAddr<$witness<Ipv4Addr>, $witness<Ipv6Addr>>> for $witness<IpAddr> {
             fn from(addr: IpAddr<$witness<Ipv4Addr>, $witness<Ipv6Addr>>) -> $witness<IpAddr> {
                 unsafe {
@@ -1388,14 +1388,16 @@ macro_rules! impl_from_witness {
             }
         }
         // NOTE: Orphan rules prevent implementing `From` for `A: IpAddress`.
-        impl From<$witness<Ipv4Addr>> for Ipv4Addr {
-            fn from(addr: $witness<Ipv4Addr>) -> Ipv4Addr {
-                addr.get()
+        impl<A: Into<Ipv4Addr> + $witness_trait + Copy> From<$witness<A>> for Ipv4Addr {
+            fn from(addr: $witness<A>) -> Ipv4Addr {
+                let addr: A = addr.get();
+                addr.into()
             }
         }
-        impl From<$witness<Ipv6Addr>> for Ipv6Addr {
-            fn from(addr: $witness<Ipv6Addr>) -> Ipv6Addr {
-                addr.get()
+        impl<A: Into<Ipv6Addr> + $witness_trait + Copy> From<$witness<A>> for Ipv6Addr {
+            fn from(addr: $witness<A>) -> Ipv6Addr {
+                let addr: A = addr.get();
+                addr.into()
             }
         }
         // NOTE: Orphan rules prevent implementing `TryFrom` for `A: IpAddress`.
@@ -1412,7 +1414,7 @@ macro_rules! impl_from_witness {
             }
         }
     };
-    ($witness:ident, $ipaddr:ident, $new_unchecked:expr) => {
+    ($witness:ident, $witness_trait:ident, $ipaddr:ident, $new_unchecked:expr) => {
         impl From<$witness<$ipaddr>> for $witness<IpAddr> {
             fn from(addr: $witness<$ipaddr>) -> $witness<IpAddr> {
                 let addr: $ipaddr = addr.get();
@@ -1423,9 +1425,10 @@ macro_rules! impl_from_witness {
                 }
             }
         }
-        impl From<$witness<$ipaddr>> for $ipaddr {
-            fn from(addr: $witness<$ipaddr>) -> $ipaddr {
-                addr.get()
+        impl<A: Into<$ipaddr> + $witness_trait + Copy> From<$witness<A>> for $ipaddr {
+            fn from(addr: $witness<A>) -> $ipaddr {
+                let addr: A = addr.get();
+                addr.into()
             }
         }
         impl TryFrom<$ipaddr> for $witness<$ipaddr> {
@@ -1437,12 +1440,13 @@ macro_rules! impl_from_witness {
     };
 }
 
-impl_from_witness!(SpecifiedAddr);
-impl_from_witness!(MulticastAddr);
-impl_from_witness!(LinkLocalAddr);
-impl_from_witness!(LinkLocalMulticastAddr);
-impl_from_witness!(UnicastAddr, Ipv6Addr, UnicastAddr::new_unchecked);
-impl_from_witness!(LinkLocalUnicastAddr, Ipv6Addr, |addr| LinkLocalAddr(UnicastAddr(addr)));
+impl_from_witness!(SpecifiedAddr, SpecifiedAddress);
+impl_from_witness!(MulticastAddr, MulticastAddress);
+impl_from_witness!(LinkLocalAddr, LinkLocalAddress);
+impl_from_witness!(NonMappedAddr, MappedAddress);
+// Only add `From` conversions for `Ipv6Addr`, because `Ipv4Addr` does not
+// implement `UnicastAddress`.
+impl_from_witness!(UnicastAddr, UnicastAddress, Ipv6Addr, UnicastAddr::new_unchecked);
 
 /// The class of an IPv4 address.
 ///
