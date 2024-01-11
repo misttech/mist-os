@@ -4,6 +4,14 @@
         "skips": [
             {
                 "notes": [
+                    "Temporary skip, to allow Vulkan-Utility-Libraries to land."
+                ],
+                "paths": [
+                    "third_party/Vulkan-Utility-Libraries"
+                ]
+            },
+            {
+                "notes": [
                     "New Flutter licenses are tripping the license checker.",
                     "Remove this skip once the flutter licenses can be successfully parsed.",
                     "See b/225400494 for more info."
