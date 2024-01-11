@@ -7,10 +7,11 @@ use lock_order::Unlocked;
 use net_types::ip::Ip;
 
 use crate::{
-    context::{BindingsTypes, ContextProvider, CoreCtx, CtxPair},
+    context::{ContextProvider, CoreCtx, CtxPair},
     device::socket::DeviceSocketApi,
     ip::icmp::socket::IcmpEchoSocketApi,
     transport::{tcp::socket::TcpApi, udp::UdpApi},
+    BindingsTypes,
 };
 
 type CoreApiCtxPair<'a, BP> = CtxPair<CoreCtx<'a, <BP as ContextProvider>::Context, Unlocked>, BP>;

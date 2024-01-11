@@ -7,30 +7,47 @@
 //! Traits in this module exist to be exported as markers to bindings without
 //! exposing the internal traits directly.
 
+use net_types::{
+    ethernet::Mac,
+    ip::{Ipv4, Ipv6},
+};
+
 use crate::{
-    context::{BindingsContext, CounterContext},
-    device::{AnyDevice, DeviceId, DeviceIdContext, WeakDeviceId},
-    ip::icmp::IcmpBindingsContext,
-    transport::{
-        tcp::socket::{TcpBindingsContext, TcpContext},
-        udp::{UdpCounters, UdpStateBindingsContext},
+    context::{
+        CounterContext, EventContext, InstantBindingsTypes, ReferenceNotifiers, RngContext,
+        TimerContext, TracingContext,
     },
+    device::{
+        self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetLinkDevice,
+        WeakDeviceId,
+    },
+    ip::{
+        self,
+        icmp::{socket::IcmpEchoBindingsContext, IcmpBindingsContext},
+    },
+    socket,
+    transport::{
+        self,
+        tcp::socket::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
+        udp::{UdpBindingsContext, UdpCounters, UdpStateBindingsContext},
+    },
+    TimerId,
 };
 
 /// A marker for extensions to IP types.
 pub trait IpExt:
-    crate::ip::IpExt
-    + crate::ip::icmp::IcmpIpExt
-    + crate::transport::tcp::socket::DualStackIpExt
-    + crate::socket::datagram::DualStackIpExt
+    ip::IpExt
+    + ip::icmp::IcmpIpExt
+    + transport::tcp::socket::DualStackIpExt
+    + socket::datagram::DualStackIpExt
 {
 }
 
 impl<O> IpExt for O where
-    O: crate::ip::IpExt
-        + crate::ip::icmp::IcmpIpExt
-        + crate::transport::tcp::socket::DualStackIpExt
-        + crate::socket::datagram::DualStackIpExt
+    O: ip::IpExt
+        + ip::icmp::IcmpIpExt
+        + transport::tcp::socket::DualStackIpExt
+        + socket::datagram::DualStackIpExt
 {
 }
 
@@ -41,11 +58,11 @@ impl<O> IpExt for O where
 /// implemented by [`crate::context::UnlockedCoreCtx`] to satisfy all the API
 /// objects vended by [`crate::api::CoreApi`].
 pub trait CoreContext<I, BC>:
-    crate::transport::udp::StateContext<I, BC>
+    transport::udp::StateContext<I, BC>
     + CounterContext<UdpCounters<I>>
     + TcpContext<I, BC>
-    + crate::ip::icmp::socket::StateContext<I, BC>
-    + crate::ip::icmp::IcmpStateContext
+    + ip::icmp::socket::StateContext<I, BC>
+    + ip::icmp::IcmpStateContext
     + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
 where
     I: IpExt,
@@ -63,11 +80,79 @@ where
         + TcpBindingsContext<O::WeakDeviceId>
         + UdpStateBindingsContext<I, O::DeviceId>
         + IcmpBindingsContext<I, O::DeviceId>,
-    O: crate::transport::udp::StateContext<I, BC>
+    O: transport::udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
         + TcpContext<I, BC>
-        + crate::ip::icmp::socket::StateContext<I, BC>
-        + crate::ip::icmp::IcmpStateContext
+        + ip::icmp::socket::StateContext<I, BC>
+        + ip::icmp::IcmpStateContext
         + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>,
+{
+}
+
+/// A marker trait for all the types stored in core objects that are specified
+/// by bindings.
+pub trait BindingsTypes: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
+
+impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
+
+/// The execution context provided by bindings for a given IP version.
+pub trait IpBindingsContext<I: IpExt>:
+    BindingsTypes
+    + RngContext
+    + EventContext<
+        ip::device::IpDeviceEvent<DeviceId<Self>, I, <Self as InstantBindingsTypes>::Instant>,
+    > + EventContext<ip::IpLayerEvent<DeviceId<Self>, I>>
+    + EventContext<
+        ip::device::nud::Event<
+            Mac,
+            device::EthernetDeviceId<Self>,
+            I,
+            <Self as InstantBindingsTypes>::Instant,
+        >,
+    > + UdpBindingsContext<I, DeviceId<Self>>
+    + IcmpEchoBindingsContext<I, DeviceId<Self>>
+    + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
+    + device::DeviceLayerEventDispatcher
+    + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
+    + ReferenceNotifiers
+    + TracingContext
+    + 'static
+{
+}
+
+impl<I, BC> IpBindingsContext<I> for BC
+where
+    I: IpExt,
+    BC: BindingsTypes
+        + RngContext
+        + EventContext<
+            ip::device::IpDeviceEvent<DeviceId<Self>, I, <Self as InstantBindingsTypes>::Instant>,
+        > + EventContext<ip::IpLayerEvent<DeviceId<Self>, I>>
+        + EventContext<
+            ip::device::nud::Event<
+                Mac,
+                device::EthernetDeviceId<Self>,
+                I,
+                <Self as InstantBindingsTypes>::Instant,
+            >,
+        > + UdpBindingsContext<I, DeviceId<Self>>
+        + IcmpEchoBindingsContext<I, DeviceId<Self>>
+        + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
+        + device::DeviceLayerEventDispatcher
+        + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
+        + ReferenceNotifiers
+        + TracingContext
+        + 'static,
+{
+}
+
+/// The execution context provided by bindings.
+pub trait BindingsContext:
+    IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + TimerContext<TimerId<Self>>
+{
+}
+
+impl<BC> BindingsContext for BC where
+    BC: IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + TimerContext<TimerId<Self>>
 {
 }

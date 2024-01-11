@@ -264,10 +264,10 @@ pub mod udp {
 
 pub use api::CoreApi;
 pub use context::{
-    BindingsContext, BindingsTypes, CoreCtx, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, SyncCtx, TimerContext, TracingContext, UnlockedCoreCtx,
+    CoreCtx, EventContext, InstantBindingsTypes, InstantContext, ReferenceNotifiers, RngContext,
+    SyncCtx, TimerContext, TracingContext, UnlockedCoreCtx,
 };
-pub use marker::{CoreContext, IpExt};
+pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpExt};
 pub use state::StackState;
 pub use time::{handle_timer, Instant, TimerId};
 

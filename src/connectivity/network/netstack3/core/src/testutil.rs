@@ -57,8 +57,8 @@ use crate::{
             FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, WithFakeFrameContext,
             WithFakeTimerContext,
         },
-        BindingsTypes, EventContext, InstantBindingsTypes, InstantContext, RngContext,
-        TimerContext, TracingContext,
+        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
+        TracingContext,
     },
     device::{
         ethernet::MaxEthernetFrameSize, link::LinkDevice, loopback::LoopbackDeviceId, DeviceId,
@@ -88,7 +88,7 @@ use crate::{
         },
         udp::{self, UdpBindingsContext},
     },
-    CoreCtx, SyncCtx,
+    BindingsTypes, CoreCtx, SyncCtx,
 };
 
 /// NDP test utilities.

@@ -38,20 +38,14 @@
 use core::{ffi::CStr, fmt::Debug, time::Duration};
 
 use lock_order::Unlocked;
-use net_types::{
-    ethernet::Mac,
-    ip::{Ipv4, Ipv6},
-};
+
 use packet::{BufferMut, Serializer};
 use rand::{CryptoRng, RngCore};
 
 use crate::{
-    device::{self, ethernet::EthernetLinkDevice, DeviceId, DeviceLayerTypes},
-    ip::{self, icmp::socket::IcmpEchoBindingsContext},
+    marker::{BindingsContext, BindingsTypes},
     state::{StackState, StackStateBuilder},
-    sync,
-    transport::{tcp::socket::TcpBindingsTypes, udp::UdpBindingsContext},
-    Instant, TimerId,
+    sync, Instant,
 };
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
@@ -274,95 +268,6 @@ pub trait ReferenceNotifiers {
     fn new_reference_notifier<T: Send + 'static, D: Debug>(
         debug_references: D,
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
-}
-
-/// A marker trait for all the types stored in core objects that are specified
-/// by bindings.
-pub trait BindingsTypes: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
-
-impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
-
-/// The execution context provided by bindings.
-pub trait BindingsContext:
-    BindingsTypes
-    + RngContext
-    + TimerContext<TimerId<Self>>
-    + EventContext<
-        ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4, <Self as InstantBindingsTypes>::Instant>,
-    > + EventContext<
-        ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantBindingsTypes>::Instant>,
-    > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
-    + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
-    + EventContext<
-        ip::device::nud::Event<
-            Mac,
-            device::EthernetDeviceId<Self>,
-            Ipv4,
-            <Self as InstantBindingsTypes>::Instant,
-        >,
-    > + EventContext<
-        ip::device::nud::Event<
-            Mac,
-            device::EthernetDeviceId<Self>,
-            Ipv6,
-            <Self as InstantBindingsTypes>::Instant,
-        >,
-    > + UdpBindingsContext<Ipv4, DeviceId<Self>>
-    + UdpBindingsContext<Ipv6, DeviceId<Self>>
-    + IcmpEchoBindingsContext<Ipv4, DeviceId<Self>>
-    + IcmpEchoBindingsContext<Ipv6, DeviceId<Self>>
-    + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
-    + device::DeviceLayerEventDispatcher
-    + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
-    + ReferenceNotifiers
-    + TracingContext
-    + 'static
-{
-}
-impl<
-        BC: BindingsTypes
-            + RngContext
-            + TimerContext<TimerId<Self>>
-            + EventContext<
-                ip::device::IpDeviceEvent<
-                    DeviceId<Self>,
-                    Ipv4,
-                    <Self as InstantBindingsTypes>::Instant,
-                >,
-            > + EventContext<
-                ip::device::IpDeviceEvent<
-                    DeviceId<Self>,
-                    Ipv6,
-                    <Self as InstantBindingsTypes>::Instant,
-                >,
-            > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
-            + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
-            + EventContext<
-                ip::device::nud::Event<
-                    Mac,
-                    device::EthernetDeviceId<Self>,
-                    Ipv4,
-                    <Self as InstantBindingsTypes>::Instant,
-                >,
-            > + EventContext<
-                ip::device::nud::Event<
-                    Mac,
-                    device::EthernetDeviceId<Self>,
-                    Ipv6,
-                    <Self as InstantBindingsTypes>::Instant,
-                >,
-            > + UdpBindingsContext<Ipv4, DeviceId<Self>>
-            + UdpBindingsContext<Ipv6, DeviceId<Self>>
-            + IcmpEchoBindingsContext<Ipv4, DeviceId<Self>>
-            + IcmpEchoBindingsContext<Ipv6, DeviceId<Self>>
-            + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
-            + device::DeviceLayerEventDispatcher
-            + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
-            + TracingContext
-            + ReferenceNotifiers
-            + 'static,
-    > BindingsContext for BC
-{
 }
 
 /// The synchronized context.
