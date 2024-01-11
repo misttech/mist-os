@@ -20,6 +20,7 @@ fidl("fuchsia.ui.test.input") {
     "//sdk/fidl/fuchsia.input",
     "//sdk/fidl/fuchsia.input.report",
     "//sdk/fidl/fuchsia.math",
+    "//sdk/fidl/fuchsia.ui.input3",
     "//sdk/fidl/fuchsia.ui.pointer",
     "//zircon/vdso/zx",
   ]

@@ -206,6 +206,7 @@ type PuppetCreationArgs = resource table {
     6: flatland_client client_end:fuchsia.ui.composition.Flatland;
     7: keyboard_client client_end:fuchsia.ui.input3.Keyboard;
     8: device_pixel_ratio float32;
+    9: focuser server_end:fuchsia.ui.views.Focuser;
 };
 
 /// A helper to spawn a puppet instance, which will own a view created with a specific
@@ -214,7 +215,9 @@ type PuppetCreationArgs = resource table {
 closed protocol PuppetFactory {
     /// Spawns a puppet instance, which will own a view created using `view_token`, and
     /// binds `puppet_server` to it.
-    strict Create(PuppetCreationArgs) -> (table {
+    strict Create(PuppetCreationArgs) -> (resource table {
         1: result Result;
+        /// view_ref of the created view.
+        2: view_ref fuchsia.ui.views.ViewRef;
     });
 };

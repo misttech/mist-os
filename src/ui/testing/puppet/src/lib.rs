@@ -120,7 +120,7 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                     .await;
 
                     responder
-                        .send(&PuppetFactoryCreateResponse {
+                        .send(PuppetFactoryCreateResponse {
                             result: Some(Result_::Success),
                             ..Default::default()
                         })
