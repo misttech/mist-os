@@ -17,6 +17,8 @@
 
 class CompilationTestReg32 : public hwreg::RegisterBase<CompilationTestReg32, uint32_t> {
  public:
+  static hwreg::RegisterAddr<CompilationTestReg32> Get() { return {0}; }
+
   DEF_FIELD(30, 12, field1);
   DEF_BIT(11, field2);
   DEF_RSVDZ_FIELD(10, 5);
@@ -24,8 +26,6 @@ class CompilationTestReg32 : public hwreg::RegisterBase<CompilationTestReg32, ui
   DEF_RSVDZ_BIT(2);
   DEF_RSVDZ_BIT(1);
   DEF_FIELD(0, 0, field4);
-
-  static auto Get() { return hwreg::RegisterAddr<CompilationTestReg32>(0); }
 };
 
 // This function exists so that the resulting code can be inspected easily in the
@@ -399,30 +399,30 @@ TEST(SubFieldTestCase, UnshifedFields) {
 
 class RsvdZPartialTestReg8 : public hwreg::RegisterBase<RsvdZPartialTestReg8, uint8_t> {
  public:
-  DEF_RSVDZ_FIELD(7, 3);
+  static hwreg::RegisterAddr<RsvdZPartialTestReg8> Get() { return {0}; }
 
-  static auto Get() { return hwreg::RegisterAddr<RsvdZPartialTestReg8>(0); }
+  DEF_RSVDZ_FIELD(7, 3);
 };
 class RsvdZPartialTestReg16 : public hwreg::RegisterBase<RsvdZPartialTestReg16, uint16_t> {
  public:
-  DEF_RSVDZ_FIELD(14, 1);
+  static hwreg::RegisterAddr<RsvdZPartialTestReg16> Get() { return {0}; }
 
-  static auto Get() { return hwreg::RegisterAddr<RsvdZPartialTestReg16>(0); }
+  DEF_RSVDZ_FIELD(14, 1);
 };
 class RsvdZPartialTestReg32 : public hwreg::RegisterBase<RsvdZPartialTestReg32, uint32_t> {
  public:
+  static hwreg::RegisterAddr<RsvdZPartialTestReg32> Get() { return {0}; }
+
   DEF_RSVDZ_FIELD(31, 12);
   DEF_RSVDZ_FIELD(10, 5);
   DEF_RSVDZ_BIT(3);
-
-  static auto Get() { return hwreg::RegisterAddr<RsvdZPartialTestReg32>(0); }
 };
 class RsvdZPartialTestReg64 : public hwreg::RegisterBase<RsvdZPartialTestReg64, uint64_t> {
  public:
+  static hwreg::RegisterAddr<RsvdZPartialTestReg64> Get() { return {0}; }
+
   DEF_RSVDZ_FIELD(63, 18);
   DEF_RSVDZ_FIELD(10, 0);
-
-  static auto Get() { return hwreg::RegisterAddr<RsvdZPartialTestReg64>(0); }
 };
 
 TEST(RegisterTestCase, RsvdzPartial) {
@@ -468,27 +468,27 @@ TEST(RegisterTestCase, RsvdzPartial) {
 
 class RsvdZFullTestReg8 : public hwreg::RegisterBase<RsvdZFullTestReg8, uint8_t> {
  public:
-  DEF_RSVDZ_FIELD(7, 0);
+  static hwreg::RegisterAddr<RsvdZFullTestReg8> Get() { return {0}; }
 
-  static auto Get() { return hwreg::RegisterAddr<RsvdZFullTestReg8>(0); }
+  DEF_RSVDZ_FIELD(7, 0);
 };
 class RsvdZFullTestReg16 : public hwreg::RegisterBase<RsvdZFullTestReg16, uint16_t> {
  public:
-  DEF_RSVDZ_FIELD(15, 0);
+  static hwreg::RegisterAddr<RsvdZFullTestReg16> Get() { return {0}; }
 
-  static auto Get() { return hwreg::RegisterAddr<RsvdZFullTestReg16>(0); }
+  DEF_RSVDZ_FIELD(15, 0);
 };
 class RsvdZFullTestReg32 : public hwreg::RegisterBase<RsvdZFullTestReg32, uint32_t> {
  public:
-  DEF_RSVDZ_FIELD(31, 0);
+  static hwreg::RegisterAddr<RsvdZFullTestReg32> Get() { return {0}; }
 
-  static auto Get() { return hwreg::RegisterAddr<RsvdZFullTestReg32>(0); }
+  DEF_RSVDZ_FIELD(31, 0);
 };
 class RsvdZFullTestReg64 : public hwreg::RegisterBase<RsvdZFullTestReg64, uint64_t> {
  public:
-  DEF_RSVDZ_FIELD(63, 0);
+  static hwreg::RegisterAddr<RsvdZFullTestReg64> Get() { return {0}; }
 
-  static auto Get() { return hwreg::RegisterAddr<RsvdZFullTestReg64>(0); }
+  DEF_RSVDZ_FIELD(63, 0);
 };
 
 TEST(RegisterTestCase, RsvdzFull) {
@@ -533,33 +533,33 @@ TEST(RegisterTestCase, RsvdzFull) {
 
 class FieldTestReg8 : public hwreg::RegisterBase<FieldTestReg8, uint8_t> {
  public:
+  static hwreg::RegisterAddr<FieldTestReg8> Get() { return {0}; }
+
   DEF_FIELD(7, 3, field1);
   DEF_FIELD(2, 0, field2);
-
-  static auto Get() { return hwreg::RegisterAddr<FieldTestReg8>(0); }
 };
 class FieldTestReg16 : public hwreg::RegisterBase<FieldTestReg16, uint16_t> {
  public:
+  static hwreg::RegisterAddr<FieldTestReg16> Get() { return {0}; }
+
   DEF_FIELD(13, 3, field1);
   DEF_FIELD(2, 1, field2);
   DEF_BIT(0, field3);
-
-  static auto Get() { return hwreg::RegisterAddr<FieldTestReg16>(0); }
 };
 class FieldTestReg32 : public hwreg::RegisterBase<FieldTestReg32, uint32_t> {
  public:
+  static hwreg::RegisterAddr<FieldTestReg32> Get() { return {0}; }
+
   DEF_FIELD(30, 21, field1);
   DEF_FIELD(20, 12, field2);
   DEF_RSVDZ_FIELD(11, 0);
-
-  static auto Get() { return hwreg::RegisterAddr<FieldTestReg32>(0); }
 };
 class FieldTestReg64 : public hwreg::RegisterBase<FieldTestReg64, uint64_t> {
  public:
+  static hwreg::RegisterAddr<FieldTestReg64> Get() { return {0}; }
+
   DEF_FIELD(60, 20, field1);
   DEF_FIELD(10, 0, field2);
-
-  static auto Get() { return hwreg::RegisterAddr<FieldTestReg64>(0); }
 };
 
 TEST(RegisterTestCase, Field) {
@@ -637,15 +637,17 @@ TEST(RegisterTestCase, Field) {
 class EnumFieldTestReg8 : public hwreg::RegisterBase<EnumFieldTestReg8, uint8_t> {
  public:
   enum MyEnum { Test0 = 0, Test1 = 1, Test2 = 2, Test3 = 3 };
+  static hwreg::RegisterAddr<EnumFieldTestReg8> Get() { return {0}; }
+
   DEF_ENUM_FIELD(MyEnum, 3, 2, TestField);
-  static auto Get() { return hwreg::RegisterAddr<EnumFieldTestReg8>(0); }
 };
 class EnumFieldTestReg8WithEnumClass
     : public hwreg::RegisterBase<EnumFieldTestReg8WithEnumClass, uint8_t> {
  public:
   enum class MyEnum { Test0 = 0, Test1 = 1, Test2 = 2, Test3 = 3 };
+  static hwreg::RegisterAddr<EnumFieldTestReg8WithEnumClass> Get() { return {0}; }
+
   DEF_ENUM_FIELD(MyEnum, 3, 2, TestField);
-  static auto Get() { return hwreg::RegisterAddr<EnumFieldTestReg8WithEnumClass>(0); }
 };
 
 TEST(RegisterTestCase, EnumField) {
@@ -694,23 +696,23 @@ TEST(RegisterTestCase, EnumField) {
 
 class UnshiftedTestReg16 : public hwreg::RegisterBase<UnshiftedTestReg16, uint16_t> {
  public:
+  static hwreg::RegisterAddr<UnshiftedTestReg16> Get() { return {0}; }
+
   DEF_UNSHIFTED_FIELD(15, 12, field1);
   DEF_UNSHIFTED_FIELD(11, 8, field2);
   DEF_UNSHIFTED_FIELD(7, 4, field3);
   DEF_UNSHIFTED_FIELD(3, 0, field4);
-
-  static auto Get() { return hwreg::RegisterAddr<UnshiftedTestReg16>(0); }
 };
 
 class TestPciBar32 : public hwreg::RegisterBase<TestPciBar32, uint32_t> {
  public:
+  static hwreg::RegisterAddr<TestPciBar32> Get() { return {0}; }
+
   DEF_UNSHIFTED_FIELD(31, 4, address);
   DEF_BIT(3, is_prefetchable);
   DEF_RSVDZ_BIT(2);
   DEF_BIT(1, is_64bit);
   DEF_BIT(0, is_io_space);
-
-  static auto Get() { return hwreg::RegisterAddr<TestPciBar32>(0); }
 };
 
 TEST(RegisterTestCase, UnshiftedField) {
@@ -778,11 +780,11 @@ struct ConstexprArithmeticTestReg
     : public hwreg::RegisterBase<ConstexprArithmeticTestReg, uint32_t> {
   static constexpr unsigned int kTen = 10;
 
+  static hwreg::RegisterAddr<ConstexprArithmeticTestReg> Get() { return {0}; }
+
   DEF_FIELD(kTen + 2 * kTen, kTen, field2);
   DEF_RSVDZ_FIELD(kTen - 1, 2);
   DEF_BIT(2 + 3 - 4, field1);
-
-  static auto Get() { return hwreg::RegisterAddr<ConstexprArithmeticTestReg>(0); }
 };
 
 TEST(RegisterTestCase, BitsAsConstexprArithmeticExpressions) {
@@ -810,6 +812,8 @@ struct ConditionalFieldTestReg
   static constexpr bool kB = Condition == ConditionalFieldTestRegEnum::kB;
   static constexpr bool kC = Condition == ConditionalFieldTestRegEnum::kC;
 
+  static hwreg::RegisterAddr<SelfType> Get() { return {0}; }
+
   // Conditional kA fields.
   DEF_COND_BIT(7, a_7, kA);
   DEF_COND_FIELD(6, 4, a_6_4, kA);
@@ -826,8 +830,6 @@ struct ConditionalFieldTestReg
 
   // Unconditional, common field.
   DEF_FIELD(2, 0, common);
-
-  static auto Get() { return hwreg::RegisterAddr<SelfType>(0); }
 };
 
 // This definition amounts to a compilation test.
@@ -899,9 +901,9 @@ struct TemplatedReg : public hwreg::RegisterBase<TemplatedReg<N>, uint32_t> {
 
   static_assert(N < 32);
 
-  DEF_FIELD(N, 0, head);
+  static hwreg::RegisterAddr<TemplatedReg<N>> Get() { return {0}; }
 
-  static auto Get() { return hwreg::RegisterAddr<TemplatedReg<N>>(0); }
+  DEF_FIELD(N, 0, head);
 };
 
 TEST(RegisterTestCase, Templated) {
@@ -934,21 +936,21 @@ TEST(RegisterTestCase, Templated) {
 class PrintableTestReg
     : public hwreg::RegisterBase<PrintableTestReg, uint32_t, hwreg::EnablePrinter> {
  public:
+  static hwreg::RegisterAddr<PrintableTestReg> Get() { return {0}; }
+
   DEF_RSVDZ_BIT(31);
   DEF_FIELD(30, 21, field1);
   DEF_FIELD(20, 12, field2);
   DEF_RSVDZ_FIELD(11, 0);
-
-  static auto Get() { return hwreg::RegisterAddr<PrintableTestReg>(0); }
 };
 
 class PrintableTestReg2
     : public hwreg::RegisterBase<PrintableTestReg2, uint32_t, hwreg::EnablePrinter> {
  public:
+  static hwreg::RegisterAddr<PrintableTestReg2> Get() { return {0}; }
+
   DEF_FIELD(30, 21, field1);
   DEF_FIELD(20, 12, field2);
-
-  static auto Get() { return hwreg::RegisterAddr<PrintableTestReg2>(0); }
 };
 
 TEST(RegisterTestCase, Print) {
@@ -1028,12 +1030,12 @@ TEST(RegisterTestCase, ForEachField) {
 
 class ChainingTestReg : public hwreg::RegisterBase<ChainingTestReg, uint32_t> {
  public:
+  static hwreg::RegisterAddr<ChainingTestReg> Get() { return {0}; }
+
   DEF_RSVDZ_BIT(31);
   DEF_FIELD(30, 21, field1);
   DEF_FIELD(20, 12, field2);
   DEF_RSVDZ_FIELD(11, 0);
-
-  static auto Get() { return hwreg::RegisterAddr<ChainingTestReg>(0); }
 };
 
 // Test using the "fluent" style of chaining calls, like:
@@ -1067,6 +1069,8 @@ class TestRegWithoutPrinter : public hwreg::RegisterBase<TestRegWithoutPrinter, 
 
 class TestRegForSizing8 : public hwreg::RegisterBase<TestRegForSizing8, uint8_t> {
  public:
+  static hwreg::RegisterAddr<TestRegForSizing8> Get() { return {0}; }
+
   DEF_RSVDZ_BIT(7);
   DEF_RSVDZ_BIT(6);
   DEF_RSVDZ_BIT(5);
@@ -1075,11 +1079,11 @@ class TestRegForSizing8 : public hwreg::RegisterBase<TestRegForSizing8, uint8_t>
   DEF_RSVDZ_BIT(2);
   DEF_RSVDZ_BIT(1);
   DEF_RSVDZ_BIT(0);
-
-  static auto Get() { return hwreg::RegisterAddr<TestRegForSizing8>(0); }
 };
 class TestRegForSizing16 : public hwreg::RegisterBase<TestRegForSizing16, uint16_t> {
  public:
+  static hwreg::RegisterAddr<TestRegForSizing16> Get() { return {0}; }
+
   DEF_RSVDZ_BIT(15);
   DEF_RSVDZ_BIT(14);
   DEF_RSVDZ_BIT(13);
@@ -1096,11 +1100,11 @@ class TestRegForSizing16 : public hwreg::RegisterBase<TestRegForSizing16, uint16
   DEF_RSVDZ_BIT(2);
   DEF_RSVDZ_BIT(1);
   DEF_RSVDZ_BIT(0);
-
-  static auto Get() { return hwreg::RegisterAddr<TestRegForSizing16>(0); }
 };
 class TestRegForSizing32 : public hwreg::RegisterBase<TestRegForSizing32, uint32_t> {
  public:
+  static hwreg::RegisterAddr<TestRegForSizing32> Get() { return {0}; }
+
   DEF_RSVDZ_BIT(15);
   DEF_RSVDZ_BIT(14);
   DEF_RSVDZ_BIT(13);
@@ -1117,11 +1121,11 @@ class TestRegForSizing32 : public hwreg::RegisterBase<TestRegForSizing32, uint32
   DEF_RSVDZ_BIT(2);
   DEF_RSVDZ_BIT(1);
   DEF_RSVDZ_BIT(0);
-
-  static auto Get() { return hwreg::RegisterAddr<TestRegForSizing32>(0); }
 };
 class TestRegForSizing64 : public hwreg::RegisterBase<TestRegForSizing64, uint64_t> {
  public:
+  static hwreg::RegisterAddr<TestRegForSizing64> Get() { return {0}; }
+
   DEF_RSVDZ_BIT(15);
   DEF_RSVDZ_BIT(14);
   DEF_RSVDZ_BIT(13);
@@ -1138,8 +1142,6 @@ class TestRegForSizing64 : public hwreg::RegisterBase<TestRegForSizing64, uint64
   DEF_RSVDZ_BIT(2);
   DEF_RSVDZ_BIT(1);
   DEF_RSVDZ_BIT(0);
-
-  static auto Get() { return hwreg::RegisterAddr<TestRegForSizing64>(0); }
 };
 
 [[maybe_unused]] void type_size() {
@@ -1174,9 +1176,9 @@ struct FakeIo {
 
 class TestRegForVariantIo : public hwreg::RegisterBase<TestRegForVariantIo, uint64_t> {
  public:
-  DEF_FIELD(63, 0, value);
+  static hwreg::RegisterAddr<TestRegForVariantIo> Get() { return {0}; }
 
-  static auto Get() { return hwreg::RegisterAddr<TestRegForVariantIo>(0); }
+  DEF_FIELD(63, 0, value);
 };
 
 TEST(RegisterTestCase, Variant) {

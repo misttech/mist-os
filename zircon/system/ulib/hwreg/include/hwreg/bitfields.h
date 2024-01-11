@@ -22,15 +22,15 @@
 //   // Define bitfields for an "AuxControl" 32-bit register.
 //   class AuxControl : public hwreg::RegisterBase<AuxControl, uint32_t> {
 //   public:
+//       // Returns an object representing the register's type and address.
+//       static hwreg::RegisterAddr<AuxControl> Get() { return {0x64010}; }
+//
+//       // Bits [30:25] and [19:0] are automatically preserved across RMW cycles.
+//
 //       // Define a single-bit field.
 //       DEF_BIT(31, enabled);
 //       // Define a 5-bit field, from bits 20-24 (inclusive).
 //       DEF_FIELD(24, 20, message_size);
-//
-//       // Bits [30:25] and [19:0] are automatically preserved across RMW cycles
-//
-//       // Returns an object representing the register's type and address.
-//       static auto Get() { return hwreg::RegisterAddr<AuxControl>(0x64010); }
 //   };
 //
 //   void Example1(hwreg::RegisterIo* reg_io) {
