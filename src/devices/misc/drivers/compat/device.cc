@@ -522,16 +522,15 @@ zx_status_t Device::CreateNode() {
         // Remove the Device.
         if (auto ptr = device.lock()) {
           ptr->controller_ = {};
-          if (ptr->pending_removal_) {
-            // TODO(https://fxbug.dev/100470): We currently do not remove the DFv1 child
-            // if the NodeController is removed but the driver didn't asked to be
-            // removed. We need to investigate the correct behavior here.
-            FDF_LOGL(INFO, ptr->logger(), "Device %s has its NodeController unexpectedly removed",
-                     (ptr)->topological_path_.data());
-          }
           // Only remove us if the driver requested it (normally via device_async_remove)
           if (ptr->pending_removal_) {
             ptr->UnbindAndRelease();
+          } else {
+            // TODO(https://fxbug.dev/100470): We currently do not remove the DFv1 child
+            // if the NodeController is removed but the driver didn't ask to be
+            // removed. We need to investigate the correct behavior here.
+            FDF_LOGL(INFO, ptr->logger(), "Device %s has its NodeController unexpectedly removed",
+                     (ptr)->topological_path_.data());
           }
         }
         completer.complete_ok();
@@ -1018,8 +1017,9 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
 
   // TODO(https://fxbug.dev/111891): Support metadata for AddCompositeNodeSpec().
   if (spec->metadata_count > 0) {
-    FDF_LOGL(WARNING, *logger_,
-             "AddCompositeNodeSpec() currently doesn't support metadata. See https://fxbug.dev/111891.");
+    FDF_LOGL(
+        WARNING, *logger_,
+        "AddCompositeNodeSpec() currently doesn't support metadata. See https://fxbug.dev/111891.");
   }
 
   auto fidl_spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
