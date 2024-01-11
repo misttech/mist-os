@@ -23,27 +23,34 @@ validation_layer_dir = "//third_party/Vulkan-ValidationLayers"
 config("vulkan_layer_config") {
   include_dirs = [
     "$validation_layer_dir/layers",
-    "$validation_layer_dir/layers/generated",
+    "$validation_layer_dir/layers/utils",
+    "$validation_layer_dir/layers/vulkan",
+    "$validation_layer_dir/layers/vulkan/generated",
   ]
   cflags = [ "-Wno-extra-semi" ]
 }
 
 source_set("layer_common") {
+  #TODO(b/319117470) - remove to complete soft transition
+  check_includes = false
   public_configs = [ ":vulkan_layer_config" ]
 
   sources = [
-    "$validation_layer_dir/layers/generated/vk_dispatch_table_helper.h",
-    "$validation_layer_dir/layers/generated/vk_extension_helper.h",
-    "$validation_layer_dir/layers/generated/vk_layer_dispatch_table.h",
-    "$validation_layer_dir/layers/vk_layer_data.h",
-    "$validation_layer_dir/layers/vk_layer_extension_utils.cpp",
-    "$validation_layer_dir/layers/vk_layer_extension_utils.h",
+    "$validation_layer_dir/layers/containers/custom_containers.h",
+    "$validation_layer_dir/layers/utils/vk_layer_extension_utils.cpp",
+    "$validation_layer_dir/layers/utils/vk_layer_extension_utils.h",
+    "$validation_layer_dir/layers/vulkan/generated/vk_api_version.h",
+    "$validation_layer_dir/layers/vulkan/generated/vk_dispatch_table_helper.h",
+    "$validation_layer_dir/layers/vulkan/generated/vk_extension_helper.h",
+    "$validation_layer_dir/layers/vulkan/generated/vk_layer_dispatch_table.h",
   ]
 
   public_deps = [ "//third_party/Vulkan-Headers:vulkan_headers" ]
 }
 
 loadable_module("swapchain") {
+  #TODO(b/319117470) - remove to complete soft transition
+  check_includes = false
   output_name = "VkLayer_image_pipe_swapchain"
   sources = [
     "fuchsia_platform_event.cc",
@@ -113,6 +120,8 @@ source_set("display") {
 }
 
 loadable_module("fb") {
+  #TODO(b/319117470) - remove to complete soft transition
+  check_includes = false
   output_name = "VkLayer_image_pipe_swapchain_fb"
   defines = [ "USE_IMAGEPIPE_SURFACE_FB" ]
   sources = [ "image_pipe_swapchain_layer.cc" ]
@@ -139,6 +148,8 @@ group("image_pipe_swapchain_fb_layer") {
 }
 
 loadable_module("fb_skip_present") {
+  #TODO(b/319117470) - remove to complete soft transition
+  check_includes = false
   output_name = "VkLayer_image_pipe_swapchain_fb_skip_present"
   defines = [
     "USE_IMAGEPIPE_SURFACE_FB",
@@ -168,6 +179,8 @@ group("image_pipe_swapchain_fb_skip_present_layer") {
 }
 
 loadable_module("copy") {
+  #TODO(b/319117470) - remove to complete soft transition
+  check_includes = false
   testonly = true  # Not intended for production use
   output_name = "VkLayer_image_pipe_swapchain_copy"
   defines = [ "USE_SWAPCHAIN_SURFACE_COPY" ]

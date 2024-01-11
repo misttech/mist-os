@@ -48,7 +48,6 @@ constexpr bool kSkipPresent = false;
 #endif
 
 #include <vk_dispatch_table_helper.h>
-#include <vk_layer_data.h>
 #include <vk_layer_extension_utils.h>
 
 #include <limits>
@@ -57,6 +56,11 @@ constexpr bool kSkipPresent = false;
 #include <vector>
 
 #include "vk_layer_dispatch_table.h"
+
+// Older headers defined this for us
+#ifndef VK_LAYER_EXPORT
+#define VK_LAYER_EXPORT __attribute__((visibility("default")))
+#endif
 
 namespace {
 // The loader dispatch table may be a different version from the layer's, and can't be used
@@ -585,9 +589,9 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateImagePipeSurfaceFUCHSIA(
     VkInstance instance, const VkImagePipeSurfaceCreateInfoFUCHSIA* pCreateInfo,
     const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-VKAPI_ATTR VkResult VKAPI_CALL
-CreateWaylandSurfaceKHR(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR* pCreateInfo,
-                        const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
+VKAPI_ATTR VkResult VKAPI_CALL CreateWaylandSurfaceKHR(
+    VkInstance instance, const VkWaylandSurfaceCreateInfoKHR* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
 
 #else
 #error Unsupported
@@ -627,9 +631,9 @@ VKAPI_ATTR void VKAPI_CALL DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR v
   delete surface;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
-GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
-                                        VkSurfaceCapabilitiesKHR* pSurfaceCapabilities) {
+VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilitiesKHR(
+    VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+    VkSurfaceCapabilitiesKHR* pSurfaceCapabilities) {
   VkLayerInstanceDispatchTable* instance_dispatch_table =
       GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map)
           ->instance_dispatch_table.get();
@@ -662,9 +666,9 @@ GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfa
   return VK_SUCCESS;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
-GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface,
-                                   uint32_t* pCount, VkSurfaceFormatKHR* pSurfaceFormats) {
+VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceFormatsKHR(
+    VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface, uint32_t* pCount,
+    VkSurfaceFormatKHR* pSurfaceFormats) {
   SupportedImageProperties& supported_properties =
       reinterpret_cast<ImagePipeSurface*>(surface)->GetSupportedImageProperties();
   if (pSurfaceFormats == nullptr) {
@@ -679,9 +683,9 @@ GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, const VkSurf
   return VK_SUCCESS;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
-GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface,
-                                        uint32_t* pCount, VkPresentModeKHR* pPresentModes) {
+VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfacePresentModesKHR(
+    VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface, uint32_t* pCount,
+    VkPresentModeKHR* pPresentModes) {
   LayerData* layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
   return reinterpret_cast<ImagePipeSurface*>(surface)->GetPresentModes(
       physicalDevice, layer_data->instance_dispatch_table.get(), pCount, pPresentModes);
@@ -889,9 +893,9 @@ VKAPI_ATTR VkResult VKAPI_CALL EnumerateInstanceExtensionProperties(
   return VK_ERROR_LAYER_NOT_PRESENT;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL
-EnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, const char* pLayerName,
-                                   uint32_t* pCount, VkExtensionProperties* pProperties) {
+VKAPI_ATTR VkResult VKAPI_CALL EnumerateDeviceExtensionProperties(
+    VkPhysicalDevice physicalDevice, const char* pLayerName, uint32_t* pCount,
+    VkExtensionProperties* pProperties) {
   if (pLayerName && !strcmp(pLayerName, swapchain_layer.layerName))
     return util_GetExtensionProperties(std::size(device_extensions), device_extensions, pCount,
                                        pProperties);
@@ -1070,8 +1074,8 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateInstanceExtensionPrope
                                                                     pProperties);
 }
 
-VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL
-vkEnumerateInstanceLayerProperties(uint32_t* pCount, VkLayerProperties* pProperties) {
+VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateInstanceLayerProperties(
+    uint32_t* pCount, VkLayerProperties* pProperties) {
   return image_pipe_swapchain::EnumerateInstanceLayerProperties(pCount, pProperties);
 }
 
@@ -1081,9 +1085,9 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateDeviceLayerProperties(
   return image_pipe_swapchain::EnumerateDeviceLayerProperties(VK_NULL_HANDLE, pCount, pProperties);
 }
 
-VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL
-vkEnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, const char* pLayerName,
-                                     uint32_t* pCount, VkExtensionProperties* pProperties) {
+VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateDeviceExtensionProperties(
+    VkPhysicalDevice physicalDevice, const char* pLayerName, uint32_t* pCount,
+    VkExtensionProperties* pProperties) {
   assert(physicalDevice == VK_NULL_HANDLE);
   return image_pipe_swapchain::EnumerateDeviceExtensionProperties(VK_NULL_HANDLE, pLayerName,
                                                                   pCount, pProperties);
@@ -1094,7 +1098,7 @@ VK_LAYER_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vkGetDeviceProcAddr(VkD
   return image_pipe_swapchain::GetDeviceProcAddr(dev, funcName);
 }
 
-VK_LAYER_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
-vkGetInstanceProcAddr(VkInstance instance, const char* funcName) {
+VK_LAYER_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr(
+    VkInstance instance, const char* funcName) {
   return image_pipe_swapchain::GetInstanceProcAddr(instance, funcName);
 }
