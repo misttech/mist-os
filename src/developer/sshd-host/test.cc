@@ -4,9 +4,8 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <fuchsia/boot/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/testing/service_directory_provider.h>
+#include <fidl/fuchsia.boot/cpp/test_base.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/zx/object.h>
 #include <unistd.h>
 #include <zircon/status.h>
@@ -27,29 +26,27 @@ namespace sshd_host {
 
 namespace {
 
-using fuchsia::boot::Items;
+using fuchsia_boot::Items;
 
 // Mock fuchsia.boot.Items server
-class FakeItems final : public Items {
+class FakeItems final : public fidl::testing::TestBase<Items> {
  public:
-  fidl::InterfaceRequestHandler<Items> GetHandler() { return bindings_.GetHandler(this); }
-
-  void Get(uint32_t type, uint32_t extra, GetCallback callback) override { EXPECT_TRUE(false); }
-  void Get2(uint32_t type, std::unique_ptr<fuchsia::boot::Extra>, Get2Callback callback) override {
-    EXPECT_TRUE(false);
+  void NotImplemented_(const std::string &name, fidl::CompleterBase &completer) override {
+    ASSERT_TRUE(false) << name << " not implemented.";
   }
 
-  void GetBootloaderFile(::std::string filename, GetBootloaderFileCallback callback) override {
+  void GetBootloaderFile(GetBootloaderFileRequest &request,
+                         GetBootloaderFileCompleter::Sync &completer) override {
     if (!bootloader_file_set_) {
-      callback(zx::vmo(ZX_HANDLE_INVALID));
+      completer.Reply({{.payload = zx::vmo(ZX_HANDLE_INVALID)}});
       return;
     }
     bootloader_file_set_ = false;
 
-    if (filename == filename_) {
-      callback(std::move(vmo_));
+    if (request.filename() == filename_) {
+      completer.Reply({{.payload = zx::vmo(std::move(vmo_))}});
     } else {
-      callback(zx::vmo(ZX_HANDLE_INVALID));
+      completer.Reply({{.payload = zx::vmo(ZX_HANDLE_INVALID)}});
     }
   }
 
@@ -65,7 +62,6 @@ class FakeItems final : public Items {
   }
 
  private:
-  fidl::BindingSet<Items> bindings_;
   bool bootloader_file_set_ = false;
   std::string filename_;
   ::zx::vmo vmo_;
@@ -75,7 +71,14 @@ class SshdHostBootItemTest : public gtest::RealLoopFixture {
  public:
   void SetUp() override {
     EXPECT_EQ(loop_.StartThread(), ZX_OK);
-    EXPECT_EQ(service_directory_provider_.AddService(fake_items_.GetHandler()), ZX_OK);
+
+    auto items_endpoints = fidl::CreateEndpoints<Items>();
+    ASSERT_TRUE(items_endpoints.is_ok());
+
+    binding_ref_ =
+        fidl::BindServer(loop_.dispatcher(), std::move(items_endpoints->server), &fake_items_);
+
+    items_client_ = fidl::SyncClient(std::move(items_endpoints->client));
   }
 
   void TearDown() override {
@@ -84,8 +87,9 @@ class SshdHostBootItemTest : public gtest::RealLoopFixture {
   }
 
   async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  sys::testing::ServiceDirectoryProvider service_directory_provider_{loop_.dispatcher()};
   FakeItems fake_items_;
+  std::optional<fidl::ServerBindingRef<Items>> binding_ref_;
+  fidl::SyncClient<Items> items_client_;
   thrd_t thread_;
 };
 
@@ -127,8 +131,7 @@ void verify_authorized_keys(const char *payload, size_t len) {
 TEST_F(SshdHostBootItemTest, TestNoKeyFileNoBootloaderFile) {
   remove_authorized_keys();
 
-  zx_status_t status = provision_authorized_keys_from_bootloader_file(
-      service_directory_provider_.service_directory());
+  zx_status_t status = provision_authorized_keys_from_bootloader_file(items_client_);
   ASSERT_EQ(status, ZX_ERR_NOT_FOUND);
 
   ASSERT_EQ(opendir(kSshDirectory), nullptr);
@@ -140,8 +143,7 @@ TEST_F(SshdHostBootItemTest, TestKeyFileExistsNoBootloaderFile) {
   constexpr char kAuthorizedKeysPayload[] = "authorized_keys_file_data";
   write_authorized_keys(kAuthorizedKeysPayload, strlen(kAuthorizedKeysPayload));
 
-  zx_status_t status = provision_authorized_keys_from_bootloader_file(
-      service_directory_provider_.service_directory());
+  zx_status_t status = provision_authorized_keys_from_bootloader_file(items_client_);
   ASSERT_EQ(status, ZX_ERR_NOT_FOUND);
 
   verify_authorized_keys(kAuthorizedKeysPayload, strlen(kAuthorizedKeysPayload));
@@ -156,8 +158,7 @@ TEST_F(SshdHostBootItemTest, TestBootloaderFileProvisioningNoKeyFile) {
 
   remove_authorized_keys();
 
-  zx_status_t status = provision_authorized_keys_from_bootloader_file(
-      service_directory_provider_.service_directory());
+  zx_status_t status = provision_authorized_keys_from_bootloader_file(items_client_);
   ASSERT_EQ(status, ZX_OK);
 
   verify_authorized_keys(kAuthorizedKeysPayload, strlen(kAuthorizedKeysPayload));
@@ -174,8 +175,7 @@ TEST_F(SshdHostBootItemTest, TestBootloaderFileProvisioningSshDirNoKeyFile) {
   remove_authorized_keys();
   ASSERT_EQ(mkdir(kSshDirectory, 0700), 0);
 
-  zx_status_t status = provision_authorized_keys_from_bootloader_file(
-      service_directory_provider_.service_directory());
+  zx_status_t status = provision_authorized_keys_from_bootloader_file(items_client_);
   ASSERT_EQ(status, ZX_OK);
 
   verify_authorized_keys(kAuthorizedKeysPayload, strlen(kAuthorizedKeysPayload));
@@ -190,8 +190,7 @@ TEST_F(SshdHostBootItemTest, TestBootloaderFileNotProvisionedWithExistingKeyFile
   fake_items_.SetFile(kAuthorizedKeysBootloaderFileName.data(), kAuthorizedKeysBootItemPayload,
                       strlen(kAuthorizedKeysBootItemPayload));
 
-  zx_status_t status = provision_authorized_keys_from_bootloader_file(
-      service_directory_provider_.service_directory());
+  zx_status_t status = provision_authorized_keys_from_bootloader_file(items_client_);
   ASSERT_EQ(status, ZX_ERR_ALREADY_EXISTS);
 
   verify_authorized_keys(kAuthorizedKeysPayload, strlen(kAuthorizedKeysPayload));

@@ -19,21 +19,25 @@ source_set("sshd_constants") {
 }
 
 source_set("lib") {
-  sources = [ "service.cc" ]
+  sources = [
+    "service.cc",
+    "service.h",
+  ]
   deps = [
     ":sshd_constants",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_hlcpp",
-    "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
-    "//src/lib/fsl",
     "//src/lib/fxl",
     "//zircon/system/ulib/zx",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
-    "//sdk/lib/sys/cpp",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//src/lib/fsl",
     "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -97,7 +101,7 @@ executable("test") {
   deps = [
     ":lib",
     ":sshd_constants",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_hlcpp",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",

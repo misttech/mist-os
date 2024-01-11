@@ -7,14 +7,13 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fuchsia/boot/cpp/fidl.h>
-#include <fuchsia/component/cpp/fidl.h>
-#include <fuchsia/process/cpp/fidl.h>
+#include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.process/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/fd.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
-#include <lib/sys/cpp/service_directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -37,23 +36,16 @@
 namespace sshd_host {
 
 zx_status_t provision_authorized_keys_from_bootloader_file(
-    const std::shared_ptr<sys::ServiceDirectory>& service_directory) {
-  fuchsia::boot::ItemsSyncPtr boot_items;
-  if (zx_status_t status = service_directory->Connect(boot_items.NewRequest()); status != ZX_OK) {
-    FX_PLOGS(ERROR, status)
-        << "Provisioning keys from boot item: failed to connect to boot items service";
-    return status;
-  }
+    fidl::SyncClient<fuchsia_boot::Items>& boot_items) {
+  auto result =
+      boot_items->GetBootloaderFile({{.filename = std::string(kAuthorizedKeysBootloaderFileName)}});
 
-  zx::vmo vmo;
-  if (zx_status_t status =
-          boot_items->GetBootloaderFile(std::string(kAuthorizedKeysBootloaderFileName.data(),
-                                                    kAuthorizedKeysBootloaderFileName.size()),
-                                        &vmo);
-      status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Provisioning keys from boot item: GetBootloaderFile failed";
-    return status;
+  if (result.is_error()) {
+    FX_PLOGS(ERROR, result.error_value().status())
+        << "Provisioning keys from boot item: GetBootloaderFile failed";
+    return result.error_value().status();
   }
+  zx::vmo vmo = std::move(result->payload());
 
   if (!vmo.is_valid()) {
     FX_LOGS(INFO) << "Provisioning keys from boot item: bootloader file not found: "
@@ -143,10 +135,8 @@ Service::Socket Service::MakeSocket(async_dispatcher_t* dispatcher, IpVersion ip
   return Socket{.fd = std::move(sock), .waiter = fsl::FDWaiter(dispatcher)};
 }
 
-Service::Service(async_dispatcher_t* dispatcher,
-                 std::shared_ptr<sys::ServiceDirectory> service_directory, uint16_t port)
+Service::Service(async_dispatcher_t* dispatcher, uint16_t port)
     : dispatcher_(dispatcher),
-      service_directory_(std::move(service_directory)),
       port_(port),
       v4_socket_(MakeSocket(dispatcher_, IpVersion::V4, port_)),
       v6_socket_(MakeSocket(dispatcher_, IpVersion::V6, port_)) {
@@ -222,90 +212,62 @@ void Service::Wait(std::optional<IpVersion> ip_version) {
 }
 
 void Service::Launch(fbl::unique_fd conn) {
-  std::string child_name = fxl::StringPrintf("sshd-%lu", next_child_num_++);
+  uint64_t child_num = next_child_num_++;
+  std::string child_name = fxl::StringPrintf("sshd-%lu", child_num);
 
-  fuchsia::component::RealmSyncPtr realm;
-  if (zx_status_t status = service_directory_->Connect(realm.NewRequest()); status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to connect to realm service";
+  auto realm_client_end = component::Connect<fuchsia_component::Realm>();
+  if (realm_client_end.is_error()) {
+    FX_PLOGS(ERROR, realm_client_end.status_value()) << "Failed to connect to realm service";
     return;
   }
 
-  fuchsia::component::ControllerSyncPtr controller;
+  fidl::SyncClient<fuchsia_component::Realm> realm{std::move(*realm_client_end)};
+
+  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_component::Controller>();
+  if (controller_endpoints.is_error()) {
+    FX_PLOGS(ERROR, controller_endpoints.status_value())
+        << "Failed to connect to create controller endpoints";
+    return;
+  }
+
+  fidl::SyncClient<fuchsia_component::Controller> controller{
+      std::move(controller_endpoints->client)};
   {
-    fuchsia::component::decl::CollectionRef collection{
+    fuchsia_component_decl::CollectionRef collection{{
         .name = std::string(kShellCollection),
-    };
-    fuchsia::component::decl::Child decl;
-    decl.set_name(child_name);
-    decl.set_url("#meta/sshd.cm");
-    decl.set_startup(fuchsia::component::decl::StartupMode::LAZY);
+    }};
+    fuchsia_component_decl::Child decl{{.name = child_name,
+                                        .url = "#meta/sshd.cm",
+                                        .startup = fuchsia_component_decl::StartupMode::kLazy}};
 
-    fuchsia::component::CreateChildArgs args;
-    args.set_controller(controller.NewRequest());
+    fuchsia_component::CreateChildArgs args{
+        {.controller = std::move(controller_endpoints->server)}};
 
-    fuchsia::component::Realm_CreateChild_Result result;
-    if (zx_status_t status =
-            realm->CreateChild(collection, std::move(decl), std::move(args), &result);
-        status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to create sshd child";
-      return;
-    }
-
-    if (result.is_err()) {
-      FX_LOGS(ERROR) << "Failed to create sshd child: " << static_cast<uint32_t>(result.err());
+    auto result = realm->CreateChild(
+        {{.collection = collection, .decl = std::move(decl), .args = std::move(args)}});
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "Failed to create sshd child: " << result.error_value().FormatDescription();
       return;
     }
   }
 
-  fuchsia::component::ExecutionControllerPtr& execution_controller = controllers_.emplace_back();
-  auto remove_controller_on_error = fit::defer([this]() { controllers_.pop_back(); });
+  auto execution_controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_component::ExecutionController>();
+  if (execution_controller_endpoints.is_error()) {
+    FX_LOGS(ERROR) << "Failed to create execution controller endpoints: "
+                   << execution_controller_endpoints.status_string();
+    return;
+  }
 
-  fit::callback<void(zx_status_t)> on_stop_cb = [this, ptr = execution_controller.get(),
-                                                 realm = std::move(realm),
-                                                 child_name](zx_status_t status) {
-    if (status != ZX_OK) {
-      FX_PLOGS(WARNING, status) << "sshd component stopped with error";
-    }
-
-    // Remove the controller.
-    auto i = std::find_if(controllers_.begin(), controllers_.end(),
-                          [ptr](const fuchsia::component::ExecutionControllerPtr& controller) {
-                            return controller.get() == ptr;
-                          });
-    if (i != controllers_.end()) {
-      controllers_.erase(i);
-    };
-
-    // Destroy the component.
-    fuchsia::component::decl::ChildRef child_ref = {
-        .name = child_name,
-        .collection = std::string(kShellCollection),
-    };
-    fuchsia::component::Realm_DestroyChild_Result result;
-    if (zx_status_t status = realm->DestroyChild(std::move(child_ref), &result); status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to destroy sshd child";
-      return;
-    }
-
-    if (result.is_err()) {
-      FX_LOGS(ERROR) << "Failed to destroy sshd child: " << static_cast<uint32_t>(result.err());
-      return;
-    }
-  };
-
-  execution_controller.events().OnStop =
-      [on_stop_cb = on_stop_cb.share()](fuchsia::component::StoppedPayload payload) mutable {
-        zx_status_t status = ZX_OK;
-        if (payload.has_status()) {
-          status = payload.status();
-        }
-        on_stop_cb(status);
-      };
-  execution_controller.set_error_handler(
-      [on_stop_cb = std::move(on_stop_cb)](zx_status_t status) mutable { on_stop_cb(status); });
+  controllers_.emplace(std::piecewise_construct, std::forward_as_tuple(child_num),
+                       std::forward_as_tuple(this, child_num, std::move(child_name),
+                                             std::move(execution_controller_endpoints->client),
+                                             dispatcher_, std::move(realm)));
+  auto remove_controller_on_error =
+      fit::defer([this, child_num]() { controllers_.erase(child_num); });
 
   // Pass the connection fd as stdin and stdout handles to the sshd component.
-  fuchsia::component::StartChildArgs start_args;
+  std::vector<fuchsia_process::HandleInfo> numbered_handles;
   for (int fd : {STDIN_FILENO, STDOUT_FILENO}) {
     zx::handle conn_handle;
     if (zx_status_t status = fdio_fd_clone(conn.get(), conn_handle.reset_and_get_address());
@@ -313,24 +275,42 @@ void Service::Launch(fbl::unique_fd conn) {
       FX_PLOGS(ERROR, status) << "Failed to clone connection file descriptor " << conn.get();
       return;
     }
-    start_args.mutable_numbered_handles()->push_back(
-        fuchsia::process::HandleInfo{.handle = std::move(conn_handle), .id = PA_HND(PA_FD, fd)});
+    numbered_handles.push_back(
+        fuchsia_process::HandleInfo{{.handle = std::move(conn_handle), .id = PA_HND(PA_FD, fd)}});
   }
 
-  fuchsia::component::Controller_Start_Result result;
-  if (zx_status_t status = controller->Start(std::move(start_args),
-                                             execution_controller.NewRequest(dispatcher_), &result);
-      status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Failed to start sshd child";
-    return;
-  }
+  auto result = controller->Start(
+      {{.args = {{
+            .numbered_handles = std::move(numbered_handles),
+            .namespace_entries = {},
+        }},
+        .execution_controller = std::move(execution_controller_endpoints->server)}});
 
-  if (result.is_err()) {
-    FX_LOGS(ERROR) << "Failed to start sshd child: " << static_cast<uint32_t>(result.err());
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to start sshd child: " << result.error_value().FormatDescription();
     return;
   }
 
   remove_controller_on_error.cancel();
+}
+
+void Service::OnStop(zx_status_t status, Controller* ptr) {
+  if (status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "sshd component stopped with error";
+  }
+
+  // Destroy the component.
+  auto result = ptr->realm_->DestroyChild({{.child = {{
+                                                .name = ptr->child_name_,
+                                                .collection = std::string(kShellCollection),
+
+                                            }}}});
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to destroy sshd child: " << result.error_value().FormatDescription();
+  }
+
+  // Remove the controller.
+  controllers_.erase(ptr->child_num_);
 }
 
 }  // namespace sshd_host

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/spawn.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/process.h>
@@ -27,12 +28,17 @@ int main(int argc, const char** argv) {
   // introspection services for debugging.
   { zx::handle((zx_take_startup_handle(PA_DIRECTORY_REQUEST))); }
 
-  std::shared_ptr service_directory = sys::ComponentContext::Create()->svc();
-
   FX_SLOG(INFO, "sshd-host starting up");
 
-  if (zx_status_t status =
-          sshd_host::provision_authorized_keys_from_bootloader_file(service_directory);
+  zx::result client_end = component::Connect<fuchsia_boot::Items>();
+  if (!client_end.is_ok()) {
+    FX_PLOGS(ERROR, client_end.status_value())
+        << "Provisioning keys from boot item: failed to connect to boot items service";
+    return client_end.status_value();
+  }
+  fidl::SyncClient boot_items{std::move(*client_end)};
+
+  if (zx_status_t status = sshd_host::provision_authorized_keys_from_bootloader_file(boot_items);
       status != ZX_OK) {
     FX_SLOG(WARNING, "Failed to provision authorized_keys",
             FX_KV("status", zx_status_get_string(status)));
@@ -69,7 +75,7 @@ int main(int argc, const char** argv) {
     }
     port = static_cast<uint16_t>(arg);
   }
-  sshd_host::Service service(loop.dispatcher(), std::move(service_directory), port);
+  sshd_host::Service service(loop.dispatcher(), port);
 
   if (zx_status_t status = loop.Run(); status != ZX_OK) {
     FX_SLOG(FATAL, "Failed to run loop", FX_KV("status", zx_status_get_string(status)));

@@ -5,9 +5,9 @@
 #ifndef SRC_DEVELOPER_SSHD_HOST_SERVICE_H_
 #define SRC_DEVELOPER_SSHD_HOST_SERVICE_H_
 
-#include <fuchsia/component/cpp/fidl.h>
+#include <fidl/fuchsia.boot/cpp/fidl.h>
+#include <fidl/fuchsia.component/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
-#include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/process.h>
 #include <sys/socket.h>
 
@@ -29,17 +29,19 @@ inline constexpr char kAuthorizedKeysPath[] = "/data/ssh/authorized_keys";
 inline constexpr std::string_view kShellCollection = "shell";
 
 zx_status_t provision_authorized_keys_from_bootloader_file(
-    const std::shared_ptr<sys::ServiceDirectory>& service_directory);
+    fidl::SyncClient<fuchsia_boot::Items>& boot_items);
+
+class Service;
 
 // Service relies on the default async dispatcher and is not thread safe.
 class Service {
  public:
-  Service(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> service_directory,
-          uint16_t port);
+  Service(async_dispatcher_t* dispatcher, uint16_t port);
   ~Service();
 
  private:
   enum class IpVersion { V4 = AF_INET, V6 = AF_INET6 };
+  struct Controller;
 
   struct Socket {
     fbl::unique_fd fd;
@@ -51,15 +53,41 @@ class Service {
   void Wait(std::optional<IpVersion> ip_version);
   void Launch(fbl::unique_fd conn);
 
+  void OnStop(zx_status_t status, Controller* controller);
+
   async_dispatcher_t* dispatcher_;
-  std::shared_ptr<sys::ServiceDirectory> service_directory_;
   uint16_t port_;
   // TODO(https://fxbug.dev/21198): Replace these with a single dual-stack
   // socket once Netstack3 supports that.
   Socket v4_socket_, v6_socket_;
   uint64_t next_child_num_ = 0;
 
-  std::vector<fuchsia::component::ExecutionControllerPtr> controllers_;
+  struct Controller final : public fidl::AsyncEventHandler<fuchsia_component::ExecutionController> {
+    Controller(Service* service, uint64_t child_num, std::string child_name,
+               fidl::ClientEnd<fuchsia_component::ExecutionController> client_end,
+               async_dispatcher_t* dispatcher, fidl::SyncClient<fuchsia_component::Realm> realm)
+        : service_(service),
+          child_num_(child_num),
+          child_name_(std::move(child_name)),
+          client_(std::move(client_end), dispatcher, this),
+          realm_(std::move(realm)) {}
+    void OnStop(fidl::Event<fuchsia_component::ExecutionController::OnStop>& event) override {
+      service_->OnStop(event.stopped_payload().status().value_or(ZX_OK), this);
+    }
+    void on_fidl_error(fidl::UnbindInfo error) override {
+      service_->OnStop(error.ToError().status(), this);
+    }
+
+    fidl::Client<fuchsia_component::ExecutionController>& operator->() { return client_; }
+
+    Service* service_;
+    uint64_t child_num_;
+    std::string child_name_;
+    fidl::Client<fuchsia_component::ExecutionController> client_;
+    fidl::SyncClient<fuchsia_component::Realm> realm_;
+  };
+
+  std::map<uint64_t, Controller> controllers_;
 };
 
 }  // namespace sshd_host
