@@ -5,7 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.driver.development") {
-  sources = [ "development.fidl" ]
+  sources = [
+    "development.fidl",
+    "iterators.fidl",
+    "types.fidl",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.component.decl",
     "//sdk/fidl/fuchsia.driver.framework",

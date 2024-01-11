@@ -694,6 +694,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         }
     }
 

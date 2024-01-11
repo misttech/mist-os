@@ -144,7 +144,7 @@ fn print_tree(
 pub async fn dump(
     cmd: DumpCommand,
     writer: &mut dyn Write,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     let devices: Vec<Device> = fuchsia_driver_dev::get_device_info(
         &driver_development_proxy,
@@ -231,11 +231,11 @@ mod tests {
 
     async fn test_dump<F, Fut>(cmd: DumpCommand, on_driver_development_request: F) -> Result<String>
     where
-        F: Fn(fdd::DriverDevelopmentRequest) -> Fut + Send + Sync + 'static,
+        F: Fn(fdd::ManagerRequest) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + Sync,
     {
         let (driver_development_proxy, mut driver_development_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdd::DriverDevelopmentMarker>()
+            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>()
                 .context("Failed to create FIDL proxy")?;
 
         // Run the command and mock driver development server.
@@ -282,9 +282,9 @@ mod tests {
     async fn test_simple() {
         let cmd = DumpCommand::from_args(&["dump"], &[]).unwrap();
 
-        let output = test_dump(cmd, |request: fdd::DriverDevelopmentRequest| async move {
+        let output = test_dump(cmd, |request: fdd::ManagerRequest| async move {
             match request {
-                fdd::DriverDevelopmentRequest::GetNodeInfo {
+                fdd::ManagerRequest::GetNodeInfo {
                     node_filter: _,
                     iterator,
                     control_handle: _,
@@ -352,9 +352,9 @@ mod tests {
     async fn test_duplicates_are_filtered() {
         let cmd = DumpCommand::from_args(&["dump"], &[]).unwrap();
 
-        let output = test_dump(cmd, |request: fdd::DriverDevelopmentRequest| async move {
+        let output = test_dump(cmd, |request: fdd::ManagerRequest| async move {
             match request {
-                fdd::DriverDevelopmentRequest::GetNodeInfo {
+                fdd::ManagerRequest::GetNodeInfo {
                     node_filter: _,
                     iterator,
                     control_handle: _,
@@ -386,9 +386,9 @@ mod tests {
     async fn test_with_node_filter() {
         let cmd = DumpCommand::from_args(&["dump"], &["parent"]).unwrap();
 
-        let output = test_dump(cmd, |request: fdd::DriverDevelopmentRequest| async move {
+        let output = test_dump(cmd, |request: fdd::ManagerRequest| async move {
             match request {
-                fdd::DriverDevelopmentRequest::GetNodeInfo {
+                fdd::ManagerRequest::GetNodeInfo {
                     node_filter: _,
                     iterator,
                     control_handle: _,

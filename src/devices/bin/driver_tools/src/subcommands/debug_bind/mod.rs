@@ -14,7 +14,7 @@ use {
 pub async fn debug_bind(
     _cmd: DebugBindCommand,
     _writer: &mut dyn Write,
-    _driver_development_proxy: fdd::DriverDevelopmentProxy,
+    _driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     // TODO(fxb:67441): Support the new bytecode format in the debugger.
     return Err(format_err!("The bind debugger is not supported currently."));

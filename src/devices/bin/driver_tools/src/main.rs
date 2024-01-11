@@ -21,14 +21,11 @@ impl DriverConnector {
 
 #[async_trait::async_trait]
 impl driver_connector::DriverConnector for DriverConnector {
-    async fn get_driver_development_proxy(
-        &self,
-        select: bool,
-    ) -> Result<fdd::DriverDevelopmentProxy> {
+    async fn get_driver_development_proxy(&self, select: bool) -> Result<fdd::ManagerProxy> {
         if select {
             anyhow::bail!("The 'driver' tool cannot use the select flag. Please use 'ffx driver' in order to select a component.");
         }
-        client::connect_to_protocol::<fdd::DriverDevelopmentMarker>()
+        client::connect_to_protocol::<fdd::ManagerMarker>()
             .context("Failed to connect to driver development service")
     }
 

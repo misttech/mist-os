@@ -45,9 +45,7 @@ impl DriverTestRealmBuilder for RealmBuilder {
         .await?;
         self.add_route(
             Route::new()
-                .capability(Capability::protocol_by_name(
-                    "fuchsia.driver.development.DriverDevelopment",
-                ))
+                .capability(Capability::protocol_by_name("fuchsia.driver.development.Manager"))
                 .capability(Capability::protocol_by_name(
                     "fuchsia.driver.registrar.DriverRegistrar",
                 ))

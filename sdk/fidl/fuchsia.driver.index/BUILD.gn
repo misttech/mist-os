@@ -5,9 +5,14 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.driver.index") {
-  sources = [ "driver_index.fidl" ]
+  sources = [
+    "development.fidl",
+    "driver_index.fidl",
+  ]
   public_deps = [
+    "//sdk/fidl/fuchsia.driver.development",
     "//sdk/fidl/fuchsia.driver.framework",
+    "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",
   ]
   enable_hlcpp = true

@@ -13,7 +13,7 @@ use {
 
 pub async fn list_hosts(
     _cmd: ListHostsCommand,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     let device_info = fuchsia_driver_dev::get_device_info(
         &driver_development_proxy,

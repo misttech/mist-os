@@ -18,7 +18,7 @@ use {
 };
 
 async fn get_driver_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     driver_filter: &[String],
 ) -> Result<Vec<fdf::DriverInfo>> {
     let (iterator, iterator_server) =
@@ -118,7 +118,7 @@ async fn test_smoke_test() -> Result<()> {
     instance.driver_test_realm_start(fdt::RealmArgs::default()).await?;
 
     // Connect to a protocol to ensure that it starts, then immediately exit.
-    let _ = instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
+    let _ = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
     Ok(())
 }
 
@@ -133,8 +133,7 @@ async fn test_empty_args() -> Result<()> {
 
     instance.driver_test_realm_start(fdt::RealmArgs::default()).await?;
 
-    let driver_dev =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
 
     let info = get_driver_info(&driver_dev, &[]).await?;
     assert!(info
@@ -162,8 +161,7 @@ async fn test_pkg_dir() -> Result<()> {
 
     instance.driver_test_realm_start(args).await?;
 
-    let driver_dev =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
 
     let info = get_driver_info(&driver_dev, &[]).await?;
     assert!(info

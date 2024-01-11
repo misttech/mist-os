@@ -170,7 +170,7 @@ impl DevicePrinter for Device {
 
 pub async fn list_devices(
     cmd: ListDevicesCommand,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     let devices: Vec<Device> = match cmd.device {
         Some(device) => {
@@ -201,15 +201,6 @@ pub async fn list_devices(
         } else {
             println!("No devices found.");
         }
-    }
-
-    // TODO(https://fxbug.dev/118660): Remove this warning once ffx driver supports unbound composites.
-    if !driver_development_proxy.is_dfv2().await? {
-        println!(
-            "\n\n\
-            PSA: Unbound composites are no longer added to the topology in DFv1. \
-            Use ffx driver list-composites to see information on the composites."
-        );
     }
 
     Ok(())

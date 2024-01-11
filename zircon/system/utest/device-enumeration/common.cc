@@ -138,8 +138,7 @@ void DeviceEnumerationTest::TestRunner(const char** device_paths, size_t paths_n
 void DeviceEnumerationTest::PrintAllDevices() {
   // This uses the development API for its convenience over directory traversal. It would be more
   // useful to log paths in devfs for the purposes of this test, but less convenient.
-  zx::result driver_development =
-      component::Connect<fuchsia_driver_development::DriverDevelopment>();
+  zx::result driver_development = component::Connect<fuchsia_driver_development::Manager>();
   ASSERT_OK(driver_development.status_value());
 
   {
@@ -157,10 +156,10 @@ void DeviceEnumerationTest::PrintAllDevices() {
       const fidl::WireResult result = fidl::WireCall(client)->GetNext();
       ASSERT_OK(result.status());
       const fidl::WireResponse response = result.value();
-      if (response.drivers.empty()) {
+      if (response.nodes.empty()) {
         break;
       }
-      for (const fuchsia_driver_development::wire::NodeInfo& info : response.drivers) {
+      for (const fuchsia_driver_development::wire::NodeInfo& info : response.nodes) {
         ASSERT_TRUE(info.has_versioned_info());
         ASSERT_TRUE(info.versioned_info().is_v2());
         ASSERT_TRUE(info.versioned_info().v2().has_moniker());

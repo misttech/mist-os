@@ -414,7 +414,7 @@
         },
         {
             protocol: [
-                "fuchsia.driver.development.DriverIndex",
+                "fuchsia.driver.index.DevelopmentManager",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.driver.registrar.DriverRegistrar",
             ],
@@ -612,7 +612,7 @@
             ],
         },
         {
-            protocol: [ "fuchsia.driver.development.DriverDevelopment" ],
+            protocol: [ "fuchsia.driver.development.Manager" ],
             from: "#driver_manager",
             to: [
                 "#console-launcher",
@@ -1192,7 +1192,7 @@
             from: "#device_name_provider",
         },
         {
-            protocol: [ "fuchsia.driver.development.DriverDevelopment" ],
+            protocol: [ "fuchsia.driver.development.Manager" ],
             from: "#driver_manager",
         },
         {

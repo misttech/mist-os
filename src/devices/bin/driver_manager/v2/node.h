@@ -179,7 +179,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // For the url, rematch takes place if either:
   //  - the url matches the requested_url and the 'requested' flag is available.
   //  - the url does not match and the 'non_requested' flag is available.
-  bool EvaluateRematchFlags(fuchsia_driver_development::RematchFlags rematch_flags,
+  bool EvaluateRematchFlags(fuchsia_driver_development::RestartRematchFlags rematch_flags,
                             std::string_view requested_url);
 
   // Creates the node's topological path by combining each primary parent's name together,

@@ -17,7 +17,7 @@ use {
 pub async fn list_composite_node_specs(
     cmd: ListCompositeNodeSpecsCommand,
     writer: &mut dyn Write,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     let composite_infos =
         fuchsia_driver_dev::get_composite_node_specs(&driver_development_proxy, cmd.name)
@@ -125,11 +125,11 @@ mod tests {
         on_driver_development_request: F,
     ) -> Result<String>
     where
-        F: Fn(fdd::DriverDevelopmentRequest) -> Fut + Send + Sync + 'static,
+        F: Fn(fdd::ManagerRequest) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + Sync,
     {
         let (driver_development_proxy, mut driver_development_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdd::DriverDevelopmentMarker>()
+            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>()
                 .context("Failed to create FIDL proxy")?;
 
         // Run the command and mock driver development server.
@@ -181,11 +181,10 @@ mod tests {
         )
         .unwrap();
 
-        let output = test_list_composite_node_specs(
-            cmd,
-            |request: fdd::DriverDevelopmentRequest| async move {
+        let output =
+            test_list_composite_node_specs(cmd, |request: fdd::ManagerRequest| async move {
                 match request {
-                    fdd::DriverDevelopmentRequest::GetCompositeNodeSpecs {
+                    fdd::ManagerRequest::GetCompositeNodeSpecs {
                         name_filter: _,
                         iterator,
                         control_handle: _,
@@ -316,10 +315,9 @@ mod tests {
                     _ => {}
                 }
                 Ok(())
-            },
-        )
-        .await
-        .unwrap();
+            })
+            .await
+            .unwrap();
 
         assert_eq!(
             output,

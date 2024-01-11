@@ -16,7 +16,7 @@
     use: [
         {
             protocol: [
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.process.Launcher",
                 "fuchsia.process.Resolver",

@@ -62,6 +62,10 @@ type DriverInfo = table {
     /// If not provided, 1 is the assumed version.
     8: driver_framework_version uint8;
 
+    /// Whether the driver is disabled. If true, this driver is not chosen to bind to nodes.
+    @available(added=17)
+    9: is_disabled bool;
+
     // TODO(b/303084353): Add the merkle root when the type is available in the sdk.
 };
 

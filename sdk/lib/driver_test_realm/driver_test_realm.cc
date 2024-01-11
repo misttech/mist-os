@@ -245,7 +245,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
     const std::array<std::string, 3> kProtocols = {
         "fuchsia.device.manager.Administrator",
-        "fuchsia.driver.development.DriverDevelopment",
+        "fuchsia.driver.development.Manager",
         "fuchsia.driver.registrar.DriverRegistrar",
     };
     for (const auto& protocol : kProtocols) {
@@ -492,7 +492,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       return;
     }
 
-    auto driver_development_connect = realm_->component().Connect<fdd::DriverDevelopment>();
+    auto driver_development_connect = realm_->component().Connect<fdd::Manager>();
     if (driver_development_connect.is_error()) {
       FX_SLOG(ERROR, "Cannot connect to test realm driver driver development");
       completer.Reply(driver_development_connect.take_error());
@@ -511,7 +511,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
     fidl::WireSyncClient<fdr::DriverRegistrar> driver_registrar(
         std::move(driver_registrar_connect.value()));
-    fidl::WireSyncClient<fdd::DriverDevelopment> driver_development(
+    fidl::WireSyncClient<fdd::Manager> driver_development(
         std::move(driver_development_connect.value()));
 
     // returned future must be held by the class so that this function doesn't block on the

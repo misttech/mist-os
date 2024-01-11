@@ -184,11 +184,11 @@ TEST_F(Dfv2NodeTest, RemoveDuringFailedBind) {
 
 TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
   auto node = CreateNode("plain");
-  ASSERT_FALSE(
-      node->EvaluateRematchFlags(fuchsia_driver_development::RematchFlags::kRequested, "some-url"));
+  ASSERT_FALSE(node->EvaluateRematchFlags(
+      fuchsia_driver_development::RestartRematchFlags::kRequested, "some-url"));
   ASSERT_TRUE(
-      node->EvaluateRematchFlags(fuchsia_driver_development::RematchFlags::kRequested |
-                                     fuchsia_driver_development::RematchFlags::kNonRequested,
+      node->EvaluateRematchFlags(fuchsia_driver_development::RestartRematchFlags::kRequested |
+                                     fuchsia_driver_development::RestartRematchFlags::kNonRequested,
                                  "some-url"));
 
   auto parent_1 = CreateNode("p1");
@@ -198,33 +198,33 @@ TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
                                               /* is_legacy*/ true, /* primary_index */ 0);
 
   ASSERT_FALSE(legacy_composite->EvaluateRematchFlags(
-      fuchsia_driver_development::RematchFlags::kRequested |
-          fuchsia_driver_development::RematchFlags::kNonRequested,
+      fuchsia_driver_development::RestartRematchFlags::kRequested |
+          fuchsia_driver_development::RestartRematchFlags::kNonRequested,
       "some-url"));
   ASSERT_TRUE(legacy_composite->EvaluateRematchFlags(
-      fuchsia_driver_development::RematchFlags::kRequested |
-          fuchsia_driver_development::RematchFlags::kNonRequested |
-          fuchsia_driver_development::RematchFlags::kLegacyComposite,
+      fuchsia_driver_development::RestartRematchFlags::kRequested |
+          fuchsia_driver_development::RestartRematchFlags::kNonRequested |
+          fuchsia_driver_development::RestartRematchFlags::kLegacyComposite,
       "some-url"));
 
   auto composite = CreateCompositeNode("composite", {parent_1, parent_2},
                                        /* is_legacy*/ false, /* primary_index */ 0);
 
-  ASSERT_FALSE(
-      composite->EvaluateRematchFlags(fuchsia_driver_development::RematchFlags::kRequested |
-                                          fuchsia_driver_development::RematchFlags::kNonRequested,
-                                      "some-url"));
   ASSERT_FALSE(composite->EvaluateRematchFlags(
-      fuchsia_driver_development::RematchFlags::kRequested |
-          fuchsia_driver_development::RematchFlags::kNonRequested |
-          fuchsia_driver_development::RematchFlags::kLegacyComposite,
+      fuchsia_driver_development::RestartRematchFlags::kRequested |
+          fuchsia_driver_development::RestartRematchFlags::kNonRequested,
+      "some-url"));
+  ASSERT_FALSE(composite->EvaluateRematchFlags(
+      fuchsia_driver_development::RestartRematchFlags::kRequested |
+          fuchsia_driver_development::RestartRematchFlags::kNonRequested |
+          fuchsia_driver_development::RestartRematchFlags::kLegacyComposite,
       "some-url"));
 
   ASSERT_TRUE(legacy_composite->EvaluateRematchFlags(
-      fuchsia_driver_development::RematchFlags::kRequested |
-          fuchsia_driver_development::RematchFlags::kNonRequested |
-          fuchsia_driver_development::RematchFlags::kLegacyComposite |
-          fuchsia_driver_development::RematchFlags::kCompositeSpec,
+      fuchsia_driver_development::RestartRematchFlags::kRequested |
+          fuchsia_driver_development::RestartRematchFlags::kNonRequested |
+          fuchsia_driver_development::RestartRematchFlags::kLegacyComposite |
+          fuchsia_driver_development::RestartRematchFlags::kCompositeSpec,
       "some-url"));
 }
 

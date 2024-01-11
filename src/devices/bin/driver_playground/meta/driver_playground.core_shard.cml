@@ -12,7 +12,7 @@
     offer: [
         {
             protocol: [
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",

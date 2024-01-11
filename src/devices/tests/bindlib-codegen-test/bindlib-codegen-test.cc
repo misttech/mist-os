@@ -67,7 +67,7 @@ class BindLibToFidlCodeGenTest : public testing::Test {
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::optional<component_testing::RealmBuilder> realm_builder_;
   std::optional<component_testing::RealmRoot> realm_;
-  fuchsia::driver::development::DriverDevelopmentSyncPtr driver_dev_;
+  fuchsia::driver::development::ManagerSyncPtr driver_dev_;
 };
 
 // TODO(b/316176095): Re-enable test after ensuring it works with DFv2.

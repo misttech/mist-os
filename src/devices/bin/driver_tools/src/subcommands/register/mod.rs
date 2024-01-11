@@ -16,7 +16,7 @@ pub async fn register(
     cmd: RegisterCommand,
     writer: &mut dyn Write,
     driver_registrar_proxy: fdr::DriverRegistrarProxy,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     writeln!(
         writer,
@@ -34,7 +34,7 @@ pub async fn register(
 
     let mut existing = false;
     let restart_result = driver_development_proxy
-        .restart_driver_hosts(cmd.url.as_str(), fdd::RematchFlags::empty())
+        .restart_driver_hosts(cmd.url.as_str(), fdd::RestartRematchFlags::empty())
         .await?;
     match restart_result {
         Ok(count) => {

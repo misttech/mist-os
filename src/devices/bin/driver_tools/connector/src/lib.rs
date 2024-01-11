@@ -9,10 +9,7 @@ use {
 
 #[async_trait::async_trait]
 pub trait DriverConnector {
-    async fn get_driver_development_proxy(
-        &self,
-        select: bool,
-    ) -> Result<fdd::DriverDevelopmentProxy>;
+    async fn get_driver_development_proxy(&self, select: bool) -> Result<fdd::ManagerProxy>;
     async fn get_dev_proxy(&self, select: bool) -> Result<fio::DirectoryProxy>;
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy>;
     async fn get_tool_runner_proxy(&self, select: bool) -> Result<fdp::ToolRunnerProxy>;

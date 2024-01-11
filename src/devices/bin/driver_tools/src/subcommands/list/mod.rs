@@ -21,7 +21,7 @@ use {
 pub async fn list(
     cmd: ListCommand,
     writer: &mut dyn Write,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     let empty: [String; 0] = [];
     let driver_info = fuchsia_driver_dev::get_driver_info(&driver_development_proxy, &empty);
@@ -174,11 +174,11 @@ mod tests {
     /// is returned.
     async fn test_list<F, Fut>(cmd: ListCommand, on_driver_development_request: F) -> Result<String>
     where
-        F: Fn(fdd::DriverDevelopmentRequest) -> Fut + Send + Sync + 'static,
+        F: Fn(fdd::ManagerRequest) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + Sync,
     {
         let (driver_development_proxy, mut driver_development_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fdd::DriverDevelopmentMarker>()
+            fidl::endpoints::create_proxy_and_stream::<fdd::ManagerMarker>()
                 .context("Failed to create FIDL proxy")?;
 
         // Run the command and mock driver development server.
@@ -245,9 +245,9 @@ mod tests {
     async fn test_verbose() {
         let cmd = ListCommand::from_args(&["list"], &["--verbose"]).unwrap();
 
-        let output = test_list(cmd, |request: fdd::DriverDevelopmentRequest| async move {
+        let output = test_list(cmd, |request: fdd::ManagerRequest| async move {
             match request {
-                fdd::DriverDevelopmentRequest::GetDriverInfo {
+                fdd::ManagerRequest::GetDriverInfo {
                     driver_filter: _,
                     iterator,
                     control_handle: _,
@@ -274,7 +274,7 @@ mod tests {
                 )
                 .await
                 .context("Failed to run driver info iterator server")?,
-                fdd::DriverDevelopmentRequest::GetNodeInfo {
+                fdd::ManagerRequest::GetNodeInfo {
                     node_filter: _,
                     iterator,
                     control_handle: _,

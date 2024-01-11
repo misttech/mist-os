@@ -43,7 +43,7 @@ async fn waiter_component(
 }
 
 fn send_get_device_info_request(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[String],
     exact_match: bool,
 ) -> Result<fdd::NodeInfoIteratorProxy> {
@@ -58,7 +58,7 @@ fn send_get_device_info_request(
 }
 
 async fn get_device_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[String],
     exact_match: bool,
 ) -> Result<Vec<fdd::NodeInfo>> {
@@ -110,8 +110,7 @@ async fn test_reload_target() -> Result<()> {
     };
     instance.driver_test_realm_start(args).await?;
 
-    let driver_dev =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
 
     // This maps nodes to Option<Option<u64>>. The outer option is whether the node has been seen
     // yet (if composite parent we start with `Some` for this since we don't receive acks
@@ -139,7 +138,10 @@ async fn test_reload_target() -> Result<()> {
 
     // Let's restart the first target driver.
     let restart_result = driver_dev
-        .restart_driver_hosts("fuchsia-boot:///#meta/target_1.cm", fdd::RematchFlags::empty())
+        .restart_driver_hosts(
+            "fuchsia-boot:///#meta/target_1.cm",
+            fdd::RestartRematchFlags::empty(),
+        )
         .await?;
     if restart_result.is_err() {
         return Err(anyhow!("Failed to restart target_1."));
@@ -176,7 +178,10 @@ async fn test_reload_target() -> Result<()> {
 
     // Now let's restart the second target driver.
     let restart_result = driver_dev
-        .restart_driver_hosts("fuchsia-boot:///#meta/target_2.cm", fdd::RematchFlags::empty())
+        .restart_driver_hosts(
+            "fuchsia-boot:///#meta/target_2.cm",
+            fdd::RestartRematchFlags::empty(),
+        )
         .await?;
     if restart_result.is_err() {
         return Err(anyhow!("Failed to restart target_2."));

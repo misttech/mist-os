@@ -82,7 +82,7 @@
                 "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",

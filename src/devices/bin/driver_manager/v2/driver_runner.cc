@@ -612,7 +612,7 @@ zx::result<> DriverRunner::CreateDriverHostComponent(
 }
 
 zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
-    std::string_view url, fdd::RematchFlags rematch_flags) {
+    std::string_view url, fdd::RestartRematchFlags rematch_flags) {
   auto driver_hosts = DriverHostsWithDriverUrl(url);
 
   // Perform a BFS over the node topology, if the current node's host is one of the driver_hosts

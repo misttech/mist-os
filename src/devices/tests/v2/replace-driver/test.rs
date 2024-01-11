@@ -43,7 +43,7 @@ async fn waiter_component(
 }
 
 fn send_get_device_info_request(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[String],
     exact_match: bool,
 ) -> Result<fdd::NodeInfoIteratorProxy> {
@@ -58,7 +58,7 @@ fn send_get_device_info_request(
 }
 
 async fn get_device_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[String],
     exact_match: bool,
 ) -> Result<Vec<fdd::NodeInfo>> {
@@ -122,8 +122,7 @@ async fn test_replace_target() -> Result<()> {
     };
     instance.driver_test_realm_start(args).await?;
 
-    let driver_dev =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
     let driver_registrar =
         instance.root.connect_to_protocol_at_exposed_dir::<fdr::DriverRegistrarMarker>()?;
 
@@ -153,13 +152,13 @@ async fn test_replace_target() -> Result<()> {
 
     // Let's disable the first target driver.
     let target_1_url = "fuchsia-boot:///#meta/target_1_no_colocate.cm";
-    let disable_result = driver_dev.disable_match_with_driver_url(&target_1_url).await;
+    let disable_result = driver_dev.disable_driver(&target_1_url, None).await;
     if disable_result.is_err() {
         return Err(anyhow!("Failed to disable target_1_no_colocate."));
     }
     // Now we can restart the first target driver with the rematch flag.
     let restart_result =
-        driver_dev.restart_driver_hosts(target_1_url, fdd::RematchFlags::REQUESTED).await?;
+        driver_dev.restart_driver_hosts(target_1_url, fdd::RestartRematchFlags::REQUESTED).await?;
     if restart_result.is_err() {
         return Err(anyhow!("Failed to restart target_1."));
     }
@@ -192,13 +191,13 @@ async fn test_replace_target() -> Result<()> {
 
     // Now let's disable the second target driver.
     let target_2_url = "fuchsia-boot:///#meta/target_2.cm";
-    let disable_2_result = driver_dev.disable_match_with_driver_url(&target_2_url).await;
+    let disable_2_result = driver_dev.disable_driver(&target_2_url, None).await;
     if disable_2_result.is_err() {
         return Err(anyhow!("Failed to disable target_2."));
     }
     // Now we can restart the second target driver with the rematch flag.
     let restart_result =
-        driver_dev.restart_driver_hosts(target_2_url, fdd::RematchFlags::REQUESTED).await?;
+        driver_dev.restart_driver_hosts(target_2_url, fdd::RestartRematchFlags::REQUESTED).await?;
     if restart_result.is_err() {
         return Err(anyhow!("Failed to restart target_2."));
     }
@@ -277,7 +276,7 @@ async fn test_replace_target() -> Result<()> {
 
     // Now let's disable the composite driver.
     let composite_url = "fuchsia-boot:///#meta/composite.cm";
-    let disable_2_result = driver_dev.disable_match_with_driver_url(&composite_url).await;
+    let disable_2_result = driver_dev.disable_driver(&composite_url, None).await;
     if disable_2_result.is_err() {
         return Err(anyhow!("Failed to disable composite."));
     }
@@ -286,7 +285,7 @@ async fn test_replace_target() -> Result<()> {
     let restart_result = driver_dev
         .restart_driver_hosts(
             composite_url,
-            fdd::RematchFlags::REQUESTED | fdd::RematchFlags::COMPOSITE_SPEC,
+            fdd::RestartRematchFlags::REQUESTED | fdd::RestartRematchFlags::COMPOSITE_SPEC,
         )
         .await?;
     if restart_result.is_err() {

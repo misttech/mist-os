@@ -9,13 +9,12 @@ use {
     crate::resolved_driver::{DriverPackageType, ResolvedDriver},
     bind::interpreter::decode_bind_rules::DecodedRules,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_index as fdi, fuchsia_async as fasync,
+    fidl_fuchsia_driver_index as fdi,
+    fidl_fuchsia_pkg_ext::BlobId,
+    fuchsia_async as fasync,
     fuchsia_zircon::Status,
     futures::StreamExt,
-    std::{
-        cell::RefCell, collections::HashMap, collections::HashSet, ops::Deref, ops::DerefMut,
-        rc::Rc,
-    },
+    std::{cell::RefCell, collections::HashMap, ops::Deref, ops::DerefMut, rc::Rc, str::FromStr},
 };
 
 fn ignore_peer_closed(err: fidl::Error) -> Result<(), fidl::Error> {
@@ -55,10 +54,6 @@ pub struct Indexer {
     // ephemeral drivers are added after the driver index server has started
     // through the FIDL API, fuchsia.driver.registrar.Register.
     ephemeral_drivers: RefCell<HashMap<url::Url, ResolvedDriver>>,
-
-    // Contains the list of driver package urls that are disabled, which means that it should not
-    // be returned as part of future match requests.
-    disabled_driver_urls: RefCell<HashSet<String>>,
 }
 
 impl Indexer {
@@ -74,7 +69,6 @@ impl Indexer {
             driver_load_watchers: RefCell::new(vec![]),
             delay_fallback_until_base_drivers_indexed,
             ephemeral_drivers: RefCell::new(HashMap::new()),
-            disabled_driver_urls: RefCell::new(HashSet::new()),
         }
     }
 
@@ -99,13 +93,92 @@ impl Indexer {
             }
     }
 
-    // Checks if the given driver is in the disabled list.
-    fn is_disabled(&self, driver: &ResolvedDriver) -> bool {
-        if self.disabled_driver_urls.borrow().contains(driver.component_url.as_str()) {
-            return true;
+    fn change_disabled_state_to(
+        &self,
+        driver_url: &str,
+        package_hash: Option<String>,
+        disabled_value: bool,
+    ) -> u32 {
+        let op = match disabled_value {
+            true => "Disable".to_string(),
+            false => "Enable".to_string(),
+        };
+        let mut count = 0;
+        let requested_hash = package_hash.and_then(|hash| {
+            let parsed_hash = fuchsia_hash::Hash::from_str(hash.as_str());
+            match parsed_hash {
+                Ok(h) => Some(BlobId::from(h)),
+                Err(e) => {
+                    tracing::warn!("Failed to parse package_hash in disable_driver: {:?}.", e);
+                    tracing::warn!("Skipping hash comparisons.");
+                    None
+                }
+            }
+        });
+
+        for driver in self.boot_repo.borrow_mut().iter_mut() {
+            if driver.component_url.as_str() == driver_url {
+                if requested_hash.is_some() && requested_hash != driver.package_hash {
+                    tracing::warn!(
+                        "{} found matching driver url, but skipping due to hash mismatch.",
+                        op
+                    );
+                    continue;
+                }
+
+                if driver.disabled != disabled_value {
+                    driver.disabled = disabled_value;
+                    count += 1;
+                }
+
+                break;
+            }
         }
 
-        false
+        match self.base_repo.borrow_mut().deref_mut() {
+            BaseRepo::Resolved(base_repo) => {
+                for driver in base_repo.iter_mut() {
+                    if driver.component_url.as_str() == driver_url {
+                        if requested_hash.is_some() && requested_hash != driver.package_hash {
+                            tracing::warn!(
+                                "{} found matching driver url, but skipping due to hash mismatch.",
+                                op
+                            );
+                            continue;
+                        }
+
+                        if driver.disabled != disabled_value {
+                            driver.disabled = disabled_value;
+                            count += 1;
+                        }
+
+                        break;
+                    }
+                }
+            }
+            BaseRepo::NotResolved => {}
+        }
+
+        for (_url, driver) in self.ephemeral_drivers.borrow_mut().iter_mut() {
+            if driver.component_url.as_str() == driver_url {
+                if requested_hash.is_some() && requested_hash != driver.package_hash {
+                    tracing::warn!(
+                        "{} found matching driver url, but skipping due to hash mismatch.",
+                        op
+                    );
+                    continue;
+                }
+
+                if driver.disabled != disabled_value {
+                    driver.disabled = disabled_value;
+                    count += 1;
+                }
+
+                break;
+            }
+        }
+
+        count
     }
 
     pub fn watch_for_driver_load(&self, responder: fdi::DriverIndexWatchForDriverLoadResponder) {
@@ -170,7 +243,7 @@ impl Indexer {
             .chain(ephemeral.values())
             .chain(fallback_boot_drivers)
             .chain(fallback_base_drivers)
-            .filter(|&driver| !self.is_disabled(driver))
+            .filter(|&driver| !driver.disabled)
             .map(|driver| driver.clone())
             .collect::<Vec<_>>()
     }
@@ -368,8 +441,19 @@ impl Indexer {
         Ok(())
     }
 
-    pub fn disable_driver(&self, driver_url: String) {
-        self.disabled_driver_urls.borrow_mut().insert(driver_url.clone());
+    pub fn disable_driver(
+        &self,
+        driver_url: String,
+        package_hash: Option<String>,
+    ) -> Result<(), i32> {
+        let count = self.change_disabled_state_to(driver_url.as_str(), package_hash, true);
+
+        if count == 0 {
+            return Err(Status::NOT_FOUND.into_raw());
+        }
+
+        tracing::info!("Disabled {} driver(s).", count);
+
         let rebind_result = self.rebind_composites_with_driver(driver_url);
         if let Err(e) = rebind_result {
             tracing::error!(
@@ -377,14 +461,31 @@ impl Indexer {
                 Status::from_raw(e)
             );
         }
+
+        Ok(())
     }
 
-    pub fn re_enable_driver(&self, driver_url: String) -> Result<(), i32> {
-        let removed = self.disabled_driver_urls.borrow_mut().remove(&driver_url);
-        if removed {
-            Ok(())
-        } else {
-            Err(Status::NOT_FOUND.into_raw())
+    pub fn enable_driver(
+        &self,
+        driver_url: String,
+        package_hash: Option<String>,
+    ) -> Result<(), i32> {
+        let count = self.change_disabled_state_to(driver_url.as_str(), package_hash, false);
+
+        if count == 0 {
+            return Err(Status::NOT_FOUND.into_raw());
         }
+
+        tracing::info!("Enabled {} driver(s).", count);
+
+        let rebind_result = self.rebind_composites_with_driver(driver_url);
+        if let Err(e) = rebind_result {
+            tracing::error!(
+                "Failed to rebind composites with the driver being enabled: {}.",
+                Status::from_raw(e)
+            );
+        }
+
+        Ok(())
     }
 }

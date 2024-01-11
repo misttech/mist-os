@@ -9,7 +9,7 @@
     use: [
         {
             protocol: [
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
                 "fuchsia.sysinfo.SysInfo",
             ],
         },

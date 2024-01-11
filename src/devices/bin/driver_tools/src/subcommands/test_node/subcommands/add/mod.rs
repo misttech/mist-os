@@ -23,7 +23,7 @@ fn string_to_property(prop: &str) -> Result<fdf::NodeProperty> {
 
 pub async fn add_test_node(
     cmd: &AddTestNodeCommand,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     driver_development_proxy
         .add_test_node(&fdd::TestNodeAddArgs {

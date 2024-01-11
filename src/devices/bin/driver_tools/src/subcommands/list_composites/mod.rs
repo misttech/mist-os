@@ -16,7 +16,7 @@ use {
 pub async fn list_composites(
     cmd: ListCompositesCommand,
     writer: &mut dyn Write,
-    proxy: fdd::DriverDevelopmentProxy,
+    proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     let (iterator, iterator_server) =
         fidl::endpoints::create_proxy::<fdd::CompositeInfoIteratorMarker>()?;

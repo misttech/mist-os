@@ -14,7 +14,7 @@ use {
 
 pub async fn test_node(
     cmd: &TestNodeCommand,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     match cmd.subcommand {
         TestNodeSubcommand::Add(ref subcmd) => {

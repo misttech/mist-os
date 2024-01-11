@@ -30,7 +30,7 @@
         {
             // Used by the device enumeration tests.
             protocol: [
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
                 "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",

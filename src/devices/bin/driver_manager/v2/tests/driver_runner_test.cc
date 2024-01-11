@@ -1133,7 +1133,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_DisableAndRematch_UndisableAndRestart
   // Disable the second-driver url, and restart with rematching of the requested.
   driver_index().disable_driver_url(second_driver_url);
   zx::result count = driver_runner().RestartNodesColocatedWithDriverUrl(
-      second_driver_url, fuchsia_driver_development::RematchFlags::kRequested);
+      second_driver_url, fuchsia_driver_development::RestartRematchFlags::kRequested);
   EXPECT_EQ(1u, count.value());
 
   // Our driver should get closed.

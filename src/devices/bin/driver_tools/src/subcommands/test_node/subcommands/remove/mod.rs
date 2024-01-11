@@ -11,7 +11,7 @@ use {
 
 pub async fn remove_test_node(
     cmd: &RemoveTestNodeCommand,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     driver_development_proxy
         .remove_test_node(&cmd.name)

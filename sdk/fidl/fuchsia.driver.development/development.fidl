@@ -3,166 +3,18 @@
 // found in the LICENSE file.
 library fuchsia.driver.development;
 
-using fuchsia.component.decl;
 using fuchsia.driver.framework;
-using fuchsia.driver.legacy;
 using fuchsia.url;
 using zx;
 
 const BINDING_RESULT_MAX uint8 = 10;
 
-const NODE_MONIKER_MAX uint32 = 1024;
+const HASH_LENGTH uint8 = 64;
 
-type V1DeviceInfo = table {
-    /// The topological path of the driver.
-    1: topological_path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
-
-    /// Path to the driver shared library.
-    2: bound_driver_libname string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
-
-    /// Properties of the device.
-    3: property_list fuchsia.driver.legacy.DevicePropertyList;
-
-    /// Tracks the state of the device.
-    4: flags fuchsia.driver.legacy.DeviceFlags;
-
-    /// Banjo protocol ID
-    5: protocol_id uint32;
-
-    /// Banjo protocol name
-    6: protocol_name string:MAX;
-};
-
-type V2NodeInfo = table {
-    /// The collection-relative moniker of the node.
-    1: moniker string:NODE_MONIKER_MAX;
-
-    /// Properties of the node.
-    2: node_property_list
-            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
-
-    /// Component offers to the node.
-    3: offer_list vector<fuchsia.component.decl.Offer>:MAX;
-};
-
-type VersionedNodeInfo = flexible union {
-    1: v1 V1DeviceInfo;
-    2: v2 V2NodeInfo;
-};
-
-type NodeInfo = table {
-    /// Unique ID identifying the node.
-    1: id uint64;
-
-    /// List of ids representing parents. If more than one, this is a composite node.
-    2: parent_ids vector<uint64>:MAX;
-
-    /// List of ids representing children.
-    3: child_ids vector<uint64>:MAX;
-
-    /// The process KOID of the driver host the driver resides within.
-    4: driver_host_koid zx.Koid;
-
-    /// URL to the driver component manifest
-    5: bound_driver_url fuchsia.url.Url;
-
-    /// Information specific to the driver framework version in use.
-    6: versioned_info VersionedNodeInfo;
-};
-
-/// Information about a node binding to either a driver or a composite.
-type NodeBindingInfo = table {
-    /// Full topological name of the node.
-    1: node_name string:NODE_MONIKER_MAX;
-    /// This is the component url for the driver that bound to the node.
-    /// If this is present, then |composite_parents| and |legacy_composite_parents| must not be.
-    2: driver_url fuchsia.url.Url;
-    /// The composite parents that this node binded to.
-    /// Can be present alongside |legacy_composite_parents|, but not |driver_url|.
-    3: composite_parents vector<fuchsia.driver.framework.CompositeParent>:MAX;
-    /// The legacy composite parents that this node binded to.
-    /// Can be present alongside |composite_parents|, but not |driver_url|.
-    4: legacy_composite_parents vector<fuchsia.driver.legacy.CompositeParent>:MAX;
-};
-
-/// Contains information for either a composite or legacy composite.
-type CompositeInfo = strict union {
-    1: legacy_composite fuchsia.driver.legacy.CompositeInfo;
-    2: composite fuchsia.driver.framework.CompositeInfo;
-};
-
-/// Contains information for a composite node.
-type CompositeNodeInfo = table {
-    /// The topological paths of the parent nodes of this composite, ordered by index.
-    1: parent_topological_paths vector<string:<MAX, optional>>:MAX;
-
-    /// The topological path of the created composite node. Empty if not created.
-    2: topological_path string:MAX;
-
-    // Information about the composite.
-    3: composite CompositeInfo;
-};
-
-type TestNodeAddArgs = table {
-    /// Name of the node.
-    1: name string:NODE_MONIKER_MAX;
-
-    /// Properties of the node.
-    2: properties
-            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
-};
-
-/// These flags indicate when a |fuchsia.driver.index.DriverIndex::MatchDriver| call should be
-/// made for a node that is restarting in order to find a new driver, instead of reusing the driver
-/// that was previously bound to the node.
-type RematchFlags = flexible bits : uint32 {
-    /// Rematch nodes that are currently bound to the requested driver. The requested driver is
-    /// the driver url that the restart operation was initiated for.
-    REQUESTED = 0x0001;
-    /// Rematch nodes that are currently bound to a driver other than the requested driver. These
-    /// are nodes that are affected by the restart of the requested driver, for example when
-    /// it is a colocated parent.
-    NON_REQUESTED = 0x0002;
-    /// Rematch nodes that are legacy composite nodes.
-    LEGACY_COMPOSITE = 0x0004;
-    /// Rematch nodes that are created as part of a completed composite spec.
-    COMPOSITE_SPEC = 0x0008;
-};
-
-closed protocol DriverInfoIterator {
-    /// Return empty when no more entries left.
-    strict GetNext() -> (struct {
-        drivers vector<fuchsia.driver.framework.DriverInfo>:MAX;
-    });
-};
-
-/// Used to page through a CompositeList.
-closed protocol CompositeInfoIterator {
-    /// Returns up to 100 entries at a time. Return empty when no more
-    /// composites are left.
-    strict GetNext() -> (struct {
-        composites vector<CompositeNodeInfo>:MAX;
-    });
-};
-
-closed protocol CompositeNodeSpecIterator {
-    /// Return empty when no more node groups are left.
-    strict GetNext() -> (struct {
-        specs vector<fuchsia.driver.framework.CompositeInfo>:MAX;
-    });
-};
-
-closed protocol NodeInfoIterator {
-    /// Return empty when no more entries left.
-    strict GetNext() -> (struct {
-        drivers vector<NodeInfo>:MAX;
-    });
-};
-
-/// Interface for developing and debugging drivers.
+/// Interface for the driver development manager.
 /// This interface should only be used for development and disabled in release builds.
 @discoverable
-open protocol DriverIndex {
+open protocol Manager {
     /// Returns a list of all drivers that are known to the system.
     /// If a |driver_filter| is provided, the returned list will be filtered to
     /// only include drivers specified in the filter.
@@ -189,40 +41,6 @@ open protocol DriverIndex {
         iterator server_end:CompositeNodeSpecIterator;
     });
 
-    /// Disable the given driver url from being returned as a match. When this is called,
-    /// subsequent |fuchsia.driver.index.DriverIndex::MatchDriver| requests will not consider
-    /// the driver with the given url.
-    /// This can be used for all driver package types. The given driver url does not
-    /// have to match existing drivers, it will apply even if the driver appears afterwards,
-    /// for example through a |fuchsia.driver.registrar.Register| operation.
-    flexible DisableMatchWithDriverUrl(struct {
-        driver_url fuchsia.url.Url;
-    }) -> ();
-
-    /// Re-enables a given driver url, that was previously disabled with
-    /// |DisableMatchWithDriverUrl|, for matching again. This must be called for driver urls that
-    /// were previously disabled.
-    /// Will return ZX_ERR_NOT_FOUND if the `driver_url` was not previously disabled.
-    flexible ReEnableMatchWithDriverUrl(struct {
-        driver_url fuchsia.url.Url;
-    }) -> () error zx.Status;
-};
-
-/// Interface for developing and debugging drivers.
-/// This interface should only be used for development and disabled in release builds.
-@discoverable
-open protocol DriverDevelopment {
-    compose DriverIndex;
-
-    /// Restarts all driver hosts containing the driver specified by the `driver_url` component url,
-    /// and returns the number of driver hosts that were restarted.
-    flexible RestartDriverHosts(struct {
-        driver_url fuchsia.url.Url;
-        rematch_flags RematchFlags;
-    }) -> (struct {
-        count uint32;
-    }) error zx.Status;
-
     /// Returns the list of nodes that are running on the system.
     ///
     /// If a |node_filter| is provided, the returned list will be filtered to
@@ -247,28 +65,49 @@ open protocol DriverDevelopment {
         iterator server_end:CompositeInfoIterator;
     });
 
+    /// Restarts all driver hosts containing the driver specified by the `driver_url`,
+    /// and returns the number of driver hosts that were restarted.
+    /// The |rematch_flags| will be used to decide for which restarting nodes the existing driver
+    /// should be bound vs. for which ones the matching process should be performed again.
+    flexible RestartDriverHosts(struct {
+        driver_url fuchsia.url.Url;
+        rematch_flags RestartRematchFlags;
+    }) -> (struct {
+        count uint32;
+    }) error zx.Status;
 
-    /// (DFv2) Attempts to bind all unbound nodes in the topology.
+    /// Disables the driver with the given driver component url.
+    /// Disabled drivers will not be considered for matching to nodes.
+    /// If a |package_hash| is provided, only that specific version of the driver
+    /// package will be disabled. Otherwise this applies to all existing versions
+    /// of a driver with the given url.
+    /// Returns an error ZX_ERR_NOT_FOUND if no drivers were affected.
+    flexible DisableDriver(struct {
+        driver_url fuchsia.url.Url;
+        package_hash string:<HASH_LENGTH, optional>;
+    }) -> () error zx.Status;
+
+    /// Enables the driver with the given driver component url.
+    /// This is only meant to revert a |DisableDriver| action.
+    /// Returns an error ZX_ERR_NOT_FOUND if no drivers were affected.
+    flexible EnableDriver(struct {
+        driver_url fuchsia.url.Url;
+        package_hash string:<HASH_LENGTH, optional>;
+    }) -> () error zx.Status;
+
+    /// Attempts to bind all unbound nodes in the topology.
     /// Returns new successful binds.
     flexible BindAllUnboundNodes() -> (struct {
         /// List of new bindings that happened as a result of this.
         binding_result vector<NodeBindingInfo>:BINDING_RESULT_MAX;
     }) error zx.Status;
 
-    // TODO(https://fxbug.dev/107895): Remove this method once it is no longer being
-    // used.
-    // Returns a boolean value of whether or not driver framework version 2 is
-    // enabled.
-    flexible IsDfv2() -> (struct {
-        response bool;
-    });
-
-    /// (DFv2) Adds test node under the root node.
+    /// Adds test node under the root node.
     flexible AddTestNode(struct {
         args TestNodeAddArgs;
     }) -> () error fuchsia.driver.framework.NodeError;
 
-    /// (DFv2) Removes the test node. The node is removed asynchronously and is
+    /// Removes the test node. The node is removed asynchronously and is
     /// not guaranteed to be removed by the time this returns.
     flexible RemoveTestNode(struct {
         name string:NODE_MONIKER_MAX;

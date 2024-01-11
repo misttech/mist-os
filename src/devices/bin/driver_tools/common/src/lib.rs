@@ -123,7 +123,7 @@ impl std::convert::From<fdd::NodeInfo> for Device {
 
 /// Combines pagination results into a single vector.
 pub async fn get_device_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[String],
     exact_match: bool,
 ) -> Result<Vec<fdd::NodeInfo>> {
@@ -148,7 +148,7 @@ pub async fn get_device_info(
 
 /// Combines pagination results into a single vector.
 pub async fn get_driver_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     driver_filter: &[String],
 ) -> Result<Vec<fdf::DriverInfo>> {
     let (iterator, iterator_server) =
@@ -172,7 +172,7 @@ pub async fn get_driver_info(
 
 /// Combines pagination results into a single vector.
 pub async fn get_composite_node_specs(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     name_filter: Option<String>,
 ) -> Result<Vec<fdf::CompositeInfo>> {
     let (iterator, iterator_server) =
@@ -203,7 +203,7 @@ pub async fn get_composite_node_specs(
 /// * `driver_filter` - Filter to the driver that matches the given filter.
 pub async fn get_driver_by_filter(
     driver_filter: &String,
-    driver_development_proxy: &fdd::DriverDevelopmentProxy,
+    driver_development_proxy: &fdd::ManagerProxy,
 ) -> Result<fdf::DriverInfo> {
     let filter_list: [String; 1] = [driver_filter.to_string()];
     let driver_list = get_driver_info(&driver_development_proxy, &filter_list).await?;
@@ -238,7 +238,7 @@ pub async fn get_driver_by_filter(
 /// * `device_topo_path` - The device's topological path. e.g. sys/platform/.../device
 pub async fn get_driver_by_device(
     device_topo_path: &String,
-    driver_development_proxy: &fdd::DriverDevelopmentProxy,
+    driver_development_proxy: &fdd::ManagerProxy,
 ) -> Result<fdf::DriverInfo> {
     let device_filter: [String; 1] = [device_topo_path.to_string()];
     let mut device_list =
@@ -282,7 +282,7 @@ pub async fn get_driver_by_device(
 /// * `driver_filter` - Filter to the driver that matches the given filter.
 pub async fn get_devices_by_driver(
     driver_filter: &String,
-    driver_development_proxy: &fdd::DriverDevelopmentProxy,
+    driver_development_proxy: &fdd::ManagerProxy,
 ) -> Result<Vec<Device>> {
     let driver_info = get_driver_by_filter(driver_filter, &driver_development_proxy);
     let empty: [String; 0] = [];

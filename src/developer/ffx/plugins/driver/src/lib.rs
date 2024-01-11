@@ -155,13 +155,10 @@ impl DriverConnector {
 
 #[async_trait::async_trait]
 impl driver_connector::DriverConnector for DriverConnector {
-    async fn get_driver_development_proxy(
-        &self,
-        select: bool,
-    ) -> Result<fdd::DriverDevelopmentProxy> {
-        self.get_component_with_capability::<fdd::DriverDevelopmentMarker>(
+    async fn get_driver_development_proxy(&self, select: bool) -> Result<fdd::ManagerProxy> {
+        self.get_component_with_capability::<fdd::ManagerMarker>(
             "/bootstrap/driver_manager",
-            DiscoverableCapabilityOptions::<fdd::DriverDevelopmentMarker>::default(),
+            DiscoverableCapabilityOptions::<fdd::ManagerMarker>::default(),
             select,
         )
         .await

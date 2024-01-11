@@ -17,7 +17,7 @@
             protocol: [
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.device.manager.SystemStateTransition",
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
             ],
@@ -98,7 +98,7 @@
         {
             protocol: [
                 "fuchsia.device.manager.Administrator",
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
             ],

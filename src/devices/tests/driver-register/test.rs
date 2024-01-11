@@ -30,7 +30,7 @@ const EPHEMERAL_FAKE_DRIVER_URL: &str =
 
 async fn set_up_test_driver_realm(
     use_dfv2: bool,
-) -> Result<(RealmInstance, fdd::DriverDevelopmentProxy, fdr::DriverRegistrarProxy)> {
+) -> Result<(RealmInstance, fdd::ManagerProxy, fdr::DriverRegistrarProxy)> {
     const ROOT_DRIVER_DFV2_URL: &str = PARENT_DRIVER_URL;
 
     let builder = RealmBuilder::new().await?;
@@ -45,8 +45,7 @@ async fn set_up_test_driver_realm(
     }
     instance.driver_test_realm_start(realm_args).await?;
 
-    let driver_dev =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
     let driver_registar =
         instance.root.connect_to_protocol_at_exposed_dir::<fdr::DriverRegistrarMarker>()?;
 
@@ -58,7 +57,7 @@ async fn set_up_test_driver_realm(
 }
 
 fn send_get_driver_info_request(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     driver_filter: &[String],
 ) -> Result<fdd::DriverInfoIteratorProxy> {
     let (iterator, iterator_server) =
@@ -72,7 +71,7 @@ fn send_get_driver_info_request(
 }
 
 async fn get_driver_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     driver_filter: &[String],
 ) -> Result<Vec<fdf::DriverInfo>> {
     let iterator = send_get_driver_info_request(service, driver_filter)?;

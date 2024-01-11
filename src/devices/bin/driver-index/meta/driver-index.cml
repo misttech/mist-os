@@ -12,7 +12,7 @@
     capabilities: [
         {
             protocol: [
-                "fuchsia.driver.development.DriverIndex",
+                "fuchsia.driver.index.DevelopmentManager",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.driver.registrar.DriverRegistrar",
             ],
@@ -47,7 +47,7 @@
     expose: [
         {
             protocol: [
-                "fuchsia.driver.development.DriverIndex",
+                "fuchsia.driver.index.DevelopmentManager",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.driver.registrar.DriverRegistrar",
             ],

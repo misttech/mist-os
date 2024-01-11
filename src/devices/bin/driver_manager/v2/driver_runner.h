@@ -109,7 +109,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   // Restarts all the nodes that are colocated with a driver with the given |url|.
   zx::result<uint32_t> RestartNodesColocatedWithDriverUrl(
-      std::string_view url, fuchsia_driver_development::RematchFlags rematch_flags);
+      std::string_view url, fuchsia_driver_development::RestartRematchFlags rematch_flags);
 
   std::unordered_set<const DriverHost*> DriverHostsWithDriverUrl(std::string_view url);
 

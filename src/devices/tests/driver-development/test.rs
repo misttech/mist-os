@@ -57,7 +57,7 @@ fn assert_not_found_error(error: fidl::Error) {
 }
 
 fn send_get_device_info_request(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[&str],
     exact_match: bool,
 ) -> Result<fdd::NodeInfoIteratorProxy> {
@@ -76,7 +76,7 @@ fn send_get_device_info_request(
 }
 
 async fn get_device_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[&str],
     exact_match: bool,
 ) -> Result<Vec<fdd::NodeInfo>> {
@@ -95,7 +95,7 @@ async fn get_device_info(
 }
 
 fn send_get_driver_info_request(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     driver_filter: &[&str],
 ) -> Result<fdd::DriverInfoIteratorProxy> {
     let (iterator, iterator_server) =
@@ -112,7 +112,7 @@ fn send_get_driver_info_request(
 }
 
 async fn get_driver_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     driver_filter: &[&str],
 ) -> Result<Vec<fdf::DriverInfo>> {
     let iterator = send_get_driver_info_request(service, driver_filter)?;
@@ -129,9 +129,7 @@ async fn get_driver_info(
     Ok(driver_infos)
 }
 
-async fn set_up_test_driver_realm(
-    use_dfv2: bool,
-) -> Result<(RealmInstance, fdd::DriverDevelopmentProxy)> {
+async fn set_up_test_driver_realm(use_dfv2: bool) -> Result<(RealmInstance, fdd::ManagerProxy)> {
     const ROOT_DRIVER_DFV2_URL: &str = PARENT_DRIVER_URL;
 
     let builder = RealmBuilder::new().await?;
@@ -146,8 +144,7 @@ async fn set_up_test_driver_realm(
     }
     instance.driver_test_realm_start(realm_args).await?;
 
-    let driver_dev =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
 
     // Make sure we wait until all the drivers are bound before returning.
     let dev = instance.driver_test_realm_connect_to_dev()?;
@@ -474,15 +471,6 @@ async fn test_get_device_info_not_found_filter_dfv2() -> Result<()> {
         get_device_info(&driver_dev, &DEVICE_FILTER, /* exact_match= */ true).await?;
 
     assert!(device_infos.is_empty());
-    Ok(())
-}
-
-#[fasync::run_singlethreaded(test)]
-async fn test_is_dfv2_in_dfv2() -> Result<()> {
-    let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
-    let is_dfv2 =
-        driver_dev.is_dfv2().await.context("FIDL call to check if DFv2 is enabled failed")?;
-    assert!(is_dfv2);
     Ok(())
 }
 

@@ -111,6 +111,7 @@ mod tests {
             package_type: DriverPackageType::Boot,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         }
     }
 

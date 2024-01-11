@@ -155,7 +155,7 @@
         },
         {
             protocol: [
-                "fuchsia.driver.development.DriverIndex",
+                "fuchsia.driver.index.DevelopmentManager",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.driver.registrar.DriverRegistrar",
             ],
@@ -206,7 +206,7 @@
         {
             protocol: [
                 "fuchsia.device.manager.Administrator",
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
             ],
             from: "#driver_manager",
         },

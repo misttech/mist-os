@@ -259,6 +259,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.framework/DriverInfo.is_disabled",
+        "ordinal": "9",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.framework/DriverInfo.is_fallback",
         "ordinal": "5",
         "type": "bool"

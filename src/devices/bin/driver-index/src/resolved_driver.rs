@@ -11,7 +11,7 @@ use {
     cm_rust::FidlIntoNative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi, fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_pkg_ext::BlobId,
     fuchsia_pkg::{OpenRights, PackageDirectory},
     futures::TryFutureExt,
 };
@@ -37,8 +37,9 @@ pub struct ResolvedDriver {
     pub device_categories: Vec<fdf::DeviceCategory>,
     pub fallback: bool,
     pub package_type: DriverPackageType,
-    pub package_hash: Option<fpkg::BlobId>,
+    pub package_hash: Option<BlobId>,
     pub is_dfv2: Option<bool>,
+    pub disabled: bool,
 }
 
 impl std::fmt::Display for ResolvedDriver {
@@ -94,7 +95,7 @@ impl ResolvedDriver {
             decl,
             package_dir,
             package_type,
-            Some(fpkg::BlobId { merkle_root: package_hash.into() }),
+            Some(BlobId::from(package_hash)),
         )
         .map_err(|e| {
             tracing::warn!("Could not load driver: {}", e);
@@ -143,6 +144,7 @@ impl ResolvedDriver {
                 Some(false) => Some(1),
                 None => None,
             },
+            is_disabled: Some(self.disabled),
             ..Default::default()
         }
     }
@@ -156,7 +158,7 @@ pub async fn load_boot_driver(
     dir: &fio::DirectoryProxy,
     component_url: url::Url,
     package_type: DriverPackageType,
-    package_hash: Option<fpkg::BlobId>,
+    package_hash: Option<BlobId>,
 ) -> Result<Option<ResolvedDriver>, Error> {
     let component = fuchsia_fs::directory::open_file_no_describe(
         &dir,
@@ -201,7 +203,7 @@ pub async fn load_driver(
     component: fdecl::Component,
     package_dir: PackageDirectory,
     package_type: DriverPackageType,
-    package_hash: Option<fpkg::BlobId>,
+    package_hash: Option<BlobId>,
 ) -> Result<ResolvedDriver, Error> {
     let component: cm_rust::ComponentDecl = component.fidl_into_native();
 
@@ -241,6 +243,7 @@ pub async fn load_driver(
         package_type,
         package_hash,
         is_dfv2,
+        disabled: false,
     })
 }
 

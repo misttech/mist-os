@@ -13,8 +13,7 @@
 
 namespace driver_manager {
 
-class DriverDevelopmentService
-    : public fidl::WireServer<fuchsia_driver_development::DriverDevelopment> {
+class DriverDevelopmentService : public fidl::WireServer<fuchsia_driver_development::Manager> {
  public:
   explicit DriverDevelopmentService(dfv2::DriverRunner& driver_runner,
                                     async_dispatcher_t* dispatcher);
@@ -29,26 +28,25 @@ class DriverDevelopmentService
                      GetDriverInfoCompleter::Sync& completer) override;
   void GetCompositeNodeSpecs(GetCompositeNodeSpecsRequestView request,
                              GetCompositeNodeSpecsCompleter::Sync& completer) override;
-  void DisableMatchWithDriverUrl(DisableMatchWithDriverUrlRequestView request,
-                                 DisableMatchWithDriverUrlCompleter::Sync& completer) override;
-  void ReEnableMatchWithDriverUrl(ReEnableMatchWithDriverUrlRequestView request,
-                                  ReEnableMatchWithDriverUrlCompleter::Sync& completer) override;
+  void DisableDriver(DisableDriverRequestView request,
+                     DisableDriverCompleter::Sync& completer) override;
+  void EnableDriver(EnableDriverRequestView request,
+                    EnableDriverCompleter::Sync& completer) override;
   void GetNodeInfo(GetNodeInfoRequestView request, GetNodeInfoCompleter::Sync& completer) override;
   void GetCompositeInfo(GetCompositeInfoRequestView request,
                         GetCompositeInfoCompleter::Sync& completer) override;
   void BindAllUnboundNodes(BindAllUnboundNodesCompleter::Sync& completer) override;
-  void IsDfv2(IsDfv2Completer::Sync& completer) override;
   void AddTestNode(AddTestNodeRequestView request, AddTestNodeCompleter::Sync& completer) override;
   void RemoveTestNode(RemoveTestNodeRequestView request,
                       RemoveTestNodeCompleter::Sync& completer) override;
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_driver_development::DriverDevelopment> metadata,
+      fidl::UnknownMethodMetadata<fuchsia_driver_development::Manager> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   dfv2::DriverRunner& driver_runner_;
   // A map of the test nodes that have been created.
   std::map<std::string, std::weak_ptr<dfv2::Node>> test_nodes_;
-  fidl::ServerBindingGroup<fuchsia_driver_development::DriverDevelopment> bindings_;
+  fidl::ServerBindingGroup<fuchsia_driver_development::Manager> bindings_;
   async_dispatcher_t* const dispatcher_;
 };
 

@@ -1006,25 +1006,25 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
       });
 }
 
-bool Node::EvaluateRematchFlags(fuchsia_driver_development::RematchFlags rematch_flags,
+bool Node::EvaluateRematchFlags(fuchsia_driver_development::RestartRematchFlags rematch_flags,
                                 std::string_view requested_url) {
   if (type_ == NodeType::kLegacyComposite &&
-      !(rematch_flags & fuchsia_driver_development::RematchFlags::kLegacyComposite)) {
+      !(rematch_flags & fuchsia_driver_development::RestartRematchFlags::kLegacyComposite)) {
     return false;
   }
 
   if (type_ == NodeType::kComposite &&
-      !(rematch_flags & fuchsia_driver_development::RematchFlags::kCompositeSpec)) {
+      !(rematch_flags & fuchsia_driver_development::RestartRematchFlags::kCompositeSpec)) {
     return false;
   }
 
   if (driver_url() == requested_url &&
-      !(rematch_flags & fuchsia_driver_development::RematchFlags::kRequested)) {
+      !(rematch_flags & fuchsia_driver_development::RestartRematchFlags::kRequested)) {
     return false;
   }
 
   if (driver_url() != requested_url &&
-      !(rematch_flags & fuchsia_driver_development::RematchFlags::kNonRequested)) {
+      !(rematch_flags & fuchsia_driver_development::RestartRematchFlags::kNonRequested)) {
     return false;
   }
 

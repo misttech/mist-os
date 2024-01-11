@@ -15,18 +15,30 @@ use {
 pub async fn disable(
     cmd: DisableCommand,
     writer: &mut dyn Write,
-    driver_development_proxy: fdd::DriverDevelopmentProxy,
+    driver_development_proxy: fdd::ManagerProxy,
 ) -> Result<()> {
     writeln!(writer, "Disabling {} and restarting driver hosts with rematching enabled.", cmd.url)?;
 
-    driver_development_proxy.disable_match_with_driver_url(&cmd.url).await?;
+    let result = driver_development_proxy.disable_driver(&cmd.url, None).await?;
+    match result {
+        Ok(_) => {
+            writeln!(writer, "Disabled driver successfully.")?;
+        }
+        Err(e) => {
+            if e == Status::NOT_FOUND.into_raw() {
+                writeln!(writer, "No drivers affected in this disable operation.")?;
+            } else {
+                writeln!(writer, "Unexpected error from disable: {}", e)?;
+            }
+        }
+    }
 
     let restart_result = driver_development_proxy
         .restart_driver_hosts(
             cmd.url.as_str(),
-            fdd::RematchFlags::REQUESTED
-                | fdd::RematchFlags::LEGACY_COMPOSITE
-                | fdd::RematchFlags::COMPOSITE_SPEC,
+            fdd::RestartRematchFlags::REQUESTED
+                | fdd::RestartRematchFlags::LEGACY_COMPOSITE
+                | fdd::RestartRematchFlags::COMPOSITE_SPEC,
         )
         .await?;
 
@@ -39,7 +51,7 @@ pub async fn disable(
                     count
                 )?;
             } else {
-                writeln!(writer, "{}", "There are no existing driver hosts with this driver.",)?;
+                writeln!(writer, "{}", "There are no existing driver hosts with this driver.")?;
             }
         }
         Err(err) => {

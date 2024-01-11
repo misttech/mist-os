@@ -15,7 +15,7 @@ use {
 };
 
 fn send_get_device_info_request(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[String],
     exact_match: bool,
 ) -> Result<fdd::NodeInfoIteratorProxy> {
@@ -30,7 +30,7 @@ fn send_get_device_info_request(
 }
 
 async fn get_device_info(
-    service: &fdd::DriverDevelopmentProxy,
+    service: &fdd::ManagerProxy,
     device_filter: &[String],
     exact_match: bool,
 ) -> Result<Vec<fdd::NodeInfo>> {
@@ -94,8 +94,7 @@ async fn test_restart_on_crash() -> Result<()> {
     // Find an instance of the `Device` service.
     let instance = wait_for_instance(&realm).await?;
 
-    let driver_dev =
-        realm.root.connect_to_protocol_at_exposed_dir::<fdd::DriverDevelopmentMarker>()?;
+    let driver_dev = realm.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
     assert_eq!(1, device_infos.len());
     let driver_host_koid_1 = device_infos[0].driver_host_koid;

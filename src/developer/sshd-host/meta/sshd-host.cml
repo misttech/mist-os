@@ -96,7 +96,7 @@
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.diagnostics.LoWPANArchiveAccessor",
-                "fuchsia.driver.development.DriverDevelopment",
+                "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.fonts.Provider",

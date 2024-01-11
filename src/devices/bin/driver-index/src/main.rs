@@ -11,7 +11,10 @@ use {
     driver_index_config::Config,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_index::{DriverIndexRequest, DriverIndexRequestStream},
+    fidl_fuchsia_driver_index::{
+        DevelopmentManagerRequest, DevelopmentManagerRequestStream, DriverIndexRequest,
+        DriverIndexRequestStream,
+    },
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::client,
     fuchsia_component::server::ServiceFs,
@@ -36,7 +39,7 @@ mod resolved_driver;
 /// and dispatched.
 enum IncomingRequest {
     DriverIndexProtocol(DriverIndexRequestStream),
-    DriverDevelopmentProtocol(fdd::DriverIndexRequestStream),
+    DriverDevelopmentProtocol(DevelopmentManagerRequestStream),
     DriverRegistrarProtocol(fdr::DriverRegistrarRequestStream),
 }
 
@@ -140,14 +143,14 @@ async fn run_composite_node_specs_iterator_server(
 
 async fn run_driver_development_server(
     indexer: Rc<Indexer>,
-    stream: fdd::DriverIndexRequestStream,
+    stream: DevelopmentManagerRequestStream,
 ) -> Result<(), anyhow::Error> {
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
             let indexer = indexer.clone();
             match request {
-                fdd::DriverIndexRequest::GetDriverInfo { driver_filter, iterator, .. } => {
+                DevelopmentManagerRequest::GetDriverInfo { driver_filter, iterator, .. } => {
                     let driver_info = indexer.get_driver_info(driver_filter);
                     if driver_info.len() == 0 {
                         iterator.close_with_epitaph(Status::NOT_FOUND)?;
@@ -162,7 +165,7 @@ async fn run_driver_development_server(
                     })
                     .detach();
                 }
-                fdd::DriverIndexRequest::GetCompositeNodeSpecs {
+                DevelopmentManagerRequest::GetCompositeNodeSpecs {
                     name_filter, iterator, ..
                 } => {
                     let composite_node_spec_manager = indexer.composite_node_spec_manager.borrow();
@@ -180,26 +183,23 @@ async fn run_driver_development_server(
                     })
                     .detach();
                 }
-                fdd::DriverIndexRequest::DisableMatchWithDriverUrl { driver_url, responder } => {
-                    indexer.disable_driver(driver_url);
+                DevelopmentManagerRequest::DisableDriver {
+                    driver_url,
+                    package_hash,
+                    responder,
+                } => {
+                    let disable_result = indexer.disable_driver(driver_url, package_hash);
                     responder
-                        .send()
+                        .send(disable_result)
                         .or_else(ignore_peer_closed)
                         .context("error responding to Disable")?;
                 }
-                fdd::DriverIndexRequest::ReEnableMatchWithDriverUrl { driver_url, responder } => {
-                    let result = indexer.re_enable_driver(driver_url);
+                DevelopmentManagerRequest::EnableDriver { driver_url, package_hash, responder } => {
+                    let enable_result = indexer.enable_driver(driver_url, package_hash);
                     responder
-                        .send(result)
+                        .send(enable_result)
                         .or_else(ignore_peer_closed)
                         .context("error responding to Disable")?;
-                }
-                fdd::DriverIndexRequest::_UnknownMethod { ordinal, method_type, .. } => {
-                    tracing::warn!(
-                        "DriverIndexRequest::UnknownMethod {:?} with ordinal {}",
-                        method_type,
-                        ordinal
-                    );
                 }
             }
             Ok(())
@@ -496,6 +496,7 @@ mod tests {
             package_type: fdf::DriverPackageType::from_primitive(package_type as u8),
             is_fallback: Some(fallback),
             bind_rules_bytecode: None,
+            is_disabled: Some(false),
             ..Default::default()
         }
     }
@@ -509,7 +510,7 @@ mod tests {
     }
 
     async fn get_driver_info_proxy(
-        development_proxy: &fdd::DriverIndexProxy,
+        development_proxy: &fdi::DevelopmentManagerProxy,
         driver_filter: &[String],
     ) -> Vec<fdf::DriverInfo> {
         let (info_iterator, info_iterator_server) =
@@ -766,6 +767,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         },]);
 
         let (proxy, stream) =
@@ -791,6 +793,7 @@ mod tests {
                 package_type: Some(fdf::DriverPackageType::Base),
                 is_fallback: Some(false),
                 bind_rules_bytecode: None,
+                is_disabled: Some(false),
                 ..Default::default()
             });
 
@@ -839,6 +842,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         },]);
 
         let (proxy, stream) =
@@ -864,6 +868,7 @@ mod tests {
                 is_fallback: Some(false),
                 device_categories: Some(vec![]),
                 bind_rules_bytecode: None,
+                is_disabled: Some(false),
                 ..Default::default()
             });
 
@@ -905,6 +910,7 @@ mod tests {
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
@@ -916,6 +922,7 @@ mod tests {
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
         ];
 
@@ -973,6 +980,7 @@ mod tests {
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
@@ -984,6 +992,7 @@ mod tests {
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
         ];
 
@@ -1076,6 +1085,7 @@ mod tests {
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
             ResolvedDriver {
                 component_url: url::Url::parse("fuchsia-boot:///#meta/driver-2.cm").unwrap(),
@@ -1087,6 +1097,7 @@ mod tests {
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
         ];
 
@@ -1094,7 +1105,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
 
         let (development_proxy, development_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdd::DriverIndexMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdi::DevelopmentManagerMarker>().unwrap();
 
         let index = Rc::new(Indexer::new(boot_repo, BaseRepo::Resolved(std::vec![]), false));
 
@@ -1126,8 +1137,9 @@ mod tests {
 
             // Disable driver-1.
             development_proxy
-                .disable_match_with_driver_url("fuchsia-boot:///#meta/driver-1.cm")
+                .disable_driver("fuchsia-boot:///#meta/driver-1.cm", None)
                 .await
+                .unwrap()
                 .unwrap();
 
             // Ask for driver-1 again and it should return not found since its been disabled.
@@ -1152,7 +1164,7 @@ mod tests {
             }
 
             development_proxy
-                .re_enable_match_with_driver_url("fuchsia-boot:///#meta/driver-1.cm")
+                .enable_driver("fuchsia-boot:///#meta/driver-1.cm", None)
                 .await
                 .unwrap()
                 .unwrap();
@@ -1219,6 +1231,7 @@ mod tests {
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
             ResolvedDriver {
                 component_url: url::Url::parse(NON_FALLBACK_BOOT_DRIVER_COMPONENT_URL).unwrap(),
@@ -1230,6 +1243,7 @@ mod tests {
                 package_type: DriverPackageType::Boot,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
         ];
 
@@ -1303,6 +1317,7 @@ mod tests {
             package_type: DriverPackageType::Boot,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         }];
 
         let base_repo = BaseRepo::Resolved(std::vec![
@@ -1316,6 +1331,7 @@ mod tests {
                 package_type: DriverPackageType::Base,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
             ResolvedDriver {
                 component_url: url::Url::parse(NON_FALLBACK_BASE_DRIVER_COMPONENT_URL).unwrap(),
@@ -1327,6 +1343,7 @@ mod tests {
                 package_type: DriverPackageType::Base,
                 package_hash: None,
                 is_dfv2: None,
+                disabled: false,
             },
         ]);
 
@@ -1609,6 +1626,7 @@ mod tests {
             package_type: DriverPackageType::Boot,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         }];
         let index = Indexer::new(boot_repo, BaseRepo::NotResolved, true);
         let (proxy, stream) =
@@ -1643,6 +1661,7 @@ mod tests {
             package_type: DriverPackageType::Boot,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         }];
         let index = Indexer::new(boot_repo, BaseRepo::NotResolved, false);
         let (proxy, stream) =
@@ -1996,6 +2015,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         },]);
 
         let (proxy, stream) =
@@ -2198,6 +2218,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         },]);
 
         let (proxy, stream) =
@@ -2400,6 +2421,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         },]);
 
         let (proxy, stream) =
@@ -2650,6 +2672,7 @@ mod tests {
                     package_type: DriverPackageType::Base,
                     package_hash: None,
                     is_dfv2: None,
+                    disabled: false,
                 });
             }
 
@@ -2854,6 +2877,7 @@ mod tests {
                     package_type: DriverPackageType::Base,
                     package_hash: None,
                     is_dfv2: None,
+                    disabled: false,
                 });
             }
 
@@ -3067,6 +3091,7 @@ mod tests {
                     package_type: DriverPackageType::Base,
                     package_hash: None,
                     is_dfv2: None,
+                    disabled: false,
                 });
             }
 
@@ -3128,6 +3153,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         },]);
 
         let (proxy, stream) =
@@ -3229,6 +3255,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         },]);
 
         let (proxy, stream) =
@@ -3370,7 +3397,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
         let (development_proxy, development_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdd::DriverIndexMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fdi::DevelopmentManagerMarker>().unwrap();
 
         let full_resolver = Some(resolver);
 
@@ -3454,6 +3481,7 @@ mod tests {
             package_type: DriverPackageType::Base,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         }]);
 
         let index = Rc::new(Indexer::new(boot_repo, base_repo, false));
@@ -3516,6 +3544,7 @@ mod tests {
             package_type: DriverPackageType::Boot,
             package_hash: None,
             is_dfv2: None,
+            disabled: false,
         }];
 
         let base_repo = BaseRepo::Resolved(std::vec![]);
