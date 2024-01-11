@@ -1100,7 +1100,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     fn clear_association(&mut self) -> Result<(), zx::Status> {
-        self.ctx.device.clear_association(&fidl_softmac::WlanSoftmacBridgeClearAssociationRequest {
+        self.ctx.device.clear_association(&fidl_softmac::WlanSoftmacBaseClearAssociationRequest {
             peer_addr: Some(self.sta.bssid().to_array()),
             ..Default::default()
         })

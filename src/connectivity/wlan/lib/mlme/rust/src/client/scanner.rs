@@ -153,7 +153,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         if let Some(scan) = &self.scanner.ongoing_scan {
             let discovery_support = self.ctx.device.discovery_support()?;
             if discovery_support.scan_offload.scan_cancel_supported {
-                self.ctx.device.cancel_scan(&fidl_softmac::WlanSoftmacBridgeCancelScanRequest {
+                self.ctx.device.cancel_scan(&fidl_softmac::WlanSoftmacBaseCancelScanRequest {
                     scan_id: Some(scan.scan_id()),
                     ..Default::default()
                 })
@@ -211,7 +211,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             in_progress_device_scan_id: self
                 .ctx
                 .device
-                .start_passive_scan(&fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest {
+                .start_passive_scan(&fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
                     channels: Some(req.channel_list),
                     // TODO(https://fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here
                     // is required since fuchsia.wlan.mlme/ScanRequest.min_channel_time has a width of
@@ -753,7 +753,7 @@ mod tests {
         // Verify that passive offload scan is requested
         assert_eq!(
             m.fake_device_state.lock().unwrap().captured_passive_scan_request,
-            Some(fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest {
+            Some(fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
                 channels: Some(vec![6]),
                 min_channel_time: Some(102_400_000),
                 max_channel_time: Some(307_200_000),

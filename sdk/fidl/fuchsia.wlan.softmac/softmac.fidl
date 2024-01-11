@@ -434,30 +434,16 @@ type WlanAssociationConfig = table {
    12: vht_op ieee80211.VhtOperation;
 };
 
-// NOTE: Some methods in this protocol use a `selector` attribute to maintain
-//       their ordinal following migration from `WlanSoftmac` into this
-//       protocol. This is necessary to preserve API compatibility.
-// TODO(https://fxbug.dev/126613): Merge `WlanSoftmacBridge` into `WlanSoftmac` when
-//                         FIDL supports generating multiple transports for the
-//                         same protocol or generating Rust bindings for driver-
-//                         transported protocols.
-// TODO(https://fxbug.dev/124830): This protocol allows `wlansoftmac` to migrate from
-//                         Banjo to FIDL and eventually completely remove Banjo.
-//                         This TODO comment will remain until the migration to
-//                         FIDL is complete.
-// TODO(https://fxbug.dev/135499): Revisit documentation about safety and when methods
-//                         can be called for clarity. See for example `Query`.
-/// The `wlansoftmac` C++ driver establishes a FIDL channel serving the
-/// `WlanSoftmacBridge` protocol to the `wlan-mlme` Rust library. The
-/// `WlanSoftmacBridge` protocol is similar to `WlanSoftmac`, but may not
-/// contain methods where the additional FIDL channel hinders performance.
+/// `WlanSoftmacBase` is a template protocol intended to be composed into
+/// `WlanSoftmacBridge` and `WlanSoftmac`. `WlanSoftmacBase` contains all method
+/// that both `WlanSoftmacBridge` and `WlanSoftmac` have in common.
+/// `WlanSoftmacBase` should not be implemented directly.
 ///
-/// `WlanSoftmac` composes a subset of its methods from `WlanSoftmacBridge` so
-/// that the `wlansoftmac` driver can trivially convert between
-/// `WlanSoftmacBridge` messages transported via the Zircon channel and
-/// `WlanSoftmac` messages transported via the driver framework channel.
-@available(added=15)
-closed protocol WlanSoftmacBridge {
+/// NOTE: All methods use a `selector` attribute to maintain their ordinal
+///       following migration from `WlanSoftmac` into this protocol. This is necessary
+///       to preserve API compatibility.
+@available(added=HEAD)
+closed protocol WlanSoftmacBase {
     /// Gets general information about the device and its supported features.
     /// This method is safe to call even when the SoftMAC has not yet started.
     @available(added=HEAD)
@@ -580,14 +566,15 @@ closed protocol WlanSoftmacBridge {
     ///
     /// - `ZX_ERR_BAD_STATE`: The device was not previously informed of this BSS
     ///                       via `WlanSoftmac.JoinBss`.
-    @available(added=15)
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmacBridge.NotifyAssociationComplete")
     strict NotifyAssociationComplete(struct {
         assoc_cfg WlanAssociationConfig;
     }) -> () error zx.Status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.
-    @selector("fuchsia.wlan.softmac/WlanSoftmac.ClearAssociation")
     @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.ClearAssociation")
     strict ClearAssociation(table {
         1: peer_addr ieee80211.MacAddr;
     }) -> () error zx.Status;
@@ -605,8 +592,8 @@ closed protocol WlanSoftmacBridge {
     ///       requested scan, e.g. because an incompatible channel was requested.
     ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans.
     ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
-    @selector("fuchsia.wlan.softmac/WlanSoftmac.StartPassiveScan")
     @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.StartPassiveScan")
     strict StartPassiveScan(table {
         /// List of channels to scan on. An empty list of channels will cause a
         /// scan request to immediately return ZX_ERR_INVALID_ARGS.
@@ -646,8 +633,8 @@ closed protocol WlanSoftmacBridge {
     ///       requested scan, e.g. because an incompatible channel was requested.
     ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans.
     ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
-    @selector("fuchsia.wlan.softmac/WlanSoftmac.StartActiveScan")
     @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.StartActiveScan")
     strict StartActiveScan(WlanSoftmacStartActiveScanRequest) -> (table {
         1: scan_id uint64;
     }) error zx.Status;
@@ -666,6 +653,7 @@ closed protocol WlanSoftmacBridge {
     /// - `ZX_ERR_NOT_FOUND`: `scan_id` does not match an ongoing scan.
     /// - `ZX_ERR_NOT_SUPPORTED`: Server does not support scan cancellation.
     @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.CancelScan")
     strict CancelScan(table {
         1: scan_id uint64;
     }) -> () error zx.Status;
@@ -680,10 +668,86 @@ closed protocol WlanSoftmacBridge {
     }) -> () error zx.Status;
 };
 
+// TODO(https://fxbug.dev/126613): Merge `WlanSoftmacBridge` into `WlanSoftmac` when
+//                         FIDL supports generating multiple transports for the
+//                         same protocol or generating Rust bindings for driver-
+//                         transported protocols.
+// TODO(https://fxbug.dev/135499): Revisit documentation about safety and when methods
+//                         can be called for clarity. See for example `Query`.
+/// `WlanSoftmacBridge` is the protocol that the `wlansoftmac` C++ driver serves
+/// to the the `wlan-mlme` Rust library. The `WlanSoftmacBridge` protocol is the
+/// same as `WlanSoftmac` with the exception of the `Start()` method.
+/// `WlanSoftmacBridge` has a distinct `Start()` because `wlansofmac` serves
+/// `WlanSoftmacBridge` over the Zircon transport instead of the Driver
+/// transport. A Zircon transport `client_end:WlanSoftmacIfc` is not compatible
+/// with an Driver transported protocol.
+@available(added=15)
+closed protocol WlanSoftmacBridge {
+    @available(added=HEAD)
+    compose WlanSoftmacBase;
+
+    /// Notifies the device of a successful association and configures
+    /// additional parameters necessary to participate in that association.
+    ///
+    /// # Errors
+    ///
+    /// Common errors include:
+    ///
+    /// - `ZX_ERR_BAD_STATE`: The device was not previously informed of this BSS
+    ///                       via `WlanSoftmac.JoinBss`.
+    @available(added=15, removed=HEAD)
+    strict NotifyAssociationComplete(struct {
+        assoc_cfg WlanAssociationConfig;
+    }) -> () error zx.Status;
+};
+
+/// `WlanSoftmac` is an SDK versioned protocol implemented by third-party drivers.
 @discoverable
 @transport("Driver")
 @available(added=15)
 closed protocol WlanSoftmac {
+    /// Start a softmac on the underlying device, using the given ifc to pass
+    /// events upwards. Callbacks on ifc may be invoked from now until Stop()
+    /// is called.
+    ///
+    /// The returned sme_channel is the server endpoint of a wlan_mlme.fidl:MLME
+    /// protocol, the client end of which is held by SME. This channel is used for
+    /// SME <-> MLME communication.
+    ///
+    /// Except where noted, WlanSoftmac APIs may only be called while the softmac
+    /// is running after a successful call to Start().
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_ALREADY_BOUND: `Start` was already called on this softmac.
+    @available(added=15)
+    strict Start(resource struct {
+        ifc client_end:WlanSoftmacIfc;
+    }) -> (resource struct {
+        sme_channel zx.Handle:CHANNEL;
+    }) error zx.Status;
+
+    /// Shut down the softmac if it is running.
+    /// Safe to call when the softmac is not running.
+    @available(added=15)
+    strict Stop() -> ();
+
+    /// Queue a packet for transmission. May return before a packet has actually
+    /// been transmitted. This call does not take ownership of the buffer passed in
+    /// the WlanTxPacket.
+    ///
+    /// Errors result from a failure to queue the packet for transmission.
+    /// An OK result thus only indicates that the packet was queued, *not* that
+    /// it was successfully transmitted.
+    @available(added=15)
+    strict QueueTx(struct {
+        packet WlanTxPacket;
+    }) -> () error zx.Status;
+
+    @available(added=HEAD)
+    compose WlanSoftmacBase;
+
+    // At API level HEAD, WlanSoftmac composes all the methods below this line from WlanSoftmacBase.
+    @available(added=15, removed=HEAD)
     compose WlanSoftmacBridge;
 
     // TODO(https://fxbug.dev/87050): the need to nest query response within a struct {} is no longer
@@ -725,43 +789,6 @@ closed protocol WlanSoftmac {
     strict QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     }) error zx.Status;
-
-    /// Start a softmac on the underlying device, using the given ifc to pass
-    /// events upwards. Callbacks on ifc may be invoked from now until Stop()
-    /// is called.
-    ///
-    /// The returned sme_channel is the server endpoint of a wlan_mlme.fidl:MLME
-    /// protocol, the client end of which is held by SME. This channel is used for
-    /// SME <-> MLME communication.
-    ///
-    /// Except where noted, WlanSoftmac APIs may only be called while the softmac
-    /// is running after a successful call to Start().
-    ///
-    /// Common errors include: \
-    ///   ZX_ERR_ALREADY_BOUND: `Start` was already called on this softmac.
-    @available(added=15)
-    strict Start(resource struct {
-        ifc client_end:WlanSoftmacIfc;
-    }) -> (resource struct {
-        sme_channel zx.Handle:CHANNEL;
-    }) error zx.Status;
-
-    /// Shut down the softmac if it is running.
-    /// Safe to call when the softmac is not running.
-    @available(added=15)
-    strict Stop() -> ();
-
-    /// Queue a packet for transmission. May return before a packet has actually
-    /// been transmitted. This call does not take ownership of the buffer passed in
-    /// the WlanTxPacket.
-    ///
-    /// Errors result from a failure to queue the packet for transmission.
-    /// An OK result thus only indicates that the packet was queued, *not* that
-    /// it was successfully transmitted.
-    @available(added=15)
-    strict QueueTx(struct {
-        packet WlanTxPacket;
-    }) -> () error zx.Status;
 
     /// Set the primary radio channel, e.g. in response to a channel switch event.
     /// If successful, this will trigger the channel switch immediately. This may

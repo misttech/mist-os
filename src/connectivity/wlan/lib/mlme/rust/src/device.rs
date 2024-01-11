@@ -247,20 +247,20 @@ pub trait DeviceOps {
     fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status>;
     fn start_passive_scan(
         &mut self,
-        request: &fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest,
-    ) -> Result<fidl_softmac::WlanSoftmacBridgeStartPassiveScanResponse, zx::Status>;
+        request: &fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest,
+    ) -> Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status>;
     fn start_active_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
-    ) -> Result<fidl_softmac::WlanSoftmacBridgeStartActiveScanResponse, zx::Status>;
+    ) -> Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status>;
     fn cancel_scan(
         &mut self,
-        request: &fidl_softmac::WlanSoftmacBridgeCancelScanRequest,
+        request: &fidl_softmac::WlanSoftmacBaseCancelScanRequest,
     ) -> Result<(), zx::Status>;
     fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status>;
     fn enable_beaconing(
         &mut self,
-        request: fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest,
+        request: fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest,
     ) -> Result<(), zx::Status>;
     fn disable_beaconing(&mut self) -> Result<(), zx::Status>;
     fn install_key(
@@ -273,11 +273,11 @@ pub trait DeviceOps {
     ) -> Result<(), zx::Status>;
     fn clear_association(
         &mut self,
-        request: &fidl_softmac::WlanSoftmacBridgeClearAssociationRequest,
+        request: &fidl_softmac::WlanSoftmacBaseClearAssociationRequest,
     ) -> Result<(), zx::Status>;
     fn update_wmm_parameters(
         &mut self,
-        request: &fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest,
+        request: &fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest,
     ) -> Result<(), zx::Status>;
     fn take_mlme_event_stream(&mut self) -> Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>;
     fn send_mlme_event(&mut self, event: fidl_mlme::MlmeEvent) -> Result<(), anyhow::Error>;
@@ -455,7 +455,7 @@ impl DeviceOps for Device {
     fn set_channel(&mut self, channel: fidl_common::WlanChannel) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
             .set_channel(
-                &fidl_softmac::WlanSoftmacBridgeSetChannelRequest {
+                &fidl_softmac::WlanSoftmacBaseSetChannelRequest {
                     channel: Some(channel),
                     ..Default::default()
                 },
@@ -470,8 +470,8 @@ impl DeviceOps for Device {
 
     fn start_passive_scan(
         &mut self,
-        request: &fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest,
-    ) -> Result<fidl_softmac::WlanSoftmacBridgeStartPassiveScanResponse, zx::Status> {
+        request: &fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest,
+    ) -> Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status> {
         Self::flatten_and_log_error(
             "StartPassiveScan",
             self.wlan_softmac_bridge_proxy.start_passive_scan(request, zx::Time::INFINITE),
@@ -481,7 +481,7 @@ impl DeviceOps for Device {
     fn start_active_scan(
         &mut self,
         request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
-    ) -> Result<fidl_softmac::WlanSoftmacBridgeStartActiveScanResponse, zx::Status> {
+    ) -> Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status> {
         Self::flatten_and_log_error(
             "StartActiveScan",
             self.wlan_softmac_bridge_proxy.start_active_scan(request, zx::Time::INFINITE),
@@ -490,7 +490,7 @@ impl DeviceOps for Device {
 
     fn cancel_scan(
         &mut self,
-        request: &fidl_softmac::WlanSoftmacBridgeCancelScanRequest,
+        request: &fidl_softmac::WlanSoftmacBaseCancelScanRequest,
     ) -> Result<(), zx::Status> {
         Self::flatten_and_log_error(
             "CancelScan",
@@ -507,7 +507,7 @@ impl DeviceOps for Device {
 
     fn enable_beaconing(
         &mut self,
-        request: fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest,
+        request: fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest,
     ) -> Result<(), zx::Status> {
         self.wlan_softmac_bridge_proxy
             .enable_beaconing(&request, zx::Time::INFINITE)
@@ -557,7 +557,7 @@ impl DeviceOps for Device {
 
     fn clear_association(
         &mut self,
-        request: &fidl_softmac::WlanSoftmacBridgeClearAssociationRequest,
+        request: &fidl_softmac::WlanSoftmacBaseClearAssociationRequest,
     ) -> Result<(), zx::Status> {
         let addr: MacAddr = request
             .peer_addr
@@ -577,7 +577,7 @@ impl DeviceOps for Device {
 
     fn update_wmm_parameters(
         &mut self,
-        request: &fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest,
+        request: &fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest,
     ) -> Result<(), zx::Status> {
         Self::flatten_and_log_error(
             "UpdateWmmParameters",
@@ -862,7 +862,7 @@ pub mod test_utils {
         pub keys: Vec<fidl_softmac::WlanKeyConfiguration>,
         pub next_scan_id: u64,
         pub captured_passive_scan_request:
-            Option<fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest>,
+            Option<fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest>,
         pub captured_active_scan_request: Option<fidl_softmac::WlanSoftmacStartActiveScanRequest>,
         pub query_response: fidl_softmac::WlanSoftmacQueryResponse,
         pub discovery_support: fidl_common::DiscoverySupport,
@@ -876,7 +876,7 @@ pub mod test_utils {
         pub buffer_provider: BufferProvider,
         pub install_key_results: VecDeque<Result<(), zx::Status>>,
         pub captured_update_wmm_parameters_request:
-            Option<fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest>,
+            Option<fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest>,
     }
 
     impl FakeDevice {
@@ -1035,8 +1035,8 @@ pub mod test_utils {
 
         fn start_passive_scan(
             &mut self,
-            request: &fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest,
-        ) -> Result<fidl_softmac::WlanSoftmacBridgeStartPassiveScanResponse, zx::Status> {
+            request: &fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest,
+        ) -> Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status> {
             let mut state = self.state.lock().unwrap();
             if state.config.start_passive_scan_fails {
                 return Err(zx::Status::NOT_SUPPORTED);
@@ -1044,7 +1044,7 @@ pub mod test_utils {
             let scan_id = state.next_scan_id;
             state.next_scan_id += 1;
             state.captured_passive_scan_request.replace(request.clone());
-            Ok(fidl_softmac::WlanSoftmacBridgeStartPassiveScanResponse {
+            Ok(fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse {
                 scan_id: Some(scan_id),
                 ..Default::default()
             })
@@ -1053,7 +1053,7 @@ pub mod test_utils {
         fn start_active_scan(
             &mut self,
             request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
-        ) -> Result<fidl_softmac::WlanSoftmacBridgeStartActiveScanResponse, zx::Status> {
+        ) -> Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status> {
             let mut state = self.state.lock().unwrap();
             if state.config.start_active_scan_fails {
                 return Err(zx::Status::NOT_SUPPORTED);
@@ -1061,7 +1061,7 @@ pub mod test_utils {
             let scan_id = state.next_scan_id;
             state.next_scan_id += 1;
             state.captured_active_scan_request.replace(request.clone());
-            Ok(fidl_softmac::WlanSoftmacBridgeStartActiveScanResponse {
+            Ok(fidl_softmac::WlanSoftmacBaseStartActiveScanResponse {
                 scan_id: Some(scan_id),
                 ..Default::default()
             })
@@ -1069,7 +1069,7 @@ pub mod test_utils {
 
         fn cancel_scan(
             &mut self,
-            _request: &fidl_softmac::WlanSoftmacBridgeCancelScanRequest,
+            _request: &fidl_softmac::WlanSoftmacBaseCancelScanRequest,
         ) -> Result<(), zx::Status> {
             Err(zx::Status::NOT_SUPPORTED)
         }
@@ -1081,7 +1081,7 @@ pub mod test_utils {
 
         fn enable_beaconing(
             &mut self,
-            request: fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest,
+            request: fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest,
         ) -> Result<(), zx::Status> {
             match (request.packet_template, request.tim_ele_offset, request.beacon_interval) {
                 (Some(packet_template), Some(tim_ele_offset), Some(beacon_interval)) => Ok({
@@ -1123,7 +1123,7 @@ pub mod test_utils {
 
         fn clear_association(
             &mut self,
-            request: &fidl_softmac::WlanSoftmacBridgeClearAssociationRequest,
+            request: &fidl_softmac::WlanSoftmacBaseClearAssociationRequest,
         ) -> Result<(), zx::Status> {
             let addr: MacAddr = request.peer_addr.unwrap().into();
             let mut state = self.state.lock().unwrap();
@@ -1137,7 +1137,7 @@ pub mod test_utils {
 
         fn update_wmm_parameters(
             &mut self,
-            request: &fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest,
+            request: &fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest,
         ) -> Result<(), zx::Status> {
             let mut state = self.state.lock().unwrap();
             state.captured_update_wmm_parameters_request.replace(request.clone());
@@ -1540,20 +1540,19 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
 
-        let result = fake_device.start_passive_scan(
-            &fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest {
+        let result =
+            fake_device.start_passive_scan(&fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
                 channels: Some(vec![1u8, 2, 3]),
                 min_channel_time: Some(zx::Duration::from_millis(0).into_nanos()),
                 max_channel_time: Some(zx::Duration::from_millis(200).into_nanos()),
                 min_home_time: Some(0),
                 ..Default::default()
-            },
-        );
+            });
         assert!(result.is_ok());
 
         assert_eq!(
             fake_device_state.lock().unwrap().captured_passive_scan_request,
-            Some(fidl_softmac::WlanSoftmacBridgeStartPassiveScanRequest {
+            Some(fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
                 channels: Some(vec![1, 2, 3]),
                 min_channel_time: Some(0),
                 max_channel_time: Some(200_000_000),
@@ -1666,7 +1665,7 @@ mod tests {
         let mac_frame = in_buf.as_slice().to_vec();
 
         fake_device
-            .enable_beaconing(fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest {
+            .enable_beaconing(fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest {
                 packet_template: Some(fidl_softmac::WlanTxPacket::template(mac_frame)),
                 tim_ele_offset: Some(1),
                 beacon_interval: Some(2),
@@ -1752,7 +1751,7 @@ mod tests {
         fake_device.notify_association_complete(assoc_cfg).expect("error configuring assoc");
         assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 1);
         fake_device
-            .clear_association(&fidl_softmac::WlanSoftmacBridgeClearAssociationRequest {
+            .clear_association(&fidl_softmac::WlanSoftmacBaseClearAssociationRequest {
                 peer_addr: Some([1, 2, 3, 4, 5, 6]),
                 ..Default::default()
             })
@@ -1766,7 +1765,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
 
-        let request = fidl_softmac::WlanSoftmacBridgeUpdateWmmParametersRequest {
+        let request = fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest {
             ac: Some(fidl_ieee80211::WlanAccessCategory::Background),
             params: Some(fidl_common::WlanWmmParameters {
                 apsd: true,

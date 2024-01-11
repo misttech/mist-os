@@ -203,7 +203,7 @@ impl RemoteClient {
         match self.state.as_mut() {
             State::Associated { .. } => {
                 ctx.device
-                    .clear_association(&fidl_softmac::WlanSoftmacBridgeClearAssociationRequest {
+                    .clear_association(&fidl_softmac::WlanSoftmacBaseClearAssociationRequest {
                         peer_addr: Some(self.addr.to_array()),
                         ..Default::default()
                     })

@@ -110,7 +110,7 @@ impl InfraBss {
             ))
         })?;
         ctx.device
-            .enable_beaconing(fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest {
+            .enable_beaconing(fidl_softmac::WlanSoftmacBaseEnableBeaconingRequest {
                 packet_template: Some(fidl_softmac::WlanTxPacket::template(mac_frame)),
                 tim_ele_offset: Some(tim_ele_offset),
                 beacon_interval: Some(beacon_interval.0),
