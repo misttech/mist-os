@@ -9,6 +9,7 @@ group("benchmarks") {
     "socket-loopback:benchmarks",
     "socket-tun:benchmarks",
     "udp-serde:benchmarks",
+    "with-tracing:benchmarks",
   ]
 }
 

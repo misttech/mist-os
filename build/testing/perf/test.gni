@@ -7,6 +7,14 @@ import("//build/python/python_action.gni")
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/host_test_data.gni")
 
+performance_testing_environments = [
+  astro_env,
+  nelson_env,
+  nuc_env,
+  sherlock_env,
+  vim3_env,
+]
+
 # Define a Python-driven performance test, specifying a Python host-side entry point specific to
 # the test. This is for tests that involve some test-specific host-side logic. If your test consists
 # of a Fuchsia component that generates a fuchsiaperf file and that requires no test-specific
@@ -106,13 +114,7 @@ template("python_perf_test") {
 
       # Enabling on internal builders is primarily controlled by GN groups and not by the
       # "environments" list
-      environments = [
-        astro_env,
-        nelson_env,
-        nuc_env,
-        sherlock_env,
-        vim3_env,
-      ]
+      environments = performance_testing_environments
 
       transport = "fuchsia-controller"
       if (defined(invoker.transport)) {

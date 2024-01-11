@@ -20,7 +20,6 @@ test_list = [
   # keep-sorted start
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
-  "netstack_benchmarks_with_tracing_test",
   "storage_benchmarks_test",
   "tracing_microbenchmarks_test",
 
