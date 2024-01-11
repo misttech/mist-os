@@ -121,7 +121,7 @@ bool ConsoleImpl::SaveHistoryFile() {
   return files::WriteFile(filepath, history_data.data(), history_data.size());
 }
 
-void ConsoleImpl::Output(const OutputBuffer& output, bool add_newline) {
+void ConsoleImpl::Write(const OutputBuffer& output, bool add_newline) {
   // Since most operations are asynchronous, we have to hide the input line before printing anything
   // or it will get appended to whatever the user is typing on the screen.
   //

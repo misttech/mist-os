@@ -244,6 +244,8 @@ int ConsoleMain(int argc, const char* argv[]) {
       file_streamers.emplace_back(StreamFDToConsole(std::move(fd)));
     }
 
+    console->EnableOutput();
+
     // Run the actions and then initialize the console to enter interactive mode. Errors in
     // running actions should be fatal and quit the debugger.
     RunCommandSequence(

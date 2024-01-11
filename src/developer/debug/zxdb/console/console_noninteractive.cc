@@ -10,7 +10,7 @@ namespace zxdb {
 
 void ConsoleNoninteractive::Quit() { debug::MessageLoop::Current()->QuitNow(); }
 
-void ConsoleNoninteractive::Output(const OutputBuffer& output, bool add_newline) {
+void ConsoleNoninteractive::Write(const OutputBuffer& output, bool add_newline) {
   output.WriteToStdout(add_newline);
 }
 

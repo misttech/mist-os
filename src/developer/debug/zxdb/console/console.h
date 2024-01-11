@@ -38,13 +38,16 @@ class Console : debug::LogBackend {
   virtual void Quit() = 0;
 
   // Prints the buffer/string to the console.
-  virtual void Output(const OutputBuffer& output, bool add_newline = true) = 0;
+  void Output(const OutputBuffer& output, bool add_newline = true);
   void Output(const std::string& s);
   void Output(const Err& err);
 
   // Synchronously prints the output if the async buffer is complete. Otherwise adds a listener and
   // prints the output to the console when it is complete.
   void Output(fxl::RefPtr<AsyncOutputBuffer> output);
+
+  // Writes the given output to the console.
+  virtual void Write(const OutputBuffer& output, bool add_newline = true) = 0;
 
   // Clears the contents of the console.
   virtual void Clear() = 0;
@@ -72,6 +75,9 @@ class Console : debug::LogBackend {
   virtual void EnableInput() = 0;
   virtual void DisableInput() = 0;
 
+  void EnableOutput();
+  void DisableOutput();
+
   // Implements |LogBackend|.
   void WriteLog(debug::LogSeverity severity, const debug::FileLineFunction& location,
                 std::string log) override;
@@ -81,6 +87,8 @@ class Console : debug::LogBackend {
   ConsoleContext context_;
 
  private:
+  bool OutputEnabled();
+
   // Track all asynchronous output pending. We want to store a reference and lookup by pointer, so
   // the object is duplicated here (RefPtr doesn't like to be put in a set).
   //
@@ -88,6 +96,13 @@ class Console : debug::LogBackend {
   // pointers to the roots of every AsyncOutputBuffer we've installed ourselves as a completion
   // callback for to keep them in scope until they're completed.
   std::map<AsyncOutputBuffer*, fxl::RefPtr<AsyncOutputBuffer>> async_output_;
+
+  // A counter for whether the `Output` functions should actually write to the console.
+  //
+  // Output is enabled if this value is greater than zero and disabled if the value is zero
+  // or lower. Using a counter lets clients balance calls to EnableOutput and DisableOutput
+  // without needing to coordinate with each other.
+  int output_enabled_ = 0;
 
   fxl::WeakPtrFactory<Console> weak_factory_;
 

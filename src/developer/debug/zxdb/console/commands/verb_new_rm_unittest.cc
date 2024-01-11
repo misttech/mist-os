@@ -34,6 +34,7 @@ class VerbNewRmTest : public RemoteAPITest {
 
 TEST_F(VerbNewRmTest, FilterAndJob) {
   MockConsole console(&session());
+  console.EnableOutput();
 
   console.ProcessInputLine("attach foobar");
 
@@ -87,6 +88,7 @@ TEST_F(VerbNewRmTest, FilterAndJob) {
 
 TEST_F(VerbNewRmTest, Process) {
   MockConsole console(&session());
+  console.EnableOutput();
 
   // Create process 2. It will become the current one.
   console.ProcessInputLine("pr new");
@@ -113,6 +115,7 @@ TEST_F(VerbNewRmTest, Process) {
 
 TEST_F(VerbNewRmTest, Breakpoint) {
   MockConsole console(&session());
+  console.EnableOutput();
 
   // Removing with no breakpoint.
   console.ProcessInputLine("bp rm");
@@ -132,6 +135,7 @@ TEST_F(VerbNewRmTest, Breakpoint) {
 
 TEST_F(VerbNewRmTest, Wildcard) {
   MockConsole console(&session());
+  console.EnableOutput();
 
   // Remove all breakpoints.
   console.ProcessInputLine("bp new");

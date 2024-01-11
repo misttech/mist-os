@@ -33,7 +33,7 @@ class ConsoleImpl : public Console {
   // Console implementation
   void Init() override;
   void Quit() override;
-  void Output(const OutputBuffer& output, bool add_newline) override;
+  void Write(const OutputBuffer& output, bool add_newline) override;
   void Clear() override;
   void ModalGetOption(const line_input::ModalPromptOptions& options, OutputBuffer message,
                       const std::string& prompt,

@@ -252,6 +252,7 @@ TEST(CommandUtils, FormatConsoleString) {
 TEST(CommandUtils, AssertStoppedThreadWithFrameCommand) {
   Session session;
   MockConsole console(&session);
+  console.EnableOutput();
 
   MockTarget target(&session);
   MockProcess process(&target);
@@ -295,6 +296,8 @@ TEST(CommandUtils, AssertStoppedThreadWithFrameCommand) {
 TEST(CommandUtils, FormatAllThreadStacks) {
   Session session;
   MockConsole console(&session);
+  console.EnableOutput();
+
   Command cmd;
 
   MockTarget target(&session);

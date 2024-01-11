@@ -30,6 +30,12 @@ Console::~Console() {
 
 fxl::WeakPtr<Console> Console::GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
+void Console::Output(const OutputBuffer& output, bool add_newline) {
+  if (OutputEnabled()) {
+    Write(output, add_newline);
+  }
+}
+
 void Console::Output(const std::string& s) {
   OutputBuffer buffer;
   buffer.Append(s);
@@ -63,6 +69,12 @@ void Console::Output(fxl::RefPtr<AsyncOutputBuffer> output) {
   }
 }
 
+bool Console::OutputEnabled() { return output_enabled_ > 0; }
+
+void Console::EnableOutput() { ++output_enabled_; }
+
+void Console::DisableOutput() { --output_enabled_; }
+
 void Console::WriteLog(debug::LogSeverity severity, const debug::FileLineFunction& location,
                        std::string log) {
   Syntax syntax;
@@ -77,7 +89,7 @@ void Console::WriteLog(debug::LogSeverity severity, const debug::FileLineFunctio
       syntax = Syntax::kError;
       break;
   }
-  Output(OutputBuffer(syntax, std::move(log)));
+  Write(OutputBuffer(syntax, std::move(log)));
 }
 
 }  // namespace zxdb

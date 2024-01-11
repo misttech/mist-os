@@ -12,6 +12,7 @@ constexpr uint64_t ConsoleTest::kThreadKoid;
 void ConsoleTest::SetUp() {
   RemoteAPITest::SetUp();
   console_ = std::make_unique<MockConsole>(&session());
+  console_->EnableOutput();
 
   process_ = InjectProcess(kProcessKoid);
   thread_ = InjectThread(kProcessKoid, kThreadKoid);

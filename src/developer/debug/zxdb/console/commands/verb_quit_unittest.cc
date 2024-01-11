@@ -20,6 +20,7 @@ class VerbQuit : public RemoteAPITest {};
 // Quit with no running processes should exit immediately.
 TEST_F(VerbQuit, QuitNoProcs) {
   MockConsole console(&session());
+  console.EnableOutput();
 
   EXPECT_FALSE(console.has_quit());
   console.ProcessInputLine("quit");
@@ -29,6 +30,7 @@ TEST_F(VerbQuit, QuitNoProcs) {
 // Quit with running processes should prompt.
 TEST_F(VerbQuit, QuitRunningProcs) {
   MockConsole console(&session());
+  console.EnableOutput();
 
   InjectProcess(1234);
   console.FlushOutputEvents();  // Process attaching will output some stuff.

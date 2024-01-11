@@ -31,7 +31,7 @@ std::unique_ptr<debug::BufferedFD> StreamFDToConsole(fbl::unique_fd fd) {
         break;
     }
     if (!data.empty()) {
-      console->Output(data);
+      console->Write(data);
     }
   });
   streamer->Start();

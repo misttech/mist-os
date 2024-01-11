@@ -12,7 +12,7 @@
 
 namespace zxdb {
 
-void MockConsole::Output(const OutputBuffer& output, bool add_newline) {
+void MockConsole::Write(const OutputBuffer& output, bool add_newline) {
   output_queue_.push_back({MockConsole::OutputEvent::Type::kOutput, output});
   output_buffer_.Append(output);
 

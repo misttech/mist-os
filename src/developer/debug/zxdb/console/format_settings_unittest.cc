@@ -44,6 +44,7 @@ TEST_F(FormatSettingTest, Setting) {
 
 TEST_F(FormatSettingTest, ExecutionScope) {
   MockConsole console(&session());
+  console.EnableOutput();
   ConsoleContext context(&session());
 
   constexpr int kProcessKoid = 1234;
@@ -87,6 +88,7 @@ TEST_F(FormatSettingTest, ExecutionScope) {
 
 TEST_F(FormatSettingTest, InputLocations) {
   MockConsole console(&session());
+  console.EnableOutput();
   ConsoleContext context(&session());
 
   std::string name = "setting-inputloc";

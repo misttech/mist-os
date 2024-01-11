@@ -51,6 +51,7 @@ namespace zxdb {
 class DebugAdapterServerTest : public TestWithLoop, public DebugAdapterServerObserver {
  public:
   DebugAdapterServerTest() : console_(&session_), server_(&console_, kServerPort) {
+    console_.EnableOutput();
     server_.AddObserver(this);
   }
 

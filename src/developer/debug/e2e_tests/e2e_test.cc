@@ -31,6 +31,7 @@ E2eTest::E2eTest() {
   // handle control characters from the line input library or UTF-8 characters. Any output will be
   // from reporting errors directly from the test.
   console_ = std::make_unique<MockConsole>(session_.get());
+  console_->EnableOutput();
   console_->Init();
 
   FfxDebugAgentBridge* bridge = FfxDebugAgentBridge::Get();

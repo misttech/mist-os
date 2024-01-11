@@ -30,6 +30,7 @@ class VerbsSettingsTest : public RemoteAPITest {
   void SetUp() override {
     RemoteAPITest::SetUp();
     console_ = std::make_unique<MockConsole>(&session());
+    console_->EnableOutput();
   }
   void TearDown() override {
     console_.reset();
