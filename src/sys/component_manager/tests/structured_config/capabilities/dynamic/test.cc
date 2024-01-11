@@ -23,57 +23,34 @@ void AddChildComponent(component_testing::RealmBuilder& builder) {
   });
 }
 
-void AddAndOfferConfig(component_testing::RealmBuilder& builder, const char* name,
-                       fuchsia::component::decl::ConfigValue value) {
-  fuchsia::component::decl::Component realm = builder.GetRealmDecl();
-
-  fuchsia::component::decl::Configuration config;
-  config.set_name(name).set_value(std::move(value));
-  realm.mutable_capabilities()->push_back(
-      fuchsia::component::decl::Capability::WithConfig(std::move(config)));
-
-  fuchsia::component::decl::OfferConfiguration config_offer;
-  config_offer
-      .set_source(::fuchsia::component::decl::Ref::WithSelf(::fuchsia::component::decl::SelfRef()))
-      .set_source_name(name)
-      .set_target_name(name)
-      .set_target(::fuchsia::component::decl::Ref::WithChild(
-          ::fuchsia::component::decl::ChildRef{.name = "child"}));
-  realm.mutable_offers()->push_back(
-      fuchsia::component::decl::Offer::WithConfig(std::move(config_offer)));
-
-  builder.ReplaceRealmDecl(std::move(realm));
-}
-
-void OfferConfigFromVoid(component_testing::RealmBuilder& builder, const char* name) {
-  fuchsia::component::decl::Component realm = builder.GetRealmDecl();
-
-  fuchsia::component::decl::OfferConfiguration config_offer;
-  config_offer
-      .set_source(
-          ::fuchsia::component::decl::Ref::WithVoidType(::fuchsia::component::decl::VoidRef()))
-      .set_availability(::fuchsia::component::decl::Availability::OPTIONAL)
-      .set_source_name(name)
-      .set_target_name(name)
-      .set_target(::fuchsia::component::decl::Ref::WithChild(
-          ::fuchsia::component::decl::ChildRef{.name = "child"}));
-  realm.mutable_offers()->push_back(
-      fuchsia::component::decl::Offer::WithConfig(std::move(config_offer)));
-
-  builder.ReplaceRealmDecl(std::move(realm));
-}
-
 TEST(ScTest, CheckValuesVoidOptional) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   component_testing::RealmBuilder builder = component_testing::RealmBuilder::Create();
   AddChildComponent(builder);
-  AddAndOfferConfig(builder, "fuchsia.config.MyFlag",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithBool_(true)));
-  AddAndOfferConfig(builder, "fuchsia.config.MyTransitional",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithUint8(5)));
-  OfferConfigFromVoid(builder, "fuchsia.config.MyInt");
+  std::vector<component_testing::ConfigCapability> configurations;
+  configurations.push_back({
+      .name = "fuchsia.config.MyFlag",
+      .value = component_testing::ConfigValue::Bool(true),
+  });
+  configurations.push_back({
+      .name = "fuchsia.config.MyTransitional",
+      .value = component_testing::ConfigValue::Uint8(5),
+  });
+  builder.AddConfiguration(std::move(configurations));
+  builder.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.config.MyFlag"},
+              component_testing::Config{.name = "fuchsia.config.MyTransitional"},
+          },
+      .source = component_testing::SelfRef{},
+      .targets = {component_testing::ChildRef{"child"}},
+  });
+  builder.AddRoute(component_testing::Route{
+      .capabilities = {component_testing::Config{.name = "fuchsia.config.MyInt"}},
+      .source = component_testing::VoidRef(),
+      .targets = {component_testing::ChildRef{"child"}},
+  });
 
   component_testing::RealmRoot root = builder.Build(loop.dispatcher());
   zx::result client_channel = root.component().Connect<test_config::Config>();
@@ -94,12 +71,25 @@ TEST(ScTest, CheckValuesNoOptional) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   component_testing::RealmBuilder builder = component_testing::RealmBuilder::Create();
   AddChildComponent(builder);
-  AddAndOfferConfig(builder, "fuchsia.config.MyFlag",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithBool_(true)));
-  AddAndOfferConfig(builder, "fuchsia.config.MyTransitional",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithUint8(5)));
+  std::vector<component_testing::ConfigCapability> configurations;
+  configurations.push_back({
+      .name = "fuchsia.config.MyFlag",
+      .value = component_testing::ConfigValue::Bool(false),
+  });
+  configurations.push_back({
+      .name = "fuchsia.config.MyTransitional",
+      .value = component_testing::ConfigValue::Uint8(5),
+  });
+  builder.AddConfiguration(std::move(configurations));
+  builder.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.config.MyFlag"},
+              component_testing::Config{.name = "fuchsia.config.MyTransitional"},
+          },
+      .source = component_testing::SelfRef{},
+      .targets = {component_testing::ChildRef{"child"}},
+  });
 
   component_testing::RealmRoot root = builder.Build(loop.dispatcher());
   zx::result client_channel = root.component().Connect<test_config::Config>();
@@ -115,15 +105,30 @@ TEST(ScTest, CheckValues) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   component_testing::RealmBuilder builder = component_testing::RealmBuilder::Create();
   AddChildComponent(builder);
-  AddAndOfferConfig(builder, "fuchsia.config.MyFlag",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithBool_(false)));
-  AddAndOfferConfig(builder, "fuchsia.config.MyInt",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithUint8(10)));
-  AddAndOfferConfig(builder, "fuchsia.config.MyTransitional",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithUint8(10)));
+  std::vector<component_testing::ConfigCapability> configurations;
+  configurations.push_back({
+      .name = "fuchsia.config.MyFlag",
+      .value = component_testing::ConfigValue::Bool(false),
+  });
+  configurations.push_back({
+      .name = "fuchsia.config.MyInt",
+      .value = component_testing::ConfigValue::Uint8(10),
+  });
+  configurations.push_back({
+      .name = "fuchsia.config.MyTransitional",
+      .value = component_testing::ConfigValue::Uint8(10),
+  });
+  builder.AddConfiguration(std::move(configurations));
+  builder.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.config.MyFlag"},
+              component_testing::Config{.name = "fuchsia.config.MyInt"},
+              component_testing::Config{.name = "fuchsia.config.MyTransitional"},
+          },
+      .source = component_testing::SelfRef{},
+      .targets = {component_testing::ChildRef{"child"}},
+  });
 
   component_testing::RealmRoot root = builder.Build(loop.dispatcher());
   zx::result client_channel = root.component().Connect<test_config::Config>();
@@ -143,12 +148,25 @@ TEST(ScTest, NoTransitionalValue) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   component_testing::RealmBuilder builder = component_testing::RealmBuilder::Create();
   AddChildComponent(builder);
-  AddAndOfferConfig(builder, "fuchsia.config.MyFlag",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithBool_(false)));
-  AddAndOfferConfig(builder, "fuchsia.config.MyInt",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithUint8(10)));
+  std::vector<component_testing::ConfigCapability> configurations;
+  configurations.push_back({
+      .name = "fuchsia.config.MyFlag",
+      .value = component_testing::ConfigValue::Bool(false),
+  });
+  configurations.push_back({
+      .name = "fuchsia.config.MyInt",
+      .value = component_testing::ConfigValue::Uint8(10),
+  });
+  builder.AddConfiguration(std::move(configurations));
+  builder.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.config.MyFlag"},
+              component_testing::Config{.name = "fuchsia.config.MyInt"},
+          },
+      .source = component_testing::SelfRef{},
+      .targets = {component_testing::ChildRef{"child"}},
+  });
   // We are specifically not routing fuchsia.config.MyTransitional.
 
   component_testing::RealmRoot root = builder.Build(loop.dispatcher());
@@ -170,9 +188,20 @@ TEST(ScTest, BadValueType) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   component_testing::RealmBuilder builder = component_testing::RealmBuilder::Create();
   AddChildComponent(builder);
-  AddAndOfferConfig(builder, "fuchsia.config.MyFlag",
-                    fuchsia::component::decl::ConfigValue::WithSingle(
-                        fuchsia::component::decl::ConfigSingleValue::WithInt8(7)));
+  std::vector<component_testing::ConfigCapability> configurations;
+  configurations.push_back({
+      .name = "fuchsia.config.MyFlag",
+      .value = component_testing::ConfigValue::Int8(7),
+  });
+  builder.AddConfiguration(std::move(configurations));
+  builder.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.config.MyFlag"},
+          },
+      .source = component_testing::SelfRef{},
+      .targets = {component_testing::ChildRef{"child"}},
+  });
 
   component_testing::RealmRoot root = builder.Build(loop.dispatcher());
   zx::result client_channel = root.component().Connect<test_config::Config>();

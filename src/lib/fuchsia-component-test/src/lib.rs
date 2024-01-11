@@ -1334,6 +1334,11 @@ impl RealmBuilder {
     ) -> Result<(), Error> {
         self.root_realm.read_only_directory(directory_name, to, directory_contents).await
     }
+
+    /// Adds a Capability to the root realm.
+    pub async fn add_capability(&self, capability: cm_rust::CapabilityDecl) -> Result<(), Error> {
+        self.root_realm.add_capability(capability).await
+    }
 }
 
 #[derive(Debug)]
@@ -1804,6 +1809,12 @@ impl SubRealmBuilder {
             directory_contents.into(),
         );
         fut.await??;
+        Ok(())
+    }
+
+    /// Adds a Configuration Capability to the root realm and routes it to the given targets.
+    pub async fn add_capability(&self, capability: cm_rust::CapabilityDecl) -> Result<(), Error> {
+        self.realm_proxy.add_capability(&capability.native_into_fidl()).await??;
         Ok(())
     }
 }
@@ -2818,6 +2829,9 @@ mod tests {
         InitMutableConfigToEmpty {
             name: String,
         },
+        AddCapability {
+            capability: fdecl::Capability,
+        },
         SetConfigValue {
             name: String,
             key: String,
@@ -2927,6 +2941,13 @@ mod tests {
                     ftest::RealmRequest::InitMutableConfigToEmpty { name, responder } => {
                         report_requests
                             .send(ServerRequest::InitMutableConfigToEmpty { name })
+                            .await
+                            .unwrap();
+                        responder.send(Ok(())).unwrap();
+                    }
+                    ftest::RealmRequest::AddCapability { capability, responder } => {
+                        report_requests
+                            .send(ServerRequest::AddCapability { capability })
                             .await
                             .unwrap();
                         responder.send(Ok(())).unwrap();
@@ -3544,5 +3565,32 @@ mod tests {
                 .await
                 .unwrap();
         });
+    }
+
+    #[fuchsia::test]
+    async fn add_configurations() {
+        let (builder, _server_task, mut receive_server_requests) =
+            new_realm_builder_and_server_task();
+        _ = builder.add_child("a", "test://a", ChildOptions::new()).await.unwrap();
+        _ = receive_server_requests.next().now_or_never();
+
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "my-config".to_string().fidl_into_native(),
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(true)),
+            }))
+            .await
+            .unwrap();
+        match receive_server_requests.next().now_or_never() {
+            Some(Some(ServerRequest::AddCapability { capability, .. })) => {
+                let configuration = assert_matches!(capability, fdecl::Capability::Config(c) => c);
+                assert_eq!(configuration.name, Some("my-config".to_string()));
+                assert_eq!(
+                    configuration.value,
+                    Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true)))
+                );
+            }
+            req => panic!("match failed, received unexpected server request: {:?}", req),
+        };
     }
 }

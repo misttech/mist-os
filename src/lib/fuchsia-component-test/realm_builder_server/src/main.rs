@@ -557,6 +557,22 @@ impl Realm {
 
                     responder.send(Ok(()))?;
                 }
+                ftest::RealmRequest::AddCapability { capability, responder } => {
+                    if self.realm_has_been_built.load(Ordering::Relaxed) {
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        continue;
+                    }
+
+                    match self.realm_node.add_capability(capability).await {
+                        Ok(()) => {
+                            responder.send(Ok(()))?;
+                        }
+                        Err(err) => {
+                            warn!(method = "Realm.AddCapability", message = %err);
+                            responder.send(Err(err.into()))?;
+                        }
+                    }
+                }
                 ftest::RealmRequest::SetConfigValue { name, key, value, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
                         responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
@@ -1132,6 +1148,25 @@ impl RealmNode2 {
             .ok_or_else(|| RealmBuilderError::NoSuchChild(child_name.clone()))
     }
 
+    async fn add_capability(
+        &self,
+        capability: fcdecl::Capability,
+    ) -> Result<(), RealmBuilderError> {
+        let mut state_guard = self.state.lock().await;
+        let mut capabilities: Vec<_> = state_guard
+            .decl
+            .capabilities
+            .clone()
+            .into_iter()
+            .map(|c| c.native_into_fidl())
+            .collect();
+        capabilities.push(capability.clone());
+        cm_fidl_validator::validate_capabilities(&capabilities, false)
+            .map_err(|e| RealmBuilderError::CapabilityInvalid(anyhow::anyhow!(e)))?;
+        push_if_not_present(&mut state_guard.decl.capabilities, capability.fidl_into_native());
+        Ok(())
+    }
+
     async fn route_capabilities(
         &self,
         capabilities: Vec<ftest::Capability>,
@@ -1162,7 +1197,8 @@ impl RealmNode2 {
                         ftest::Capability::Protocol(ftest::Protocol { availability, .. })
                         | ftest::Capability::Directory(ftest::Directory { availability, .. })
                         | ftest::Capability::Storage(ftest::Storage { availability, .. })
-                        | ftest::Capability::Service(ftest::Service { availability, .. }) => {
+                        | ftest::Capability::Service(ftest::Service { availability, .. })
+                        | ftest::Capability::Config(ftest::Config { availability, .. }) => {
                             match availability {
                                 Some(fcdecl::Availability::Required) | None => (),
                                 _ => {
@@ -1519,6 +1555,19 @@ fn create_offer_decl(
                 target_name,
                 scope: event_stream.scope.as_ref().cloned().map(FidlIntoNative::fidl_into_native),
                 availability: cm_rust::Availability::Required,
+            })
+        }
+        ftest::Capability::Config(config) => {
+            let availability = match source {
+                cm_rust::OfferSource::Void => cm_rust::Availability::Optional,
+                _ => get_offer_availability(&config.availability),
+            };
+            cm_rust::OfferDecl::Config(cm_rust::OfferConfigurationDecl {
+                source,
+                source_name: try_into_source_name(&config.name)?,
+                target,
+                target_name: try_into_target_name(&config.name, &config.as_)?,
+                availability,
             })
         }
         _ => {

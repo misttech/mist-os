@@ -157,7 +157,7 @@ pub fn validate(decl: &fdecl::Component) -> Result<(), ErrorList> {
 
 /// Validates a list of Capabilities independently.
 pub fn validate_capabilities(
-    capabilities: &Vec<fdecl::Capability>,
+    capabilities: &[fdecl::Capability],
     as_builtin: bool,
 ) -> Result<(), ErrorList> {
     let mut ctx = ValidationContext::default();

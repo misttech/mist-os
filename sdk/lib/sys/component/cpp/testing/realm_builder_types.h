@@ -75,9 +75,15 @@ struct Storage final {
   cpp17::optional<std::string_view> path = cpp17::nullopt;
 };
 
+// Routing information for a configuration capability.
+struct Config final {
+  std::string_view name;
+  cpp17::optional<std::string_view> as = cpp17::nullopt;
+};
+
 // A capability to be routed from one component to another.
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities
-using Capability = cpp17::variant<Protocol, Service, Directory, Storage>;
+using Capability = cpp17::variant<Protocol, Service, Directory, Storage, Config>;
 
 // [START mock_handles_cpp]
 // Handles provided to mock component.
@@ -235,6 +241,8 @@ struct ChildOptions {
 #endif
 };
 
+struct SelfRef {};
+
 // If this is used for the root Realm, then this endpoint refers to the test
 // component itself. This used to route capabilities to/from the test component.
 // If this ise used in a sub Realm, then `Parent` will refer to its parent Realm.
@@ -255,7 +263,7 @@ struct FrameworkRef {};
 // "void".
 struct VoidRef {};
 
-using Ref = cpp17::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef, VoidRef>;
+using Ref = cpp17::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef, VoidRef, SelfRef>;
 
 struct Route {
   std::vector<Capability> capabilities;
@@ -359,6 +367,12 @@ class ConfigValue {
   explicit ConfigValue(fuchsia::component::decl::ConfigValueSpec spec);
   fuchsia::component::decl::ConfigValueSpec spec;
 #endif
+};
+
+// Defines a configuration capability.
+struct ConfigCapability {
+  std::string name;
+  ConfigValue value;
 };
 
 }  // namespace component_testing

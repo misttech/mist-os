@@ -68,6 +68,9 @@ fuchsia::component::decl::Ref ConvertToFidl(Ref ref) {
   if (auto _ = cpp17_get_if<VoidRef>(&ref)) {
     return fuchsia::component::decl::Ref::WithVoidType(fuchsia::component::decl::VoidRef());
   }
+  if (auto _ = cpp17_get_if<SelfRef>(&ref)) {
+    return fuchsia::component::decl::Ref::WithSelf(fuchsia::component::decl::SelfRef());
+  }
 
   ZX_PANIC("ConvertToFidl(Ref) reached unreachable block!");
 }
@@ -112,6 +115,18 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     ZX_COMPONENT_ADD_STR_IF_PRESENT(storage, path, fidl_capability);
 
     return fuchsia::component::test::Capability::WithStorage(std::move(fidl_capability));
+  }
+  if (auto config = cpp17_get_if<Config>(&capability)) {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    fuchsia::component::test::Config fidl_capability;
+
+    fidl_capability.set_name(std::string(config->name));
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(config, as, fidl_capability);
+
+    return fuchsia::component::test::Capability::WithConfig(std::move(fidl_capability));
+#else
+    ZX_PANIC("Config capabilities are not supported in this API level.");
+#endif
   }
 
   ZX_PANIC("ConvertToFidl(Capability) reached unreachable block!");
