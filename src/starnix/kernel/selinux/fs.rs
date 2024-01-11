@@ -140,7 +140,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "enforce".into(),
-            SeEnforce::new_node(),
+            SeEnforce::new_node(security_server.clone()),
             // TODO(b/297313229): Get mode from the container.
             mode!(IFREG, 0o644),
         );
@@ -216,31 +216,28 @@ impl BytesFileOps for SePolicy {
 }
 
 struct SeEnforce {
-    enforce: Mutex<bool>,
+    security_server: Arc<SecurityServer>,
 }
 
 impl SeEnforce {
-    fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self { enforce: Mutex::new(false) })
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        BytesFile::new_node(Self { security_server })
     }
 }
 
 impl BytesFileOps for SeEnforce {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let enforce_data = parse_unsigned_file::<u32>(&data)?;
-        let enforce_opt = match enforce_data {
-            0 => Some(false),
-            1 => Some(true),
-            _ => None,
-        };
-        if let Some(enforce) = enforce_opt {
-            *self.enforce.lock() = enforce;
-        }
+        self.security_server.set_enforcing(match enforce_data {
+            0 => false,
+            1 => true,
+            _ => error!(EINVAL)?,
+        });
         Ok(())
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(serialize_u32_file(*self.enforce.lock() as u32).into())
+        Ok(serialize_u32_file(self.security_server.enforcing() as u32).into())
     }
 }
 

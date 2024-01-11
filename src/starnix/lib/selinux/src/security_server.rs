@@ -36,6 +36,9 @@ struct SecurityServerState {
 
     /// Describes the currently active policy.
     policy: Option<Arc<LoadedPolicy>>,
+
+    /// True if hooks should enforce policy-based access decisions.
+    enforcing: bool,
 }
 
 pub struct SecurityServer {
@@ -56,7 +59,11 @@ pub struct SecurityServer {
 impl SecurityServer {
     pub fn new(mode: Mode) -> Arc<SecurityServer> {
         let avc_manager = AvcManager::new();
-        let state = Mutex::new(SecurityServerState { sids: HashMap::new(), policy: None });
+        let state = Mutex::new(SecurityServerState {
+            sids: HashMap::new(),
+            policy: None,
+            enforcing: false,
+        });
         let security_server = Arc::new(SecurityServer { mode, avc_manager, state });
 
         // TODO(http://b/304776236): Consider constructing shared owner of `AvcManager` and
@@ -105,6 +112,17 @@ impl SecurityServer {
         // TODO(b/315531456): Update the policy load count for "status".
         self.state.lock().policy = Some(policy);
         Ok(())
+    }
+
+    /// Set to enforcing mode if `enforce` is true, permissive mode otherwise.
+    pub fn set_enforcing(&self, enforcing: bool) {
+        self.state.lock().enforcing = enforcing;
+    }
+
+    /// Returns true if access decisions by the [`SecurityServer`] should be
+    /// enforced by hooks.
+    pub fn enforcing(&self) -> bool {
+        self.state.lock().enforcing
     }
 
     /// Returns the active policy in binary form.
@@ -230,5 +248,14 @@ mod tests {
         let not_really_a_policy = "not a real policy".as_bytes().to_vec();
         let security_server = SecurityServer::new(Mode::Enable);
         assert!(security_server.load_policy(not_really_a_policy.clone()).is_err());
+    }
+
+    #[fuchsia::test]
+    fn enforcing_mode_is_reported() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        assert!(!security_server.enforcing());
+
+        security_server.set_enforcing(true);
+        assert!(security_server.enforcing());
     }
 }
