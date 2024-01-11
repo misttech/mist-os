@@ -4,53 +4,46 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 
 // This trivial component writes a single property and node of every possible type in inspect for
 // the sake of verifying that the accessor API is stable in CTS.
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  auto inspector = std::make_unique<sys::ComponentInspector>(context.get());
+  auto inspector =
+      std::make_unique<inspect::ComponentInspector>(loop.dispatcher(), inspect::PublishOptions{});
 
   auto numeric_properties = inspector->root().CreateChild("numeric");
-  numeric_properties.CreateInt("int", -1, inspector.get());
-  numeric_properties.CreateUint("uint", 1, inspector.get());
-  numeric_properties.CreateDouble("double", 1.5, inspector.get());
-  numeric_properties.CreateBool("bool", true, inspector.get());
+  numeric_properties.RecordInt("int", -1);
+  numeric_properties.RecordUint("uint", 1);
+  numeric_properties.RecordDouble("double", 1.5);
+  numeric_properties.RecordBool("bool", true);
 
-  inspector->root().CreateLazyValues(
-      "buffers_lazy_values",
-      []() {
-        inspect::Inspector inspector;
-        auto buffer_properties = inspector.GetRoot().CreateChild("buffers");
-        buffer_properties.CreateString("string", "foo", &inspector);
-        buffer_properties.CreateByteVector("bytes", std::vector<uint8_t>({1, 2, 3}), &inspector);
-        inspector.emplace(std::move(buffer_properties));
-        return fpromise::make_ok_promise(std::move(inspector));
-      },
-      inspector.get());
+  inspector->root().RecordLazyValues("buffers_lazy_values", []() {
+    inspect::Inspector inspector;
+    auto buffer_properties = inspector.GetRoot().CreateChild("buffers");
+    buffer_properties.CreateString("string", "foo", &inspector);
+    buffer_properties.CreateByteVector("bytes", std::vector<uint8_t>({1, 2, 3}), &inspector);
+    inspector.emplace(std::move(buffer_properties));
+    return fpromise::make_ok_promise(std::move(inspector));
+  });
 
-  inspector->root().CreateLazyNode(
-      "arrays",
-      []() {
-        inspect::Inspector inspector;
-        auto ints = inspector.GetRoot().CreateIntArray("ints", 2);
-        ints.Set(0, -1);
-        inspector.emplace(std::move(ints));
+  inspector->root().RecordLazyNode("arrays", []() {
+    inspect::Inspector inspector;
+    auto ints = inspector.GetRoot().CreateIntArray("ints", 2);
+    ints.Set(0, -1);
+    inspector.emplace(std::move(ints));
 
-        auto uints = inspector.GetRoot().CreateUintArray("uints", 3);
-        uints.Set(1, 2);
-        inspector.emplace(std::move(uints));
+    auto uints = inspector.GetRoot().CreateUintArray("uints", 3);
+    uints.Set(1, 2);
+    inspector.emplace(std::move(uints));
 
-        auto doubles = inspector.GetRoot().CreateDoubleArray("doubles", 4);
-        doubles.Set(2, 3.5);
-        inspector.emplace(std::move(doubles));
+    auto doubles = inspector.GetRoot().CreateDoubleArray("doubles", 4);
+    doubles.Set(2, 3.5);
+    inspector.emplace(std::move(doubles));
 
-        return fpromise::make_ok_promise(std::move(inspector));
-      },
-      inspector.get());
+    return fpromise::make_ok_promise(std::move(inspector));
+  });
 
   auto linear_histograms = inspector->root().CreateChild("linear_histgorams");
   auto int_linear_hist = linear_histograms.CreateLinearIntHistogram("int", /*floor*/ -10,

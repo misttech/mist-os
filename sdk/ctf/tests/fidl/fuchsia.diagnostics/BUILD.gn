@@ -12,8 +12,7 @@ executable("inspect-publisher-bin") {
   sources = [ "inspect_publisher.cc" ]
 
   deps = [
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

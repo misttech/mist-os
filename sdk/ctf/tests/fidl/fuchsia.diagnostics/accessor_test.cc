@@ -140,121 +140,6 @@ const char EXPECTED[] = R"JSON({
     "version": 1
 })JSON";
 
-const char EXPECTED_OLD[] = R"JSON({
-    "data_source": "Inspect",
-    "metadata": {
-        "component_url": "COMPONENT_URL",
-        "filename": "fuchsia.inspect.Tree",
-        "timestamp": TIMESTAMP
-    },
-    "moniker": "MONIKER",
-    "payload": {
-        "root": {
-            "arrays": {
-                "doubles": [
-                    0.0,
-                    0.0,
-                    3.5,
-                    0.0
-                ],
-                "ints": [
-                    -1,
-                    0
-                ],
-                "uints": [
-                    0,
-                    2,
-                    0
-                ]
-            },
-            "buffers": {
-                "bytes": "b64:AQID",
-                "string": "foo"
-            },
-            "exponential_histograms": {
-                "double": {
-                    "counts": [
-                        1.0
-                    ],
-                    "floor": 1.5,
-                    "indexes": [
-                        2
-                    ],
-                    "initial_step": 2.0,
-                    "size": 5,
-                    "step_multiplier": 3.5
-                },
-                "int": {
-                    "counts": [
-                        1
-                    ],
-                    "floor": -10,
-                    "indexes": [
-                        2
-                    ],
-                    "initial_step": 2,
-                    "size": 5,
-                    "step_multiplier": 3
-                },
-                "uint": {
-                    "counts": [
-                        1
-                    ],
-                    "floor": 1,
-                    "indexes": [
-                        2
-                    ],
-                    "initial_step": 2,
-                    "size": 5,
-                    "step_multiplier": 3
-                }
-            },
-            "linear_histgorams": {
-                "double": {
-                    "counts": [
-                        1.0
-                    ],
-                    "floor": 1.5,
-                    "indexes": [
-                        2
-                    ],
-                    "size": 5,
-                    "step": 2.5
-                },
-                "int": {
-                    "counts": [
-                        1
-                    ],
-                    "floor": -10,
-                    "indexes": [
-                        3
-                    ],
-                    "size": 5,
-                    "step": 2
-                },
-                "uint": {
-                    "counts": [
-                        1
-                    ],
-                    "floor": 1,
-                    "indexes": [
-                        2
-                    ],
-                    "size": 5,
-                    "step": 2
-                }
-            },
-            "numeric": {
-                "bool": true,
-                "double": 1.5,
-                "int": -1,
-                "uint": 1
-            }
-        }
-    },
-    "version": 1
-})JSON";
-
 struct Sorter {
   bool operator()(const rapidjson::Value::Member& a, const rapidjson::Value::Member& b) const {
     return strcmp(a.name.GetString(), b.name.GetString()) < 0;
@@ -354,18 +239,14 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
   EXPECT_TRUE(re2::RE2::PartialMatch(actual, re2::RE2("\"timestamp\": (\\d+)"), &timestamp));
 
   std::string expected = EXPECTED;
-  std::string expected_old = EXPECTED_OLD;
 
   // Replace non-deterministic expected values.
   re2::RE2::GlobalReplace(&expected, re2::RE2("CHILD_NAME"), realm.component().GetChildName());
   re2::RE2::GlobalReplace(&expected, re2::RE2("TIMESTAMP"), timestamp);
-  re2::RE2::GlobalReplace(&expected_old, re2::RE2("CHILD_NAME"), realm.component().GetChildName());
-  re2::RE2::GlobalReplace(&expected_old, re2::RE2("TIMESTAMP"), timestamp);
 
   std::string actual_sorted = SortJsonFile(actual);
 
-  EXPECT_TRUE(expected == actual_sorted || expected_old == actual_sorted,
-              "Histogram format didn't match buckets or params");
+  EXPECT_TRUE(expected == actual_sorted, "Histogram format didn't match buckets or params");
 }
 
 }  // namespace
