@@ -9,94 +9,17 @@
 #include <vector>
 
 #include "src/media/audio/audio_core/shared/device_id.h"
-#include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
+#include "src/media/audio/audio_core/test/api/audio_renderer_test_shared.h"
 #include "src/media/audio/audio_core/v1/audio_tuner_impl.h"
 #include "src/media/audio/lib/analysis/analysis.h"
 #include "src/media/audio/lib/analysis/generators.h"
 #include "src/media/audio/lib/processing/gain.h"
 #include "src/media/audio/lib/test/comparators.h"
 
-using ASF = fuchsia::media::AudioSampleFormat;
-using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
-
 namespace media::audio::test {
 
-namespace {
-constexpr zx::duration kPacketLength = zx::msec(10);
-constexpr int64_t kNumPacketsInPayload = 50;
-constexpr int64_t kFramesPerPacketForDisplay = 480;
-// Tolerance to account for scheduling latency.
-constexpr int64_t kToleranceInPackets = 2;
-// The one-sided filter width of the SincSampler.
-constexpr int64_t kSincSamplerHalfFilterWidth = 13;
-// The length of gain ramp for each volume change.
-// Must match the constant in audio_core.
-constexpr zx::duration kVolumeRampDuration = zx::msec(5);
-}  // namespace
-
-template <ASF SampleType>
-class AudioRendererPipelineTest : public HermeticAudioTest {
- protected:
-  static constexpr int32_t kOutputFrameRate = 48000;
-  static constexpr int32_t kNumChannels = 2;
-  static constexpr audio_stream_unique_id_t kUniqueId{{0xff, 0x00}};
-
-  static constexpr int64_t PacketsToFrames(int64_t num_packets, int32_t frame_rate) {
-    auto numerator = num_packets * frame_rate * kPacketLength.to_msecs();
-    FX_CHECK(numerator % 1000 == 0);
-    return numerator / 1000;
-  }
-
-  void SetUp() override {
-    HermeticAudioTest::SetUp();
-    // The output can store exactly 1s of audio data.
-    auto format = Format::Create<SampleType>(2, kOutputFrameRate).take_value();
-    output_ = CreateOutput(kUniqueId, format, kOutputFrameRate);
-  }
-
-  void TearDown() override {
-    if constexpr (kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
-      ExpectNoOverflowsOrUnderflows();
-    } else {
-      // We expect no renderer underflows: we pre-submit the whole signal. Keep that check enabled.
-      ExpectNoRendererUnderflows();
-    }
-
-    HermeticAudioTest::TearDown();
-  }
-
-  std::pair<AudioRendererShim<SampleType>*, TypedFormat<SampleType>> CreateRenderer(
-      int32_t frame_rate,
-      fuchsia::media::AudioRenderUsage usage = fuchsia::media::AudioRenderUsage::MEDIA) {
-    auto format = Format::Create<SampleType>(2, frame_rate).take_value();
-    return std::make_pair(
-        CreateAudioRenderer(format, PacketsToFrames(kNumPacketsInPayload, frame_rate), usage),
-        format);
-  }
-
-  // All pipeline tests send batches of packets. This method returns the suggested size for
-  // each batch. We want each batch to be large enough such that the output driver needs to
-  // wake multiple times to mix the batch -- this ensures we're testing the timing paths in
-  // the driver. We don't have direct access to the driver's timers, however, we know that
-  // the driver must wake up at least once every MinLeadTime. Therefore, we return enough
-  // packets to exceed one MinLeadTime.
-  std::pair<int64_t, int64_t> NumPacketsAndFramesPerBatch(AudioRendererShim<SampleType>* renderer) {
-    auto min_lead_time = renderer->min_lead_time();
-    FX_CHECK(min_lead_time.get() > 0);
-    // In exceptional cases, min_lead_time might be smaller than one packet.
-    // Ensure we have at least a handful of packets.
-    auto num_packets = std::max(5l, static_cast<int64_t>(min_lead_time / kPacketLength));
-    FX_CHECK(num_packets < kNumPacketsInPayload);
-    return std::make_pair(num_packets,
-                          PacketsToFrames(num_packets, renderer->format().frames_per_second()));
-  }
-
-  VirtualOutput<SampleType>* output() const { return output_; }
-
- private:
-  VirtualOutput<SampleType>* output_ = nullptr;
-};
-
+using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
+using ASF = fuchsia::media::AudioSampleFormat;
 using AudioRendererPipelineTestInt16 = AudioRendererPipelineTest<ASF::SIGNED_16>;
 using AudioRendererPipelineTestFloat = AudioRendererPipelineTest<ASF::FLOAT>;
 
@@ -579,7 +502,8 @@ TEST_F(AudioRendererPipelineTestInt16, DiscardDuringPlayback) {
       AudioBufferSlice<ASF::SIGNED_16>(), opts);
 }
 
-// TODO(https://fxbug.dev/74985): Parameterize gainramp tests (volume-change, Play, Pause) for shared code.
+// TODO(https://fxbug.dev/74985): Parameterize gainramp tests (volume-change, Play, Pause) for
+// shared code.
 TEST_F(AudioRendererPipelineTestInt16, RampOnGainChanges) {
   fuchsia::media::audio::VolumeControlPtr volume;
   audio_core_->BindUsageVolumeControl(
@@ -774,117 +698,6 @@ TEST_F(AudioRendererPipelineTestInt16, AddPayloadBufferDiscardable) {
   RunLoopWithTimeout(zx::msec(50));
 }
 
-class AudioRendererGainLimitsTest : public AudioRendererPipelineTestFloat {
- protected:
-  static void SetUpTestSuite() {
-    HermeticAudioTest::SetTestSuiteRealmOptions([] {
-      return HermeticAudioRealm::Options{
-          .audio_core_config_data = MakeAudioCoreConfig({
-              .output_device_config = R"x(
-                "device_id": "*",
-                "supported_stream_types": [
-                  "render:media",
-                  "render:background",
-                  "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
-                ],
-                "pipeline": {
-                  "name": "default",
-                  "streams": [
-                    "render:media",
-                    "render:background",
-                    "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
-                  ],
-                  "min_gain_db": -20,
-                  "max_gain_db": -10
-                }
-              )x",
-          }),
-      };
-    });
-  }
-
-  // The test plays a sequence of constant values with amplitude 1.0. This output waveform's
-  // amplitude will be adjusted by the specified stream and usage gains.
-  struct TestCase {
-    // Calls SetMute(true) if |input_stream_mute|, otherwise SetGain.
-    float input_stream_gain_db = 0;
-    bool input_stream_mute = false;
-    // Calls SetMute(true) if |media_mute|, otherwise SetGain.
-    float media_gain_db = 0;
-    bool media_mute = false;
-    float expected_output_sample = 1.0;
-  };
-
-  void Run(TestCase tc) {
-    auto [renderer, format] = CreateRenderer(kOutputFrameRate);
-    const auto [num_packets, num_frames] = NumPacketsAndFramesPerBatch(renderer);
-    const auto frames_per_packet = num_frames / num_packets;
-    const auto kSilentPrefix = frames_per_packet;
-
-    // Set stream gain/mute.
-    fuchsia::media::audio::GainControlPtr gain_control;
-    renderer->fidl()->BindGainControl(gain_control.NewRequest());
-    AddErrorHandler(gain_control, "AudioRenderer::GainControl");
-    if (tc.input_stream_mute) {
-      gain_control->SetMute(true);
-    } else {
-      gain_control->SetGain(tc.input_stream_gain_db);
-    }
-
-    // Set usage gain/mute.
-    if (tc.media_mute) {
-      fuchsia::media::audio::VolumeControlPtr volume_control;
-      audio_core_->BindUsageVolumeControl(
-          fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA),
-          volume_control.NewRequest());
-      volume_control->SetMute(true);
-    } else {
-      audio_core_->SetRenderUsageGain(AudioRenderUsage::MEDIA, tc.media_gain_db);
-    }
-
-    // Render.
-    auto input_buffer = GenerateSilentAudio(format, kSilentPrefix);
-    auto signal = GenerateConstantAudio(format, num_frames - kSilentPrefix, 1.0);
-    input_buffer.Append(&signal);
-
-    auto packets = renderer->AppendSlice(input_buffer, frames_per_packet);
-    renderer->PlaySynchronized(this, output(), 0);
-    renderer->WaitForPackets(this, packets);
-    auto ring_buffer = output()->SnapshotRingBuffer();
-    gain_control.Unbind();
-    Unbind(renderer);
-
-    if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
-      // In case of underflows, exit NOW (don't assess this buffer).
-      // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-      if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
-        GTEST_SKIP() << "Skipping data checks due to underflows";
-        __builtin_unreachable();
-      }
-    }
-
-    auto expected_output_buffer =
-        GenerateConstantAudio(format, num_frames - kSilentPrefix, tc.expected_output_sample);
-
-    CompareAudioBufferOptions opts;
-    opts.num_frames_per_packet = kFramesPerPacketForDisplay;
-    opts.test_label = "check initial silence";
-    CompareAudioBuffers(AudioBufferSlice(&ring_buffer, 0, kSilentPrefix),
-                        AudioBufferSlice<ASF::FLOAT>(), opts);
-    opts.test_label = "check data";
-    CompareAudioBuffers(AudioBufferSlice(&ring_buffer, kSilentPrefix, num_frames - kSilentPrefix),
-                        AudioBufferSlice(&expected_output_buffer, 0, num_frames - kSilentPrefix),
-                        opts);
-    opts.test_label = "check final silence";
-    CompareAudioBuffers(AudioBufferSlice(&ring_buffer, num_frames, output()->frame_count()),
-                        AudioBufferSlice<ASF::FLOAT>(), opts);
-  }
-};
-
 TEST_F(AudioRendererGainLimitsTest, StreamGainRespectsMinGain) {
   Run({
       .input_stream_gain_db = -30,
@@ -955,67 +768,6 @@ TEST_F(AudioRendererGainLimitsTest, KeepUsageMute) {
   });
 }
 
-class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
- protected:
-  static constexpr int32_t kFrameRate = 48000;
-  static constexpr auto kPacketFrames = kFrameRate / 100;
-  static constexpr audio_stream_unique_id_t kUniqueId{{0xff, 0x00}};
-
-  static void SetUpTestSuite() {
-    HermeticAudioTest::SetTestSuiteRealmOptions([] {
-      return HermeticAudioRealm::Options{
-          .audio_core_config_data = MakeAudioCoreConfig({
-              .output_device_config = R"x(
-                "device_id": "*",
-                "supported_stream_types": [
-                  "render:media",
-                  "render:background",
-                  "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
-                ],
-                "pipeline": {
-                  "name": "default",
-                  "streams": [
-                    "render:media",
-                    "render:background",
-                    "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
-                  ],
-                  "effects": [
-                    {
-                      "lib": "audio-core-api-test-effects.so",
-                      "effect": "sleeper_filter",
-                      "name": "sleeper"
-                    }
-                  ]
-                }
-              )x",
-          }),
-      };
-    });
-  }
-
-  AudioRendererPipelineUnderflowTest()
-      : format_(Format::Create<ASF::SIGNED_16>(2, kFrameRate).value()) {}
-
-  void SetUp() override {
-    HermeticAudioTest::SetUp();
-    output_ = CreateOutput(kUniqueId, format_, kFrameRate);
-    renderer_ = CreateAudioRenderer(format_, kFrameRate);
-  }
-
-  TypedFormat<ASF::SIGNED_16> format() const { return format_; }
-  VirtualOutput<ASF::SIGNED_16>* output() const { return output_; }
-  AudioRendererShim<ASF::SIGNED_16>* renderer() const { return renderer_; }
-
- private:
-  const TypedFormat<ASF::SIGNED_16> format_;
-  VirtualOutput<ASF::SIGNED_16>* output_ = nullptr;
-  AudioRendererShim<ASF::SIGNED_16>* renderer_ = nullptr;
-};
-
 // Validate that a slow effects pipeline registers an underflow.
 TEST_F(AudioRendererPipelineUnderflowTest, HasUnderflow) {
   // Inject one packet and wait for it to be rendered.
@@ -1037,62 +789,6 @@ TEST_F(AudioRendererPipelineUnderflowTest, HasUnderflow) {
                        });
   Unbind(renderer());
 }
-
-class AudioRendererEffectsV1Test : public AudioRendererPipelineTestInt16 {
- protected:
-  // Matches the value in audio_core_config_with_inversion_filter.json
-  static constexpr const char* kInverterEffectName = "inverter";
-
-  static void SetUpTestSuite() {
-    HermeticAudioTest::SetTestSuiteRealmOptions([] {
-      return HermeticAudioRealm::Options{
-          .audio_core_config_data = MakeAudioCoreConfig({
-              .output_device_config = R"x(
-                "device_id": "*",
-                "supported_stream_types": [
-                  "render:media",
-                  "render:background",
-                  "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
-                ],
-                "pipeline": {
-                  "name": "default",
-                  "streams": [
-                    "render:media",
-                    "render:background",
-                    "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
-                  ],
-                  "effects": [
-                    {
-                      "lib": "audio-core-api-test-effects.so",
-                      "effect": "inversion_filter",
-                      "name": "inverter"
-                    }
-                  ]
-                }
-              )x",
-          }),
-      };
-    });
-  }
-
-  void SetUp() override {
-    AudioRendererPipelineTestInt16::SetUp();
-    realm().Connect(effects_controller_.NewRequest());
-  }
-
-  static void RunInversionFilter(AudioBuffer<ASF::SIGNED_16>* audio_buffer_ptr) {
-    auto& samples = audio_buffer_ptr->samples();
-    for (std::remove_pointer_t<decltype(audio_buffer_ptr)>::SampleT& sample : samples) {
-      sample = -sample;
-    }
-  }
-
-  fuchsia::media::audio::EffectsControllerSyncPtr effects_controller_;
-};
 
 // Validate that the effects package is loaded and that it processes the input.
 TEST_F(AudioRendererEffectsV1Test, RenderWithEffects) {
@@ -1138,7 +834,7 @@ TEST_F(AudioRendererEffectsV1Test, RenderWithEffects) {
 TEST_F(AudioRendererEffectsV1Test, EffectsControllerEffectDoesNotExist) {
   fuchsia::media::audio::EffectsController_UpdateEffect_Result result;
   zx_status_t status =
-      effects_controller_->UpdateEffect("invalid_effect_name", "{ \"enabled\": false}", &result);
+      effects_controller()->UpdateEffect("invalid_effect_name", "{ \"enabled\": false}", &result);
   EXPECT_EQ(status, ZX_OK);
   EXPECT_TRUE(result.is_err());
   EXPECT_EQ(result.err(), fuchsia::media::audio::UpdateEffectError::NOT_FOUND);
@@ -1147,7 +843,7 @@ TEST_F(AudioRendererEffectsV1Test, EffectsControllerEffectDoesNotExist) {
 TEST_F(AudioRendererEffectsV1Test, EffectsControllerInvalidConfig) {
   fuchsia::media::audio::EffectsController_UpdateEffect_Result result;
   zx_status_t status =
-      effects_controller_->UpdateEffect(kInverterEffectName, "invalid config string", &result);
+      effects_controller()->UpdateEffect(kInverterEffectName, "invalid config string", &result);
   EXPECT_EQ(status, ZX_OK);
   EXPECT_TRUE(result.is_err());
   EXPECT_EQ(result.err(), fuchsia::media::audio::UpdateEffectError::INVALID_CONFIG);
@@ -1158,7 +854,7 @@ TEST_F(AudioRendererEffectsV1Test, EffectsControllerUpdateEffect) {
   // Disable the inverter; frames should be unmodified.
   fuchsia::media::audio::EffectsController_UpdateEffect_Result result;
   zx_status_t status =
-      effects_controller_->UpdateEffect(kInverterEffectName, "{ \"enabled\": false}", &result);
+      effects_controller()->UpdateEffect(kInverterEffectName, "{ \"enabled\": false}", &result);
   EXPECT_EQ(status, ZX_OK);
   EXPECT_TRUE(result.is_response());
 
@@ -1197,61 +893,6 @@ TEST_F(AudioRendererEffectsV1Test, EffectsControllerUpdateEffect) {
   CompareAudioBuffers(AudioBufferSlice(&ring_buffer, num_frames, output()->frame_count()),
                       AudioBufferSlice<ASF::SIGNED_16>(), opts);
 }
-
-class AudioRendererEffectsV2Test : public AudioRendererPipelineTestFloat {
- protected:
-  static void SetUpTestSuite() {
-    HermeticAudioTest::SetTestSuiteRealmOptions([] {
-      return HermeticAudioRealm::Options{
-          .audio_core_config_data = MakeAudioCoreConfig({
-              .output_device_config = R"x(
-                "device_id": "*",
-                "supported_stream_types": [
-                  "render:media",
-                  "render:background",
-                  "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
-                ],
-                "pipeline": {
-                  "name": "default",
-                  "streams": [
-                    "render:media",
-                    "render:background",
-                    "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
-                  ],
-                  "effect_over_fidl": {
-                    "name": "inverter"
-                  }
-                }
-              )x",
-          }),
-          .test_effects_v2 = std::vector<TestEffectsV2::Effect>{{
-              .name = "inverter",
-              .process = &Invert,
-              .process_in_place = true,
-              .max_frames_per_call = 1024,
-              .frames_per_second = kOutputFrameRate,
-              .input_channels = kNumChannels,
-              .output_channels = kNumChannels,
-          }},
-      };
-    });
-  }
-
-  static zx_status_t Invert(uint64_t num_frames, const float* input, float* output,
-                            float total_applied_gain_for_input,
-                            std::vector<fuchsia_audio_effects::wire::ProcessMetrics>& metrics) {
-    for (uint64_t k = 0; k < num_frames; k++) {
-      for (int c = 0; c < kNumChannels; c++) {
-        output[k * kNumChannels + c] = -input[k * kNumChannels + c];
-      }
-    }
-    return ZX_OK;
-  }
-};
 
 // Validate that the effects package is loaded and that it processes the input.
 TEST_F(AudioRendererEffectsV2Test, RenderWithEffects) {
@@ -1295,62 +936,6 @@ TEST_F(AudioRendererEffectsV2Test, RenderWithEffects) {
   CompareAudioBuffers(AudioBufferSlice(&ring_buffer, num_frames, output()->frame_count()),
                       AudioBufferSlice<ASF::FLOAT>(), opts);
 }
-
-class AudioRendererPipelineTuningTest : public AudioRendererPipelineTestInt16 {
- protected:
-  // Matches the value in audio_core_config_with_inversion_filter.json
-  static constexpr const char* kInverterEffectName = "inverter";
-
-  static void SetUpTestSuite() {
-    HermeticAudioTest::SetTestSuiteRealmOptions([] {
-      return HermeticAudioRealm::Options{
-          .audio_core_config_data = MakeAudioCoreConfig({
-              .output_device_config = R"x(
-                "device_id": "*",
-                "supported_stream_types": [
-                  "render:media",
-                  "render:background",
-                  "render:interruption",
-                  "render:system_agent",
-                  "render:communications"
-                ],
-                "pipeline": {
-                  "name": "default",
-                  "streams": [
-                    "render:media",
-                    "render:background",
-                    "render:interruption",
-                    "render:system_agent",
-                    "render:communications"
-                  ],
-                  "effects": [
-                    {
-                      "lib": "audio-core-api-test-effects.so",
-                      "effect": "inversion_filter",
-                      "name": "inverter"
-                    }
-                  ]
-                }
-              )x",
-          }),
-      };
-    });
-  }
-
-  void SetUp() override {
-    AudioRendererPipelineTestInt16::SetUp();
-    realm().Connect(audio_tuner_.NewRequest());
-  }
-
-  static void RunInversionFilter(AudioBuffer<ASF::SIGNED_16>* audio_buffer_ptr) {
-    auto& samples = audio_buffer_ptr->samples();
-    for (std::remove_pointer_t<decltype(audio_buffer_ptr)>::SampleT& sample : samples) {
-      sample = -sample;
-    }
-  }
-
-  fuchsia::media::tuning::AudioTunerPtr audio_tuner_;
-};
 
 // Verify the correct output is received before and after update of the OutputPipeline.
 //
@@ -1422,7 +1007,7 @@ TEST_F(AudioRendererPipelineTuningTest, CorrectStreamOutputUponUpdatedPipeline) 
       ToAudioDeviceTuningProfile(pipeline_config, volume_curve);
 
   // Update PipelineConfig through AudioTuner service.
-  audio_tuner_->SetAudioDeviceProfile(
+  audio_tuner()->SetAudioDeviceProfile(
       device_id, std::move(device_profile_with_inversion_effect),
       AddCallback("SetAudioDeviceProfile", [](zx_status_t status) { EXPECT_EQ(status, ZX_OK); }));
 
@@ -1471,7 +1056,7 @@ TEST_F(AudioRendererPipelineTuningTest, AudioTunerUpdateEffect) {
   fuchsia::media::tuning::AudioEffectConfig updated_effect;
   updated_effect.set_instance_name(kInverterEffectName);
   updated_effect.set_configuration("{\"enabled\": false}");
-  audio_tuner_->SetAudioEffectConfig(
+  audio_tuner()->SetAudioEffectConfig(
       device_id, std::move(updated_effect),
       AddCallback("SetAudioEffectConfig", [](zx_status_t status) { EXPECT_EQ(status, ZX_OK); }));
 
