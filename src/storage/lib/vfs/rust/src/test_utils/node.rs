@@ -28,6 +28,22 @@ where
     new_proxy
 }
 
+pub fn open2_get_proxy<M>(
+    proxy: &fio::DirectoryProxy,
+    protocols: &fio::ConnectionProtocols,
+    path: &str,
+) -> M::Proxy
+where
+    M: ProtocolMarker,
+{
+    let (new_proxy, new_server_end) =
+        create_proxy::<M>().expect("Failed to create connection endpoints");
+
+    proxy.open2(path, protocols, new_server_end.into_channel()).unwrap();
+
+    new_proxy
+}
+
 /// This trait repeats parts of the `NodeProxy` trait, and is implemented for `NodeProxy`,
 /// `FileProxy`, and `DirectoryProxy`, which all share the same API.  FIDL currently does not
 /// expose the API inheritance, so with this trait we have a workaround.  As soon as FIDL will

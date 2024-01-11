@@ -93,6 +93,22 @@ impl NewEntryType {
             Ok((type_, flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT)))
         }
     }
+
+    /// Given the connection protocols for a `Directory::Open2()`, fuchsia.io calls this method
+    /// which will return the proper type from the [`NewEntryType`] enum or an error.
+    ///
+    /// Note that `fio::NodeProtocols` can have more than one protocol present. However, the
+    /// connection layer already checks for ambiguity in the protocols specified, i.e.
+    /// `directory` and `file` can not both be set.
+    pub fn from_protocols(node_protocols: &fio::NodeProtocols) -> Result<Self, Status> {
+        if node_protocols.directory.is_some() {
+            return Ok(Self::Directory);
+        }
+        if node_protocols.file.is_some() {
+            return Ok(Self::File);
+        }
+        Err(Status::INVALID_ARGS)
+    }
 }
 
 #[cfg(test)]

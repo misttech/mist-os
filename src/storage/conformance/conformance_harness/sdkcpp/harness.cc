@@ -52,6 +52,7 @@ class SdkCppHarness : public fio_test::Io1Harness {
     config.set_supports_get_attributes(false);      // get_attributes is not supported.
     config.set_supports_update_attributes(false);   // update_attributes is not supported.
     config.set_supports_directory_watchers(false);  // watchers are not supported.
+    config.set_supports_append(false);              // append mode is not supported.
 
     // TODO(https://fxbug.dev/45287): Support ExecutableFile
     config.set_supports_executable_file(false);

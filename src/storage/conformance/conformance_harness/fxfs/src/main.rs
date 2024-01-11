@@ -98,6 +98,7 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                     supports_update_attributes: Some(true),
                     supports_link_into: Some(true),
                     supports_directory_watchers: Some(true),
+                    supports_append: Some(true),
                     ..Default::default()
                 })?;
             }

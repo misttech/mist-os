@@ -46,6 +46,9 @@ pub trait DerivedConnection: Send + Sync {
     /// Whether these connections support mutable connections.
     const MUTABLE: bool;
 
+    // TODO(b/293947862): this function will always return `Err(Status::NOT_FOUND)` if `create` is
+    // false. Consider if it may be worth refactoring this so that this is only called to create an
+    // entry that is not found when the open mode supports create.
     fn entry_not_found(
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,
@@ -417,6 +420,9 @@ where
         }
 
         // If creating an object, it's not legal to specify more than one protocol.
+        //
+        // TODO(b/293947862): If we add an additional node type, we will need to update this. See if
+        // there is a more generic or robust way to check this so that we don't miss any node types.
         if protocols.open_mode() != fio::OpenMode::OpenExisting
             && ((protocols.is_file_allowed() && protocols.is_dir_allowed())
                 || protocols.is_symlink_allowed())

@@ -2,19 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_trait::async_trait;
-use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_io as fio;
-use fuchsia_zircon_status::Status;
-use std::sync::{Arc, Mutex};
+use crate::{
+    attributes,
+    directory::entry::{DirectoryEntry, EntryInfo},
+    execution_scope::ExecutionScope,
+    file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode},
+    node::Node,
+    path::Path,
+    protocols::ProtocolsExt,
+    ObjectRequestRef, ToObjectRequest,
+};
 
-use crate::attributes;
-use crate::directory::entry::{DirectoryEntry, EntryInfo};
-use crate::execution_scope::ExecutionScope;
-use crate::file::{FidlIoConnection, File, FileIo, FileOptions, SyncMode};
-use crate::node::Node;
-use crate::path::Path;
-use crate::ToObjectRequest;
+use {
+    async_trait::async_trait,
+    fidl::endpoints::ServerEnd,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
+    std::sync::{Arc, Mutex},
+};
 
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
@@ -62,6 +67,30 @@ impl DirectoryEntry for TestFile {
             });
             Ok(())
         });
+    }
+
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        if !path.is_empty() {
+            return Err(Status::NOT_DIR);
+        }
+
+        let options = protocols.to_file_options()?;
+        if options.is_append {
+            return Err(Status::NOT_SUPPORTED);
+        }
+
+        object_request.take().spawn(&scope.clone(), move |object_request| {
+            Box::pin(async move {
+                object_request.create_connection(scope, self, protocols, FidlIoConnection::create)
+            })
+        });
+        Ok(())
     }
 
     fn entry_info(&self) -> EntryInfo {

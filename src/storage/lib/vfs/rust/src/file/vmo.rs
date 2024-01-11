@@ -15,7 +15,8 @@ use crate::{
     file::{common::vmo_flags_to_rights, FidlIoConnection, File, FileIo, FileOptions, SyncMode},
     node::Node,
     path::Path,
-    ToObjectRequest,
+    protocols::ProtocolsExt,
+    ObjectRequestRef, ToObjectRequest,
 };
 
 use {
@@ -227,6 +228,37 @@ impl DirectoryEntry for VmoFile {
         });
     }
 
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        if !path.is_empty() {
+            return Err(Status::NOT_DIR);
+        }
+
+        // VmoFile doesn't support the option to append.
+        let options = protocols.to_file_options()?;
+        if options.is_append {
+            return Err(Status::NOT_SUPPORTED);
+        }
+
+        object_request.take().spawn(&scope.clone(), move |object_request| {
+            Box::pin(async move {
+                {
+                    let mut guard = self.vmo.lock().await;
+                    if let VmoOrInit::Init(init) = &mut *guard {
+                        *guard = VmoOrInit::Vmo(init()?);
+                    }
+                }
+                object_request.create_connection(scope, self, protocols, FidlIoConnection::create)
+            })
+        });
+        Ok(())
+    }
+
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(self.inode, fio::DirentType::File)
     }
@@ -253,15 +285,23 @@ impl Node for VmoFile {
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
         let content_size = self.get_size().await?;
+
+        let mut abilities = fio::Operations::GET_ATTRIBUTES | fio::Operations::UPDATE_ATTRIBUTES;
+        if self.readable {
+            abilities |= fio::Operations::READ_BYTES
+        }
+        if self.writable {
+            abilities |= fio::Operations::WRITE_BYTES
+        }
+        if self.executable {
+            abilities |= fio::Operations::EXECUTE
+        }
         Ok(attributes!(
             requested_attributes,
             Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::UPDATE_ATTRIBUTES
-                    | fio::Operations::READ_BYTES
-                    | fio::Operations::WRITE_BYTES,
+                abilities: abilities,
                 content_size: content_size,
                 storage_size: content_size,
                 link_count: 1,

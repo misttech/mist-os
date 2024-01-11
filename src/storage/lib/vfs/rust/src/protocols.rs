@@ -70,6 +70,8 @@ pub trait ProtocolsExt: Sync + 'static {
     fn is_node(&self) -> bool;
 }
 
+// TODO(b/293947862): add function to check for illegal node protocol combinations for Open2, e.g.
+// where `directory` and `file` are set.
 impl ProtocolsExt for fio::ConnectionProtocols {
     fn is_dir_allowed(&self) -> bool {
         matches!(
@@ -120,7 +122,7 @@ impl ProtocolsExt for fio::ConnectionProtocols {
     }
 
     fn to_directory_options(&self) -> Result<DirectoryOptions, Status> {
-        if !self.is_dir_allowed() {
+        if !self.is_node() && !self.is_dir_allowed() {
             if self.is_file_allowed() && !self.is_symlink_allowed() {
                 return Err(Status::NOT_FILE);
             } else {
@@ -146,7 +148,7 @@ impl ProtocolsExt for fio::ConnectionProtocols {
     }
 
     fn to_file_options(&self) -> Result<FileOptions, Status> {
-        if !self.is_file_allowed() {
+        if !self.is_node() && !self.is_file_allowed() {
             if self.is_dir_allowed() && !self.is_symlink_allowed() {
                 return Err(Status::NOT_DIR);
             } else {
@@ -161,7 +163,7 @@ impl ProtocolsExt for fio::ConnectionProtocols {
     }
 
     fn to_symlink_options(&self) -> Result<SymlinkOptions, Status> {
-        if !self.is_symlink_allowed() {
+        if !self.is_node() && !self.is_symlink_allowed() {
             return Err(Status::WRONG_TYPE);
         }
         // If is_symlink_allowed() returned true, there must be rights.

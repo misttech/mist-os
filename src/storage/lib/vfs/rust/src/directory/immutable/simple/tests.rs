@@ -24,16 +24,18 @@ use crate::{
     },
     execution_scope::ExecutionScope,
     path::Path,
-    test_utils::node::open_get_proxy,
+    test_utils::node::{open2_get_proxy, open_get_proxy},
     test_utils::test_file::TestFile,
     test_utils::{build_flag_combinations, run_client},
 };
 
 use {
+    assert_matches::assert_matches,
     fidl::endpoints::{create_proxy, Proxy},
     fidl_fuchsia_io as fio,
     fuchsia_async::TestExecutor,
     fuchsia_zircon_status::Status,
+    futures::TryStreamExt,
     static_assertions::assert_eq_size,
     std::sync::{Arc, Mutex},
     vfs_macros::pseudo_directory,
@@ -280,6 +282,43 @@ fn one_file_open_missing_not_found_handler() {
 
         assert_close!(root);
         assert_eq!(Some("file2".to_string()), *last_handler_value.lock().unwrap())
+    });
+}
+
+#[test]
+fn one_file_open2_missing_not_found_handler() {
+    let root = pseudo_directory! {
+        "foo" => TestFile::read_only("Content"),
+    };
+
+    let last_handler_value = Arc::new(Mutex::new(None));
+
+    {
+        let last_handler_value = last_handler_value.clone();
+        root.clone().set_not_found_handler(Box::new(move |path| {
+            *last_handler_value.lock().unwrap() = Some(path.to_string());
+        }));
+    }
+
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |proxy| async move {
+        let file = open2_get_proxy::<fio::FileMarker>(
+            &proxy,
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            "bar",
+        );
+        assert_matches!(
+            file.take_event_stream().try_next().await,
+            Err(fidl::Error::ClientChannelClosed { status: Status::NOT_FOUND, .. })
+        );
+
+        assert_close!(proxy);
+        assert_eq!(Some("bar".to_string()), *last_handler_value.lock().unwrap())
     });
 }
 

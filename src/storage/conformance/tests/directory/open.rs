@@ -800,7 +800,9 @@ async fn open2_open_file() {
 async fn open2_file_append() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2.unwrap_or_default() {
+    if !harness.config.supports_open2.unwrap_or_default()
+        || !harness.config.supports_append.unwrap_or_default()
+    {
         return;
     }
 
@@ -927,16 +929,19 @@ async fn open2_file_get_representation() {
     let test_dir = harness
         .get_directory(root_directory(vec![file("file", vec![])]), fio::OpenFlags::RIGHT_READABLE);
 
+    let file_protocols = if harness.config.supports_append.unwrap_or_default() {
+        Some(fio::FileProtocolFlags::APPEND)
+    } else {
+        Some(fio::FileProtocolFlags::default())
+    };
+
     let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     test_dir
         .open2(
             "file",
             &fio::ConnectionProtocols::Node(fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::APPEND),
-                    ..Default::default()
-                }),
+                protocols: Some(fio::NodeProtocols { file: file_protocols, ..Default::default() }),
                 attributes: Some(
                     fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
                 ),
@@ -955,7 +960,7 @@ async fn open2_file_get_representation() {
             .expect("missing OnRepresentation event")
             .into_on_representation(),
         Some(fio::Representation::File(fio::FileInfo {
-            is_append: Some(true),
+            is_append,
             attributes: Some(fio::NodeAttributes2 { mutable_attributes, immutable_attributes }),
             ..
         }))
@@ -967,15 +972,11 @@ async fn open2_file_get_representation() {
                         fio::Operations::GET_ATTRIBUTES
                             | fio::Operations::UPDATE_ATTRIBUTES
                             | fio::Operations::READ_BYTES
-                            | fio::Operations::WRITE_BYTES
-                            | if harness.config.supports_executable_file.unwrap_or_default() {
-                                fio::Operations::EXECUTE
-                            } else {
-                                fio::Operations::empty()
-                            },
+                            | fio::Operations::WRITE_BYTES,
                     ),
                     ..Default::default()
                 }
+            && is_append == Some(file_protocols == Some(fio::FileProtocolFlags::APPEND))
     );
 }
 
@@ -1063,6 +1064,59 @@ async fn open2_request_attributes_rights_failure() {
         proxy2.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::ACCESS_DENIED, .. })
     );
+}
+
+#[fuchsia::test]
+async fn open2_open_existing_directory() {
+    let harness = TestHarness::new().await;
+
+    if !harness.config.supports_open2.unwrap_or_default() {
+        return;
+    }
+
+    let test_dir = harness.get_directory(
+        root_directory(vec![directory("dir", vec![])]),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    );
+
+    // Should not be able to open non-existing directory entry with open mode `OpenExisting`.
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    test_dir
+        .open2(
+            "foo",
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                mode: Some(fio::OpenMode::OpenExisting),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(
+        proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. })
+    );
+
+    // Check that calling open with `OpenExisting` is successful with an existing directory.
+    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    test_dir
+        .open2(
+            "dir",
+            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                protocols: Some(fio::NodeProtocols {
+                    directory: Some(fio::DirectoryProtocolOptions::default()),
+                    ..Default::default()
+                }),
+                mode: Some(fio::OpenMode::OpenExisting),
+                ..Default::default()
+            }),
+            server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(proxy2.get_connection_info().await, Ok(_));
 }
 
 // TODO(https://fxbug.dev/77623): Add open2 connect tests.

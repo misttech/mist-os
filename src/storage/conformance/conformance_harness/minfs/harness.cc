@@ -79,6 +79,7 @@ class MinfsHarness : public fuchsia::io::test::Io1Harness {
     config.set_conformant_path_handling(true);
     config.set_supports_unlink(true);
     config.set_supports_directory_watchers(true);
+    config.set_supports_append(true);
 
     // Unsupported options
     config.set_supports_executable_file(false);

@@ -87,6 +87,9 @@ type Io1Config = table {
 
     /// Supports directory watchers.
     17: supports_directory_watchers bool;
+
+    /// Files can be opened in append mode.
+    18: supports_append bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.

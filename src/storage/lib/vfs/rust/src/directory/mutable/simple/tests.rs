@@ -24,12 +24,15 @@ use crate::{
         mutable::simple::tree_constructor,
         test_utils::{run_server_client, test_server_client, DirentsSameInodeBuilder},
     },
-    test_utils::test_file::TestFile,
+    test_utils::{node::open2_get_proxy, test_file::TestFile},
 };
 
 use {
+    assert_matches::assert_matches,
     fidl::Event,
     fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
+    futures::TryStreamExt,
     std::sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
@@ -758,6 +761,55 @@ fn can_not_create_nested() {
                 assert_read_dirents!(proxy, 1000, expected.into_vec());
             }
 
+            assert_close!(proxy);
+        },
+    )
+    .entry_constructor(constructor)
+    .run();
+}
+
+#[test]
+fn open_existing_file() {
+    let constructor = tree_constructor(move |_, _| Ok(TestFile::read_write(b"")));
+
+    let root = mut_pseudo_directory! {
+        "foo" => TestFile::read_write(b"abc"),
+    };
+
+    test_server_client(
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        root,
+        |proxy| async move {
+            let file = open2_get_proxy::<fio::FileMarker>(
+                &proxy,
+                &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols: Some(fio::NodeProtocols {
+                        file: Some(fio::FileProtocolFlags::default()),
+                        ..Default::default()
+                    }),
+                    mode: Some(fio::OpenMode::OpenExisting),
+                    ..Default::default()
+                }),
+                "bar",
+            );
+            assert_matches!(
+                file.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: Status::NOT_FOUND, .. })
+            );
+
+            let file2 = open2_get_proxy::<fio::FileMarker>(
+                &proxy,
+                &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols: Some(fio::NodeProtocols {
+                        file: Some(fio::FileProtocolFlags::default()),
+                        ..Default::default()
+                    }),
+                    mode: Some(fio::OpenMode::OpenExisting),
+                    ..Default::default()
+                }),
+                "foo",
+            );
+            assert_matches!(file2.get_connection_info().await, Ok(_));
             assert_close!(proxy);
         },
     )

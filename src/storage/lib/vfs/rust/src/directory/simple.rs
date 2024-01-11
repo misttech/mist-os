@@ -26,7 +26,8 @@ use crate::{
     name::Name,
     node::Node,
     path::Path,
-    ToObjectRequest,
+    protocols::ProtocolsExt,
+    ObjectRequestRef, ToObjectRequest,
 };
 
 use {
@@ -112,6 +113,52 @@ where
                     name,
                     path,
                 )?;
+
+                let name: Name = name.to_string().try_into()?;
+                let _ = this.entries.insert(name, entry.clone());
+                Ok(entry)
+            }
+        }
+    }
+
+    // Attempts to find or create a directory entry given the specified protocols.
+    fn get_or_insert_entry_from_protocols(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        protocols: &fio::ConnectionProtocols,
+        name: &str,
+        path: &Path,
+    ) -> Result<Arc<dyn DirectoryEntry>, Status> {
+        let mut this = self.inner.lock().unwrap();
+
+        match this.entries.get(name) {
+            Some(entry) => {
+                if protocols.open_mode() == fio::OpenMode::AlwaysCreate {
+                    return Err(Status::ALREADY_EXISTS);
+                }
+                Ok(entry.clone())
+            }
+            None => {
+                let entry = if let fio::ConnectionProtocols::Node(fio::NodeOptions {
+                    protocols: Some(node_protocols),
+                    ..
+                }) = protocols
+                {
+                    let create = protocols.open_mode() != fio::OpenMode::OpenExisting;
+                    let entry_type = NewEntryType::from_protocols(node_protocols)?;
+                    // TODO(b/293947862): Consider refactoring `entry_not_found` to be only
+                    // caled when we want to create the entry.
+                    Connection::entry_not_found(
+                        scope.clone(),
+                        self.clone(),
+                        entry_type,
+                        create,
+                        name,
+                        path,
+                    )?
+                } else {
+                    return Err(Status::INVALID_ARGS);
+                };
 
                 let name: Name = name.to_string().try_into()?;
                 let _ = this.entries.insert(name, entry.clone());
@@ -232,6 +279,60 @@ where
             }
             Ok(entry) => {
                 entry.open(scope, flags, path, server_end);
+            }
+        }
+    }
+
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        mut path: Path,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        // See if the path has a next segment, if so we want to traverse down the directory.
+        // Otherwise we've arrived at the right directory.
+        let (name, path_ref) = match path.next_with_ref() {
+            (path_ref, Some(name)) => (name, path_ref),
+            (_, None) => {
+                object_request.take().handle(|object_request| {
+                    if Connection::MUTABLE {
+                        object_request.spawn_connection(
+                            scope,
+                            self,
+                            protocols,
+                            MutableConnection::create,
+                        )
+                    } else {
+                        object_request.spawn_connection(
+                            scope,
+                            self,
+                            protocols,
+                            ImmutableConnection::create,
+                        )
+                    }
+                });
+                return Ok(());
+            }
+        };
+
+        // Create a copy so if this fails to open we can call the not found handler
+        let ref_copy = self.clone();
+
+        let entry = if path_ref.is_empty() {
+            self.get_or_insert_entry_from_protocols(scope.clone(), &protocols, name, path_ref)
+        } else {
+            self.get_entry(name)
+        };
+
+        match entry {
+            Ok(entry) => entry.open2(scope, path, protocols, object_request),
+            Err(e) => {
+                let mut handler = ref_copy.not_found_handler.lock().unwrap();
+                if let Some(handler) = handler.as_mut() {
+                    handler(path_ref.as_str());
+                }
+                Err(e)
             }
         }
     }

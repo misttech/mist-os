@@ -121,6 +121,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     conformant_path_handling: Some(true),
                     supports_unlink: Some(true),
                     supports_get_attributes: Some(true),
+                    supports_open2: Some(true),
 
                     // Unsupported options:
                     supports_link: Some(false), // Link is not supported using a pseudo filesystem.
@@ -131,6 +132,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     // TODO(https://fxbug.dev/315357754): Pseudo-directories don't seem to generate watch
                     // events even though the machinery is available.
                     supports_directory_watchers: Some(false),
+                    supports_append: Some(false),
 
                     ..Default::default()
                 };
