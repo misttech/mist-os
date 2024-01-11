@@ -9427,7 +9427,7 @@ rust_library("parking_lot-v0_12_0") {
 
   deps = []
   deps += [ ":lock_api-v0_4_11" ]
-  deps += [ ":parking_lot_core-v0_9_6" ]
+  deps += [ ":parking_lot_core-v0_9_9" ]
 
   rustenv = []
 
@@ -9573,32 +9573,32 @@ rust_library("parking_lot_core-v0_8_3") {
   applicable_licenses = [ ":parking_lot_core-v0_8_3.license" ]
 }
 
-license("parking_lot_core-v0_9_6.license") {
+license("parking_lot_core-v0_9_9.license") {
   public_package_name = "parking_lot_core"
   license_files = [
-    "//third_party/rust_crates/vendor/parking_lot_core-0.9.6/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/parking_lot_core-0.9.6/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/parking_lot_core-0.9.9/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/parking_lot_core-0.9.9/LICENSE-MIT",
   ]
 }
 
-rust_library("parking_lot_core-v0_9_6") {
+rust_library("parking_lot_core-v0_9_9") {
   crate_name = "parking_lot_core"
   crate_root =
-      "//third_party/rust_crates/vendor/parking_lot_core-0.9.6/src/lib.rs"
-  output_name = "parking_lot_core-a7bb8576751f5ea9"
+      "//third_party/rust_crates/vendor/parking_lot_core-0.9.9/src/lib.rs"
+  output_name = "parking_lot_core-514c12b41d285b80"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":smallvec-v1_8_0" ]
   if (false) {
-    deps += [ ":redox_syscall-v0_2_13" ]
+    deps += [ ":redox_syscall-v0_4_1" ]
   }
   if (true) {
     deps += [ ":libc-v0_2_149" ]
   }
   if (false) {
-    deps += [ ":windows-sys-v0_42_0" ]
+    deps += [ ":windows-targets-v0_48_5" ]
   }
 
   rustenv = []
@@ -9606,16 +9606,13 @@ rust_library("parking_lot_core-v0_9_6") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=a7bb8576751f5ea9",
-    "-Cextra-filename=-a7bb8576751f5ea9",
+    "-Cmetadata=514c12b41d285b80",
+    "-Cextra-filename=-514c12b41d285b80",
   ]
 
-  aliased_deps = {
-    syscall = ":redox_syscall-v0_2_13"
-  }
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":parking_lot_core-v0_9_6.license" ]
+  applicable_licenses = [ ":parking_lot_core-v0_9_9.license" ]
 }
 
 license("password-hash-v0_4_2.license") {
@@ -11940,6 +11937,28 @@ rust_library("redox_syscall-v0_2_13") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":redox_syscall-v0_2_13.license" ]
+}
+
+rust_library("redox_syscall-v0_4_1") {
+  crate_name = "redox_syscall"
+  crate_root = "//third_party/rust_crates/empty/redox_syscall/src/lib.rs"
+  output_name = "redox_syscall-e9984ec56112b9ff"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=e9984ec56112b9ff",
+    "-Cextra-filename=-e9984ec56112b9ff",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
 license("redox_termios-v0_1_1.license") {
@@ -17742,9 +17761,7 @@ rust_library("windows-sys-v0_42_0") {
     "--cfg=feature=\"Win32_Security_Authorization\"",
     "--cfg=feature=\"Win32_Storage_FileSystem\"",
     "--cfg=feature=\"Win32_System_IO\"",
-    "--cfg=feature=\"Win32_System_LibraryLoader\"",
     "--cfg=feature=\"Win32_System_Pipes\"",
-    "--cfg=feature=\"Win32_System_SystemServices\"",
     "--cfg=feature=\"Win32_System_WindowsProgramming\"",
   ]
 
@@ -17774,6 +17791,28 @@ rust_library("windows-sys-v0_45_0") {
     "--cfg=feature=\"Win32_System_IO\"",
     "--cfg=feature=\"Win32_System_Threading\"",
     "--cfg=feature=\"Win32_System_WindowsProgramming\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+rust_library("windows-targets-v0_48_5") {
+  crate_name = "windows_targets"
+  crate_root = "//third_party/rust_crates/empty/windows-targets/src/lib.rs"
+  output_name = "windows_targets-b310ace0c4c0e58e"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=b310ace0c4c0e58e",
+    "-Cextra-filename=-b310ace0c4c0e58e",
   ]
 
   visibility = [ ":*" ]

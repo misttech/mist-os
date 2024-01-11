@@ -342,6 +342,7 @@ ctor = { path = "empty/ctor" }
 miow = { path = "empty/miow" }
 ntapi = { path = "empty/ntapi" }
 output_vt100 = { path = "empty/output_vt100" }
+redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
 wasi = { path = "empty/wasi" }
 wasi-0_10_1 = { path = "empty/wasi-0.10.1", package = "wasi" }
@@ -352,6 +353,7 @@ winapi-util = { path = "empty/winapi-util" }
 windows = { path = "empty/windows" }
 windows-sys-0_42_0 = { package = "windows-sys", path = "empty/windows-sys-0.42.0" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
+windows-targets = { path = "empty/windows-targets" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
 async-io = { path = "forks/async-io" }
@@ -652,7 +654,7 @@ visibility = ["//src/lib/fuchsia-sync", "//third_party/rust_crates:*"]
 [gn.package.parking_lot_core."0.6.2"]
 # Has build script but no config needed.
 
-[gn.package.parking_lot_core."0.9.6"]
+[gn.package.parking_lot_core."0.9.9"]
 rustflags = []
 
 [gn.package.polling."2.4.0"]
