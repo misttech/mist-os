@@ -18,6 +18,6 @@ pub struct StartLoggingForeverRequest {
 }
 
 #[derive(Serialize, Debug)]
-pub enum MetricsLoggerResult {
+pub enum RecorderResult {
     Success,
 }

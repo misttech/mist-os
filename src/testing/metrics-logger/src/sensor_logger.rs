@@ -8,7 +8,7 @@ use {
     anyhow::{format_err, Error, Result},
     async_trait::async_trait,
     fidl_fuchsia_hardware_power_sensor as fpower,
-    fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_metricslogger_test as fmetrics,
+    fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_power_metrics as fmetrics,
     fuchsia_async as fasync,
     fuchsia_inspect::{self as inspect, ArrayProperty, Property},
     fuchsia_zircon as zx,
@@ -244,23 +244,23 @@ impl<T: Sensor<T>> SensorLogger<T> {
         client_id: String,
         output_samples_to_syslog: bool,
         output_stats_to_syslog: bool,
-    ) -> Result<Self, fmetrics::MetricsLoggerError> {
+    ) -> Result<Self, fmetrics::RecorderError> {
         if let Some(interval) = statistics_interval_ms {
             if sampling_interval_ms > interval
                 || duration_ms.map_or(false, |d| d <= interval)
                 || output_stats_to_syslog && interval < MIN_INTERVAL_FOR_SYSLOG_MS
             {
-                return Err(fmetrics::MetricsLoggerError::InvalidStatisticsInterval);
+                return Err(fmetrics::RecorderError::InvalidStatisticsInterval);
             }
         }
         if sampling_interval_ms == 0
             || output_samples_to_syslog && sampling_interval_ms < MIN_INTERVAL_FOR_SYSLOG_MS
             || duration_ms.map_or(false, |d| d <= sampling_interval_ms)
         {
-            return Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval);
+            return Err(fmetrics::RecorderError::InvalidSamplingInterval);
         }
         if drivers.len() == 0 {
-            return Err(fmetrics::MetricsLoggerError::NoDrivers);
+            return Err(fmetrics::RecorderError::NoDrivers);
         }
 
         let driver_names: Vec<String> = drivers.iter().map(|c| c.name().to_string()).collect();

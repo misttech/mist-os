@@ -121,7 +121,7 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.metricslogger.test.MetricsLogger",
+            protocol: "fuchsia.power.metrics.Recorder",
             from: "#metrics-logger",
             to: "#sl4f",
             source_availability: "unknown",

@@ -47,6 +47,8 @@ pub async fn map_topo_paths_to_class_paths(
         for driver in drivers.iter() {
             let class_path = format!("{}/{}", dir_path, driver);
             let topo_path = get_driver_topological_path(&class_path).await?;
+            info!("----------------------------------topo_path: {:?}", topo_path);
+            info!("----------------------------------class_path: {:?}", class_path);
             path_map.insert(topo_path, class_path);
         }
     }
@@ -80,6 +82,7 @@ async fn get_driver_topological_path(path: &str) -> Result<String> {
 }
 
 pub async fn list_drivers(path: &str) -> Vec<String> {
+    info!("---------------------------list drivers in: {:?}", path);
     let dir = match fuchsia_fs::directory::open_in_namespace(
         path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,

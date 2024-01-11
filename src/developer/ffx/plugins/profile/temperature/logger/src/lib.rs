@@ -8,7 +8,7 @@ use {
     errors::ffx_bail,
     ffx_temperature_logger_args as args_mod,
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_metricslogger_test::{self as fmetrics, Metric, StatisticsArgs, Temperature},
+    fidl_fuchsia_power_metrics::{self as fmetrics, Metric, StatisticsArgs, Temperature},
 };
 
 #[derive(FfxTool)]
@@ -16,7 +16,7 @@ pub struct TemperatureLoggerTool {
     #[command]
     cmd: args_mod::Command,
     #[with(moniker("/core/metrics-logger"))]
-    temperature_logger: fmetrics::MetricsLoggerProxy,
+    temperature_logger: fmetrics::RecorderProxy,
 }
 
 fho::embedded_plugin!(TemperatureLoggerTool);
@@ -36,7 +36,7 @@ impl FfxMain for TemperatureLoggerTool {
 }
 
 pub async fn start(
-    temperature_logger: fmetrics::MetricsLoggerProxy,
+    temperature_logger: fmetrics::RecorderProxy,
     cmd: args_mod::StartCommand,
 ) -> Result<()> {
     let statistics_args = cmd
@@ -44,7 +44,7 @@ pub async fn start(
         .map(|i| Box::new(StatisticsArgs { statistics_interval_ms: i.as_millis() as u32 }));
     let sampling_interval_ms = cmd.sampling_interval.as_millis() as u32;
 
-    // Dispatch to MetricsLogger.StartLogging or MetricsLogger.StartLoggingForever,
+    // Dispatch to Recorder.StartLogging or Recorder.StartLoggingForever,
     // depending on whether a logging duration is specified.
     let result = if let Some(duration) = cmd.duration {
         let duration_ms = duration.as_millis() as u32;
@@ -69,24 +69,24 @@ pub async fn start(
     };
 
     match result {
-        Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval) => ffx_bail!(
-            "MetricsLogger.StartLogging received an invalid sampling interval. \n\
+        Err(fmetrics::RecorderError::InvalidSamplingInterval) => ffx_bail!(
+            "Recorder.StartLogging received an invalid sampling interval. \n\
             Please check if `sampling-interval` meets the following requirements: \n\
             1) Must be smaller than `duration` if `duration` is specified; \n\
             2) Must not be smaller than 500ms if `output_samples_to_syslog` is enabled."
         ),
-        Err(fmetrics::MetricsLoggerError::AlreadyLogging) => ffx_bail!(
+        Err(fmetrics::RecorderError::AlreadyLogging) => ffx_bail!(
             "Ffx temperature logging is already active. Use \"stop\" subcommand to stop the active \
             loggingg manually."
         ),
-        Err(fmetrics::MetricsLoggerError::NoDrivers) => {
+        Err(fmetrics::RecorderError::NoDrivers) => {
             ffx_bail!("This device has no sensor for logging temperature.")
         }
-        Err(fmetrics::MetricsLoggerError::TooManyActiveClients) => ffx_bail!(
-            "MetricsLogger is running too many clients. Retry after any other client is stopped."
+        Err(fmetrics::RecorderError::TooManyActiveClients) => ffx_bail!(
+            "Recorder is running too many clients. Retry after any other client is stopped."
         ),
-        Err(fmetrics::MetricsLoggerError::InvalidStatisticsInterval) => ffx_bail!(
-            "MetricsLogger.StartLogging received an invalid statistics interval. \n\
+        Err(fmetrics::RecorderError::InvalidStatisticsInterval) => ffx_bail!(
+            "Recorder.StartLogging received an invalid statistics interval. \n\
             Please check if `statistics-interval` meets the following requirements: \n\
             1) Must be equal to or larger than `sampling-interval`; \n\
             2) Must be smaller than `duration` if `duration` is specified; \n\
@@ -96,7 +96,7 @@ pub async fn start(
     }
 }
 
-pub async fn stop(temperature_logger: fmetrics::MetricsLoggerProxy) -> Result<()> {
+pub async fn stop(temperature_logger: fmetrics::RecorderProxy) -> Result<()> {
     if !temperature_logger.stop_logging("ffx_temperature").await? {
         ffx_bail!("Stop logging returned false; Check if logging is already inactive.");
     }
@@ -108,7 +108,7 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        fidl_fuchsia_metricslogger_test::{self as fmetrics, Metric, StatisticsArgs, Temperature},
+        fidl_fuchsia_power_metrics::{self as fmetrics, Metric, StatisticsArgs, Temperature},
         futures::channel::mpsc,
         std::time::Duration,
     };
@@ -118,14 +118,12 @@ mod tests {
     macro_rules! make_logger {
         ($request_type:tt, $error_type:tt) => {
             fho::testing::fake_proxy(move |req| match req {
-                fmetrics::MetricsLoggerRequest::$request_type { responder, .. } => {
-                    responder.send(Err(fmetrics::MetricsLoggerError::$error_type)).unwrap();
+                fmetrics::RecorderRequest::$request_type { responder, .. } => {
+                    responder.send(Err(fmetrics::RecorderError::$error_type)).unwrap();
                 }
-                _ => panic!(
-                    "Expected MetricsLoggerRequest::{}; got {:?}",
-                    stringify!($request_type),
-                    req
-                ),
+                _ => {
+                    panic!("Expected RecorderRequest::{}; got {:?}", stringify!($request_type), req)
+                }
             })
         };
     }
@@ -145,7 +143,7 @@ mod tests {
         };
         let (mut sender, mut receiver) = mpsc::channel(1);
         let logger = fho::testing::fake_proxy(move |req| match req {
-            fmetrics::MetricsLoggerRequest::StartLogging {
+            fmetrics::RecorderRequest::StartLogging {
                 client_id,
                 metrics,
                 duration_ms,
@@ -170,7 +168,7 @@ mod tests {
                 responder.send(Ok(())).unwrap();
                 sender.try_send(()).unwrap();
             }
-            _ => panic!("Expected MetricsLoggerRequest::StartLogging; got {:?}", req),
+            _ => panic!("Expected RecorderRequest::StartLogging; got {:?}", req),
         });
         start(logger, args).await.unwrap();
         assert_matches!(receiver.try_next().unwrap(), Some(()));
@@ -189,7 +187,7 @@ mod tests {
         };
         let (mut sender, mut receiver) = mpsc::channel(1);
         let logger = fho::testing::fake_proxy(move |req| match req {
-            fmetrics::MetricsLoggerRequest::StartLoggingForever {
+            fmetrics::RecorderRequest::StartLoggingForever {
                 client_id,
                 metrics,
                 output_samples_to_syslog,
@@ -213,7 +211,7 @@ mod tests {
                 responder.send(Ok(())).unwrap();
                 sender.try_send(()).unwrap();
             }
-            _ => panic!("Expected MetricsLoggerRequest::StartLoggingForever; got {:?}", req),
+            _ => panic!("Expected RecorderRequest::StartLoggingForever; got {:?}", req),
         });
         start(logger, args).await.unwrap();
         assert_matches!(receiver.try_next().unwrap(), Some(()));
@@ -225,12 +223,12 @@ mod tests {
         // Stop logging
         let (mut sender, mut receiver) = mpsc::channel(1);
         let logger = fho::testing::fake_proxy(move |req| match req {
-            fmetrics::MetricsLoggerRequest::StopLogging { client_id, responder } => {
+            fmetrics::RecorderRequest::StopLogging { client_id, responder } => {
                 assert_eq!(String::from("ffx_temperature"), client_id);
                 responder.send(true).unwrap();
                 sender.try_send(()).unwrap();
             }
-            _ => panic!("Expected MetricsLoggerRequest::StopLogging; got {:?}", req),
+            _ => panic!("Expected RecorderRequest::StopLogging; got {:?}", req),
         });
         stop(logger).await.unwrap();
         assert_matches!(receiver.try_next().unwrap(), Some(()));
@@ -239,10 +237,10 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop_logging_error() {
         let logger = fho::testing::fake_proxy(move |req| match req {
-            fmetrics::MetricsLoggerRequest::StopLogging { responder, .. } => {
+            fmetrics::RecorderRequest::StopLogging { responder, .. } => {
                 responder.send(false).unwrap();
             }
-            _ => panic!("Expected MetricsLoggerRequest::StopLogging; got {:?}", req),
+            _ => panic!("Expected RecorderRequest::StopLogging; got {:?}", req),
         });
         let error = stop(logger).await.unwrap_err();
         assert!(error.to_string().contains("Stop logging returned false"));

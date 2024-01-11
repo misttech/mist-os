@@ -6,7 +6,7 @@ use crate::system_metrics::types::{
     CpuLoadLoggerResult, StartLoggingForeverRequest, StartLoggingRequest,
 };
 use anyhow::Error;
-use fidl_fuchsia_metricslogger_test::{CpuLoad, Metric, MetricsLoggerMarker};
+use fidl_fuchsia_power_metrics::{CpuLoad, Metric, RecorderMarker};
 use fuchsia_component::client::connect_to_protocol;
 use serde_json::{from_value, Value};
 
@@ -27,7 +27,7 @@ impl SystemMetricsFacade {
     /// or crashing.
     pub async fn start_logging(&self, args: Value) -> Result<CpuLoadLoggerResult, Error> {
         let params: StartLoggingRequest = from_value(args)?;
-        connect_to_protocol::<MetricsLoggerMarker>()?
+        connect_to_protocol::<RecorderMarker>()?
             .start_logging(
                 CLIENT_ID,
                 &[Metric::CpuLoad(CpuLoad { interval_ms: params.interval_ms })],
@@ -36,14 +36,14 @@ impl SystemMetricsFacade {
                 /* output_stats_to_syslog */ false,
             )
             .await?
-            .map_err(|e| format_err!("Received MetricsLoggerError: {:?}", e))?;
+            .map_err(|e| format_err!("Received RecorderError: {:?}", e))?;
         Ok(CpuLoadLoggerResult::Success)
     }
 
     /// Start logging cpu load into trace events until a call to [stop_logging].
     pub async fn start_logging_forever(&self, args: Value) -> Result<CpuLoadLoggerResult, Error> {
         let params: StartLoggingForeverRequest = from_value(args)?;
-        connect_to_protocol::<MetricsLoggerMarker>()?
+        connect_to_protocol::<RecorderMarker>()?
             .start_logging_forever(
                 CLIENT_ID,
                 &[Metric::CpuLoad(CpuLoad { interval_ms: params.interval_ms })],
@@ -51,7 +51,7 @@ impl SystemMetricsFacade {
                 /* output_stats_to_syslog */ false,
             )
             .await?
-            .map_err(|e| format_err!("Received MetricsLoggerError: {:?}", e))?;
+            .map_err(|e| format_err!("Received RecorderError: {:?}", e))?;
         Ok(CpuLoadLoggerResult::Success)
     }
 
@@ -61,7 +61,7 @@ impl SystemMetricsFacade {
     /// tests can call this before starting their logging session to clean up in case a prior test
     /// failed without stopping logging.
     pub async fn stop_logging(&self, _args: Value) -> Result<CpuLoadLoggerResult, Error> {
-        let logger = connect_to_protocol::<MetricsLoggerMarker>()?;
+        let logger = connect_to_protocol::<RecorderMarker>()?;
         logger.stop_logging(CLIENT_ID).await?;
         Ok(CpuLoadLoggerResult::Success)
     }

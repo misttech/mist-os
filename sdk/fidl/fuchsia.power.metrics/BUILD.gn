@@ -4,7 +4,7 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.metricslogger.test") {
-  sdk_category = "internal"
-  sources = [ "metricslogger.test.fidl" ]
+fidl("fuchsia.power.metrics") {
+  sdk_category = "partner_internal"
+  sources = [ "recorder.fidl" ]
 }

@@ -6,7 +6,7 @@ use {
     crate::MIN_INTERVAL_FOR_SYSLOG_MS,
     anyhow::{format_err, Result},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_kernel as fkernel,
-    fidl_fuchsia_metricslogger_test as fmetrics, fuchsia_async as fasync,
+    fidl_fuchsia_power_metrics as fmetrics, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_inspect::{self as inspect, Property},
     fuchsia_zbi_abi::ZbiType,
@@ -115,7 +115,7 @@ fn calculate_cpu_usage(
     let num_cpus = cpu_indexes.len() as f64;
     let mut cpu_percentage_sum: f64 = 0.0;
     for cpu_index in cpu_indexes {
-        // TODO(https://fxbug.dev/110111): Return `MetricsLoggerError::INTERNAL` instead of unwrap.
+        // TODO(https://fxbug.dev/110111): Return `RecorderError::INTERNAL` instead of unwrap.
         let current_per_cpu_stats =
             &current_sample.cpu_stats.per_cpu_stats.as_ref().unwrap()[cpu_index as usize];
         let last_per_cpu_stats =
@@ -155,12 +155,12 @@ impl CpuLoadLogger {
         client_inspect: &inspect::Node,
         client_id: String,
         output_samples_to_syslog: bool,
-    ) -> Result<Self, fmetrics::MetricsLoggerError> {
+    ) -> Result<Self, fmetrics::RecorderError> {
         if interval_ms == 0
             || output_samples_to_syslog && interval_ms < MIN_INTERVAL_FOR_SYSLOG_MS
             || duration_ms.map_or(false, |d| d <= interval_ms)
         {
-            return Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval);
+            return Err(fmetrics::RecorderError::InvalidSamplingInterval);
         }
 
         let start_time = fasync::Time::now();

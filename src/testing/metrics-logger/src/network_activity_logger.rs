@@ -6,7 +6,7 @@ use {
     crate::driver_utils::{connect_proxy, list_drivers},
     crate::MIN_INTERVAL_FOR_SYSLOG_MS,
     anyhow::{format_err, Result},
-    fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_metricslogger_test as fmetrics,
+    fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_power_metrics as fmetrics,
     fuchsia_async as fasync,
     fuchsia_inspect::{self as inspect, Property},
     fuchsia_zircon as zx,
@@ -52,7 +52,7 @@ async fn watch_and_update_ports(
     device: &fhwnet::DeviceProxy,
     ports: Rc<RefCell<HashMap<u8, fhwnet::PortProxy>>>,
 ) {
-    // TODO(https://fxbug.dev/110111): Return `MetricsLoggerError::INTERNAL` instead of unwrap.
+    // TODO(https://fxbug.dev/110111): Return `RecorderError::INTERNAL` instead of unwrap.
     let (port_watcher, port_watcher_server_end) =
         fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>().unwrap();
     device.get_port_watcher(port_watcher_server_end).unwrap();
@@ -222,18 +222,18 @@ impl<'a> NetworkActivityLoggerBuilder<'a> {
         self
     }
 
-    pub async fn build(self) -> Result<NetworkActivityLogger, fmetrics::MetricsLoggerError> {
+    pub async fn build(self) -> Result<NetworkActivityLogger, fmetrics::RecorderError> {
         if self.interval_ms == 0
             || self.output_samples_to_syslog && self.interval_ms < MIN_INTERVAL_FOR_SYSLOG_MS
             || self.duration_ms.map_or(false, |d| d <= self.interval_ms)
         {
-            return Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval);
+            return Err(fmetrics::RecorderError::InvalidSamplingInterval);
         }
 
         let ports = match self.ports {
             None => {
                 if self.devices.len() == 0 {
-                    return Err(fmetrics::MetricsLoggerError::NoDrivers);
+                    return Err(fmetrics::RecorderError::NoDrivers);
                 }
                 let network_ports = Rc::new(RefCell::new(HashMap::new()));
                 // Keep a task running in the background to listen to the port events to keep

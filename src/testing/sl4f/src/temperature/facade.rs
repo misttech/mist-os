@@ -6,9 +6,7 @@ use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
 use crate::temperature::types;
 use anyhow::Error;
 use fidl_fuchsia_hardware_temperature::{DeviceMarker, DeviceProxy};
-use fidl_fuchsia_metricslogger_test::{
-    Metric, MetricsLoggerMarker, MetricsLoggerProxy, Temperature,
-};
+use fidl_fuchsia_power_metrics::{Metric, RecorderMarker, RecorderProxy, Temperature};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
 use serde_json::Value;
@@ -27,7 +25,7 @@ pub struct TemperatureFacade {
     device_proxy: Option<DeviceProxy>,
 
     /// Optional logger proxy for testing, similar to `device_proxy`.
-    logger_proxy: Option<MetricsLoggerProxy>,
+    logger_proxy: Option<RecorderProxy>,
 }
 
 impl TemperatureFacade {
@@ -66,14 +64,14 @@ impl TemperatureFacade {
         }
     }
 
-    /// Connect to the discoverable MetricsLogger service and return the proxy.
-    fn get_logger_proxy(&self) -> Result<MetricsLoggerProxy, Error> {
+    /// Connect to the discoverable Recorder service and return the proxy.
+    fn get_logger_proxy(&self) -> Result<RecorderProxy, Error> {
         let tag = "TemperatureFacade::get_logger_proxy";
 
         if let Some(proxy) = &self.logger_proxy {
             Ok(proxy.clone())
         } else {
-            match connect_to_protocol::<MetricsLoggerMarker>() {
+            match connect_to_protocol::<RecorderMarker>() {
                 Ok(proxy) => Ok(proxy),
                 Err(e) => fx_err_and_bail!(
                     &with_line!(tag),
@@ -96,7 +94,7 @@ impl TemperatureFacade {
         Ok(temperature)
     }
 
-    /// Initiates fixed-duration logging with the MetricsLogger service.
+    /// Initiates fixed-duration logging with the Recorder service.
     ///
     /// # Arguments
     /// * `args`: JSON value containing the StartLoggingRequest information. Key "interval_ms"
@@ -164,7 +162,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_hardware_temperature::DeviceRequest;
-    use fidl_fuchsia_metricslogger_test::MetricsLoggerRequest;
+    use fidl_fuchsia_power_metrics::RecorderRequest;
     use fuchsia_async as fasync;
     use futures::prelude::*;
     use serde_json::json;
@@ -203,11 +201,11 @@ mod tests {
         let query_interval_ms = 500;
         let query_duration_ms = 10_000;
 
-        let (proxy, mut stream) = create_proxy_and_stream::<MetricsLoggerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {
-                Ok(Some(MetricsLoggerRequest::StartLogging {
+                Ok(Some(RecorderRequest::StartLogging {
                     client_id,
                     metrics,
                     duration_ms,
@@ -252,11 +250,11 @@ mod tests {
     async fn test_start_logging_forever() {
         let query_interval_ms = 500;
 
-        let (proxy, mut stream) = create_proxy_and_stream::<MetricsLoggerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {
-                Ok(Some(MetricsLoggerRequest::StartLoggingForever {
+                Ok(Some(RecorderRequest::StartLoggingForever {
                     client_id,
                     metrics,
                     output_samples_to_syslog,
@@ -292,11 +290,11 @@ mod tests {
     /// Tests that the `stop_logging` method correctly queries the logger.
     #[fasync::run_singlethreaded(test)]
     async fn test_stop_logging() {
-        let (proxy, mut stream) = create_proxy_and_stream::<MetricsLoggerMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<RecorderMarker>().unwrap();
 
         let _stream_task = fasync::Task::local(async move {
             match stream.try_next().await {
-                Ok(Some(MetricsLoggerRequest::StopLogging { client_id, responder })) => {
+                Ok(Some(RecorderRequest::StopLogging { client_id, responder })) => {
                     assert_eq!(String::from("sl4f_temperature"), client_id);
                     responder.send(true).unwrap()
                 }

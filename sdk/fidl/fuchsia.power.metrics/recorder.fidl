@@ -1,15 +1,16 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.metricslogger.test;
+@available(added=17)
+library fuchsia.power.metrics;
 
 // Type aliase for client Id for convenience
 alias ClientId = string:16;
 
-/// Errors associated with MetricsLogger methods.
+/// Errors associated with Recorder methods.
 /// If the request contains any of the following errors, it will fail without
 /// affecting the existing logging tasks.
-type MetricsLoggerError = strict enum : uint32 {
+type RecorderError = strict enum : uint32 {
     /// Indicates that no driver is found for requested metric logging.
     NO_DRIVERS = 1;
     /// Indicates that an invalid sampling interval was provided.
@@ -21,7 +22,7 @@ type MetricsLoggerError = strict enum : uint32 {
     DUPLICATED_METRIC = 4;
     /// Indicates that the total number of active clients has reached the
     /// allowed maxium (defined by `MAX_CONCURRENT_CLIENTS = 20` in
-    /// the MetricsLogger to keep memory use bounded).
+    /// the Recorder to keep memory use bounded).
     TOO_MANY_ACTIVE_CLIENTS = 5;
     /// Indicates that statistics is enabled and an invalid statistics interval
     /// is provided.
@@ -30,7 +31,7 @@ type MetricsLoggerError = strict enum : uint32 {
     INTERNAL = 7;
 };
 
-/// Metric type requested in MetricsLogger methods.
+/// Metric type requested in Recorder methods.
 type Metric = strict union {
     1: temperature Temperature;
     2: cpu_load CpuLoad;
@@ -102,7 +103,7 @@ type Power = struct {
 
 /// A protocol for managing on-demand metrics logging.
 @discoverable
-closed protocol MetricsLogger {
+closed protocol Recorder {
     /// Initiates logging of specified metrics for the provided duration.
     /// Supports concurrent logging of different metrics. Logging may be
     /// terminated early with a call to `StopLogging`.
@@ -129,7 +130,7 @@ closed protocol MetricsLogger {
         duration_ms uint32;
         output_samples_to_syslog bool;
         output_stats_to_syslog bool;
-    }) -> () error MetricsLoggerError;
+    }) -> () error RecorderError;
 
     /// Initiates logging of specified metrics. Supports concurrent logging of
     /// different metrics. Logging will only end upon a `StopLogging` call.
@@ -144,14 +145,14 @@ closed protocol MetricsLogger {
     ///     syslog.
     /// + request `output_stats_to_syslog` Toggle for outputting any available
     ///     statistics to syslog.
-    /// + error a [fuchsia.metrics.test/MetricsLoggerError] value indicating why
+    /// + error a [fuchsia.metrics.test/RecorderError] value indicating why
     ///     the request failed.
     strict StartLoggingForever(struct {
         client_id ClientId;
         metrics vector<Metric>:MAX;
         output_samples_to_syslog bool;
         output_stats_to_syslog bool;
-    }) -> () error MetricsLoggerError;
+    }) -> () error RecorderError;
 
     /// Terminates all active logging tasks with the given client_id. It is
     /// valid to call this method when logging is inactive.

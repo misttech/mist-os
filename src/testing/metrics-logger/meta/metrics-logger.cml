@@ -11,7 +11,7 @@
         binary: "bin/metrics_logger",
     },
     capabilities: [
-        { protocol: "fuchsia.metricslogger.test.MetricsLogger" },
+        { protocol: "fuchsia.power.metrics.Recorder" },
     ],
     use: [
         {
@@ -54,7 +54,7 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.metricslogger.test.MetricsLogger",
+            protocol: "fuchsia.power.metrics.Recorder",
             from: "self",
         },
     ],

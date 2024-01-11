@@ -46,7 +46,6 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   deps = [
-    "fuchsia.metricslogger.test:fuchsia.metricslogger.test_rust",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_rust",
@@ -54,6 +53,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_rust",
     "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/fidl/fuchsia.power.metrics:fuchsia.power.metrics_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",

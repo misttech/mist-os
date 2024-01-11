@@ -19,7 +19,7 @@ use {
     },
     anyhow::{Error, Result},
     fidl_fuchsia_hardware_network as fhwnet,
-    fidl_fuchsia_metricslogger_test::{self as fmetrics, MetricsLoggerRequest},
+    fidl_fuchsia_power_metrics::{self as fmetrics, RecorderRequest},
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect as inspect,
@@ -220,7 +220,7 @@ impl MetricsLoggerServer {
 
     fn handle_new_service_connection(
         self: Rc<Self>,
-        mut stream: fmetrics::MetricsLoggerRequestStream,
+        mut stream: fmetrics::RecorderRequestStream,
     ) -> fasync::Task<()> {
         fasync::Task::local(
             async move {
@@ -235,12 +235,12 @@ impl MetricsLoggerServer {
 
     async fn handle_metrics_logger_request(
         self: &Rc<Self>,
-        request: MetricsLoggerRequest,
+        request: RecorderRequest,
     ) -> Result<()> {
         self.purge_completed_tasks();
 
         match request {
-            MetricsLoggerRequest::StartLogging {
+            RecorderRequest::StartLogging {
                 client_id,
                 metrics,
                 duration_ms,
@@ -259,7 +259,7 @@ impl MetricsLoggerServer {
                     .await;
                 responder.send(result)?;
             }
-            MetricsLoggerRequest::StartLoggingForever {
+            RecorderRequest::StartLoggingForever {
                 client_id,
                 metrics,
                 output_samples_to_syslog,
@@ -277,7 +277,7 @@ impl MetricsLoggerServer {
                     .await;
                 responder.send(result)?;
             }
-            MetricsLoggerRequest::StopLogging { client_id, responder } => {
+            RecorderRequest::StopLogging { client_id, responder } => {
                 responder.send(self.client_tasks.borrow_mut().remove(&client_id).is_some())?;
             }
         }
@@ -292,19 +292,19 @@ impl MetricsLoggerServer {
         output_samples_to_syslog: bool,
         output_stats_to_syslog: bool,
         duration_ms: Option<u32>,
-    ) -> fmetrics::MetricsLoggerStartLoggingResult {
+    ) -> fmetrics::RecorderStartLoggingResult {
         if self.client_tasks.borrow_mut().contains_key(client_id) {
-            return Err(fmetrics::MetricsLoggerError::AlreadyLogging);
+            return Err(fmetrics::RecorderError::AlreadyLogging);
         }
 
         if self.client_tasks.borrow().len() >= MAX_CONCURRENT_CLIENTS {
-            return Err(fmetrics::MetricsLoggerError::TooManyActiveClients);
+            return Err(fmetrics::RecorderError::TooManyActiveClients);
         }
 
         let incoming_metric_types: HashSet<_> =
             HashSet::from_iter(metrics.iter().map(|m| std::mem::discriminant(m)));
         if incoming_metric_types.len() != metrics.len() {
-            return Err(fmetrics::MetricsLoggerError::DuplicatedMetric);
+            return Err(fmetrics::RecorderError::DuplicatedMetric);
         }
 
         let client_inspect = self.inspect_root.create_child(&client_id.to_string());
@@ -412,7 +412,7 @@ impl MetricsLoggerServer {
 
     async fn get_temperature_drivers(
         &self,
-    ) -> Result<Rc<Vec<TemperatureDriver>>, fmetrics::MetricsLoggerError> {
+    ) -> Result<Rc<Vec<TemperatureDriver>>, fmetrics::RecorderError> {
         match self.temperature_drivers.borrow().as_ref() {
             Some(drivers) => return Ok(drivers.clone()),
             _ => (),
@@ -429,15 +429,13 @@ impl MetricsLoggerServer {
         let drivers =
             Rc::new(generate_temperature_drivers(driver_aliases).await.map_err(|err| {
                 error!(%err, "Request failed with internal error");
-                fmetrics::MetricsLoggerError::Internal
+                fmetrics::RecorderError::Internal
             })?);
         self.temperature_drivers.replace(Some(drivers.clone()));
         Ok(drivers)
     }
 
-    async fn get_power_drivers(
-        &self,
-    ) -> Result<Rc<Vec<PowerDriver>>, fmetrics::MetricsLoggerError> {
+    async fn get_power_drivers(&self) -> Result<Rc<Vec<PowerDriver>>, fmetrics::RecorderError> {
         match self.power_drivers.borrow().as_ref() {
             Some(drivers) => return Ok(drivers.clone()),
             _ => (),
@@ -453,13 +451,13 @@ impl MetricsLoggerServer {
 
         let drivers = Rc::new(generate_power_drivers(driver_aliases).await.map_err(|err| {
             error!(%err, "Request failed with internal error");
-            fmetrics::MetricsLoggerError::Internal
+            fmetrics::RecorderError::Internal
         })?);
         self.power_drivers.replace(Some(drivers.clone()));
         Ok(drivers)
     }
 
-    async fn get_gpu_drivers(&self) -> Result<Rc<Vec<GpuDriver>>, fmetrics::MetricsLoggerError> {
+    async fn get_gpu_drivers(&self) -> Result<Rc<Vec<GpuDriver>>, fmetrics::RecorderError> {
         match self.gpu_drivers.borrow().as_ref() {
             Some(drivers) => return Ok(drivers.clone()),
             _ => (),
@@ -475,13 +473,13 @@ impl MetricsLoggerServer {
 
         let drivers = Rc::new(generate_gpu_drivers(driver_aliases).await.map_err(|err| {
             error!(%err, "Request failed with internal error");
-            fmetrics::MetricsLoggerError::Internal
+            fmetrics::RecorderError::Internal
         })?);
         self.gpu_drivers.replace(Some(drivers.clone()));
         Ok(drivers)
     }
 
-    async fn get_cpu_driver(&self) -> Result<Rc<CpuStatsDriver>, fmetrics::MetricsLoggerError> {
+    async fn get_cpu_driver(&self) -> Result<Rc<CpuStatsDriver>, fmetrics::RecorderError> {
         match self.cpu_stats_driver.borrow().as_ref() {
             Some(driver) => return Ok(driver.clone()),
             _ => (),
@@ -489,7 +487,7 @@ impl MetricsLoggerServer {
 
         let driver = Rc::new(generate_cpu_stats_driver().await.map_err(|err| {
             error!(%err, "Request failed with internal error");
-            fmetrics::MetricsLoggerError::Internal
+            fmetrics::RecorderError::Internal
         })?);
         self.cpu_stats_driver.replace(Some(driver.clone()));
         Ok(driver)
@@ -497,7 +495,7 @@ impl MetricsLoggerServer {
 
     async fn get_network_devices(
         &self,
-    ) -> Result<Rc<Vec<fhwnet::DeviceProxy>>, fmetrics::MetricsLoggerError> {
+    ) -> Result<Rc<Vec<fhwnet::DeviceProxy>>, fmetrics::RecorderError> {
         match &*self.network_devices.borrow() {
             Some(device) => return Ok(device.clone()),
             _ => (),
@@ -505,7 +503,7 @@ impl MetricsLoggerServer {
 
         let device = Rc::new(generate_network_devices().await.map_err(|err| {
             error!(%err, "Request failed with internal error");
-            fmetrics::MetricsLoggerError::Internal
+            fmetrics::RecorderError::Internal
         })?);
         self.network_devices.replace(Some(device.clone()));
         Ok(device)
@@ -542,7 +540,7 @@ async fn inner_main() -> Result<()> {
         .ok()
         .and_then(|file| json::from_reader(std::io::BufReader::new(file)).ok());
     let server = ServerBuilder::new_from_json(config).build().await?;
-    fs.dir("svc").add_fidl_service(move |stream: fmetrics::MetricsLoggerRequestStream| {
+    fs.dir("svc").add_fidl_service(move |stream: fmetrics::RecorderRequestStream| {
         MetricsLoggerServer::handle_new_service_connection(server.clone(), stream).detach();
     });
 
@@ -634,7 +632,7 @@ mod tests {
 
     struct Runner {
         server_task: fasync::Task<()>,
-        proxy: fmetrics::MetricsLoggerProxy,
+        proxy: fmetrics::RecorderProxy,
 
         inspector: inspect::Inspector,
 
@@ -695,8 +693,7 @@ mod tests {
 
             // Construct the server task.
             let (proxy, stream) =
-                fidl::endpoints::create_proxy_and_stream::<fmetrics::MetricsLoggerMarker>()
-                    .unwrap();
+                fidl::endpoints::create_proxy_and_stream::<fmetrics::RecorderMarker>().unwrap();
             let server_task = server.handle_new_service_connection(stream);
 
             Self { executor, server_task, proxy, inspector }
@@ -935,7 +932,7 @@ mod tests {
         );
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::DuplicatedMetric)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::DuplicatedMetric)))
         );
     }
 
@@ -1315,7 +1312,7 @@ mod tests {
         );
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::TooManyActiveClients)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::TooManyActiveClients)))
         );
 
         // Remove one active client.
@@ -1370,7 +1367,7 @@ mod tests {
         );
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::AlreadyLogging)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::AlreadyLogging)))
         );
 
         // Attempt to start another task for logging a different metric while the first one is
@@ -1387,7 +1384,7 @@ mod tests {
         );
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::AlreadyLogging)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::AlreadyLogging)))
         );
 
         // Starting a new logging task of a different client should succeed.
@@ -1434,7 +1431,7 @@ mod tests {
         );
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::AlreadyLogging)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::AlreadyLogging)))
         );
     }
 
@@ -1488,7 +1485,7 @@ mod tests {
         // Check `InvalidSamplingInterval` is returned when interval_ms is 0.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1502,7 +1499,7 @@ mod tests {
         // smaller than MIN_INTERVAL_FOR_SYSLOG_MS.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1516,7 +1513,7 @@ mod tests {
         // larger than `duration_ms`.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
     }
 
@@ -1556,7 +1553,7 @@ mod tests {
         // Check `InvalidSamplingInterval` is returned when interval_ms is 0.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1570,7 +1567,7 @@ mod tests {
         // smaller than MIN_INTERVAL_FOR_SYSLOG_MS.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1584,7 +1581,7 @@ mod tests {
         // larger than `duration_ms`.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1597,7 +1594,7 @@ mod tests {
         // Check `NoDrivers` is returned when other logging request parameters are correct.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::NoDrivers)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::NoDrivers)))
         );
     }
 
@@ -1640,7 +1637,7 @@ mod tests {
         // `statistics_interval_ms` is larger than `duration_ms`.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidStatisticsInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidStatisticsInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1658,7 +1655,7 @@ mod tests {
         // `statistics_interval_ms` is less than `sampling_interval_ms`.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidStatisticsInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidStatisticsInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1676,7 +1673,7 @@ mod tests {
         // `statistics_interval_ms` is less than MIN_INTERVAL_FOR_SYSLOG_MS.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidStatisticsInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidStatisticsInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1689,7 +1686,7 @@ mod tests {
         // Check `InvalidSamplingInterval` is returned when sampling_interval_ms is 0.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1703,7 +1700,7 @@ mod tests {
         // smaller than MIN_INTERVAL_FOR_SYSLOG_MS.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1717,7 +1714,7 @@ mod tests {
         // larger than `duration_ms`.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1730,7 +1727,7 @@ mod tests {
         // Check `NoDrivers` is returned when other logging request parameters are correct.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::NoDrivers)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::NoDrivers)))
         );
     }
 
@@ -1769,7 +1766,7 @@ mod tests {
         // Check `InvalidSamplingInterval` is returned when interval_ms is 0.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1783,7 +1780,7 @@ mod tests {
         // smaller than MIN_INTERVAL_FOR_SYSLOG_MS.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1797,7 +1794,7 @@ mod tests {
         // larger than `duration_ms`.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::InvalidSamplingInterval)))
         );
 
         let mut query = runner.proxy.start_logging(
@@ -1810,7 +1807,7 @@ mod tests {
         // Check `NoDrivers` is returned when other logging request parameters are correct.
         assert_matches!(
             runner.executor.run_until_stalled(&mut query),
-            Poll::Ready(Ok(Err(fmetrics::MetricsLoggerError::NoDrivers)))
+            Poll::Ready(Ok(Err(fmetrics::RecorderError::NoDrivers)))
         );
     }
 

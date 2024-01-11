@@ -245,6 +245,7 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.posix",
   "fuchsia.sys2",
   "fuchsia.vulkan.loader",
+  "fuchsia.power.metrics",
 ]
 
 group("sdk_partner_internal_libs") {

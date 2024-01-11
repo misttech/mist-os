@@ -6,7 +6,7 @@ use {
     crate::driver_utils::{connect_proxy, get_driver_alias, map_topo_paths_to_class_paths, Driver},
     crate::MIN_INTERVAL_FOR_SYSLOG_MS,
     anyhow::{format_err, Error, Result},
-    fidl_fuchsia_gpu_magma as fgpu, fidl_fuchsia_metricslogger_test as fmetrics,
+    fidl_fuchsia_gpu_magma as fgpu, fidl_fuchsia_power_metrics as fmetrics,
     fuchsia_async as fasync,
     fuchsia_inspect::{self as inspect, Property},
     fuchsia_zircon as zx,
@@ -118,15 +118,15 @@ impl GpuUsageLogger {
         client_inspect: &inspect::Node,
         client_id: String,
         output_samples_to_syslog: bool,
-    ) -> Result<Self, fmetrics::MetricsLoggerError> {
+    ) -> Result<Self, fmetrics::RecorderError> {
         if interval_ms == 0
             || output_samples_to_syslog && interval_ms < MIN_INTERVAL_FOR_SYSLOG_MS
             || duration_ms.map_or(false, |d| d <= interval_ms)
         {
-            return Err(fmetrics::MetricsLoggerError::InvalidSamplingInterval);
+            return Err(fmetrics::RecorderError::InvalidSamplingInterval);
         }
         if drivers.len() == 0 {
-            return Err(fmetrics::MetricsLoggerError::NoDrivers);
+            return Err(fmetrics::RecorderError::NoDrivers);
         }
 
         let driver_names: Vec<String> = drivers.iter().map(|c| c.name().to_string()).collect();
