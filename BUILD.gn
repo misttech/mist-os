@@ -1540,6 +1540,7 @@ group("default") {
     "//:product_bundles.check",
     "//:test-list",
     "//build/assembly:validate_product_defs",
+    "//bundles/assembly",
 
     # TODO(https://fxbug.dev/116566) has_board check not working
     "//build/images:default-images",
