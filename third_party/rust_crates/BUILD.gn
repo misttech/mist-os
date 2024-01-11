@@ -9162,7 +9162,6 @@ rust_library("once_cell-v1_17_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":parking_lot_core-v0_9_6" ]
 
   rustenv = []
 
@@ -9173,8 +9172,6 @@ rust_library("once_cell-v1_17_1") {
     "-Cextra-filename=-283c53dba5ff9f5a",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
-    "--cfg=feature=\"parking_lot\"",
-    "--cfg=feature=\"parking_lot_core\"",
     "--cfg=feature=\"race\"",
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"unstable\"",
