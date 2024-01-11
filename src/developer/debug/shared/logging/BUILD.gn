@@ -21,5 +21,8 @@ sdk_source_set("logging") {
     "logging.cc",
   ]
 
-  deps = [ "//src/lib/fxl" ]
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl",
+  ]
 }
