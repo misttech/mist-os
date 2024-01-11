@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -19,6 +20,10 @@ const (
 	defaultTarget = "//:default"
 
 	PERMISSIONS_ALLRW_OWNERX = 0755
+
+	PLATFORM_LINUX   = "linux-x64"
+	PLATFORM_MACOS   = "macos-x64"
+	DEFAULT_PLATFORM = PLATFORM_LINUX
 )
 
 var (
@@ -34,7 +39,7 @@ var (
 	outDir         = flag.String("out_dir", "/tmp/check-licenses", "Directory to write outputs to.")
 	licensesOutDir = flag.String("licenses_out_dir", "", "Directory to write license text segments.")
 
-	gnPath              = flag.String("gn_path", "{FUCHSIA_DIR}/prebuilt/third_party/gn/linux-x64/gn", "Path to GN executable. Required when gen_filter_target is specified.")
+	gnPath              = flag.String("gn_path", "{FUCHSIA_DIR}/prebuilt/third_party/gn/{PLATFORM}/gn", "Path to GN executable. Required when gen_filter_target is specified.")
 	genProjectFile      = flag.String("gen_project_file", "{BUILD_DIR}/project.json", "Path to 'project.json' output file.")
 	genIntermediateFile = flag.String("gen_intermediate_file", "", "Path to intermediate serialized gen struct.")
 	pruneTargets        = flag.String("prune_targets", "", "Flag for filtering out targets from the dependency tree. Targets separated by comma.")
@@ -104,8 +109,13 @@ func mainImpl() error {
 	ConfigVars["{LICENSES_OUT_DIR}"] = *licensesOutDir
 
 	// gnPath
+	platform := DEFAULT_PLATFORM
+	if runtime.GOOS == "darwin" {
+		platform = PLATFORM_MACOS
+	}
 	if len(*gnPath) > 0 {
 		*gnPath = strings.ReplaceAll(*gnPath, "{FUCHSIA_DIR}", *fuchsiaDir)
+		*gnPath = strings.ReplaceAll(*gnPath, "{PLATFORM}", platform)
 		*gnPath, err = filepath.Abs(*gnPath)
 		if err != nil {
 			return fmt.Errorf("Failed to get absolute directory for *gnPath %s: %w", *gnPath, err)
