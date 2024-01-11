@@ -913,6 +913,16 @@ fuchsia.microbenchmarks: Vmo/Read/2048kbytes
 fuchsia.microbenchmarks: Vmo/Read/32kbytes
 fuchsia.microbenchmarks: Vmo/Read/4kbytes
 fuchsia.microbenchmarks: Vmo/Read/512kbytes
+fuchsia.microbenchmarks: Vmo/TransferData/128kbytes.fill_source
+fuchsia.microbenchmarks: Vmo/TransferData/128kbytes.transfer
+fuchsia.microbenchmarks: Vmo/TransferData/2048kbytes.fill_source
+fuchsia.microbenchmarks: Vmo/TransferData/2048kbytes.transfer
+fuchsia.microbenchmarks: Vmo/TransferData/32kbytes.fill_source
+fuchsia.microbenchmarks: Vmo/TransferData/32kbytes.transfer
+fuchsia.microbenchmarks: Vmo/TransferData/4kbytes.fill_source
+fuchsia.microbenchmarks: Vmo/TransferData/4kbytes.transfer
+fuchsia.microbenchmarks: Vmo/TransferData/512kbytes.fill_source
+fuchsia.microbenchmarks: Vmo/TransferData/512kbytes.transfer
 fuchsia.microbenchmarks: Vmo/Write/128kbytes
 fuchsia.microbenchmarks: Vmo/Write/2048kbytes
 fuchsia.microbenchmarks: Vmo/Write/32kbytes

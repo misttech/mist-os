@@ -28,6 +28,7 @@
 //    * Subcase: "/WithPrecommit" variants use ZX_VMAR_OP_COMMIT to map and commit the VMO prior to
 //      issuing a memcpy.
 //    * Subcase: "/WithoutPrecommit" variants perform a memcpy into the VMO without committing it.
+//  * Vmo/TransferData: cost of zx_vmo_transfer_data().
 
 namespace {
 
@@ -358,6 +359,30 @@ bool VmoCreateWriteReadCloseTest(perftest::RepeatState* state, uint32_t copy_siz
   return true;
 }
 
+// Measure the time taken to transfer data between VMOs using zx_vmo_transfer_data().
+bool VmoTransferDataTest(perftest::RepeatState* state, uint64_t transfer_size) {
+  const uint64_t vmo_size = transfer_size * 2;
+  const uint64_t src_offset = transfer_size;
+  const uint64_t dst_offset = 0;
+  zx::vmo src_vmo;
+  ASSERT_OK(zx::vmo::create(vmo_size, 0, &src_vmo));
+  zx_vaddr_t buffer_addr;
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, src_vmo, 0, vmo_size,
+                                       &buffer_addr));
+  zx::vmo dst_vmo;
+  ASSERT_OK(zx::vmo::create(vmo_size, 0, &dst_vmo));
+
+  state->DeclareStep("fill_source");
+  state->DeclareStep("transfer");
+  while (state->KeepRunning()) {
+    memset((void*)buffer_addr, 'f', vmo_size);
+    state->NextStep();
+    ASSERT_OK(dst_vmo.transfer_data(0, dst_offset, transfer_size, &src_vmo, src_offset));
+  }
+  ASSERT_OK(zx::vmar::root_self()->unmap(buffer_addr, vmo_size));
+  return true;
+}
+
 template <typename Func, typename... Args>
 void RegisterVmoTest(const char* name, Func fn, Args... args) {
   for (unsigned size_in_kbytes : {4, 32, 128, 512, 2048}) {
@@ -433,6 +458,9 @@ void RegisterTests() {
 
   name = fbl::StringPrintf("Vmo/CreateWriteReadClose");
   RegisterVmoTest(name.c_str(), VmoCreateWriteReadCloseTest);
+
+  name = fbl::StringPrintf("Vmo/TransferData");
+  RegisterVmoTest(name.c_str(), VmoTransferDataTest);
 }
 PERFTEST_CTOR(RegisterTests)
 
