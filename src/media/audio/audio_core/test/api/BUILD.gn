@@ -260,10 +260,11 @@ audio_core_test_package("audio_core_thermal_tests") {
 
   test_components = [ ":audio_core_thermal_test" ]
 
-  # Many of the above tests print ERROR logs in cases where the client makes an error.
+  # AudioCore emits ERRORs upon output pipeline underflows, which are not incorrect audio,
+  # but they are system failures (and are no longer expected) so we consider them failures.
   test_specs = {
     log_settings = {
-      max_severity = "ERROR"
+      max_severity = "WARN"
     }
     environments = hardware_envs
   }
