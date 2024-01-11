@@ -17,7 +17,7 @@ use crate::{
         IpLayerTimerId,
     },
     transport::{self, TransportLayerTimerId},
-    BindingsContext, CoreCtx, SyncCtx,
+    BindingsContext, BindingsTypes, CoreCtx, SyncCtx,
 };
 
 /// The identifier for any timer event.
@@ -29,7 +29,7 @@ use crate::{
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub struct TimerId<BC: BindingsContext>(pub(crate) TimerIdInner<BC>);
+pub struct TimerId<BT: BindingsTypes>(pub(crate) TimerIdInner<BT>);
 
 #[derive(Derivative)]
 #[derivative(
@@ -39,84 +39,84 @@ pub struct TimerId<BC: BindingsContext>(pub(crate) TimerIdInner<BC>);
     Hash(bound = ""),
     Debug(bound = "")
 )]
-pub(crate) enum TimerIdInner<BC: BindingsContext> {
+pub(crate) enum TimerIdInner<BT: BindingsTypes> {
     /// A timer event in the device layer.
-    DeviceLayer(DeviceLayerTimerId<BC>),
+    DeviceLayer(DeviceLayerTimerId<BT>),
     /// A timer event in the transport layer.
-    TransportLayer(TransportLayerTimerId<BC>),
+    TransportLayer(TransportLayerTimerId<BT>),
     /// A timer event in the IP layer.
     IpLayer(IpLayerTimerId),
     /// A timer event for an IPv4 device.
-    Ipv4Device(Ipv4DeviceTimerId<DeviceId<BC>>),
+    Ipv4Device(Ipv4DeviceTimerId<DeviceId<BT>>),
     /// A timer event for an IPv6 device.
-    Ipv6Device(Ipv6DeviceTimerId<DeviceId<BC>>),
+    Ipv6Device(Ipv6DeviceTimerId<DeviceId<BT>>),
     /// A no-op timer event (used for tests)
     #[cfg(test)]
     Nop(usize),
 }
 
-impl<BC: BindingsContext> From<DeviceLayerTimerId<BC>> for TimerId<BC> {
-    fn from(id: DeviceLayerTimerId<BC>) -> TimerId<BC> {
+impl<BT: BindingsTypes> From<DeviceLayerTimerId<BT>> for TimerId<BT> {
+    fn from(id: DeviceLayerTimerId<BT>) -> TimerId<BT> {
         TimerId(TimerIdInner::DeviceLayer(id))
     }
 }
 
-impl<BC: BindingsContext> From<Ipv4DeviceTimerId<DeviceId<BC>>> for TimerId<BC> {
-    fn from(id: Ipv4DeviceTimerId<DeviceId<BC>>) -> TimerId<BC> {
+impl<BT: BindingsTypes> From<Ipv4DeviceTimerId<DeviceId<BT>>> for TimerId<BT> {
+    fn from(id: Ipv4DeviceTimerId<DeviceId<BT>>) -> TimerId<BT> {
         TimerId(TimerIdInner::Ipv4Device(id))
     }
 }
 
-impl<BC: BindingsContext> From<Ipv6DeviceTimerId<DeviceId<BC>>> for TimerId<BC> {
-    fn from(id: Ipv6DeviceTimerId<DeviceId<BC>>) -> TimerId<BC> {
+impl<BT: BindingsTypes> From<Ipv6DeviceTimerId<DeviceId<BT>>> for TimerId<BT> {
+    fn from(id: Ipv6DeviceTimerId<DeviceId<BT>>) -> TimerId<BT> {
         TimerId(TimerIdInner::Ipv6Device(id))
     }
 }
 
-impl<BC: BindingsContext> From<IpLayerTimerId> for TimerId<BC> {
-    fn from(id: IpLayerTimerId) -> TimerId<BC> {
+impl<BT: BindingsTypes> From<IpLayerTimerId> for TimerId<BT> {
+    fn from(id: IpLayerTimerId) -> TimerId<BT> {
         TimerId(TimerIdInner::IpLayer(id))
     }
 }
 
-impl<BC: BindingsContext> From<TransportLayerTimerId<BC>> for TimerId<BC> {
-    fn from(id: TransportLayerTimerId<BC>) -> Self {
+impl<BT: BindingsTypes> From<TransportLayerTimerId<BT>> for TimerId<BT> {
+    fn from(id: TransportLayerTimerId<BT>) -> Self {
         TimerId(TimerIdInner::TransportLayer(id))
     }
 }
 
 impl_timer_context!(
-    C: BindingsContext,
-    TimerId<C>,
-    DeviceLayerTimerId<C>,
+    BT: BindingsTypes,
+    TimerId<BT>,
+    DeviceLayerTimerId<BT>,
     TimerId(TimerIdInner::DeviceLayer(id)),
     id
 );
 impl_timer_context!(
-    C: BindingsContext,
-    TimerId<C>,
+    BT: BindingsTypes,
+    TimerId<BT>,
     IpLayerTimerId,
     TimerId(TimerIdInner::IpLayer(id)),
     id
 );
 impl_timer_context!(
-    C: BindingsContext,
-    TimerId<C>,
-    Ipv4DeviceTimerId<DeviceId<C>>,
+    BT: BindingsTypes,
+    TimerId<BT>,
+    Ipv4DeviceTimerId<DeviceId<BT>>,
     TimerId(TimerIdInner::Ipv4Device(id)),
     id
 );
 impl_timer_context!(
-    C: BindingsContext,
-    TimerId<C>,
-    Ipv6DeviceTimerId<DeviceId<C>>,
+    BT: BindingsTypes,
+    TimerId<BT>,
+    Ipv6DeviceTimerId<DeviceId<BT>>,
     TimerId(TimerIdInner::Ipv6Device(id)),
     id
 );
 impl_timer_context!(
-    C: BindingsContext,
-    TimerId<C>,
-    TransportLayerTimerId<C>,
+    BT: BindingsTypes,
+    TimerId<BT>,
+    TransportLayerTimerId<BT>,
     TimerId(TimerIdInner::TransportLayer(id)),
     id
 );
@@ -164,8 +164,8 @@ pub struct TimerCounters {
 }
 
 #[cfg(test)]
-impl<BC: BindingsContext> lock_order::lock::UnlockedAccess<crate::lock_ordering::TimerCounters>
-    for crate::StackState<BC>
+impl<BT: BindingsTypes> lock_order::lock::UnlockedAccess<crate::lock_ordering::TimerCounters>
+    for crate::StackState<BT>
 {
     type Data = TimerCounters;
     type Guard<'l> = &'l TimerCounters where Self: 'l;
@@ -176,7 +176,7 @@ impl<BC: BindingsContext> lock_order::lock::UnlockedAccess<crate::lock_ordering:
 }
 
 #[cfg(test)]
-impl<BC: BindingsContext, L> crate::context::CounterContext<TimerCounters> for CoreCtx<'_, BC, L> {
+impl<BT: BindingsTypes, L> crate::context::CounterContext<TimerCounters> for CoreCtx<'_, BT, L> {
     fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {
         use lock_order::wrap::prelude::*;
         cb(self.unlocked_access::<crate::lock_ordering::TimerCounters>())

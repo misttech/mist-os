@@ -17,7 +17,7 @@ use core::{fmt::Debug, num::NonZeroU8, ops::Deref};
 
 use net_types::{
     ip::{
-        AddrSubnet, AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
         Ipv6SourceAddr, Mtu, Subnet,
     },
     MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness,
@@ -312,7 +312,8 @@ impl From<DelIpv6AddrReason> for AddressRemovedReason {
     }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 /// Events emitted from IP devices.
 pub enum IpDeviceEvent<DeviceId, I: Ip, Instant> {
     /// Address was assigned.

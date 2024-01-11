@@ -1327,15 +1327,13 @@ impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>
     }
 }
 
-impl From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>> for DispatchedEvent {
-    fn from(e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, Ipv4, FakeInstant>) -> DispatchedEvent {
-        DispatchedEvent::IpDeviceIpv4(e.into())
-    }
-}
-
-impl From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>> for DispatchedEvent {
-    fn from(e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, Ipv6, FakeInstant>) -> DispatchedEvent {
-        DispatchedEvent::IpDeviceIpv6(e.into())
+impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>> for DispatchedEvent {
+    fn from(e: IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>) -> DispatchedEvent {
+        I::map_ip(
+            e,
+            |e| DispatchedEvent::IpDeviceIpv4(e.into()),
+            |e| DispatchedEvent::IpDeviceIpv6(e.into()),
+        )
     }
 }
 
@@ -1361,15 +1359,13 @@ impl<I: Ip> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>>
     }
 }
 
-impl From<IpLayerEvent<DeviceId<FakeBindingsCtx>, Ipv4>> for DispatchedEvent {
-    fn from(e: IpLayerEvent<DeviceId<FakeBindingsCtx>, Ipv4>) -> DispatchedEvent {
-        DispatchedEvent::IpLayerIpv4(e.into())
-    }
-}
-
-impl From<IpLayerEvent<DeviceId<FakeBindingsCtx>, Ipv6>> for DispatchedEvent {
-    fn from(e: IpLayerEvent<DeviceId<FakeBindingsCtx>, Ipv6>) -> DispatchedEvent {
-        DispatchedEvent::IpLayerIpv6(e.into())
+impl<I: Ip> From<IpLayerEvent<DeviceId<FakeBindingsCtx>, I>> for DispatchedEvent {
+    fn from(e: IpLayerEvent<DeviceId<FakeBindingsCtx>, I>) -> DispatchedEvent {
+        I::map_ip(
+            e,
+            |e| DispatchedEvent::IpLayerIpv4(e.into()),
+            |e| DispatchedEvent::IpLayerIpv6(e.into()),
+        )
     }
 }
 

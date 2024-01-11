@@ -378,6 +378,7 @@ impl OptionFromU16 for NonZeroU16 {
 impl<I> TransportState<I> for Udp
 where
     I: IpExt + SocketCollectionIpExt<Self>,
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
     for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
         netstack3_core::CoreContext<I, BindingsCtx>,
 {
@@ -606,6 +607,7 @@ impl OptionFromU16 for u16 {
 impl<I> TransportState<I> for IcmpEcho
 where
     I: IpExt + SocketCollectionIpExt<Self>,
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
     for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
         netstack3_core::CoreContext<I, BindingsCtx>,
 {

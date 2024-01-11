@@ -444,6 +444,7 @@ struct BindingData<I: IpExt> {
 impl<I> BindingData<I>
 where
     I: IpExt,
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
     for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
         netstack3_core::CoreContext<I, BindingsCtx>,
 {
@@ -472,6 +473,7 @@ enum InitialSocketState {
 
 impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
 where
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
     for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
         netstack3_core::CoreContext<I, BindingsCtx>,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
@@ -643,6 +645,7 @@ fn spawn_send_task<I: IpExt>(
     spawner: &worker::SocketScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) -> futures::channel::oneshot::Sender<()>
 where
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
     for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
         netstack3_core::CoreContext<I, BindingsCtx>,
 {
@@ -701,6 +704,7 @@ struct RequestHandler<'a, I: IpExt> {
 
 impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I>
 where
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
     for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
         netstack3_core::CoreContext<I, BindingsCtx>,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
@@ -1556,6 +1560,7 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     watcher: NeedsDataWatcher,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) where
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
     for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
         netstack3_core::CoreContext<I, BindingsCtx>,
     DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,

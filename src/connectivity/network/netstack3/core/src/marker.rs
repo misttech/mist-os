@@ -21,15 +21,12 @@ use crate::{
         self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetLinkDevice,
         WeakDeviceId,
     },
-    ip::{
-        self,
-        icmp::{socket::IcmpEchoBindingsContext, IcmpBindingsContext},
-    },
+    ip::{self, icmp::IcmpBindingsContext},
     socket,
     transport::{
         self,
         tcp::socket::{TcpBindingsContext, TcpBindingsTypes, TcpContext},
-        udp::{UdpBindingsContext, UdpCounters, UdpStateBindingsContext},
+        udp::{UdpCounters, UdpStateBindingsContext},
     },
     TimerId,
 };
@@ -66,20 +63,14 @@ pub trait CoreContext<I, BC>:
     + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
 where
     I: IpExt,
-    BC: BindingsContext
-        + TcpBindingsContext<I, Self::WeakDeviceId>
-        + UdpStateBindingsContext<I, Self::DeviceId>
-        + IcmpBindingsContext<I, Self::DeviceId>,
+    BC: IpBindingsContext<I>,
 {
 }
 
 impl<I, BC, O> CoreContext<I, BC> for O
 where
     I: IpExt,
-    BC: BindingsContext
-        + TcpBindingsContext<I, O::WeakDeviceId>
-        + UdpStateBindingsContext<I, O::DeviceId>
-        + IcmpBindingsContext<I, O::DeviceId>,
+    BC: IpBindingsContext<I>,
     O: transport::udp::StateContext<I, BC>
         + CounterContext<UdpCounters<I>>
         + TcpContext<I, BC>
@@ -109,8 +100,9 @@ pub trait IpBindingsContext<I: IpExt>:
             I,
             <Self as InstantBindingsTypes>::Instant,
         >,
-    > + UdpBindingsContext<I, DeviceId<Self>>
-    + IcmpEchoBindingsContext<I, DeviceId<Self>>
+    > + UdpStateBindingsContext<I, DeviceId<Self>>
+    + TcpBindingsContext<I, WeakDeviceId<Self>>
+    + IcmpBindingsContext<I, DeviceId<Self>>
     + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
     + device::DeviceLayerEventDispatcher
     + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
@@ -135,8 +127,9 @@ where
                 I,
                 <Self as InstantBindingsTypes>::Instant,
             >,
-        > + UdpBindingsContext<I, DeviceId<Self>>
-        + IcmpEchoBindingsContext<I, DeviceId<Self>>
+        > + UdpStateBindingsContext<I, DeviceId<Self>>
+        + TcpBindingsContext<I, WeakDeviceId<Self>>
+        + IcmpBindingsContext<I, DeviceId<Self>>
         + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
         + device::DeviceLayerEventDispatcher
         + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>

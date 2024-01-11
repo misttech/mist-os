@@ -48,9 +48,9 @@ macro_rules! impl_timer_context {
             impl_timer_context!(@inner $outer_timer_id, $inner_timer_id, $pat, $bound_variable);
         }
     };
-    (C: $c_bound:ident, $outer_timer_id:ty, $inner_timer_id:ty, $pat:pat, $bound_variable:ident) => {
-        impl<C: $c_bound + crate::context::TimerContext<$outer_timer_id>>
-            crate::context::TimerContext<$inner_timer_id> for C
+    ($c_type:ident: $c_bound:ident, $outer_timer_id:ty, $inner_timer_id:ty, $pat:pat, $bound_variable:ident) => {
+        impl<$c_type: $c_bound + crate::context::TimerContext<$outer_timer_id>>
+            crate::context::TimerContext<$inner_timer_id> for $c_type
         {
             impl_timer_context!(@inner $outer_timer_id, $inner_timer_id, $pat, $bound_variable);
         }

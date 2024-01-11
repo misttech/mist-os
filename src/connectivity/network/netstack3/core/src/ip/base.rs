@@ -580,7 +580,8 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, B
 }
 
 /// Events observed at the IP layer.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
 pub enum IpLayerEvent<DeviceId, I: Ip> {
     /// A route needs to be added.
     AddRoute(types::AddableEntry<I::Addr, DeviceId>),

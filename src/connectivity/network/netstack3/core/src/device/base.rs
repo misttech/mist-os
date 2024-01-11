@@ -311,9 +311,9 @@ impl<BT: DeviceLayerTypes> From<EthernetTimerId<EthernetDeviceId<BT>>> for Devic
 }
 
 impl_timer_context!(
-    C: BindingsContext,
-    DeviceLayerTimerId<C>,
-    EthernetTimerId<EthernetDeviceId<C>>,
+    BT: DeviceLayerTypes,
+    DeviceLayerTimerId<BT>,
+    EthernetTimerId<EthernetDeviceId<BT>>,
     DeviceLayerTimerId(DeviceLayerTimerIdInner::Ethernet(id)),
     id
 );

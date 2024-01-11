@@ -267,7 +267,7 @@ pub use context::{
     CoreCtx, EventContext, InstantBindingsTypes, InstantContext, ReferenceNotifiers, RngContext,
     SyncCtx, TimerContext, TracingContext, UnlockedCoreCtx,
 };
-pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpExt};
+pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use state::StackState;
 pub use time::{handle_timer, Instant, TimerId};
 
