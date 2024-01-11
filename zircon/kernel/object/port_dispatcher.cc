@@ -287,10 +287,6 @@ zx_status_t PortDispatcher::Queue(PortPacket* port_packet, zx_signals_t observed
     }
 
     if (observed) {
-      if (port_packet->InContainer()) {
-        port_packet->packet.signal.observed |= observed;
-        return ZX_OK;
-      }
       port_packet->packet.signal.observed = observed;
 
       // |count| previously stored the number of pending messages on
