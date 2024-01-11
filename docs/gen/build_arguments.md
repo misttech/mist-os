@@ -364,6 +364,24 @@ to stdout/stderr during the Ninja build.
 
 From //build/bazel/bazel_action.gni:16
 
+### bazel_upload_build_events
+
+Configure bazel to stream build events and results to a service.
+This is useful for sharing build results and invocation details
+for reproducing and triaging issues.
+This option uses direct network access and requires authentication.
+More information can be found at:
+https://bazel.build/remote/bep#build-event-service
+
+Valid options:
+  "": do not stream (default)
+  "sponge": uploads to Sponge2
+  "resultstore": uploads to ResultStore
+
+**Current value (from the default):** `""`
+
+From //build/bazel/remote_services.gni:27
+
 ### bless_goldens
 
 TODO(https://fxbug.dev/100321): delete bless_goldens, to give users time to switch to new gn arg, update_goldens
@@ -3334,6 +3352,16 @@ used for host tools.  If this is "", then a standard prebuilt is used.
 **Current value (from the default):** `""`
 
 From //build/toolchain/zircon/gcc.gni:10
+
+### generate_cuckoo_tests
+
+Defines the default value of `kernel_zbi_test()` template `generate_cuckoo` parameters.
+When true, all instances of `kernel_zbi_tests()` will default to generating a `cuckoo_zbi_test()`
+which is a full system image generated for exfiltrating instrumentation data from a target system.
+
+**Current value (from the default):** `false`
+
+From //build/testing/boot_tests/kernel_zbi_test.gni:16
 
 ### generate_legacy_ninja_build_outputs_licenses_spdx
 
