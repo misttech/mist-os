@@ -30,6 +30,7 @@ impl Credential {
     }
 
     /// Returns true iff self includes these permissions for the given element.
+    #[cfg(test)]
     pub fn authorizes(&self, element: &ElementID, permissions: Permissions) -> bool {
         self.element == *element && self.permissions.contains(permissions)
     }
@@ -171,21 +172,24 @@ mod tests {
     #[fuchsia::test]
     fn test_no_permissions() {
         let none = Permissions::empty();
-        assert_eq!(none.contains(Permissions::MODIFY_DEPENDENT), false);
+        assert_eq!(none.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), false);
+        assert_eq!(none.contains(Permissions::MODIFY_PASSIVE_DEPENDENT), false);
         assert_eq!(none.contains(Permissions::MODIFY_DEPENDENCY), false);
     }
 
     #[fuchsia::test]
     fn test_all_permissions() {
         let all = Permissions::all();
-        assert_eq!(all.contains(Permissions::MODIFY_DEPENDENT), true);
+        assert_eq!(all.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), true);
+        assert_eq!(all.contains(Permissions::MODIFY_PASSIVE_DEPENDENT), true);
         assert_eq!(all.contains(Permissions::MODIFY_DEPENDENCY), true);
     }
 
     #[fuchsia::test]
     fn test_some_permissions() {
-        let some = Permissions::MODIFY_DEPENDENT;
-        assert_eq!(some.contains(Permissions::MODIFY_DEPENDENT), true);
+        let some = Permissions::MODIFY_ACTIVE_DEPENDENT | Permissions::MODIFY_PASSIVE_DEPENDENT;
+        assert_eq!(some.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), true);
+        assert_eq!(some.contains(Permissions::MODIFY_PASSIVE_DEPENDENT), true);
         assert_eq!(some.contains(Permissions::MODIFY_DEPENDENCY), false);
     }
 
@@ -194,9 +198,12 @@ mod tests {
         let gold_credential = Credential {
             element: "Gold".into(),
             id: DependencyToken::create().get_koid().expect("get_koid failed"),
-            permissions: Permissions::MODIFY_DEPENDENT,
+            permissions: Permissions::MODIFY_ACTIVE_DEPENDENT,
         };
-        assert_eq!(gold_credential.authorizes(&"Gold".into(), Permissions::MODIFY_DEPENDENT), true);
+        assert_eq!(
+            gold_credential.authorizes(&"Gold".into(), Permissions::MODIFY_ACTIVE_DEPENDENT),
+            true
+        );
         assert_eq!(
             gold_credential.authorizes(&"Gold".into(), Permissions::MODIFY_DEPENDENCY),
             false
@@ -213,7 +220,7 @@ mod tests {
                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                 .expect("dup failed")
                 .into(),
-            permissions: Permissions::MODIFY_DEPENDENT,
+            permissions: Permissions::MODIFY_ACTIVE_DEPENDENT,
         };
         registry.register(&element_kryptonite, credential_to_register).expect("register failed");
         use fuchsia_zircon::HandleBased;
@@ -222,7 +229,7 @@ mod tests {
         let credential = registry.lookup(token_kryptonite_dup.into()).unwrap();
         assert_eq!(credential.id, token_kryptonite.basic_info().expect("basic_info failed").koid);
         assert_eq!(credential.element, element_kryptonite);
-        assert_eq!(credential.permissions.contains(Permissions::MODIFY_DEPENDENT), true);
+        assert_eq!(credential.permissions.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), true);
         assert_eq!(credential.permissions.contains(Permissions::MODIFY_DEPENDENCY), false);
 
         let unregistered = registry.unregister(&credential);

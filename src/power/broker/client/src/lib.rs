@@ -9,7 +9,7 @@ pub struct PowerElementContext {
     pub element_control: fbroker::ElementControlProxy,
     pub lessor: fbroker::LessorProxy,
     pub level_control: fbroker::LevelControlProxy,
-    dependency_token: fbroker::DependencyToken,
+    active_dependency_token: fbroker::DependencyToken,
 }
 
 impl PowerElementContext {
@@ -19,11 +19,11 @@ impl PowerElementContext {
         initial_current_level: fbroker::PowerLevel,
         minimum_level: fbroker::PowerLevel,
         dependencies: Vec<fbroker::LevelDependency>,
-        mut dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
+        mut active_dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
     ) -> Result<Self> {
-        let dependency_token = fbroker::DependencyToken::create();
-        dependency_tokens_to_register.push(
-            dependency_token
+        let active_dependency_token = fbroker::DependencyToken::create();
+        active_dependency_tokens_to_register.push(
+            active_dependency_token
                 .duplicate_handle(Rights::SAME_RIGHTS)
                 .expect("failed to duplicate token"),
         );
@@ -34,7 +34,8 @@ impl PowerElementContext {
                 initial_current_level,
                 minimum_level,
                 dependencies,
-                dependency_tokens_to_register,
+                active_dependency_tokens_to_register,
+                vec![],
             )
             .await?
             .map_err(|d| anyhow::anyhow!("{d:?}"))?;
@@ -43,12 +44,12 @@ impl PowerElementContext {
             element_control: element_control_client_end.into_proxy()?,
             lessor: lessor_client_end.into_proxy()?,
             level_control: level_control_client_end.into_proxy()?,
-            dependency_token,
+            active_dependency_token,
         })
     }
 
-    pub fn dependency_token(&self) -> fbroker::DependencyToken {
-        self.dependency_token
+    pub fn active_dependency_token(&self) -> fbroker::DependencyToken {
+        self.active_dependency_token
             .duplicate_handle(Rights::SAME_RIGHTS)
             .expect("failed to duplicate token")
     }

@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_power_broker::{
-    self as fpb, BinaryPowerLevel, LeaseStatus, Permissions, PowerLevel,
+    self as fpb, BinaryPowerLevel, DependencyType, LeaseStatus, Permissions, PowerLevel,
     RegisterDependencyTokenError, UnregisterDependencyTokenError,
 };
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
@@ -12,6 +12,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
+use std::iter::repeat;
 use uuid::Uuid;
 
 use crate::credentials::*;
@@ -48,14 +49,16 @@ impl Broker {
         &mut self,
         element_id: &ElementID,
         token: Token,
+        dependency_type: DependencyType,
     ) -> Result<(), RegisterDependencyTokenError> {
-        match self.credentials.register(
-            element_id,
-            CredentialToRegister {
-                broker_token: token,
-                permissions: Permissions::MODIFY_DEPENDENT,
-            },
-        ) {
+        let permissions = match dependency_type {
+            DependencyType::Active => Permissions::MODIFY_ACTIVE_DEPENDENT,
+            DependencyType::Passive => Permissions::MODIFY_PASSIVE_DEPENDENT,
+        };
+        match self
+            .credentials
+            .register(element_id, CredentialToRegister { broker_token: token, permissions })
+        {
             Err(RegisterCredentialsError::AlreadyInUse) => {
                 Err(RegisterDependencyTokenError::AlreadyInUse)
             }
@@ -73,7 +76,7 @@ impl Broker {
             tracing::debug!("unregister_dependency_token: token not found");
             return Err(UnregisterDependencyTokenError::NotFound);
         };
-        if !credential.authorizes(element_id, Permissions::MODIFY_DEPENDENT) {
+        if credential.get_element() != element_id {
             tracing::debug!(
                 "unregister_dependency_token: token is registered to {:?}, not {:?}",
                 &credential.get_element(),
@@ -102,16 +105,19 @@ impl Broker {
         // Some previously pending claims may now be ready to be activated,
         // because the active claims upon which they depend may now be
         // satisfied.
-        // Find active claims that are now satisfied by the new current level:
-        let active_claims_for_required_element =
-            self.catalog.active_claims.for_required_element(element_id);
-        let claims_satisfied: Vec<&Claim> = active_claims_for_required_element
-            .iter()
-            .filter(|c| level.satisfies(c.requires().level))
-            .collect();
+        // Find active or passive claims that are now satisfied by the new
+        // current level:
+        let claims_for_required_element = self
+            .catalog
+            .active_claims
+            .for_required_element(element_id)
+            .into_iter()
+            .chain(self.catalog.passive_claims.for_required_element(element_id));
+        let claims_satisfied: Vec<Claim> =
+            claims_for_required_element.filter(|c| level.satisfies(c.requires().level)).collect();
         tracing::debug!("claims_satisfied = {:?})", &claims_satisfied);
         let mut leases_to_check_if_satisfied = HashSet::new();
-        for claim in claims_satisfied {
+        for claim in &claims_satisfied {
             leases_to_check_if_satisfied.insert(&claim.lease_id);
             // Look for pending claims that were (at least partially) blocked
             // by a claim on this element level that is now satisfied.
@@ -127,6 +133,7 @@ impl Broker {
             tracing::debug!("claims_activated = {:?})", &claims_activated);
             self.update_required_levels(element_ids_required_by_claims(&claims_activated));
         }
+        tracing::debug!("leases_to_check_if_satisfied = {:?})", &leases_to_check_if_satisfied);
         for lease_id in leases_to_check_if_satisfied {
             self.update_lease_status(lease_id);
         }
@@ -191,6 +198,13 @@ impl Broker {
                 return LeaseStatus::Pending;
             }
         }
+        // If a lease has any passive claims that have not been satisfied
+        // it is still Pending.
+        for claim in self.catalog.passive_claims.for_lease(lease_id) {
+            if !self.current_level_satisfies(claim.requires()) {
+                return LeaseStatus::Pending;
+            }
+        }
         // All claims are active and satisfied, so the lease is Satisfied.
         LeaseStatus::Satisfied
     }
@@ -198,6 +212,11 @@ impl Broker {
     pub fn update_lease_status(&mut self, lease_id: &LeaseID) {
         let status = self.calculate_lease_status(lease_id);
         self.catalog.lease_status.update(lease_id, status);
+    }
+
+    #[cfg(test)]
+    pub fn get_lease_status(&mut self, lease_id: &LeaseID) -> Option<LeaseStatus> {
+        self.catalog.get_lease_status(lease_id)
     }
 
     pub fn watch_lease_status(
@@ -296,41 +315,35 @@ impl Broker {
         initial_current_level: PowerLevel,
         minimum_level: PowerLevel,
         level_dependencies: Vec<fpb::LevelDependency>,
-        dependency_tokens: Vec<Token>,
+        active_dependency_tokens: Vec<Token>,
+        passive_dependency_tokens: Vec<Token>,
     ) -> Result<ElementID, AddElementError> {
         let id = self.catalog.topology.add_element(name, minimum_level)?;
         self.current.update(&id, initial_current_level);
         self.required.update(&id, minimum_level);
         for dependency in level_dependencies {
-            let credential = self
-                .lookup_credentials(dependency.requires_token.into())
-                .ok_or(AddElementError::NotAuthorized)?;
-            if !credential.contains(Permissions::MODIFY_DEPENDENT) {
-                return Err(AddElementError::NotAuthorized);
-            }
-            if let Err(err) = self.catalog.topology.add_active_dependency(&Dependency {
-                dependent: ElementLevel {
-                    element_id: id.clone(),
-                    level: dependency.dependent_level,
-                },
-                requires: ElementLevel {
-                    element_id: credential.get_element().clone(),
-                    level: dependency.requires_level,
-                },
-            }) {
+            if let Err(err) = self.add_dependency(
+                &id,
+                dependency.dependency_type,
+                dependency.dependent_level,
+                dependency.requires_token.into(),
+                dependency.requires_level,
+            ) {
                 // Clean up by removing the element we just added.
                 self.remove_element(&id);
                 return Err(match err {
-                    AddDependencyError::AlreadyExists => AddElementError::Invalid,
-                    AddDependencyError::ElementNotFound(_) => AddElementError::Invalid,
-                    AddDependencyError::RequiredElementNotFound(_) => AddElementError::Invalid,
-                    // Shouldn't get NotAuthorized here.
-                    AddDependencyError::NotAuthorized => AddElementError::Internal,
+                    ModifyDependencyError::AlreadyExists => AddElementError::Invalid,
+                    ModifyDependencyError::NotFound(_) => AddElementError::Invalid,
+                    ModifyDependencyError::NotAuthorized => AddElementError::NotAuthorized,
                 });
             };
         }
-        for token in dependency_tokens {
-            if let Err(err) = self.register_dependency_token(&id, token) {
+        let labeled_dependency_tokens = active_dependency_tokens
+            .into_iter()
+            .zip(repeat(DependencyType::Active))
+            .chain(passive_dependency_tokens.into_iter().zip(repeat(DependencyType::Passive)));
+        for (token, dependency_type) in labeled_dependency_tokens {
+            if let Err(err) = self.register_dependency_token(&id, token, dependency_type) {
                 match err {
                     RegisterDependencyTokenError::Internal => {
                         tracing::debug!("can't register_dependency_token for {:?}: internal", &id);
@@ -368,50 +381,75 @@ impl Broker {
         self.required.remove(element_id);
     }
 
-    /// Checks authorization from requires_token, and if valid, adds a dependency to the Topology.
+    /// Checks authorization from requires_token, and if valid, adds an active
+    /// or passive dependency to the Topology, according to dependency_type.
     pub fn add_dependency(
         &mut self,
         element_id: &ElementID,
+        dependency_type: DependencyType,
         dependent_level: PowerLevel,
         requires_token: Token,
         requires_level: PowerLevel,
-    ) -> Result<(), AddDependencyError> {
+    ) -> Result<(), ModifyDependencyError> {
         let Some(requires_cred) = self.lookup_credentials(requires_token) else {
-            return Err(AddDependencyError::NotAuthorized);
+            return Err(ModifyDependencyError::NotAuthorized);
         };
-        if !requires_cred.contains(Permissions::MODIFY_DEPENDENT) {
-            return Err(AddDependencyError::NotAuthorized);
-        }
-        self.catalog.topology.add_active_dependency(&Dependency {
+        let dependency = Dependency {
             dependent: ElementLevel { element_id: element_id.clone(), level: dependent_level },
             requires: ElementLevel {
                 element_id: requires_cred.get_element().clone(),
                 level: requires_level,
             },
-        })
+        };
+        match dependency_type {
+            DependencyType::Active => {
+                if !requires_cred.contains(Permissions::MODIFY_ACTIVE_DEPENDENT) {
+                    return Err(ModifyDependencyError::NotAuthorized);
+                }
+                self.catalog.topology.add_active_dependency(&dependency)
+            }
+            DependencyType::Passive => {
+                if !requires_cred.contains(Permissions::MODIFY_PASSIVE_DEPENDENT) {
+                    return Err(ModifyDependencyError::NotAuthorized);
+                }
+                self.catalog.topology.add_passive_dependency(&dependency)
+            }
+        }
     }
 
     /// Checks authorization from requires_token, and if valid, removes a dependency from the Topology.
     pub fn remove_dependency(
         &mut self,
         element_id: &ElementID,
+        dependency_type: DependencyType,
         dependent_level: PowerLevel,
         requires_token: Token,
         requires_level: PowerLevel,
-    ) -> Result<(), RemoveDependencyError> {
+    ) -> Result<(), ModifyDependencyError> {
         let Some(requires_cred) = self.lookup_credentials(requires_token) else {
-            return Err(RemoveDependencyError::NotAuthorized);
+            return Err(ModifyDependencyError::NotAuthorized);
         };
-        if !requires_cred.contains(Permissions::MODIFY_DEPENDENT) {
-            return Err(RemoveDependencyError::NotAuthorized);
-        }
-        self.catalog.topology.remove_active_dependency(&Dependency {
+        let dependency = Dependency {
             dependent: ElementLevel { element_id: element_id.clone(), level: dependent_level },
             requires: ElementLevel {
                 element_id: requires_cred.get_element().clone(),
                 level: requires_level,
             },
-        })
+        };
+        match dependency_type {
+            DependencyType::Active => {
+                if !requires_cred.contains(Permissions::MODIFY_ACTIVE_DEPENDENT) {
+                    return Err(ModifyDependencyError::NotAuthorized);
+                }
+                self.catalog.topology.remove_active_dependency(&dependency)
+            }
+            DependencyType::Passive => {
+                if !requires_cred.contains(Permissions::MODIFY_PASSIVE_DEPENDENT) {
+                    return Err(ModifyDependencyError::NotAuthorized);
+                }
+                self.catalog.topology.remove_passive_dependency(&dependency)
+            }
+        }
     }
 }
 
@@ -601,6 +639,11 @@ impl Catalog {
     fn drop_active_claim(&mut self, claim_id: &ClaimID) {
         tracing::debug!("drop_claim: {:?}", claim_id);
         self.active_claims.remove(&claim_id);
+    }
+
+    #[cfg(test)]
+    pub fn get_lease_status(&mut self, lease_id: &LeaseID) -> Option<LeaseStatus> {
+        self.lease_status.get(lease_id)
     }
 
     fn watch_lease_status(&mut self, lease_id: &LeaseID) -> UnboundedReceiver<Option<LeaseStatus>> {
@@ -883,8 +926,9 @@ mod tests {
     #[fuchsia::test]
     fn test_initialize_current_and_required_levels() {
         let mut broker = Broker::new();
-        let latinum =
-            broker.add_element("Latinum", 7, 2, vec![], vec![]).expect("add_element failed");
+        let latinum = broker
+            .add_element("Latinum", 7, 2, vec![], vec![], vec![])
+            .expect("add_element failed");
         assert_eq!(broker.get_current_level(&latinum), Some(7));
         assert_eq!(broker.get_required_level(&latinum), Some(2));
     }
@@ -904,6 +948,7 @@ mod tests {
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
+                vec![],
             )
             .expect("add_element failed");
 
@@ -913,12 +958,14 @@ mod tests {
             BinaryPowerLevel::Off.into_primitive(),
             BinaryPowerLevel::Off.into_primitive(),
             vec![fpb::LevelDependency {
+                dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
                 requires_token: never_registered_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed"),
                 requires_level: BinaryPowerLevel::On.into_primitive(),
             }],
+            vec![],
             vec![],
         );
         assert!(matches!(add_element_not_authorized_res, Err(AddElementError::NotAuthorized)));
@@ -930,12 +977,14 @@ mod tests {
                 BinaryPowerLevel::Off.into_primitive(),
                 BinaryPowerLevel::Off.into_primitive(),
                 vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
                     requires_level: BinaryPowerLevel::On.into_primitive(),
                 }],
+                vec![],
                 vec![],
             )
             .expect("add_element failed");
@@ -954,12 +1003,14 @@ mod tests {
                 BinaryPowerLevel::Off.into_primitive(),
                 BinaryPowerLevel::Off.into_primitive(),
                 vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
                     requires_token: token_mithril
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
                     requires_level: BinaryPowerLevel::On.into_primitive(),
                 }],
+                vec![],
                 vec![],
             );
         assert!(matches!(add_element_not_authorized_res, Err(AddElementError::NotAuthorized)));
@@ -973,6 +1024,7 @@ mod tests {
                 "Unobtainium",
                 BinaryPowerLevel::Off.into_primitive(),
                 BinaryPowerLevel::Off.into_primitive(),
+                vec![],
                 vec![],
                 vec![],
             )
@@ -999,6 +1051,7 @@ mod tests {
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
+                vec![],
             )
             .expect("add_element failed");
         let parent2_token = DependencyToken::create();
@@ -1012,6 +1065,7 @@ mod tests {
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
+                vec![],
             )
             .expect("add_element failed");
         let child = broker
@@ -1021,6 +1075,7 @@ mod tests {
                 BinaryPowerLevel::Off.into_primitive(),
                 vec![
                     fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: parent1_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1028,6 +1083,7 @@ mod tests {
                         requires_level: BinaryPowerLevel::On.into_primitive(),
                     },
                     fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: parent2_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1035,6 +1091,7 @@ mod tests {
                         requires_level: BinaryPowerLevel::On.into_primitive(),
                     },
                 ],
+                vec![],
                 vec![],
             )
             .expect("add_element failed");
@@ -1100,6 +1157,7 @@ mod tests {
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
+                vec![],
             )
             .expect("add_element failed");
         let parent_token = DependencyToken::create();
@@ -1113,6 +1171,7 @@ mod tests {
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
+                vec![],
             )
             .expect("add_element failed");
         let child = broker
@@ -1121,6 +1180,7 @@ mod tests {
                 BinaryPowerLevel::Off.into_primitive(),
                 BinaryPowerLevel::Off.into_primitive(),
                 vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1128,11 +1188,13 @@ mod tests {
                     requires_level: BinaryPowerLevel::On.into_primitive(),
                 }],
                 vec![],
+                vec![],
             )
             .expect("add_element failed");
         broker
             .add_dependency(
                 &parent,
+                DependencyType::Active,
                 BinaryPowerLevel::On.into_primitive(),
                 grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1245,6 +1307,7 @@ mod tests {
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
+                vec![],
             )
             .expect("add_element failed");
         let parent_token = DependencyToken::create();
@@ -1255,6 +1318,7 @@ mod tests {
                 0,
                 vec![
                     fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
                         dependent_level: 50,
                         requires_token: grandparent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1262,6 +1326,7 @@ mod tests {
                         requires_level: 200,
                     },
                     fpb::LevelDependency {
+                        dependency_type: DependencyType::Active,
                         dependent_level: 30,
                         requires_token: grandparent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1273,6 +1338,7 @@ mod tests {
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
+                vec![],
             )
             .expect("add_element failed");
         let child1 = broker
@@ -1281,12 +1347,14 @@ mod tests {
                 0,
                 0,
                 vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
                     dependent_level: 5,
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
                     requires_level: 50,
                 }],
+                vec![],
                 vec![],
             )
             .expect("add_element failed");
@@ -1296,12 +1364,14 @@ mod tests {
                 0,
                 0,
                 vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
                     dependent_level: 3,
                     requires_token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
                     requires_level: 30,
                 }],
+                vec![],
                 vec![],
             )
             .expect("add_element failed");
@@ -1438,17 +1508,208 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_broker_lease_passive() {
+        // B has an active dependency on A.
+        // C has a passive dependency on B (and transitively, a passive dependency on A).
+        // D has an active dependency on B (and transitively, an active dependency on A).
+        //  A     B     C     D
+        // ON <= ON
+        //       ON <- ON
+        //       ON <======= ON
+        let mut broker = Broker::new();
+        let token_a = DependencyToken::create();
+        let element_a = broker
+            .add_element(
+                "A",
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
+                vec![],
+                vec![token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let token_b_active = DependencyToken::create();
+        let token_b_passive = DependencyToken::create();
+        let element_b = broker
+            .add_element(
+                "B",
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: token_a
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }],
+                vec![token_b_active
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_b_passive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_c = broker
+            .add_element(
+                "C",
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Passive,
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: token_b_passive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_d = broker
+            .add_element(
+                "D",
+                BinaryPowerLevel::Off.into_primitive(),
+                BinaryPowerLevel::Off.into_primitive(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Active,
+                    dependent_level: BinaryPowerLevel::On.into_primitive(),
+                    requires_token: token_b_active
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level: BinaryPowerLevel::On.into_primitive(),
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+
+        // Initial required level for A and B should be OFF.
+        // Set A and B's current level to OFF.
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        broker
+            .update_current_level(&element_a, BinaryPowerLevel::Off.into_primitive())
+            .expect("update_current_level failed");
+        broker
+            .update_current_level(&element_b, BinaryPowerLevel::Off.into_primitive())
+            .expect("update_current_level failed");
+
+        // Lease C, A & B's required levels should remain OFF because of
+        // passive claim.
+        // Lease C should remain unsatisfied.
+        // TODO(b/311419716): When we have lease rejection, reject this lease.
+        let lease_c = broker
+            .acquire_lease(&element_c, BinaryPowerLevel::On.into_primitive())
+            .expect("acquire failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+
+        // Lease D, A should have required level ON because of D's transitive active claim.
+        // Lease C & D should become satisfied.
+        let lease_d = broker
+            .acquire_lease(&element_d, BinaryPowerLevel::On.into_primitive())
+            .expect("acquire failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.get_lease_status(&lease_d.id), Some(LeaseStatus::Pending));
+
+        // Update A's current level to ON.
+        // B should now have required level ON because of D's active claim and
+        // its dependency on A being satisfied.
+        broker
+            .update_current_level(&element_a, BinaryPowerLevel::On.into_primitive())
+            .expect("update_current_level failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
+        assert_eq!(broker.get_lease_status(&lease_d.id), Some(LeaseStatus::Pending));
+
+        // Update B's current level to ON.
+        // Lease C & D should become satisfied.
+        broker
+            .update_current_level(&element_b, BinaryPowerLevel::On.into_primitive())
+            .expect("update_current_level failed");
+        assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Satisfied));
+        assert_eq!(broker.get_lease_status(&lease_d.id), Some(LeaseStatus::Satisfied));
+
+        // Drop Lease on D, B's required level should become OFF.
+        broker.drop_lease(&lease_d.id).expect("drop_lease failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::On.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        // TODO(b/308659273): When we have lease revocation, verify lease C was revoked.
+
+        // Update B's current level to OFF. A's required level should become OFF.
+        broker
+            .update_current_level(&element_b, BinaryPowerLevel::Off.into_primitive())
+            .expect("update_current_level failed");
+        assert_eq!(
+            broker.get_required_level(&element_a),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+        assert_eq!(
+            broker.get_required_level(&element_b),
+            Some(BinaryPowerLevel::Off.into_primitive())
+        );
+    }
+
+    #[fuchsia::test]
     fn test_add_remove_dependency() {
         let mut broker = Broker::new();
-        let token_adamantium = DependencyToken::create();
-        let token_vibranium = DependencyToken::create();
+        let token_active_adamantium = DependencyToken::create();
+        let token_passive_adamantium = DependencyToken::create();
+        let token_active_vibranium = DependencyToken::create();
+        let token_passive_vibranium = DependencyToken::create();
         let adamantium = broker
             .add_element(
                 "Adamantium",
                 BinaryPowerLevel::Off.into_primitive(),
                 BinaryPowerLevel::Off.into_primitive(),
                 vec![],
-                vec![token_adamantium
+                vec![token_active_adamantium
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_passive_adamantium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
@@ -1460,7 +1721,11 @@ mod tests {
                 BinaryPowerLevel::Off.into_primitive(),
                 BinaryPowerLevel::Off.into_primitive(),
                 vec![],
-                vec![token_vibranium
+                vec![token_active_vibranium
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_passive_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into()],
@@ -1471,18 +1736,33 @@ mod tests {
         let unregistered_token = DependencyToken::create();
         let res_add_not_authorized = broker.add_dependency(
             &adamantium,
+            DependencyType::Active,
             BinaryPowerLevel::On.into_primitive(),
             unregistered_token.into(),
             BinaryPowerLevel::On.into_primitive(),
         );
-        assert!(matches!(res_add_not_authorized, Err(AddDependencyError::NotAuthorized)));
+        assert!(matches!(res_add_not_authorized, Err(ModifyDependencyError::NotAuthorized)));
 
-        // Valid add should succeed
+        // Adding should return NotAuthorized if token is of wrong dependency type
+        let res_add_wrong_type = broker.add_dependency(
+            &adamantium,
+            DependencyType::Active,
+            BinaryPowerLevel::On.into_primitive(),
+            token_passive_vibranium
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            BinaryPowerLevel::On.into_primitive(),
+        );
+        assert!(matches!(res_add_wrong_type, Err(ModifyDependencyError::NotAuthorized)));
+
+        // Valid add of active type should succeed
         broker
             .add_dependency(
                 &adamantium,
+                DependencyType::Active,
                 BinaryPowerLevel::On.into_primitive(),
-                token_vibranium
+                token_active_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into(),
@@ -1490,22 +1770,81 @@ mod tests {
             )
             .expect("add_dependency failed");
 
+        // Adding an overlapping dependency with a different type should fail
+        let res_add_overlap = broker.add_dependency(
+            &adamantium,
+            DependencyType::Passive,
+            BinaryPowerLevel::On.into_primitive(),
+            token_passive_vibranium
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            BinaryPowerLevel::On.into_primitive(),
+        );
+        assert!(
+            matches!(res_add_overlap, Err(ModifyDependencyError::AlreadyExists)),
+            "{res_add_overlap:?}"
+        );
+
         // Removing should return NotAuthorized if token is not registered
         let unregistered_token = DependencyToken::create();
         let res_remove_not_authorized = broker.remove_dependency(
             &adamantium,
+            DependencyType::Active,
             BinaryPowerLevel::On.into_primitive(),
             unregistered_token.into(),
             BinaryPowerLevel::On.into_primitive(),
         );
-        assert!(matches!(res_remove_not_authorized, Err(RemoveDependencyError::NotAuthorized)));
+        assert!(matches!(res_remove_not_authorized, Err(ModifyDependencyError::NotAuthorized)));
 
-        // Valid remove should succeed
+        // Removing should return NotAuthorized if token is of wrong type
+        let res_remove_wrong_type = broker.remove_dependency(
+            &adamantium,
+            DependencyType::Active,
+            BinaryPowerLevel::On.into_primitive(),
+            token_passive_vibranium
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            BinaryPowerLevel::On.into_primitive(),
+        );
+        assert!(matches!(res_remove_wrong_type, Err(ModifyDependencyError::NotAuthorized)));
+
+        // Valid remove of active type should succeed
         broker
             .remove_dependency(
                 &adamantium,
+                DependencyType::Active,
                 BinaryPowerLevel::On.into_primitive(),
-                token_vibranium
+                token_active_vibranium
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .expect("remove_dependency failed");
+
+        // Valid add of passive type should succeed
+        broker
+            .add_dependency(
+                &adamantium,
+                DependencyType::Passive,
+                BinaryPowerLevel::On.into_primitive(),
+                token_passive_vibranium
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                BinaryPowerLevel::On.into_primitive(),
+            )
+            .expect("add_dependency failed");
+
+        // Valid remove of passive type should succeed
+        broker
+            .remove_dependency(
+                &adamantium,
+                DependencyType::Passive,
+                BinaryPowerLevel::On.into_primitive(),
+                token_passive_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
                     .into(),

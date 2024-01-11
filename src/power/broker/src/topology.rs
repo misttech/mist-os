@@ -74,37 +74,18 @@ impl Into<fpb::AddElementError> for AddElementError {
 }
 
 #[derive(Debug)]
-pub enum AddDependencyError {
+pub enum ModifyDependencyError {
     AlreadyExists,
-    ElementNotFound(ElementID),
     NotAuthorized,
-    RequiredElementNotFound(ElementID),
+    NotFound(ElementID),
 }
 
-impl Into<fpb::AddDependencyError> for AddDependencyError {
-    fn into(self) -> fpb::AddDependencyError {
+impl Into<fpb::ModifyDependencyError> for ModifyDependencyError {
+    fn into(self) -> fpb::ModifyDependencyError {
         match self {
-            AddDependencyError::AlreadyExists => fpb::AddDependencyError::AlreadyExists,
-            AddDependencyError::ElementNotFound(_) => fpb::AddDependencyError::ElementNotFound,
-            AddDependencyError::NotAuthorized => fpb::AddDependencyError::NotAuthorized,
-            AddDependencyError::RequiredElementNotFound(_) => {
-                fpb::AddDependencyError::RequiredElementNotFound
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum RemoveDependencyError {
-    NotAuthorized,
-    NotFound(Dependency),
-}
-
-impl Into<fpb::RemoveDependencyError> for RemoveDependencyError {
-    fn into(self) -> fpb::RemoveDependencyError {
-        match self {
-            RemoveDependencyError::NotAuthorized => fpb::RemoveDependencyError::NotAuthorized,
-            RemoveDependencyError::NotFound(_) => fpb::RemoveDependencyError::NotFound,
+            ModifyDependencyError::AlreadyExists => fpb::ModifyDependencyError::AlreadyExists,
+            ModifyDependencyError::NotAuthorized => fpb::ModifyDependencyError::NotAuthorized,
+            ModifyDependencyError::NotFound(_) => fpb::ModifyDependencyError::NotFound,
         }
     }
 }
@@ -210,20 +191,18 @@ impl Topology {
     }
 
     /// Adds an active dependency to the Topology.
-    pub fn add_active_dependency(&mut self, dep: &Dependency) -> Result<(), AddDependencyError> {
+    pub fn add_active_dependency(&mut self, dep: &Dependency) -> Result<(), ModifyDependencyError> {
         if !self.elements.contains_key(&dep.dependent.element_id) {
-            return Err(AddDependencyError::ElementNotFound(dep.dependent.element_id.clone()));
+            return Err(ModifyDependencyError::NotFound(dep.dependent.element_id.clone()));
         }
         if !self.elements.contains_key(&dep.requires.element_id) {
-            return Err(AddDependencyError::RequiredElementNotFound(
-                dep.requires.element_id.clone(),
-            ));
+            return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         // TODO(b/299463665): Add Dependency validation here, or in Dependency construction.
         let required_levels =
             self.active_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if required_levels.contains(&dep.requires) {
-            return Err(AddDependencyError::AlreadyExists);
+            return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
         Ok(())
@@ -233,59 +212,63 @@ impl Topology {
     pub fn remove_active_dependency(
         &mut self,
         dep: &Dependency,
-    ) -> Result<(), RemoveDependencyError> {
+    ) -> Result<(), ModifyDependencyError> {
         if !self.elements.contains_key(&dep.dependent.element_id) {
-            return Err(RemoveDependencyError::NotFound(dep.clone()));
+            return Err(ModifyDependencyError::NotFound(dep.dependent.element_id.clone()));
         }
         if !self.elements.contains_key(&dep.requires.element_id) {
-            return Err(RemoveDependencyError::NotFound(dep.clone()));
+            return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         let required_levels =
             self.active_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if !required_levels.contains(&dep.requires) {
-            return Err(RemoveDependencyError::NotFound(dep.clone()));
+            return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
         Ok(())
     }
 
     /// Adds a passive dependency to the Topology.
-    #[allow(dead_code)] // TODO(b/309164154): Remove once used by FIDL APIs
-    pub fn add_passive_dependency(&mut self, dep: &Dependency) -> Result<(), AddDependencyError> {
+    pub fn add_passive_dependency(
+        &mut self,
+        dep: &Dependency,
+    ) -> Result<(), ModifyDependencyError> {
         if !self.elements.contains_key(&dep.dependent.element_id) {
-            return Err(AddDependencyError::ElementNotFound(dep.dependent.element_id.clone()));
+            return Err(ModifyDependencyError::NotFound(dep.dependent.element_id.clone()));
         }
         if !self.elements.contains_key(&dep.requires.element_id) {
-            return Err(AddDependencyError::RequiredElementNotFound(
-                dep.requires.element_id.clone(),
-            ));
+            return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         // TODO(b/299463665): Add Dependency validation here, or in Dependency construction.
+        let active_required_levels =
+            self.active_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
+        if active_required_levels.contains(&dep.requires) {
+            return Err(ModifyDependencyError::AlreadyExists);
+        }
         let required_levels =
             self.passive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if required_levels.contains(&dep.requires) {
-            return Err(AddDependencyError::AlreadyExists);
+            return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
         Ok(())
     }
 
     /// Removes an passive dependency from the Topology.
-    #[allow(dead_code)] // TODO(b/309164154): Remove once used by FIDL APIs
     pub fn remove_passive_dependency(
         &mut self,
         dep: &Dependency,
-    ) -> Result<(), RemoveDependencyError> {
+    ) -> Result<(), ModifyDependencyError> {
         if !self.elements.contains_key(&dep.dependent.element_id) {
-            return Err(RemoveDependencyError::NotFound(dep.clone()));
+            return Err(ModifyDependencyError::NotFound(dep.dependent.element_id.clone()));
         }
         if !self.elements.contains_key(&dep.requires.element_id) {
-            return Err(RemoveDependencyError::NotFound(dep.clone()));
+            return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         let required_levels =
             self.passive_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if !required_levels.contains(&dep.requires) {
-            return Err(RemoveDependencyError::NotFound(dep.clone()));
+            return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
         Ok(())
@@ -335,7 +318,7 @@ mod tests {
                 level: BinaryPowerLevel::On.into_primitive(),
             },
         });
-        assert!(matches!(extra_add_dep_res, Err(AddDependencyError::AlreadyExists { .. })));
+        assert!(matches!(extra_add_dep_res, Err(ModifyDependencyError::AlreadyExists { .. })));
 
         t.remove_active_dependency(&Dependency {
             dependent: ElementLevel {
@@ -359,7 +342,7 @@ mod tests {
                 level: BinaryPowerLevel::On.into_primitive(),
             },
         });
-        assert!(matches!(extra_remove_dep_res, Err(RemoveDependencyError::NotFound { .. })));
+        assert!(matches!(extra_remove_dep_res, Err(ModifyDependencyError::NotFound { .. })));
 
         assert_eq!(t.element_exists(&fire), true);
         t.remove_element(&fire);
@@ -378,7 +361,7 @@ mod tests {
                 level: BinaryPowerLevel::On.into_primitive(),
             },
         });
-        assert!(matches!(element_not_found_res, Err(AddDependencyError::ElementNotFound { .. })));
+        assert!(matches!(element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
 
         let req_element_not_found_res = t.add_active_dependency(&Dependency {
             dependent: ElementLevel {
@@ -390,10 +373,7 @@ mod tests {
                 level: BinaryPowerLevel::On.into_primitive(),
             },
         });
-        assert!(matches!(
-            req_element_not_found_res,
-            Err(AddDependencyError::RequiredElementNotFound { .. })
-        ));
+        assert!(matches!(req_element_not_found_res, Err(ModifyDependencyError::NotFound { .. })));
     }
 
     #[fuchsia::test]

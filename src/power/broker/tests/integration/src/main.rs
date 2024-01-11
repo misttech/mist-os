@@ -5,7 +5,8 @@
 use anyhow::{Error, Result};
 use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_power_broker::{
-    self as fpb, BinaryPowerLevel, LeaseStatus, LevelDependency, StatusMarker, TopologyMarker,
+    self as fpb, BinaryPowerLevel, DependencyType, LeaseStatus, LevelDependency, StatusMarker,
+    TopologyMarker,
 };
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_zircon::{self as zx, HandleBased};
@@ -42,6 +43,7 @@ async fn test_direct() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             vec![],
             vec![parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -57,12 +59,14 @@ async fn test_direct() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             BinaryPowerLevel::Off.into_primitive(),
             vec![LevelDependency {
+                dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
                 requires_token: parent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed"),
                 requires_level: BinaryPowerLevel::On.into_primitive(),
             }],
+            vec![],
             vec![],
         )
         .await?
@@ -129,6 +133,7 @@ async fn test_transitive() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             vec![],
             vec![element_a_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -145,6 +150,7 @@ async fn test_transitive() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             BinaryPowerLevel::Off.into_primitive(),
             vec![LevelDependency {
+                dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
                 requires_token: element_a_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -152,6 +158,7 @@ async fn test_transitive() -> Result<()> {
                 requires_level: BinaryPowerLevel::On.into_primitive(),
             }],
             vec![element_b_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -167,12 +174,14 @@ async fn test_transitive() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             BinaryPowerLevel::Off.into_primitive(),
             vec![LevelDependency {
+                dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
                 requires_token: element_b_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed"),
                 requires_level: BinaryPowerLevel::On.into_primitive(),
             }],
+            vec![],
             vec![],
         )
         .await?
@@ -183,6 +192,7 @@ async fn test_transitive() -> Result<()> {
             "D",
             BinaryPowerLevel::Off.into_primitive(),
             BinaryPowerLevel::Off.into_primitive(),
+            vec![],
             vec![],
             vec![],
         )
@@ -338,6 +348,7 @@ async fn test_shared() -> Result<()> {
             10,
             vec![],
             vec![grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -350,6 +361,7 @@ async fn test_shared() -> Result<()> {
             0,
             vec![
                 LevelDependency {
+                    dependency_type: DependencyType::Active,
                     dependent_level: 50,
                     requires_token: grandparent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -357,6 +369,7 @@ async fn test_shared() -> Result<()> {
                     requires_level: 200,
                 },
                 LevelDependency {
+                    dependency_type: DependencyType::Active,
                     dependent_level: 30,
                     requires_token: grandparent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -365,6 +378,7 @@ async fn test_shared() -> Result<()> {
                 },
             ],
             vec![parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -375,12 +389,14 @@ async fn test_shared() -> Result<()> {
             0,
             0,
             vec![LevelDependency {
+                dependency_type: DependencyType::Active,
                 dependent_level: 5,
                 requires_token: parent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed"),
                 requires_level: 50,
             }],
+            vec![],
             vec![],
         )
         .await?
@@ -392,12 +408,14 @@ async fn test_shared() -> Result<()> {
             0,
             0,
             vec![LevelDependency {
+                dependency_type: DependencyType::Active,
                 dependent_level: 3,
                 requires_token: parent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed"),
                 requires_level: 30,
             }],
+            vec![],
             vec![],
         )
         .await?
@@ -525,6 +543,192 @@ async fn test_shared() -> Result<()> {
 }
 
 #[fuchsia::test]
+async fn test_passive() -> Result<()> {
+    // B has an active dependency on A.
+    // C has a passive dependency on B (and transitively, a passive dependency on A).
+    // D has an active dependency on B (and transitively, an active dependency on A).
+    //  A     B     C     D
+    // ON <= ON
+    //       ON <- ON
+    //       ON <======= ON
+    let realm = build_power_broker_realm().await?;
+    let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+    let token_a = zx::Event::create();
+    let (_, _, level_control_a) = topology
+        .add_element(
+            "A",
+            BinaryPowerLevel::Off.into_primitive(),
+            BinaryPowerLevel::Off.into_primitive(),
+            vec![],
+            vec![token_a.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
+            vec![],
+        )
+        .await?
+        .expect("add_element failed");
+    let level_control_a = level_control_a.into_proxy()?;
+    let token_b_active = zx::Event::create();
+    let token_b_passive = zx::Event::create();
+    let (_, _, level_control_b) = topology
+        .add_element(
+            "B",
+            BinaryPowerLevel::Off.into_primitive(),
+            BinaryPowerLevel::Off.into_primitive(),
+            vec![LevelDependency {
+                dependency_type: DependencyType::Active,
+                dependent_level: BinaryPowerLevel::On.into_primitive(),
+                requires_token: token_a.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                requires_level: BinaryPowerLevel::On.into_primitive(),
+            }],
+            vec![token_b_active.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
+            vec![token_b_passive.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
+        )
+        .await?
+        .expect("add_element failed");
+    let level_control_b = level_control_b.into_proxy()?;
+    let (_, element_c_lessor, _) = topology
+        .add_element(
+            "C",
+            BinaryPowerLevel::Off.into_primitive(),
+            BinaryPowerLevel::Off.into_primitive(),
+            vec![LevelDependency {
+                dependency_type: DependencyType::Passive,
+                dependent_level: BinaryPowerLevel::On.into_primitive(),
+                requires_token: token_b_passive.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                requires_level: BinaryPowerLevel::On.into_primitive(),
+            }],
+            vec![],
+            vec![],
+        )
+        .await?
+        .expect("add_element failed");
+    let element_c_lessor = element_c_lessor.into_proxy()?;
+    let (_, element_d_lessor, _) = topology
+        .add_element(
+            "D",
+            BinaryPowerLevel::Off.into_primitive(),
+            BinaryPowerLevel::Off.into_primitive(),
+            vec![LevelDependency {
+                dependency_type: DependencyType::Active,
+                dependent_level: BinaryPowerLevel::On.into_primitive(),
+                requires_token: token_b_active.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                requires_level: BinaryPowerLevel::On.into_primitive(),
+            }],
+            vec![],
+            vec![],
+        )
+        .await?
+        .expect("add_element failed");
+    let element_d_lessor = element_d_lessor.into_proxy()?;
+
+    // Initial required level for A and B should be OFF.
+    // Set A and B's current level to OFF.
+    let req_level_a =
+        level_control_a.get_required_level().await?.expect("watch_required_level failed");
+    assert_eq!(req_level_a, BinaryPowerLevel::Off.into_primitive());
+    let req_level_b =
+        level_control_b.get_required_level().await?.expect("watch_required_level failed");
+    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
+    level_control_a
+        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
+        .await?
+        .expect("update_current_power_level failed");
+    level_control_b
+        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
+        .await?
+        .expect("update_current_power_level failed");
+
+    // Lease C, A & B's required levels should remain OFF because of
+    // passive claim.
+    // Lease C should remain unsatisfied.
+    // TODO(b/311419716): When we have lease rejection, reject this lease.
+    let lease_c = element_c_lessor
+        .lease(BinaryPowerLevel::On.into_primitive())
+        .await?
+        .expect("Lease response not ok")
+        .into_proxy()?;
+    let req_level_a =
+        level_control_a.get_required_level().await?.expect("watch_required_level failed");
+    assert_eq!(req_level_a, BinaryPowerLevel::Off.into_primitive());
+    let req_level_b =
+        level_control_b.get_required_level().await?.expect("watch_required_level failed");
+    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
+    assert_eq!(lease_c.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+
+    // Lease D, A should have required level ON because of D's transitive active claim.
+    // Lease C & D should become satisfied.
+    let lease_d = element_d_lessor
+        .lease(BinaryPowerLevel::On.into_primitive())
+        .await?
+        .expect("Lease response not ok")
+        .into_proxy()?;
+    let req_level_a = level_control_a
+        .watch_required_level(BinaryPowerLevel::Off.into_primitive())
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(req_level_a, BinaryPowerLevel::On.into_primitive());
+    let req_level_b =
+        level_control_b.get_required_level().await?.expect("watch_required_level failed");
+    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
+    assert_eq!(lease_c.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+    assert_eq!(lease_d.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+
+    // Update A's current level to ON.
+    // B should now have required level ON because of D's active claim and
+    // its dependency on A being satisfied.
+    level_control_a
+        .update_current_power_level(BinaryPowerLevel::On.into_primitive())
+        .await?
+        .expect("update_current_power_level failed");
+    let req_level_a =
+        level_control_a.get_required_level().await?.expect("watch_required_level failed");
+    assert_eq!(req_level_a, BinaryPowerLevel::On.into_primitive());
+    let req_level_b = level_control_b
+        .watch_required_level(BinaryPowerLevel::Off.into_primitive())
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(req_level_b, BinaryPowerLevel::On.into_primitive());
+    assert_eq!(lease_c.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+    assert_eq!(lease_d.watch_status(LeaseStatus::Unknown).await?, LeaseStatus::Pending);
+
+    // Update B's current level to ON.
+    // Lease C & D should become satisfied.
+    level_control_b
+        .update_current_power_level(BinaryPowerLevel::On.into_primitive())
+        .await?
+        .expect("update_current_power_level failed");
+    assert_eq!(lease_c.watch_status(LeaseStatus::Pending).await?, LeaseStatus::Satisfied);
+    assert_eq!(lease_d.watch_status(LeaseStatus::Pending).await?, LeaseStatus::Satisfied);
+
+    // Drop Lease on D, B's required level should become OFF.
+    drop(lease_d);
+    let req_level_a =
+        level_control_a.get_required_level().await?.expect("watch_required_level failed");
+    assert_eq!(req_level_a, BinaryPowerLevel::On.into_primitive());
+    let req_level_b = level_control_b
+        .watch_required_level(BinaryPowerLevel::On.into_primitive())
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
+    // TODO(b/308659273): When we have lease revocation, verify lease C was revoked.
+
+    // Update B's current level to OFF. A's required level should become OFF.
+    level_control_b
+        .update_current_power_level(BinaryPowerLevel::Off.into_primitive())
+        .await?
+        .expect("update_current_power_level failed");
+    let req_level_a = level_control_a
+        .watch_required_level(BinaryPowerLevel::On.into_primitive())
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(req_level_a, BinaryPowerLevel::Off.into_primitive());
+    let req_level_b =
+        level_control_b.get_required_level().await?.expect("watch_required_level failed");
+    assert_eq!(req_level_b, BinaryPowerLevel::Off.into_primitive());
+
+    Ok(())
+}
+
+#[fuchsia::test]
 async fn test_topology() -> Result<()> {
     let realm = build_power_broker_realm().await?;
 
@@ -538,6 +742,7 @@ async fn test_topology() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             vec![],
             vec![earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -549,6 +754,7 @@ async fn test_topology() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             BinaryPowerLevel::Off.into_primitive(),
             vec![LevelDependency {
+                dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
                 requires_token: earth_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -556,6 +762,7 @@ async fn test_topology() -> Result<()> {
                 requires_level: BinaryPowerLevel::On.into_primitive(),
             }],
             vec![water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -568,6 +775,7 @@ async fn test_topology() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             vec![],
             vec![fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -580,6 +788,7 @@ async fn test_topology() -> Result<()> {
             BinaryPowerLevel::Off.into_primitive(),
             vec![],
             vec![air_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
+            vec![],
         )
         .await?
         .expect("add_element failed");
@@ -587,15 +796,17 @@ async fn test_topology() -> Result<()> {
 
     let extra_add_dep_res = water_element_control
         .add_dependency(
+            DependencyType::Active,
             BinaryPowerLevel::On.into_primitive(),
             earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
             BinaryPowerLevel::On.into_primitive(),
         )
         .await?;
-    assert!(matches!(extra_add_dep_res, Err(fpb::AddDependencyError::AlreadyExists { .. })));
+    assert!(matches!(extra_add_dep_res, Err(fpb::ModifyDependencyError::AlreadyExists { .. })));
 
     water_element_control
         .remove_dependency(
+            DependencyType::Active,
             BinaryPowerLevel::On.into_primitive(),
             earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
             BinaryPowerLevel::On.into_primitive(),
@@ -605,12 +816,13 @@ async fn test_topology() -> Result<()> {
 
     let extra_remove_dep_res = water_element_control
         .remove_dependency(
+            DependencyType::Active,
             BinaryPowerLevel::On.into_primitive(),
             earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
             BinaryPowerLevel::On.into_primitive(),
         )
         .await?;
-    assert!(matches!(extra_remove_dep_res, Err(fpb::RemoveDependencyError::NotFound { .. })));
+    assert!(matches!(extra_remove_dep_res, Err(fpb::ModifyDependencyError::NotFound { .. })));
 
     fire_element_control.remove_element().await.expect("remove_element failed");
     fire_element_control.on_closed().await?;
@@ -619,12 +831,13 @@ async fn test_topology() -> Result<()> {
 
     let add_dep_req_invalid = earth_element_control
         .add_dependency(
+            DependencyType::Active,
             BinaryPowerLevel::On.into_primitive(),
             fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
             BinaryPowerLevel::On.into_primitive(),
         )
         .await?;
-    assert!(matches!(add_dep_req_invalid, Err(fpb::AddDependencyError::NotAuthorized),));
+    assert!(matches!(add_dep_req_invalid, Err(fpb::ModifyDependencyError::NotAuthorized),));
 
     Ok(())
 }

@@ -138,7 +138,7 @@ impl SystemActivityGovernor {
                 fsystem::ActivityGovernorRequest::GetPowerElements { responder } => {
                     let _ = responder.send(fsystem::PowerElements {
                         execution_state: Some(fsystem::ExecutionState {
-                            token: Some(self.execution_state.dependency_token()),
+                            token: Some(self.execution_state.active_dependency_token()),
                             ..Default::default()
                         }),
                         ..Default::default()

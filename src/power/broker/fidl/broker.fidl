@@ -22,6 +22,11 @@ type BinaryPowerLevel = strict enum : PowerLevel {
     ON = 1;
 };
 
+type DependencyType = strict enum {
+    ACTIVE = 1;
+    PASSIVE = 2;
+};
+
 /// A token that represents the right to add a dependency upon another
 /// element. Should first be registered with Power Broker via
 /// ElementControl.RegisterDependencyToken of the required element.
@@ -30,6 +35,7 @@ alias DependencyToken = zx.Handle:EVENT;
 /// Power dependency from an already specified element's PowerLevel to another.
 /// The dependent Element should already be known from context.
 type LevelDependency = resource struct {
+    dependency_type DependencyType;
     dependent_level PowerLevel;
     /// Must supply a token registered via the RegisterDependencyToken call of
     /// the required element's ElementControl protocol.
@@ -58,11 +64,16 @@ open protocol Topology {
         /// List of dependencies for this element's power levels.
         /// Note: dependencies UPON this element's levels cannot be added here.
         dependencies vector<LevelDependency>:MAX_DEPENDENCIES_IN_ADD_ELEMENT;
-        /// List of initial dependency tokens to register for this element.
-        /// These tokens will allow other element owners to create dependencies
-        /// upon this element by passing them as the requires_token of a
-        /// LevelDependency.
-        dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
+        /// List of active dependency tokens to register for this element.
+        /// These tokens will allow other element owners to create active
+        /// dependencies upon this element by passing them as the
+        /// requires_token of a LevelDependency.
+        active_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
+        /// List of passive dependency tokens to register for this element.
+        /// These tokens will allow other element owners to create passive
+        /// dependencies upon this element by passing them as the
+        /// requires_token of a LevelDependency.
+        passive_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
     }) -> (resource struct {
         /// ElementControl channel for this element.
         element_control_channel client_end:ElementControl;
@@ -103,16 +114,20 @@ open protocol ElementControl {
     /// TODO(b/314814975): Make the above actually true.
     flexible RemoveElement() -> ();
 
-    /// Add a dependency of this element upon another Power Element.
-    flexible AddDependency(LevelDependency) -> () error AddDependencyError;
+    /// Adds an active or passive dependency of this element upon another
+    /// element.
+    flexible AddDependency(LevelDependency) -> () error ModifyDependencyError;
 
-    /// Remove a dependency of this element upon another Power Element.
-    flexible RemoveDependency(LevelDependency) -> () error RemoveDependencyError;
+    /// Removes an active or passive dependency of this element upon another
+    /// element.
+    flexible RemoveDependency(LevelDependency) -> () error ModifyDependencyError;
 
-    /// Register a token which will permit the bearer to add a dependency upon
-    /// this element.
+    /// Register a token which will permit the bearer to add either an
+    /// active or passive dependency upon this element, depending on the
+    /// dependency_type specified.
     flexible RegisterDependencyToken(resource struct {
         token DependencyToken;
+        dependency_type DependencyType;
     }) -> () error RegisterDependencyTokenError;
 
     /// Unregister a token previously registered via RegisterDependencyToken.
@@ -121,16 +136,10 @@ open protocol ElementControl {
     }) -> () error UnregisterDependencyTokenError;
 };
 
-type AddDependencyError = flexible enum {
+type ModifyDependencyError = flexible enum {
     ALREADY_EXISTS = 1;
-    ELEMENT_NOT_FOUND = 2;
     NOT_AUTHORIZED = 3;
-    REQUIRED_ELEMENT_NOT_FOUND = 4;
-};
-
-type RemoveDependencyError = flexible enum {
-    NOT_AUTHORIZED = 1;
-    NOT_FOUND = 2;
+    NOT_FOUND = 4;
 };
 
 type RegisterDependencyTokenError = flexible enum {
@@ -145,8 +154,9 @@ type UnregisterDependencyTokenError = flexible enum {
 
 /// Element Permissions
 type Permissions = strict bits : uint32 {
-    MODIFY_DEPENDENT = 0b00000001;
-    MODIFY_DEPENDENCY = 0b00000010;
+    MODIFY_ACTIVE_DEPENDENT = 0b00000001;
+    MODIFY_PASSIVE_DEPENDENT = 0b0000010;
+    MODIFY_DEPENDENCY = 0b00000100;
 };
 
 /// Provides element-scoped access to receive current power level status

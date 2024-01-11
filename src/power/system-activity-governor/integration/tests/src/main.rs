@@ -63,6 +63,7 @@ async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElemen
         0,
         0,
         vec![fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Active,
             dependent_level: 1,
             requires_token: es_token,
             requires_level: 2,

@@ -230,15 +230,17 @@ impl BrokerSvc {
                         res
                     }
                     ElementControlRequest::AddDependency {
+                        dependency_type,
                         dependent_level,
                         requires_token,
                         requires_level,
                         responder,
                     } => {
-                        tracing::debug!("AddDependency({:?},{:?},{:?},{:?})", &element_id, &dependent_level, &requires_token, &requires_level);
+                        tracing::debug!("AddDependency({:?},{:?},{:?},{:?},{:?})", &element_id, dependency_type, &dependent_level, &requires_token, &requires_level);
                         let mut broker = self.broker.lock().await;
                         let res = broker.add_dependency(
                             &element_id,
+                            dependency_type,
                             dependent_level,
                             requires_token.into(),
                             requires_level,
@@ -251,15 +253,17 @@ impl BrokerSvc {
                         }
                     }
                     ElementControlRequest::RemoveDependency {
+                        dependency_type,
                         dependent_level,
                         requires_token,
                         requires_level,
                         responder,
                     } => {
-                        tracing::debug!("RemoveDependency({:?},{:?},{:?},{:?})", &element_id, &dependent_level, &requires_token, &requires_level);
+                        tracing::debug!("RemoveDependency({:?},{:?},{:?},{:?},{:?})", &element_id, dependency_type, &dependent_level, &requires_token, &requires_level);
                         let mut broker = self.broker.lock().await;
                         let res = broker.remove_dependency(
                             &element_id,
+                            dependency_type,
                             dependent_level,
                             requires_token.into(),
                             requires_level,
@@ -273,6 +277,7 @@ impl BrokerSvc {
                     }
                     ElementControlRequest::RegisterDependencyToken {
                         token,
+                        dependency_type,
                         responder,
                     } => {
                         tracing::debug!(
@@ -284,6 +289,7 @@ impl BrokerSvc {
                         let res = broker.register_dependency_token(
                             &element_id,
                             token.into(),
+                            dependency_type,
                         );
                         tracing::debug!("RegisterDependencyToken register_credentials = ({:?})", &res);
                         if let Err(err) = res {
@@ -419,26 +425,35 @@ impl BrokerSvc {
                         initial_current_level,
                         minimum_level,
                         dependencies,
-                        dependency_tokens_to_register,
+                        active_dependency_tokens_to_register,
+                        passive_dependency_tokens_to_register,
                         responder,
                     } => {
                         tracing::debug!(
-                            "AddElement({:?}, {:?}, {:?}, {:?}, {:?})",
+                            "AddElement({:?}, {:?}, {:?}, {:?}, {:?}, {:?})",
                             &element_name,
                             &initial_current_level,
                             &minimum_level,
                             &dependencies,
-                            &dependency_tokens_to_register,
+                            &active_dependency_tokens_to_register,
+                            &passive_dependency_tokens_to_register,
                         );
                         let mut broker = self.broker.lock().await;
-                        let dependency_tokens =
-                            dependency_tokens_to_register.into_iter().map(|d| d.into()).collect();
+                        let active_dependency_tokens = active_dependency_tokens_to_register
+                            .into_iter()
+                            .map(|d| d.into())
+                            .collect();
+                        let passive_dependency_tokens = passive_dependency_tokens_to_register
+                            .into_iter()
+                            .map(|d| d.into())
+                            .collect();
                         let res = broker.add_element(
                             &element_name,
                             initial_current_level,
                             minimum_level,
                             dependencies,
-                            dependency_tokens,
+                            active_dependency_tokens,
+                            passive_dependency_tokens,
                         );
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
