@@ -12,4 +12,22 @@ declare_args() {
   # https://github.com/bazelbuild/remote-apis
   # For an overview of remote execution for Bazel, see https://bazel.build/remote/rbe
   enable_bazel_remote_rbe = false
+
+  # Configure bazel to stream build events and results to a service.
+  # This is useful for sharing build results and invocation details
+  # for reproducing and triaging issues.
+  # This option uses direct network access and requires authentication.
+  # More information can be found at:
+  # https://bazel.build/remote/bep#build-event-service
+  #
+  # Valid options:
+  #   "": do not stream (default)
+  #   "sponge": uploads to Sponge2
+  #   "resultstore": uploads to ResultStore
+  bazel_upload_build_events = ""
 }
+
+assert(
+    bazel_upload_build_events == "" || bazel_upload_build_events == "sponge" ||
+        bazel_upload_build_events == "resultstore",
+    "Valid choices for bazel_upload_build_events are: \"\", \"sponge\", \"resultstore\"")

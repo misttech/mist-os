@@ -419,6 +419,12 @@ template("bazel_action") {
       args += [ "--config=remote" ]
     }
 
+    if (bazel_upload_build_events == "sponge") {
+      args += [ "--config=sponge" ]
+    } else if (bazel_upload_build_events == "resultstore") {
+      args += [ "--config=resultstore" ]
+    }
+
     if (defined(invoker.extra_bazel_args)) {
       args += invoker.extra_bazel_args
     }

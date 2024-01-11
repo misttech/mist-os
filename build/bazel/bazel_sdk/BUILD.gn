@@ -185,13 +185,18 @@ template("bazel_sdk_tests_for") {
     if (defined(invoker.remote_build)) {
       _remote_build = invoker.remote_build
     }
-    if (_remote_build) {
+    if (_remote_build || bazel_upload_build_events != "") {
       args += [
         "--bazelrc",
         rebase_path(_services_bazelrc_path, root_build_dir),
-        "--bazel-config=remote",
       ]
       deps += [ ":remote_services_bazelrc" ]
+    }
+    if (_remote_build) {
+      args += [ "--bazel-config=remote" ]
+    }
+    if (bazel_upload_build_events != "") {
+      args += [ "--bazel-config=" + bazel_upload_build_events ]
     }
 
     if (_use_idk_exported) {
