@@ -1075,7 +1075,7 @@ zx_status_t BaseRenderer::SetCustomReferenceClock(zx::clock ref_clock) {
   constexpr auto kRequiredClockRights = ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER | ZX_RIGHT_READ;
   auto status = ref_clock.replace(kRequiredClockRights, &ref_clock);
   if (status != ZX_OK || !ref_clock.is_valid()) {
-    FX_PLOGS(WARNING, status) << "Could not set rights on client-submitted reference clock";
+    FX_PLOGS(ERROR, status) << "Could not set rights on client-submitted reference clock";
     return ZX_ERR_INVALID_ARGS;
   }
   clock_ = context_.clock_factory()->CreateClientFixed(std::move(ref_clock));

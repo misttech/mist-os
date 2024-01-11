@@ -92,7 +92,7 @@ void AudioCapturer::SetReferenceClock(zx::clock raw_clock) {
   // We cannot change the reference clock, once set. Also, once the capturer is routed to a device
   // (which occurs upon AddPayloadBuffer), we set the default clock if one has not yet been set.
   if (reference_clock_is_set_) {
-    FX_LOGS(WARNING) << "Cannot change reference clock once it is set!";
+    FX_LOGS(ERROR) << "Cannot change reference clock once it is set!";
     return;
   }
 
@@ -100,7 +100,7 @@ void AudioCapturer::SetReferenceClock(zx::clock raw_clock) {
     // If raw_clock doesn't have DUPLICATE or READ or TRANSFER rights, return (i.e. shutdown).
     zx_status_t status = raw_clock.replace(kRequiredClockRights, &raw_clock);
     if (status != ZX_OK) {
-      FX_PLOGS(WARNING, status) << "Could not set rights on client-submitted reference clock";
+      FX_PLOGS(ERROR, status) << "Could not set rights on client-submitted reference clock";
       return;
     }
     SetClock(context().clock_factory()->CreateClientFixed(std::move(raw_clock)));
@@ -123,20 +123,20 @@ void AudioCapturer::SetPcmStreamType(fuchsia::media::AudioStreamType stream_type
   // If our shared buffer has been assigned, we are operating and our mode can no longer be changed.
   State state = capture_state();
   if (state != State::WaitingForVmo) {
-    FX_LOGS(WARNING) << "Cannot change format after payload buffer has been added"
-                     << "(state = " << static_cast<uint32_t>(state) << ")";
+    FX_LOGS(ERROR) << "Cannot change format after payload buffer has been added"
+                   << "(state = " << static_cast<uint32_t>(state) << ")";
     return;
   }
 
   auto format_result = Format::Create(stream_type);
   if (format_result.is_error()) {
-    FX_LOGS(WARNING) << "AudioCapturer: PcmStreamType is invalid";
+    FX_LOGS(ERROR) << "AudioCapturer: PcmStreamType is invalid";
     return;
   }
 
   if (stream_type.channels > 4) {
-    FX_LOGS(WARNING) << "AudioCapturer::PcmStreamType specified channels (" << stream_type.channels
-                     << ") is too large";
+    FX_LOGS(ERROR) << "AudioCapturer::PcmStreamType specified channels (" << stream_type.channels
+                   << ") is too large";
     return;
   }
 
@@ -158,7 +158,7 @@ void AudioCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
     return;
   }
   if (loopback_) {
-    FX_LOGS(WARNING) << "SetUsage on loopback capturer is not allowed";
+    FX_LOGS(WARNING) << "SetUsage on loopback capturer is not allowed - ignoring this command";
     return;
   }
 
@@ -188,7 +188,7 @@ fuchsia::media::Usage AudioCapturer::GetStreamUsage() const {
 
 void AudioCapturer::RealizeVolume(VolumeCommand volume_command) {
   if (volume_command.ramp.has_value()) {
-    FX_LOGS(WARNING) << "Capturer gain ramping is not implemented";
+    FX_LOGS(WARNING) << "Capturer gain ramping is not implemented - ignoring the ramp component";
   }
 
   context().link_matrix().ForEachSourceLink(*this, [this,
@@ -226,7 +226,7 @@ void AudioCapturer::SetGain(float gain_db) {
   // Before setting stream_gain_db_, we should always perform this range check.
   if ((gain_db < fuchsia::media::audio::MUTED_GAIN_DB) ||
       (gain_db > fuchsia::media::audio::MAX_GAIN_DB) || isnan(gain_db)) {
-    FX_LOGS(WARNING) << "SetGain(" << gain_db << " dB) out of range.";
+    FX_LOGS(ERROR) << "SetGain(" << gain_db << " dB) out of range.";
     BeginShutdown();
     return;
   }

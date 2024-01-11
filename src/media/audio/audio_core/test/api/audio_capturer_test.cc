@@ -42,7 +42,8 @@ class AudioCapturerTestOldAPI : public HermeticAudioTest {
     audio_capturer_->SetPcmStreamType(t);
   }
 
-  void SetUpPayloadBuffer(int64_t num_frames = 16000, zx::vmo* vmo_out = nullptr) {
+  void SetUpPayloadBuffer(uint32_t payload_buffer_id = 0, int64_t num_frames = 16000,
+                          zx::vmo* vmo_out = nullptr) {
     zx::vmo audio_capturer_vmo;
 
     auto status = zx::vmo::create(num_frames * sizeof(int16_t), 0, &audio_capturer_vmo);
@@ -53,7 +54,7 @@ class AudioCapturerTestOldAPI : public HermeticAudioTest {
       ASSERT_EQ(status, ZX_OK);
     }
 
-    audio_capturer_->AddPayloadBuffer(0, std::move(audio_capturer_vmo));
+    audio_capturer_->AddPayloadBuffer(payload_buffer_id, std::move(audio_capturer_vmo));
   }
 
   std::optional<Format> format_;
@@ -98,7 +99,13 @@ class AudioCapturerClockTestOldAPI : public AudioCapturerTestOldAPI {
 //
 
 // TODO(mpuryear): test AddPayloadBuffer(uint32 id, handle<vmo> payload_buffer);
-// Also negative testing: bad id, null or bad handle
+// Also negative testing: null or bad handle
+TEST_F(AudioCapturerTestOldAPI, AddPayloadBufferBadIdShouldDisconnect) {
+  SetFormat();
+  SetUpPayloadBuffer(1);
+
+  ExpectDisconnect(audio_capturer_);
+}
 
 // TODO(mpuryear): test RemovePayloadBuffer(uint32 id);
 // Also negative testing: unknown or already-removed id
@@ -240,7 +247,7 @@ TEST_F(AudioCapturerTestOldAPI, StopAsyncWithAllPacketsInFlight) {
   const auto kPackets = 10;
   const auto kFramesPerSecond = kFramesPerPacket * kPackets;  // below we assume 1 packet == 100ms
   SetFormat(kFramesPerSecond);
-  SetUpPayloadBuffer(kFramesPerSecond);
+  SetUpPayloadBuffer(0, kFramesPerSecond);
 
   // Don't recycle any packets.
   int count = 0;

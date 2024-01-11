@@ -191,13 +191,13 @@ void BaseCapturer::GetStreamType(GetStreamTypeCallback cbk) {
 void BaseCapturer::AddPayloadBuffer(uint32_t id, zx::vmo payload_buf_vmo) {
   TRACE_DURATION("audio", "BaseCapturer::AddPayloadBuffer");
   if (!format_.has_value()) {
-    FX_LOGS(WARNING) << "StreamType must be set before payload buffer is added.";
+    FX_LOGS(ERROR) << "StreamType must be set before payload buffer is added.";
     BeginShutdown();
     return;
   }
 
   if (id != 0) {
-    FX_LOGS(WARNING) << "Only buffer ID 0 is currently supported.";
+    FX_LOGS(ERROR) << "Only buffer ID 0 is currently supported.";
     BeginShutdown();
     return;
   }
@@ -284,7 +284,7 @@ void BaseCapturer::AddPayloadBuffer(uint32_t id, zx::vmo payload_buf_vmo) {
 
 void BaseCapturer::RemovePayloadBuffer(uint32_t id) {
   TRACE_DURATION("audio", "BaseCapturer::RemovePayloadBuffer");
-  FX_LOGS(WARNING) << "RemovePayloadBuffer is not currently supported.";
+  FX_LOGS(ERROR) << "RemovePayloadBuffer is not currently supported.";
   BeginShutdown();
 }
 
@@ -304,20 +304,21 @@ bool BaseCapturer::IsOperating() {
 void BaseCapturer::CaptureAt(uint32_t payload_buffer_id, uint32_t offset_frames,
                              uint32_t num_frames, CaptureAtCallback cbk) {
   TRACE_DURATION("audio", "BaseCapturer::CaptureAt");
-  if (payload_buffer_id != 0) {
-    FX_LOGS(WARNING) << "payload_buffer_id must be 0 for now.";
-    return;
-  }
 
   // If something goes wrong, hang up the phone and shutdown.
   auto cleanup = fit::defer([this]() { BeginShutdown(); });
+
+  if (payload_buffer_id != 0) {
+    FX_LOGS(ERROR) << "payload_buffer_id must be 0 for now.";
+    return;
+  }
 
   // It is illegal to call CaptureAt unless we are currently operating in
   // synchronous mode.
   State state = state_.load();
   if (state != State::WaitingForRequest && state != State::SyncOperating) {
-    FX_LOGS(WARNING) << "CaptureAt called while in wrong state "
-                     << "(state = " << static_cast<uint32_t>(state) << ")";
+    FX_LOGS(ERROR) << "CaptureAt called while in wrong state "
+                   << "(state = " << static_cast<uint32_t>(state) << ")";
     return;
   }
 
@@ -326,7 +327,7 @@ void BaseCapturer::CaptureAt(uint32_t payload_buffer_id, uint32_t offset_frames,
   auto was_empty = (pq->PendingSize() == 0);
   auto result = pq->PushPending(offset_frames, num_frames, std::move(cbk));
   if (!result.is_ok()) {
-    FX_LOGS(WARNING) << "CaptureAt failed to create a new packet: " << result.error();
+    FX_LOGS(ERROR) << "CaptureAt failed to create a new packet: " << result.error();
     return;
   }
 
@@ -362,8 +363,8 @@ void BaseCapturer::DiscardAllPackets(DiscardAllPacketsCallback cbk) {
   // synchronous mode.
   State state = state_.load();
   if (state != State::WaitingForRequest && state != State::SyncOperating) {
-    FX_LOGS(WARNING) << "DiscardAllPackets called while not in wrong state "
-                     << "(state = " << static_cast<uint32_t>(state) << ")";
+    FX_LOGS(ERROR) << "DiscardAllPackets called while not in wrong state "
+                   << "(state = " << static_cast<uint32_t>(state) << ")";
     BeginShutdown();
     return;
   }
@@ -394,13 +395,13 @@ void BaseCapturer::StartAsyncCapture(uint32_t frames_per_packet) {
   // To enter Async mode, we must be in Synchronous mode and not have packets in flight.
   State state = state_.load();
   if (state != State::WaitingForRequest) {
-    FX_LOGS(WARNING) << "Bad state while attempting to enter async capture mode "
-                     << "(state = " << static_cast<uint32_t>(state) << ")";
+    FX_LOGS(ERROR) << "Bad state while attempting to enter async capture mode "
+                   << "(state = " << static_cast<uint32_t>(state) << ")";
     return;
   }
 
   if (!packet_queue()->empty()) {
-    FX_LOGS(WARNING) << "Attempted to enter async capture mode with packets still in flight.";
+    FX_LOGS(ERROR) << "Attempted to enter async capture mode with packets still in flight.";
     return;
   }
 
@@ -408,7 +409,7 @@ void BaseCapturer::StartAsyncCapture(uint32_t frames_per_packet) {
   auto result =
       CapturePacketQueue::CreatePreallocated(payload_buf_, format_.value(), frames_per_packet);
   if (!result.is_ok()) {
-    FX_LOGS(WARNING) << "StartAsyncCapture failed: " << result.error();
+    FX_LOGS(ERROR) << "StartAsyncCapture failed: " << result.error();
     return;
   }
 
@@ -439,8 +440,8 @@ void BaseCapturer::StopAsyncCapture(StopAsyncCaptureCallback cbk) {
   }
 
   if (state != State::AsyncOperating) {
-    FX_LOGS(WARNING) << "Bad state while attempting to stop async capture mode "
-                     << "(state = " << static_cast<uint32_t>(state) << ")";
+    FX_LOGS(ERROR) << "Bad state while attempting to stop async capture mode "
+                   << "(state = " << static_cast<uint32_t>(state) << ")";
     BeginShutdown();
     return;
   }
