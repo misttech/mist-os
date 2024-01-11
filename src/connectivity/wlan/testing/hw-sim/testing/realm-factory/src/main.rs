@@ -147,6 +147,9 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
         .add_child("archivist", "#meta/archivist-for-embedding.cm", ChildOptions::new())
         .await?;
 
+    let trace_manager =
+        builder.add_child("trace_manager", "#meta/trace_manager.cm", ChildOptions::new()).await?;
+
     let wlandevicemonitor = builder
         .add_child("wlandevicemonitor", "#meta/wlandevicemonitor.cm", ChildOptions::new())
         .await?;
@@ -202,6 +205,28 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
                 .to(&wlancfg)
                 .to(&wlandevicemonitor)
                 .to(&stash),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"))
+                .from(&trace_manager)
+                .to(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
+                .to(&archivist)
+                .to(&wlancfg)
+                .to(&wlandevicemonitor)
+                .to(&stash),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.tracing.controller.Controller"))
+                .from(&trace_manager)
+                .to(Ref::parent()),
         )
         .await?;
 

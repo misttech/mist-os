@@ -9,5 +9,10 @@
     ],
     use: [
         { protocol: "test.wlan.realm.RealmFactory" },
+        {
+            storage: "custom_artifacts",
+            rights: [ "rw*" ],
+            path: "/custom_artifacts",
+        },
     ],
 }

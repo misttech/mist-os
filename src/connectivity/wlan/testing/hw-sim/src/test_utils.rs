@@ -14,12 +14,13 @@ use {
     fuchsia_async::{DurationExt, Time, TimeoutExt, Timer},
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon::{self as zx, prelude::*},
-    futures::{channel::oneshot, FutureExt, StreamExt},
+    futures::{channel::oneshot, AsyncReadExt, FutureExt, StreamExt},
     ieee80211::{MacAddr, MacAddrBytes},
     realm_proxy::client::RealmProxyClient,
     std::{
         fmt::Display,
         future::Future,
+        io::Write,
         marker::Unpin,
         pin::Pin,
         sync::Arc,
@@ -133,6 +134,8 @@ impl TestRealmContext {
 type EventStream = wlantap::WlantapPhyEventStream;
 pub struct TestHelper {
     ctx: Arc<TestRealmContext>,
+    tracing_controller: fidl_fuchsia_tracing_controller::ControllerSynchronousProxy,
+    tracing_collector: Option<std::thread::JoinHandle<Vec<u8>>>,
     netdevice_task_handles: Vec<fuchsia_async::Task<()>>,
     _wlantap: Wlantap,
     proxy: Arc<wlantap::WlantapPhyProxy>,
@@ -269,6 +272,52 @@ impl TestHelper {
         config: wlantap::WlantapPhyConfig,
         ctx: Arc<TestRealmContext>,
     ) -> Self {
+        let tracing_controller = ctx
+            .test_realm_proxy
+            .connect_to_protocol::<fidl_fuchsia_tracing_controller::ControllerMarker>()
+            .await
+            .expect("Failed to get tracing controller.");
+        let tracing_controller = fidl_fuchsia_tracing_controller::ControllerSynchronousProxy::new(
+            fidl::Channel::from_handle(
+                tracing_controller
+                    .into_channel()
+                    .expect("Failed to get fidl::AsyncChannel from proxy.")
+                    .into_zx_channel()
+                    .into_handle(),
+            ),
+        );
+        let (tracing_socket, tracing_socket_write) = fidl::Socket::create_stream();
+        tracing_controller
+            .initialize_tracing(
+                &fidl_fuchsia_tracing_controller::TraceConfig {
+                    categories: Some(vec!["wlan".to_string()]),
+                    buffer_size_megabytes_hint: Some(64),
+                    ..Default::default()
+                },
+                tracing_socket_write,
+            )
+            .expect("Failed to initialize tracing.");
+
+        let tracing_collector = Some(std::thread::spawn(move || {
+            let mut executor = fuchsia_async::LocalExecutor::new();
+            executor.run_singlethreaded(async move {
+                let mut tracing_socket = fuchsia_async::Socket::from_socket(tracing_socket);
+                info!("draining trace record socket...");
+                let mut buf = Vec::new();
+                tracing_socket.read_to_end(&mut buf).await.unwrap();
+                info!("trace record socket drained.");
+                buf
+            })
+        }));
+
+        tracing_controller
+            .start_tracing(
+                &fidl_fuchsia_tracing_controller::StartOptions::default(),
+                zx::Time::INFINITE,
+            )
+            .expect("Encountered FIDL error when starting trace.")
+            .expect("Failed to start tracing.");
+
         // If injected, wlancfg does not start automatically in a test component.
         // Connecting to the service to start wlancfg so that it can create new interfaces.
         let _wlan_proxy = ctx
@@ -284,6 +333,8 @@ impl TestHelper {
         let event_stream = Some(proxy.take_event_stream());
         TestHelper {
             ctx,
+            tracing_controller,
+            tracing_collector,
             netdevice_task_handles: vec![],
             _wlantap: wlantap,
             proxy: Arc::new(proxy),
@@ -412,6 +463,30 @@ impl Drop for TestHelper {
         // first shutdown the phy to prevent any automated CreateIface
         // calls from wlancfg after removing the iface.
         sync_proxy.shutdown(zx::Time::INFINITE).expect("shut down fake phy");
+
+        self.tracing_controller
+            .terminate_tracing(
+                &fidl_fuchsia_tracing_controller::TerminateOptions {
+                    write_results: Some(true),
+                    ..Default::default()
+                },
+                zx::Time::INFINITE,
+            )
+            .expect("Failed to stop tracing.");
+
+        info!("Waiting for trace collection from socket to complete...");
+        let trace = self
+            .tracing_collector
+            .take()
+            .expect("Failed to acquire join handle for tracing collector.")
+            .join()
+            .expect("Failed to join tracing collector thread.");
+
+        let fxt_path = format!("/custom_artifacts/trace.fxt");
+        info!("Writing trace records to {fxt_path} ...");
+        let mut fxt_file = std::fs::File::create(fxt_path).unwrap();
+        fxt_file.write_all(&trace[..]).unwrap();
+        fxt_file.sync_all().unwrap();
     }
 }
 

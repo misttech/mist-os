@@ -6,6 +6,7 @@
         "//sdk/lib/driver_test_realm/meta/realm_builder.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",

@@ -54,6 +54,11 @@
             to: "#test_realm_factory",
         },
         {
+            storage: "custom_artifacts",
+            from: "parent",
+            to: "#test_suite",
+        },
+        {
             event_stream: [
                 "capability_requested",
                 "directory_ready",
