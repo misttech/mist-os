@@ -365,7 +365,6 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",
     "//src/diagnostics/iquery:bootfs",
-    "//src/graphics/display/bin/dsiutil:bootfs",
     "//src/media/audio/tools/audio-driver-ctl:bootfs",
     "//src/security/bin/syscall-check:bootfs",
     "//src/ui/backlight/bin/backlight:bootfs",
