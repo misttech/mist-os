@@ -2,14 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# C and Assembly parts of ring 0.16.19
+# C and Assembly parts of ring 0.16.20
 #
 # More advanced usages of might require more sophisticated
 # build rules
 
 import("//build/licenses/license.gni")
 
-ring_crate = "../../vendor/ring-0.16.19"
+ring_crate = "../../vendor/ring-0.16.20"
 
 license("ring_license") {
   public_package_name = "ring"
@@ -36,7 +36,7 @@ config("ring-config") {
 
       # Define an architecture that is supported to avoid "Unknown target CPU"
       # and other compile errors.
-      "-D__aarch64__",
+      "-D__AARCH64EL__",
 
       # The above causes this inaccurate symbol to be defined. This might not
       # have any effect.
@@ -78,6 +78,7 @@ static_library("ring-core") {
     deps += [
       # asm
       ":ring-aesni",
+      ":ring-chacha20-poly1305",
       ":ring-cpu-intel",
       ":ring-mont5-elf",
       ":ring-p256",
@@ -171,6 +172,19 @@ static_library("ring-chacha") {
     sources = [ "$ring_crate/pregenerated/chacha-armv8-linux64.S" ]
   } else if (current_cpu == "arm64" && is_mac) {
     sources = [ "$ring_crate/pregenerated/chacha-armv8-ios64.S" ]
+  }
+}
+
+static_library("ring-chacha20-poly1305") {
+  visibility = [ ":*" ]
+  include_dirs = [ "$ring_crate/include" ]
+
+  configs += [ ":ring-config" ]
+
+  if (current_cpu == "x64" && !is_mac) {
+    sources = [ "$ring_crate/pregenerated/chacha20_poly1305_x86_64-elf.S" ]
+  } else if (current_cpu == "x64" && is_mac) {
+    sources = [ "$ring_crate/pregenerated/chacha20_poly1305_x86_64-macosx.S" ]
   }
 }
 
