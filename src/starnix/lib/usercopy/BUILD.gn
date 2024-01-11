@@ -99,10 +99,13 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
   }
   _hermetic_code_blob("hermetic_copy_until_null_byte") {
   }
+  _hermetic_code_blob("hermetic_zero") {
+  }
 
   _usercopy_non_rust_deps = [
     ":hermetic_copy_bin.basic",
     ":hermetic_copy_until_null_byte_bin.basic",
+    ":hermetic_zero_bin.basic",
     ":usercopy_assembly_routines",
   ]
 }

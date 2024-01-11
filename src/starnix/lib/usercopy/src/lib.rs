@@ -129,12 +129,17 @@ pub fn slice_to_maybe_uninit_mut<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
 type HermeticCopyFn =
     unsafe extern "C" fn(dest: *mut u8, source: *const u8, len: usize, ret_dest: bool) -> usize;
 
+type HermeticZeroFn = unsafe extern "C" fn(dest: *mut u8, len: usize) -> usize;
+
 pub struct Usercopy {
     // Pointer to the hermetic_copy routine loaded into memory.
     hermetic_copy_fn: HermeticCopyFn,
 
     // Pointer to the hermetic_copy_until_null_byte routine loaded into memory.
     hermetic_copy_until_null_byte_fn: HermeticCopyFn,
+
+    // Pointer to the hermetic_zero routine loaded into memory.
+    hermetic_zero_fn: HermeticZeroFn,
 
     // This is an event used to signal the exception handling thread to shut down.
     shutdown_event: zx::Event,
@@ -326,6 +331,10 @@ impl Usercopy {
         let hermetic_copy_until_null_byte_fn: HermeticCopyFn =
             unsafe { std::mem::transmute(hermetic_copy_until_null_byte_addr_range.start) };
 
+        let hermetic_zero_addr_range = get_hermetic_copy_bin("/pkg/hermetic_zero.bin")?;
+        let hermetic_zero_fn: HermeticZeroFn =
+            unsafe { std::mem::transmute(hermetic_zero_addr_range.start) };
+
         #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         let atomic_load_relaxed_range = atomic_load_u32_relaxed as *const () as usize
             ..atomic_load_u32_relaxed_end as *const () as usize;
@@ -439,6 +448,7 @@ impl Usercopy {
                 // Only handle faults that occur within one of our usercopy routines.
                 if hermetic_copy_addr_range.contains(&pc)
                     || hermetic_copy_until_null_byte_addr_range.contains(&pc)
+                    || hermetic_zero_addr_range.contains(&pc)
                 {
                     set_registers_for_hermetic_error(&mut regs, fault_address);
                 } else if atomic_load_relaxed_range.contains(&pc)
@@ -468,6 +478,7 @@ impl Usercopy {
         Ok(Some(Self {
             hermetic_copy_fn,
             hermetic_copy_until_null_byte_fn,
+            hermetic_zero_fn,
             shutdown_event,
             join_handle: Some(join_handle),
             restricted_address_range,
@@ -490,6 +501,36 @@ impl Usercopy {
         ret_dest: bool,
     ) -> usize {
         do_hermetic_copy(self.hermetic_copy_fn, dest as usize, source as usize, count, ret_dest)
+    }
+
+    /// Zeros `count` bytes to starting at `dest_addr`.
+    ///
+    /// Returns the number of bytes zeroed.
+    pub fn zero(&self, dest_addr: usize, count: usize) -> usize {
+        // Assumption: The address 0 is invalid and cannot be mapped.  The error encoding scheme has
+        // a collision on the value 0 - it could mean that there was a fault at the address 0 or
+        // that there was no fault. We want to treat an attempt to copy to 0 as a fault always.
+        if dest_addr == 0 || !self.restricted_address_range.contains(&dest_addr) {
+            return 0;
+        }
+
+        let unset_address = unsafe { (self.hermetic_zero_fn)(dest_addr as *mut u8, count) };
+        debug_assert!(
+            unset_address >= dest_addr,
+            "unset_address={:#x}, dest_addr={:#x}",
+            unset_address,
+            dest_addr,
+        );
+        let bytes_set = unset_address - dest_addr;
+        debug_assert!(
+            bytes_set <= count,
+            "bytes_set={}, count={}; unset_address={:#x}, dest_addr={:#x}",
+            bytes_set,
+            count,
+            unset_address,
+            dest_addr,
+        );
+        bytes_set
     }
 
     /// Copies data from `source` to the restricted address `dest_addr`.
@@ -734,6 +775,86 @@ mod test {
                 return;
             }
         }};
+    }
+
+    #[test_case(0, 0)]
+    #[test_case(1, 1)]
+    #[test_case(7, 2)]
+    #[test_case(8, 3)]
+    #[test_case(9, 4)]
+    #[test_case(128, 5)]
+    #[test_case(zx::system_get_page_size() as usize - 1, 6)]
+    #[test_case(zx::system_get_page_size() as usize, 7)]
+    #[::fuchsia::test]
+    fn zero_no_fault(zero_len: usize, ch: u8) {
+        let page_size = zx::system_get_page_size() as usize;
+
+        let dest_vmo = zx::Vmo::create(page_size as u64).unwrap();
+
+        let root_vmar = fuchsia_runtime::vmar_root_self();
+
+        let mapped_addr = root_vmar
+            .map(0, &dest_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
+            .unwrap();
+        let mapped_bytes =
+            unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, page_size) };
+        mapped_bytes.fill(ch);
+
+        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
+
+        let result = usercopy.zero(mapped_addr, zero_len);
+        assert_eq!(result, zero_len);
+
+        assert_eq!(&mapped_bytes[..zero_len], &vec![0; zero_len]);
+        assert_eq!(&mapped_bytes[zero_len..], &vec![ch; page_size - zero_len]);
+    }
+
+    #[test_case(1, 2, 0)]
+    #[test_case(1, 4, 1)]
+    #[test_case(1, 8, 2)]
+    #[test_case(1, 16, 3)]
+    #[test_case(1, 32, 4)]
+    #[test_case(1, 64, 5)]
+    #[test_case(1, 128, 6)]
+    #[test_case(1, 256, 7)]
+    #[test_case(1, 512, 8)]
+    #[test_case(1, 1024, 9)]
+    #[test_case(32, 64, 10)]
+    #[test_case(32, 128, 11)]
+    #[test_case(32, 256, 12)]
+    #[test_case(32, 512, 13)]
+    #[test_case(32, 1024, 14)]
+    #[::fuchsia::test]
+    fn zero_fault(offset: usize, zero_len: usize, ch: u8) {
+        let page_size = zx::system_get_page_size() as usize;
+
+        let dest_vmo = zx::Vmo::create(page_size as u64).unwrap();
+
+        let root_vmar = fuchsia_runtime::vmar_root_self();
+
+        let mapped_addr = root_vmar
+            .map(
+                0,
+                &dest_vmo,
+                0,
+                page_size * 2,
+                zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+            )
+            .unwrap();
+        let mapped_bytes =
+            unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, page_size) };
+        mapped_bytes.fill(ch);
+
+        let usercopy =
+            new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
+
+        let dest_addr = mapped_addr + page_size - offset;
+
+        let result = usercopy.zero(dest_addr, zero_len);
+        assert_eq!(result, offset);
+
+        assert_eq!(&mapped_bytes[page_size - offset..], &vec![0; offset][..]);
+        assert_eq!(&mapped_bytes[..page_size - offset], &vec![ch; page_size - offset][..]);
     }
 
     #[test_case(0)]
