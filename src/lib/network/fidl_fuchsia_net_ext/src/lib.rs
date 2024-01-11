@@ -487,7 +487,7 @@ macro_rules! generate_subnet_type {
 generate_subnet_type!(v4, 32);
 generate_subnet_type!(v6, 128);
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
 pub struct MacAddress {
     pub octets: [u8; 6],
 }
@@ -501,6 +501,14 @@ impl From<fidl::MacAddress> for MacAddress {
 impl From<MacAddress> for fidl::MacAddress {
     fn from(MacAddress { octets }: MacAddress) -> fidl::MacAddress {
         fidl::MacAddress { octets }
+    }
+}
+
+// We deliberately redirect Debug to use Display so that the MacAddress
+// will be printed using hex formatting.
+impl std::fmt::Debug for MacAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
