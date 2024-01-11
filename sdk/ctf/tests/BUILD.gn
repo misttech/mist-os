@@ -15,6 +15,7 @@ group("tests") {
 
     # Tests defined outside of //sdk/ctf
     "//src/connectivity/wlan/testing/hw-sim/test:ctf-tests",
+    "//src/devices/tests/ctf:ctf-tests",
     "//src/sys/component_manager/tests/reboot_on_terminate:tests",
     "//src/sys/pkg/tests/pkgdir:ctf-tests",
     "//src/sys/time/timekeeper_integration:ctf-tests",

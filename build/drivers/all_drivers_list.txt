@@ -196,6 +196,7 @@
 //src/devices/tests/bind-fail-test:fuchsia_driver
 //src/devices/tests/bindlib-codegen-test:child-driver-driver
 //src/devices/tests/bindlib-codegen-test:parent-driver-driver
+//src/devices/tests/ctf/basic_driver:basic-driver
 //src/devices/tests/ddk-environment-test:ddk-environment-test-driver
 //src/devices/tests/ddk-fallback-test-v2:ddk-fallback-test-driver-module
 //src/devices/tests/ddk-fallback-test:ddk-fallback-test-driver

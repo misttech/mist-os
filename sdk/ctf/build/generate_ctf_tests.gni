@@ -240,6 +240,19 @@ template("generate_simulate-scan-wlan-hw-sim-tests") {
   }
 }
 
+template("generate_basic-driver-test") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component =
+        "//src/devices/tests/ctf/basic_driver:basic-driver-test-root"
+    test_component_name = "basic-driver-test-root.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/devices/testing/realm-factory",
+    ]
+  }
+}
+
 # Expands a prebuilt CTF test into a runnable fuchsia package.
 #
 # This template is called several times with every combination of ctf_test and
