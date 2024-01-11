@@ -1,6 +1,7 @@
 ffx/debug.golden
 ffx/debug/connect.golden
 ffx/debug/core.golden
+ffx/debug/crash.golden
 ffx/debug/fidl.golden
 ffx/debug/limbo.golden
 ffx/debug/limbo/disable.golden

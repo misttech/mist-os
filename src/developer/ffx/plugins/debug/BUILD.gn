@@ -12,6 +12,7 @@ ffx_plugin("ffx_debug_plugin") {
   plugin_deps = [
     "connect:ffx_debug_connect",
     "core:ffx_debug_core",
+    "crash:ffx_debug_crash",
     "fidlcat:ffx_debug_fidlcat",
     "limbo:ffx_debug_limbo",
     "symbol-index:ffx_debug_symbol_index",
