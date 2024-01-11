@@ -15,7 +15,7 @@ use lock_order::{
 use net_types::{
     ethernet::Mac,
     ip::{AddrSubnet, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
+    MulticastAddr, SpecifiedAddr, Witness as _,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
@@ -46,7 +46,7 @@ use crate::{
         },
         DualStackDeviceContext, DualStackDeviceStateRef, IpDeviceAddressContext,
         IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceIpExt, IpDeviceSendContext,
-        IpDeviceStateContext, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+        IpDeviceStateContext, Ipv6DeviceAddr, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
     },
     sync::{PrimaryRc, StrongRc},
     BindingsContext, CoreCtx, StackState,
@@ -579,7 +579,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
     fn add_ip_address(
         &mut self,
         device_id: &Self::DeviceId,
-        addr: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        addr: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         config: <Ipv6 as IpDeviceIpExt>::AddressConfig<BC::Instant>,
     ) -> Result<Self::AddressId, ExistsError> {
         with_ip_device_state(self, device_id, |mut state| {
@@ -593,10 +593,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         &mut self,
         device_id: &Self::DeviceId,
         addr: Self::AddressId,
-    ) -> (
-        AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
-        <Ipv6 as IpDeviceIpExt>::AddressConfig<BC::Instant>,
-    ) {
+    ) -> (AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, <Ipv6 as IpDeviceIpExt>::AddressConfig<BC::Instant>)
+    {
         let primary = with_ip_device_state(self, device_id, |mut state| {
             state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>().remove(&addr.addr())
         })

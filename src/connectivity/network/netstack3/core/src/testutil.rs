@@ -27,7 +27,7 @@ use net_types::{
     SpecifiedAddr, UnicastAddr,
 };
 #[cfg(test)]
-use net_types::{ip::IpAddr, MulticastAddr, Witness as _};
+use net_types::{ip::IpAddr, MulticastAddr, NonMappedAddr, Witness as _};
 use packet::{Buf, BufferMut};
 #[cfg(test)]
 use packet_formats::ip::IpProto;
@@ -47,7 +47,10 @@ use tracing_subscriber::{
 };
 
 #[cfg(test)]
-use crate::{context::testutil::InstantAndData, ip::SendIpPacketMeta};
+use crate::{
+    context::testutil::InstantAndData,
+    ip::{device::Ipv6DeviceAddr, SendIpPacketMeta},
+};
 use crate::{
     context::{
         testutil::{
@@ -851,6 +854,16 @@ impl<A: IpAddress> FakeEventDispatcherConfig<A> {
     /// Shorthand for `FakeEventDispatcherBuilder::from_config(self)`.
     pub(crate) fn into_builder(self) -> FakeEventDispatcherBuilder {
         FakeEventDispatcherBuilder::from_config(self)
+    }
+}
+
+#[cfg(test)]
+impl FakeEventDispatcherConfig<Ipv6Addr> {
+    pub(crate) fn local_ipv6_device_addr(&self) -> Ipv6DeviceAddr {
+        NonMappedAddr::new(UnicastAddr::try_from(self.local_ip).unwrap()).unwrap()
+    }
+    pub(crate) fn remote_ipv6_device_addr(&self) -> Ipv6DeviceAddr {
+        NonMappedAddr::new(UnicastAddr::try_from(self.remote_ip).unwrap()).unwrap()
     }
 }
 

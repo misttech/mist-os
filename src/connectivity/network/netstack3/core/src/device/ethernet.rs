@@ -1511,9 +1511,9 @@ mod tests {
             testutil::{
                 set_forwarding_enabled, update_ipv6_configuration, FakeDeviceId, FakeWeakDeviceId,
             },
-            DeviceId,
+            AddIpAddrSubnetError, DeviceId,
         },
-        error::{ExistsError, NotFoundError},
+        error::NotFoundError,
         ip::{
             device::{
                 nud::{self, DynamicNeighborUpdateSource},
@@ -2360,7 +2360,7 @@ mod tests {
         assert_eq!(
             crate::device::add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, as2)
                 .unwrap_err(),
-            ExistsError,
+            AddIpAddrSubnetError::Exists,
         );
         assert!(!contains_addr(&core_ctx, &device, ip1));
         assert!(contains_addr(&core_ctx, &device, ip2));
@@ -2375,7 +2375,7 @@ mod tests {
                 AddrSubnet::new(ip2.get(), prefix - 1).unwrap()
             )
             .unwrap_err(),
-            ExistsError,
+            AddIpAddrSubnetError::Exists,
         );
         assert!(!contains_addr(&core_ctx, &device, ip1));
         assert!(contains_addr(&core_ctx, &device, ip2));
@@ -2828,8 +2828,8 @@ mod tests {
                 .addrs
                 .read()
                 .iter()
-                .map(|entry| entry.addr_sub().addr())
-                .collect::<Vec<_>>(),
+                .map(|entry| entry.addr_sub().addr().get())
+                .collect::<Vec<UnicastAddr<_>>>(),
             [config.local_mac.to_ipv6_link_local().addr().get()]
         );
         crate::device::add_ip_addr_subnet(
@@ -2847,8 +2847,8 @@ mod tests {
             .addrs
             .read()
             .iter()
-            .map(|entry| entry.addr_sub().addr().get())
-            .collect();
+            .map(|entry| entry.addr_sub().addr().into())
+            .collect::<Vec<Ipv6Addr>>();
         assert_eq!(
             addr_subs,
             [

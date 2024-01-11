@@ -224,7 +224,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                     core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
                     bindings_ctx.on_event(DadEvent::AddressAssigned {
                         device: device_id.clone(),
-                        addr: addr.addr_sub().addr(),
+                        addr: addr.addr_sub().addr().get(),
                     });
                     false
                 }
@@ -248,7 +248,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                             retrans_timer.get(),
                             DadTimerId {
                                 device_id: device_id.clone(),
-                                addr: addr.addr_sub().addr()
+                                addr: addr.addr_sub().addr().get()
                             }
                         ),
                         None,
@@ -327,7 +327,7 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> fo
                         assert_ne!(
                             bindings_ctx.cancel_timer(DadTimerId {
                                 device_id: device_id.clone(),
-                                addr: addr.addr_sub().addr(),
+                                addr: addr.addr_sub().addr().get(),
                             }),
                             None,
                         );
@@ -392,7 +392,7 @@ mod tests {
             InstantContext as _, SendFrameContext as _,
         },
         device::testutil::FakeDeviceId,
-        ip::testutil::FakeIpDeviceIdCtx,
+        ip::{device::Ipv6DeviceAddr, testutil::FakeIpDeviceIdCtx},
     };
 
     struct FakeDadAddressContext {
@@ -411,7 +411,7 @@ mod tests {
     }
 
     impl IpDeviceAddressIdContext<Ipv6> for FakeAddressCtxImpl {
-        type AddressId = AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>;
+        type AddressId = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>;
     }
 
     impl DadAddressContext<FakeBindingsCtxImpl> for FakeAddressCtxImpl {
@@ -423,7 +423,7 @@ mod tests {
         ) -> O {
             let FakeDadAddressContext { addr, assigned, groups: _, ip_device_id_ctx: _ } =
                 self.get_mut();
-            assert_eq!(request_addr.addr(), *addr);
+            assert_eq!(*request_addr.addr(), *addr);
             cb(assigned)
         }
 
@@ -485,12 +485,12 @@ mod tests {
 
     type FakeCoreCtxImpl = FakeCoreCtx<FakeDadContext, DadMessageMeta, FakeDeviceId>;
 
-    fn get_address_id(addr: Ipv6Addr) -> AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
+    fn get_address_id(addr: Ipv6Addr) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
         AddrSubnet::new(addr, Ipv6Addr::BYTES * 8).unwrap()
     }
 
     impl IpDeviceAddressIdContext<Ipv6> for FakeCoreCtxImpl {
-        type AddressId = AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>;
+        type AddressId = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>;
     }
 
     impl DadContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
@@ -513,7 +513,7 @@ mod tests {
             let FakeDadContext { state, retrans_timer, max_dad_transmits, address_ctx } =
                 self.get_mut();
             cb(DadStateRef {
-                state: (address_ctx.get_ref().addr == request_addr.addr())
+                state: (address_ctx.get_ref().addr == request_addr.addr().get())
                     .then(|| DadAddressStateRef { dad_state: state, core_ctx: address_ctx }),
                 retrans_timer,
                 max_dad_transmits,

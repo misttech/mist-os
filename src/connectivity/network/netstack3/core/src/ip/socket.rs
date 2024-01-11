@@ -637,10 +637,10 @@ pub(crate) mod ipv6_source_address_selection {
 
     use super::*;
 
-    use crate::ip::device::state::Ipv6AddressFlags;
+    use crate::ip::device::{state::Ipv6AddressFlags, Ipv6DeviceAddr};
 
     pub(crate) struct SasCandidate<D> {
-        pub(crate) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        pub(crate) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         pub(crate) flags: Ipv6AddressFlags,
         pub(crate) device: D,
     }
@@ -683,6 +683,9 @@ pub(crate) mod ipv6_source_address_selection {
             .filter(|SasCandidate { addr_sub: _, flags, device: _ }| flags.assigned)
             .max_by(|a, b| select_ipv6_source_address_cmp(remote_ip, outbound_device, a, b))
             .map(|SasCandidate { addr_sub, flags: _, device: _ }| addr_sub.addr())
+            // TODO(https://fxbug.dev/42082235): Plumb the `NonMappedAddr` up to
+            // the socket layer.
+            .map(|a: Ipv6DeviceAddr| *a)
     }
 
     /// Comparison operator used by `select_ipv6_source_address`.
@@ -770,8 +773,8 @@ pub(crate) mod ipv6_source_address_selection {
 
     fn rule_8(
         remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
-        a: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
-        b: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        a: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
+        b: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     ) -> Ordering {
         let remote_ip = match remote_ip {
             Some(remote_ip) => remote_ip,
@@ -787,7 +790,7 @@ pub(crate) mod ipv6_source_address_selection {
         //   interface ID).  For example, CommonPrefixLen(fe80::1, fe80::2) is
         //   64.
         fn common_prefix_len(
-            src: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+            src: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
             dst: SpecifiedAddr<Ipv6Addr>,
         ) -> u8 {
             core::cmp::min(src.addr().common_prefix_len(&dst), src.subnet().prefix())

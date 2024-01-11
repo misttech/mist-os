@@ -453,6 +453,57 @@ async fn add_address_errors<N: Netstack>(name: &str) {
     }
 }
 
+#[netstack_test]
+async fn add_ipv4_mapped_ipv6_address<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    let fidl_fuchsia_net_interfaces_ext::Properties {
+        id: loopback_id,
+        addresses: _,
+        name: _,
+        device_class: _,
+        online: _,
+        has_default_ipv4_route: _,
+        has_default_ipv6_route: _,
+    } = realm
+        .loopback_properties()
+        .await
+        .expect("failed to get loopback properties")
+        .expect("loopback not found");
+
+    let control = realm
+        .interface_control(loopback_id.get())
+        .expect("failed to get loopback interface control client proxy");
+
+    let mapped_address =
+        fidl_fuchsia_net::Subnet { addr: fidl_ip!("::FFFF:192.0.2.1"), prefix_len: 128 };
+
+    // NS2 is more permissive than NS3 when validating interface addresses, and
+    // allows IPv4-mapped-IPv6 addresses to be assigned.
+    let assertion = |result| match N::VERSION {
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
+            assert_matches::assert_matches!(
+                result,
+                Err(fnet_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(
+                    finterfaces_admin::AddressRemovalReason::Invalid,
+                ))
+            )
+        }
+        NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => {
+            assert_matches::assert_matches!(result, Ok(_))
+        }
+    };
+    assertion(
+        interfaces::add_address_wait_assigned(
+            &control,
+            mapped_address,
+            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+        )
+        .await,
+    )
+}
+
 #[derive(Clone, Copy, Debug)]
 enum AddressRemovalMethod {
     InterfaceControl,

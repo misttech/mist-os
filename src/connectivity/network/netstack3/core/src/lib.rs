@@ -81,8 +81,9 @@ pub mod device {
 
     // Re-exported types.
     pub use base::{
-        DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, DevicesVisitor,
-        InspectDeviceState, NeighborVisitor, RemoveDeviceResult, RemoveDeviceResultWithContext,
+        AddIpAddrSubnetError, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
+        DeviceSendFrameError, DevicesVisitor, InspectDeviceState, NeighborVisitor,
+        RemoveDeviceResult, RemoveDeviceResultWithContext,
     };
     pub use config::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,

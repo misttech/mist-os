@@ -18,7 +18,7 @@ use const_unwrap::const_unwrap_option;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet},
-    UnicastAddr, Witness as _,
+    Witness as _,
 };
 use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
 use rand::{distributions::Uniform, Rng as _, RngCore};
@@ -34,7 +34,10 @@ use crate::{
     counters::Counter,
     device::{AnyDevice, DeviceIdContext, Id},
     error::{ExistsError, NotFoundError},
-    ip::device::state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
+    ip::device::{
+        state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
+        Ipv6DeviceAddr,
+    },
     BindingsContext, CoreCtx, Instant, StackState,
 };
 
@@ -54,12 +57,12 @@ const REQUIRED_PREFIX_BITS: u8 = 64;
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 enum InnerSlaacTimerId {
     /// Timer to deprecate an address configured via SLAAC.
-    DeprecateSlaacAddress { addr: UnicastAddr<Ipv6Addr> },
+    DeprecateSlaacAddress { addr: Ipv6DeviceAddr },
     /// Timer to invalidate an address configured via SLAAC.
-    InvalidateSlaacAddress { addr: UnicastAddr<Ipv6Addr> },
+    InvalidateSlaacAddress { addr: Ipv6DeviceAddr },
     /// Timer to generate a new temporary SLAAC address before an existing one
     /// expires.
-    RegenerateTemporaryAddress { addr_subnet: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> },
+    RegenerateTemporaryAddress { addr_subnet: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> },
 }
 
 /// A timer ID for SLAAC.
@@ -79,21 +82,21 @@ impl<DeviceId> SlaacTimerId<DeviceId> {
 impl<DeviceId> SlaacTimerId<DeviceId> {
     pub(crate) fn new_deprecate_slaac_address(
         device_id: DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
+        addr: Ipv6DeviceAddr,
     ) -> SlaacTimerId<DeviceId> {
         SlaacTimerId { device_id, inner: InnerSlaacTimerId::DeprecateSlaacAddress { addr } }
     }
 
     pub(crate) fn new_invalidate_slaac_address(
         device_id: DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
+        addr: Ipv6DeviceAddr,
     ) -> SlaacTimerId<DeviceId> {
         SlaacTimerId { device_id, inner: InnerSlaacTimerId::InvalidateSlaacAddress { addr } }
     }
 
     pub(crate) fn new_regenerate_temporary_slaac_address(
         device_id: DeviceId,
-        addr_subnet: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        addr_subnet: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     ) -> SlaacTimerId<DeviceId> {
         SlaacTimerId {
             device_id,
@@ -105,14 +108,14 @@ impl<DeviceId> SlaacTimerId<DeviceId> {
 /// The state associated with a SLAAC address.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) struct SlaacAddressEntry<Instant> {
-    pub(super) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+    pub(super) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     pub(super) config: SlaacConfig<Instant>,
     pub(super) deprecated: bool,
 }
 
 /// A mutable view into state associated with a SLAAC address's mutable state.
 pub(super) struct SlaacAddressEntryMut<'a, Instant> {
-    pub(super) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+    pub(super) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     pub(super) config: &'a mut SlaacConfig<Instant>,
     pub(super) deprecated: &'a mut bool,
 }
@@ -134,7 +137,7 @@ pub(super) trait SlaacAddresses<BC: InstantContext> {
     fn add_addr_sub_and_then<O, F: FnOnce(SlaacAddressEntryMut<'_, BC::Instant>, &mut BC) -> O>(
         &mut self,
         bindings_ctx: &mut BC,
-        addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         config: SlaacConfig<BC::Instant>,
         and_then: F,
     ) -> Result<O, ExistsError>;
@@ -147,11 +150,8 @@ pub(super) trait SlaacAddresses<BC: InstantContext> {
     fn remove_addr(
         &mut self,
         bindings_ctx: &mut BC,
-        addr: &UnicastAddr<Ipv6Addr>,
-    ) -> Result<
-        (AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, SlaacConfig<BC::Instant>),
-        NotFoundError,
-    >;
+        addr: &Ipv6DeviceAddr,
+    ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<BC::Instant>), NotFoundError>;
 }
 
 pub(super) struct SlaacAddrsMutAndConfig<'a, BC: InstantContext, A: SlaacAddresses<BC>> {
@@ -286,7 +286,7 @@ pub(crate) trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        addr: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        addr: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         state: SlaacConfig<BC::Instant>,
         reason: DelIpv6AddrReason,
     );
@@ -427,7 +427,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         state: SlaacConfig<BC::Instant>,
         reason: DelIpv6AddrReason,
     ) {
@@ -1099,7 +1099,7 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: S
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    addr_subnet: &AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+    addr_subnet: &AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
 ) {
     core_ctx.with_slaac_addrs_mut_and_configs(
         device_id,
@@ -1303,7 +1303,7 @@ fn has_iana_allowed_iid(address: Ipv6Addr) -> bool {
 fn generate_global_static_address(
     prefix: &Subnet<Ipv6Addr>,
     iid: &[u8],
-) -> AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
+) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
     if prefix.prefix() % 8 != 0 {
         unimplemented!("generate_global_address: not implemented for when prefix length is not a multiple of 8 bits");
     }
@@ -1339,7 +1339,7 @@ fn generate_global_temporary_address(
     iid: &[u8; 8],
     seed: u64,
     secret_key: &[u8; STABLE_IID_SECRET_KEY_BYTES],
-) -> AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
+) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
     let prefix_len = usize::from(prefix.prefix() / 8);
 
     assert_eq!(usize::from(Ipv6Addr::BYTES) - prefix_len, iid.len());
@@ -1660,7 +1660,7 @@ mod tests {
     use assert_matches::assert_matches;
 
     use net_declare::net::ip_v6;
-    use net_types::{ethernet::Mac, ip::Ipv6, LinkLocalAddress as _};
+    use net_types::{ethernet::Mac, ip::Ipv6, LinkLocalAddress as _, NonMappedAddr};
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         icmp::{
@@ -1721,7 +1721,7 @@ mod tests {
     #[derive(Default)]
     struct FakeSlaacAddrs {
         slaac_addrs: Vec<SlaacAddressEntry<FakeInstant>>,
-        non_slaac_addr: Option<UnicastAddr<Ipv6Addr>>,
+        non_slaac_addr: Option<Ipv6DeviceAddr>,
         counters: SlaacCounters,
     }
 
@@ -1759,7 +1759,7 @@ mod tests {
         >(
             &mut self,
             bindings_ctx: &mut FakeBindingsCtxImpl,
-            add_addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+            add_addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
             config: SlaacConfig<FakeInstant>,
             and_then: F,
         ) -> Result<O, ExistsError> {
@@ -1791,11 +1791,9 @@ mod tests {
         fn remove_addr(
             &mut self,
             _bindings_ctx: &mut FakeBindingsCtxImpl,
-            addr: &UnicastAddr<Ipv6Addr>,
-        ) -> Result<
-            (AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, SlaacConfig<FakeInstant>),
-            NotFoundError,
-        > {
+            addr: &Ipv6DeviceAddr,
+        ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<FakeInstant>), NotFoundError>
+        {
             let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
 
             slaac_addrs
@@ -1898,7 +1896,7 @@ mod tests {
     fn calculate_addr_sub(
         subnet: Subnet<Ipv6Addr>,
         iid: [u8; 8],
-    ) -> AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
+    ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
         let mut bytes = subnet.network().ipv6_bytes();
         bytes[8..].copy_from_slice(&iid);
         AddrSubnet::new(Ipv6Addr::from_bytes(bytes), subnet.prefix()).unwrap()
@@ -2848,8 +2846,8 @@ mod tests {
         let (stable_addr_sub, temp_addr_sub) = assert_matches!(
             addrs[..],
             [a1, a2] => {
-                let a1 = a1.to_unicast();
-                let a2 = a2.to_unicast();
+                let a1 = a1.to_unicast().add_witness::<NonMappedAddr<_>>().unwrap();
+                let a2 = a2.to_unicast().add_witness::<NonMappedAddr<_>>().unwrap();
 
                 assert_eq!(a1.subnet(), SUBNET);
                 assert_eq!(a2.subnet(), SUBNET);

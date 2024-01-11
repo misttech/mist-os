@@ -14,9 +14,10 @@ use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnetEither, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu,
+        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6,
+        Ipv6Addr, Mtu,
     },
-    BroadcastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
+    BroadcastAddr, MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{Buf, BufferMut};
 use smallvec::SmallVec;
@@ -58,7 +59,7 @@ use crate::{
                 Ipv4DeviceConfigurationAndFlags, Ipv6DeviceConfigurationAndFlags, Lifetime,
             },
             DelIpv6Addr, DualStackDeviceHandler, IpDeviceIpExt, IpDeviceStateContext,
-            Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+            Ipv4DeviceConfigurationUpdate, Ipv6DeviceAddr, Ipv6DeviceConfigurationUpdate,
             PendingIpv4DeviceConfigurationUpdate, PendingIpv6DeviceConfigurationUpdate,
         },
         forwarding::IpForwardingDeviceContext,
@@ -947,6 +948,16 @@ pub fn get_all_ip_addr_subnets<BC: BindingsContext>(
     DualStackDeviceHandler::get_all_ip_addr_subnets(&mut CoreCtx::new_deprecated(core_ctx), device)
 }
 
+/// Errors that can be returned by the [`add_ip_addr_subnet`] function.
+#[derive(Debug, Eq, PartialEq)]
+pub enum AddIpAddrSubnetError {
+    /// The address is already assigned to this device.
+    Exists,
+    /// The address is invalid and cannot be assigned to any device. For
+    /// example, and IPv4-mapped-IPv6 address.
+    InvalidAddr,
+}
+
 /// Adds an IP address and associated subnet to this device.
 ///
 /// For IPv6, this function also joins the solicited-node multicast group and
@@ -956,7 +967,7 @@ pub fn add_ip_addr_subnet<BC: BindingsContext>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
     addr_sub_and_config: impl Into<AddrSubnetAndManualConfigEither<BC::Instant>>,
-) -> Result<(), ExistsError> {
+) -> Result<(), AddIpAddrSubnetError> {
     let addr_sub_and_config = addr_sub_and_config.into();
     trace!(
         "add_ip_addr_subnet: adding addr_sub_and_config {:?} to device {:?}",
@@ -974,8 +985,13 @@ pub fn add_ip_addr_subnet<BC: BindingsContext>(
                 addr_sub,
                 config,
             )
+            .map_err(|ExistsError| AddIpAddrSubnetError::Exists)
         }
         AddrSubnetAndManualConfigEither::V6(addr_sub, config) => {
+            let addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> = addr_sub
+                .to_unicast()
+                .add_witness::<NonMappedAddr<_>>()
+                .ok_or(AddIpAddrSubnetError::InvalidAddr)?;
             crate::ip::device::add_ipv6_addr_subnet(
                 &mut core_ctx,
                 bindings_ctx,
@@ -983,6 +999,7 @@ pub fn add_ip_addr_subnet<BC: BindingsContext>(
                 addr_sub,
                 config,
             )
+            .map_err(|ExistsError| AddIpAddrSubnetError::Exists)
         }
     }
 }
@@ -1790,7 +1807,7 @@ mod tests {
         // Add IP again (already exists).
         assert_eq!(
             add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, addr_subnet).unwrap_err(),
-            error::ExistsError
+            AddIpAddrSubnetError::Exists,
         );
         assert_eq!(
             get_all_ip_addr_subnets(&core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
@@ -1802,7 +1819,7 @@ mod tests {
         assert_eq!(
             add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, wrong_addr_subnet)
                 .unwrap_err(),
-            error::ExistsError
+            AddIpAddrSubnetError::Exists,
         );
         assert_eq!(
             get_all_ip_addr_subnets(&core_ctx, &device).into_iter().find(|&a| a == addr_subnet),

@@ -52,7 +52,7 @@ use crate::{
                 Ipv6DeviceConfiguration, SlaacConfig,
             },
             AddressRemovedReason, DelIpv6Addr, IpAddressId, IpDeviceBindingsContext, IpDeviceIpExt,
-            IpDeviceSendContext, IpDeviceStateContext,
+            IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
         },
         gmp::{
             self,
@@ -162,7 +162,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     fn add_addr_sub_and_then<O, F: FnOnce(SlaacAddressEntryMut<'_, BC::Instant>, &mut BC) -> O>(
         &mut self,
         bindings_ctx: &mut BC,
-        add_addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        add_addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         slaac_config: SlaacConfig<BC::Instant>,
         and_then: F,
     ) -> Result<O, ExistsError> {
@@ -200,11 +200,9 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     fn remove_addr(
         &mut self,
         bindings_ctx: &mut BC,
-        addr: &UnicastAddr<Ipv6Addr>,
-    ) -> Result<
-        (AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, SlaacConfig<BC::Instant>),
-        NotFoundError,
-    > {
+        addr: &Ipv6DeviceAddr,
+    ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<BC::Instant>), NotFoundError>
+    {
         let SlaacAddrs { core_ctx, device_id, config, _marker } = self;
         del_ipv6_addr_with_config(
             core_ctx,
@@ -1364,7 +1362,7 @@ impl<
                              config: _,
                          }| {
                             if *assigned {
-                                LinkLocalUnicastAddr::new(addr_id.addr_sub().addr())
+                                LinkLocalUnicastAddr::new(addr_id.addr_sub().addr().get())
                             } else {
                                 None
                             }

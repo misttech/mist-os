@@ -799,7 +799,13 @@ fn add_loopback_ip_addrs<BC: BindingsContext>(
                 .expect("error creating IPv6 loopback AddrSub"),
         ),
     ] {
-        netstack3_core::device::add_ip_addr_subnet(core_ctx, bindings_ctx, loopback, addr_subnet)?
+        netstack3_core::device::add_ip_addr_subnet(core_ctx, bindings_ctx, loopback, addr_subnet)
+            .map_err(|e| match e {
+                netstack3_core::device::AddIpAddrSubnetError::Exists => NetstackError::Exists,
+                netstack3_core::device::AddIpAddrSubnetError::InvalidAddr => {
+                    panic!("loopback address should not be invalid")
+                }
+            })?
     }
     Ok(())
 }

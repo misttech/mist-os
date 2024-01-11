@@ -15,7 +15,7 @@ use net_types::{
         AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr,
         Ipv6, Ipv6Addr,
     },
-    SpecifiedAddr, UnicastAddr, Witness,
+    SpecifiedAddr, Witness,
 };
 use packet_formats::utils::NonZeroDuration;
 
@@ -23,7 +23,7 @@ use crate::{
     ip::{
         device::{
             route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration, IpAddressId,
-            IpDeviceIpExt,
+            IpDeviceIpExt, Ipv6DeviceAddr,
         },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
     },
@@ -94,7 +94,7 @@ impl<I: Instant> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<I>> {
         self.addr_sub.addr().into_specified()
     }
 
-    fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
+    fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
         self.addr_sub
     }
 }
@@ -917,14 +917,14 @@ pub struct Ipv6AddressState<Instant> {
 // TODO(https://fxbug.dev/91753): Should this be generalized for loopback?
 #[derive(Debug)]
 pub struct Ipv6AddressEntry<Instant> {
-    pub(crate) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+    pub(crate) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     pub(crate) dad_state: Mutex<Ipv6DadState>,
     pub(crate) state: RwLock<Ipv6AddressState<Instant>>,
 }
 
 impl<Instant> Ipv6AddressEntry<Instant> {
     pub(crate) fn new(
-        addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         dad_state: Ipv6DadState,
         config: Ipv6AddrConfig<Instant>,
     ) -> Self {
@@ -944,7 +944,7 @@ impl<Instant> Ipv6AddressEntry<Instant> {
         }
     }
 
-    pub(crate) fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
+    pub(crate) fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
         &self.addr_sub
     }
 }

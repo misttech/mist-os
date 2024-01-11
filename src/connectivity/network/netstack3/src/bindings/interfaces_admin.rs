@@ -1201,15 +1201,19 @@ async fn run_address_state_provider(
         )
     };
     let (state_to_remove_from_core, removal_reason) = match add_to_core_result {
-        Err(netstack3_core::error::ExistsError) => {
-            send_address_removal_event(
-                *address,
-                id,
-                control_handle.clone(),
-                fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned,
-            );
-            // The address already existed, so don't attempt to remove it.
-            // Otherwise we would accidentally remove an address we didn't add!
+        Err(e) => {
+            let removal_reason = match e {
+                netstack3_core::device::AddIpAddrSubnetError::Exists => {
+                    fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
+                }
+                netstack3_core::device::AddIpAddrSubnetError::InvalidAddr => {
+                    fnet_interfaces_admin::AddressRemovalReason::Invalid
+                }
+            };
+            send_address_removal_event(*address, id, control_handle.clone(), removal_reason);
+            // The address wasn't added, so don't attempt to remove it. In the
+            // `AlreadyAssigned` case, this ensures we don't accidentally remove
+            // an address we didn't add.
             (StateInCore { address: false, subnet_route: None }, None)
         }
         Ok(()) => {

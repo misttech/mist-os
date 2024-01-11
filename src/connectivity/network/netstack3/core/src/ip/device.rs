@@ -20,7 +20,7 @@ use net_types::{
         AddrSubnet, AddrSubnetEither, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
         Ipv6SourceAddr, Mtu, Subnet,
     },
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
+    MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::{
@@ -271,11 +271,14 @@ impl IpDeviceIpExt for Ipv6 {
     type State<I: Instant> = Ipv6DeviceState<I>;
     type Configuration = Ipv6DeviceConfiguration;
     type Timer<DeviceId> = Ipv6DeviceTimerId<DeviceId>;
-    type AssignedWitness = UnicastAddr<Ipv6Addr>;
+    type AssignedWitness = Ipv6DeviceAddr;
     type AddressConfig<I> = Ipv6AddrConfig<I>;
     type ManualAddressConfig<I> = Ipv6AddrManualConfig<I>;
     type AddressState<I> = Ipv6AddressState<I>;
 }
+
+/// An IPv6 address that witnesses properties needed to be assigned to a device.
+pub(crate) type Ipv6DeviceAddr = NonMappedAddr<UnicastAddr<Ipv6Addr>>;
 
 /// IP address assignment states.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -1460,7 +1463,7 @@ pub(crate) fn add_ipv6_addr_subnet<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    addr_sub: AddrSubnet<Ipv6Addr>,
+    addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     addr_config: Ipv6AddrManualConfig<BC::Instant>,
 ) -> Result<(), ExistsError> {
     core_ctx.with_ipv6_device_configuration(device_id, |config, mut core_ctx| {
@@ -1483,7 +1486,7 @@ fn add_ipv6_addr_subnet_with_config<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    addr_sub: AddrSubnet<Ipv6Addr>,
+    addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     addr_config: Ipv6AddrConfig<BC::Instant>,
     // Not used but required to make sure that the caller is currently holding a
     // a reference to the IP device's IP configuration as a way to prove that
@@ -1491,8 +1494,6 @@ fn add_ipv6_addr_subnet_with_config<
     // device configuration.
     _device_config: &Ipv6DeviceConfiguration,
 ) -> Result<CC::AddressId, ExistsError> {
-    let addr_sub = addr_sub.to_unicast();
-
     let addr_id = core_ctx.add_ip_address(device_id, addr_sub, addr_config)?;
     assert_eq!(addr_id.addr(), addr_sub.addr().into_specified());
 
@@ -1613,8 +1614,7 @@ fn del_ipv6_addr_with_config<
     addr: DelIpv6Addr<CC::AddressId>,
     reason: AddressRemovedReason,
     _config: &Ipv6DeviceConfiguration,
-) -> Result<(AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>, Ipv6AddrConfig<BC::Instant>), NotFoundError>
-{
+) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, Ipv6AddrConfig<BC::Instant>), NotFoundError> {
     let addr_id = match addr {
         DelIpv6Addr::SpecifiedAddr(addr) => core_ctx.get_address_id(device_id, addr)?,
         DelIpv6Addr::AddressId(id) => id,
@@ -2561,7 +2561,7 @@ mod tests {
                 &mut CoreCtx::new_deprecated(*core_ctx),
                 device_id,
                 |addrs, _core_ctx| {
-                    addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
+                    addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
                 }
             ),
             HashSet::from([ll_addr.ipv6_unicast_addr()]),
@@ -2767,7 +2767,7 @@ mod tests {
             &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             &device_id,
-            ll_addr.to_witness(),
+            ll_addr.to_unicast().add_witness::<NonMappedAddr<_>>().unwrap(),
             Ipv6AddrManualConfig::default(),
         )
         .expect("add MAC based IPv6 link-local address");
@@ -2776,7 +2776,7 @@ mod tests {
                 &mut CoreCtx::new_deprecated(core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
-                    addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
+                    addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
                 }
             ),
             HashSet::from([ll_addr.ipv6_unicast_addr()])
@@ -2861,7 +2861,7 @@ mod tests {
                 &mut CoreCtx::new_deprecated(core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
-                    addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
+                    addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
                 }
             ),
             HashSet::from([ll_addr.ipv6_unicast_addr()]),
@@ -2986,7 +2986,7 @@ mod tests {
             bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
                 device: weak_device_id,
-                addr: assigned_addr.addr(),
+                addr: assigned_addr.addr().into(),
                 reason: AddressRemovedReason::DadFailed,
             }),]
         );
@@ -2996,7 +2996,7 @@ mod tests {
                 &mut CoreCtx::new_deprecated(core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
-                    addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
+                    addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
                 }
             ),
             HashSet::from([ll_addr.ipv6_unicast_addr()]),
@@ -3342,7 +3342,7 @@ mod tests {
                 &mut CoreCtx::new_deprecated(&core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
-                    addrs.map(|addr_id| addr_id.addr_sub().addr()).collect::<HashSet<_>>()
+                    addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
                 }
             ),
             expected_addrs,

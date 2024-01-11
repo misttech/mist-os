@@ -115,7 +115,7 @@ mod tests {
     use net_types::{
         ethernet::Mac,
         ip::{AddrSubnet, Ip as _, Ipv6, Ipv6Addr, Ipv6Scope, Mtu, Subnet},
-        ScopeableAddress as _, UnicastAddr, Witness as _,
+        NonMappedAddr, ScopeableAddress as _, UnicastAddr, Witness as _,
     };
     use packet::{Buf, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
@@ -169,7 +169,8 @@ mod tests {
                 },
                 testutil::with_assigned_ipv6_addr_subnets,
                 IpAddressId as _, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-                Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId,
+                Ipv6DeviceAddr, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
+                Ipv6DeviceTimerId,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
             receive_ip_packet,
@@ -187,13 +188,13 @@ mod tests {
 
     #[derive(Debug, PartialEq, Copy, Clone)]
     struct GlobalIpv6Addr<I> {
-        addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         flags: Ipv6AddressFlags,
         config: Ipv6AddrConfig<I>,
     }
 
     impl<I> GlobalIpv6Addr<I> {
-        fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>> {
+        fn addr_sub(&self) -> &AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
             &self.addr_sub
         }
     }
@@ -244,12 +245,12 @@ mod tests {
         UnicastAddr::new(Mac::new([6, 7, 8, 9, 10, 11])).unwrap()
     }
 
-    fn local_ip() -> UnicastAddr<Ipv6Addr> {
-        UnicastAddr::from_witness(FAKE_CONFIG_V6.local_ip).unwrap()
+    fn local_ip() -> Ipv6DeviceAddr {
+        FAKE_CONFIG_V6.local_ipv6_device_addr()
     }
 
-    fn remote_ip() -> UnicastAddr<Ipv6Addr> {
-        UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap()
+    fn remote_ip() -> Ipv6DeviceAddr {
+        FAKE_CONFIG_V6.remote_ipv6_device_addr()
     }
 
     impl TryFrom<DeviceId<crate::testutil::FakeBindingsCtx>> for EthernetDeviceId<FakeBindingsCtx> {
@@ -359,7 +360,7 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 &remote_device_id,
-                AddrSubnet::new(remote_ip().get(), 128).unwrap(),
+                AddrSubnet::<Ipv6Addr, _>::new(remote_ip().into(), 128).unwrap(),
             )
             .unwrap();
 
@@ -370,7 +371,7 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 &local_device_id,
-                AddrSubnet::new(local_ip().get(), 128).unwrap(),
+                AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
             )
             .unwrap();
 
@@ -519,10 +520,10 @@ mod tests {
 
     fn dad_timer_id(
         id: EthernetDeviceId<FakeBindingsCtx>,
-        addr: UnicastAddr<Ipv6Addr>,
+        addr: Ipv6DeviceAddr,
     ) -> TimerId<crate::testutil::FakeBindingsCtx> {
         TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Dad(
-            crate::ip::device::dad::DadTimerId { device_id: id.into(), addr },
+            crate::ip::device::dad::DadTimerId { device_id: id.into(), addr: addr.get() },
         )))
     }
 
@@ -556,7 +557,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let addr = AddrSubnet::new(local_ip().get(), 128).unwrap();
+        let addr = AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap();
         let multicast_addr = local_ip().to_solicited_node_address();
         net.with_context("local", |Ctx { core_ctx, bindings_ctx }| {
             let _: Ipv6DeviceConfigurationUpdate =
@@ -652,7 +653,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &dev_id,
-            AddrSubnet::new(addr.get(), 128).unwrap(),
+            AddrSubnet::<Ipv6Addr, _>::new(addr.into(), 128).unwrap(),
         )
         .unwrap();
         assert_eq!(get_address_assigned(&core_ctx, &dev_id, addr,), Some(false));
@@ -663,7 +664,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &dev_id,
-            AddrSubnet::new(addr.get(), 128).unwrap(),
+            AddrSubnet::<Ipv6Addr, _>::new(addr.into(), 128).unwrap(),
         )
         .unwrap();
         assert_eq!(get_address_assigned(&core_ctx, &dev_id, addr,), Some(false));
@@ -701,7 +702,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &dev_id,
-            AddrSubnet::new(local_ip().get(), 128).unwrap(),
+            AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
         )
         .unwrap();
         for _ in 0..3 {
@@ -739,7 +740,7 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 &local_device_id,
-                AddrSubnet::new(local_ip().get(), 128).unwrap(),
+                AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
             )
             .unwrap();
         });
@@ -766,7 +767,7 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 &remote_device_id,
-                AddrSubnet::new(local_ip().get(), 128).unwrap(),
+                AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
             )
             .unwrap();
         });
@@ -808,7 +809,7 @@ mod tests {
     fn get_address_assigned(
         core_ctx: &crate::testutil::FakeCoreCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
-        addr: UnicastAddr<Ipv6Addr>,
+        addr: Ipv6DeviceAddr,
     ) -> Option<bool> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
             &mut CoreCtx::new_deprecated(core_ctx),
@@ -867,7 +868,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &dev_id,
-            AddrSubnet::new(local_ip().get(), 128).unwrap(),
+            AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
         )
         .unwrap();
         assert_matches!(get_address_assigned(&core_ctx, &dev_id, local_ip()), Some(false));
@@ -889,7 +890,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &dev_id,
-            AddrSubnet::new(remote_ip().get(), 128).unwrap(),
+            AddrSubnet::<Ipv6Addr, _>::new(remote_ip().into(), 128).unwrap(),
         )
         .unwrap();
         assert_matches!(get_address_assigned(&core_ctx, &dev_id, local_ip()), Some(false));
@@ -967,7 +968,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &dev_id,
-            AddrSubnet::new(local_ip().get(), 128).unwrap(),
+            AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
         )
         .unwrap();
         assert_matches!(get_address_assigned(&core_ctx, &dev_id, local_ip()), Some(false));
@@ -989,7 +990,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &dev_id,
-            AddrSubnet::new(remote_ip().get(), 128).unwrap(),
+            AddrSubnet::<Ipv6Addr, _>::new(remote_ip().into(), 128).unwrap(),
         )
         .unwrap();
         assert_matches!(get_address_assigned(&core_ctx, &dev_id, local_ip()), Some(false));
@@ -1672,10 +1673,7 @@ mod tests {
         )
         .unwrap();
         let device_id = device.clone().try_into().unwrap();
-        assert_eq!(
-            get_address_assigned(&core_ctx, &device, fake_config.local_ip.try_into().unwrap()),
-            Some(true)
-        );
+        assert_eq!(get_address_assigned(&core_ctx, &device, local_ip()), Some(true));
         assert_empty(bindings_ctx.frames_sent().iter());
         assert_empty(bindings_ctx.timer_ctx().timers());
 
@@ -1704,14 +1702,8 @@ mod tests {
             AddrSubnet::new(fake_config.remote_ip.get(), 128).unwrap(),
         )
         .unwrap();
-        assert_eq!(
-            get_address_assigned(&core_ctx, &device, fake_config.local_ip.try_into().unwrap()),
-            Some(true)
-        );
-        assert_eq!(
-            get_address_assigned(&core_ctx, &device, fake_config.remote_ip.try_into().unwrap()),
-            Some(false)
-        );
+        assert_eq!(get_address_assigned(&core_ctx, &device, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&core_ctx, &device, remote_ip()), Some(false));
         assert_eq!(bindings_ctx.frames_sent().len(), 1);
         assert_eq!(bindings_ctx.timer_ctx().timers().len(), 1);
 
@@ -1723,7 +1715,7 @@ mod tests {
             Ipv6DeviceConfigurationUpdate { dad_transmits: Some(None), ..Default::default() },
         )
         .unwrap();
-        let expected_timer_id = dad_timer_id(device_id, fake_config.remote_ip.try_into().unwrap());
+        let expected_timer_id = dad_timer_id(device_id, remote_ip());
         // Allow already started DAD to complete (2 more more NS, 3 more timers).
         assert_eq!(
             bindings_ctx.trigger_next_timer(core_ctx, crate::handle_timer).unwrap(),
@@ -1740,10 +1732,7 @@ mod tests {
             expected_timer_id
         );
         assert_eq!(bindings_ctx.frames_sent().len(), 3);
-        assert_eq!(
-            get_address_assigned(&core_ctx, &device, fake_config.remote_ip.try_into().unwrap()),
-            Some(true)
-        );
+        assert_eq!(get_address_assigned(&core_ctx, &device, remote_ip()), Some(true));
 
         // Updating the IP should resolve immediately since DAD has just been
         // turned off.
@@ -1755,16 +1744,14 @@ mod tests {
             AddrSubnet::new(new_ip.get(), 128).unwrap(),
         )
         .unwrap();
+        assert_eq!(get_address_assigned(&core_ctx, &device, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&core_ctx, &device, remote_ip()), Some(true));
         assert_eq!(
-            get_address_assigned(&core_ctx, &device, fake_config.local_ip.try_into().unwrap()),
-            Some(true)
-        );
-        assert_eq!(
-            get_address_assigned(&core_ctx, &device, fake_config.remote_ip.try_into().unwrap()),
-            Some(true)
-        );
-        assert_eq!(
-            get_address_assigned(&core_ctx, &device, new_ip.try_into().unwrap()),
+            get_address_assigned(
+                &core_ctx,
+                &device,
+                NonMappedAddr::new(new_ip.try_into().unwrap()).unwrap()
+            ),
             Some(true)
         );
     }
@@ -1907,7 +1894,7 @@ mod tests {
     ) -> Option<(UnicastAddr<Ipv6Addr>, SlaacConfig<I>)> {
         match entry.config {
             Ipv6AddrConfig::Manual(_manual_config) => None,
-            Ipv6AddrConfig::Slaac(s) => Some((entry.addr_sub.addr(), s)),
+            Ipv6AddrConfig::Slaac(s) => Some((entry.addr_sub.addr().get(), s)),
         }
     }
 
@@ -2352,7 +2339,8 @@ mod tests {
         let prefix = subnet_v6!("0102:0304:0506:0708::/64");
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
         expected_addr[8..].copy_from_slice(&config.local_mac.to_eui64()[..]);
-        let expected_addr = UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap();
+        let expected_addr =
+            NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
         let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix.prefix()).unwrap();
 
         // Have no addresses yet.
@@ -2495,7 +2483,7 @@ mod tests {
     fn get_slaac_address_entry(
         core_ctx: &mut &crate::testutil::FakeCoreCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
-        addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+        addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     ) -> Option<GlobalIpv6Addr<FakeInstant>> {
         let mut matching_addrs = get_global_ipv6_addrs(core_ctx, device)
             .into_iter()
@@ -2552,7 +2540,7 @@ mod tests {
             device: &DeviceId<crate::testutil::FakeBindingsCtx>,
             src_ip: Ipv6Addr,
             subnet: Subnet<Ipv6Addr>,
-            addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
+            addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
             preferred_lifetime: u32,
             valid_lifetime: u32,
             expected_valid_lifetime: u32,
@@ -2617,7 +2605,8 @@ mod tests {
         let subnet = Subnet::new(prefix, prefix_length).unwrap();
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
         expected_addr[8..].copy_from_slice(&config.local_mac.to_eui64()[..]);
-        let expected_addr = UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap();
+        let expected_addr =
+            NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
         let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix_length).unwrap();
 
         // Have no addresses yet.
@@ -2923,7 +2912,7 @@ mod tests {
         core_ctx: &mut &crate::testutil::FakeCoreCtx,
         bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
-        source_ip: UnicastAddr<Ipv6Addr>,
+        source_ip: Ipv6DeviceAddr,
     ) {
         let peer_mac = mac!("00:11:22:33:44:55");
         let dest_ip = Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get();
@@ -2931,14 +2920,13 @@ mod tests {
         let solicited_flag = false;
         let override_flag = true;
 
-        let src_ip = source_ip.get();
         receive_ip_packet::<_, _, Ipv6>(
             core_ctx,
             bindings_ctx,
             &device,
             FrameDestination::Multicast,
             testutil::neighbor_advertisement_ip_packet(
-                src_ip,
+                source_ip.into(),
                 dest_ip,
                 router_flag,
                 solicited_flag,
@@ -3485,7 +3473,8 @@ mod tests {
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
         expected_addr[8..].copy_from_slice(&interface_identifier.to_be_bytes()[..8]);
-        let expected_addr = UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap();
+        let expected_addr =
+            NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
         let expected_addr_sub = AddrSubnet::from_witness(expected_addr, subnet.prefix()).unwrap();
 
         // Send an update with lifetimes that are smaller than the ones specified in the preferences.
@@ -3677,7 +3666,8 @@ mod tests {
         let prefix_length = 64;
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
         expected_addr[8..].copy_from_slice(&config.local_mac.to_eui64()[..]);
-        let expected_addr = UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap();
+        let expected_addr =
+            NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
 
         // Receive a new RA with new prefix (autonomous).
         //
@@ -3708,7 +3698,7 @@ mod tests {
         let now = bindings_ctx.now();
         let valid_until = now + Duration::from_secs(VALID_LIFETIME_SECS.into());
         let expected_address_entry = GlobalIpv6Addr {
-            addr_sub: AddrSubnet::new(expected_addr.get(), prefix_length).unwrap(),
+            addr_sub: AddrSubnet::<Ipv6Addr, _>::new(expected_addr.into(), prefix_length).unwrap(),
             config: Ipv6AddrConfig::Slaac(SlaacConfig::Static {
                 valid_until: Lifetime::Finite(valid_until),
             }),

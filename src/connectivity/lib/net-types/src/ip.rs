@@ -2827,6 +2827,13 @@ impl<S: IpAddress, A: Witness<S> + Copy> AddrSubnet<S, A> {
     {
         AddrSubnet { addr: self.addr.into(), subnet: self.subnet }
     }
+
+    /// Wraps an additional witness onto this [`AddrSubnet`].
+    #[inline]
+    pub fn add_witness<B: Witness<A> + Witness<S> + Copy>(&self) -> Option<AddrSubnet<S, B>> {
+        let addr = B::new(self.addr)?;
+        Some(AddrSubnet { addr, subnet: self.subnet })
+    }
 }
 
 impl<S: IpAddress, A: Witness<S> + Copy + Display> Display for AddrSubnet<S, A> {
