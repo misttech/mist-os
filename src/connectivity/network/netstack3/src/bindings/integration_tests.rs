@@ -854,12 +854,13 @@ async fn test_list_del_routes() {
 
     fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
         let mut ctx = ts.ctx();
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        netstack3_core::routes::get_all_routes(core_ctx)
+        ctx.api()
+            .routes_any()
+            .get_all_routes()
             .into_iter()
             .map(|entry| {
                 entry
-                    .try_into_fidl_with_ctx(&bindings_ctx)
+                    .try_into_fidl_with_ctx(ctx.bindings_ctx())
                     .expect("failed to map forwarding entry into FIDL")
             })
             .collect()

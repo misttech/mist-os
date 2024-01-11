@@ -8,21 +8,20 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddr, IpInvariant, Ipv4, Ipv6, Subnet},
+    ip::{GenericOverIp, Ip, Subnet},
     SpecifiedAddr,
 };
 use thiserror::Error;
 use tracing::debug;
 
 use crate::{
-    device::{AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes},
+    device::{AnyDevice, DeviceIdContext},
     ip::{
         types::{
             AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
         },
-        IpExt, IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
+        IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt,
     },
-    BindingsContext, CoreCtx, SyncCtx,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -50,74 +49,6 @@ impl From<crate::error::ExistsError> for AddRouteError {
     fn from(crate::error::ExistsError: crate::error::ExistsError) -> AddRouteError {
         AddRouteError::AlreadyExists
     }
-}
-
-/// Selects the device to use for gateway routes when the device was unspecified
-/// by the client.
-/// This can be used to construct an `Entry` from an `AddableEntry` the same
-/// way that the core routing table does.
-pub fn select_device_for_gateway<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    gateway: SpecifiedAddr<IpAddr>,
-) -> Option<DeviceId<BC>> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    match gateway.into() {
-        IpAddr::V4(gateway) => {
-            select_device_for_gateway_inner::<Ipv4, _, _>(&mut core_ctx, gateway)
-        }
-        IpAddr::V6(gateway) => {
-            select_device_for_gateway_inner::<Ipv6, _, _>(&mut core_ctx, gateway)
-        }
-    }
-}
-
-fn select_device_for_gateway_inner<
-    I: IpLayerIpExt,
-    BC: IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpStateContext<I, BC>,
->(
-    core_ctx: &mut CC,
-    gateway: SpecifiedAddr<I::Addr>,
-) -> Option<CC::DeviceId> {
-    core_ctx.with_ip_routing_table_mut(|core_ctx, table| {
-        table.lookup(core_ctx, None, *gateway).and_then(
-            |Destination { next_hop: found_next_hop, device: found_device }| match found_next_hop {
-                NextHop::RemoteAsNeighbor => Some(found_device),
-                NextHop::Gateway(_intermediary_gateway) => None,
-            },
-        )
-    })
-}
-
-/// Set the routes in the routing table.
-///
-/// While doing a full `set` of the routing table with each modification is
-/// suboptimal for performance, it simplifies the API exposed by core for route
-/// table modifications to allow for evolution of the routing table in the
-/// future.
-pub fn set_routes<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    entries: Vec<EntryAndGeneration<I::Addr, DeviceId<BC>>>,
-) {
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct Wrap<I: Ip, BC: BindingsContext>(Vec<EntryAndGeneration<I::Addr, DeviceId<BC>>>);
-
-    let () = net_types::map_ip_twice!(
-        I,
-        (IpInvariant((core_ctx, bindings_ctx)), Wrap(entries)),
-        |(IpInvariant((core_ctx, _bindings_ctx)), Wrap(mut entries))| {
-            let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-            // Make sure to sort the entries _before_ taking the routing table lock.
-            entries.sort_unstable_by(|a, b| {
-                OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
-            });
-            IpStateContext::<I, _>::with_ip_routing_table_mut(&mut core_ctx, |_core_ctx, table| {
-                table.table = entries;
-            });
-        },
-    );
 }
 
 /// Requests that a route be added to the forwarding table.
@@ -151,44 +82,6 @@ pub(crate) fn request_context_del_routes<
     })
 }
 
-/// Visitor for route table state.
-pub trait RoutesVisitor<'a, BT: DeviceLayerTypes + 'a> {
-    /// The result of [`RoutesVisitor::visit`].
-    type VisitResult;
-
-    /// Consumes an Entry iterator to produce a `VisitResult`.
-    fn visit<'b, I: Ip>(
-        &mut self,
-        stats: impl Iterator<Item = &'b Entry<I::Addr, DeviceId<BT>>> + 'b,
-    ) -> Self::VisitResult
-    where
-        'a: 'b;
-}
-
-/// Provides access to the state of the route table via a visitor.
-pub fn with_routes<'a, I, BC, V>(core_ctx: &SyncCtx<BC>, cb: &mut V) -> V::VisitResult
-where
-    I: IpExt,
-    BC: BindingsContext + 'a,
-    V: RoutesVisitor<'a, BC>,
-{
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let IpInvariant(r) = I::map_ip(
-        IpInvariant((&mut core_ctx, cb)),
-        |IpInvariant((core_ctx, cb))| {
-            IpInvariant(core_ctx.with_ip_routing_table(
-                |_core_ctx, table: &ForwardingTable<Ipv4, _>| cb.visit::<Ipv4>(table.iter_table()),
-            ))
-        },
-        |IpInvariant((core_ctx, cb))| {
-            IpInvariant(core_ctx.with_ip_routing_table(
-                |_core_ctx, table: &ForwardingTable<Ipv6, _>| cb.visit::<Ipv6>(table.iter_table()),
-            ))
-        },
-    );
-    r
-}
-
 /// An IP forwarding table.
 ///
 /// `ForwardingTable` maps destination subnets to the nearest IP hosts (on the
@@ -205,7 +98,7 @@ pub struct ForwardingTable<I: Ip, D> {
     /// Preference is determined first by longest prefix, then by lowest metric,
     /// then by locality (prefer on-link routes over off-link routes), and
     /// finally by the entry's tenure in the table.
-    table: Vec<EntryAndGeneration<I::Addr, D>>,
+    pub(super) table: Vec<EntryAndGeneration<I::Addr, D>>,
 }
 
 impl<I: Ip, D> Default for ForwardingTable<I, D> {
@@ -555,7 +448,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        device::testutil::MultipleDevicesId,
+        device::{testutil::MultipleDevicesId, DeviceId},
         error,
         ip::{
             forwarding::testutil::FakeIpForwardingCtx,
@@ -1224,12 +1117,12 @@ mod tests {
     #[test_case(true; "when there is an on-link route to the gateway")]
     #[test_case(false; "when there is no on-link route to the gateway")]
     fn select_device_for_gateway<I: Ip + TestIpExt>(on_link_route: bool) {
-        let crate::testutil::FakeCtx { core_ctx, mut bindings_ctx } =
-            crate::testutil::Ctx::new_with_builder(crate::state::StackStateBuilder::default());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let mut ctx = crate::testutil::Ctx::<crate::testutil::FakeBindingsCtx>::new_with_builder(
+            crate::state::StackStateBuilder::default(),
+        );
 
         let device_id: DeviceId<_> = crate::device::add_ethernet_device(
-            &core_ctx,
+            &ctx.core_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxEthernetFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
             crate::testutil::DEFAULT_INTERFACE_METRIC,
@@ -1257,7 +1150,7 @@ mod tests {
         .expect("should be specified");
 
         // Try to resolve a device for a gateway that we have no route to.
-        assert_eq!(super::select_device_for_gateway(&core_ctx, gateway), None);
+        assert_eq!(ctx.core_api().routes_any().select_device_for_gateway(gateway), None);
 
         // Add a route to the gateway.
         let route_to_add = if on_link_route {
@@ -1275,16 +1168,19 @@ mod tests {
             ))
         };
 
-        assert_eq!(crate::testutil::add_route(&core_ctx, &mut bindings_ctx, route_to_add), Ok(()));
+        assert_eq!(
+            crate::testutil::add_route(&ctx.core_ctx, &mut ctx.bindings_ctx, route_to_add),
+            Ok(())
+        );
 
         // It still won't resolve successfully because the device is not enabled yet.
-        assert_eq!(super::select_device_for_gateway(&core_ctx, gateway), None);
+        assert_eq!(ctx.core_api().routes_any().select_device_for_gateway(gateway), None);
 
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device_id);
+        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &device_id);
 
         // Now, try to resolve a device for the gateway.
         assert_eq!(
-            super::select_device_for_gateway(&core_ctx, gateway),
+            ctx.core_api().routes_any().select_device_for_gateway(gateway),
             if on_link_route { Some(device_id) } else { None }
         );
     }
@@ -1390,21 +1286,22 @@ mod tests {
 
     #[ip_test]
     fn test_route_tracks_interface_metric<I: Ip + TestIpExt>() {
-        let crate::testutil::FakeCtx { core_ctx, mut bindings_ctx } =
-            crate::testutil::Ctx::new_with_builder(crate::state::StackStateBuilder::default());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let mut ctx = crate::testutil::Ctx::<crate::testutil::FakeBindingsCtx>::new_with_builder(
+            crate::state::StackStateBuilder::default(),
+        );
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         let metric = RawMetric(9999);
         let device_id = crate::device::add_ethernet_device(
-            &core_ctx,
+            &ctx.core_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxEthernetFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
             metric,
         );
         assert_eq!(
             crate::testutil::add_route(
-                &core_ctx,
-                &mut bindings_ctx,
+                &ctx.core_ctx,
+                &mut ctx.bindings_ctx,
                 AddableEntryEither::from(AddableEntry::without_gateway(
                     I::FAKE_CONFIG.subnet,
                     device_id.clone().into(),
@@ -1414,7 +1311,7 @@ mod tests {
             Ok(())
         );
         assert_eq!(
-            crate::ip::get_all_routes(&core_ctx),
+            ctx.core_api().routes_any().get_all_routes(),
             &[Entry {
                 subnet: I::FAKE_CONFIG.subnet,
                 device: device_id.into(),

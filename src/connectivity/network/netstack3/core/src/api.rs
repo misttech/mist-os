@@ -9,7 +9,10 @@ use net_types::ip::Ip;
 use crate::{
     context::{ContextProvider, CoreCtx, CtxPair},
     device::socket::DeviceSocketApi,
-    ip::icmp::socket::IcmpEchoSocketApi,
+    ip::{
+        api::{RoutesAnyApi, RoutesApi},
+        icmp::socket::IcmpEchoSocketApi,
+    },
     transport::{tcp::socket::TcpApi, udp::UdpApi},
     BindingsTypes,
 };
@@ -53,6 +56,18 @@ where
     pub fn device_socket(self) -> DeviceSocketApi<CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         DeviceSocketApi::new(ctx)
+    }
+
+    /// Gets access to the routes API for IP version `I`.
+    pub fn routes<I: Ip>(self) -> RoutesApi<I, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        RoutesApi::new(ctx)
+    }
+
+    /// Gets access to the routes API for IP version `I`.
+    pub fn routes_any(self) -> RoutesAnyApi<CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        RoutesAnyApi::new(ctx)
     }
 }
 

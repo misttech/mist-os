@@ -96,15 +96,12 @@ impl StackFidlWorker {
             entry: AddableEntry<I::Addr, Option<DeviceId>>,
         ) -> Option<AddableEntry<I::Addr, DeviceId>> {
             let AddableEntry { subnet, device, gateway, metric } = entry;
-            let core_ctx = ctx.core_ctx();
             let (device, gateway) = match (device, gateway) {
                 (Some(device), gateway) => (device, gateway),
                 (None, gateway) => {
                     let gateway = gateway?;
-                    let device = netstack3_core::routes::select_device_for_gateway(
-                        core_ctx,
-                        gateway.into(),
-                    )?;
+                    let device =
+                        ctx.api().routes_any().select_device_for_gateway(gateway.into())?;
                     (device, Some(gateway))
                 }
             };

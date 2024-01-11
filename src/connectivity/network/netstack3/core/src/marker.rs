@@ -41,6 +41,7 @@ pub trait IpExt:
     IpLayerIpExt
     + IpDeviceIpExt
     + ip::icmp::IcmpIpExt
+    + ip::device::IpDeviceIpExt
     + transport::tcp::socket::DualStackIpExt
     + socket::datagram::DualStackIpExt
 {
@@ -50,6 +51,7 @@ impl<O> IpExt for O where
     O: ip::IpLayerIpExt
         + IpDeviceIpExt
         + ip::icmp::IcmpIpExt
+        + ip::device::IpDeviceIpExt
         + transport::tcp::socket::DualStackIpExt
         + socket::datagram::DualStackIpExt
 {

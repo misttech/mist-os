@@ -5642,8 +5642,8 @@ mod tests {
             > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>
             + CoreContext<I, testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx: TimerContext<
-            NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
-        >,
+                NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
+            > + crate::IpBindingsContext<I>,
     {
         let (mut net, local_device, remote_device) = new_test_net::<I>();
 

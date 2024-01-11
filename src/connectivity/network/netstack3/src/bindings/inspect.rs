@@ -97,14 +97,14 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 
 /// Publishes netstack3 routing table diagnostics data to Inspect.
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    impl<'a> netstack3_core::routes::RoutesVisitor<'a, BindingsCtx> for DualIpVisitor {
-        type VisitResult = ();
-        fn visit<'b, I: Ip>(
+    impl<'a, I: Ip> netstack3_core::routes::RoutesVisitor<'a, I, DeviceId<BindingsCtx>>
+        for DualIpVisitor
+    {
+        fn visit<'b>(
             &mut self,
             per_route: impl Iterator<Item = &'b netstack3_core::routes::Entry<I::Addr, DeviceId<BindingsCtx>>>
                 + 'b,
-        ) -> Self::VisitResult
-        where
+        ) where
             'a: 'b,
         {
             for route in per_route {
@@ -134,10 +134,9 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
-    let core_ctx = ctx.core_ctx();
     let mut visitor = DualIpVisitor::new();
-    netstack3_core::routes::with_routes::<Ipv4, BindingsCtx, _>(core_ctx, &mut visitor);
-    netstack3_core::routes::with_routes::<Ipv6, BindingsCtx, _>(core_ctx, &mut visitor);
+    ctx.api().routes::<Ipv4>().with_routes(&mut visitor);
+    ctx.api().routes::<Ipv6>().with_routes(&mut visitor);
     visitor.inspector
 }
 

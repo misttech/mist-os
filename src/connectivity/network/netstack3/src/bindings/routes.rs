@@ -29,10 +29,9 @@ use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
     SpecifiedAddr,
 };
-use netstack3_core::SyncCtx;
+use netstack3_core::{routes::AddableMetric, SyncCtx};
 
-use crate::bindings::{util::TryIntoFidlWithContext, BindingsCtx, Ctx};
-use netstack3_core::routes::AddableMetric;
+use crate::bindings::{util::TryIntoFidlWithContext, BindingsCtx, Ctx, IpExt};
 
 pub(crate) mod admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
@@ -372,7 +371,13 @@ pub(crate) struct Changes<A: IpAddress> {
     sender: mpsc::UnboundedSender<WorkItem<A>>,
 }
 
-impl<I: Ip> State<I> {
+impl<I> State<I>
+where
+    I: IpExt,
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
+{
     pub(crate) async fn run_changes(&mut self, mut ctx: Ctx) {
         let State { receiver, table, update_dispatcher } = self;
         pin_mut!(receiver);
@@ -412,14 +417,18 @@ fn to_entry<I: Ip>(
     addable_entry.resolve_metric(device_metric)
 }
 
-async fn handle_change<I: Ip>(
+async fn handle_change<I>(
     table: &mut Table<I::Addr>,
     ctx: &mut Ctx,
     change: Change<I::Addr>,
     route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
-) -> Result<ChangeOutcome, Error> {
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
+) -> Result<ChangeOutcome, Error>
+where
+    I: IpExt,
+    BindingsCtx: netstack3_core::IpBindingsContext<I>,
+    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
+        netstack3_core::CoreContext<I, BindingsCtx>,
+{
     tracing::debug!("routes::handle_change {change:?}");
 
     enum TableChange<I: Ip, Iter> {
@@ -436,7 +445,7 @@ async fn handle_change<I: Ip>(
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
                 TableModifyResult::TableChanged((addable_entry, _generation)) => {
-                    TableChange::Add(to_entry::<I>(core_ctx, addable_entry))
+                    TableChange::Add(to_entry::<I>(ctx.core_ctx(), addable_entry))
                 }
             }
         }
@@ -445,11 +454,7 @@ async fn handle_change<I: Ip>(
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
                 TableModifyResult::TableChanged(entries) => {
-                    TableChange::Remove(itertools::Either::Left(
-                        entries
-                            .into_iter()
-                            .map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
-                    ))
+                    TableChange::Remove(itertools::Either::Left(entries.into_iter()))
                 }
             }
         }
@@ -465,13 +470,9 @@ async fn handle_change<I: Ip>(
             ) {
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
-                TableModifyResult::TableChanged(entries) => {
-                    TableChange::Remove(itertools::Either::Right(itertools::Either::Left(
-                        entries
-                            .into_iter()
-                            .map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
-                    )))
-                }
+                TableModifyResult::TableChanged(entries) => TableChange::Remove(
+                    itertools::Either::Right(itertools::Either::Left(entries.into_iter())),
+                ),
             }
         }
         Change::RemoveMatchingDevice(device) => {
@@ -490,13 +491,11 @@ async fn handle_change<I: Ip>(
                          when globally removing a route"
                     )
                 }
-                TableModifyResult::TableChanged(routes_from_table) => TableChange::Remove(
-                    itertools::Either::Right(itertools::Either::Right(itertools::Either::Left(
-                        routes_from_table
-                            .into_iter()
-                            .map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
-                    ))),
-                ),
+                TableModifyResult::TableChanged(routes_from_table) => {
+                    TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
+                        itertools::Either::Left(routes_from_table.into_iter()),
+                    )))
+                }
             }
         }
         Change::RemoveSet(set) => {
@@ -505,26 +504,21 @@ async fn handle_change<I: Ip>(
                 return Ok(ChangeOutcome::NoChange);
             }
             TableChange::Remove(itertools::Either::Right(itertools::Either::Right(
-                itertools::Either::Right(
-                    entries.into_iter().map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
-                ),
+                itertools::Either::Right(entries.into_iter()),
             )))
         }
     };
 
-    netstack3_core::routes::set_routes::<I, _>(
-        core_ctx,
-        bindings_ctx,
-        table
-            .inner
-            .iter()
-            .map(|(entry, data)| {
-                let device_metric =
-                    netstack3_core::device::get_routing_metric(core_ctx, &entry.device);
-                entry.clone().resolve_metric(device_metric).with_generation(data.generation)
-            })
-            .collect::<Vec<_>>(),
-    );
+    let new_routes = table
+        .inner
+        .iter()
+        .map(|(entry, data)| {
+            let device_metric =
+                netstack3_core::device::get_routing_metric(ctx.core_ctx(), &entry.device);
+            entry.clone().resolve_metric(device_metric).with_generation(data.generation)
+        })
+        .collect::<Vec<_>>();
+    ctx.api().routes::<I>().set_routes(new_routes);
 
     match table_change {
         TableChange::Add(entry) => {
@@ -540,7 +534,7 @@ async fn handle_change<I: Ip>(
                     .count()
                     == 1
                 {
-                    bindings_ctx.notify_interface_update(
+                    ctx.bindings_ctx_mut().notify_interface_update(
                         &entry.device,
                         crate::bindings::InterfaceUpdate::DefaultRouteChanged {
                             version: I::VERSION,
@@ -550,7 +544,7 @@ async fn handle_change<I: Ip>(
                 }
             }
             let installed_route = entry
-                .try_into_fidl_with_ctx(bindings_ctx)
+                .try_into_fidl_with_ctx(ctx.bindings_ctx())
                 .expect("failed to convert route to FIDL");
             route_update_dispatcher
                 .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteAdded(
@@ -560,7 +554,14 @@ async fn handle_change<I: Ip>(
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
-            notify_removed_routes::<I>(bindings_ctx, route_update_dispatcher, removed, table).await;
+            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+            notify_removed_routes::<I>(
+                bindings_ctx,
+                route_update_dispatcher,
+                removed.map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
+                table,
+            )
+            .await;
         }
     };
 

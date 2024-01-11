@@ -1561,20 +1561,23 @@ mod tests {
 
     #[test]
     fn test_no_default_routes() {
-        let Ctx { core_ctx, bindings_ctx: _ } = crate::testutil::FakeCtx::default();
+        let mut ctx = crate::testutil::FakeCtx::default();
 
-        let _loopback_device: LoopbackDeviceId<_> =
-            crate::device::add_loopback_device(&core_ctx, Mtu::new(55), DEFAULT_INTERFACE_METRIC)
-                .expect("error adding loopback device");
+        let _loopback_device: LoopbackDeviceId<_> = crate::device::add_loopback_device(
+            &ctx.core_ctx,
+            Mtu::new(55),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .expect("error adding loopback device");
 
-        assert_eq!(crate::ip::get_all_routes(&core_ctx), []);
+        assert_eq!(ctx.core_api().routes_any().get_all_routes(), []);
         let _ethernet_device: EthernetDeviceId<_> = crate::device::add_ethernet_device(
-            &core_ctx,
+            &ctx.core_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             MaxEthernetFrameSize::MIN,
             DEFAULT_INTERFACE_METRIC,
         );
-        assert_eq!(crate::ip::get_all_routes(&core_ctx), []);
+        assert_eq!(ctx.core_api().routes_any().get_all_routes(), []);
     }
 
     #[test]

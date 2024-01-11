@@ -134,6 +134,7 @@ pub mod ip {
     #[macro_use]
     pub(crate) mod path_mtu;
 
+    pub(crate) mod api;
     pub(crate) mod base;
     pub(crate) mod device;
     pub(crate) mod forwarding;
@@ -175,15 +176,9 @@ pub mod neighbor {
 
 /// Types and utilities for dealing with routes.
 pub mod routes {
-    // Re-exported functions.
-    //
-    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
-    // objects.
-    pub use crate::ip::base::{get_all_routes, resolve_route};
-    pub use crate::ip::forwarding::{select_device_for_gateway, set_routes, with_routes};
-
     // Re-exported types.
-    pub use crate::ip::forwarding::{AddRouteError, RoutesVisitor};
+    pub use crate::ip::api::RoutesVisitor;
+    pub use crate::ip::forwarding::AddRouteError;
     pub use crate::ip::types::{
         AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Generation, Metric,
         NextHop, RawMetric, ResolvedRoute,

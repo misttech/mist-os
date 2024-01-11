@@ -28,13 +28,14 @@ use netstack3_core::{
     error::AddressResolutionFailed,
     neighbor::{LinkResolutionContext, LinkResolutionResult},
     routes::{NextHop, ResolvedRoute},
+    CoreContext, IpBindingsContext, UnlockedCoreCtx,
 };
 use thiserror::Error;
 use tracing::{error, info, warn};
 
 use crate::bindings::{
     util::{ConversionContext as _, IntoCore as _, IntoFidl as _},
-    BindingsCtx, Ctx, SyncCtx,
+    BindingsCtx, Ctx, IpExt, SyncCtx,
 };
 
 // The maximum number of events a client for the `fuchsia.net.routes/Watcher`
@@ -103,10 +104,14 @@ async fn resolve(
 async fn resolve_inner<A: IpAddress>(
     destination: A,
     mut ctx: Ctx,
-) -> Result<fnet_routes::Resolved, zx::Status> {
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+) -> Result<fnet_routes::Resolved, zx::Status>
+where
+    A::Version: IpExt,
+    BindingsCtx: IpBindingsContext<A::Version>,
+    for<'a> UnlockedCoreCtx<'a, BindingsCtx>: CoreContext<A::Version, BindingsCtx>,
+{
     let ResolvedRoute { device, src_addr, next_hop } =
-        match netstack3_core::routes::resolve_route::<A::Version, _>(core_ctx, destination) {
+        match ctx.api().routes::<A::Version>().resolve_route(destination) {
             Err(e) => {
                 info!("Resolve failed for {}, {:?}", destination, e);
                 return Err(zx::Status::ADDRESS_UNREACHABLE);
@@ -123,6 +128,7 @@ async fn resolve_inner<A: IpAddress>(
         DeviceId::Loopback(_device) => None,
         DeviceId::Ethernet(device) => {
             if let Some(addr) = next_hop_addr {
+                let (core_ctx, bindings_ctx) = ctx.contexts_mut();
                 Some(resolve_ethernet_link_addr(core_ctx, bindings_ctx, device, &addr).await?)
             } else {
                 warn!("Cannot attempt Ethernet link resolution for the unspecified address.");
@@ -136,7 +142,7 @@ async fn resolve_inner<A: IpAddress>(
             next_hop_addr.map_or(A::Version::UNSPECIFIED_ADDRESS, |a| *a).to_ip_addr().into_fidl();
         let source_address = src_addr.to_ip_addr().into_fidl();
         let mac = remote_mac.map(|mac| mac.into_fidl());
-        let interface_id = bindings_ctx.get_binding_id(device);
+        let interface_id = ctx.bindings_ctx().get_binding_id(device);
         fnet_routes::Destination {
             address: Some(address),
             mac,

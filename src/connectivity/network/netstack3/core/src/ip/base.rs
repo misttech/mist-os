@@ -77,7 +77,7 @@ use crate::{
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
     uninstantiable::UninstantiableWrapper,
-    BindingsContext, BindingsTypes, CoreCtx, Instant, StackState, SyncCtx,
+    BindingsContext, BindingsTypes, CoreCtx, Instant, StackState,
 };
 
 /// Default IPv4 TTL.
@@ -701,13 +701,10 @@ pub enum ResolveRouteError {
 //
 // If `local_ip` is specified the resolved route is limited to those that egress
 // over a device with the address assigned.
-fn resolve_route_to_destination<
+pub(crate) fn resolve_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId> + IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpLayerContext<I, BC>
-        + device::IpDeviceConfigurationContext<I, BC>
-        + IpDeviceStateContext<I, BC>
-        + NonTestCtxMarker,
+    CC: IpLayerContext<I, BC> + device::IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
     device: Option<&CC::DeviceId>,
@@ -1938,7 +1935,7 @@ macro_rules! try_parse_ip_packet {
 /// depending on the type parameter, `I`.
 #[cfg(test)]
 pub(crate) fn receive_ip_packet<B: BufferMut, BC: BindingsContext, I: Ip>(
-    core_ctx: &SyncCtx<BC>,
+    core_ctx: &crate::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
     frame_dst: FrameDestination,
@@ -2777,24 +2774,6 @@ fn lookup_route_table<
     core_ctx.with_ip_routing_table(|core_ctx, table| table.lookup(core_ctx, device, dst_ip))
 }
 
-/// Get all the routes.
-pub fn get_all_routes<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-) -> Vec<types::EntryEither<DeviceId<BC>>> {
-    {
-        let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-        IpStateContext::<Ipv4, _>::with_ip_routing_table(&mut core_ctx, |core_ctx, ipv4| {
-            IpStateContext::<Ipv6, _>::with_ip_routing_table(core_ctx, |_, ipv6| {
-                ipv4.iter_table()
-                    .cloned()
-                    .map(From::from)
-                    .chain(ipv6.iter_table().cloned().map(From::from))
-                    .collect()
-            })
-        })
-    }
-}
-
 /// The metadata associated with an outgoing IP packet.
 #[cfg_attr(test, derive(Debug))]
 pub(crate) struct SendIpPacketMeta<I: packet_formats::ip::IpExt, D, Src> {
@@ -3238,27 +3217,6 @@ impl<
     }
 }
 
-/// Resolve the route to a given destination.
-///
-/// Returns `Some` [`ResolvedRoute`] with details for reaching the destination,
-/// or `None` if the destination is unreachable.
-pub fn resolve_route<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    destination: I::Addr,
-) -> Result<ResolvedRoute<I, DeviceId<BC>>, ResolveRouteError> {
-    let core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let destination = SpecifiedAddr::new(destination);
-    I::map_ip(
-        (IpInvariant(core_ctx), destination),
-        |(IpInvariant(mut core_ctx), destination)| {
-            resolve_route_to_destination::<Ipv4, _, _>(&mut core_ctx, None, None, destination)
-        },
-        |(IpInvariant(mut core_ctx), destination)| {
-            resolve_route_to_destination::<Ipv6, _, _>(&mut core_ctx, None, None, destination)
-        },
-    )
-}
-
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
@@ -3546,7 +3504,7 @@ mod tests {
             FakeCtx, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
             FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        UnlockedCoreCtx,
+        SyncCtx, UnlockedCoreCtx,
     };
 
     // Some helper functions
