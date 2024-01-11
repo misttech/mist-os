@@ -118,7 +118,7 @@ impl<D, I: Ip> RecvIpFrameMeta<D, I> {
 /// Implements `Iterator<Item=DeviceId<C>>` by pulling from provided loopback
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
-pub(crate) struct DevicesIter<'s, BC: BindingsContext> {
+pub struct DevicesIter<'s, BC: BindingsContext> {
     pub(super) ethernet:
         alloc::collections::hash_map::Values<'s, EthernetDeviceId<BC>, EthernetPrimaryDeviceId<BC>>,
     pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<BC>>,

@@ -422,7 +422,7 @@ impl<S: Id, W: Id> EitherDeviceId<S, W> {
 }
 
 /// The status of an IP address on an interface.
-pub(crate) enum AddressStatus<S> {
+pub enum AddressStatus<S> {
     Present(S),
     Unassigned,
 }
@@ -490,7 +490,7 @@ impl IpLayerIpExt for Ipv6 {
 }
 
 /// The state context provided to the IP layer.
-pub(crate) trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpForwardingDeviceContext<I>
         + IpDeviceStateContext<I, BC>;
@@ -515,9 +515,7 @@ pub(crate) trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice>
 }
 
 /// Provices access to an IP device's state for the IP layer.
-pub(crate) trait IpDeviceStateContext<I: IpLayerIpExt, BC>:
-    DeviceIdContext<AnyDevice>
-{
+pub trait IpDeviceStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Calls the callback with the next packet ID.
     fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O;
 
@@ -544,7 +542,7 @@ pub(crate) trait IpDeviceStateContext<I: IpLayerIpExt, BC>:
 }
 
 /// The IP device context provided to the IP layer.
-pub(crate) trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
+pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
     /// Is the device enabled?
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
@@ -597,7 +595,7 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
 }
 
 /// The bindings execution context for the IP layer.
-pub(crate) trait IpLayerBindingsContext<I: Ip, DeviceId>:
+pub trait IpLayerBindingsContext<I: Ip, DeviceId>:
     InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext
 {
 }
@@ -610,7 +608,7 @@ impl<
 }
 
 /// The execution context for the IP layer.
-pub(crate) trait IpLayerContext<
+pub trait IpLayerContext<
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
 >: IpStateContext<I, BC> + IpDeviceContext<I, BC>

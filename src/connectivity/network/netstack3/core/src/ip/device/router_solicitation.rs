@@ -43,7 +43,7 @@ pub(crate) const MAX_RTR_SOLICITATION_DELAY: Duration = Duration::from_secs(1);
 pub(crate) const RTR_SOLICITATION_INTERVAL: Duration = Duration::from_secs(4);
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub(crate) struct RsTimerId<DeviceId> {
+pub struct RsTimerId<DeviceId> {
     pub(crate) device_id: DeviceId,
 }
 

@@ -67,7 +67,7 @@ enum InnerSlaacTimerId {
 
 /// A timer ID for SLAAC.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
-pub(crate) struct SlaacTimerId<DeviceId> {
+pub struct SlaacTimerId<DeviceId> {
     device_id: DeviceId,
     inner: InnerSlaacTimerId,
 }

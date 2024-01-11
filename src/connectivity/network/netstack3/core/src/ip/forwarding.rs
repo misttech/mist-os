@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
-pub(crate) trait IpForwardingDeviceContext<I: Ip>: DeviceIdContext<AnyDevice> {
+pub trait IpForwardingDeviceContext<I: Ip>: DeviceIdContext<AnyDevice> {
     /// Returns the routing metric for the device.
     fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric;
 

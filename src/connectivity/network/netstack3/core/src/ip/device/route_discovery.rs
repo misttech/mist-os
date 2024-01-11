@@ -22,7 +22,7 @@ use crate::{
 
 #[derive(Default)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
-pub(crate) struct Ipv6RouteDiscoveryState {
+pub struct Ipv6RouteDiscoveryState {
     // The valid (non-zero lifetime) discovered routes.
     //
     // Routes with a finite lifetime must have a timer set; routes with an
@@ -44,7 +44,7 @@ pub struct Ipv6DiscoveredRoute {
 
 /// A timer ID for IPv6 route discovery.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub(crate) struct Ipv6DiscoveredRouteTimerId<DeviceId> {
+pub struct Ipv6DiscoveredRouteTimerId<DeviceId> {
     device_id: DeviceId,
     route: Ipv6DiscoveredRoute,
 }
@@ -764,9 +764,10 @@ mod tests {
         route: Ipv6DiscoveredRoute,
         device_id: DeviceId<crate::testutil::FakeBindingsCtx>,
     ) -> TimerId<crate::testutil::FakeBindingsCtx> {
-        TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::RouteDiscovery(
-            Ipv6DiscoveredRouteTimerId { device_id, route },
-        )))
+        TimerId(TimerIdInner::Ipv6Device(
+            Ipv6DeviceTimerId::RouteDiscovery(Ipv6DiscoveredRouteTimerId { device_id, route })
+                .into(),
+        ))
     }
 
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");

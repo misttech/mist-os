@@ -568,7 +568,9 @@ mod tests {
         },
         device::{ethernet::MaxEthernetFrameSize, testutil::FakeDeviceId, DeviceId},
         ip::{
-            device::{IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate},
+            device::{
+                IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,
+            },
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
                 QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
@@ -1332,10 +1334,10 @@ mod tests {
 
         let now = bindings_ctx.now();
         let timer_id = TimerId(TimerIdInner::Ipv4Device(
-            IgmpTimerId::Gmp(GmpDelayedReportTimerId {
+            Ipv4DeviceTimerId::from(IgmpTimerId::Gmp(GmpDelayedReportTimerId {
                 device: device_id.clone(),
                 group_addr: Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS,
-            })
+            }))
             .into(),
         ));
         let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);

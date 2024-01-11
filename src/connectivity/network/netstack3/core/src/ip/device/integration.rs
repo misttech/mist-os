@@ -268,7 +268,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>
 /// This is functionally identical to using `Iterator::filter_map` on the
 /// provided devices and yielding devices with the address assigned (and the
 /// status), but is named so that it can be used as an associated type.
-pub(crate) struct FilterPresentWithDevices<
+pub struct FilterPresentWithDevices<
     I: IpLayerIpExt,
     Devices: Iterator<Item = Accessor::DeviceId>,
     Accessor: DeviceIdContext<AnyDevice>,
@@ -573,7 +573,7 @@ fn assignment_state_v6<
         AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
     }
 }
-pub(crate) struct CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC: BindingsContext> {
+pub struct CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC: BindingsContext> {
     pub config: Config,
     pub core_ctx: CoreCtx<'a, BC, L>,
 }

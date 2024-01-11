@@ -64,9 +64,19 @@ use crate::{
 
 use self::state::Ipv6NetworkLearnedParameters;
 
+/// An IP device timer.
+///
+/// This timer is an indirection to the real types defined by the
+/// [`IpDeviceIpExt`] trait. Having a concrete type parameterized over IP allows
+/// us to provide implementations generic on I for outer timer contexts that
+/// handle `IpDeviceTimerId` timers.
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct IpDeviceTimerId<I: IpDeviceIpExt, DeviceId>(I::Timer<DeviceId>);
+
 /// A timer ID for IPv4 devices.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub(crate) struct Ipv4DeviceTimerId<DeviceId>(IgmpTimerId<DeviceId>);
+pub struct Ipv4DeviceTimerId<DeviceId>(IgmpTimerId<DeviceId>);
 
 impl<DeviceId> Ipv4DeviceTimerId<DeviceId> {
     fn device_id(&self) -> &DeviceId {
@@ -75,11 +85,31 @@ impl<DeviceId> Ipv4DeviceTimerId<DeviceId> {
     }
 }
 
+impl<DeviceId> From<IpDeviceTimerId<Ipv4, DeviceId>> for Ipv4DeviceTimerId<DeviceId> {
+    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv4, DeviceId>) -> Self {
+        inner
+    }
+}
+
+impl<DeviceId> From<Ipv4DeviceTimerId<DeviceId>> for IpDeviceTimerId<Ipv4, DeviceId> {
+    fn from(value: Ipv4DeviceTimerId<DeviceId>) -> Self {
+        Self(value)
+    }
+}
+
 impl<DeviceId> From<IgmpTimerId<DeviceId>> for Ipv4DeviceTimerId<DeviceId> {
     fn from(id: IgmpTimerId<DeviceId>) -> Ipv4DeviceTimerId<DeviceId> {
         Ipv4DeviceTimerId(id)
     }
 }
+
+impl_timer_context!(
+    DeviceId,
+    IpDeviceTimerId<Ipv4, DeviceId>,
+    Ipv4DeviceTimerId<DeviceId>,
+    IpDeviceTimerId(id),
+    id
+);
 
 // If we are provided with an impl of `TimerContext<Ipv4DeviceTimerId<_>>`, then
 // we can in turn provide an impl of `TimerContext` for IGMP.
@@ -120,12 +150,24 @@ pub(crate) fn handle_ipv4_timer<
 
 /// A timer ID for IPv6 devices.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub(crate) enum Ipv6DeviceTimerId<DeviceId> {
+pub enum Ipv6DeviceTimerId<DeviceId> {
     Mld(MldDelayedReportTimerId<DeviceId>),
     Dad(DadTimerId<DeviceId>),
     Rs(RsTimerId<DeviceId>),
     RouteDiscovery(Ipv6DiscoveredRouteTimerId<DeviceId>),
     Slaac(SlaacTimerId<DeviceId>),
+}
+
+impl<DeviceId> From<IpDeviceTimerId<Ipv6, DeviceId>> for Ipv6DeviceTimerId<DeviceId> {
+    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv6, DeviceId>) -> Self {
+        inner
+    }
+}
+
+impl<DeviceId> From<Ipv6DeviceTimerId<DeviceId>> for IpDeviceTimerId<Ipv6, DeviceId> {
+    fn from(value: Ipv6DeviceTimerId<DeviceId>) -> Self {
+        Self(value)
+    }
 }
 
 impl<DeviceId> Ipv6DeviceTimerId<DeviceId> {
@@ -169,6 +211,14 @@ impl<DeviceId> From<SlaacTimerId<DeviceId>> for Ipv6DeviceTimerId<DeviceId> {
         Ipv6DeviceTimerId::Slaac(id)
     }
 }
+
+impl_timer_context!(
+    DeviceId,
+    IpDeviceTimerId<Ipv6, DeviceId>,
+    Ipv6DeviceTimerId<DeviceId>,
+    IpDeviceTimerId(id),
+    id
+);
 
 // If we are provided with an impl of `TimerContext<Ipv6DeviceTimerId<_>>`, then
 // we can in turn provide an impl of `TimerContext` for MLD and DAD.
@@ -247,10 +297,11 @@ pub(crate) fn handle_ipv6_timer<
 }
 
 /// An extension trait adding IP device properties.
-pub(crate) trait IpDeviceIpExt: IpDeviceStateIpExt {
+pub trait IpDeviceIpExt: IpDeviceStateIpExt {
     type State<I: Instant>: AsRef<IpDeviceState<I, Self>> + AsMut<IpDeviceState<I, Self>>;
     type Configuration: AsRef<IpDeviceConfiguration>;
-    type Timer<DeviceId>;
+    type Timer<DeviceId>: Into<IpDeviceTimerId<Self, DeviceId>>
+        + From<IpDeviceTimerId<Self, DeviceId>>;
     type AssignedWitness: Witness<Self::Addr> + Copy + PartialEq + Debug;
     type AddressConfig<I>: Default;
     type ManualAddressConfig<I>: Default;
@@ -431,9 +482,9 @@ impl<BC: DualStackDeviceBindingsContext, CC: DualStackDeviceContext<BC>> DualSta
 }
 
 /// The bindings execution context for IP devices.
-pub(crate) trait IpDeviceBindingsContext<I: IpDeviceIpExt, DeviceId>:
+pub trait IpDeviceBindingsContext<I: IpDeviceIpExt, DeviceId>:
     RngContext
-    + TimerContext<I::Timer<DeviceId>>
+    + TimerContext<IpDeviceTimerId<I, DeviceId>>
     + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
 {
 }
@@ -441,14 +492,14 @@ impl<
         DeviceId,
         I: IpDeviceIpExt,
         BC: RngContext
-            + TimerContext<I::Timer<DeviceId>>
+            + TimerContext<IpDeviceTimerId<I, DeviceId>>
             + EventContext<IpDeviceEvent<DeviceId, I, <Self as InstantBindingsTypes>::Instant>>,
     > IpDeviceBindingsContext<I, DeviceId> for BC
 {
 }
 
 /// An IP address ID.
-pub(crate) trait IpAddressId<A: IpAddress>: Clone + Debug {
+pub trait IpAddressId<A: IpAddress>: Clone + Debug {
     /// Returns the specified address this ID represents.
     fn addr(&self) -> SpecifiedAddr<A>;
 
@@ -473,13 +524,11 @@ where
 }
 
 /// Provides the execution context related to address IDs.
-pub(crate) trait IpDeviceAddressIdContext<I: IpDeviceIpExt>:
-    DeviceIdContext<AnyDevice>
-{
+pub trait IpDeviceAddressIdContext<I: IpDeviceIpExt>: DeviceIdContext<AnyDevice> {
     type AddressId: IpAddressId<I::Addr>;
 }
 
-pub(crate) trait IpDeviceAddressContext<I: IpDeviceIpExt, BC: InstantContext>:
+pub trait IpDeviceAddressContext<I: IpDeviceIpExt, BC: InstantContext>:
     IpDeviceAddressIdContext<I>
 {
     fn with_ip_address_state<O, F: FnOnce(&I::AddressState<BC::Instant>) -> O>(
@@ -498,7 +547,7 @@ pub(crate) trait IpDeviceAddressContext<I: IpDeviceIpExt, BC: InstantContext>:
 }
 
 /// Accessor for IP device state.
-pub(crate) trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
+pub trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
     IpDeviceAddressContext<I, BC>
 {
     type IpDeviceAddressCtx<'a>: IpDeviceAddressContext<
@@ -594,7 +643,7 @@ pub(crate) trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
 
 /// The context provided to the callback passed to
 /// [`IpDeviceConfigurationContext::with_ip_device_configuration_mut`].
-pub(crate) trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BC: InstantContext>:
+pub trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BC: InstantContext>:
     DeviceIdContext<AnyDevice>
 {
     type IpDeviceStateCtx<'s>: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
@@ -623,7 +672,7 @@ pub(crate) trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BC: Instant
 }
 
 /// The execution context for IP devices.
-pub(crate) trait IpDeviceConfigurationContext<
+pub trait IpDeviceConfigurationContext<
     I: IpDeviceIpExt,
     BC: IpDeviceBindingsContext<I, Self::DeviceId>,
 >: IpDeviceStateContext<I, BC> + DeviceIdContext<AnyDevice>
@@ -2619,36 +2668,41 @@ mod tests {
             enable_ipv6_device(core_ctx, bindings_ctx, &device_id, ll_addr, expected_prev);
             let mut timers = vec![
                 (
-                    TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Rs(RsTimerId {
-                        device_id: device_id.clone(),
-                    }))),
+                    TimerId(TimerIdInner::Ipv6Device(
+                        Ipv6DeviceTimerId::Rs(RsTimerId { device_id: device_id.clone() }).into(),
+                    )),
                     ..,
                 ),
                 (
-                    TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Dad(DadTimerId {
-                        device_id: device_id.clone(),
-                        addr: ll_addr.ipv6_unicast_addr(),
-                    }))),
+                    TimerId(TimerIdInner::Ipv6Device(
+                        Ipv6DeviceTimerId::Dad(DadTimerId {
+                            device_id: device_id.clone(),
+                            addr: ll_addr.ipv6_unicast_addr(),
+                        })
+                        .into(),
+                    )),
                     ..,
                 ),
                 (
-                    TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(
-                        MldDelayedReportTimerId(GmpDelayedReportTimerId {
+                    TimerId(TimerIdInner::Ipv6Device(
+                        Ipv6DeviceTimerId::Mld(MldDelayedReportTimerId(GmpDelayedReportTimerId {
                             device: device_id.clone(),
                             group_addr: ll_addr.addr().to_solicited_node_address(),
-                        }),
-                    ))),
+                        }))
+                        .into(),
+                    )),
                     ..,
                 ),
             ];
             if let Some(group_addr) = extra_group {
                 timers.push((
-                    TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(
-                        MldDelayedReportTimerId(GmpDelayedReportTimerId {
+                    TimerId(TimerIdInner::Ipv6Device(
+                        Ipv6DeviceTimerId::Mld(MldDelayedReportTimerId(GmpDelayedReportTimerId {
                             device: device_id.clone(),
                             group_addr,
-                        }),
-                    ))),
+                        }))
+                        .into(),
+                    )),
                     ..,
                 ))
             }

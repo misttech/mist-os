@@ -137,7 +137,7 @@ impl<T> From<RemoveResult<T>> for GroupLeaveResult<T> {
 /// `T`. Each group is reference-counted, only being removed once its reference
 /// count reaches zero.
 #[cfg_attr(test, derive(Debug))]
-pub(crate) struct MulticastGroupSet<A: IpAddress, T> {
+pub struct MulticastGroupSet<A: IpAddress, T> {
     inner: RefCountedHashMap<MulticastAddr<A>, T>,
 }
 
@@ -286,7 +286,7 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
 }
 
 /// An implementation of query operations on a Group Management Protocol (GMP).
-pub(crate) trait GmpQueryHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
+pub trait GmpQueryHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     /// Returns true if the device is a member of the group.
     fn gmp_is_in_group(
         &mut self,
@@ -298,7 +298,7 @@ pub(crate) trait GmpQueryHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
 /// An implementation of a Group Management Protocol (GMP) such as the Internet
 /// Group Management Protocol, Version 2 (IGMPv2) for IPv4 or the Multicast
 /// Listener Discovery (MLD) protocol for IPv6.
-pub(crate) trait GmpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
+pub trait GmpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     /// Handles GMP potentially being enabled.
     ///
     /// Attempts to transition memberships in the non-member state to a member

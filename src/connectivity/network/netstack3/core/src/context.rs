@@ -162,7 +162,7 @@ pub trait TimerContext<Id>: InstantContext {
 /// A handler for timer firing events.
 ///
 /// A `TimerHandler` is a type capable of handling the event of a timer firing.
-pub(crate) trait TimerHandler<BC, Id> {
+pub trait TimerHandler<BC, Id> {
     /// Handle a timer firing.
     fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id);
 }

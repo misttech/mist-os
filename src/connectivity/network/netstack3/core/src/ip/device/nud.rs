@@ -1728,7 +1728,7 @@ pub(crate) trait NudSenderContext<
 }
 
 /// An implementation of NUD for the IP layer.
-pub(crate) trait NudIpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
+pub trait NudIpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     /// Handles an incoming neighbor probe message.
     ///
     /// For IPv6, this can be an NDP Neighbor Solicitation or an NDP Router

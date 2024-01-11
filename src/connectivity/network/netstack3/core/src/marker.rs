@@ -21,7 +21,12 @@ use crate::{
         self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetLinkDevice,
         WeakDeviceId,
     },
-    ip::{self, icmp::IcmpBindingsContext},
+    ip::{
+        self,
+        device::{IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt},
+        icmp::IcmpBindingsContext,
+        IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
+    },
     socket,
     transport::{
         self,
@@ -33,7 +38,8 @@ use crate::{
 
 /// A marker for extensions to IP types.
 pub trait IpExt:
-    ip::IpExt
+    IpLayerIpExt
+    + IpDeviceIpExt
     + ip::icmp::IcmpIpExt
     + transport::tcp::socket::DualStackIpExt
     + socket::datagram::DualStackIpExt
@@ -41,7 +47,8 @@ pub trait IpExt:
 }
 
 impl<O> IpExt for O where
-    O: ip::IpExt
+    O: ip::IpLayerIpExt
+        + IpDeviceIpExt
         + ip::icmp::IcmpIpExt
         + transport::tcp::socket::DualStackIpExt
         + socket::datagram::DualStackIpExt
@@ -60,6 +67,8 @@ pub trait CoreContext<I, BC>:
     + TcpContext<I, BC>
     + ip::icmp::socket::StateContext<I, BC>
     + ip::icmp::IcmpStateContext
+    + IpLayerContext<I, BC>
+    + IpDeviceConfigurationContext<I, BC>
     + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
 where
     I: IpExt,
@@ -76,6 +85,8 @@ where
         + TcpContext<I, BC>
         + ip::icmp::socket::StateContext<I, BC>
         + ip::icmp::IcmpStateContext
+        + IpLayerContext<I, BC>
+        + IpDeviceConfigurationContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>,
 {
 }
@@ -91,9 +102,6 @@ pub trait IpBindingsContext<I: IpExt>:
     BindingsTypes
     + RngContext
     + EventContext<
-        ip::device::IpDeviceEvent<DeviceId<Self>, I, <Self as InstantBindingsTypes>::Instant>,
-    > + EventContext<ip::IpLayerEvent<DeviceId<Self>, I>>
-    + EventContext<
         ip::device::nud::Event<
             Mac,
             device::EthernetDeviceId<Self>,
@@ -103,6 +111,8 @@ pub trait IpBindingsContext<I: IpExt>:
     > + UdpStateBindingsContext<I, DeviceId<Self>>
     + TcpBindingsContext<I, WeakDeviceId<Self>>
     + IcmpBindingsContext<I, DeviceId<Self>>
+    + IpDeviceBindingsContext<I, DeviceId<Self>>
+    + IpLayerBindingsContext<I, DeviceId<Self>>
     + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
     + device::DeviceLayerEventDispatcher
     + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
@@ -118,9 +128,6 @@ where
     BC: BindingsTypes
         + RngContext
         + EventContext<
-            ip::device::IpDeviceEvent<DeviceId<Self>, I, <Self as InstantBindingsTypes>::Instant>,
-        > + EventContext<ip::IpLayerEvent<DeviceId<Self>, I>>
-        + EventContext<
             ip::device::nud::Event<
                 Mac,
                 device::EthernetDeviceId<Self>,
@@ -130,6 +137,8 @@ where
         > + UdpStateBindingsContext<I, DeviceId<Self>>
         + TcpBindingsContext<I, WeakDeviceId<Self>>
         + IcmpBindingsContext<I, DeviceId<Self>>
+        + IpDeviceBindingsContext<I, DeviceId<Self>>
+        + IpLayerBindingsContext<I, DeviceId<Self>>
         + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
         + device::DeviceLayerEventDispatcher
         + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>

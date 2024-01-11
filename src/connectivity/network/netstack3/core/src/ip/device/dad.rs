@@ -21,7 +21,7 @@ use crate::{
 
 /// A timer ID for duplicate address detection.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub(crate) struct DadTimerId<DeviceId> {
+pub struct DadTimerId<DeviceId> {
     pub(crate) device_id: DeviceId,
     pub(crate) addr: UnicastAddr<Ipv6Addr>,
 }

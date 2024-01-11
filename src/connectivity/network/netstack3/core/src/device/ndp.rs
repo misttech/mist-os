@@ -522,17 +522,24 @@ mod tests {
         id: EthernetDeviceId<FakeBindingsCtx>,
         addr: Ipv6DeviceAddr,
     ) -> TimerId<crate::testutil::FakeBindingsCtx> {
-        TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Dad(
-            crate::ip::device::dad::DadTimerId { device_id: id.into(), addr: addr.get() },
-        )))
+        TimerId(TimerIdInner::Ipv6Device(
+            Ipv6DeviceTimerId::Dad(crate::ip::device::dad::DadTimerId {
+                device_id: id.into(),
+                addr: addr.get(),
+            })
+            .into(),
+        ))
     }
 
     fn rs_timer_id(
         id: EthernetDeviceId<FakeBindingsCtx>,
     ) -> TimerId<crate::testutil::FakeBindingsCtx> {
-        TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Rs(
-            crate::ip::device::router_solicitation::RsTimerId { device_id: id.into() },
-        )))
+        TimerId(TimerIdInner::Ipv6Device(
+            Ipv6DeviceTimerId::Rs(crate::ip::device::router_solicitation::RsTimerId {
+                device_id: id.into(),
+            })
+            .into(),
+        ))
     }
 
     #[test]
@@ -1853,7 +1860,7 @@ mod tests {
         fn from(
             id: SlaacTimerId<DeviceId<crate::testutil::FakeBindingsCtx>>,
         ) -> TimerId<crate::testutil::FakeBindingsCtx> {
-            TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Slaac(id)))
+            TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Slaac(id).into()))
         }
     }
 

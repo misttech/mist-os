@@ -7,13 +7,15 @@
 use core::fmt::Debug;
 use derivative::Derivative;
 
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use tracing::trace;
 
 use crate::{
+    context::TimerContext,
     device::{self, DeviceId, DeviceLayerTimerId},
     ip::{
         self,
-        device::{Ipv4DeviceTimerId, Ipv6DeviceTimerId},
+        device::{IpDeviceIpExt, IpDeviceTimerId},
         IpLayerTimerId,
     },
     transport::{self, TransportLayerTimerId},
@@ -21,7 +23,7 @@ use crate::{
 };
 
 /// The identifier for any timer event.
-#[derive(Derivative)]
+#[derive(Derivative, GenericOverIp)]
 #[derivative(
     Clone(bound = ""),
     Eq(bound = ""),
@@ -29,9 +31,10 @@ use crate::{
     Hash(bound = ""),
     Debug(bound = "")
 )]
+#[generic_over_ip()]
 pub struct TimerId<BT: BindingsTypes>(pub(crate) TimerIdInner<BT>);
 
-#[derive(Derivative)]
+#[derive(Derivative, GenericOverIp)]
 #[derivative(
     Clone(bound = ""),
     Eq(bound = ""),
@@ -39,6 +42,7 @@ pub struct TimerId<BT: BindingsTypes>(pub(crate) TimerIdInner<BT>);
     Hash(bound = ""),
     Debug(bound = "")
 )]
+#[generic_over_ip()]
 pub(crate) enum TimerIdInner<BT: BindingsTypes> {
     /// A timer event in the device layer.
     DeviceLayer(DeviceLayerTimerId<BT>),
@@ -47,29 +51,33 @@ pub(crate) enum TimerIdInner<BT: BindingsTypes> {
     /// A timer event in the IP layer.
     IpLayer(IpLayerTimerId),
     /// A timer event for an IPv4 device.
-    Ipv4Device(Ipv4DeviceTimerId<DeviceId<BT>>),
+    Ipv4Device(IpDeviceTimerId<Ipv4, DeviceId<BT>>),
     /// A timer event for an IPv6 device.
-    Ipv6Device(Ipv6DeviceTimerId<DeviceId<BT>>),
+    Ipv6Device(IpDeviceTimerId<Ipv6, DeviceId<BT>>),
     /// A no-op timer event (used for tests)
     #[cfg(test)]
     Nop(usize),
 }
 
+impl<BT: BindingsTypes> TimerIdInner<BT> {
+    fn as_ip_device<I: IpDeviceIpExt>(&self) -> Option<&IpDeviceTimerId<I, DeviceId<BT>>> {
+        I::map_ip(
+            self,
+            |t| match t {
+                TimerIdInner::Ipv4Device(d) => Some(d),
+                _ => None,
+            },
+            |t| match t {
+                TimerIdInner::Ipv6Device(d) => Some(d),
+                _ => None,
+            },
+        )
+    }
+}
+
 impl<BT: BindingsTypes> From<DeviceLayerTimerId<BT>> for TimerId<BT> {
     fn from(id: DeviceLayerTimerId<BT>) -> TimerId<BT> {
         TimerId(TimerIdInner::DeviceLayer(id))
-    }
-}
-
-impl<BT: BindingsTypes> From<Ipv4DeviceTimerId<DeviceId<BT>>> for TimerId<BT> {
-    fn from(id: Ipv4DeviceTimerId<DeviceId<BT>>) -> TimerId<BT> {
-        TimerId(TimerIdInner::Ipv4Device(id))
-    }
-}
-
-impl<BT: BindingsTypes> From<Ipv6DeviceTimerId<DeviceId<BT>>> for TimerId<BT> {
-    fn from(id: Ipv6DeviceTimerId<DeviceId<BT>>) -> TimerId<BT> {
-        TimerId(TimerIdInner::Ipv6Device(id))
     }
 }
 
@@ -99,20 +107,49 @@ impl_timer_context!(
     TimerId(TimerIdInner::IpLayer(id)),
     id
 );
-impl_timer_context!(
+
+impl<BT: BindingsTypes, I: IpDeviceIpExt> From<IpDeviceTimerId<I, DeviceId<BT>>> for TimerId<BT> {
+    fn from(value: IpDeviceTimerId<I, DeviceId<BT>>) -> Self {
+        I::map_ip(
+            value,
+            |v4| TimerId(TimerIdInner::Ipv4Device(v4)),
+            |v6| TimerId(TimerIdInner::Ipv6Device(v6)),
+        )
+    }
+}
+
+impl<BT, I, O> TimerContext<IpDeviceTimerId<I, DeviceId<BT>>> for O
+where
     BT: BindingsTypes,
-    TimerId<BT>,
-    Ipv4DeviceTimerId<DeviceId<BT>>,
-    TimerId(TimerIdInner::Ipv4Device(id)),
-    id
-);
-impl_timer_context!(
-    BT: BindingsTypes,
-    TimerId<BT>,
-    Ipv6DeviceTimerId<DeviceId<BT>>,
-    TimerId(TimerIdInner::Ipv6Device(id)),
-    id
-);
+    I: IpDeviceIpExt,
+    O: TimerContext<TimerId<BT>>,
+{
+    fn schedule_timer_instant(
+        &mut self,
+        time: Self::Instant,
+        id: IpDeviceTimerId<I, DeviceId<BT>>,
+    ) -> Option<Self::Instant> {
+        TimerContext::<TimerId<BT>>::schedule_timer_instant(self, time, id.into())
+    }
+
+    fn cancel_timer(&mut self, id: IpDeviceTimerId<I, DeviceId<BT>>) -> Option<Self::Instant> {
+        TimerContext::<TimerId<BT>>::cancel_timer(self, id.into())
+    }
+
+    fn cancel_timers_with<F: FnMut(&IpDeviceTimerId<I, DeviceId<BT>>) -> bool>(
+        &mut self,
+        mut f: F,
+    ) {
+        TimerContext::<TimerId<BT>>::cancel_timers_with(self, move |TimerId(timer_id)| {
+            timer_id.as_ip_device::<I>().is_some_and(|d| f(d))
+        })
+    }
+
+    fn scheduled_instant(&self, id: IpDeviceTimerId<I, DeviceId<BT>>) -> Option<Self::Instant> {
+        TimerContext::<TimerId<BT>>::scheduled_instant(self, id.into())
+    }
+}
+
 impl_timer_context!(
     BT: BindingsTypes,
     TimerId<BT>,
@@ -141,10 +178,10 @@ pub fn handle_timer<BC: BindingsContext>(
             ip::handle_timer(&mut core_ctx, bindings_ctx, x);
         }
         TimerId(TimerIdInner::Ipv4Device(x)) => {
-            ip::device::handle_ipv4_timer(&mut core_ctx, bindings_ctx, x);
+            ip::device::handle_ipv4_timer(&mut core_ctx, bindings_ctx, x.into());
         }
         TimerId(TimerIdInner::Ipv6Device(x)) => {
-            ip::device::handle_ipv6_timer(&mut core_ctx, bindings_ctx, x);
+            ip::device::handle_ipv6_timer(&mut core_ctx, bindings_ctx, x.into());
         }
         #[cfg(test)]
         TimerId(TimerIdInner::Nop(_)) => {

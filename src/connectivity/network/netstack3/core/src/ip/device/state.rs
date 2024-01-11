@@ -143,7 +143,7 @@ pub struct IpDeviceFlags {
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 #[cfg_attr(test, derive(Debug))]
-pub(crate) struct IpDeviceState<Instant: crate::Instant, I: IpDeviceStateIpExt> {
+pub struct IpDeviceState<Instant: crate::Instant, I: IpDeviceStateIpExt> {
     /// IP addresses assigned to this device.
     ///
     /// IPv6 addresses may be tentative (performing NDP's Duplicate Address
@@ -301,7 +301,7 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> Default for IpDeviceState<I
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug))]
-pub(crate) struct IpDeviceAddresses<Instant: crate::Instant, I: Ip + IpDeviceStateIpExt> {
+pub struct IpDeviceAddresses<Instant: crate::Instant, I: Ip + IpDeviceStateIpExt> {
     addrs: Vec<PrimaryRc<I::AssignedAddress<Instant>>>,
 }
 
@@ -353,7 +353,7 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
 }
 
 /// The state common to all IPv4 devices.
-pub(crate) struct Ipv4DeviceState<I: Instant> {
+pub struct Ipv4DeviceState<I: Instant> {
     pub(crate) ip_state: IpDeviceState<I, Ipv4>,
     pub(super) config: RwLock<Ipv4DeviceConfiguration>,
 }
@@ -627,7 +627,7 @@ impl Ipv6NetworkLearnedParameters {
 }
 
 /// The state common to all IPv6 devices.
-pub(crate) struct Ipv6DeviceState<I: Instant> {
+pub struct Ipv6DeviceState<I: Instant> {
     pub(super) learned_params: RwLock<Ipv6NetworkLearnedParameters>,
     pub(super) route_discovery: Mutex<Ipv6RouteDiscoveryState>,
     pub(super) router_soliciations_remaining: Mutex<Option<NonZeroU8>>,

@@ -365,7 +365,7 @@ impl<I: Instant> AsMut<GmpStateMachine<I, MldProtocolSpecific>> for MldGroupStat
 
 /// An MLD timer to delay the sending of a report.
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
-pub(crate) struct MldDelayedReportTimerId<DeviceId>(
+pub struct MldDelayedReportTimerId<DeviceId>(
     pub(crate) GmpDelayedReportTimerId<Ipv6Addr, DeviceId>,
 );
 
@@ -1260,10 +1260,13 @@ mod tests {
         let now = bindings_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();
         let snmc_addr = ll_addr.to_solicited_node_address();
-        let snmc_timer_id =
-            TimerId(TimerIdInner::Ipv6Device(Ipv6DeviceTimerId::Mld(MldDelayedReportTimerId(
-                GmpDelayedReportTimerId { device: device_id.clone(), group_addr: snmc_addr },
-            ))));
+        let snmc_timer_id = TimerId(TimerIdInner::Ipv6Device(
+            Ipv6DeviceTimerId::Mld(MldDelayedReportTimerId(GmpDelayedReportTimerId {
+                device: device_id.clone(),
+                group_addr: snmc_addr,
+            }))
+            .into(),
+        ));
         let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
         struct TestConfig {
             ip_enabled: bool,
