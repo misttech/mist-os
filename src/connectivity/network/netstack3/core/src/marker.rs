@@ -67,7 +67,7 @@ pub trait CoreContext<I, BC>:
 where
     I: IpExt,
     BC: BindingsContext
-        + TcpBindingsContext<Self::WeakDeviceId>
+        + TcpBindingsContext<I, Self::WeakDeviceId>
         + UdpStateBindingsContext<I, Self::DeviceId>
         + IcmpBindingsContext<I, Self::DeviceId>,
 {
@@ -77,7 +77,7 @@ impl<I, BC, O> CoreContext<I, BC> for O
 where
     I: IpExt,
     BC: BindingsContext
-        + TcpBindingsContext<O::WeakDeviceId>
+        + TcpBindingsContext<I, O::WeakDeviceId>
         + UdpStateBindingsContext<I, O::DeviceId>
         + IcmpBindingsContext<I, O::DeviceId>,
     O: transport::udp::StateContext<I, BC>

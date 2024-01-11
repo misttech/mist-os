@@ -78,33 +78,11 @@ use crate::{
 
 pub use accept_queue::ListenerNotifier;
 
-/// We use this trait to turn [`DualStackIpExt::DemuxSocketId`]s into a TimerId.
-pub trait ToTimerId<D: device::WeakId, BT: TcpBindingsTypes> {
-    fn to_timer_id(&self) -> TimerId<D, BT>;
-}
-
-impl<D: device::WeakId, BT: TcpBindingsTypes> ToTimerId<D, BT> for TcpSocketId<Ipv6, D, BT> {
-    fn to_timer_id(&self) -> TimerId<D, BT> {
-        TimerId::V6(self.downgrade())
-    }
-}
-
-impl<D: device::WeakId, BT: TcpBindingsTypes> ToTimerId<D, BT>
-    for EitherStack<TcpSocketId<Ipv4, D, BT>, TcpSocketId<Ipv6, D, BT>>
-{
-    fn to_timer_id(&self) -> TimerId<D, BT> {
-        match self {
-            EitherStack::ThisStack(v4) => TimerId::V4(v4.downgrade()),
-            EitherStack::OtherStack(v6) => TimerId::V6(v6.downgrade()),
-        }
-    }
-}
-
 /// A dual stack IP extension trait for TCP.
 pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
-    type DemuxSocketId<D: device::WeakId, BT: TcpBindingsTypes>: SpecSocketId + ToTimerId<D, BT>;
+    type DemuxSocketId<D: device::WeakId, BT: TcpBindingsTypes>: SpecSocketId;
 
     /// The type for a connection, for [`Ipv4`], this will be just the single
     /// stack version of the connection state and the connection address. For
@@ -311,14 +289,15 @@ pub trait TcpBindingsTypes: InstantBindingsTypes + 'static {
 /// The bindings context for TCP.
 ///
 /// TCP timers are scoped by weak device IDs.
-pub trait TcpBindingsContext<D: device::WeakId>:
-    Sized + TimerContext<TimerId<D, Self>> + TracingContext + TcpBindingsTypes
+pub trait TcpBindingsContext<I: DualStackIpExt, D: device::WeakId>:
+    Sized + TimerContext<WeakTcpSocketId<I, D, Self>> + TracingContext + TcpBindingsTypes
 {
 }
 
-impl<D, O> TcpBindingsContext<D> for O
+impl<I, D, O> TcpBindingsContext<I, D> for O
 where
-    O: TimerContext<TimerId<D, O>> + TracingContext + TcpBindingsTypes + Sized,
+    I: DualStackIpExt,
+    O: TimerContext<WeakTcpSocketId<I, D, Self>> + TracingContext + TcpBindingsTypes + Sized,
     D: device::WeakId,
 {
 }
@@ -1344,7 +1323,7 @@ pub struct Connection<
 
 fn make_connection<
     I: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
     CC: TcpContext<I, BC>,
 >(
     conn: Connection<I, I, CC::WeakDeviceId, BC>,
@@ -1362,7 +1341,7 @@ fn make_connection<
 fn try_into_this_stack_conn_mut<
     'a,
     I: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
     CC: TcpContext<I, BC>,
 >(
     conn: &'a mut I::ConnectionAndAddr<CC::WeakDeviceId, BC>,
@@ -1589,7 +1568,7 @@ where
     C: ContextPair,
     C::CoreContext: TcpContext<I, C::BindingsContext>,
     C::BindingsContext:
-        TcpBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+        TcpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair, PhantomData) = self;
@@ -1942,6 +1921,7 @@ where
                     let conn_and_addr = connect_inner(
                         core_ctx,
                         bindings_ctx,
+                        id,
                         &I::into_demux_socket_id(id.clone()),
                         isn,
                         listener_addr,
@@ -1968,6 +1948,7 @@ where
                     let conn_and_addr = connect_inner(
                         core_ctx,
                         bindings_ctx,
+                        id,
                         &I::into_demux_socket_id(id.clone()),
                         isn,
                         listener_addr,
@@ -2001,6 +1982,7 @@ where
                     let conn_and_addr = connect_inner(
                         core_ctx,
                         bindings_ctx,
+                        id,
                         &core_ctx.into_other_demux_socket_id(id.clone()),
                         isn,
                         listener_addr,
@@ -2081,7 +2063,7 @@ where
                         where
                             SockI: DualStackIpExt,
                             WireI: DualStackIpExt,
-                            BC: TcpBindingsContext<CC::WeakDeviceId>,
+                            BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
                             CC: TransportIpContext<WireI, BC>
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
                         {
@@ -2101,7 +2083,7 @@ where
                                         Ok(())
                                     );
                                 });
-                                let _: Option<_> = bindings_ctx.cancel_timer(id.downgrade().into());
+                                let _: Option<_> = bindings_ctx.cancel_timer(id.downgrade());
                             } else {
                                 do_send_inner(&id, conn, &addr, core_ctx, bindings_ctx);
                             };
@@ -2195,7 +2177,7 @@ where
                     where
                         SockI: DualStackIpExt,
                         WireI: DualStackIpExt,
-                        BC: TcpBindingsContext<CC::WeakDeviceId>,
+                        BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
                         CC: TransportIpContext<WireI, BC>
                             + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
                     {
@@ -2511,7 +2493,7 @@ where
                 where
                     SockI: DualStackIpExt,
                     WireI: DualStackIpExt,
-                    BC: TcpBindingsContext<CC::WeakDeviceId>,
+                    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
                     CC: TransportIpContext<WireI, BC>
                         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
                 {
@@ -2520,7 +2502,7 @@ where
                         core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
                             assert_matches!(socketmap.conns_mut().remove(demux_id, addr), Ok(()));
                         });
-                        let _: Option<_> = bindings_ctx.cancel_timer(weak_id.into());
+                        let _: Option<_> = bindings_ctx.cancel_timer(weak_id);
                         true
                     } else {
                         false
@@ -2929,7 +2911,7 @@ where
 fn destroy_socket<
     I: DualStackIpExt,
     CC: TcpContext<I, BC>,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
 >(
     core_ctx: &mut CC,
     _bindings_ctx: &mut BC,
@@ -3023,11 +3005,11 @@ fn close_pending_sockets<I, CC, BC>(
     pending: impl Iterator<Item = TcpSocketId<I, CC::WeakDeviceId, BC>>,
 ) where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
     CC: TcpContext<I, BC>,
 {
     for conn_id in pending {
-        let _: Option<BC::Instant> = bindings_ctx.cancel_timer(conn_id.downgrade().into());
+        let _: Option<BC::Instant> = bindings_ctx.cancel_timer(conn_id.downgrade());
         core_ctx.with_socket_mut_transport_demux(&conn_id, |core_ctx, socket_state| {
             let (core_ctx, converter)= core_ctx.into_single_stack();
             let (conn, conn_addr) = assert_matches!(
@@ -3074,7 +3056,7 @@ fn do_send_inner<SockI, WireI, CC, BC>(
 ) where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
     CC: TransportIpContext<WireI, BC>,
 {
     while let Some(seg) = conn.state.poll_send(u32::MAX, bindings_ctx.now(), &conn.socket_options) {
@@ -3097,7 +3079,7 @@ fn do_send_inner<SockI, WireI, CC, BC>(
     }
 
     if let Some(instant) = conn.state.poll_send_at() {
-        let _: Option<_> = bindings_ctx.schedule_timer_instant(instant, conn_id.downgrade().into());
+        let _: Option<_> = bindings_ctx.schedule_timer_instant(instant, conn_id.downgrade());
     }
 }
 
@@ -3169,7 +3151,7 @@ impl AccessBufferSize for ReceiveBufferSize {
 fn set_buffer_size<
     Which: AccessBufferSize,
     I: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
     CC: TcpContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -3205,7 +3187,7 @@ fn set_buffer_size<
 fn get_buffer_size<
     Which: AccessBufferSize,
     I: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
     CC: TcpContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -3337,7 +3319,8 @@ pub enum BindError {
 fn connect_inner<CC, BC, SockI, WireI>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+    sock_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+    demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
     isn: &IsnGenerator<BC::Instant>,
     listener_addr: Option<ListenerAddr<ListenerIpAddr<WireI::Addr, NonZeroU16>, CC::WeakDeviceId>>,
     local_ip: Option<SocketIpAddr<WireI::Addr>>,
@@ -3359,7 +3342,7 @@ fn connect_inner<CC, BC, SockI, WireI>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
     CC: TransportIpContext<WireI, BC>
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
@@ -3409,7 +3392,7 @@ where
 
         let _entry = socketmap
             .conns_mut()
-            .try_insert(conn_addr.clone(), sharing, id.clone())
+            .try_insert(conn_addr.clone(), sharing, demux_id.clone())
             .map_err(|(err, _sharing)| match err {
                 // The connection will conflict with an existing one.
                 InsertError::Exists | InsertError::ShadowerExists => ConnectError::ConnectionExists,
@@ -3425,7 +3408,7 @@ where
         if let Some(listener_addr) = listener_addr {
             // TODO(https://fxbug.dev/136316): This assertion is OK because we
             // don't have dual stack listeners.
-            let id = assert_matches!(WireI::as_dual_stack_ip_socket(id), EitherStack::ThisStack(id) => id);
+            let id = assert_matches!(WireI::as_dual_stack_ip_socket(demux_id), EitherStack::ThisStack(id) => id);
             socketmap
                 .listeners_mut()
                 .remove(id, &listener_addr)
@@ -3461,7 +3444,7 @@ where
             trace!("tcp: failed to send ip packet {:?}: {:?}", body, err);
         });
 
-    assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, id.to_timer_id()), None);
+    assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, sock_id.downgrade()), None);
 
     Ok((
         Connection {
@@ -3589,7 +3572,7 @@ pub(crate) fn handle_timer<CC, BC>(
     bindings_ctx: &mut BC,
     timer_id: TimerId<CC::WeakDeviceId, BC>,
 ) where
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<Ipv4, CC::WeakDeviceId> + TcpBindingsContext<Ipv6, CC::WeakDeviceId>,
     CC: TcpContext<Ipv4, BC> + TcpContext<Ipv6, BC>,
 {
     let ctx_pair = CtxPair { core_ctx, bindings_ctx };
@@ -4424,7 +4407,7 @@ mod tests {
     fn assert_this_stack_conn<
         'a,
         I: DualStackIpExt,
-        BC: TcpBindingsContext<CC::WeakDeviceId>,
+        BC: TcpBindingsContext<I, CC::WeakDeviceId>,
         CC: TcpContext<I, BC>,
     >(
         conn: &'a I::ConnectionAndAddr<CC::WeakDeviceId, BC>,
@@ -6203,7 +6186,8 @@ mod tests {
         I: TcpTestIpExt + IcmpIpExt,
         CC: TcpContext<I, BC, DeviceId = FakeDeviceId>
             + TcpContext<I::OtherVersion, BC, DeviceId = FakeDeviceId>,
-        BC: TcpBindingsContext<CC::WeakDeviceId>,
+        BC: TcpBindingsContext<I, CC::WeakDeviceId>
+            + TcpBindingsContext<I::OtherVersion, CC::WeakDeviceId>,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,

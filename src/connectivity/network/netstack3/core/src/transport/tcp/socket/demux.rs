@@ -71,7 +71,8 @@ impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for
 impl<I, BC, CC> IpTransportContext<I, BC, CC> for TcpIpTransportContext
 where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>
+        + TcpBindingsContext<I::OtherVersion, CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -179,7 +180,8 @@ fn handle_incoming_packet<I, B, BC, CC>(
 ) where
     I: DualStackIpExt,
     B: BufferMut,
-    BC: TcpBindingsContext<CC::WeakDeviceId>
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>
+        + TcpBindingsContext<I::OtherVersion, CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -419,7 +421,7 @@ fn lookup_socket<I, CC, BC>(
 ) -> Option<SocketLookupResult<I, CC::WeakDeviceId, BC>>
 where
     I: DualStackIpExt,
-    BC: TcpBindingsContext<CC::WeakDeviceId>,
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
     CC: TcpContext<I, BC>,
 {
     addrs_to_search.find_map(|addr| {
@@ -485,7 +487,7 @@ where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
     B: BufferMut,
-    BC: TcpBindingsContext<CC::WeakDeviceId>
+    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -586,7 +588,7 @@ where
                         assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
                     },
                 );
-                let _: Option<_> = bindings_ctx.cancel_timer(conn_id.downgrade().into());
+                let _: Option<_> = bindings_ctx.cancel_timer(conn_id.downgrade());
                 return ConnectionIncomingSegmentDisposition::Destroy;
             }
             let _: bool = handshake_status.update_if_pending(match reason {
@@ -641,7 +643,7 @@ fn try_handle_incoming_for_listener<I, CC, BC, B>(
 where
     I: DualStackIpExt,
     B: BufferMut,
-    BC: TcpBindingsContext<CC::WeakDeviceId>
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -770,10 +772,7 @@ where
                     .remove(&I::into_demux_socket_id(tw_reuse.clone()), &conn_addr)
                 {
                     Ok(()) => {
-                        assert_matches!(
-                            bindings_ctx.cancel_timer(tw_reuse.downgrade().into()),
-                            Some(_)
-                        );
+                        assert_matches!(bindings_ctx.cancel_timer(tw_reuse.downgrade()), Some(_));
                     }
                     Err(NotFoundError) => {
                         // We could lose a race trying to reuse the tw_reuse
@@ -817,7 +816,7 @@ where
                     // Make sure the new socket is in the pending accept queue
                     // before we release the demux lock.
                     accept_queue.push_pending(id.clone());
-                    let timer = id.downgrade().into();
+                    let timer = id.downgrade();
                     assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, timer), None);
                     Some(primary)
                 }
