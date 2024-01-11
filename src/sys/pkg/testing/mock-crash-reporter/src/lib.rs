@@ -8,7 +8,6 @@ use {
         FilingError,
     },
     fuchsia_async::Task,
-    fuchsia_zircon::Status,
     futures::{
         channel::mpsc,
         future::{self, BoxFuture},
@@ -69,14 +68,6 @@ impl MockCrashReporterService {
     ) {
         while let Some(event) = stream.try_next().await.expect("received CrashReporter request") {
             match event {
-                fidl_fuchsia_feedback::CrashReporterRequest::File { report, responder } => {
-                    let res = self.call_hook.file_report(report).await;
-                    match res {
-                        Err(_) => responder.send(Err(Status::NOT_SUPPORTED.into_raw())).unwrap(),
-                        Ok(_) => responder.send(Ok(())).unwrap(),
-                    }
-                }
-
                 fidl_fuchsia_feedback::CrashReporterRequest::FileReport { report, responder } => {
                     let res = self.call_hook.file_report(report).await;
                     match res {

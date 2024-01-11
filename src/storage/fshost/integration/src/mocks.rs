@@ -152,10 +152,6 @@ async fn run_crash_reporter(
 ) {
     while let Some(request) = stream.next().await {
         match request.unwrap() {
-            ffeedback::CrashReporterRequest::File { report, responder } => {
-                crash_reports_sink.send(report).await.unwrap();
-                responder.send(Ok(())).unwrap();
-            }
             ffeedback::CrashReporterRequest::FileReport { report, responder } => {
                 crash_reports_sink.send(report).await.unwrap();
                 responder.send(Ok(&FileReportResults::default())).unwrap();

@@ -32,9 +32,6 @@ class CrashReporter : public CrashReporterBase {
   ~CrashReporter();
 
   // |fuchsia::feedback::CrashReporter|
-  void File(fuchsia::feedback::CrashReport report, FileCallback callback) override;
-
-  // |fuchsia::feedback::CrashReporter|
   void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override;
 
  private:
@@ -49,26 +46,17 @@ class CrashReporter : public CrashReporterBase {
 class CrashReporterClosesConnection : public CrashReporterBase {
  public:
   // |fuchsia::feedback::CrashReporter|
-  STUB_METHOD_CLOSES_CONNECTION(File, fuchsia::feedback::CrashReport, FileCallback)
-
-  // |fuchsia::feedback::CrashReporter|
   STUB_METHOD_CLOSES_CONNECTION(FileReport, fuchsia::feedback::CrashReport, FileReportCallback)
 };
 
 class CrashReporterAlwaysReturnsError : public CrashReporterBase {
  public:
   // |fuchsia::feedback::CrashReporter|
-  void File(fuchsia::feedback::CrashReport report, FileCallback callback) override;
-
-  // |fuchsia::feedback::CrashReporter|
   void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override;
 };
 
 class CrashReporterNoFileExpected : public CrashReporterBase {
  public:
-  // |fuchsia::feedback::CrashReporter|
-  void File(fuchsia::feedback::CrashReport report, FileCallback callback) override;
-
   // |fuchsia::feedback::CrashReporter|
   void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override;
 };

@@ -138,10 +138,6 @@ mod test {
 
     fn handle_crash_reporter_request(request: CrashReporterRequest) -> CrashReport {
         match request {
-            CrashReporterRequest::File { report, responder } => {
-                let _ = responder.send(Ok(()));
-                report
-            }
             CrashReporterRequest::FileReport { report, responder } => {
                 let _ = responder.send(Ok(&Default::default()));
                 report

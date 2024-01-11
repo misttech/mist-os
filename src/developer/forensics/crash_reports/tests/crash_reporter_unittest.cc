@@ -465,30 +465,6 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReport) {
   CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
 }
 
-// TODO(https://fxbug.dev/117123): delete when CrashReporter::File is removed.
-TEST_F(CrashReporterTest, Succeed_OnInputCrashReport_OldFile) {
-  SetUpDataProviderServer(
-      std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
-  SetUpCrashReporterDefaultConfig({kUploadSuccessful});
-
-  CrashReport report;
-  report.set_program_name(kProgramName);
-
-  // Run loop to start the clock.
-  RunLoopUntilIdle();
-  std::optional<::fpromise::result<void, zx_status_t>> out_result{std::nullopt};
-  crash_reporter_->File(std::move(report),
-                        [&out_result](::fpromise::result<void, zx_status_t> result) {
-                          out_result = std::move(result);
-                        });
-  RunLoopFor(kSnapshotSharedRequestWindow);
-  FX_CHECK(out_result.has_value());
-  ASSERT_TRUE(out_result->is_ok());
-
-  CheckAnnotationsOnServer();
-  CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
-}
-
 TEST_F(CrashReporterTest, EnforcesQuota) {
   SetUpDataProviderServer(
       std::make_unique<stubs::DataProvider>(kFeedbackAnnotations, kDefaultAttachmentBundleKey));
@@ -720,24 +696,6 @@ TEST_F(CrashReporterTest, Fail_OnInvalidInputCrashReport) {
   const CrashReporter_FileReport_Result result = FileOneEmptyCrashReport();
   EXPECT_TRUE(result.is_err());
   EXPECT_EQ(result.err(), FilingError::INVALID_ARGS_ERROR);
-}
-
-// TODO(https://fxbug.dev/117123): delete when CrashReporter::File is removed.
-TEST_F(CrashReporterTest, Fail_OnInvalidInputCrashReport_OldFile) {
-  SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
-  SetUpCrashReporterDefaultConfig();
-
-  // Run loop to start the clock.
-  RunLoopUntilIdle();
-  CrashReport report;
-  std::optional<::fpromise::result<void, zx_status_t>> out_result{std::nullopt};
-  crash_reporter_->File(std::move(report),
-                        [&out_result](::fpromise::result<void, zx_status_t> result) {
-                          out_result = std::move(result);
-                        });
-  RunLoopFor(kSnapshotSharedRequestWindow);
-  ASSERT_TRUE(out_result.has_value());
-  EXPECT_TRUE(out_result->is_error());
 }
 
 TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithIsFatalTrue) {

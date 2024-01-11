@@ -54,18 +54,6 @@ CrashReporter::~CrashReporter() {
       << ErrorMessage("is fatal", ToString(is_fatal_), ToString(expectations_.is_fatal));
 }
 
-void CrashReporter::File(fuchsia::feedback::CrashReport report, FileCallback callback) {
-  FileReport(std::move(report),
-             [callback = std::move(callback)](
-                 const fuchsia::feedback::CrashReporter_FileReport_Result& result) {
-               if (result.is_err()) {
-                 callback(fpromise::error(ZX_ERR_INTERNAL));
-               } else {
-                 callback(fpromise::ok());
-               }
-             });
-}
-
 void CrashReporter::FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) {
   FX_CHECK(report.has_crash_signature());
   FX_CHECK(report.has_attachments());
@@ -98,19 +86,9 @@ void CrashReporter::FileReport(fuchsia::feedback::CrashReport report, FileReport
   callback(fpromise::ok(std::move(results)));
 }
 
-void CrashReporterAlwaysReturnsError::File(fuchsia::feedback::CrashReport report,
-                                           FileCallback callback) {
-  callback(::fpromise::error(ZX_ERR_INTERNAL));
-}
-
 void CrashReporterAlwaysReturnsError::FileReport(fuchsia::feedback::CrashReport report,
                                                  FileReportCallback callback) {
   callback(::fpromise::error(fuchsia::feedback::FilingError::INVALID_ARGS_ERROR));
-}
-
-void CrashReporterNoFileExpected::File(fuchsia::feedback::CrashReport report,
-                                       FileCallback callback) {
-  FX_CHECK(false) << "No call to File() expected";
 }
 
 void CrashReporterNoFileExpected::FileReport(fuchsia::feedback::CrashReport report,

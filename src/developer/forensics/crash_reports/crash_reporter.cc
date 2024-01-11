@@ -154,22 +154,6 @@ void CrashReporter::PersistAllCrashReports() {
   snapshot_collector_.Shutdown();
 }
 
-void CrashReporter::File(fuchsia::feedback::CrashReport report, FileCallback callback) {
-  if (!report.has_program_name()) {
-    FX_LOGS(ERROR) << "Input report missing required program name. Won't file.";
-    callback(::fpromise::error(ZX_ERR_INVALID_ARGS));
-    info_.LogCrashState(cobalt::CrashState::kDropped);
-    return;
-  }
-
-  // Execute the callback informing the client the report has been filed. The rest of the async flow
-  // can take quite some time and blocking clients would defeat the purpose of sharing the snapshot.
-  callback(::fpromise::ok());
-
-  File(std::move(report), /*is_hourly_snapshot=*/false,
-       [](const CrashReporter_FileReport_Result& result) {});
-}
-
 void CrashReporter::FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) {
   if (!report.has_program_name()) {
     FX_LOGS(ERROR) << "Input report missing required program name. Won't file.";

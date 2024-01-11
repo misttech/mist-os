@@ -17,19 +17,6 @@ namespace fakes {
 
 using namespace fuchsia::feedback;
 
-void CrashReporter::File(CrashReport report, FileCallback callback) {
-  if (!report.has_program_name()) {
-    callback(CrashReporter_File_Result::WithErr(ZX_ERR_INVALID_ARGS));
-  } else {
-    callback(CrashReporter_File_Result::WithResponse(CrashReporter_File_Response()));
-  }
-
-  ++num_crash_reports_filed_;
-  if (querier_) {
-    querier_->UpdateAndNotify(num_crash_reports_filed_);
-  }
-}
-
 void CrashReporter::FileReport(CrashReport report, FileReportCallback callback) {
   if (!report.has_program_name()) {
     callback(fpromise::error(FilingError::INVALID_ARGS_ERROR));

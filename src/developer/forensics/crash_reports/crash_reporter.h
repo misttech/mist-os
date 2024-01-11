@@ -53,9 +53,6 @@ class CrashReporter : public fuchsia::feedback::CrashReporter {
   void PersistAllCrashReports();
 
   // |fuchsia::feedback::CrashReporter|
-  void File(fuchsia::feedback::CrashReport report, FileCallback callback) override;
-
-  // |fuchsia::feedback::CrashReporter|
   void FileReport(fuchsia::feedback::CrashReport report, FileReportCallback callback) override;
 
  private:

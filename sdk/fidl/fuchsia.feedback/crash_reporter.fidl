@@ -9,24 +9,6 @@ using zx;
 /// Provides the ability to file crash reports.
 @discoverable
 closed protocol CrashReporter {
-    /// Files a crash `report`.
-    ///
-    /// This could mean generating a crash report in a local crash report database or uploading the
-    /// crash report to a remote crash server depending on the FIDL server's configuration.
-    ///
-    /// # Deprecation
-    ///
-    /// This method returns an immediate acknowledgement that the request was
-    /// received. In practice this acknowledgement isn't used and only returns
-    /// an error if the program name is blank. By F12, FileReport should be
-    /// used instead. FileReport will provide a useful status once the report
-    /// has been successfully or unsuccessfully filed.
-    // TODO(https://fxbug.dev/122422): delete File once F12 is out of support window.
-    @available(deprecated=11, removed=12, legacy=true, note="use FileReport")
-    strict File(resource struct {
-        report CrashReport;
-    }) -> () error zx.Status;
-
     /// Files a crash `report` and gives the final result of the operation.
     ///
     /// This could mean generating a crash report in a local crash report
