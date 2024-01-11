@@ -50,6 +50,9 @@ impl PlatformBacking {
     //         simultaneously made on other threads.
     unsafe fn glob() -> &'static mut Option<PlatformBacking> {
         static mut SINGLETON_BACKING: Option<PlatformBacking> = None;
+        // TODO(b/319328255) -- Fix usage so lint no longer applies
+        #[allow(unknown_lints)]
+        #[allow(static_mut_ref)]
         &mut SINGLETON_BACKING
     }
 

@@ -51,6 +51,9 @@ impl InstanceBacking {
 impl InstanceBacking {
     unsafe fn glob() -> &'static mut Option<InstanceBacking> {
         static mut SINGLETON_BACKING: Option<InstanceBacking> = None;
+        // TODO(b/319328255) -- Fix usage so lint no longer applies
+        #[allow(unknown_lints)]
+        #[allow(static_mut_ref)]
         &mut SINGLETON_BACKING
     }
 
