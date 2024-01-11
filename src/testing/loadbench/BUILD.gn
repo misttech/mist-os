@@ -24,6 +24,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/files",
     "//src/lib/fxl",
     "//src/performance/lib/fxt",
