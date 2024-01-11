@@ -197,7 +197,6 @@ def main():
     )
     parser.add_argument("--output", type=argparse.FileType("w"), required=True)
     parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("--blobfs-capacity", type=int, required=True)
     parser.add_argument("--max-blob-contents-size", type=int, required=True)
     args = parser.parse_args()
 

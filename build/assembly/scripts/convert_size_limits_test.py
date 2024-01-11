@@ -116,7 +116,6 @@ class ConvertTest(unittest.TestCase):
                     ],
                     total_budget_bytes=999,
                 ),
-                blobfs_capacity=3000,
                 max_blob_contents_size=999,
                 return_value=0,
             ),
@@ -150,7 +149,6 @@ class ConvertTest(unittest.TestCase):
                     base=["obj/a/b_c2/package_manifest.json"]
                 ),
                 expected_output=None,
-                blobfs_capacity=101,
                 max_blob_contents_size=100,
                 return_value=1,
             ),
@@ -163,7 +161,6 @@ class ConvertTest(unittest.TestCase):
                     package_set_budgets=[],
                     total_budget_bytes=200,
                 ),
-                blobfs_capacity=101,
                 max_blob_contents_size=200,
                 return_value=0,
             ),
@@ -175,7 +172,6 @@ class ConvertTest(unittest.TestCase):
         size_limits,
         image_assembly_config,
         expected_output,
-        blobfs_capacity,
         max_blob_contents_size,
         return_value,
     ):
@@ -209,8 +205,6 @@ class ConvertTest(unittest.TestCase):
                 image_assembly_config_path,
                 "--output",
                 output_path,
-                "--blobfs-capacity",
-                str(blobfs_capacity),
                 "--max-blob-contents-size",
                 str(max_blob_contents_size),
             ]

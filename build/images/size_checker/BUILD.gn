@@ -132,8 +132,6 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
         rebase_path(_image_assembly_config, root_build_dir),
         "--output",
         rebase_path(_size_budgets_blobfs_file, root_build_dir),
-        "--blobfs-capacity",
-        "$blobfs_capacity",
         "--max-blob-contents-size",
         "$max_blob_contents_size",
       ]

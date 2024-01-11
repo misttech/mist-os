@@ -30,8 +30,6 @@ def _fuchsia_package_size_check_impl(ctx):
             product_assembly_out.path + "/image_assembly.json",
             "--output",
             budgets_file.path,
-            "--blobfs-capacity",
-            str(ctx.attr.blobfs_capacity),
             "--max-blob-contents-size",
             str(ctx.attr.max_blob_contents_size),
         ],
@@ -101,8 +99,7 @@ fuchsia_package_size_check = rule(
             providers = [FuchsiaProductImageInfo],
         ),
         "blobfs_capacity": attr.int(
-            doc = "Total Capacity of BlobFS",
-            mandatory = True,
+            doc = "Total Capacity of BlobFS. Deprecated!",
         ),
         "max_blob_contents_size": attr.int(
             doc = "Total size of BlobFS Contents",
