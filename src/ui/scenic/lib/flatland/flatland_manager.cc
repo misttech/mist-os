@@ -181,8 +181,9 @@ void FlatlandManager::CreateFlatlandDisplay(
   FX_DCHECK(flatland_instances_.find(id) == flatland_instances_.end());
   FX_DCHECK(flatland_display_instances_.find(id) == flatland_display_instances_.end());
 
-  // TODO(https://fxbug.dev/76985): someday there will be a DisplayToken or something for the client to
-  // identify which hardware display this FlatlandDisplay is associated with.  For now: hard-coded.
+  // TODO(https://fxbug.dev/76985): someday there will be a DisplayToken or something for the client
+  // to identify which hardware display this FlatlandDisplay is associated with.  For now:
+  // hard-coded.
   auto hw_display = primary_display_;
 
   if (hw_display->is_claimed()) {
@@ -242,11 +243,11 @@ void FlatlandManager::UpdateInstances(
     FX_DCHECK((flatland_instances_.find(session_id) != flatland_instances_.end()) ||
               (flatland_display_instances_.find(session_id) != flatland_display_instances_.end()));
 
-    // TODO(https://fxbug.dev/76640): we currently only keep track of present tokens for Flatland sessions,
-    // not FlatlandDisplay sessions.  It's not clear what we could do with them for FlatlandDisplay:
-    // there is no API that would allow sending them to the client.  Maybe the current approach is
-    // OK?  Maybe we should DCHECK that |present_credits_returned| is only non-zero for Flatlands,
-    // not FlatlandDisplays?
+    // TODO(https://fxbug.dev/76640): we currently only keep track of present tokens for Flatland
+    // sessions, not FlatlandDisplay sessions.  It's not clear what we could do with them for
+    // FlatlandDisplay: there is no API that would allow sending them to the client.  Maybe the
+    // current approach is OK?  Maybe we should DCHECK that |present_credits_returned| is only
+    // non-zero for Flatlands, not FlatlandDisplays?
 
     // Add the session to the map of updated_sessions, and increment the number of present tokens it
     // should receive after the firing of the SendHintsToStartRendering().
@@ -315,7 +316,6 @@ void FlatlandManager::OnFramePresented(
 
     // Skip sessions that have exited since their frame was rendered.
     if (instance_kv == flatland_instances_.end()) {
-      FX_LOGS(INFO) << "Skipping SendFramePresented(): session " << session_id << " not found.";
       continue;
     }
 
