@@ -250,15 +250,19 @@ void SimpleAudioStream::DeactivateStreamChannel(StreamChannel* channel) {
 
   // Any pending LLCPP completer must be either replied to or closed before we destroy it.
   if (channel->plug_completer_.has_value()) {
-    zxlogf(ERROR, "Plug completer is still open when deactivating stream channel");
-    channel->plug_completer_->Close(ZX_ERR_INTERNAL);
+    zxlogf(INFO, "Plug completer is still open when deactivating stream channel");
+    // This is expected/normal: clients may always have an outstanding Plug hanging-get, and it is
+    // not automatically completed/canceled when either side closes the StreamConfig channel.
+    channel->plug_completer_->Reply({});
   }
   channel->plug_completer_.reset();
 
   // Any pending LLCPP completer must be either replied to or closed before we destroy it.
   if (channel->gain_completer_.has_value()) {
-    zxlogf(ERROR, "Gain completer is still open when deactivating stream channel");
-    channel->gain_completer_->Close(ZX_ERR_INTERNAL);
+    zxlogf(INFO, "Gain completer is still open when deactivating stream channel");
+    // This is expected/normal: clients may always have an outstanding Gain hanging-get, and it is
+    // not automatically completed/canceled when either side closes the StreamConfig channel.
+    channel->gain_completer_->Reply({});
   }
   channel->gain_completer_.reset();
 
@@ -276,9 +280,9 @@ void SimpleAudioStream::DeactivateRingBufferChannel(const Channel* channel) {
     delay_info_updated_ = false;
     // Any pending LLCPP completer must be either replied to or closed before we destroy it.
     if (delay_completer_.has_value()) {
-      // This is expected/normal: clients will always have an outstanding hanging-get, and it is not
-      // automatically completed/canceled by any RingBuffer call (Stop(), for example).
       zxlogf(INFO, "Delay completer is still open when deactivating ring buffer channel");
+      // This is expected/normal: clients may always have an outstanding Delay hanging-get while the
+      // RingBuffer lives. No RingBuffer call (e.g. `Stop()`) automatically completes/cancels them.
       delay_completer_->Reply({});  // Don't close the channel with an error.
     }
     delay_completer_.reset();
@@ -288,8 +292,10 @@ void SimpleAudioStream::DeactivateRingBufferChannel(const Channel* channel) {
       fbl::AutoLock position_lock(&position_lock_);
       // Any pending LLCPP completer must be either replied to or closed before we destroy it.
       if (position_completer_.has_value()) {
-        zxlogf(ERROR, "Position completer is still open when deactivating ring buffer channel");
-        position_completer_->Close(ZX_ERR_INTERNAL);
+        zxlogf(INFO, "Position completer is still open when deactivating ring buffer channel");
+        // This is expected/normal: clients may always have an outstanding Position hanging-get
+        // while the RingBuffer lives. No RingBuffer call automatically completes/cancels them.
+        position_completer_->Reply({});  // Don't close the channel with an error.
       }
       position_completer_.reset();
     }
