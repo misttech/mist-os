@@ -52,7 +52,9 @@ executable("bin") {
          ] + gidl_deps
 }
 
-fuchsia_shell_package("hlcpp") {
+fuchsia_package_with_single_component("fidl_microbenchmarks_hlcpp") {
   testonly = true
+  manifest = "meta/benchmark.cml"
+  component_name = "benchmark"
   deps = [ ":bin" ]
 }

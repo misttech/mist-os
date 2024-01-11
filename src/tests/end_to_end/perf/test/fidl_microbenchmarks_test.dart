@@ -49,8 +49,6 @@ void main(List<String> args) {
   enableLoggingOutput();
 
   runPerftestFidlBenchmark(
-      'hlcpp_fidl_microbenchmarks', 'fuchsia.fidl_microbenchmarks.hlcpp.txt');
-  runPerftestFidlBenchmark(
       'lib_fidl_microbenchmarks', 'fuchsia.fidl_microbenchmarks.libfidl.txt');
   runPerftestFidlBenchmark(
       'llcpp_fidl_microbenchmarks', 'fuchsia.fidl_microbenchmarks.llcpp.txt');
