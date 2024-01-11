@@ -42,21 +42,15 @@ impl DerivedConnection for MutableConnection {
     type Directory = dyn MutableDirectory;
     const MUTABLE: bool = true;
 
-    fn entry_not_found(
+    fn create_entry(
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,
         entry_type: NewEntryType,
-        create: bool,
         name: &str,
         path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        match create {
-            false => Err(Status::NOT_FOUND),
-            true => {
-                let entry_constructor = scope.entry_constructor().ok_or(Status::NOT_SUPPORTED)?;
-                entry_constructor.create_entry(parent, entry_type, name, path)
-            }
-        }
+        let entry_constructor = scope.entry_constructor().ok_or(Status::NOT_SUPPORTED)?;
+        entry_constructor.create_entry(parent, entry_type, name, path)
     }
 }
 

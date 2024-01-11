@@ -104,15 +104,12 @@ where
                 Ok(entry.clone())
             }
             None => {
-                let (type_, create) = NewEntryType::from_flags(flags, path.is_dir())?;
-                let entry = Connection::entry_not_found(
-                    scope.clone(),
-                    self.clone(),
-                    type_,
-                    create,
-                    name,
-                    path,
-                )?;
+                if !flags.intersects(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT) {
+                    return Err(Status::NOT_FOUND);
+                }
+                let entry_type = NewEntryType::from_flags(flags, path.is_dir())?;
+                let entry =
+                    Connection::create_entry(scope.clone(), self.clone(), entry_type, name, path)?;
 
                 let name: Name = name.to_string().try_into()?;
                 let _ = this.entries.insert(name, entry.clone());
@@ -144,18 +141,11 @@ where
                     ..
                 }) = protocols
                 {
-                    let create = protocols.open_mode() != fio::OpenMode::OpenExisting;
+                    if protocols.open_mode() == fio::OpenMode::OpenExisting {
+                        return Err(Status::NOT_FOUND);
+                    }
                     let entry_type = NewEntryType::from_protocols(node_protocols)?;
-                    // TODO(b/293947862): Consider refactoring `entry_not_found` to be only
-                    // caled when we want to create the entry.
-                    Connection::entry_not_found(
-                        scope.clone(),
-                        self.clone(),
-                        entry_type,
-                        create,
-                        name,
-                        path,
-                    )?
+                    Connection::create_entry(scope.clone(), self.clone(), entry_type, name, path)?
                 } else {
                     return Err(Status::INVALID_ARGS);
                 };

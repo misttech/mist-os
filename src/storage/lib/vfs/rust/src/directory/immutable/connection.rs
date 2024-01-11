@@ -69,17 +69,13 @@ impl DerivedConnection for ImmutableConnection {
     type Directory = dyn entry_container::Directory;
     const MUTABLE: bool = false;
 
-    fn entry_not_found(
+    fn create_entry(
         _scope: ExecutionScope,
         _parent: Arc<dyn DirectoryEntry>,
         _entry_type: NewEntryType,
-        create: bool,
         _name: &str,
         _path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, Status> {
-        match create {
-            false => Err(Status::NOT_FOUND),
-            true => Err(Status::NOT_SUPPORTED),
-        }
+        Err(Status::NOT_SUPPORTED)
     }
 }

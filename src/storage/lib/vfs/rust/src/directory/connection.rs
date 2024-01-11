@@ -46,14 +46,11 @@ pub trait DerivedConnection: Send + Sync {
     /// Whether these connections support mutable connections.
     const MUTABLE: bool;
 
-    // TODO(b/293947862): this function will always return `Err(Status::NOT_FOUND)` if `create` is
-    // false. Consider if it may be worth refactoring this so that this is only called to create an
-    // entry that is not found when the open mode supports create.
-    fn entry_not_found(
+    /// Creates entry of the specified type `NewEntryType`.
+    fn create_entry(
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,
         entry_type: NewEntryType,
-        create: bool,
         name: &str,
         path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, Status>;
