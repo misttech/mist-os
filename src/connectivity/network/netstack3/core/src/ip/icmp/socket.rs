@@ -6,7 +6,6 @@
 
 use core::{
     fmt::Debug,
-    marker::PhantomData,
     num::{NonZeroU16, NonZeroU8},
 };
 
@@ -508,11 +507,11 @@ impl<I: Ip> EntryKey for SocketId<I> {
 }
 
 /// The ICMP Echo sockets API.
-pub struct IcmpEchoSocketApi<I, C>(C, PhantomData<I>);
+pub struct IcmpEchoSocketApi<I: Ip, C>(C, IpVersionMarker<I>);
 
-impl<I, C> IcmpEchoSocketApi<I, C> {
+impl<I: Ip, C> IcmpEchoSocketApi<I, C> {
     pub(crate) fn new(ctx: C) -> Self {
-        Self(ctx, PhantomData)
+        Self(ctx, IpVersionMarker::new())
     }
 }
 
@@ -525,12 +524,12 @@ where
         IcmpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
-        let Self(pair, PhantomData) = self;
+        let Self(pair, IpVersionMarker { .. }) = self;
         pair.core_ctx()
     }
 
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
-        let Self(pair, PhantomData) = self;
+        let Self(pair, IpVersionMarker { .. }) = self;
         pair.contexts()
     }
 

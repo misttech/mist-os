@@ -33,7 +33,10 @@ use core::{
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{
+        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
+        Ipv6Addr,
+    },
     AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
 use packet_formats::ip::IpProto;
@@ -1544,11 +1547,11 @@ impl HandshakeStatus {
     }
 }
 /// The TCP socket API.
-pub struct TcpApi<I, C>(C, PhantomData<I>);
+pub struct TcpApi<I: Ip, C>(C, IpVersionMarker<I>);
 
-impl<I, C> TcpApi<I, C> {
+impl<I: Ip, C> TcpApi<I, C> {
     pub(crate) fn new(ctx: C) -> Self {
-        Self(ctx, PhantomData)
+        Self(ctx, IpVersionMarker::new())
     }
 }
 
@@ -1571,12 +1574,12 @@ where
         TcpBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
-        let Self(pair, PhantomData) = self;
+        let Self(pair, IpVersionMarker { .. }) = self;
         pair.core_ctx()
     }
 
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
-        let Self(pair, PhantomData) = self;
+        let Self(pair, IpVersionMarker { .. }) = self;
         pair.contexts()
     }
 
@@ -4426,7 +4429,7 @@ mod tests {
 
     /// A trait providing a shortcut to instantiate a [`TcpApi`] from a context.
     trait TcpApiExt: crate::context::ContextPair + Sized {
-        fn tcp_api<I>(&mut self) -> TcpApi<I, &mut Self> {
+        fn tcp_api<I: Ip>(&mut self) -> TcpApi<I, &mut Self> {
             TcpApi::new(self)
         }
     }

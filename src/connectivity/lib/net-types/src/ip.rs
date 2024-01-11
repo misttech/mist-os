@@ -100,9 +100,10 @@ pub struct IpVersionMarker<I: Ip> {
 }
 
 impl<I: Ip> IpVersionMarker<I> {
+    /// Creates a new `IpVersionMarker`.
     // TODO(https://github.com/rust-lang/rust/issues/67792): Remove once
     // `const_trait_impl` is stabilized.
-    const fn new() -> Self {
+    pub const fn new() -> Self {
         Self { _marker: core::marker::PhantomData }
     }
 }

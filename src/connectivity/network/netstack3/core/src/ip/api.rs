@@ -5,9 +5,9 @@
 //! Defines the public API exposed to bindings by the IP module.
 
 use alloc::vec::Vec;
-use core::{cmp::Ord, iter::Extend, marker::PhantomData};
+use core::{cmp::Ord, iter::Extend};
 use net_types::{
-    ip::{Ip, IpAddr, Ipv4, Ipv6},
+    ip::{Ip, IpAddr, IpVersionMarker, Ipv4, Ipv6},
     SpecifiedAddr,
 };
 
@@ -26,11 +26,11 @@ use crate::{
 };
 
 /// The routes API for a specific IP version `I`.
-pub struct RoutesApi<I, C>(C, PhantomData<I>);
+pub struct RoutesApi<I: Ip, C>(C, IpVersionMarker<I>);
 
-impl<I, C> RoutesApi<I, C> {
+impl<I: Ip, C> RoutesApi<I, C> {
     pub(crate) fn new(ctx: C) -> Self {
-        Self(ctx, PhantomData)
+        Self(ctx, IpVersionMarker::new())
     }
 }
 
@@ -52,7 +52,7 @@ where
     <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId: Ord,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
-        let Self(pair, PhantomData) = self;
+        let Self(pair, IpVersionMarker { .. }) = self;
         pair.core_ctx()
     }
 
@@ -154,7 +154,7 @@ where
         + RoutesApiBindingsContext<Ipv6, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
     <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId: Ord,
 {
-    fn ip<I>(&mut self) -> RoutesApi<I, &mut C> {
+    fn ip<I: Ip>(&mut self) -> RoutesApi<I, &mut C> {
         let Self(pair) = self;
         RoutesApi::new(pair)
     }

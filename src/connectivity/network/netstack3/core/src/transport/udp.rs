@@ -8,7 +8,6 @@ use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
 use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
-    marker::PhantomData,
     num::{NonZeroU16, NonZeroU8, NonZeroUsize},
     ops::RangeInclusive,
 };
@@ -1543,11 +1542,11 @@ pub enum SendToError {
 }
 
 /// The UDP socket API.
-pub struct UdpApi<I, C>(C, PhantomData<I>);
+pub struct UdpApi<I: Ip, C>(C, IpVersionMarker<I>);
 
-impl<I, C> UdpApi<I, C> {
+impl<I: Ip, C> UdpApi<I, C> {
     pub(crate) fn new(ctx: C) -> Self {
-        Self(ctx, PhantomData)
+        Self(ctx, IpVersionMarker::new())
     }
 }
 
@@ -1560,12 +1559,12 @@ where
         UdpStateBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
-        let Self(pair, PhantomData) = self;
+        let Self(pair, IpVersionMarker { .. }) = self;
         pair.core_ctx()
     }
 
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
-        let Self(pair, PhantomData) = self;
+        let Self(pair, IpVersionMarker { .. }) = self;
         pair.contexts()
     }
 
