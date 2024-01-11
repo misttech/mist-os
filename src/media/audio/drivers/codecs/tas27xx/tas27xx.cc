@@ -19,7 +19,7 @@
 
 namespace audio {
 
-// TODO(104023): Add handling for the other formats supported by this hardware.
+// TODO(https://fxbug.dev/104023): Add handling for the other formats supported by this hardware.
 static const std::vector<uint32_t> kSupportedNumberOfChannels = {2};
 static const std::vector<SampleFormat> kSupportedSampleFormats = {SampleFormat::PCM_SIGNED};
 static const std::vector<FrameFormat> kSupportedFrameFormats = {FrameFormat::I2S};
@@ -128,8 +128,7 @@ void Tas27xx::PeriodicStateCheck() {
 
   // It is safe to capture "this" here, the dispatcher's loop is guaranteed to be shutdown
   // before this object is destroyed.
-  async::PostDelayedTask(
-      dispatcher(), [this]() { PeriodicStateCheck(); }, zx::sec(20));
+  async::PostDelayedTask(dispatcher(), [this]() { PeriodicStateCheck(); }, zx::sec(20));
 }
 
 zx_status_t Tas27xx::GetTemperature(float* temperature) {
@@ -283,8 +282,7 @@ zx::result<DriverIds> Tas27xx::Initialize() {
   // Start a periodic state check.
   // It is safe to capture "this" here, the dispatcher's loop is guaranteed to be shutdown
   // before this object is destroyed.
-  async::PostDelayedTask(
-      dispatcher(), [this]() { PeriodicStateCheck(); }, zx::sec(20));
+  async::PostDelayedTask(dispatcher(), [this]() { PeriodicStateCheck(); }, zx::sec(20));
 
   return zx::ok(DriverIds{
       .vendor_id = PDEV_VID_TI,

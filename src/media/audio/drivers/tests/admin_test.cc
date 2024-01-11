@@ -64,8 +64,8 @@ void AdminTest::SetBridgedMode(bool bridged_mode) {
 }
 
 // Request that the driver reset, expecting a response.
-// TODO(https://fxbug.dev/124865): Test Reset for Composite and Dai as well (Reset closes any RingBuffer).
-// TODO(https://fxbug.dev/126734): When we add SignalProcessing testing, check that this resets that state.
+// TODO(https://fxbug.dev/124865): Test Reset for Composite and Dai (Reset closes any RingBuffer).
+// TODO(https://fxbug.dev/126734): When SignalProcessing testing, Reset should change this state.
 void AdminTest::ResetAndExpectResponse() {
   if (device_entry().isCodec()) {
     codec()->Reset(AddCallback("Codec::Reset"));
@@ -387,8 +387,8 @@ void AdminTest::DropRingBuffer() {
   // We need this wait when testing a "real hardware" driver (i.e. on realtime-capable systems). For
   // this reason a hardcoded time constant, albeit a test antipattern, is (grudgingly) acceptable.
   //
-  // TODO(https://fxbug.dev/113683): investigate why we fail without this delay, fix the drivers/test as
-  // necessary, and eliminate this workaround.
+  // TODO(https://fxbug.dev/113683): investigate why we fail without this delay, fix the
+  // drivers/test as necessary, and eliminate this workaround.
   zx::nanosleep(zx::deadline_after(zx::msec(100)));
 }
 
@@ -771,7 +771,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
 
 // TODO(https://fxbug.dev/126734): Add testing for SignalProcessing methods.
 
-// TODO(https://fxbug.dev/124865): Add more testing for Composite protocol (e.g. Reset, SetDaiFormat).
+// TODO(https://fxbug.dev/124865): Add more Composite testing (e.g. Reset, SetDaiFormat).
 
 // TODO(b/302704556): Add tests for Watch-while-still-pending (specifically delay and position).
 

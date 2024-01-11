@@ -260,7 +260,7 @@ zx_status_t HardwareDspChannel::SendIpcWait(Txn* txn) {
     return res;
   }
 
-  // TODO(yky): https://fxbug.dev/32120: Figure out why this is needed and eliminate it.
+  // TODO(https://fxbug.dev/32120): Figure out why this is needed and eliminate it.
   zx_nanosleep(zx_deadline_after(ZX_MSEC(1)));
   return res;
 }

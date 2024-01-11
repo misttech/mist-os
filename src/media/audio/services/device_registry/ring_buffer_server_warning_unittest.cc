@@ -603,9 +603,9 @@ TEST_F(RingBufferServerWarningTest, WatchDelayInfoWhilePending) {
   ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
 }
 
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test when Healthy device
-// becomes Unhealthy right before (1) SetActiveChannels, (2) Start, (3) Stop, (4) WatchDelayInfo.
-// In all four cases, expect Observers/Control/RingBuffer to drop and Registry/WatchDeviceRemoved.
+// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+//   Unhealthy right before (1) SetActiveChannels, (2) Start, (3) Stop, (4) WatchDelayInfo. In all
+//   four cases, expect Observers/Control/RingBuffer to drop + Registry/WatchDeviceRemoved notif.
 
 }  // namespace
 }  // namespace media_audio

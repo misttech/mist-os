@@ -697,7 +697,7 @@ impl AudioDaemon {
         Ok(())
     }
 
-    // TODO(298683668) this will be removed, replaced by client direct calls.
+    // TODO(b/298683668) this will be removed, replaced by client direct calls.
     async fn serve_device_control(
         &mut self,
         mut stream: DeviceControlRequestStream,

@@ -279,8 +279,8 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-// unhealthy before ControlCreator/Create. Expect Obs/Ctl/RingBuffer to drop & Reg/WatcDevRemoved.
+// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+//   unhealthy before ControlCreator/Create. Expect Obs/Ctl/RingBuf to drop + Reg/WatcDevRemoved.
 
 }  // namespace
 }  // namespace media_audio

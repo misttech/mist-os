@@ -60,7 +60,7 @@ zx_status_t RealtekCodec::ProcessSolicitedResponse(const CodecResponse& resp) {
 
   waiting_for_impl_id_ = false;
 
-  // TODO(72652): Generic HDA codec graph traversal such that we don't base this
+  // TODO(https://fxbug.dev/72652): Generic HDA codec graph traversal such that we don't base this
   // setup behavior on exact matches in the implementation ID register.
   // We should have a generic driver which depends mostly on codec VID/DID and
   // BIOS provided configuration hints to make the majority of configuration
@@ -214,7 +214,7 @@ zx_status_t RealtekCodec::SetupAcer12() {
       // Enable MIC2's input.  Failure to keep this enabled causes the positive half of
       // the headphone output to be destroyed.
       //
-      // TODO(103178) : figure out why
+      // TODO(https://fxbug.dev/103178) : figure out why
       {25u, SET_ANALOG_PIN_WIDGET_CTRL(false, true, false)},
 
       // Power up the top level Audio Function group.
@@ -434,7 +434,7 @@ zx_status_t RealtekCodec::SetupLenovoX1() {
       {12u, SET_OUTPUT_AMPLIFIER_GAIN_MUTE(true, 1, 0)},   // Mix NID 12, In-1 (nid 11) muted.
 
       // Enable MIC2's input. Failure to keep this enabled causes headphone output to not work.
-      // TODO(103178) : figure out why.
+      // TODO(https://fxbug.dev/103178) : figure out why.
       {25u, SET_ANALOG_PIN_WIDGET_CTRL(false, true, false)},
 
       // Power up the top level Audio Function group.
@@ -513,7 +513,7 @@ zx_status_t RealtekCodec::SetupIntelNUC() {
       // Enable MIC2's input.  Failure to keep this enabled causes the positive half of
       // the headphone output to be destroyed.
       //
-      // TODO(103178) : figure out why.
+      // TODO(https://fxbug.dev/103178) : figure out why.
       {25u, SET_ANALOG_PIN_WIDGET_CTRL(false, true, false)},
 
       // Power up the top level Audio Function group.

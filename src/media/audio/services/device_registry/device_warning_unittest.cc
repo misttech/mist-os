@@ -12,7 +12,7 @@ namespace media_audio {
 
 class DeviceWarningTest : public DeviceTestBase {};
 
-// TODO(https://fxbug.dev/117826): test behavior with non-compliant drivers (e.g. min_gain > max_gain).
+// TODO(https://fxbug.dev/117826): test non-compliant driver behavior (e.g. min_gain>max_gain).
 
 TEST_F(DeviceWarningTest, DeviceUnhealthy) {
   fake_driver_->set_health_state(false);
@@ -27,8 +27,8 @@ TEST_F(DeviceWarningTest, DeviceUnhealthy) {
   EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
 }
 
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-// unhealthy - before any Device method. Expect method-specific failure and State::Error notif.
+// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+//   unhealthy before any Device method. Expect method-specific failure + State::Error notif.
 
 TEST_F(DeviceWarningTest, UnhealthyDeviceRemoved) {
   fake_driver_->set_health_state(false);

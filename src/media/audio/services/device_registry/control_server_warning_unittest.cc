@@ -440,9 +440,9 @@ TEST_F(ControlServerWarningTest, CreateRingBufferWhilePending) {
   EXPECT_TRUE(control_client.is_valid());
 }
 
-// TODO(https://fxbug.dev/117826): Enable this unittest that tests the upper limit of VMO size (4Gb).
-// This is not high-priority since even at the service's highest supported frame rate (192 kHz),
-// channel_count (8) and sample_type (float64), a 4Gb ring-buffer would be 5.8 minutes long!
+// TODO(https://fxbug.dev/117826): Enable this unittest to test the upper limit of VMO size (4Gb).
+//   This is not high-priority since even at the service's highest supported bitrate (192kHz,
+//   8-channel, float64), a 4Gb ring-buffer would be 5.8 minutes long!
 TEST_F(ControlServerWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes) {
   EXPECT_EQ(dispatcher(), test_loop().dispatcher());
   zx::channel server_end, client_end;
@@ -621,14 +621,14 @@ TEST_F(ControlServerWarningTest, CreateRingBufferBadRingBufferServerEnd) {
   EXPECT_EQ(ControlServer::count(), 0u);
 }
 
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-//     unhealthy before SetGain. Expect Observer/Control/RingBuffer to drop, Reg/WatchRemoved.
+// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+//   unhealthy before SetGain. Expect Observer/Control/RingBuffer to drop, Reg/WatchRemoved.
 
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-//     unhealthy before GetCurrentlyPermittedFormats. Expect Obs/Ctl/RBr to drop, Reg/WatchRemoved.
+// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+//   unhealthy before GetCurrentlyPermittedFormats. Expect Obs/Ctl/RBr to drop, Reg/WatchRemoved.
 
-// TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
-//     unhealthy before CreateRingBuffer. Expect Obs/Ctl to drop, Reg/WatchRemoved.
+// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+//   unhealthy before CreateRingBuffer. Expect Obs/Ctl to drop, Reg/WatchRemoved.
 
 }  // namespace
 }  // namespace media_audio

@@ -45,7 +45,7 @@ impl Config {
         self.stream_config_indexes.entry(device).or_default().push(index);
     }
     pub fn load(&mut self) -> Result<(), Error> {
-        // TODO(95437): Add configurability per product/device instead of hardcoding.
+        // TODO(https://fxbug.dev/95437): Add configurability per product/device instead of hardcoding.
         let indexes = HashMap::from([
             // Codecs:
             (

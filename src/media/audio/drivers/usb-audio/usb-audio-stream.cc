@@ -1154,7 +1154,7 @@ size_t UsbAudioStream::CompleteRequestLocked(fuchsia_hardware_usb_endpoint::Comp
 
   // If we are an input stream, copy the payload into the ring buffer.
   if (is_input()) {
-    // TODO(31906): for async inputs, measure and report the device's
+    // TODO(https://fxbug.dev/31906): for async inputs, measure and report the device's
     // observed sampling rate to the client.  If the device is falling
     // behind the nominal sampling rate, it's probably a minor quality
     // issue; but if they're running faster than the nominal sampling rate,

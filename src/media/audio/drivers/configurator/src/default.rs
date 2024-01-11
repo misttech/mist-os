@@ -315,7 +315,7 @@ impl DefaultConfigurator {
         formats1: &Vec<DaiSupportedFormats>,
         formats2: &Vec<DaiSupportedFormats>,
     ) -> Option<DaiFormat> {
-        // TODO(95437): Add heuristics and configurability for the decision of what DAI formats
+        // TODO(https://fxbug.dev/95437): Add heuristics and configurability for the decision of what DAI formats
         // to use when there is more than one match here..
         for i in formats1 {
             for j in formats2 {
@@ -405,7 +405,7 @@ impl DefaultConfigurator {
         product: &str,
     ) -> Result<(), Error> {
         // Enable only the DAI channel as channel to use in the codec.
-        // TODO(95437): Add flexibility instead of only allowing one DAI channel per codec.
+        // TODO(https://fxbug.dev/95437): Add flexibility instead of only allowing one DAI channel per codec.
         let bitmask: u64 = 1 << (dai_channel as u32 % codec_dai_format.number_of_channels);
         codec_dai_format.channels_to_use_bitmask = bitmask;
         tracing::debug!(
@@ -614,7 +614,7 @@ impl Configurator for DefaultConfigurator {
             .ok_or(anyhow!("Codec index ({:?}) not in config", device))?;
 
         // Use DAI channel matching the StreamConfigIndex used.
-        // TODO(95437): Add configurability for the DAI channel in addition to this heuristic.
+        // TODO(https://fxbug.dev/95437): Add configurability for the DAI channel in addition to this heuristic.
         let dai_channel = (stream_config_indexes.len() - 1) as u8;
 
         let stream_config_state = inner
@@ -660,7 +660,7 @@ impl Configurator for DefaultConfigurator {
 
         let proxy = interface.get_proxy()?.clone();
         let stream_config_state_clone = stream_config_state.clone();
-        // TODO(95437): Improve handing of misbehaving codecs for instance dropping the
+        // TODO(https://fxbug.dev/95437): Improve handing of misbehaving codecs for instance dropping the
         // corresponding StreamConfigs.
         let task = fasync::Task::spawn(async move {
             DefaultConfigurator::watch_plug_detect(proxy, stream_config_state_clone).await;

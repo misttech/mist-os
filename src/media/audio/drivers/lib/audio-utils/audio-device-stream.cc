@@ -279,7 +279,8 @@ zx_status_t AudioDeviceStream::SetFormat(uint32_t frames_per_second, uint16_t ch
   }
   driver_transfer_bytes_ = result1.value().properties.driver_transfer_bytes();
 
-  // TODO(81650): Add support to audio-driver-ctl to interactively activate/deactivate channels.
+  // TODO(https://fxbug.dev/81650): Add support to audio-driver-ctl to interactively
+  // activate/deactivate channels.
   auto result2 = fidl::WireCall(rb_ch_)->SetActiveChannels(channels_to_use_bitmask);
   if (result2.status() == ZX_ERR_NOT_SUPPORTED) {
     printf("Active channel filtering not supported by the driver.\n");

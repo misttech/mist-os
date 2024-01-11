@@ -181,7 +181,7 @@ zx_status_t HdmiStream::OnUnsolicitedResponseLocked(const CodecResponse& resp) {
 
   bool eld_valid = resp.data & (1u << 1);  // ELD Valid, section 7.3.3.14.1.
   if (eld_valid) {
-    // TODO(35986): Add support for updating existing ELDs and hence formats
+    // TODO(https://fxbug.dev/35986): Add support for updating existing ELDs and hence formats
     // when a different monitor is plugged, blocked on 66649.
     if (!eld_valid_) {
       eld_valid_ = true;

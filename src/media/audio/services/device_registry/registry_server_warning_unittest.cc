@@ -238,8 +238,8 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
   EXPECT_TRUE(received_callback);
 }
 
-// TODO(fxbug/dev:117199): When Health can change after initialization, we need a test case for:
-// CreateObserver with token of device that was ready & Added, but then became unhealthy.
+// TODO(https://fxbug.dev/117199): If Health can change post-initialization, add a test case for:
+//   CreateObserver with token of device that was ready & Added, but then became unhealthy.
 
 }  // namespace
 }  // namespace media_audio

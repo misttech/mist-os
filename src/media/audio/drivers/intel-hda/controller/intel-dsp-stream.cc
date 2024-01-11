@@ -138,7 +138,8 @@ void IntelDspStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
 }
 
 void IntelDspStream::OnResetLocked() {
-  // TODO(84428): As part of redesign SST implement the ability to recover via a reset.
+  // TODO(https://fxbug.dev/84428): As part of redesign SST implement the ability to recover via a
+  // reset.
 }
 
 zx_status_t IntelDspStream::OnActivateLocked() {
