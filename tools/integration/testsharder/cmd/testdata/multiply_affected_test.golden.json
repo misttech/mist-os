@@ -27,7 +27,9 @@
         },
         "deps": [
             "images.json",
-            "sdk/manifest/core"
+            "product_bundles.json",
+            "sdk/manifest/core",
+            "zbi"
         ],
         "timeout_secs": 604,
         "summary": {
@@ -66,7 +68,9 @@
         },
         "deps": [
             "images.json",
-            "sdk/manifest/core"
+            "product_bundles.json",
+            "sdk/manifest/core",
+            "zbi"
         ],
         "timeout_secs": 842,
         "summary": {
@@ -104,7 +108,9 @@
         },
         "deps": [
             "images.json",
-            "sdk/manifest/core"
+            "product_bundles.json",
+            "sdk/manifest/core",
+            "zbi"
         ],
         "timeout_secs": 842,
         "summary": {

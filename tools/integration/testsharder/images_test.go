@@ -8,6 +8,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -92,11 +94,33 @@ type mockFFX struct {
 }
 
 func (m *mockFFX) GetPBArtifacts(ctx context.Context, pbPath, group string) ([]string, error) {
-	return []string{"zbi"}, nil
+	var artifacts []string
+	if group == "bootloader" {
+		if strings.Contains(pbPath, "efi") {
+			artifacts = append(artifacts, "firmware_fat:efi")
+		}
+	} else {
+		artifacts = append(artifacts, "zbi")
+		if group == "emu" {
+			artifacts = append(artifacts, "qemu-kernel")
+		}
+	}
+	return artifacts, nil
 }
 
 func TestAddImageDeps(t *testing.T) {
 	imgs, imgDir := mockImages(t)
+	defaultDeps := func(pbPath string, emu bool) []string {
+		deps := []string{"images.json", "product_bundles.json"}
+		if pbPath == "" {
+			pbPath = "obj/build/images/fuchsia/product_bundle"
+		}
+		deps = append(deps, filepath.Join(pbPath, "zbi"))
+		if emu {
+			deps = append(deps, filepath.Join(pbPath, "qemu-kernel"))
+		}
+		return deps
+	}
 	testCases := []struct {
 		name           string
 		pave           bool
@@ -109,41 +133,47 @@ func TestAddImageDeps(t *testing.T) {
 			name:       "emulator image deps",
 			deviceType: "AEMU",
 			pave:       false,
-			pbPath:     "obj/build/images/fuchsia/product_bundle",
-			want:       []string{"fuchsia.zbi", "images.json", "multiboot.bin", "obj/build/images/fuchsia/fuchsia/fvm.blk", "obj/build/images/fuchsia/product_bundle/zbi", "product_bundles.json"},
+			want:       defaultDeps("", true),
 		},
 		{
 			name:       "paving image deps",
 			deviceType: "NUC",
 			pave:       true,
-			want:       []string{"fuchsia.zbi", "images.json", "zedboot.zbi"},
+			want:       append(defaultDeps("", false), "fuchsia.zbi", "zedboot.zbi"),
 		},
 		{
 			name:       "netboot image deps",
 			deviceType: "NUC",
 			pave:       false,
-			want:       []string{"images.json", "netboot.zbi", "zedboot.zbi"},
+			want:       append(defaultDeps("", false), "netboot.zbi", "zedboot.zbi"),
 		},
 		{
 			name:           "emulator env with qemu kernel override",
 			deviceType:     "AEMU",
 			pave:           false,
 			imageOverrides: build.ImageOverrides{ZBI: "//build/images:my-zbi", QEMUKernel: "//build/images:other-qemu-kernel"},
-			want:           []string{"images.json", "my.zbi", "other-qemu-kernel.bin"},
+			want:           append(defaultDeps("", true), "my.zbi", "other-qemu-kernel.bin"),
 		},
 		{
 			name:           "emulator env with no qemu kernel override",
 			deviceType:     "AEMU",
 			pave:           false,
 			imageOverrides: build.ImageOverrides{ZBI: "//build/images:my-zbi"},
-			want:           []string{"images.json", "multiboot.bin", "my.zbi"},
+			want:           append(defaultDeps("", true), "multiboot.bin", "my.zbi"),
+		},
+		{
+			name:       "emulator env with efi",
+			deviceType: "AEMU",
+			pave:       false,
+			pbPath:     "efi-boot-test/product_bundle",
+			want:       append(defaultDeps("efi-boot-test/product_bundle", true), "efi-boot-test/product_bundle/efi"),
 		},
 		{
 			name:           "hardware env with image overrides",
 			deviceType:     "NUC",
 			pave:           false,
 			imageOverrides: build.ImageOverrides{ZBI: "//build/images:my-zbi", VBMeta: "//build/images:my-vbmeta"},
-			want:           []string{"images.json", "my.vbmeta", "my.zbi", "zedboot.zbi"},
+			want:           append(defaultDeps("", false), "my.vbmeta", "my.zbi", "zedboot.zbi"),
 		},
 		{
 			name:       "GCE image deps",
@@ -166,14 +196,20 @@ func TestAddImageDeps(t *testing.T) {
 					},
 				},
 			}
-			origGetFFX := getFFX
+			origGetFFX := GetFFX
 			defer func() {
-				getFFX = origGetFFX
+				GetFFX = origGetFFX
 			}()
-			getFFX = func(ctx context.Context, ffxPath, outputsDir string) (ffxInterface, error) {
+			GetFFX = func(ctx context.Context, ffxPath, outputsDir string) (FFXInterface, error) {
 				return &mockFFX{}, nil
 			}
-			AddImageDeps(context.Background(), s, imgDir, imgs, tc.pave, tc.pbPath, "path/to/ffx")
+			pbPath := "obj/build/images/fuchsia/product_bundle"
+			if tc.pbPath != "" {
+				pbPath = tc.pbPath
+			}
+			AddImageDeps(context.Background(), s, imgDir, imgs, tc.pave, pbPath, "path/to/ffx")
+			sort.Strings(tc.want)
+			sort.Strings(s.Deps)
 			if diff := cmp.Diff(tc.want, s.Deps); diff != "" {
 				t.Errorf("AddImageDeps(%v, %v, %t) failed: (-want +got): \n%s", s, imgs, tc.pave, diff)
 			}

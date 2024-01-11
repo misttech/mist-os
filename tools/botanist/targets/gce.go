@@ -447,6 +447,10 @@ func (g *GCE) SSHKey() string {
 	return g.opts.SSHKey
 }
 
+func (g *GCE) UseProductBundles() bool {
+	return false
+}
+
 func (g *GCE) Start(_ context.Context, _ []bootserver.Image, _ []string, _ string, _ bool) error {
 	return nil
 }

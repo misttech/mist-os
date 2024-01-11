@@ -15,7 +15,7 @@ import (
 
 // AddFFXDeps selects and adds the files needed by ffx to provision a device
 // or launch an emulator to the shard's list of dependencies.
-func AddFFXDeps(s *Shard, buildDir string, images []build.Image, tools build.Tools, flash bool) error {
+func AddFFXDeps(s *Shard, buildDir string, tools build.Tools, flash bool) error {
 	if len(s.Tests) == 0 {
 		return fmt.Errorf("shard %s has no tests", s.Name)
 	}
@@ -25,22 +25,6 @@ func AddFFXDeps(s *Shard, buildDir string, images []build.Image, tools build.Too
 		deps, err := ffxutil.GetEmuDeps(buildDir, s.TargetCPU(), []string{})
 		if err != nil {
 			return err
-		}
-		s.AddDeps(deps)
-	} else if flash && s.Env.Dimensions.DeviceType() != "" {
-		deps, err := ffxutil.GetFlashDeps(buildDir, "fuchsia")
-		if err != nil {
-			return err
-		}
-		s.AddDeps(deps)
-	} else if s.Env.Dimensions.DeviceType() != "" && s.ImageOverrides.IsEmpty() {
-		deps := []string{}
-		for _, image := range images {
-			// This provisions the images used by `ffx target bootloader boot` in botanist:
-			// https://cs.opensource.google/fuchsia/fuchsia/+/master:tools/botanist/targets/device.go?q=zircon-a
-			if image.Name == "zircon-a" {
-				deps = append(deps, image.Path)
-			}
 		}
 		s.AddDeps(deps)
 	}

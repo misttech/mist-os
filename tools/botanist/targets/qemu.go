@@ -227,10 +227,6 @@ func (t *QEMU) SSHClient() (*sshutil.Client, error) {
 	return t.sshClient(addr)
 }
 
-func (t *QEMU) UseProductBundles() bool {
-	return t.UseFFX()
-}
-
 // Start starts the QEMU target.
 // TODO(https://fxbug.dev/95938): Add logic to use PB with ffx emu
 func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) (err error) {
@@ -255,7 +251,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	}
 	qemuCmd.SetBinary(absQEMUSystemPath)
 
-	useProductBundle := t.UseFFX() && pbPath != ""
+	useProductBundle := pbPath != ""
 
 	// If a QEMU kernel override was specified, use that; else, unless we want
 	// to boot via a UEFI disk image (which does not require one), then we

@@ -19,8 +19,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
-	"go.fuchsia.dev/fuchsia/tools/build"
-	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
@@ -218,12 +216,8 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 	return t.sshClient(&net.IPAddr{IP: addr})
 }
 
-func (t *Device) UseProductBundles() bool {
-	return t.UseFFX()
-}
-
 func (t *Device) mustLoadThroughZedboot() bool {
-	return mustLoadThroughZedboot || t.config.FastbootSernum == "" || !t.UseFFX()
+	return mustLoadThroughZedboot || t.config.FastbootSernum == "" || !t.imageOverrides.IsEmpty()
 }
 
 // Start starts the device target.
@@ -285,25 +279,10 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			return err
 		}
 		var imgs []bootserver.Image
-		var ffxFlashDeps []string
-		if t.UseFFX() && !t.opts.Netboot && !t.mustLoadThroughZedboot() {
-			ffxFlashDeps, err = ffxutil.GetFlashDeps(wd, "fuchsia")
-			if err != nil {
-				return err
-			}
-		}
 		for _, img := range images {
 			img := img
-			if len(ffxFlashDeps) > 0 {
-				for _, dep := range ffxFlashDeps {
-					if img.Path == dep {
-						imgs = append(imgs, img)
-					}
-				}
-			} else {
-				if t.neededForFlashing(img) {
-					imgs = append(imgs, img)
-				}
+			if t.neededForFlashing(img) {
+				imgs = append(imgs, img)
 			}
 		}
 		{
@@ -321,7 +300,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 				return err
 			}
 		} else if t.opts.Netboot {
-			if err := t.ramBoot(ctx, imgs, pbPath); err != nil {
+			if err := t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, pbPath); err != nil {
 				return err
 			}
 		} else {
@@ -332,7 +311,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			var err error
 			for attempt := 1; attempt <= maxAllowedAttempts; attempt++ {
 				logger.Debugf(ctx, "Starting flash attempt %d/%d", attempt, maxAllowedAttempts)
-				if err = t.flash(ctx, imgs, pbPath); err == nil {
+				if err = t.flash(ctx, pbPath); err == nil {
 					// If successful, early exit.
 					break
 				}
@@ -380,13 +359,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 		// in only the custom images to bootserver.Boot() to exclude the default
 		// images which already have boot args attached to them.
 		var finalImgs []bootserver.Image
-		if t.imageOverrides.IsEmpty() && pbPath != "" {
-			// pbPath should only be provided if ffx is enabled.
-			// TODO(ihuh): Parse from the product bundle manifest
-			// even when ffx is not enabled.
-			if !t.UseFFX() {
-				return fmt.Errorf("product bundles are not supported without ffx")
-			}
+		if t.imageOverrides.IsEmpty() {
 			var zbi, fvm *bootserver.Image
 			if isBootTest {
 				// Only get images from product bundle for boot tests when
@@ -487,45 +460,6 @@ func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) err
 	return err
 }
 
-func (t *Device) ramBoot(ctx context.Context, images []bootserver.Image, productBundle string) error {
-	if t.UseFFX() {
-		if productBundle != "" && t.imageOverrides.IsEmpty() {
-			return t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, "", "", "", productBundle)
-		}
-		var zbi *bootserver.Image
-		if t.imageOverrides.ZBI == "" {
-			zbi = getImageByName(images, "zbi_zircon-a")
-		} else {
-			zbi = getImage(images, t.imageOverrides.ZBI, build.ImageTypeZBI)
-		}
-		if zbi == nil {
-			return fmt.Errorf("could not find \"zbi_zircon-a\" or ZBI override")
-		}
-
-		var vbmeta *bootserver.Image
-		if t.imageOverrides.VBMeta == "" {
-			vbmeta = getImageByName(images, "vbmeta_zircon-a")
-		} else {
-			vbmeta = getImage(images, t.imageOverrides.VBMeta, build.ImageTypeVBMeta)
-		}
-		if vbmeta == nil {
-			return fmt.Errorf("could not find \"vbmeta_zircon-a\" or VBMeta override")
-		}
-
-		return t.ffx.BootloaderBoot(ctx, t.config.FastbootSernum, zbi.Path, vbmeta.Path, "", "")
-	}
-	bootScript := getImageByName(images, "script_fastboot-boot-script")
-	if bootScript == nil {
-		return errors.New("fastboot boot script not found")
-	}
-	cmd := exec.CommandContext(ctx, bootScript.Path, "-s", t.config.FastbootSernum)
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
-	defer flush()
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	return cmd.Run()
-}
-
 func (t *Device) writePubKey() (string, error) {
 	pubkey, err := os.CreateTemp("", "pubkey*")
 	if err != nil {
@@ -539,7 +473,7 @@ func (t *Device) writePubKey() (string, error) {
 	return pubkey.Name(), nil
 }
 
-func (t *Device) flash(ctx context.Context, images []bootserver.Image, productBundle string) error {
+func (t *Device) flash(ctx context.Context, productBundle string) error {
 	var pubkey string
 	var err error
 	if len(t.signers) > 0 {
@@ -560,35 +494,7 @@ func (t *Device) flash(ctx context.Context, images []bootserver.Image, productBu
 	}()
 
 	// TODO(https://fxbug.dev/87634): Need support for ffx target flash for cuckoo tests.
-	if pubkey != "" && t.UseFFX() {
-		var flashManifestPath string
-		if productBundle == "" {
-			flashManifest := getImageByName(images, "manifest_flash-manifest")
-			if flashManifest == nil {
-				return errors.New("flash manifest not found")
-			}
-			flashManifestPath = flashManifest.Path
-		}
-
-		return t.ffx.Flash(ctx, t.config.FastbootSernum, flashManifestPath, pubkey, productBundle)
-	}
-
-	flashScript := getImageByName(images, "script_flash-script")
-	if flashScript == nil {
-		return errors.New("flash script not found")
-	}
-	// Write the public SSH key to disk if one is needed.
-	flashArgs := []string{"-s", t.config.FastbootSernum}
-	if pubkey != "" {
-		flashArgs = append([]string{fmt.Sprintf("--ssh-key=%s", pubkey)}, flashArgs...)
-	}
-
-	cmd := exec.CommandContext(ctx, flashScript.Path, flashArgs...)
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
-	defer flush()
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	return cmd.Run()
+	return t.ffx.Flash(ctx, t.config.FastbootSernum, pubkey, productBundle)
 }
 
 // Nasty hack to try to deal with the fact that some devices have real bad USB
@@ -776,19 +682,8 @@ func (t *Device) neededForFlashing(img bootserver.Image) bool {
 		return true
 	}
 
-	// If we have specified image overrides, then we are only looking for image
-	// among those specifications in the case of flashing.
-	if !t.mustLoadThroughZedboot() && (t.imageOverrides.ZBI != "" || t.imageOverrides.VBMeta != "") {
-		return img.Label == t.imageOverrides.ZBI || img.Label == t.imageOverrides.VBMeta
-	}
-
 	neededImages := []string{
-		"zbi_zircon-a",
-		"vbmeta_zircon-a",
-		"script_flash-script",
 		"exe.linux-x64_fastboot",
-		"script_fastboot-boot-script",
-		"manifest_flash-manifest",
 	}
 	for _, imageName := range neededImages {
 		if img.Name == imageName {

@@ -68,7 +68,9 @@
         },
         "deps": [
             "images.json",
-            "sdk/manifest/core"
+            "product_bundles.json",
+            "sdk/manifest/core",
+            "zbi"
         ],
         "timeout_secs": 1206,
         "summary": {

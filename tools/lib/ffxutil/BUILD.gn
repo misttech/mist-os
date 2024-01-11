@@ -12,7 +12,6 @@ go_library("ffxutil") {
     "ffx.go",
     "ffx_test.go",
     "flash.go",
-    "flash_test.go",
     "mock.go",
     "test.go",
   ]

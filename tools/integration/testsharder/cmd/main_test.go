@@ -21,6 +21,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
+	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 )
 
@@ -30,6 +31,14 @@ var (
 )
 
 const testListPath = "fake-test-list.json"
+
+type mockFFX struct {
+	ffxutil.MockFFXInstance
+}
+
+func (m *mockFFX) GetPBArtifacts(ctx context.Context, pbPath, group string) ([]string, error) {
+	return []string{"zbi"}, nil
+}
 
 // TestExecute runs golden tests for the execute() function.
 //
@@ -514,6 +523,7 @@ func TestExecute(t *testing.T) {
 			}
 
 			tc.flags.buildDir = t.TempDir()
+			tc.flags.productBundleName = "core.x64"
 			if len(tc.modifiers) > 0 {
 				tc.flags.modifiersPath = writeTempJSONFile(t, tc.modifiers)
 			}
@@ -538,6 +548,18 @@ func TestExecute(t *testing.T) {
 				build.TestList{Data: tc.testList, SchemaID: "experimental"},
 			); err != nil {
 				t.Fatal(err)
+			}
+			origGetHostPlatform := getHostPlatform
+			origGetFFX := testsharder.GetFFX
+			defer func() {
+				getHostPlatform = origGetHostPlatform
+				testsharder.GetFFX = origGetFFX
+			}()
+			getHostPlatform = func() (string, error) {
+				return "linux-x64", nil
+			}
+			testsharder.GetFFX = func(ctx context.Context, ffxPath, outputsDir string) (testsharder.FFXInterface, error) {
+				return &mockFFX{}, nil
 			}
 			writeDeps(t, tc.flags.buildDir, tc.testSpecs)
 			for _, repo := range tc.packageRepos {

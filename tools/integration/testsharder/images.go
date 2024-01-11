@@ -18,13 +18,13 @@ import (
 )
 
 // for testability
-type ffxInterface interface {
+type FFXInterface interface {
 	Run(context.Context, ...string) error
 	GetPBArtifacts(context.Context, string, string) ([]string, error)
 	Stop() error
 }
 
-var getFFX = func(ctx context.Context, ffxPath, outputsDir string) (ffxInterface, error) {
+var GetFFX = func(ctx context.Context, ffxPath, outputsDir string) (FFXInterface, error) {
 	return ffxutil.NewFFXInstance(ctx, ffxPath, "", []string{}, "", "", outputsDir)
 }
 
@@ -62,52 +62,50 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 	}
 
 	// Add product bundle related artifacts.
-	if pbPath != "" {
-		imageDeps = append(imageDeps, "product_bundles.json")
+	imageDeps = append(imageDeps, "product_bundles.json")
 
-		tmp, err := os.MkdirTemp("", "wt")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(tmp)
+	tmp, err := os.MkdirTemp("", "wt")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
 
-		ffxOutputsDir := filepath.Join(tmp, "ffx_outputs")
-		ffx, err := getFFX(ctx, ffxPath, ffxOutputsDir)
-		if err != nil {
-			return err
+	ffxOutputsDir := filepath.Join(tmp, "ffx_outputs")
+	ffx, err := GetFFX(ctx, ffxPath, ffxOutputsDir)
+	if err != nil {
+		return err
+	}
+	if ffx == nil {
+		return fmt.Errorf("failed to initialize an ffx instance")
+	}
+	defer func() {
+		if err := ffx.Stop(); err != nil {
+			logger.Debugf(ctx, "failed to stop ffx: %s", err)
 		}
-		if ffx == nil {
-			return fmt.Errorf("failed to initialize an ffx instance")
-		}
-		defer func() {
-			if err := ffx.Stop(); err != nil {
-				logger.Debugf(ctx, "failed to stop ffx: %s", err)
-			}
-		}()
+	}()
 
-		if err := ffx.Run(ctx, "config", "set", "daemon.autostart", "false", "-l", "global"); err != nil {
-			return err
-		}
-		artifactsGroup := "flash"
-		if s.Env.TargetsEmulator() {
-			artifactsGroup = "emu"
-		}
-		artifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), artifactsGroup)
-		if err != nil {
-			return err
-		}
-		for _, a := range artifacts {
-			imageDeps = append(imageDeps, filepath.Join(pbPath, a))
-		}
-		bootloaderArtifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), "bootloader")
-		if err != nil {
-			return err
-		}
-		for _, a := range bootloaderArtifacts {
-			parts := strings.SplitN(a, ":", 2)
-			if parts[0] == "firmware_fat" {
-				imageDeps = append(imageDeps, filepath.Join(pbPath, parts[1]))
-			}
+	if err := ffx.Run(ctx, "config", "set", "daemon.autostart", "false", "-l", "global"); err != nil {
+		return err
+	}
+	artifactsGroup := "flash"
+	if s.Env.TargetsEmulator() {
+		artifactsGroup = "emu"
+	}
+	artifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), artifactsGroup)
+	if err != nil {
+		return err
+	}
+	for _, a := range artifacts {
+		imageDeps = append(imageDeps, filepath.Join(pbPath, a))
+	}
+	bootloaderArtifacts, err := ffx.GetPBArtifacts(ctx, filepath.Join(buildDir, pbPath), "bootloader")
+	if err != nil {
+		return err
+	}
+	for _, a := range bootloaderArtifacts {
+		parts := strings.SplitN(a, ":", 2)
+		if parts[0] == "firmware_fat" {
+			imageDeps = append(imageDeps, filepath.Join(pbPath, parts[1]))
 		}
 	}
 
@@ -136,9 +134,10 @@ func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 	}
 
 	if s.Env.TargetsEmulator() {
-		// This provisions the images used by EMU targets in botanist:
-		// https://cs.opensource.google/fuchsia/fuchsia/+/master:tools/botanist/targets/qemu.go?q=zbi_zircon
-		return image.Name == "qemu-kernel" || image.Name == "storage-full" || image.Name == "zircon-a"
+		// Unless image overrides are specified, all EMU targets in botanist
+		// are using product bundles, so we don't need to get any deps from the
+		// images.json.
+		return false
 	}
 	if isFlashingDep(image) {
 		return true
@@ -152,5 +151,5 @@ func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 }
 
 func isFlashingDep(image build.Image) bool {
-	return image.Name == "flash-script" || image.Name == "fastboot" || image.Name == "fastboot-boot-script"
+	return image.Name == "fastboot"
 }

@@ -116,9 +116,6 @@ type FuchsiaTarget interface {
 	// GetFFX returns the ffx instance associated with the target.
 	GetFFX() *FFXInstance
 
-	// UseFFX returns whether to enable using ffx.
-	UseFFX() bool
-
 	// UseFFXExperimental returns whether to enable an experimental ffx feature.
 	UseFFXExperimental(int) bool
 
@@ -181,24 +178,18 @@ func (t *genericFuchsiaTarget) GetFFX() *FFXInstance {
 	return t.ffx
 }
 
-// UseFFX returns true if there is an FFXInstance associated with this target.
-// Use to enable stable ffx features.
-func (t *genericFuchsiaTarget) UseFFX() bool {
-	return t.ffx != nil && t.ffx.FFXInstance != nil
-}
-
 // UseFFXExperimental returns true if there is an FFXInstance associated with
 // this target and we're running with an experiment level >= the provided level.
 // Use to enable experimental ffx features.
 func (t *genericFuchsiaTarget) UseFFXExperimental(level int) bool {
-	return t.UseFFX() && t.ffx.ExperimentLevel >= level
+	return t.ffx.ExperimentLevel >= level
 }
 
 // UseProductBundles returns whether this target can be provisioned using
-// product bundles. The default is false and should be overridden by each
+// product bundles. The default is true and should be overridden by each
 // target type.
 func (t *genericFuchsiaTarget) UseProductBundles() bool {
-	return false
+	return true
 }
 
 // FFXEnv returns the environment to run ffx with.

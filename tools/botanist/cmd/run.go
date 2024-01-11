@@ -178,74 +178,75 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 
 func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget) (func(), error) {
 	var cleanup func()
+	if r.ffxPath == "" {
+		return cleanup, fmt.Errorf("ffx path must be provided with the -ffx flag.")
+	}
 	ffxOutputsDir := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_outputs")
 
 	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, primaryTarget.Nodename(), primaryTarget.SSHKey(), ffxOutputsDir)
 	if err != nil {
 		return cleanup, err
 	}
-	if ffx != nil {
-		stdout, stderr, flush := botanist.NewStdioWriters(ctx)
-		defer flush()
-		ffx.SetStdoutStderr(stdout, stderr)
-		if r.ffxExperimentLevel > 0 {
-			if err := ffx.SetLogLevel(ctx, ffxutil.Debug); err != nil {
-				return cleanup, err
-			}
-		}
-		if err := ffx.Run(ctx, "config", "env"); err != nil {
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	defer flush()
+	ffx.SetStdoutStderr(stdout, stderr)
+	if r.ffxExperimentLevel > 0 {
+		if err := ffx.SetLogLevel(ctx, ffxutil.Debug); err != nil {
 			return cleanup, err
 		}
-		// ffxutil disables the mdns discovery if it can find a FUCHSIA_DEVICE_ADDR
-		// to manually add to its targets. We should disable it from the start so
-		// that it is off during target setup as well.
-		if err := ffx.Run(ctx, "config", "set", "discovery.mdns.enabled", "false", "-l", "global"); err != nil {
-			return cleanup, err
+	}
+	if err := ffx.Run(ctx, "config", "env"); err != nil {
+		return cleanup, err
+	}
+	// ffxutil disables the mdns discovery if it can find a FUCHSIA_DEVICE_ADDR
+	// to manually add to its targets. We should disable it from the start so
+	// that it is off during target setup as well.
+	if err := ffx.Run(ctx, "config", "set", "discovery.mdns.enabled", "false", "-l", "global"); err != nil {
+		return cleanup, err
+	}
+	if err := ffx.Run(ctx, "config", "set", "daemon.autostart", "false", "-l", "global"); err != nil {
+		return cleanup, err
+	}
+
+	cmd := ffx.Command("daemon", "start")
+	daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
+	if err != nil {
+		return cleanup, err
+	}
+	cmd.Stdout = daemonLog
+	logger.Debugf(ctx, "%s", cmd.Args)
+	// Use a new context so that the subprocess can only be terminated by
+	// a direct call to the cancel function.
+	daemonCtx, daemonCancel := context.WithCancel(context.Background())
+	if err := cmd.Start(); err != nil {
+		return cleanup, err
+	}
+	// Wait for the daemon process to terminate in a separate goroutine
+	// and log when it finishes in order to detect if the process gets
+	// terminated earlier than expected.
+	cmdWait := make(chan error)
+	go func() {
+		// Using subprocess.WaitForCmd() instead of cmd.Wait() ensures that
+		// the function returns when the context is done.
+		if err := subprocess.WaitForCmd(daemonCtx, cmd); err != nil {
+			logger.Errorf(ctx, "daemon process finished with err: %s", err)
+		} else {
+			logger.Debugf(ctx, "ffx daemon process finished")
 		}
-		if err := ffx.Run(ctx, "config", "set", "daemon.autostart", "false", "-l", "global"); err != nil {
-			return cleanup, err
+		cmdWait <- err
+	}()
+	cleanup = func() {
+		// TODO(https://fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
+		// process once that is supported.
+		if err := ffx.Stop(); err != nil {
+			logger.Errorf(ctx, "failed to stop ffx daemon: %s", err)
 		}
 
-		cmd := ffx.Command("daemon", "start")
-		daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
-		if err != nil {
-			return cleanup, err
-		}
-		cmd.Stdout = daemonLog
-		logger.Debugf(ctx, "%s", cmd.Args)
-		// Use a new context so that the subprocess can only be terminated by
-		// a direct call to the cancel function.
-		daemonCtx, daemonCancel := context.WithCancel(context.Background())
-		if err := cmd.Start(); err != nil {
-			return cleanup, err
-		}
-		// Wait for the daemon process to terminate in a separate goroutine
-		// and log when it finishes in order to detect if the process gets
-		// terminated earlier than expected.
-		cmdWait := make(chan error)
-		go func() {
-			// Using subprocess.WaitForCmd() instead of cmd.Wait() ensures that
-			// the function returns when the context is done.
-			if err := subprocess.WaitForCmd(daemonCtx, cmd); err != nil {
-				logger.Errorf(ctx, "daemon process finished with err: %s", err)
-			} else {
-				logger.Debugf(ctx, "ffx daemon process finished")
-			}
-			cmdWait <- err
-		}()
-		cleanup = func() {
-			// TODO(https://fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
-			// process once that is supported.
-			if err := ffx.Stop(); err != nil {
-				logger.Errorf(ctx, "failed to stop ffx daemon: %s", err)
-			}
-
-			// Wait for the daemon process to finish before closing the log.
-			daemonCancel()
-			<-cmdWait
-			if err := daemonLog.Close(); err != nil {
-				logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
-			}
+		// Wait for the daemon process to finish before closing the log.
+		daemonCancel()
+		<-cmdWait
+		if err := daemonLog.Close(); err != nil {
+			logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
 		}
 	}
 
@@ -257,18 +258,12 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		}
 		// Attach an ffx instance for all targets. All ffx instances will use the same
 		// config and daemon, but run commands against its own specified target.
-		if ffx != nil {
-			ffxForTarget := ffxutil.FFXWithTarget(ffx, t.Nodename())
-			t.SetFFX(&targets.FFXInstance{ffxForTarget, r.ffxExperimentLevel}, ffx.Env())
-		}
+		ffxForTarget := ffxutil.FFXWithTarget(ffx, t.Nodename())
+		t.SetFFX(&targets.FFXInstance{ffxForTarget, r.ffxExperimentLevel}, ffx.Env())
 		t.SetImageOverrides(build.ImageOverrides(r.imageOverrides))
 	}
 
-	if ffx != nil {
-		return cleanup, ffx.WaitForDaemon(ctx)
-	}
-
-	return cleanup, nil
+	return cleanup, ffx.WaitForDaemon(ctx)
 }
 
 func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuchsiaTargets []targets.FuchsiaTarget) error {
@@ -358,6 +353,12 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 		// Signal other goroutines to exit when tests complete.
 		defer cancel()
 
+		if build.ImageOverrides(r.imageOverrides).IsEmpty() && r.productBundles == "" {
+			return fmt.Errorf("-product-bundles is required")
+		}
+		if build.ImageOverrides(r.imageOverrides).IsEmpty() && r.productBundleName == "" {
+			return fmt.Errorf("-product-bundle-name is required")
+		}
 		startOpts := targets.StartOptions{
 			Netboot:           r.netboot,
 			ImageManifest:     r.imageManifest,
@@ -623,11 +624,9 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 		testrunnerEnv[constants.DeviceAddrEnvKey] = addr.String()
 		testrunnerEnv[constants.IPv4AddrEnvKey] = ipv4.String()
 		testrunnerEnv[constants.IPv6AddrEnvKey] = ipv6.String()
-		if t.UseFFX() {
-			// Add the target address in order to skip MDNS discovery.
-			if err := t.GetFFX().Run(ctx, "target", "add", addr.String()); err != nil {
-				return err
-			}
+		// Add the target address in order to skip MDNS discovery.
+		if err := t.GetFFX().Run(ctx, "target", "add", addr.String()); err != nil {
+			return err
 		}
 	}
 
@@ -653,11 +652,9 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 			return fmt.Errorf("error setting env variable %s=%s. %w", k, v, err)
 		}
 	}
-	if t.UseFFX() {
-		setEnviron(t.FFXEnv())
-		r.testrunnerOptions.FFX = t.GetFFX().FFXInstance
-		r.testrunnerOptions.FFXExperimentLevel = r.ffxExperimentLevel
-	}
+	setEnviron(t.FFXEnv())
+	r.testrunnerOptions.FFX = t.GetFFX().FFXInstance
+	r.testrunnerOptions.FFXExperimentLevel = r.ffxExperimentLevel
 
 	if err := testrunner.SetupAndExecute(ctx, r.testrunnerOptions, testsPath); err != nil {
 		return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerOptions, r.timeout, err)

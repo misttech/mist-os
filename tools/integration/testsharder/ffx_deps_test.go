@@ -38,7 +38,7 @@ func TestAddFFXDeps(t *testing.T) {
 			name:       "NUC bootloader boot deps",
 			targetCPU:  "x64",
 			deviceType: "NUC",
-			want:       []string{"zircon-a.zbi", "zircon-a.vbmeta", "host_x64/ffx-test", "host_x64/ffx-test.json"},
+			want:       []string{"host_x64/ffx-test", "host_x64/ffx-test.json"},
 		},
 		{
 			name:       "AEMU x64 deps",
@@ -72,11 +72,7 @@ func TestAddFFXDeps(t *testing.T) {
 				Tests: []Test{{Test: build.Test{CPU: tc.targetCPU}}},
 			}
 			hostOS := runtime.GOOS
-			if err := AddFFXDeps(s, buildDir, []build.Image{
-				{Name: "zircon-a", Path: "zircon-a.zbi", Type: "zbi"},
-				{Name: "zircon-a", Path: "zircon-a.vbmeta", Type: "vbmeta"},
-				{Name: "fuchsia", Path: "fuchsia.zbi", Type: "zbi"},
-			}, build.Tools{
+			if err := AddFFXDeps(s, buildDir, build.Tools{
 				{Name: "ffx-test", OS: hostOS, CPU: "x64", Path: "host_x64/ffx-test",
 					RuntimeFiles: []string{"host_x64/ffx-test.json"}},
 				{Name: "ffx-emu", OS: hostOS, CPU: "x64", Path: "host_x64/ffx-emu",

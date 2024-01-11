@@ -48,7 +48,6 @@ type testsharderFlags struct {
 	affectedTestsMaxAttempts       int
 	affectedTestsMultiplyThreshold int
 	affectedOnly                   bool
-	ffxDeps                        bool
 	hermeticDeps                   bool
 	imageDeps                      bool
 	pave                           bool
@@ -79,8 +78,6 @@ func parseFlags() testsharderFlags {
 	flag.IntVar(&flags.affectedTestsMultiplyThreshold, "affected-tests-multiply-threshold", 0, "if there are <= this many tests in -affected-tests, they may be multplied "+
 		"(modified to run many times in a separate shard), but only be multiplied if allowed by certain constraints designed to minimize false rejections and bot demand.")
 	flag.BoolVar(&flags.affectedOnly, "affected-only", false, "whether to create test shards for only the affected tests found in either the modifiers file or the affected-tests file.")
-	// TODO(ihuh): Remove this flag once it's no longer used.
-	flag.BoolVar(&flags.ffxDeps, "ffx-deps", false, "whether to add dependencies of ffx to the shard dependencies")
 	flag.BoolVar(&flags.hermeticDeps, "hermetic-deps", false, "whether to add all the images and blobs used by the shard as dependencies")
 	flag.BoolVar(&flags.imageDeps, "image-deps", false, "whether to add all the images used by the shard as dependencies")
 	flag.BoolVar(&flags.pave, "pave", false, "whether the shards generated should pave or netboot fuchsia")
@@ -133,6 +130,11 @@ type buildModules interface {
 	Tools() build.Tools
 	PackageRepositories() []build.PackageRepo
 	ProductBundles() []build.ProductBundle
+}
+
+// for testability
+var getHostPlatform = func() (string, error) {
+	return hostplatform.Name()
 }
 
 func execute(ctx context.Context, flags testsharderFlags, m buildModules) error {
@@ -316,26 +318,29 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 	shards = append(shards, multipliedShards...)
 
 	for _, s := range shards {
-		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Images(), m.Tools(), flags.pave); err != nil {
+		if s.Env.Dimensions.DeviceType() == "" {
+			continue
+		}
+		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), flags.pave); err != nil {
 			return err
 		}
 		productBundle := flags.productBundleName
 		if s.ProductBundle != "" {
 			productBundle = s.ProductBundle
 		}
-		var pbPath, ffxPath string
-		if productBundle != "" {
-			pbPath = build.GetPbPathByName(m.ProductBundles(), productBundle)
-			platform, err := hostplatform.Name()
-			if err != nil {
-				return err
-			}
-			ffxTool, err := m.Tools().LookupTool(platform, "ffx")
-			if err != nil {
-				return err
-			}
-			ffxPath = filepath.Join(flags.buildDir, ffxTool.Path)
+		if productBundle == "" {
+			return fmt.Errorf("-product-bundle-name must be provided")
 		}
+		pbPath := build.GetPbPathByName(m.ProductBundles(), productBundle)
+		platform, err := getHostPlatform()
+		if err != nil {
+			return err
+		}
+		ffxTool, err := m.Tools().LookupTool(platform, "ffx")
+		if err != nil {
+			return err
+		}
+		ffxPath := filepath.Join(flags.buildDir, ffxTool.Path)
 		if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, m.Images(), flags.pave, pbPath, ffxPath); err != nil {
 			return err
 		}
