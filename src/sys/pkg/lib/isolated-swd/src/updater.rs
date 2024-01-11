@@ -135,9 +135,8 @@ pub(crate) mod for_tests {
         },
         fuchsia_merkle::Hash,
         fuchsia_pkg_testing::serve::ServedRepository,
-        fuchsia_pkg_testing::{Package, PackageBuilder, RepositoryBuilder, SystemImageBuilder},
+        fuchsia_pkg_testing::{Package, RepositoryBuilder, SystemImageBuilder},
         mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent},
-        std::collections::HashMap,
         std::sync::Arc,
     };
 
@@ -145,7 +144,10 @@ pub(crate) mod for_tests {
     pub struct UpdaterBuilder {
         paver_builder: MockPaverServiceBuilder,
         packages: Vec<Package>,
-        images: HashMap<String, Vec<u8>>,
+        // The zbi and optional vbmeta contents.
+        fuchsia_image: Option<(Vec<u8>, Option<Vec<u8>>)>,
+        // The zbi and optional vbmeta contents of the recovery partition.
+        recovery_image: Option<(Vec<u8>, Option<Vec<u8>>)>,
         repo_url: fuchsia_url::RepositoryUrl,
     }
 
@@ -156,7 +158,8 @@ pub(crate) mod for_tests {
             UpdaterBuilder {
                 paver_builder: MockPaverServiceBuilder::new(),
                 packages: vec![SystemImageBuilder::new().build().await],
-                images: HashMap::new(),
+                fuchsia_image: None,
+                recovery_image: None,
                 repo_url: TEST_REPO_URL.parse().unwrap(),
             }
         }
@@ -167,9 +170,17 @@ pub(crate) mod for_tests {
             self
         }
 
-        /// Add an image to the update package this builder will generate.
-        pub fn add_image(mut self, name: &str, contents: &[u8]) -> Self {
-            self.images.insert(name.to_owned(), contents.to_owned());
+        /// The zbi and optional vbmeta images to write.
+        pub fn fuchsia_image(mut self, zbi: Vec<u8>, vbmeta: Option<Vec<u8>>) -> Self {
+            assert_eq!(self.fuchsia_image, None);
+            self.fuchsia_image = Some((zbi, vbmeta));
+            self
+        }
+
+        /// The zbi and optional vbmeta images to write to the recovery partition.
+        pub fn recovery_image(mut self, zbi: Vec<u8>, vbmeta: Option<Vec<u8>>) -> Self {
+            assert_eq!(self.recovery_image, None);
+            self.recovery_image = Some((zbi, vbmeta));
             self
         }
 
@@ -212,22 +223,37 @@ pub(crate) mod for_tests {
         /// Create an UpdateForTest from this UpdaterBuilder.
         /// This will construct an update package containing all packages and images added to the
         /// builder, create a repository containing the packages, and create a MockPaver.
-        pub async fn build(self) -> UpdaterForTest {
-            let mut update = PackageBuilder::new("update").add_resource_at(
-                "packages.json",
-                generate_packages_json(&self.packages, &self.repo_url.to_string()).as_bytes(),
-            );
-            for (name, data) in self.images.iter() {
-                update = update.add_resource_at(name, data.as_slice());
+        pub async fn build(mut self) -> UpdaterForTest {
+            let mut update = fuchsia_pkg_testing::UpdatePackageBuilder::new(self.repo_url.clone())
+                .packages(
+                    self.packages
+                        .iter()
+                        .map(|p| {
+                            fuchsia_url::PinnedAbsolutePackageUrl::new(
+                                self.repo_url.clone(),
+                                p.name().clone(),
+                                None,
+                                *p.hash(),
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                );
+            if let Some((zbi, vbmeta)) = self.fuchsia_image {
+                update = update.fuchsia_image(zbi, vbmeta);
             }
+            if let Some((zbi, vbmeta)) = self.recovery_image {
+                update = update.recovery_image(zbi, vbmeta);
+            }
+            let (update, images) = update.build().await;
 
-            let update = update.build().await.expect("Building update package");
+            self.packages.push(images);
 
             let repo = Arc::new(
                 self.packages
                     .iter()
                     .fold(
-                        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH).add_package(&update),
+                        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+                            .add_package(update.as_package()),
                         |repo, package| repo.add_package(package),
                     )
                     .build()
@@ -412,7 +438,7 @@ pub(crate) mod for_tests {
                 served_repo,
                 paver: paver_clone,
                 packages: self.packages,
-                update_merkle_root: *update.hash(),
+                update_merkle_root: *update.as_package().hash(),
                 repo_url: self.repo_url,
                 updater,
                 resolver,
@@ -424,19 +450,6 @@ pub(crate) mod for_tests {
         pub async fn build_and_run(self) -> UpdaterResult {
             self.build().await.run().await
         }
-    }
-
-    pub fn generate_packages_json(packages: &[Package], repo_url: &str) -> String {
-        let package_urls: Vec<String> = packages
-            .iter()
-            .map(|p| format!("{}/{}/0?hash={}", repo_url, p.name(), p.hash()))
-            .collect();
-
-        let packages_json = serde_json::json!({
-            "version": "1",
-            "content": package_urls
-        });
-        serde_json::to_string(&packages_json).unwrap()
     }
 
     /// This wraps the `Updater` in order to reduce test boilerplate.
@@ -510,12 +523,12 @@ pub mod tests {
         anyhow::Context,
         fidl_fuchsia_paver::{Asset, Configuration},
         fuchsia_async as fasync,
-        fuchsia_pkg_testing::{make_current_epoch_json, PackageBuilder},
+        fuchsia_pkg_testing::PackageBuilder,
         mock_paver::PaverEvent,
     };
 
     #[fasync::run_singlethreaded(test)]
-    pub async fn test_updater() -> Result<(), Error> {
+    pub async fn test_updater() {
         let data = "hello world!".as_bytes();
         let test_package = PackageBuilder::new("test_package")
             .add_resource_at("bin/hello", "this is a test".as_bytes())
@@ -523,7 +536,7 @@ pub mod tests {
             .add_resource_at("meta/test_package.cm", "{}".as_bytes())
             .build()
             .await
-            .context("Building test_package")?;
+            .expect("Building test_package");
         let updater = UpdaterBuilder::new()
             .await
             .paver(|p| {
@@ -531,11 +544,8 @@ pub mod tests {
                 p.boot_manager_close_with_epitaph(zx::Status::NOT_SUPPORTED)
             })
             .add_package(test_package)
-            .add_image("zbi.signed", data)
-            .add_image("fuchsia.vbmeta", data)
-            .add_image("recovery", data)
-            .add_image("epoch.json", make_current_epoch_json().as_bytes())
-            .add_image("recovery.vbmeta", data);
+            .fuchsia_image(data.to_vec(), Some(data.to_vec()))
+            .recovery_image(data.to_vec(), Some(data.to_vec()));
         let result = updater.build_and_run().await;
 
         assert_eq!(
@@ -561,6 +571,7 @@ pub mod tests {
                     asset: Asset::VerifiedBootMetadata,
                     payload: data.to_vec()
                 },
+                // isolated-swd does not write recovery even if an image is provided.
                 PaverEvent::DataSinkFlush,
             ]
         );
@@ -570,6 +581,5 @@ pub mod tests {
             .await
             .context("Verifying packages were correctly installed")
             .unwrap();
-        Ok(())
     }
 }

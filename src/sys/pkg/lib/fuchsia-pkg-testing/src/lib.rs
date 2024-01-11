@@ -22,7 +22,8 @@ pub use crate::system_image::SystemImageBuilder;
 
 mod update_package;
 pub use crate::update_package::{
-    make_current_epoch_json, make_epoch_json, make_packages_json, FakeUpdatePackage, SOURCE_EPOCH,
+    make_current_epoch_json, make_epoch_json, make_packages_json, FakeUpdatePackage, UpdatePackage,
+    UpdatePackageBuilder, SOURCE_EPOCH,
 };
 
 pub mod blobfs;

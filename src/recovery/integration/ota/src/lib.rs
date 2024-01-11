@@ -16,7 +16,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
-use fuchsia_pkg_testing::{make_current_epoch_json, Package, PackageBuilder};
+use fuchsia_pkg_testing::{Package, PackageBuilder};
 use futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt};
 use isolated_ota::{OmahaConfig, UpdateUrlSource};
 use isolated_ota_env::expose_mock_paver;
@@ -546,16 +546,11 @@ async fn test_ota_component_successfully_updates_with_empty_blobfs() -> Result<(
     let mut builder = TestEnvBuilder::new()
         .test_executor(OtaComponentTestExecutor::new())
         .omaha_state(OmahaState::Auto(OmahaResponse::Update))
-        .add_image("zbi.signed", "This is a zbi".as_bytes())
-        .add_image("fuchsia.vbmeta", "This is a vbmeta".as_bytes())
-        .add_image("recovery", "This is recovery".as_bytes())
-        .add_image("recovery.vbmeta", "This is another vbmeta".as_bytes())
-        .add_image("bootloader", "This is a bootloader upgrade".as_bytes())
-        .add_image("epoch.json", make_current_epoch_json().as_bytes())
-        .add_image("firmware_test", "This is the test firmware".as_bytes());
-
+        .fuchsia_image(b"This is a zbi".to_vec(), Some(b"This is a vbmeta".to_vec()))
+        .recovery_image(b"This is recovery".to_vec(), Some(b"This is another vbmeta".to_vec()))
+        .firmware_image("".to_owned(), b"This is a bootloader upgrade".to_vec())
+        .firmware_image("test".to_owned(), b"This is the test firmware".to_vec());
     builder = add_test_packages(builder).await;
-
     let env = builder.build().await.expect("failed to build TestEnv");
 
     let result = env.run().await.expect("failed to run TestEnv");
@@ -592,25 +587,35 @@ async fn test_ota_component_successfully_updates_with_empty_blobfs() -> Result<(
             PaverEvent::QueryConfigurationStatus { configuration: Configuration::A },
             PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
             PaverEvent::BootManagerFlush,
+            PaverEvent::ReadAsset { configuration: Configuration::B, asset: Asset::Kernel },
+            PaverEvent::ReadAsset {
+                configuration: Configuration::B,
+                asset: Asset::VerifiedBootMetadata
+            },
+            PaverEvent::ReadFirmware { configuration: Configuration::B, firmware_type: "".into() },
+            PaverEvent::ReadFirmware {
+                configuration: Configuration::B,
+                firmware_type: "test".into()
+            },
             PaverEvent::WriteFirmware {
                 configuration: Configuration::B,
                 firmware_type: "".to_owned(),
-                payload: "This is a bootloader upgrade".as_bytes().to_vec(),
+                payload: b"This is a bootloader upgrade".to_vec(),
             },
             PaverEvent::WriteFirmware {
                 configuration: Configuration::B,
                 firmware_type: "test".to_owned(),
-                payload: "This is the test firmware".as_bytes().to_vec(),
+                payload: b"This is the test firmware".to_vec(),
             },
             PaverEvent::WriteAsset {
                 configuration: Configuration::B,
                 asset: Asset::Kernel,
-                payload: "This is a zbi".as_bytes().to_vec(),
+                payload: b"This is a zbi".to_vec(),
             },
             PaverEvent::WriteAsset {
                 configuration: Configuration::B,
                 asset: Asset::VerifiedBootMetadata,
-                payload: "This is a vbmeta".as_bytes().to_vec(),
+                payload: b"This is a vbmeta".to_vec(),
             },
             PaverEvent::DataSinkFlush,
             // Note that recovery isn't written, as isolated-ota skips them.
@@ -642,7 +647,7 @@ async fn test_ota_component_reports_error_when_omaha_broken() -> Result<(), Erro
     let builder = TestEnvBuilder::new()
         .test_executor(OtaComponentTestExecutor::new())
         .add_package(package)
-        .add_image("zbi.signed", "ZBI".as_bytes())
+        .fuchsia_image(b"ZBI".to_vec(), None)
         .omaha_state(OmahaState::Manual(bad_omaha_config));
 
     let env = builder.build().await.expect("failed to build TestEnv");

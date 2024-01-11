@@ -804,7 +804,23 @@ async fn omaha_client_update(
                 "packages.json",
                 make_packages_json(["fuchsia-pkg://fuchsia.com/system_image/0?hash=beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead"]),
             )
-            .add_file("zbi", "fake zbi")
+            .add_file(
+                "images.json",
+                serde_json::to_vec(
+                    &update_package::ImagePackagesManifest::builder()
+                    .fuchsia_package(
+                        update_package::ImageMetadata::new(
+                            8,
+                            [0; 32].into(),
+                            "fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=2222222222222222222222222222222222222222222222222222222222222222#zbi".parse().unwrap(),
+                        ),
+                        None
+                    )
+                    .clone()
+                    .build()
+                )
+                .unwrap()
+            )
             .add_file("epoch.json", make_current_epoch_json())
     );
     env.proxies
@@ -813,6 +829,14 @@ async fn omaha_client_update(
         &env.proxies
             .resolver
             .package("system_image", "beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeada")
+    );
+    env.proxies
+        .resolver.url("fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=2222222222222222222222222222222222222222222222222222222222222222")
+        .resolve(
+        &env.proxies
+            .resolver
+            .package("update_images_fuchsia", "2222222222222222222222222222222222222222222222222222222222222222")
+            .add_file("zbi", "fake zbi")
     );
 
     let mut stream = env.check_now().await;
@@ -1862,7 +1886,7 @@ async fn test_omaha_client_policy_config_inspect() {
 async fn test_omaha_client_perform_pending_reboot_after_out_of_space() {
     let env = TestEnvBuilder::new().default_with_response(OmahaResponse::Update).build().await;
 
-    // We should be able to get the update package just fine
+    // We should be able to get the update package and images package just fine.
     env.proxies
         .resolver
         .url("fuchsia-pkg://integration.test.fuchsia.com/update?hash=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
@@ -1872,15 +1896,43 @@ async fn test_omaha_client_perform_pending_reboot_after_out_of_space() {
             .package("update", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
             .add_file(
                 "packages.json",
-                make_packages_json(["fuchsia-pkg://fuchsia.com/system_image/0?hash=beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead"]),
+                make_packages_json(["fuchsia-pkg://fuchsia.com/system_image/0?hash=1111111111111111111111111111111111111111111111111111111111111111"]),
             )
-            .add_file("zbi", "fake zbi")
-            .add_file("epoch.json", make_current_epoch_json()),
+            .add_file(
+                "images.json",
+                serde_json::to_vec(
+                    &update_package::ImagePackagesManifest::builder()
+                    .fuchsia_package(
+                        update_package::ImageMetadata::new(
+                            8,
+                            [0; 32].into(),
+                            "fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=2222222222222222222222222222222222222222222222222222222222222222#zbi".parse().unwrap(),
+                        ),
+                        None
+                    )
+                    .clone()
+                    .build()
+                )
+                .unwrap()
+            )
+            .add_file("epoch.json", make_current_epoch_json())
+    );
+    env.proxies
+        .resolver
+        .url("fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=2222222222222222222222222222222222222222222222222222222222222222"
+        )
+        .resolve(
+            &env.proxies.resolver
+                .package(
+                    "update_images_fuchsia",
+                    "2222222222222222222222222222222222222222222222222222222222222222"
+                )
+                .add_file("zbi", "fake zbi")
     );
 
     // ...but the system image package should fail with NO_SPACE
     env.proxies
-        .resolver.url("fuchsia-pkg://fuchsia.com/system_image/0?hash=beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead")
+        .resolver.url("fuchsia-pkg://fuchsia.com/system_image/0?hash=1111111111111111111111111111111111111111111111111111111111111111")
         .fail(fidl_fuchsia_pkg::ResolveError::NoSpace);
 
     let mut stream = env.check_now().await;
