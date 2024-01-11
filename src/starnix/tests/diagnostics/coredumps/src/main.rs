@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use component_events::{
+    events::{EventStream, Stopped},
+    matcher::EventMatcher,
+};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fuchsia_component_test::ScopedInstance;
 use parse_starnix_inspect::CoredumpReport;
+use tracing::info;
 
 #[fuchsia::main]
 async fn main() {
@@ -12,29 +17,30 @@ async fn main() {
     let report_capacity = 64usize;
     let max_idx = report_capacity + 8;
 
+    let mut events = EventStream::open().await.unwrap();
+    let collection = "coredumps";
+    let child_name = "coredumper";
+    let url = "#meta/coredump.cm";
+    let moniker = format!("{collection}:{child_name}");
+
     for current_idx in 0..max_idx {
         let mut instance =
-            ScopedInstance::new("coredumps".into(), "#meta/coredump.cm".into()).await.unwrap();
+            ScopedInstance::new_with_name(child_name.into(), collection.into(), url.into())
+                .await
+                .unwrap();
 
-        eprintln!("starting coredump instance...");
+        info!("starting coredump instance...");
         instance.start_with_binder_sync().await.unwrap();
 
-        // Wait until the most recent coredump expected has been reported before we make assertions
-        // about the observed diagnostics.
-        eprintln!("retrieving coredump reports...");
-        let observed_coredumps = loop {
-            if let Some(observed_coredumps) = get_coredumps_from_inspect().await {
-                if let Some(most_recent) = observed_coredumps.last() {
-                    if most_recent.idx == current_idx {
-                        break observed_coredumps;
-                    }
-                }
-                eprintln!("waiting for coredump ({current_idx}/{max_idx}) to show up...");
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        };
-        eprintln!("observed coredump {current_idx} in inspect, validating...");
+        info!("waiting for coredumper to stop...");
+        EventMatcher::ok().moniker(&moniker).wait::<Stopped>(&mut events).await.unwrap();
 
+        // Now that starnix has reported the component as stopped to the framework, we can expect
+        // the kernel's inspect to have the last coredump.
+        info!("retrieving coredump reports...");
+        let observed_coredumps = get_coredumps_from_inspect().await.unwrap();
+
+        info!("observed coredump {current_idx} in inspect, validating...");
         // The "earliest"/lowest index should be either 0 have advanced by how many were rolled out.
         let expected_min_idx = current_idx.saturating_sub(report_capacity - 1);
         // There should be as many reports as loop iterations unless we're at capacity.
@@ -58,7 +64,7 @@ async fn main() {
             expected_idx += 1;
         }
 
-        eprintln!("destroying child before another iteration of the test loop...");
+        info!("destroying child before another iteration of the test loop...");
         let on_destroy = instance.take_destroy_waiter();
         drop(instance);
         on_destroy.await.unwrap();

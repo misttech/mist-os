@@ -38,8 +38,8 @@
         },
         {
             event_stream: [
-                "destroyed",
                 "started",
+                "stopped",
             ],
         },
     ],

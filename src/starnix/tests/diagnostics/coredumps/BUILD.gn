@@ -23,6 +23,8 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/starnix/tests/diagnostics/lib/parse_starnix_inspect",
+    "//src/sys/lib/component-events",
+    "//third_party/rust_crates:tracing",
   ]
 }
 
