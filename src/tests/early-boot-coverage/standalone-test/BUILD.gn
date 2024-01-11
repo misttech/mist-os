@@ -62,7 +62,7 @@ if (is_fuchsia) {
     # The empty device list prevents this image from being launched by infra
     # as an individual shard. The sole purpose of this image is to be launched
     # by the host interaction test.
-    device_types = []
+    disabled = true
   }
 }
 

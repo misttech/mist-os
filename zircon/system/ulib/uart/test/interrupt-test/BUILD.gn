@@ -35,8 +35,7 @@ if (toolchain_variant.base == default_toolchain) {
     # `zbi_test()` and not `zbi()`. Investigate whether we can have `zbi()`
     # targets set this metadata and update this target accordingly - and
     # disable the ZBI from being booted as a ZBI test for now.
-    device_types = []
-
+    disabled = true
     metadata = {
       test_runtime_deps = [ zbi ]
     }

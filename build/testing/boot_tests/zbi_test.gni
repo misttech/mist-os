@@ -40,6 +40,12 @@ import("//build/zbi/zbi_input.gni")
 #     specifying QEMU kernel + ZBI initrd, rather than allowing QEMU kernel to
 #     be supplied here.
 #
+#   disabled (optional, default: false)
+#     [boolean] When true, the generated image is considered disabled, that
+#     is any associated test should not be run automatically. Useful for
+#     generating build artifacts. By disabling a target the 'device_types'
+#     are set to an empty list.
+#
 #   deps, data_deps, replace, complete, compress, metadata
 #     See //build/zbi/zbi.gni.
 template("zbi_test") {
@@ -162,29 +168,37 @@ template("zbi_test") {
     }
   }
 
+  target_device_types = [
+    "QEMU",
+    "AEMU",
+  ]
+
+  if (defined(invoker.device_types)) {
+    target_device_types = []
+    target_device_types = invoker.device_types
+  }
+
+  # AEMU does not support RISC-V.
+  if (current_cpu == "riscv64") {
+    target_device_types += [ "AEMU" ]
+    target_device_types -= [ "AEMU" ]
+  }
+
+  # If disabled, clear `target_device_types`.
+  if (defined(invoker.disabled) && invoker.disabled) {
+    target_device_types = []
+  }
+
   boot_test(main_target) {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
                              "data_deps",
-                             "device_types",
                              "metadata",
                              "qemu_kernel",
                              "timeout",
                            ])
-    if (!defined(device_types)) {
-      device_types = [
-        "QEMU",
-        "AEMU",
-      ]
-    }
-
-    # AEMU does not support RISC-V.
-    if (current_cpu == "riscv64") {
-      device_types += [ "AEMU" ]
-      device_types -= [ "AEMU" ]
-    }
-
+    device_types = target_device_types
     zbi = ":$zbi_target"
     if (use_vbmeta) {
       vbmeta = ":$vbmeta_target"
