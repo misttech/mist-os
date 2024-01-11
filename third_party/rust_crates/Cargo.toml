@@ -133,7 +133,7 @@ lazy_static = "1.4"
 libc = { version = "0.2.149", features = ["extra_traits"] }
 libm = "0.2.1"
 linked-hash-map = "0.5.3"
-lock_api = "0.4.7"
+lock_api = "0.4.11"
 log = { version = "0.4.20", features = ["std"] }
 lru-cache = "0.1.2"
 maplit = "1.0"
@@ -579,7 +579,7 @@ rustflags = ["--cfg=freebsd11"]
 # It is a fork:
 uses_fuchsia_license = true
 
-[gn.package.lock_api."0.4.7"]
+[gn.package.lock_api."0.4.11"]
 rustflags = ["--cfg=has_const_fn_trait_bound"]
 
 [gn.package.log."0.4.20"]

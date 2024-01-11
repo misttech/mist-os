@@ -1378,7 +1378,7 @@ dependencies = [
  "libm",
  "linked-hash-map",
  "lipsum",
- "lock_api 0.4.7",
+ "lock_api 0.4.11",
  "log",
  "loom",
  "lru-cache",
@@ -2168,9 +2168,9 @@ dependencies = [
 
 [[package]]
 name = "lock_api"
-version = "0.4.7"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "327fa5b6a6940e4699ec49a9beae1ea4845c6bab9314e4f84ac68742139d8c53"
+checksum = "3c168f8615b12bc01f9c17e2eb0cc07dcae1940121185446edc3744920e8ef45"
 dependencies = [
  "autocfg 1.1.0",
  "scopeguard",
@@ -2650,7 +2650,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d7744ac029df22dca6284efe4e898991d28e3085c706c972bcd7da4a27a15eb"
 dependencies = [
  "instant",
- "lock_api 0.4.7",
+ "lock_api 0.4.11",
  "parking_lot_core 0.8.3",
 ]
 
@@ -2660,7 +2660,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87f5ec2493a61ac0506c0f4199f99070cbe83857b0337006a30f3e6719b8ef58"
 dependencies = [
- "lock_api 0.4.7",
+ "lock_api 0.4.11",
  "parking_lot_core 0.9.6",
 ]
 
@@ -4563,7 +4563,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c3cee86884622e131719fff27539a520d0a5fee90e2a70691d9cc18789abce5"
 dependencies = [
- "lock_api 0.4.7",
+ "lock_api 0.4.11",
  "parking_lot 0.12.0",
 ]
 
