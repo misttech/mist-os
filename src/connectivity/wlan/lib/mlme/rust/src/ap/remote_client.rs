@@ -1063,7 +1063,8 @@ impl RemoteClient {
 
         let (in_buf, bytes_written) = ctx
             .make_data_frame(
-                dst_addr, src_addr, protection, false, // TODO(https://fxbug.dev/37891): Support QoS.
+                dst_addr, src_addr, protection,
+                false, // TODO(https://fxbug.dev/37891): Support QoS.
                 ether_type, body,
             )
             .map_err(ClientRejection::WlanSendError)?;
