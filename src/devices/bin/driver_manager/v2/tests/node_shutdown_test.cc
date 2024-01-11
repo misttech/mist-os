@@ -34,7 +34,8 @@ class TestRealm final : public fidl::WireServer<fuchsia_component::Realm> {
 
   void DestroyChild(DestroyChildRequestView request,
                     DestroyChildCompleter::Sync& completer) override {
-    destroy_completers_[std::string(request->child.name.data())] = completer.ToAsync();
+    destroy_completers_[std::string(request->child.name.data(), request->child.name.size())] =
+        completer.ToAsync();
   }
 
   void ListChildren(ListChildrenRequestView request,
