@@ -105,7 +105,9 @@ rustc_binary("rust_fidl_microbenchmarks_bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_shell_package("rust") {
+fuchsia_package_with_single_component("fidl_microbenchmarks_rust") {
   testonly = true
+  manifest = "meta/benchmark.cml"
+  component_name = "benchmark"
   deps = [ ":rust_fidl_microbenchmarks_bin" ]
 }

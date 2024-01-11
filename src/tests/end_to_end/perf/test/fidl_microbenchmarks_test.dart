@@ -72,14 +72,6 @@ void main(List<String> args) {
                 '/bin/go_fidl_microbenchmarks --out_file $resultsFile',
             expectedMetricNamesFile: 'fuchsia.fidl_microbenchmarks.go.txt');
       }, timeout: Timeout.none);
-    })
-    ..add(() {
-      test('rust_fidl_microbenchmarks', () async {
-        final helper = await PerfTestHelper.make();
-        await helper.runTestCommand(
-            (resultsFile) => '/bin/rust_fidl_microbenchmarks $resultsFile',
-            expectedMetricNamesFile: 'fuchsia.fidl_microbenchmarks.rust.txt');
-      }, timeout: Timeout.none);
     });
 
   runShardTests(args, _tests);

@@ -29,7 +29,7 @@ group("tests_no_e2e") {
 group("e2e_tests") {
   testonly = true
   deps = [
-    "//src/tests/benchmarks/fidl:benchmarks",
+    "//src/tests/benchmarks/fidl:tests",
     "//src/tests/fidl/compatibility",
     "//src/tests/fidl/dangerous_identifiers:tests",
     "//src/tests/fidl/fidl_go_conformance:tests",

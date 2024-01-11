@@ -196,7 +196,6 @@ if (is_host) {
     "fuchsia.fidl_microbenchmarks.libfidl.txt",
     "fuchsia.fidl_microbenchmarks.llcpp.txt",
     "fuchsia.fidl_microbenchmarks.reference.txt",
-    "fuchsia.fidl_microbenchmarks.rust.txt",
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
     "fuchsia.microbenchmarks.tracing.txt",
@@ -248,7 +247,9 @@ _python_benchmarks += [
   "//src/lib/diagnostics:benchmarks",
   "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
   "//src/starnix:benchmarks",
-  "//src/tests/benchmarks/fidl/fidlc:benchmarks",
+  "//src/storage/benchmarks/fuchsia:benchmarks",
+  "//src/storage/benchmarks/starnix:benchmarks",
+  "//src/tests/benchmarks",
   "//src/tests/microbenchmarks:benchmarks",
 ]
 
@@ -258,8 +259,10 @@ group("test") {
   deps = _python_benchmarks
 
   deps += [
-    "//src/tests/benchmarks",
     "//third_party/sbase:sbase-pkgs",
+
+    # Used by the FIDL benchmarks.
+    "//src/tests/benchmarks/fidl:benchmarks-under-migration",
 
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
