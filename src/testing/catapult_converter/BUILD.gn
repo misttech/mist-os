@@ -9,6 +9,7 @@ import("//build/test.gni")
 source_set("converter") {
   sources = [ "converter.cc" ]
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//third_party/rapidjson",
   ]

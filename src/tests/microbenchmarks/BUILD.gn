@@ -173,6 +173,7 @@ if (is_fuchsia) {
       ":fuchsia.zircon.benchmarks_hlcpp",
       "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
       "//sdk/lib/fdio",
+      "//sdk/lib/syslog/cpp",
       "//src/lib/fxl",
       "//src/storage/lib/vfs/cpp",
       "//src/zircon/lib/zircon",
