@@ -225,7 +225,7 @@ impl<'a> NetworkActivityLoggerBuilder<'a> {
     pub async fn build(self) -> Result<NetworkActivityLogger, fmetrics::RecorderError> {
         if self.interval_ms == 0
             || self.output_samples_to_syslog && self.interval_ms < MIN_INTERVAL_FOR_SYSLOG_MS
-            || self.duration_ms.map_or(false, |d| d <= self.interval_ms)
+            || self.duration_ms.is_some_and(|d| d <= self.interval_ms)
         {
             return Err(fmetrics::RecorderError::InvalidSamplingInterval);
         }

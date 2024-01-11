@@ -247,7 +247,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
     ) -> Result<Self, fmetrics::RecorderError> {
         if let Some(interval) = statistics_interval_ms {
             if sampling_interval_ms > interval
-                || duration_ms.map_or(false, |d| d <= interval)
+                || duration_ms.is_some_and(|d| d <= interval)
                 || output_stats_to_syslog && interval < MIN_INTERVAL_FOR_SYSLOG_MS
             {
                 return Err(fmetrics::RecorderError::InvalidStatisticsInterval);
@@ -255,7 +255,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
         }
         if sampling_interval_ms == 0
             || output_samples_to_syslog && sampling_interval_ms < MIN_INTERVAL_FOR_SYSLOG_MS
-            || duration_ms.map_or(false, |d| d <= sampling_interval_ms)
+            || duration_ms.is_some_and(|d| d <= sampling_interval_ms)
         {
             return Err(fmetrics::RecorderError::InvalidSamplingInterval);
         }
@@ -330,7 +330,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
         let is_last_sample_for_statistics = self
             .statistics_tracker
             .as_ref()
-            .map_or(false, |t| time_stamp - t.statistics_start_time >= t.statistics_interval);
+            .is_some_and(|t| time_stamp - t.statistics_start_time >= t.statistics_interval);
 
         let mut trace_args = Vec::new();
         let mut trace_args_statistics = vec![Vec::new(), Vec::new(), Vec::new()];

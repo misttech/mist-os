@@ -158,7 +158,7 @@ impl CpuLoadLogger {
     ) -> Result<Self, fmetrics::RecorderError> {
         if interval_ms == 0
             || output_samples_to_syslog && interval_ms < MIN_INTERVAL_FOR_SYSLOG_MS
-            || duration_ms.map_or(false, |d| d <= interval_ms)
+            || duration_ms.is_some_and(|d| d <= interval_ms)
         {
             return Err(fmetrics::RecorderError::InvalidSamplingInterval);
         }
