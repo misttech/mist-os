@@ -345,12 +345,17 @@ impl Telemetry {
                         MetricEvent::builder(
                             metrics::REACHABILITY_GLOBAL_SNAPSHOT_DURATION_METRIC_ID,
                         )
-                        .with_event_codes(metrics::ReachabilityGlobalSnapshotDurationEventCodes {
-                            route_config,
-                            internet_available,
-                            gateway_reachable,
-                            dns_active,
-                        })
+                        .with_event_codes(
+                            // TODO(zmbush): Switch back to
+                            // metrics::ReachabilityGlobalSnapshotDurationEventCodes
+                            // after fxr/972232 lands.
+                            [
+                                route_config.as_event_code(),
+                                internet_available.as_event_code(),
+                                gateway_reachable.as_event_code(),
+                                dns_active.as_event_code(),
+                            ],
+                        )
                         .as_integer(duration_cobalt.into_micros()),
                     );
                 }
