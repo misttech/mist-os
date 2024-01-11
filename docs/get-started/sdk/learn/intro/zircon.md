@@ -13,8 +13,8 @@
 Let's explore some of these fundamental concepts on a running system. In
 this exercise, you'll see how jobs and processes interact to form a tree.
 
-Note: To ensure that you’re using the right version of `ffx` and `fssh` (which
- need to match the version of the SDK), consider updating your `PATH` to include
+Note: To ensure that you’re using the right version of `ffx` (which
+ needs to match the version of the SDK), consider updating your `PATH` to include
  the SDK's `tools` directory (for instance, `export
  PATH="$PATH:$HOME/getting-started/tools"`). However, if you don't wish to
  update your `PATH`, ensure that you specify the relative path (for instance,
@@ -30,7 +30,7 @@ Connect to a device shell prompt and use the `ps` command to dump the list of
 running jobs and processes.
 
 ```posix-terminal
-fssh ps
+ffx target ssh ps
 ```
 
 Below is a trimmed example of what the output looks like:
