@@ -10,8 +10,8 @@ executable("bin") {
   sources = [ "src/main.cc" ]
   deps = [
     ":config_lib",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp:cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/sys/component_manager/tests/structured_config/fidl:test.structuredconfig.receiver_hlcpp",
     "//zircon/system/ulib/async-default",
@@ -107,7 +107,7 @@ source_set("config_lib") {
   public_deps = [
     ":${cpp_elf_headers_target}",
     ":${cpp_elf_source_target}($default_toolchain)",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
   ]
 
   # prevent manifest from getting into package this way

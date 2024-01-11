@@ -5,8 +5,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/binding.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <iostream>
@@ -52,7 +52,7 @@ int main(int argc, const char** argv) {
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  sys::ComponentInspector inspector(context.get());
+  inspect::ComponentInspector inspector(loop.dispatcher(), inspect::PublishOptions{});
   inspect::Node inspect_config = inspector.root().CreateChild("config");
   c.RecordInspect(&inspect_config);
 

@@ -10,8 +10,8 @@ executable("bin") {
   sources = [ "src/main.cc" ]
   deps = [
     ":config_lib",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp:cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/sys/component_manager/tests/structured_config/fidl:test.structuredconfig.receiver_hlcpp",
     "//zircon/system/ulib/async-default",

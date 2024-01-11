@@ -23,8 +23,7 @@ executable("bin") {
     ":example_config",
 
     # [START_EXCLUDE]
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

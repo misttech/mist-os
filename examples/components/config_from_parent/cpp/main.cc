@@ -4,8 +4,8 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <chrono>
@@ -20,7 +20,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  sys::ComponentInspector inspector(context.get());
+  inspect::ComponentInspector inspector(loop.dispatcher(), {});
   inspect::Node config_node = inspector.root().CreateChild("config");
   c.RecordInspect(&config_node);
 
