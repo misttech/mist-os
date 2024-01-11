@@ -656,7 +656,7 @@ impl fidl::endpoints::ServiceRequest for EmptyServiceRequest {
     }
 }
 #[cfg(target_os = "fuchsia")]
-pub struct EmptyServiceProxy(Box<dyn fidl::endpoints::MemberOpener>);
+pub struct EmptyServiceProxy(#[allow(dead_code)] Box<dyn fidl::endpoints::MemberOpener>);
 
 #[cfg(target_os = "fuchsia")]
 impl fidl::endpoints::ServiceProxy for EmptyServiceProxy {

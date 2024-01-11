@@ -58,7 +58,7 @@ impl fidl::endpoints::ServiceRequest for {{ .Name }}Request {
 ///{{ . }}
 {{- end }}
 #[cfg(target_os = "fuchsia")]
-pub struct {{ .Name }}Proxy(Box<dyn fidl::endpoints::MemberOpener>);
+pub struct {{ .Name }}Proxy({{ if not .Members }}#[allow(dead_code)] {{ end }}Box<dyn fidl::endpoints::MemberOpener>);
 
 #[cfg(target_os = "fuchsia")]
 impl fidl::endpoints::ServiceProxy for {{ .Name }}Proxy {
