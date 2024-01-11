@@ -192,7 +192,6 @@ if (is_host) {
     "fuchsia.fidl_microbenchmarks.driver_llcpp.txt",
     "fuchsia.fidl_microbenchmarks.go.txt",
     "fuchsia.fidl_microbenchmarks.libfidl.txt",
-    "fuchsia.fidl_microbenchmarks.llcpp.txt",
     "fuchsia.fidl_microbenchmarks.reference.txt",
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
