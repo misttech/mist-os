@@ -427,6 +427,7 @@ impl DeviceHandler {
                     .into(),
                     static_common_info: devices::StaticCommonInfo {
                         tx_notifier: Default::default(),
+                        authorization_token: zx::Event::create(),
                     },
                 }
                 .into();
@@ -439,7 +440,8 @@ impl DeviceHandler {
         let binding_id = core_id.bindings_id().id;
         let core_id: DeviceId<_> = core_id.into();
         let external_state = core_id.external_state();
-        let devices::StaticCommonInfo { tx_notifier } = external_state.static_common_info();
+        let devices::StaticCommonInfo { tx_notifier, authorization_token: _ } =
+            external_state.static_common_info();
         let task =
             crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
         let (core_ctx, bindings_ctx) = ctx.contexts_mut();

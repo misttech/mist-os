@@ -39,8 +39,9 @@ use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+use fnet_interfaces_admin::GrantForInterfaceAuthorization;
 use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
+use fuchsia_zircon::{self as zx, HandleBased, Rights};
 use futures::{
     future::FusedFuture as _, stream::FusedStream as _, FutureExt as _, SinkExt as _,
     StreamExt as _, TryFutureExt as _, TryStreamExt as _,
@@ -61,7 +62,8 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    devices, netdevice_worker,
+    devices::{self, StaticCommonInfo},
+    netdevice_worker,
     routes::{self, admin::RouteSet},
     util::{IllegalZeroValueError, IntoCore as _, IntoFidl, TryIntoCore},
     BindingId, BindingsCtx, Ctx, DeviceIdExt as _, Netstack, StackTime,
@@ -665,8 +667,8 @@ async fn dispatch_control_request(
             }
             responder.send(Err(fnet_interfaces_admin::ControlRemoveError::NotAllowed))
         }
-        fnet_interfaces_admin::ControlRequest::GetAuthorizationForInterface { responder: _ } => {
-            todo!("https://fxbug.dev/117844 support GetAuthorizationForInterface")
+        fnet_interfaces_admin::ControlRequest::GetAuthorizationForInterface { responder } => {
+            responder.send(grant_for_interface(ctx, id))
         }
     }
     .map(|()| ControlRequestResult::Continue)
@@ -1141,6 +1143,25 @@ fn add_address(
             assignment_state_sender,
         });
     })
+}
+
+fn grant_for_interface(ctx: &mut Ctx, id: BindingId) -> GrantForInterfaceAuthorization {
+    let core_id = ctx
+        .bindings_ctx()
+        .devices
+        .get_core_id(id)
+        .expect("device lifetime should be tied to channel lifetime");
+
+    let external_state = core_id.external_state();
+    let StaticCommonInfo { authorization_token, tx_notifier: _ } =
+        external_state.static_common_info();
+
+    GrantForInterfaceAuthorization {
+        interface_id: id.get(),
+        token: authorization_token
+            .duplicate_handle(Rights::TRANSFER | Rights::DUPLICATE)
+            .expect("failed to duplicate handle"),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

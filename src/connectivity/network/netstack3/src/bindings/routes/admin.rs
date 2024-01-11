@@ -271,7 +271,6 @@ pub(crate) trait RouteSet: Send + Sync {
                     "TODO(https://fxbug.dev/134307): RouteSetVX.AuthenticateForInterface \
                     is not implemented; assuming authenticated"
                 );
-
                 responder.send(Ok(()))
             }
         }

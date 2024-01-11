@@ -15,6 +15,8 @@ use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_posix_socket as fposix_socket;
+use finterfaces_admin::GrantForInterfaceAuthorization;
+use fnet_interfaces_ext::admin::TerminalError;
 use fuchsia_async::{
     self as fasync,
     net::{DatagramSocket, UdpSocket},
@@ -40,6 +42,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use std::ops::Not as _;
 use test_case::test_case;
+use zx::AsHandleRef;
 
 #[netstack_test]
 async fn address_deprecation<N: Netstack>(name: &str) {
@@ -3443,4 +3446,98 @@ async fn nud_max_unicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name: 
         to_ip_nud_configuration::<I>(config).expect("nud present")
     };
     assert_eq!(max_unicast_solicitations, Some(WANT_SOLICITS));
+}
+
+#[netstack_test]
+async fn interface_authorization<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    let device_1 = sandbox.create_endpoint(format!("{name}1")).await.expect("create endpoint");
+    let endpoint_1 = realm
+        .install_endpoint(device_1, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+    let control_1 = endpoint_1.control();
+
+    let iface_id_1 = control_1.get_id().await.expect("get id");
+    let GrantForInterfaceAuthorization { token: grant_token_1, interface_id: grant_iface_id_1 } =
+        control_1.get_authorization_for_interface().await.expect("interface authorization");
+
+    assert_eq!(grant_iface_id_1, iface_id_1);
+    let koid_1 = grant_token_1.basic_info().expect("basic_info").koid;
+
+    // Check that the same object is returned for a second call.
+    {
+        let grant_1_again =
+            control_1.get_authorization_for_interface().await.expect("interface authorization");
+        assert_eq!(grant_1_again.interface_id, iface_id_1);
+        let koid_1_again = grant_1_again.token.basic_info().expect("basic_info").koid;
+        assert_eq!(koid_1_again, koid_1);
+    }
+
+    let device_2 = sandbox.create_endpoint(format!("{name}2")).await.expect("create endpoint");
+    let endpoint_2 = realm
+        .install_endpoint(device_2, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+    let control_2 = endpoint_2.control();
+
+    let iface_id_2 = control_2.get_id().await.expect("get id");
+    let GrantForInterfaceAuthorization { token: grant_token_2, interface_id: grant_iface_id_2 } =
+        control_2.get_authorization_for_interface().await.expect("interface authorization");
+
+    assert_eq!(grant_iface_id_2, iface_id_2);
+    let koid_2 = grant_token_2.basic_info().expect("basic_info").koid;
+
+    assert_ne!(koid_1, koid_2);
+}
+
+#[netstack_test]
+async fn interface_authorization_root_access<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let endpoint = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+    let control = endpoint.control().clone();
+
+    let iface_id = control.get_id().await.expect("get id");
+    let grant = control.get_authorization_for_interface().await.expect("interface authorization");
+
+    assert_eq!(grant.interface_id, iface_id);
+    let koid = grant.token.basic_info().expect("basic_info").koid;
+
+    let root_interfaces = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+        .expect("connect to protocol");
+    let (root_control, control_server_end) =
+        fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints().expect("create proxy");
+    let () = root_interfaces
+        .get_admin(iface_id, control_server_end)
+        .expect("create root interfaces connection");
+
+    let root_grant =
+        root_control.get_authorization_for_interface().await.expect("interface authorization");
+
+    // Objects returned through different channels should be the same underlying object.
+    assert_eq!(root_grant.interface_id, iface_id);
+    let root_koid = grant.token.basic_info().expect("basic_info").koid;
+
+    assert_eq!(koid, root_koid);
+
+    // Remove the interface, so subsequent calls for getting an authorization
+    // token should fail.
+    let _ = control.remove().await.expect("removing interface");
+    let _ = control.wait_termination().await;
+
+    // TerminalError doesn't impl PartialEq/Eq, so we have to do some
+    // destructuring to get at the InterfaceRemovedReason directly.
+    assert_matches!(
+        root_control.get_authorization_for_interface().await,
+        Err(TerminalError::Terminal(_))
+    );
 }

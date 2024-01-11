@@ -12,6 +12,7 @@ use std::{
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
+use fuchsia_zircon as zx;
 use net_types::{
     ethernet::Mac,
     ip::{IpAddr, Mtu},
@@ -206,6 +207,7 @@ pub(crate) fn spawn_tx_task(
 pub(crate) struct StaticCommonInfo {
     #[derivative(Debug = "ignore")]
     pub(crate) tx_notifier: NeedsDataNotifier,
+    pub(crate) authorization_token: zx::Event,
 }
 
 /// Information common to all devices.

@@ -494,7 +494,8 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
 
     fn wake_tx_task(&mut self, device: &DeviceId<BindingsCtx>) {
         let external_state = device.external_state();
-        let StaticCommonInfo { tx_notifier } = external_state.static_common_info();
+        let StaticCommonInfo { tx_notifier, authorization_token: _ } =
+            external_state.static_common_info();
         tx_notifier.schedule()
     }
 
@@ -928,7 +929,10 @@ impl Netstack {
                     .expect("interfaces worker not running");
 
                 let loopback_info = LoopbackInfo {
-                    static_common_info: StaticCommonInfo { tx_notifier: Default::default() },
+                    static_common_info: StaticCommonInfo {
+                        tx_notifier: Default::default(),
+                        authorization_token: zx::Event::create(),
+                    },
                     dynamic_common_info: DynamicCommonInfo {
                         mtu: DEFAULT_LOOPBACK_MTU,
                         admin_enabled: true,
@@ -952,7 +956,8 @@ impl Netstack {
         let binding_id = loopback.bindings_id().id;
         let loopback: DeviceId<_> = loopback.into();
         let external_state = loopback.external_state();
-        let StaticCommonInfo { tx_notifier } = external_state.static_common_info();
+        let StaticCommonInfo { tx_notifier, authorization_token: _ } =
+            external_state.static_common_info();
         devices.add_device(binding_id, loopback.clone());
         let tx_task = crate::bindings::devices::spawn_tx_task(
             tx_notifier,

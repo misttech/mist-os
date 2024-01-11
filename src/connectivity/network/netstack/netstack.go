@@ -289,6 +289,10 @@ type ifState struct {
 
 	adminControls adminControlCollection
 
+	// authorizationToken is a Zircon object used to prove client ownership of
+	// this interface.
+	authorizationToken zx.Event
+
 	dns struct {
 		mu struct {
 			sync.Mutex
@@ -1487,6 +1491,12 @@ func (ns *Netstack) addEndpoint(
 	ns.mu.countNIC++
 	ns.mu.Unlock()
 	name := nameFn(ifs.nicid)
+
+	token, err := zx.NewEvent(0 /* options */)
+	if err != nil {
+		return nil, fmt.Errorf("while allocating authorization token for %s: %w", name, err)
+	}
+	ifs.authorizationToken = token
 
 	// LinkEndpoint chains:
 	// Put sniffer as close as the NIC.

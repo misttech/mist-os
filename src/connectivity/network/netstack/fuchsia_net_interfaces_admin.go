@@ -251,10 +251,14 @@ func (ci *adminControlImpl) Remove(fidl.Context) (admin.ControlRemoveResult, err
 }
 
 func (ci *adminControlImpl) GetAuthorizationForInterface(fidl.Context) (admin.GrantForInterfaceAuthorization, error) {
-	// TODO(https://fxbug.dev/117846): Implement GetAuthorizationForInterface.
-	_ = syslog.Errorf("GetAuthorizationForInterface is unimplemented")
-	ci.cancelServe()
-	return admin.GrantForInterfaceAuthorization{}, nil
+	nicInfo := ci.getNICContext()
+
+	token, err := nicInfo.authorizationToken.Duplicate(zx.RightTransfer | zx.RightDuplicate)
+	if err != nil {
+		return admin.GrantForInterfaceAuthorization{}, err
+	}
+
+	return admin.GrantForInterfaceAuthorization{InterfaceId: uint64(nicInfo.nicid), Token: token}, nil
 }
 
 func propertiesToLifetimes(properties admin.AddressProperties) stack.AddressLifetimes {
