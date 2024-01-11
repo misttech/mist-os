@@ -11,21 +11,19 @@
         {
             name: "debian_container",
             url: "#meta/container.cm",
+            startup: "eager",
             environment: "#starnix_kernel_env",
         },
         {
             name: "puppet",
             url: "#meta/puppet.cm",
-            startup: "eager",
             environment: "#debian_container_env",
         },
     ],
     capabilities: [
         {
-            directory: "fs_root",
-            from: "#debian_container",
-            rights: [ "r*" ],
-            path: "/fs_root",
+            protocol: "PuppetBinder",
+            from: "#puppet",
         },
     ],
     offer: [
@@ -37,8 +35,11 @@
     ],
     expose: [
         {
-            directory: "fs_root",
-            from: "#debian_container",
+            protocol: "fuchsia.component.Binder",
+            from: "#puppet",
+
+            // NB: RealmBuilder includes its own capability for this, need a different name.
+            as: "PuppetBinder",
         },
     ],
     environments: [

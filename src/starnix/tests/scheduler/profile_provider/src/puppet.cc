@@ -26,12 +26,13 @@ void spawn_and_join_thread_with_nice(int child_nice) {
 }
 
 int main(int argc, const char** argv) {
-  std::filesystem::path parent_fence_path(argv[1]);
-  std::filesystem::path child_fence_path(argv[2]);
+  std::cout << "starting starnix puppet...\n";
+  std::filesystem::path child_fence_path("/tmp/child.done");
 
   set_priority_or_panic(10);
   spawn_and_join_thread_with_nice(12);
 
+  std::cout << "forking child process...\n";
   // TODO(b/297961833) test SCHED_RESET_ON_FORK
   pid_t child = fork();
   if (child > 0) {
@@ -40,10 +41,9 @@ int main(int argc, const char** argv) {
       if (std::filesystem::exists(child_fence_path)) {
         break;
       }
-      std::this_thread::sleep_for(1s);
+      std::this_thread::sleep_for(5ms);
     }
-    std::ofstream parent_fence(parent_fence_path);
-    parent_fence << "done!";
+    std::cout << "child reported done, exiting.";
   } else {
     // child process emits some scheduler calls and writes to its fence when done
     set_priority_or_panic(14);

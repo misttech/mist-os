@@ -5,9 +5,17 @@
     program: {
         runner: "starnix_container",
         binary: "data/tests/linux_scheduler_puppet",
-        args: [
-            "/tmp/puppet.done",
-            "/tmp/child.done",
-        ],
     },
+    capabilities: [
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "self",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "self",
+        },
+    ],
 }
