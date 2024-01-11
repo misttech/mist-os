@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/lib/icu/tzdata/icu_tzdata_config_data.gni")
 
 group("tz_version_parrot") {
   testonly = true
