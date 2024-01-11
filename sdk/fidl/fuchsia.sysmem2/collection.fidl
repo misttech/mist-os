@@ -407,7 +407,7 @@ closed protocol Node {
     /// (and on a per-buffer basis).
     ///
     /// A participant that doesn't handle `close_weak_asap` and also doesn't
-    /// retreive any VMO handles via `WaitForAllBuffersAllocated` doesn't need
+    /// retrieve any VMO handles via `WaitForAllBuffersAllocated` doesn't need
     /// to send `SetWeakOk` (and doesn't need to have a parent `Node` send
     /// `SetWeakOk` with `for_child_nodes_also` true either). However, if that
     /// same participant has a child/delegate which does retrieve VMOs, that
@@ -426,7 +426,14 @@ closed protocol Node {
     ///   `for_child_nodes_also` true if the participant can really promise to
     ///   obey `close_weak_asap` both for its own weak VMO handles, and for all
     ///   weak VMO handles held by participants holding the corresponding child
-    ///   `Node`(s).
+    ///   `Node`(s). When `for_child_nodes_also` is set, descendent `Node`(s)
+    ///   which are using sysmem(1) can be weak, despite the clients of those
+    ///   sysmem1 `Node`(s) not having any direct way to `SetWeakOk` or any
+    ///   direct way to find out about `close_weak_asap`. This only applies to
+    ///   descendents of this `Node` which are using sysmem(1), not to this
+    ///   `Node` when converted directly from a sysmem2 token to a sysmem(1)
+    ///   token, which will fail allocation unless an ancestor of this `Node`
+    ///   specified `for_child_nodes_also` true.
     strict SetWeakOk(resource table {
         1: for_child_nodes_also bool;
     });

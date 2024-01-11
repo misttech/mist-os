@@ -700,10 +700,14 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
 fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> BufferCollection::CloneResultForSendingV1(
     const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   if (node_properties().is_weak() && !node_properties().is_weak_ok_from_parent()) {
-    // To avoid this failure, consider migrating to sysmem2 (a sysmem (1) token client_end can be
-    // used directly as a sysmem2 token).
+    // To avoid this failure case, consider migrating to sysmem2 (a sysmem (1) token client_end can
+    // be used directly as a sysmem2 token).
+    //
+    // It doesn't work to set for_child_nodes_also true on a v2 Node then convert that Node to a v1
+    // Node then get VMO handles via that v1 Node. Instead, an _ancestor_ v2 Node must have set
+    // for_child_nodes_also true - only then can a descendant v1 Node be sent weak VMO handles.
     FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS,
-              "sysmem v1 can't do weak unless for_child_nodes_also=true from parent Node");
+              "sysmem v1 can't do weak unless for_child_nodes_also=true from _ancestor_ v2 node");
     return fpromise::error();
   }
   auto v2_result = CloneResultForSendingV2(buffer_collection_info);
@@ -914,5 +918,15 @@ bool BufferCollection::is_currently_connected() const {
 }
 
 const char* BufferCollection::node_type_string() const { return "collection"; }
+
+ConnectionVersion BufferCollection::connection_version() const {
+  if (server_binding_v2_.has_value()) {
+    return ConnectionVersion::kVersion2;
+  }
+  if (server_binding_v1_.has_value()) {
+    return ConnectionVersion::kVersion1;
+  }
+  return ConnectionVersion::kNoConnection;
+}
 
 }  // namespace sysmem_driver

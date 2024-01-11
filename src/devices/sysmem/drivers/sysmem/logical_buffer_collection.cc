@@ -95,8 +95,8 @@ bool IsNonZeroPowerOf2(T value) {
   return true;
 }
 
-// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar field
-// types.
+// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar
+// field types.
 #define FIELD_DEFAULT_1(table_ref_name, field_name)                                         \
   do {                                                                                      \
     auto& table_ref = (table_ref_name);                                                     \
@@ -109,8 +109,8 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                    \
   } while (false)
 
-// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar field
-// types.
+// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar
+// field types.
 #define FIELD_DEFAULT_MAX(table_ref_name, field_name)                                           \
   do {                                                                                          \
     auto& table_ref = (table_ref_name);                                                         \
@@ -123,8 +123,8 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                        \
   } while (false)
 
-// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar field
-// types.
+// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar
+// field types.
 #define FIELD_DEFAULT_ZERO(table_ref_name, field_name)                                      \
   do {                                                                                      \
     auto& table_ref = (table_ref_name);                                                     \
@@ -138,8 +138,8 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                    \
   } while (false)
 
-// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar field
-// types.
+// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar
+// field types.
 #define FIELD_DEFAULT_ZERO_64_BIT(table_ref_name, field_name)                               \
   do {                                                                                      \
     auto& table_ref = (table_ref_name);                                                     \
@@ -4316,31 +4316,49 @@ void LogicalBufferCollection::LogImageFormatConstraints(
 
 void LogicalBufferCollection::LogPrunedSubTree(NodeProperties* subtree) const {
   ZX_DEBUG_ASSERT(is_verbose_logging());
-  ignore_result(subtree->DepthFirstPreOrder(
-      PrunedSubtreeFilter(*subtree, [this, subtree](const NodeProperties& node_properties) {
-        uint32_t depth = 0;
-        for (auto iter = &node_properties; iter != subtree; iter = iter->parent()) {
-          ++depth;
-        }
+  LogInfo(FROM_HERE, "collection name: %s", name().has_value() ? name()->c_str() : "<nullopt>");
+  ignore_result(subtree->DepthFirstPreOrder(PrunedSubtreeFilter(*subtree, [this, subtree](
+                                                                              const NodeProperties&
+                                                                                  node_properties) {
+    uint32_t depth = 0;
+    for (auto iter = &node_properties; iter != subtree; iter = iter->parent()) {
+      ++depth;
+    }
 
-        const char* logical_type_name = "?";
-        if (node_properties.is_token()) {
-          logical_type_name = "token";
-        } else if (node_properties.is_token_group()) {
-          logical_type_name = "group";
-        } else if (node_properties.is_collection()) {
-          logical_type_name = "collection";
-        }
+    const char* logical_type_name = "?";
+    if (node_properties.is_token()) {
+      logical_type_name = "token";
+    } else if (node_properties.is_token_group()) {
+      logical_type_name = "group";
+    } else if (node_properties.is_collection()) {
+      logical_type_name = "collection";
+    }
 
-        LogInfo(FROM_HERE, "%*sNodeProperties: %p (%s;%s) has_constraints: %u ready: %u name: %s",
-                2 * depth, "", &node_properties, node_properties.node_type_name(),
-                logical_type_name, node_properties.has_constraints(),
-                node_properties.node()->ReadyForAllocation(),
-                node_properties.client_debug_info().name.c_str());
-        // No need to keep the nodes in a list; we've alread done what we need to do during the
-        // visit.
-        return false;
-      })));
+    const char* connection_version_string = "?";
+    switch (node_properties.connection_version()) {
+      case ConnectionVersion::kNoConnection:
+        connection_version_string = "<none>";
+        break;
+      case ConnectionVersion::kVersion1:
+        connection_version_string = "v1";
+        break;
+      case ConnectionVersion::kVersion2:
+        connection_version_string = "v2";
+        break;
+    }
+
+    LogInfo(
+        FROM_HERE,
+        "%*sNodeProperties: %p (%s;%s;%s) has_constraints: %u ready: %u weak: %u weak_ok: %u weak_ok_for_child_nodes_also: %u weak_ok_from_parent: %u client_name: %s",
+        2 * depth, "", &node_properties, node_properties.node_type_name(),
+        connection_version_string, logical_type_name, node_properties.has_constraints(),
+        node_properties.node()->ReadyForAllocation(), node_properties.is_weak(),
+        node_properties.is_weak_ok(), node_properties.is_weak_ok_for_child_nodes_also(),
+        node_properties.is_weak_ok_from_parent(), node_properties.client_debug_info().name.c_str());
+    // No need to keep the nodes in a list; we've already done what we need to do during the
+    // visit.
+    return false;
+  })));
 }
 
 void LogicalBufferCollection::LogNodeConstraints(std::vector<NodeProperties*> nodes) const {

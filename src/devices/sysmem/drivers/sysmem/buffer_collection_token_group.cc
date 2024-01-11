@@ -420,4 +420,14 @@ void BufferCollectionTokenGroup::CloseServerBinding(zx_status_t epitaph) {
 
 const char* BufferCollectionTokenGroup::node_type_string() const { return "group"; }
 
+ConnectionVersion BufferCollectionTokenGroup::connection_version() const {
+  if (server_binding_v2_.has_value()) {
+    return ConnectionVersion::kVersion2;
+  }
+  if (server_binding_v1_.has_value()) {
+    return ConnectionVersion::kVersion1;
+  }
+  return ConnectionVersion::kNoConnection;
+}
+
 }  // namespace sysmem_driver

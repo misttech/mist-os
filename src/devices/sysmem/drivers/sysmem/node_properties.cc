@@ -364,4 +364,8 @@ void NodeProperties::LogConstraints(Location location) {
 
 const char* NodeProperties::node_type_name() const { return node()->node_type_string(); }
 
+ConnectionVersion NodeProperties::connection_version() const {
+  return node()->connection_version();
+}
+
 }  // namespace sysmem_driver

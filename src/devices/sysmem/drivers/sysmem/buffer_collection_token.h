@@ -67,6 +67,7 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   bool is_connected_type() const override;
   bool is_currently_connected() const override;
   const char* node_type_string() const override;
+  ConnectionVersion connection_version() const override;
 
   void Bind(TokenServerEnd server_end);
 
@@ -179,6 +180,7 @@ class BufferCollectionToken : public Node, public LoggingMixin {
 
   std::optional<fidl::ServerBindingRef<fuchsia_sysmem2_internal::CombinedBufferCollectionToken>>
       server_binding_;
+  ConnectionVersion last_seen_version_ = ConnectionVersion::kNoConnection;
 
   // This is set up to once during
   // LogicalBufferCollection::BindSharedCollection(), and essentially curries

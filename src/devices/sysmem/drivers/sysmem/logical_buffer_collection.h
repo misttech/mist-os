@@ -323,7 +323,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   std::optional<NodeProperties*> FindNodePropertiesByNodeRefKoid(zx_koid_t node_ref_keep_koid);
 
   std::optional<std::string> name() const {
-    return name_.has_value() ? std::make_optional(name_->name) : std::optional<std::string>();
+    return name_.has_value() ? std::make_optional(name_->name) : std::nullopt;
   }
 
   inspect::Node& inspect_node() { return inspect_node_; }

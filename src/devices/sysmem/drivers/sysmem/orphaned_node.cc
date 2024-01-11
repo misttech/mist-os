@@ -57,6 +57,11 @@ bool OrphanedNode::is_currently_connected() const { return false; }
 
 const char* OrphanedNode::node_type_string() const { return "orphaned"; }
 
+ConnectionVersion OrphanedNode::connection_version() const {
+  // no connection version because never connected
+  return ConnectionVersion::kNoConnection;
+}
+
 OrphanedNode::OrphanedNode(fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
                            NodeProperties* node_properties)
     : Node(std::move(logical_buffer_collection), node_properties, zx::unowned_channel{}) {

@@ -101,6 +101,7 @@ class Node : public fbl::RefCounted<Node> {
   // when !is_connected_type(), and can return true or false if is_connected_type().
   virtual bool is_currently_connected() const = 0;
   virtual const char* node_type_string() const = 0;
+  virtual ConnectionVersion connection_version() const = 0;
 
   LogicalBufferCollection& logical_buffer_collection() const;
   fbl::RefPtr<LogicalBufferCollection> shared_logical_buffer_collection();

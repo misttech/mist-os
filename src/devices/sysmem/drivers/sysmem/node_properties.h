@@ -74,6 +74,12 @@ enum class ErrorPropagationMode : uint32_t {
   kDoNotPropagate,
 };
 
+enum class ConnectionVersion {
+  kNoConnection = 0,
+  kVersion1 = 1,
+  kVersion2 = 2,
+};
+
 struct NodeFilterResult {
   bool keep_node = true;
   bool iterate_children = true;
@@ -192,6 +198,9 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
 
   void SetWeak();
   [[nodiscard]] bool is_weak() const { return is_weak_; }
+  [[nodiscard]] bool is_weak_ok_for_child_nodes_also() const {
+    return is_weak_ok_for_child_nodes_also_;
+  }
   [[nodiscard]] bool is_weak_ok_from_parent() const { return is_weak_ok_from_parent_; }
 
   void SetWeakOk(bool for_child_nodes_also);
@@ -201,9 +210,9 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   // the current NodeProperties.  For LogicalBufferCollection::root_, these counts are for the whole
   // tree.
   //
-  // TODO(https://fxbug.dev/71454): Limit node_count() of root_, but instead of failing root_ when limit
-  // reached, prune a sub-tree selected to prefer more-nested over less nested, and larger node
-  // count over smaller node count (lexicographically).
+  // TODO(https://fxbug.dev/71454): Limit node_count() of root_, but instead of failing root_ when
+  // limit reached, prune a sub-tree selected to prefer more-nested over less nested, and larger
+  // node count over smaller node count (lexicographically).
   uint32_t node_count() const;
   uint32_t connected_client_count() const;
   uint32_t buffer_collection_count() const;
@@ -222,6 +231,8 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   void LogConstraints(Location location);
 
   const char* node_type_name() const;
+
+  ConnectionVersion connection_version() const;
 
  private:
   friend class LogicalBufferCollection;
@@ -275,8 +286,8 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   // node has is_weak_ok_ true - in this case we allow sysmem(1) since a parent Node (using sysmem2)
   // has taken responsibility for paying attention to close_weak_asap, so the inability to deliver
   // close_weak_asap via sysmem(1) to this Node's client is not a problem since the parent Node's
-  // client will take care of telling this Node's client to close its VMOs when close_weak_asap
-  // ZX_EVENTPAIR_PEER_CLOSED is seen by the parent Node's client.
+  // client will take care of telling this Node's sysmem(1) client to close its VMOs when
+  // close_weak_asap ZX_EVENTPAIR_PEER_CLOSED is seen by the parent Node's sysmem2 client.
   bool is_weak_ok_from_parent_ = false;
 
   // Constraints as set by:

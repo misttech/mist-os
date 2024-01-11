@@ -39,6 +39,7 @@ class BufferCollectionTokenGroup : public Node {
   bool is_connected_type() const override;
   bool is_currently_connected() const override;
   const char* node_type_string() const override;
+  ConnectionVersion connection_version() const override;
 
   void Bind(GroupServerEnd server_end);
 

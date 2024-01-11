@@ -75,6 +75,7 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateSyncV1(
     DuplicateSyncV1Request& request, DuplicateSyncV1Completer::Sync& completer) {
   TRACE_DURATION("gfx", "BufferCollectionToken::CombinedTokenServer::DuplicateSyncV1", "this", this,
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   if (parent_.is_done_) {
     // Probably a Close() followed by DuplicateSync(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
@@ -121,6 +122,7 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateSyncV2(
     DuplicateSyncV2Request& request, DuplicateSyncV2Completer::Sync& completer) {
   TRACE_DURATION("gfx", "BufferCollectionToken::CombiendTokenServer::DuplicateSyncV2", "this", this,
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   if (parent_.is_done_) {
     // Probably a Close() followed by DuplicateSync(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
@@ -197,6 +199,7 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateV1(
     DuplicateV1Request& request, DuplicateV1Completer::Sync& completer) {
   TRACE_DURATION("gfx", "BufferCollectionToken::DuplicateV1", "this", this,
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   NodeProperties* new_node_properties;
   if (!parent_.CommonDuplicateStage1(request.rights_attenuation_mask(), completer,
                                      &new_node_properties)) {
@@ -211,6 +214,7 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateV2(
     DuplicateV2Request& request, DuplicateV2Completer::Sync& completer) {
   TRACE_DURATION("gfx", "BufferCollectionToken::DuplicateV2", "this", this,
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   if (!request.rights_attenuation_mask().has_value()) {
     parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
                      "Duplicate() requires rights_attenuation_mask set");
@@ -232,29 +236,35 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateV2(
 }
 
 void BufferCollectionToken::CombinedTokenServer::SyncV1(SyncV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SyncImpl(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SyncV2(SyncV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SyncImpl(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::DeprecatedSyncV1(
     DeprecatedSyncV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SyncImpl(completer);
 }
 
 // Clean token close without causing LogicalBufferCollection failure.
 void BufferCollectionToken::CombinedTokenServer::CloseV1(CloseV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.TokenCloseImpl(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::CloseV2(CloseV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.TokenCloseImpl(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::DeprecatedCloseV1(
     DeprecatedCloseV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.TokenCloseImpl(completer);
 }
 
@@ -287,60 +297,71 @@ std::optional<CollectionServerEnd> BufferCollectionToken::TakeBufferCollectionRe
 
 void BufferCollectionToken::CombinedTokenServer::SetNameV1(SetNameV1Request& request,
                                                            SetNameV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SetNameImplV1(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetNameV2(SetNameV2Request& request,
                                                            SetNameV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetNameImplV2(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::DeprecatedSetNameV1(
     DeprecatedSetNameV1Request& request, DeprecatedSetNameV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SetNameImplV1(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetDebugClientInfoV1(
     SetDebugClientInfoV1Request& request, SetDebugClientInfoV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SetDebugClientInfoImplV1(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetDebugClientInfoV2(
     SetDebugClientInfoV2Request& request, SetDebugClientInfoV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetDebugClientInfoImplV2(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::DeprecatedSetDebugClientInfoV1(
     DeprecatedSetDebugClientInfoV1Request& request,
     DeprecatedSetDebugClientInfoV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SetDebugClientInfoImplV1(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetDebugTimeoutLogDeadlineV1(
     SetDebugTimeoutLogDeadlineV1Request& request,
     SetDebugTimeoutLogDeadlineV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SetDebugTimeoutLogDeadlineImplV1(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetDebugTimeoutLogDeadlineV2(
     SetDebugTimeoutLogDeadlineV2Request& request,
     SetDebugTimeoutLogDeadlineV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetDebugTimeoutLogDeadlineImplV2(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::DeprecatedSetDebugTimeoutLogDeadlineV1(
     DeprecatedSetDebugTimeoutLogDeadlineV1Request& request,
     DeprecatedSetDebugTimeoutLogDeadlineV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SetDebugTimeoutLogDeadlineImplV1(request, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetDispensableV1(
     SetDispensableV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SetDispensableInternal();
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetDispensableV2(
     SetDispensableV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetDispensableInternal();
 }
 
@@ -371,6 +392,7 @@ void BufferCollectionToken::CombinedTokenServer::CreateBufferCollectionTokenGrou
     CreateBufferCollectionTokenGroupV1Completer::Sync& completer) {
   TRACE_DURATION("gfx", "BufferCollectionTokenGroup::CreateBufferCollectionTokenGroupV1", "this",
                  this, "logical_buffer_collection", &parent_.logical_buffer_collection());
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   NodeProperties* new_node_properties;
   if (!parent_.CommonCreateBufferCollectionTokenGroupStage1(completer, &new_node_properties)) {
     return;
@@ -385,6 +407,7 @@ void BufferCollectionToken::CombinedTokenServer::CreateBufferCollectionTokenGrou
     CreateBufferCollectionTokenGroupV2Completer::Sync& completer) {
   TRACE_DURATION("gfx", "BufferCollectionTokenGroup::CreateBufferCollectionTokenGroupV2", "this",
                  this, "logical_buffer_collection", &parent_.logical_buffer_collection());
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   if (!request.group_request().has_value()) {
     parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
                      "CreateBufferCollectionTokenGroup() requires group_request set");
@@ -401,21 +424,25 @@ void BufferCollectionToken::CombinedTokenServer::CreateBufferCollectionTokenGrou
 
 void BufferCollectionToken::CombinedTokenServer::SetVerboseLoggingV1(
     SetVerboseLoggingV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.SetVerboseLoggingImpl(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetVerboseLoggingV2(
     SetVerboseLoggingV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetVerboseLoggingImpl(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::GetNodeRefV1(
     GetNodeRefV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.GetNodeRefImplV1(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::GetNodeRefV2(
     GetNodeRefV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.GetNodeRefImplV2<
       GetNodeRefV2Completer::Sync,
       fuchsia_sysmem2_internal::CombinedBufferCollectionTokenGetNodeRefV2Response>(completer);
@@ -423,6 +450,7 @@ void BufferCollectionToken::CombinedTokenServer::GetNodeRefV2(
 
 void BufferCollectionToken::CombinedTokenServer::IsAlternateForV1(
     IsAlternateForV1Request& request, IsAlternateForV1Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   parent_.IsAlternateForImplV1<
       IsAlternateForV1Request, IsAlternateForV1Completer::Sync,
       fuchsia_sysmem2_internal::CombinedBufferCollectionTokenIsAlternateForV1Response>(request,
@@ -431,6 +459,7 @@ void BufferCollectionToken::CombinedTokenServer::IsAlternateForV1(
 
 void BufferCollectionToken::CombinedTokenServer::IsAlternateForV2(
     IsAlternateForV2Request& request, IsAlternateForV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.IsAlternateForImplV2<
       IsAlternateForV2Request, IsAlternateForV2Completer::Sync,
       fuchsia_sysmem2_internal::CombinedBufferCollectionTokenIsAlternateForV2Response>(request,
@@ -439,6 +468,7 @@ void BufferCollectionToken::CombinedTokenServer::IsAlternateForV2(
 
 void BufferCollectionToken::CombinedTokenServer::GetBufferCollectionIdV2(
     GetBufferCollectionIdV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.GetBufferCollectionIdImplV2<
       GetBufferCollectionIdV2Completer::Sync,
       fuchsia_sysmem2_internal::CombinedBufferCollectionTokenGetBufferCollectionIdV2Response>(
@@ -446,11 +476,13 @@ void BufferCollectionToken::CombinedTokenServer::GetBufferCollectionIdV2(
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetWeakV2(SetWeakV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetWeakImplV2(completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetWeakOkV2(
     SetWeakOkV2Request& request, SetWeakOkV2Completer::Sync& completer) {
+  parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   parent_.SetWeakOkImplV2(request, completer);
 }
 
@@ -523,5 +555,12 @@ bool BufferCollectionToken::is_connected_type() const { return true; }
 bool BufferCollectionToken::is_currently_connected() const { return server_binding_.has_value(); }
 
 const char* BufferCollectionToken::node_type_string() const { return "token"; }
+
+ConnectionVersion BufferCollectionToken::connection_version() const {
+  if (!server_binding_.has_value()) {
+    return ConnectionVersion::kNoConnection;
+  }
+  return last_seen_version_;
+}
 
 }  // namespace sysmem_driver
