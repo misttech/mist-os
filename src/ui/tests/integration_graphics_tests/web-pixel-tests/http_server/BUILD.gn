@@ -8,6 +8,7 @@ executable("http_server_bin") {
   sources = [ "http_server.cc" ]
 
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/fbl",
   ]
