@@ -8,6 +8,7 @@ fidl("fuchsia.hardware.bluetooth") {
   sources = [
     "hci.fidl",
     "host.fidl",
+    "vendor.fidl",
     "virtual.fidl",
   ]
 
