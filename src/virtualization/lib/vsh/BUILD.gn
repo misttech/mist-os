@@ -26,6 +26,7 @@ source_set("util") {
     "util.h",
   ]
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//third_party/protobuf:protobuf_lite",
     "//zircon/system/ulib/zx",

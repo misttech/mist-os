@@ -23,7 +23,10 @@ source_set("periodic_logger") {
     "periodic_logger.cc",
     "periodic_logger.h",
   ]
-  deps = [ "//src/lib/fxl" ]
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl",
+  ]
   public_deps = [ "//zircon/system/ulib/zx" ]
 }
 
@@ -34,6 +37,7 @@ source_set("backtrace_watchdog") {
     "backtrace_watchdog.h",
   ]
   deps = [
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/inspector",
     "//zircon/system/ulib/task-utils",
