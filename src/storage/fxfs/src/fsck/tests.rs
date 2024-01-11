@@ -147,7 +147,7 @@ async fn install_items_in_store<K: Key, V: Value>(
     transaction.commit().await.expect("commit failed");
 
     {
-        let mut writer = SimplePersistentLayerWriter::<Writer<'_>, K, V>::new(
+        let mut writer = SimplePersistentLayerWriter::<_, K, V>::new(
             Writer::new(&layer_handle).await,
             filesystem.block_size(),
         )
@@ -345,13 +345,12 @@ async fn test_malformed_allocation() {
         transaction.commit().await.expect("commit failed");
 
         {
-            let mut writer =
-                SimplePersistentLayerWriter::<Writer<'_>, AllocatorKey, AllocatorValue>::new(
-                    Writer::new(&layer_handle).await,
-                    fs.block_size(),
-                )
-                .await
-                .expect("writer new");
+            let mut writer = SimplePersistentLayerWriter::<_, AllocatorKey, AllocatorValue>::new(
+                Writer::new(&layer_handle).await,
+                fs.block_size(),
+            )
+            .await
+            .expect("writer new");
             // We also need a discontiguous allocation, and some blocks will have been used up by
             // other things, so allocate the very last block.  Note that changing our allocation
             // strategy might break this test.

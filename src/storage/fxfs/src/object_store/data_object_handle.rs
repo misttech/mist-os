@@ -1173,7 +1173,6 @@ impl<S: HandleOwner> ReadObjectHandle for DataObjectHandle<S> {
     }
 }
 
-#[async_trait]
 impl<S: HandleOwner> WriteObjectHandle for DataObjectHandle<S> {
     async fn write_or_append(&self, offset: Option<u64>, buf: BufferRef<'_>) -> Result<u64, Error> {
         let offset = offset.unwrap_or(self.get_size());
@@ -1240,8 +1239,8 @@ impl<'a, S: HandleOwner> DirectWriter<'a, S> {
 }
 
 impl<'a, S: HandleOwner> WriteBytes for DirectWriter<'a, S> {
-    fn handle(&self) -> &dyn WriteObjectHandle {
-        self.handle
+    fn block_size(&self) -> u64 {
+        self.handle.block_size()
     }
 
     async fn write_bytes(&mut self, mut buf: &[u8]) -> Result<(), Error> {

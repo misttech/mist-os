@@ -85,7 +85,7 @@ where
         if layers_to_keep.is_empty() {
             iter = LSMTree::<K, V>::major_iter(iter).await?;
         }
-        let block_size = writer.handle().block_size();
+        let block_size = writer.block_size();
         tree.compact_with_iterator(iter, writer, block_size).await.context("ObjectStore::flush")?;
     }
 

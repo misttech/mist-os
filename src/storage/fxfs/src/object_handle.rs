@@ -65,26 +65,29 @@ pub trait ReadObjectHandle: ObjectHandle {
     fn get_size(&self) -> u64;
 }
 
-#[async_trait]
 pub trait WriteObjectHandle: ObjectHandle {
     /// Writes |buf.len())| bytes at |offset| (or the end of the file), returning the object size
     /// after writing.
     /// The writes may be cached, in which case a later call to |flush| is necessary to persist the
     /// writes.
-    async fn write_or_append(&self, offset: Option<u64>, buf: BufferRef<'_>) -> Result<u64, Error>;
+    fn write_or_append(
+        &self,
+        offset: Option<u64>,
+        buf: BufferRef<'_>,
+    ) -> impl Future<Output = Result<u64, Error>> + Send;
 
     /// Truncates the object to |size| bytes.
     /// The truncate may be cached, in which case a later call to |flush| is necessary to persist
     /// the truncate.
-    async fn truncate(&self, size: u64) -> Result<(), Error>;
+    fn truncate(&self, size: u64) -> impl Future<Output = Result<(), Error>> + Send;
 
     /// Flushes all pending data and metadata updates for the object.
-    async fn flush(&self) -> Result<(), Error>;
+    fn flush(&self) -> impl Future<Output = Result<(), Error>> + Send;
 }
 
 /// This trait is an asynchronous streaming writer.
 pub trait WriteBytes: Sized {
-    fn handle(&self) -> &dyn WriteObjectHandle;
+    fn block_size(&self) -> u64;
 
     /// Buffers writes to be written to the underlying handle. This may flush bytes immediately
     /// or when buffers are full.

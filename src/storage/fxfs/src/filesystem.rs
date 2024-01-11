@@ -1038,7 +1038,7 @@ mod tests {
         object.write_or_append(Some(5000), buf.as_ref()).await.expect("write failed");
 
         // Truncate.
-        (&object as &dyn WriteObjectHandle).truncate(3000).await.expect("truncate failed");
+        object.truncate(3000).await.expect("truncate failed");
 
         // Delete the object.
         let mut transaction = fs

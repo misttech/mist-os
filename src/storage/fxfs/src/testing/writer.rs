@@ -10,21 +10,21 @@ use {
 
 const BUFFER_SIZE: usize = 131_072;
 
-pub struct Writer<'a> {
-    handle: &'a dyn WriteObjectHandle,
+pub struct Writer<'a, H> {
+    handle: &'a H,
     buffer: Buffer<'a>,
     offset: u64,
 }
 
-impl<'a> Writer<'a> {
-    pub async fn new(handle: &'a dyn WriteObjectHandle) -> Writer<'a> {
+impl<'a, H: WriteObjectHandle> Writer<'a, H> {
+    pub async fn new(handle: &'a H) -> Self {
         Self { handle, buffer: handle.allocate_buffer(BUFFER_SIZE).await, offset: 0 }
     }
 }
 
-impl WriteBytes for Writer<'_> {
-    fn handle(&self) -> &dyn WriteObjectHandle {
-        self.handle
+impl<H: WriteObjectHandle> WriteBytes for Writer<'_, H> {
+    fn block_size(&self) -> u64 {
+        self.handle.block_size()
     }
 
     async fn write_bytes(&mut self, mut buf: &[u8]) -> Result<(), Error> {

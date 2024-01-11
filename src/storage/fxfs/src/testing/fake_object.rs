@@ -99,7 +99,6 @@ impl ReadObjectHandle for FakeObjectHandle {
     }
 }
 
-#[async_trait]
 impl WriteObjectHandle for FakeObjectHandle {
     async fn write_or_append(&self, offset: Option<u64>, buf: BufferRef<'_>) -> Result<u64, Error> {
         self.object.write_or_append(offset, buf)
