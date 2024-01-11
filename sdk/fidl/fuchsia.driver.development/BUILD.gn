@@ -5,9 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.driver.development") {
+  sdk_category = "partner"
   sources = [
     "development.fidl",
     "iterators.fidl",
+    "overview.fidl",
     "types.fidl",
   ]
   public_deps = [
