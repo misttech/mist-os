@@ -86,3 +86,12 @@ go_library(
     ],
     importpath = "github.com/google/go-cmp/cmp/internal/value",
 )
+
+go_library(
+    name = "github.com/google/subcommands",
+    srcs = [
+        "vendor/github.com/google/subcommands/subcommands.go",
+    ],
+    importpath = "github.com/google/subcommands",
+    visibility = ["//visibility:public"],
+)
