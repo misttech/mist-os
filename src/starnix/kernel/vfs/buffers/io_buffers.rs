@@ -258,13 +258,24 @@ pub trait InputBuffer: Buffer {
 
     /// Peek all the remaining content in this buffer and returns it as a `Vec`.
     fn peek_all(&mut self) -> Result<Vec<u8>, Errno> {
-        let mut result = vec![];
-        result.reserve(self.available());
-        self.peek_each(&mut |data| {
-            result.extend_from_slice(data);
-            Ok(data.len())
-        })?;
-        Ok(result)
+        // SAFETY: self.peek returns the number of bytes read.
+        unsafe { read_to_vec(self.available(), |buf| self.peek(buf)) }
+    }
+
+    /// Peeks the content of this buffer into `buffer`.
+    /// If `buffer` is too small, the read will be partial.
+    /// If `buffer` is too large, the remaining bytes will be left untouched.
+    ///
+    /// Returns the number of bytes read from this buffer.
+    fn peek(&mut self, buffer: &mut [MaybeUninit<u8>]) -> Result<usize, Errno> {
+        let mut index = 0;
+        self.peek_each(&mut move |data| {
+            let data = slice_to_maybe_uninit(data);
+            let size = std::cmp::min(buffer.len() - index, data.len());
+            buffer[index..index + size].clone_from_slice(&data[..size]);
+            index += size;
+            Ok(size)
+        })
     }
 
     /// Write the content of this buffer into `buffer`.
@@ -273,15 +284,9 @@ pub trait InputBuffer: Buffer {
     ///
     /// Returns the number of bytes read from this buffer.
     fn read(&mut self, buffer: &mut [MaybeUninit<u8>]) -> Result<usize, Errno> {
-        let mut index = 0;
-        self.read_each(&mut move |data: &[u8]| {
-            let data = slice_to_maybe_uninit(data);
-
-            let size = std::cmp::min(buffer.len() - index, data.len());
-            buffer[index..index + size].clone_from_slice(&data[0..size]);
-            index += size;
-            Ok(size)
-        })
+        let length = self.peek(buffer)?;
+        self.advance(length)?;
+        Ok(length)
     }
 
     /// Read the exact number of bytes required to fill buf.
@@ -378,6 +383,36 @@ impl<'a, const USE_VMO: bool> UserBuffersOutputBuffer<'a, USE_VMO> {
         buffers.reverse();
         Ok(Self { mm, buffers, available, bytes_written: 0 })
     }
+
+    fn write_each_inner<B: AsRef<[u8]>, F: FnMut(usize) -> Result<B, Errno>>(
+        &mut self,
+        mut callback: F,
+    ) -> Result<usize, Errno> {
+        let mut bytes_written = 0;
+        while let Some(mut buffer) = self.buffers.pop() {
+            if buffer.is_null() {
+                continue;
+            }
+
+            let bytes = callback(buffer.length)?;
+            let bytes = bytes.as_ref();
+
+            bytes_written += if USE_VMO {
+                self.mm.vmo_write_memory(buffer.address, bytes)
+            } else {
+                self.mm.write_memory(buffer.address, bytes)
+            }?;
+            let bytes_len = bytes.len();
+            buffer.advance(bytes_len)?;
+            self.available -= bytes_len;
+            self.bytes_written += bytes_len;
+            if !buffer.is_empty() {
+                self.buffers.push(buffer);
+                break;
+            }
+        }
+        Ok(bytes_written)
+    }
 }
 
 impl<'a> UserBuffersOutputBuffer<'a> {
@@ -424,37 +459,28 @@ impl<'a, const USE_VMO: bool> Buffer for UserBuffersOutputBuffer<'a, USE_VMO> {
 }
 
 impl<'a, const USE_VMO: bool> OutputBuffer for UserBuffersOutputBuffer<'a, USE_VMO> {
+    fn write(&mut self, mut bytes: &[u8]) -> Result<usize, Errno> {
+        self.write_each_inner(|buflen| {
+            let bytes_len = std::cmp::min(bytes.len(), buflen);
+            let (to_write, remaining) = bytes.split_at(bytes_len);
+            bytes = remaining;
+            Ok(to_write)
+        })
+    }
+
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
-        let mut bytes_written = 0;
-        while let Some(mut buffer) = self.buffers.pop() {
-            if buffer.is_null() {
-                continue;
-            }
+        self.write_each_inner(|buflen| {
             // SAFETY: `callback` returns the number of bytes read on success.
-            let bytes = unsafe {
-                read_to_vec(buffer.length, |buf| {
+            unsafe {
+                read_to_vec(buflen, |buf| {
                     let result = callback(buf)?;
-                    if result > buffer.length {
+                    if result > buflen {
                         return error!(EINVAL);
                     }
                     Ok(result)
                 })
-            }?;
-            bytes_written += if USE_VMO {
-                self.mm.vmo_write_memory(buffer.address, &bytes)
-            } else {
-                self.mm.write_memory(buffer.address, &bytes)
-            }?;
-            let bytes_len = bytes.len();
-            buffer.advance(bytes_len)?;
-            self.available -= bytes_len;
-            self.bytes_written += bytes_len;
-            if !buffer.is_empty() {
-                self.buffers.push(buffer);
-                break;
             }
-        }
-        Ok(bytes_written)
+        })
     }
 
     fn available(&self) -> usize {
@@ -543,6 +569,28 @@ impl<'a, const USE_VMO: bool> UserBuffersInputBuffer<'a, USE_VMO> {
         buffers.reverse();
         Ok(Self { mm, buffers, available, bytes_read: 0 })
     }
+
+    fn peek_each_inner<F: FnMut(&UserBuffer, usize) -> Result<usize, Errno>>(
+        &mut self,
+        mut callback: F,
+    ) -> Result<usize, Errno> {
+        let mut read = 0;
+        for buffer in self.buffers.iter().rev() {
+            if buffer.is_null() {
+                continue;
+            }
+
+            let result = callback(buffer, read)?;
+            if result > buffer.length {
+                return error!(EINVAL);
+            }
+            read += result;
+            if result != buffer.length {
+                break;
+            }
+        }
+        Ok(read)
+    }
 }
 
 impl<'a> UserBuffersInputBuffer<'a> {
@@ -589,27 +637,30 @@ impl<'a, const USE_VMO: bool> Buffer for UserBuffersInputBuffer<'a, USE_VMO> {
 }
 
 impl<'a, const USE_VMO: bool> InputBuffer for UserBuffersInputBuffer<'a, USE_VMO> {
+    fn peek(&mut self, uninit_bytes: &mut [MaybeUninit<u8>]) -> Result<usize, Errno> {
+        self.peek_each_inner(|buffer, read_so_far| {
+            let read_to = &mut uninit_bytes[read_so_far..];
+            let read_count = std::cmp::min(buffer.length, read_to.len());
+            let read_to = &mut read_to[..read_count];
+            let read_bytes = if USE_VMO {
+                self.mm.vmo_read_memory(buffer.address, read_to)
+            } else {
+                self.mm.read_memory(buffer.address, read_to)
+            }?;
+            debug_assert_eq!(read_bytes.len(), read_count);
+            Ok(read_count)
+        })
+    }
+
     fn peek_each(&mut self, callback: &mut InputBufferCallback<'_>) -> Result<usize, Errno> {
-        let mut read = 0;
-        for buffer in self.buffers.iter().rev() {
-            if buffer.is_null() {
-                continue;
-            }
+        self.peek_each_inner(|buffer, _read_so_far| {
             let bytes = if USE_VMO {
                 self.mm.vmo_read_memory_to_vec(buffer.address, buffer.length)
             } else {
                 self.mm.read_memory_to_vec(buffer.address, buffer.length)
             }?;
-            let result = callback(&bytes)?;
-            if result > buffer.length {
-                return error!(EINVAL);
-            }
-            read += result;
-            if result != buffer.length {
-                break;
-            }
-        }
-        Ok(read)
+            callback(&bytes)
+        })
     }
 
     fn drain(&mut self) -> usize {
