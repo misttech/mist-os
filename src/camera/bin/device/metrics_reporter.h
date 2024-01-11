@@ -6,7 +6,8 @@
 #define SRC_CAMERA_BIN_DEVICE_METRICS_REPORTER_H_
 
 #include <fuchsia/camera3/cpp/fidl.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
+#include <lib/sys/cpp/component_context.h>
 
 #include <mutex>
 
@@ -46,7 +47,7 @@ class MetricsReporter {
   // Get a reference to the inspector object.
   const inspect::Inspector& inspector() FXL_LOCKS_EXCLUDED(mutex_) {
     std::lock_guard<std::mutex> lock(mutex_);
-    return *impl_->inspector_->inspector();
+    return impl_->inspector_->inspector();
   }
 
   // Creates a ConfigurationRecord object that collects metrics from each device configurations.
@@ -82,7 +83,7 @@ class MetricsReporter {
 
   struct Impl {
     sys::ComponentContext& context_;
-    std::unique_ptr<sys::ComponentInspector> inspector_;
+    std::unique_ptr<inspect::ComponentInspector> inspector_;
 
     inspect::Node node_;
 

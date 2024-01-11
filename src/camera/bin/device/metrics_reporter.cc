@@ -4,6 +4,7 @@
 #include "src/camera/bin/device/metrics_reporter.h"
 
 #include <lib/async/default.h>
+#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
@@ -174,7 +175,8 @@ MetricsReporter::MetricsReporter(sys::ComponentContext& context, bool enable_cob
 
 void MetricsReporter::InitInspector() {
   // Initializes the inspector and creates the configuration node.
-  impl_->inspector_ = std::make_unique<sys::ComponentInspector>(&impl_->context_);
+  impl_->inspector_ = std::make_unique<inspect::ComponentInspector>(async_get_default_dispatcher(),
+                                                                    inspect::PublishOptions{});
   impl_->node_ = impl_->inspector_->root().CreateChild(kConfigurationInspectorNodeName);
 }
 

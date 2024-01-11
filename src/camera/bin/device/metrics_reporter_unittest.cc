@@ -4,6 +4,7 @@
 #include "src/camera/bin/device/metrics_reporter.h"
 
 #include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
 #include <gtest/gtest.h>
