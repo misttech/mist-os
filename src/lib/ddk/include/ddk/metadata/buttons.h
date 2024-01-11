@@ -20,7 +20,8 @@
 #define BUTTONS_ID_CAM_MUTE              0x07
 #define BUTTONS_ID_MIC_AND_CAM_MUTE      0x08
 #define BUTTONS_ID_FUNCTION              0x09
-#define BUTTONS_ID_MAX                   0x10
+#define BUTTONS_ID_POWER                 0x0a
+#define BUTTONS_ID_MAX                   0x0b
 
 #define BUTTONS_TYPE_DIRECT              0x00
 #define BUTTONS_TYPE_MATRIX              0x01

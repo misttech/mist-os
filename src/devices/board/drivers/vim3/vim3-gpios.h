@@ -43,6 +43,8 @@
 
 #define VIM3_TOUCH_PANEL_INTERRUPT A311D_GPIOA(5)
 
+#define VIM3_POWER_BUTTON A311D_GPIOAO(7)
+
 // USB Power Enable for USB 2.0 and USB 3.0 ports
 #define VIM3_USB_PWR A311D_GPIOA(6)
 

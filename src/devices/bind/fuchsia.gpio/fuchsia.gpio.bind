@@ -42,4 +42,5 @@ enum FUNCTION {
    VOLUME_DOWN,
    VOLUME_UP,
    VDIG_ENABLE,
+   POWER,
 };

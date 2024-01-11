@@ -95,11 +95,13 @@ static_assert(fidl::ToUnderlying(fuchsia_input_report::wire::ConsumerControlButt
 static_assert(fidl::ToUnderlying(fuchsia_input_report::wire::ConsumerControlButton::kReboot) == 6);
 static_assert(
     fidl::ToUnderlying(fuchsia_input_report::wire::ConsumerControlButton::kCameraDisable) == 7);
+static_assert(fidl::ToUnderlying(fuchsia_input_report::wire::ConsumerControlButton::kFunction) ==
+              8);
+static_assert(fidl::ToUnderlying(fuchsia_input_report::wire::ConsumerControlButton::kPower) == 9);
 // These strings must be ordered based on the enums in fuchsia.input.report/consumer_control.fidl.
 const char* const kConsumerControlButtonStrings[] = {
-    "ERROR",         "VOLUME_UP", "VOLUME_DOWN", "PAUSE",
-    "FACTORY_RESET", "MIC_MUTE",  "REBOOT",      "CAMERA_DISABLE",
-};
+    "ERROR",    "VOLUME_UP", "VOLUME_DOWN",    "PAUSE",    "FACTORY_RESET",
+    "MIC_MUTE", "REBOOT",    "CAMERA_DISABLE", "FUNCTION", "POWER"};
 
 class Printer {
  public:

@@ -12,7 +12,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/pt/astro/post-init/post-init",
       "sys/platform/05:03:1/aml-gpio",
       "sys/platform/05:03:1/aml-gpio/gpio-init",
-      "sys/platform/05:03:1/aml-gpio/gpio-2/astro-buttons/hid-buttons",
+      "sys/platform/00:00:13/astro-buttons/hid-buttons",
       "sys/platform/05:00:2/i2c-0/aml-i2c",
       "sys/platform/05:00:2:1/i2c-1/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c",

@@ -42,6 +42,10 @@ void HidButtonsDevice::ButtonsInputReport::ToFidlInputReport(
     }
 
     switch (id) {
+      case BUTTONS_ID_POWER:
+        buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kPower;
+        count++;
+        break;
       case BUTTONS_ID_VOLUME_UP:
         buttons_rpt[count] = fuchsia_input_report::ConsumerControlButton::kVolumeUp;
         count++;
@@ -231,7 +235,8 @@ void HidButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
       fuchsia_input_report::ConsumerControlButton::kVolumeDown,
       fuchsia_input_report::ConsumerControlButton::kFactoryReset,
       fuchsia_input_report::ConsumerControlButton::kCameraDisable,
-      fuchsia_input_report::ConsumerControlButton::kMicMute};
+      fuchsia_input_report::ConsumerControlButton::kMicMute,
+      fuchsia_input_report::ConsumerControlButton::kPower};
 
   const auto input = fuchsia_input_report::wire::ConsumerControlInputDescriptor::Builder(arena)
                          .buttons(buttons)
@@ -666,6 +671,9 @@ static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
         break;
       case BUTTONS_ID_CAM_MUTE:
         name = "cam-mute";
+        break;
+      case BUTTONS_ID_POWER:
+        name = "power";
         break;
       default:
         return ZX_ERR_NOT_SUPPORTED;

@@ -34,6 +34,10 @@ type ConsumerControlButton = flexible enum : uint32 {
     /// This button represents a function.
     @available(added=HEAD)
     FUNCTION = 8;
+
+    /// This button represents a power button.
+    @available(added=HEAD)
+    POWER = 9;
 };
 
 /// Describes the format of the input report that will be sent from the
