@@ -21,19 +21,16 @@ pub enum ParseEpochError {
 }
 
 pub(crate) async fn epoch(proxy: &fio::DirectoryProxy) -> Result<Option<u64>, ParseEpochError> {
-    // Open the epoch.json file.
-    let fopen_res =
-        fuchsia_fs::directory::open_file(proxy, "epoch.json", fio::OpenFlags::RIGHT_READABLE).await;
-    if let Err(fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND)) = fopen_res {
-        return Ok(None);
-    }
-
-    // Read the epoch.json file.
-    let contents = fuchsia_fs::file::read_to_string(&fopen_res.map_err(ParseEpochError::OpenFile)?)
-        .await
-        .map_err(ParseEpochError::ReadFile)?;
-
-    // Parse the json string to extract the epoch.
+    let file =
+        match fuchsia_fs::directory::open_file(proxy, "epoch.json", fio::OpenFlags::RIGHT_READABLE)
+            .await
+        {
+            Ok(file) => file,
+            Err(fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND)) => return Ok(None),
+            Err(e) => return Err(ParseEpochError::OpenFile(e)),
+        };
+    let contents =
+        fuchsia_fs::file::read_to_string(&file).await.map_err(ParseEpochError::ReadFile)?;
     match serde_json::from_str(&contents).map_err(|e| ParseEpochError::Deserialize(contents, e))? {
         EpochFile::Version1 { epoch } => Ok(Some(epoch)),
     }
@@ -42,21 +39,13 @@ pub(crate) async fn epoch(proxy: &fio::DirectoryProxy) -> Result<Option<u64>, Pa
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::TestUpdatePackage, assert_matches::assert_matches,
-        fuchsia_async as fasync, serde_json::json,
+        super::*, crate::TestUpdatePackage, assert_matches::assert_matches, fuchsia_async as fasync,
     };
 
     #[fasync::run_singlethreaded(test)]
     async fn parse_epoch_success() {
         let p = TestUpdatePackage::new()
-            .add_file(
-                "epoch.json",
-                json!({
-                    "version": "1",
-                    "epoch": 3
-                })
-                .to_string(),
-            )
+            .add_file("epoch.json", serde_json::to_vec(&EpochFile::Version1 { epoch: 3 }).unwrap())
             .await;
         assert_matches!(p.epoch().await, Ok(Some(3)));
     }

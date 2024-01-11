@@ -28,6 +28,7 @@ rustc_library("fuchsia-pkg-testing") {
     "//src/storage/lib/delivery_blob",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/blobfs",
+    "//src/sys/pkg/lib/epoch",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-merkle",

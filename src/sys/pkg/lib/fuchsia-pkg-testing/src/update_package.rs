@@ -94,11 +94,7 @@ pub const SOURCE_EPOCH: u64 = 1;
 
 /// Provided an epoch, constructs an `epoch.json` and returns the JSON as a string.
 pub fn make_epoch_json(epoch: u64) -> String {
-    json!({
-        "version": "1",
-        "epoch": epoch
-    })
-    .to_string()
+    serde_json::to_string(&epoch::EpochFile::Version1 { epoch }).unwrap()
 }
 
 /// Constructs an `epoch.json` with the current epoch and returns the JSON as a string.
