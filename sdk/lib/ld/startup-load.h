@@ -140,7 +140,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   // into the link_map list before the next Load call allocates the next one.
   template <class Allocator, class File>
   [[nodiscard]] StartupLoadResult Load(Diagnostics& diag, Allocator& allocator, File&& file,
-                                       uint32_t symbolizer_modid, Elf::size_type& max_tls_modid) {
+                                       uint32_t symbolizer_modid, size_type& max_tls_modid) {
     // Diagnostics sent to diag during loading will be prefixed with the module
     // name, unless the name is empty as it is for the main executable.
     ModuleDiagnostics module_diag(diag, this->name().str());
@@ -235,7 +235,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   }
 
   // Returns number of DT_NEEDED entries. See StartupLoadResult, for why that is useful.
-  size_t DecodeDynamic(Diagnostics& diag, const std::optional<typename Elf::Phdr>& dyn_phdr) {
+  size_t DecodeDynamic(Diagnostics& diag, const std::optional<Phdr>& dyn_phdr) {
     using NeededObserver = elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>;
     size_t count = 0;
     // Save the span of Dyn entries for LoadDeps to scan later.
@@ -276,7 +276,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
         MakePreloadedList(diag, scratch, preloaded_module_list, loader_args...);
 
     // This will be incremented by each Load() of a module that has a PT_TLS.
-    Elf::size_type max_tls_modid = main_executable->tls_module_id();
+    size_type max_tls_modid = main_executable->tls_module_id();
 
     LoadDeps(diag, scratch, initial_exec, modules, preloaded_modules, executable_needed_count,
              std::forward<GetDepFile>(get_dep_file), max_tls_modid, loader_args...);
@@ -336,8 +336,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
     if (auto found = std::find(preloaded_modules.begin(), preloaded_modules.end(), soname);
         found != preloaded_modules.end()) {
-      // TODO(https://fxbug.dev/130483): Mark this preloaded_module as having it's symbols visible to
-      // the program.
+      // TODO(https://fxbug.dev/130483): Mark this preloaded_module as having it's symbols visible
+      // to the program.
       modules.push_back(preloaded_modules.erase(found));
       return true;
     }
@@ -367,8 +367,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
             typename... LoaderArgs>
   static void LoadDeps(Diagnostics& diag, ScratchAllocator& scratch,
                        InitialExecAllocator& initial_exec, List& modules, List& preloaded_modules,
-                       size_t needed_count, GetDepFile&& get_dep_file,
-                       Elf::size_type& max_tls_modid, LoaderArgs&&... loader_args) {
+                       size_t needed_count, GetDepFile&& get_dep_file, size_type& max_tls_modid,
+                       LoaderArgs&&... loader_args) {
     // Note, this assumes that ModuleList iterators are not invalidated after
     // push_back(), done by `EnqueueDeps`. This is true of lists and
     // StaticVector. No assumptions are made on the validity of the end()
@@ -450,7 +450,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   // passive ABI's array.
   template <typename InitialExecAllocator>
   static void PopulateAbiTls(Diagnostics& diag, InitialExecAllocator& initial_exec_allocator,
-                             List& modules, Elf::size_type max_tls_modid) {
+                             List& modules, size_type max_tls_modid) {
     if (max_tls_modid > 0) {
       auto new_array = [&diag, &initial_exec_allocator, max_tls_modid](auto& result) {
         using T = typename std::decay_t<decltype(result.front())>;
