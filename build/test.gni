@@ -103,12 +103,6 @@ template("test") {
           },
         ]
 
-        test_component_manifest_cml = [
-          {
-            include = [ "//sdk/lib/syslog/use.shard.cml" ]
-          },
-        ]
-
         test_component_manifest_program_barrier = []
       }
     }

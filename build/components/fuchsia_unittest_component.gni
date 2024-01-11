@@ -109,6 +109,13 @@ template("fuchsia_unittest_component") {
       generated_target = "${target_name}_generated_manifest"
       fuchsia_test_component_manifest(generated_target) {
         forward_variables_from(invoker, [ "deps" ])
+        metadata = {
+          test_component_manifest_cml = [
+            {
+              include = [ "//sdk/lib/syslog/use.shard.cml" ]
+            },
+          ]
+        }
         visibility = [ ":*" ]
       }
       manifest = get_target_outputs(":$generated_target")
