@@ -11,7 +11,7 @@ use {
             resolve::sandbox_construction::{
                 build_component_sandbox, extend_dict_with_offers, CapabilitySourceFactory,
             },
-            shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
+            shutdown, start, ActionSet, DestroyAction, DiscoverAction, ResolveAction,
             ShutdownAction, ShutdownType, StartAction, StopAction, UnresolveAction,
         },
         context::ModelContext,
@@ -633,11 +633,7 @@ impl ComponentInstance {
                 return Err(DestroyActionError::InstanceNotFound { moniker });
             }
         };
-        ActionSet::register(
-            self.clone(),
-            DestroyChildAction::new(child_moniker.clone(), incarnation),
-        )
-        .await
+        self.destroy_child(child_moniker.clone(), incarnation).await
     }
 
     /// Stops this component.
@@ -778,16 +774,13 @@ impl ComponentInstance {
         };
         if let Some(coll) = child_moniker.collection() {
             if single_run_colls.contains(coll) {
-                let component = self.clone();
+                let self_clone = self.clone();
                 let child_moniker = child_moniker.clone();
                 fasync::Task::spawn(async move {
-                    if let Err(error) = ActionSet::register(
-                        component.clone(),
-                        DestroyChildAction::new(child_moniker.clone(), incarnation),
-                    )
-                    .await
+                    if let Err(error) =
+                        self_clone.destroy_child(child_moniker.clone(), incarnation).await
                     {
-                        let moniker = component.moniker.child(child_moniker);
+                        let moniker = self_clone.moniker.child(child_moniker);
                         warn!(
                             %moniker,
                             %error,
@@ -859,11 +852,49 @@ impl ComponentInstance {
         // Destroy all children that belong to a collection.
         for (m, id) in moniker_incarnations {
             if m.collection().is_some() {
-                let nf = ActionSet::register(self.clone(), DestroyChildAction::new(m, id));
+                let nf = self.destroy_child(m, id);
                 futures.push(nf);
             }
         }
         join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))
+    }
+
+    pub async fn destroy_child(
+        self: &Arc<Self>,
+        moniker: ChildName,
+        incarnation: IncarnationId,
+    ) -> Result<(), DestroyActionError> {
+        // The child may not exist or may already be deleted by a previous DeleteChild action.
+        let child = {
+            let state = self.lock_state().await;
+            match *state {
+                InstanceState::Resolved(ref s) => {
+                    let child = s.get_child(&moniker).map(|r| r.clone());
+                    child
+                }
+                InstanceState::Destroyed => None,
+                InstanceState::New | InstanceState::Unresolved(_) => {
+                    panic!("DestroyChild: target is not resolved");
+                }
+            }
+        };
+
+        let Some(child) = child else { return Ok(()) };
+
+        if child.incarnation_id() != incarnation {
+            // The instance of the child we pulled from our live children does not match the
+            // instance of the child we were asked to delete. This is possible if destroy_child
+            // was called twice for the same child, and after the first call a child with the
+            // same name was recreated.
+            //
+            // If there's already a live child with a different instance than what we were
+            // asked to destroy, then surely the instance we wanted to destroy is long gone,
+            // and we can safely return without doing any work.
+            return Ok(());
+        }
+
+        // Wait for the child component to be destroyed
+        ActionSet::register(child.clone(), DestroyAction::new()).await
     }
 
     /// Opens an object referenced by `path` from the outgoing directory of the component.
@@ -2754,12 +2785,10 @@ pub mod tests {
         }
 
         // Destroy `coll_1:b`. It should not be listed. The dynamic offer should be deleted.
-        ActionSet::register(
-            root_component.clone(),
-            DestroyChildAction::new("coll_1:b".try_into().unwrap(), 2),
-        )
-        .await
-        .expect("destroy failed");
+        root_component
+            .destroy_child("coll_1:b".try_into().unwrap(), 2)
+            .await
+            .expect("destroy failed");
 
         {
             let root_resolved = root_component.lock_resolved_state().await.expect("resolving");

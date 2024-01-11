@@ -198,7 +198,6 @@ rustc_binary("bin") {
     "src/inspect_sink_provider.rs",
     "src/main.rs",
     "src/model/actions/destroy.rs",
-    "src/model/actions/destroy_child.rs",
     "src/model/actions/discover.rs",
     "src/model/actions/mod.rs",
     "src/model/actions/resolve/mod.rs",

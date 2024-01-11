@@ -16,7 +16,7 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction, ShutdownType},
+            actions::{ActionSet, DestroyAction, ShutdownAction, ShutdownType},
             component::StartReason,
             error::{
                 ModelError, ResolveActionError, RouteAndOpenCapabilityError, StartActionError,
@@ -1214,9 +1214,7 @@ async fn destroying_instance_kills_framework_service_task() {
 
     // Destroy `b`. This should cause the task hosted for `Realm` to be cancelled.
     let root = test.model.find_and_maybe_resolve(&Moniker::root()).await.unwrap();
-    ActionSet::register(root.clone(), DestroyChildAction::new("b".try_into().unwrap(), 0))
-        .await
-        .expect("destroy failed");
+    root.destroy_child("b".try_into().unwrap(), 0).await.expect("destroy failed");
     let mut event_stream = proxy.take_event_stream();
     assert_matches!(event_stream.next().await, None);
 }
@@ -1333,10 +1331,11 @@ async fn destroying_instance_blocks_on_routing() {
 
     // Destroy `b`.
     let root = test.model.find_and_maybe_resolve(&Moniker::root()).await.unwrap();
-    let mut actions = root.lock_actions().await;
+    let root_clone = root.clone();
     let destroy_nf =
-        actions.register_no_wait(&root, DestroyChildAction::new("b".try_into().unwrap(), 0));
-    drop(actions);
+        fasync::Task::spawn(
+            async move { root_clone.destroy_child("b".try_into().unwrap(), 0).await },
+        );
 
     // Give the destroy action some time to complete. Sleeping is not an ideal testing strategy,
     // but it helps add confidence to the test because it makes it more likely the test would

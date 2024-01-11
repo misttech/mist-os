@@ -52,7 +52,6 @@
 //!   complete.
 
 mod destroy;
-mod destroy_child;
 mod discover;
 pub mod resolve;
 pub mod shutdown;
@@ -62,21 +61,14 @@ mod unresolve;
 
 // Re-export the actions
 pub use {
-    destroy_child::DestroyChildAction, discover::DiscoverAction, resolve::ResolveAction,
+    destroy::DestroyAction, discover::DiscoverAction, resolve::ResolveAction,
     shutdown::ShutdownAction, shutdown::ShutdownType, start::StartAction, stop::StopAction,
     unresolve::UnresolveAction,
 };
 
-// Limit visibility of internal actions
-#[cfg(test)]
-pub use destroy::DestroyAction;
-#[cfg(not(test))]
-pub(self) use destroy::DestroyAction;
-
 use {
     crate::model::{component::ComponentInstance, error::StopActionError},
     async_trait::async_trait,
-    cm_moniker::IncarnationId,
     fuchsia_async as fasync,
     futures::{
         channel::oneshot,
@@ -84,7 +76,6 @@ use {
         task::{Context, Poll},
         Future,
     },
-    moniker::ChildName,
     std::any::Any,
     std::collections::HashMap,
     std::fmt::Debug,
@@ -113,7 +104,6 @@ pub enum ActionKey {
     Start,
     Stop,
     Shutdown,
-    DestroyChild(ChildName, IncarnationId),
     Destroy,
 }
 
