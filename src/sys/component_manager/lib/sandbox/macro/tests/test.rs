@@ -32,6 +32,8 @@ impl From<StringCapability> for fsandbox::Capability {
 
 /// A capability that holds an integer.
 #[derive(Capability, Clone, Debug)]
+// Tuple member is never used
+#[allow(dead_code)]
 struct IntCapability(pub i64);
 
 impl Capability for IntCapability {}
