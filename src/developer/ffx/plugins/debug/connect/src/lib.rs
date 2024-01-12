@@ -83,13 +83,7 @@ async fn connect_tool_impl(
     launcher_proxy: fdebugger::LauncherProxy,
 ) -> Result<()> {
     let socket = choose_debug_agent(&launcher_proxy).await?.map_or_else(
-        || {
-            if !&cmd.agent_only {
-                // zxdb_e2e_tests depend on the socket path output below.
-                println!("Launching new DebugAgent");
-            }
-            DebugAgentSocket::create(DebuggerProxy::LauncherProxy(launcher_proxy))
-        },
+        || DebugAgentSocket::create(DebuggerProxy::LauncherProxy(launcher_proxy)),
         |agent| {
             println!("Connecting to {}", agent.name);
             DebugAgentSocket::create(DebuggerProxy::DebugAgentProxy(agent.debug_agent_proxy))
