@@ -19,6 +19,7 @@ namespace zxdb {
 namespace {
 
 constexpr int kUnixSwitch = 1;
+constexpr int kQuietSwitch = 2;
 
 const char kConnectShortHelp[] = R"(connect: Connect to a remote system for debugging.)";
 const char kConnectHelp[] =
@@ -41,6 +42,10 @@ Options
   -u
       Attempt to connect to a unix socket. In this case <host> is a filesystem
       path.
+
+  --quiet
+  -q
+      Produce less information console output.
 
 Examples
 
@@ -89,6 +94,8 @@ void RunVerbConnect(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
         Err("connect: Already connected to the debugged system. Type \"status\" for more."));
   }
 
+  const bool quiet = cmd.HasSwitch(kQuietSwitch);
+
   if (cmd.HasSwitch(kUnixSwitch)) {
     connection_info.type = SessionConnectionType::kUnix;
     if (cmd.args().size() == 1) {
@@ -121,25 +128,31 @@ void RunVerbConnect(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context)
     }
   }
 
-  console_context->session()->Connect(connection_info, [cmd_context](const Err& err) mutable {
-    if (err.has_error()) {
-      // Don't display error message if they canceled the connection.
-      if (err.type() != ErrType::kCanceled)
-        DisplayConnectionFailed(cmd_context.get(), err);
-    } else {
-      cmd_context->Output("Connected successfully.\n");
-    }
-  });
-  cmd_context->Output("Connecting (use \"disconnect\" to cancel)...\n");
+  console_context->session()->Connect(connection_info,
+                                      [cmd_context, quiet](const Err& err) mutable {
+                                        if (err.has_error()) {
+                                          // Don't display error message if they canceled the
+                                          // connection.
+                                          if (err.type() != ErrType::kCanceled)
+                                            DisplayConnectionFailed(cmd_context.get(), err);
+                                        } else {
+                                          if (!quiet)
+                                            cmd_context->Output("Connected successfully.\n");
+                                        }
+                                      });
+  if (!quiet)
+    cmd_context->Output("Connecting (use \"disconnect\" to cancel)...\n");
 }
 
 }  // namespace
 
 VerbRecord GetConnectVerbRecord() {
   SwitchRecord unix_switch(kUnixSwitch, false, "unix-socket", 'u');
+  SwitchRecord quiet_switch(kQuietSwitch, false, "quiet", 'q');
   VerbRecord connect_record = VerbRecord(&RunVerbConnect, {"connect"}, kConnectShortHelp,
                                          kConnectHelp, CommandGroup::kGeneral);
   connect_record.switches.push_back(unix_switch);
+  connect_record.switches.push_back(quiet_switch);
   return connect_record;
 }
 

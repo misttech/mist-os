@@ -55,7 +55,7 @@ Err SetupActions(const CommandLineOptions& options, std::vector<std::string>* ac
     actions->push_back(VerbToString(Verb::kConnect) + " " + *options.connect);
 
   if (options.unix_connect)
-    actions->push_back(VerbToString(Verb::kConnect) + " -u " + *options.unix_connect);
+    actions->push_back(VerbToString(Verb::kConnect) + " -q -u " + *options.unix_connect);
 
   for (const auto& script_file : options.script_files) {
     ErrOr<std::vector<std::string>> cmds_or = ReadCommandsFromFile(script_file);
