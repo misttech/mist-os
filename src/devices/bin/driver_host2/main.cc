@@ -8,7 +8,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/env.h>
-#include <lib/inspect/service/cpp/service.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
@@ -23,10 +23,6 @@
 namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf
-
-namespace fi = fuchsia::inspect;
-
-constexpr char kDiagnosticsDir[] = "diagnostics";
 
 int main(int argc, char** argv) {
   fuchsia_logging::SetTags({"driver_host2", "driver"});
@@ -55,34 +51,9 @@ int main(int argc, char** argv) {
   }
 
   // Setup inspect.
-  inspect::Inspector inspector;
-  if (!inspector) {
-    FX_SLOG(ERROR, "Failed to allocate VMO for inspector");
-    return ZX_ERR_NO_MEMORY;
-  }
-  auto tree_handler = inspect::MakeTreeHandler(&inspector, loop.dispatcher());
-  auto tree_service = std::make_unique<vfs::Service>(std::move(tree_handler));
-  vfs::PseudoDir diagnostics_dir;
-  status = diagnostics_dir.AddEntry(fi::Tree::Name_, std::move(tree_service));
-  if (status != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to add directory entry", FX_KV("name", fi::Tree::Name_),
-            FX_KV("status_str", zx_status_get_string(status)));
-    return status;
-  }
+  inspect::ComponentInspector inspector(loop.dispatcher(), {});
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  diagnostics_dir.Serve(
-      fuchsia::io::OpenFlags::RIGHT_WRITABLE | fuchsia::io::OpenFlags::RIGHT_READABLE |
-          fuchsia::io::OpenFlags::RIGHT_EXECUTABLE | fuchsia::io::OpenFlags::DIRECTORY,
-      endpoints->server.TakeChannel(), loop.dispatcher());
-  zx::result<> status_result = outgoing.AddDirectory(std::move(endpoints->client), kDiagnosticsDir);
-  if (status_result.is_error()) {
-    FX_SLOG(ERROR, "Failed to add directory entry", FX_KV("name", kDiagnosticsDir),
-            FX_KV("status_str", status_result.status_string()));
-    return status_result.status_value();
-  }
-
-  dfv2::DriverHost driver_host(inspector, loop);
+  dfv2::DriverHost driver_host(inspector.inspector(), loop);
   auto init = driver_host.PublishDriverHost(outgoing);
   if (init.is_error()) {
     return init.error_value();
