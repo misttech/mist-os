@@ -14,10 +14,7 @@ ffx_subtool_fidl_allowlist = [
 
   # ffx driver
   "//sdk/fidl/fuchsia.device:fuchsia.device",
-  "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development",
-  "//sdk/fidl/fuchsia.driver.legacy:fuchsia.driver.legacy",
   "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground",
-  "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar",
 
   # used by ffx debug
   "//sdk/fidl/fuchsia.exception:fuchsia.exception",
