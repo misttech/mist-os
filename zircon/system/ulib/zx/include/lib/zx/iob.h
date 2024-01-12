@@ -8,6 +8,7 @@
 #include <lib/zx/handle.h>
 #include <lib/zx/object.h>
 #include <zircon/availability.h>
+#include <zircon/syscalls/iob.h>
 
 namespace zx {
 
@@ -28,7 +29,7 @@ class iob final : public object<iob> {
     return *this;
   }
 
-  static zx_status_t create(uint64_t options, iob_region* regions, uint32_t region_count,
+  static zx_status_t create(uint64_t options, zx_iob_region_t* regions, uint32_t region_count,
                             iob* endpoint0, iob* endpoint1) ZX_AVAILABLE_SINCE(14);
 } ZX_AVAILABLE_SINCE(14);
 

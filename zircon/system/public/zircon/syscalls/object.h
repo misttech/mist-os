@@ -5,6 +5,7 @@
 #ifndef ZIRCON_SYSCALLS_OBJECT_H_
 #define ZIRCON_SYSCALLS_OBJECT_H_
 
+#include <zircon/syscalls/iob.h>
 #include <zircon/types.h>
 
 __BEGIN_CDECLS

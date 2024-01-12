@@ -12,6 +12,7 @@
 #include <platform.h>
 #include <trace.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls/iob.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -78,8 +79,8 @@ class SimpleJobEnumerator final : public JobEnumerator {
     // visible and allowing handles to be constructed via object_get_child, could spuriously destroy
     // it. Once a process either has a handle, or has left the initial state, handles can freely be
     // constructed since any additional on_zero_handles invocations will be idempotent.
-    // TODO(https://fxbug.dev/93331): Consider whether long term needing to allow multiple on_zero_handles
-    // transitions is the correct strategy.
+    // TODO(https://fxbug.dev/93331): Consider whether long term needing to allow multiple
+    // on_zero_handles transitions is the correct strategy.
     if (proc->state() == ProcessDispatcher::State::INITIAL && Handle::Count(*proc) == 0) {
       return true;
     }
@@ -1642,9 +1643,9 @@ zx_status_t sys_object_get_child(zx_handle_t handle, uint64_t koid, zx_rights_t 
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  // TODO(https://fxbug.dev/93331): Constructing the handles below may cause the handle count to go from 0->1,
-  // resulting in multiple on_zero_handles invocations. Presently this is benign, except for one
-  // scenario with processes in the initial state. Such processes are filtered out by the
+  // TODO(https://fxbug.dev/93331): Constructing the handles below may cause the handle count to go
+  // from 0->1, resulting in multiple on_zero_handles invocations. Presently this is benign, except
+  // for one scenario with processes in the initial state. Such processes are filtered out by the
   // SimpleJobEnumerator and should not be able to be learned about. Further protection against
   // guessing is not performed here since the worst case scenario is a misbehaving privileged
   // process guessing a koid and destroying a process that was in construction.

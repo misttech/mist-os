@@ -5,6 +5,7 @@
 #ifndef ZIRCON_SYSCALLS_IOB_H_
 #define ZIRCON_SYSCALLS_IOB_H_
 
+#include <stdint.h>
 #include <zircon/compiler.h>
 
 __BEGIN_CDECLS
@@ -27,6 +28,29 @@ __BEGIN_CDECLS
 #define ZX_IOB_EP1_CAN_MAP_WRITE (1 << 5)
 #define ZX_IOB_EP1_CAN_MEDIATED_READ (1 << 6)
 #define ZX_IOB_EP1_CAN_MEDIATED_WRITE (1 << 7)
+
+// IOBuffer types describing the structure of a region
+typedef struct zx_iob_discipline {
+  uint64_t type;
+  uint64_t reserved[8];
+} zx_iob_discipline_t;
+
+typedef struct zx_iob_region_private {
+  uint32_t options;
+  uint32_t padding1;
+  uint64_t padding2[3];
+} zx_iob_region_private_t;
+
+typedef struct zx_iob_region {
+  uint32_t type;
+  uint32_t access;
+  uint64_t size;
+  zx_iob_discipline_t discipline;
+  union {
+    zx_iob_region_private_t private_region;
+    uint8_t max_extension[32];
+  };
+} zx_iob_region_t;
 
 __END_CDECLS
 

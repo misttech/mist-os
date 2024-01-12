@@ -4,10 +4,11 @@
 
 #include <lib/zx/iob.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/iob.h>
 
 namespace zx {
 
-zx_status_t iob::create(uint64_t options, iob_region* regions, uint32_t region_count,
+zx_status_t iob::create(uint64_t options, zx_iob_region_t* regions, uint32_t region_count,
                         iob* endpoint0, iob* endpoint1) {
   // Ensure aliasing of both out parameters to the same container
   // has a well-defined result, and does not leak.

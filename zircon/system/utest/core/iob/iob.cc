@@ -7,6 +7,7 @@
 #include <zircon/rights.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/iob.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/system/public/zircon/process.h>
 #include <zircon/system/public/zircon/syscalls/iob.h>
