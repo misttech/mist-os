@@ -300,7 +300,7 @@ impl DeviceHandler {
         let mut status_stream =
             netdevice_client::client::new_port_status_stream(&port_proxy, None)?;
 
-        // TODO(https://fxbug.dev/100871): support non-ethernet devices.
+        // TODO(https://fxbug.dev/42051633): support non-ethernet devices.
         let supports_ethernet_on_rx =
             rx_types.iter().any(|f| *f == fhardware_network::FrameType::Ethernet);
         let supports_ethernet_on_tx = tx_types.iter().any(
@@ -324,7 +324,7 @@ impl DeviceHandler {
         let mac_addr = {
             let fnet::MacAddress { octets } =
                 mac_proxy.get_unicast_address().await.map_err(|e| {
-                    // TODO(https://fxbug.dev/100871): support non-ethernet
+                    // TODO(https://fxbug.dev/42051633): support non-ethernet
                     // devices.
                     tracing::warn!("failed to get unicast address, sending not supported: {:?}", e);
                     Error::ConfigurationNotSupported
