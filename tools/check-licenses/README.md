@@ -19,6 +19,7 @@ Support:
 Run:
 
 ```
+$ fx set <PRODUCT>.<BOARD> --with //tools/check-licenses:host
 $ fx build tools/check-licenses:host
 $ fx check-licenses
 ```
