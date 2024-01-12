@@ -66,7 +66,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace i915 {
@@ -2286,7 +2285,8 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
         if (display->pipe() == nullptr) {
           continue;
         }
-        // TODO(https://fxbug.dev/31310): Reset/scale the display to ensure the buffer displays properly
+        // TODO(https://fxbug.dev/31310): Reset/scale the display to ensure the buffer displays
+        // properly
         registers::PipeRegs pipe_regs(display->pipe()->pipe_id());
 
         auto plane_stride = pipe_regs.PlaneSurfaceStride(0).ReadFrom(mmio_space());
@@ -2334,6 +2334,13 @@ void Controller::DdkResume(ddk::ResumeTxn txn) {
   txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
 }
 
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
 zx_status_t Controller::Init() {
   zxlogf(TRACE, "Binding to display controller");
 
@@ -2344,10 +2351,10 @@ zx_status_t Controller::Init() {
     return client.status_value();
   }
   sysmem_.Bind(std::move(*client));
-
-  std::string debug_name = fxl::StringPrintf("intel-i915[%lu]", fsl::GetCurrentProcessKoid());
-  auto set_debug_status = sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name),
-                                                      fsl::GetCurrentProcessKoid());
+  auto pid = GetKoid(zx_process_self());
+  std::string debug_name = fxl::StringPrintf("intel-i915[%lu]", pid);
+  auto set_debug_status =
+      sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name), pid);
   if (!set_debug_status.ok()) {
     zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
     return set_debug_status.status();

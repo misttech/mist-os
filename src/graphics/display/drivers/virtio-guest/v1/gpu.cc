@@ -31,7 +31,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace virtio_display {
@@ -730,6 +729,13 @@ zx_status_t GpuDevice::Start() {
   return ZX_OK;
 }
 
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
 zx_status_t GpuDevice::Init() {
   zxlogf(TRACE, "Init()");
 
@@ -740,11 +746,10 @@ zx_status_t GpuDevice::Init() {
     return sysmem_result.status_value();
   }
   sysmem_ = fidl::WireSyncClient(std::move(*sysmem_result));
-
-  std::string debug_name =
-      fxl::StringPrintf("virtio-gpu-display[%lu]", fsl::GetCurrentProcessKoid());
-  auto set_debug_status = sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name),
-                                                      fsl::GetCurrentProcessKoid());
+  auto pid = GetKoid(zx_process_self());
+  std::string debug_name = fxl::StringPrintf("virtio-gpu-display[%lu]", pid);
+  auto set_debug_status =
+      sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name), pid);
   if (!set_debug_status.ok()) {
     zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
     return set_debug_status.error().status();

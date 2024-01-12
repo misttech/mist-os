@@ -22,6 +22,7 @@
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/process.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -58,7 +59,6 @@
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/graphics/display/lib/edid/edid.h"
-#include "src/lib/fsl/handles/object_info.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
@@ -1463,6 +1463,19 @@ void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
   zxlogf(TRACE, "Cookie %" PRIu64 " Acked\n", ack_cookie.value());
 }
 
+std::string GetObjectName(zx_handle_t handle) {
+  char name[ZX_MAX_NAME_LEN];
+  zx_status_t status = zx_object_get_property(handle, ZX_PROP_NAME, name, sizeof(name));
+  return status == ZX_OK ? std::string(name) : std::string();
+}
+
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
 fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>, zx_status_t>
 Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
   running_ = true;
@@ -1496,10 +1509,12 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
             }
             sysmem_allocator_ = fidl::WireSyncClient(std::move(sysmem_allocator_client));
 
+            auto process_name = GetObjectName(zx_process_self());
+
             // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
-            std::string debug_name = std::string("display[") + fsl::GetCurrentProcessName() + "]";
+            std::string debug_name = std::string("display[") + process_name + "]";
             fidl::OneWayStatus status = sysmem_allocator_->SetDebugClientInfo(
-                fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
+                fidl::StringView::FromExternal(debug_name), GetKoid(zx_process_self()));
             return status.status();
           }();
       status != ZX_OK) {
