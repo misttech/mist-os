@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
@@ -15,10 +16,13 @@
 #include <lib/zbi-format/memory.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/view.h>
+#include <lib/zircon-internal/align.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
+#include <zircon/limits.h>
 
+#include <fbl/algorithm.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
 #include <phys/address-space.h>
@@ -34,37 +38,6 @@ namespace {
 
 using PlatformIdItem = boot_shim::SingleOptionalItem<zbi_platform_id_t, ZBI_TYPE_PLATFORM_ID>;
 using BoardInfoItem = boot_shim::SingleOptionalItem<zbi_board_info_t, ZBI_TYPE_DRV_BOARD_INFO>;
-
-// Specialized PoolMemConfigItem that allows attaching additional ranges. This is needed to
-// provide the single range for peripherial [0, 1G].
-//
-// TODO(https://fxbug.dev/131475): Remove hack for hardcoded 1G peripherial range.
-class QemuArm64PoolMemConfigItem : public boot_shim::PoolMemConfigItem {
- public:
-  // Include the extra range.
-  size_t size_bytes() const { return ItemSize(PayloadSize() + sizeof(zbi_mem_range_t)); }
-
-  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi) const {
-    if (auto result = boot_shim::PoolMemConfigItem::AppendItems(zbi, 1); result.is_error()) {
-      return result;
-    }
-    auto it = zbi.find(ZBI_TYPE_MEM_CONFIG);
-    ZX_DEBUG_ASSERT(it != zbi.end());
-    zbi.ignore_error();
-
-    auto [header, payload] = *it;
-
-    // The base class allocated enough space for our extra range.
-    auto* extra_range = reinterpret_cast<zbi_mem_range_t*>(payload.data() + PayloadSize());
-    *extra_range = {
-        .paddr = 0,
-        .length = 1 << 30,
-        .type = ZBI_MEM_TYPE_PERIPHERAL,
-    };
-
-    return fit::ok();
-  }
-};
 
 constexpr const char* kShimName = "linux-arm64-boot-shim";
 
@@ -91,10 +64,50 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
   boot_shim::DevicetreeBootShim<
-      boot_shim::UartItem<>, QemuArm64PoolMemConfigItem, boot_shim::ArmDevicetreePsciItem,
+      boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::ArmDevicetreePsciItem,
       boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem, PlatformIdItem, BoardInfoItem,
       boot_shim::ArmDevictreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem>
       shim(kShimName, gDevicetreeBoot.fdt);
+  shim.set_mmio_observer([&](boot_shim::DevicetreeMmioRange mmio_range) {
+    // This attempts to generate a peripheral ramge the covers as much as possible from the
+    // non free ram ranges.
+    auto& pool = Allocation::GetPool();
+    memalloc::Range peripheral_range = {
+        .addr = mmio_range.address,
+        .size = mmio_range.size,
+        .type = memalloc::Type::kPeripheral,
+    };
+
+    // Look for the range that comes right after `peripheral_range`.
+    bool found = false;
+    for (const auto range : pool) {
+      if (range.addr >= peripheral_range.end()) {
+        peripheral_range.size = range.addr - peripheral_range.addr;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      peripheral_range.size = fbl::round_up(peripheral_range.end(), 1ull << 30);
+    }
+
+    // Make sure generate ranges are always page aligned. The address is rounded to the containing
+    // page, and the end is rounded up to the following page.
+    uint64_t page_aligned_start = ZX_ROUNDDOWN(peripheral_range.addr, ZX_PAGE_SIZE);
+    uint64_t page_aligned_end = ZX_PAGE_ALIGN(peripheral_range.end());
+    peripheral_range.addr = page_aligned_start;
+    peripheral_range.size = page_aligned_end - page_aligned_start;
+
+    // This may reintroduce reserved ranges from the initial memory bootstrap as peripheral ranges,
+    // since reserved ranges are no longer tracked and are represented as wholes in the memory. This
+    // should be harmless, since the implications is that an uncached mapping will be created but
+    // not touched.
+    if (pool.MarkAsPeripheral(peripheral_range).is_error()) {
+      printf("Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n", peripheral_range.addr,
+             peripheral_range.end());
+    }
+  });
   shim.set_allocator([](size_t size, size_t align) -> void* {
     if (auto alloc = Allocation::GetPool().Allocate(memalloc::Type::kPhysScratch, size, align);
         alloc.is_ok()) {
@@ -104,7 +117,7 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
   shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
-  shim.Get<QemuArm64PoolMemConfigItem>().Init(Allocation::GetPool());
+  shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
   shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(
       {reinterpret_cast<const ktl::byte*>(gDevicetreeBoot.fdt.fdt().data()),
        gDevicetreeBoot.fdt.size_bytes()});
