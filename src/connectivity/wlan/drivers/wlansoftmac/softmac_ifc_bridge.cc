@@ -26,8 +26,8 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
     fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&&
         softmac_ifc_bridge_client_endpoint) {
   WLAN_TRACE_DURATION();
-  auto softmac_ifc_bridge = std::unique_ptr<SoftmacIfcBridge>(new SoftmacIfcBridge(
-      std::forward<fdf::UnownedDispatcher>(softmac_ifc_bridge_client_dispatcher)));
+  auto softmac_ifc_bridge = std::unique_ptr<SoftmacIfcBridge>(
+      new SoftmacIfcBridge(std::move(softmac_ifc_bridge_client_dispatcher)));
 
   // The protocol functions are stored in this class, which will act as
   // the server end of WlanSoftmacifc FIDL protocol, and this set of function pointers will be

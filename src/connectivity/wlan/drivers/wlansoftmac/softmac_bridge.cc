@@ -24,7 +24,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   WLAN_TRACE_DURATION();
   auto softmac_bridge = std::unique_ptr<SoftmacBridge>(new SoftmacBridge(
       device,
-      std::forward<fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>>(softmac_client)));
+      std::move(softmac_client)));
 
   rust_device_interface_t wlansoftmac_rust_ops = {
       .device = static_cast<void*>(softmac_bridge->device_interface_),

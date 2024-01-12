@@ -60,9 +60,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
  private:
   explicit SoftmacBridge(DeviceInterface* device_interface,
                          fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client)
-      : softmac_client_(
-            std::forward<fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>>(softmac_client)),
-        device_interface_(device_interface) {}
+      : softmac_client_(std::move(softmac_client)), device_interface_(device_interface) {}
 
   template <typename, typename = void>
   static constexpr bool has_value_type = false;

@@ -51,8 +51,7 @@
 namespace wlan::drivers::wlansoftmac {
 
 SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher)
-    : device_(device),
-      main_driver_dispatcher_(std::forward<fdf::UnownedDispatcher>(main_driver_dispatcher)) {
+    : device_(device), main_driver_dispatcher_(std::move(main_driver_dispatcher)) {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
@@ -144,7 +143,7 @@ zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(
   ldebug(0, nullptr, "Entering.");
   linfo("Binding...");
   auto softmac_binding = std::unique_ptr<SoftmacBinding>(
-      new SoftmacBinding(device, std::forward<fdf::UnownedDispatcher>(main_driver_dispatcher)));
+      new SoftmacBinding(device, std::move(main_driver_dispatcher)));
 
   device_add_args_t args = {
       .version = DEVICE_ADD_ARGS_VERSION,

@@ -38,8 +38,7 @@ class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftma
 
  private:
   explicit SoftmacIfcBridge(fdf::UnownedDispatcher&& softmac_ifc_bridge_client_dispatcher)
-      : softmac_ifc_bridge_client_dispatcher_(
-            std::forward<fdf::UnownedDispatcher>(softmac_ifc_bridge_client_dispatcher)) {
+      : softmac_ifc_bridge_client_dispatcher_(std::move(softmac_ifc_bridge_client_dispatcher)) {
     WLAN_TRACE_DURATION();
   }
 
