@@ -352,6 +352,8 @@ if [[ $? -ne 0 || ! -x "${command_path[0]}" ]]; then
   exit 1
 fi
 
+metrics-init
+
 # For each optional feature, force the existence of the FUCHSIA_DISABLE_* env
 # variable. This is needed so that non-bash code can reliably use this
 # to check for optional features that have default values.
@@ -359,6 +361,7 @@ for f in $(list_optional_features); do
   _disabled_env_name="$(get_disable_feature_env_name "${f}")"
   is_feature_enabled "$f"
   export ${_disabled_env_name}=$?
+  track-feature-status "${f}" "${_disabled_env_name}" &
 done
 
 export FX_ENTRY_CMD="$command_name"
@@ -366,7 +369,6 @@ export FX_ENTRY_CMD="$command_name"
 declare -r cmd_and_args="$@"
 shift # Removes the command name.
 
-metrics-init
 if [[ "${command_name}" != "vendor" || $# -lt 2 ]]; then
   metric_name="${command_name}"
 else

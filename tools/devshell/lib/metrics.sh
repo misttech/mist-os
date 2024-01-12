@@ -512,6 +512,35 @@ function track-command-finished {
   return 0
 }
 
+# Arguments:
+#   - feature name
+#   - 0 for enabled, 1 for disabled
+function track-feature-status {
+  if [[ "${HOST_OS}" == "mac" ]]; then
+    return
+  fi
+  exec 1>/dev/null
+  exec 2>/dev/null
+
+  local feature=$1
+  local is_disabled=$2
+  local status
+
+  if [[ "${is_disabled}" -eq 0 ]]; then
+      status="enabled"
+  else
+      status="disabled"
+  fi
+
+  event_params=$(fx-command-run jq -c -n \
+    --arg feature "${feature}" \
+    --arg status "${status}" \
+    '$ARGS.named')
+
+  _add-to-analytics-batch "feature" "${event_params}"
+}
+
+
 # Add an analytics hit with the given args to the batch of hits. This will trigger
 # sending a batch when the batch size limit is hit.
 #
