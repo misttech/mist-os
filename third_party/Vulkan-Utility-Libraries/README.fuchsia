@@ -1,0 +1,8 @@
+Name: Vulkan-Utility-Libraries
+License: Apache 2.0
+License File: src/LICENSE.md
+Upstream Git: https://github.com/KhronosGroup/Vulkan-Utility-Libraries
+Description:
+
+Shared code across various Vulkan repositories.
+
