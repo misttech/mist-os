@@ -7,7 +7,6 @@ import("//build/testing/perf/test.gni")
 group("benchmarks-under-migration") {
   testonly = true
   deps = [
-    "driver_llcpp",
     "fidlc:fidlc_microbenchmarks",
     "go",
     "lib-fidl",
@@ -18,6 +17,7 @@ group("benchmarks-under-migration") {
 _tests = [
   "cpp",
   "driver_cpp",
+  "driver_llcpp",
   "hlcpp",
   "llcpp",
   "rust",

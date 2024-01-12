@@ -53,3 +53,10 @@ fuchsia_shell_package("driver_llcpp") {
   testonly = true
   deps = [ ":bin" ]
 }
+
+fuchsia_package_with_single_component("fidl_microbenchmarks_driver_llcpp") {
+  testonly = true
+  manifest = "meta/benchmark.cml"
+  component_name = "benchmark"
+  deps = [ ":bin" ]
+}
