@@ -157,7 +157,9 @@ impl TargetCollection {
                 Entry::Occupied(mut other) => {
                     let MergeState { info: prev, addrs } = other.get_mut();
 
-                    tracing::info!("Merging {prev:?} + {info:?}");
+                    // Previously this was an info message, moving to debug as this is internal
+                    // state of target collection.
+                    tracing::debug!("Merging {prev:?} + {info:?}");
 
                     let ffx::TargetInfo {
                         nodename: _,
@@ -356,7 +358,10 @@ impl TargetCollection {
             if cmp == IdentityCmp::Intersects {
                 // Incoming identity has more knowledge than this identity.
                 // (nodename, serial) > (nodename)
-                tracing::info!("Merge identity {:?} with {:?}", identity, id);
+
+                // Previously this was an info message, moving to debug as this is internal state
+                // of target collection.
+                tracing::debug!("Merge identity {:?} with {:?}", identity, id);
                 identity.join((*id).clone());
                 merge = true;
             } else {
@@ -385,7 +390,9 @@ impl TargetCollection {
                     target.try_with_identity(|ident| Rc::ptr_eq(ident, &id)).unwrap_or(false);
 
                 if is_ptr_eq {
-                    tracing::info!("Updating identity of {:?}", target);
+                    // This was previously info, moving to debug as this is the internal state of
+                    // ffx target collection.
+                    tracing::debug!("Updating identity of {:?}", target);
                     target.replace_shared_identity(Rc::clone(&identity));
                     targets_changed |= true;
                 }
@@ -539,7 +546,11 @@ impl TargetCollection {
         target.enable();
 
         if was_disabled {
-            tracing::info!("Enabling discovered target: {}@{}", target.nodename_str(), target.id());
+            tracing::info!(
+                "Enabling ['Discovered'] target:['{}']@[{}]",
+                target.nodename_str(),
+                target.id()
+            );
 
             // Discovered target went from unused to used.
             // Broadcast NewTarget event since we do not broadcast events for discovered
@@ -590,7 +601,12 @@ impl TargetCollection {
         let Some(to_update) = to_update else {
             // The target was not matched in the collection, so insert it and return.
 
-            tracing::info!("adding new target: {:?}", new_target);
+            tracing::info!(
+                "Adding new ['{:?}'] target: [{}]",
+                new_target.get_connection_state(),
+                new_target.id()
+            );
+            tracing::debug!("{:#?}", new_target);
             self.targets.borrow_mut().insert(new_target.id(), new_target.clone());
 
             self.try_push_new_target_event(&*new_target);
