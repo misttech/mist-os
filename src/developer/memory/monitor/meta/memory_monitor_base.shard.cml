@@ -19,6 +19,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.component.Introspector.root",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",

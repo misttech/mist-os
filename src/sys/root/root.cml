@@ -326,6 +326,12 @@
             ],
         },
         {
+            protocol: "fuchsia.component.Introspector",
+            from: "framework",
+            as: "fuchsia.component.Introspector.root",
+            to: "#core",
+        },
+        {
             protocol: "fuchsia.sys2.LifecycleController",
             from: "framework",
             as: "fuchsia.sys2.LifecycleController.root",
