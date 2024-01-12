@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_async as fasync,
     fuchsia_inspect::{self, Inspector},
     fuchsia_inspect_contrib::auto_persist,
-    fuchsia_zircon as zx,
+    fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         channel::{mpsc, oneshot},
         Future, StreamExt,
@@ -151,13 +151,18 @@ async fn wlansoftmac_thread<D: DeviceOps>(
 
     let ifc = WlanSoftmacIfcProtocol::new(&mut driver_event_sink);
 
+    let (softmac_ifc_bridge_client, _softmac_ifc_bridge_server) =
+        fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
+
     // Indicate to the vendor driver that we can start sending and receiving
     // info. Any messages received from the driver before we start our SME will
     // be safely buffered in our driver_event_sink.
     // Note that device.start will copy relevant fields out of ifc, so dropping
     // it after this is fine. The returned value is the MLME server end of the
     // channel wlanmevicemonitor created to connect MLME and SME.
-    let usme_bootstrap_handle_via_iface_creation = match device.start(&ifc) {
+    let usme_bootstrap_handle_via_iface_creation = match device
+        .start(&ifc, zx::Handle::from(softmac_ifc_bridge_client.into_channel()).into_raw())
+    {
         Ok(handle) => handle,
         Err(e) => {
             // Failure to unwrap indicates a critical failure in the driver init thread.

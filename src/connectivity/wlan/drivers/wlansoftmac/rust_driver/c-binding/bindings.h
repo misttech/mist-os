@@ -64,7 +64,7 @@ typedef struct {
    * Start operations on the underlying device and return the SME channel.
    */
   int32_t (*start)(void *device, const rust_wlan_softmac_ifc_protocol_copy_t *ifc,
-                   zx_handle_t *out_sme_channel);
+                   zx_handle_t wlan_softmac_ifc_bridge_client_handle, zx_handle_t *out_sme_channel);
   /**
    * Request to deliver an Ethernet II frame to Fuchsia's Netstack.
    */

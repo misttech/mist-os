@@ -294,11 +294,22 @@ type WlanTxPacket = struct {
     info WlanTxInfo;
 };
 
+@available(added=HEAD)
+closed protocol WlanSoftmacIfcBase {};
+
+@available(added=HEAD)
+closed protocol WlanSoftmacIfcBridge {
+    compose WlanSoftmacIfcBase;
+};
+
 @discoverable
 @transport("Driver")
 @banjo_layout("ddk-interface")
 @available(added=15)
 closed protocol WlanSoftmacIfc {
+    @available(added=HEAD)
+    compose WlanSoftmacIfcBase;
+
     /// Forward up a packet received over the wireless medium.
     strict Recv(struct {
         packet WlanRxPacket;

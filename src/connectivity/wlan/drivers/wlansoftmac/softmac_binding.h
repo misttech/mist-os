@@ -48,6 +48,7 @@ class SoftmacBinding : public DeviceInterface {
 
   // DeviceInterface methods
   zx_status_t Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
+                    zx_handle_t softmac_ifc_bridge_client_handle,
                     zx::channel* out_sme_channel) final;
   zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) final
       __TA_EXCLUDES(ethernet_proxy_lock_);
@@ -129,6 +130,7 @@ class SoftmacBinding : public DeviceInterface {
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
   fdf::Dispatcher softmac_ifc_server_dispatcher_;
+  fdf::Dispatcher softmac_ifc_bridge_client_dispatcher_;
   std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
   // Dispatcher for being a FIDL client firing requests on WlanSoftmac protocol.

@@ -224,7 +224,11 @@ const PEER_ADDR_OFFSET: usize = 4;
 /// can then implement trait methods instead of mocking an underlying DeviceInterface
 /// and FIDL proxy.
 pub trait DeviceOps {
-    fn start(&mut self, ifc: *const WlanSoftmacIfcProtocol<'_>) -> Result<zx::Handle, zx::Status>;
+    fn start(
+        &mut self,
+        ifc: *const WlanSoftmacIfcProtocol<'_>,
+        wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
+    ) -> Result<zx::Handle, zx::Status>;
     fn wlan_softmac_query_response(
         &mut self,
     ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>;
@@ -369,10 +373,18 @@ pub fn try_query_spectrum_management_support(
 }
 
 impl DeviceOps for Device {
-    fn start(&mut self, ifc: *const WlanSoftmacIfcProtocol<'_>) -> Result<zx::Handle, zx::Status> {
+    fn start(
+        &mut self,
+        ifc: *const WlanSoftmacIfcProtocol<'_>,
+        wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
+    ) -> Result<zx::Handle, zx::Status> {
         let mut out_channel = 0;
-        let status =
-            (self.raw_device.start)(self.raw_device.device, ifc, &mut out_channel as *mut u32);
+        let status = (self.raw_device.start)(
+            self.raw_device.device,
+            ifc,
+            wlan_softmac_ifc_bridge_client_handle,
+            &mut out_channel as *mut u32,
+        );
         // Unsafe block required because we cannot pass a Rust handle over FFI. An invalid
         // handle violates the banjo API, and may be detected by the caller of this fn.
         zx::ok(status).map(|_| unsafe { zx::Handle::from_raw(out_channel) })
@@ -693,6 +705,7 @@ pub struct DeviceInterface {
     start: extern "C" fn(
         device: *mut c_void,
         ifc: *const WlanSoftmacIfcProtocol<'_>,
+        wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
     /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
@@ -972,6 +985,7 @@ pub mod test_utils {
         fn start(
             &mut self,
             _ifc: *const WlanSoftmacIfcProtocol<'_>,
+            _wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         ) -> Result<zx::Handle, zx::Status> {
             let mut state = self.state.lock().unwrap();
             let usme_bootstrap_server_end_handle =

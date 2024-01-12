@@ -5,7 +5,7 @@
 #include "softmac_ifc_bridge.h"
 
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
-#include <fidl/fuchsia.wlan.softmac/cpp/wire.h>
+#include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/client.h>
@@ -21,9 +21,13 @@ namespace wlan::drivers::wlansoftmac {
 zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
     fdf::Dispatcher& softmac_ifc_server_dispatcher,
     const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
-    fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint) {
+    fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
+    fdf::UnownedDispatcher&& softmac_ifc_bridge_client_dispatcher,
+    fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&&
+        softmac_ifc_bridge_client_endpoint) {
   WLAN_TRACE_DURATION();
-  auto softmac_ifc_bridge = std::unique_ptr<SoftmacIfcBridge>(new SoftmacIfcBridge());
+  auto softmac_ifc_bridge = std::unique_ptr<SoftmacIfcBridge>(new SoftmacIfcBridge(
+      std::forward<fdf::UnownedDispatcher>(softmac_ifc_bridge_client_dispatcher)));
 
   // The protocol functions are stored in this class, which will act as
   // the server end of WlanSoftmacifc FIDL protocol, and this set of function pointers will be
@@ -57,7 +61,35 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
         server_binding_task_complete.Signal();
       });
   server_binding_task_complete.Wait();
+
+  // Bind the WlanSoftmacIfcBridge client on softmac_ifc_bridge_client_dispatcher.
+  libsync::Completion wire_client_binding_task_complete;
+  async::PostTask(
+      softmac_ifc_bridge->softmac_ifc_bridge_client_dispatcher_->async_dispatcher(),
+      [softmac_ifc_bridge = softmac_ifc_bridge.get(), server_endpoint = std::move(server_endpoint),
+       softmac_ifc_bridge_client_endpoint = std::move(softmac_ifc_bridge_client_endpoint),
+       &wire_client_binding_task_complete]() mutable {
+        softmac_ifc_bridge->softmac_ifc_bridge_client_ =
+            std::make_unique<fidl::WireClient<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>>(
+                std::move(softmac_ifc_bridge_client_endpoint),
+                fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        wire_client_binding_task_complete.Signal();
+      });
+  wire_client_binding_task_complete.Wait();
+
   return fit::ok(std::move(softmac_ifc_bridge));
+}
+
+SoftmacIfcBridge::~SoftmacIfcBridge() {
+  WLAN_TRACE_DURATION();
+  auto softmac_ifc_bridge_client = softmac_ifc_bridge_client_.release();
+  libsync::Completion client_destruction_complete;
+  async::PostTask(softmac_ifc_bridge_client_dispatcher_->async_dispatcher(),
+                  [softmac_ifc_bridge_client, &client_destruction_complete]() mutable {
+                    delete softmac_ifc_bridge_client;
+                    client_destruction_complete.Signal();
+                  });
+  client_destruction_complete.Wait();
 }
 
 void SoftmacIfcBridge::Recv(RecvRequestView request, fdf::Arena& arena,

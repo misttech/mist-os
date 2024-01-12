@@ -16,9 +16,11 @@
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/dispatcher.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/result.h>
 #include <lib/operation/ethernet.h>
 #include <lib/sync/cpp/completion.h>
+#include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
@@ -83,6 +85,20 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
     softmac_ifc_server_dispatcher_ = *std::move(dispatcher);
   }
 
+  // Create a dispatcher to serve the WlanSoftmacIfc protocol.
+  {
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifcbridge_client",
+        [](fdf_dispatcher_t*) {});
+
+    if (dispatcher.is_error()) {
+      ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
+                    zx_status_get_string(dispatcher.status_value()));
+    }
+
+    softmac_ifc_bridge_client_dispatcher_ = *std::move(dispatcher);
+  }
+
   // Create a dispatcher for WlanSoftmac method calls to the parent device.
   //
   // The Unbind hook relies on client_dispatcher_ implementing a shutdown
@@ -101,6 +117,7 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
           // dispatcher its bound too.
           async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(), [&]() {
             softmac_ifc_bridge_.reset();
+            softmac_ifc_bridge_client_dispatcher_.ShutdownAsync();
             device_unbind_reply(child_device_);
           });
           // Explicitly call destroy since Unbind() calls releases this dispatcher before
@@ -329,6 +346,7 @@ void SoftmacBinding::EthernetImplGetBti(zx_handle_t* out_bti) {
 }
 
 zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
+                                  zx_handle_t softmac_ifc_bridge_client_handle,
                                   zx::channel* out_sme_channel) {
   WLAN_TRACE_DURATION();
   debugf("Start");
@@ -345,8 +363,14 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* r
     return endpoints.status_value();
   }
 
+  zx::channel softmac_ifc_bridge_client_channel(softmac_ifc_bridge_client_handle);
+  fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge> softmac_ifc_bridge_client_endpoint(
+      std::move(softmac_ifc_bridge_client_channel));
+
   auto softmac_ifc_bridge = SoftmacIfcBridge::New(softmac_ifc_server_dispatcher_, rust_softmac_ifc,
-                                                  std::move(endpoints->server));
+                                                  std::move(endpoints->server),
+                                                  softmac_ifc_bridge_client_dispatcher_.borrow(),
+                                                  std::move(softmac_ifc_bridge_client_endpoint));
   if (softmac_ifc_bridge.is_error()) {
     lerror("Failed to create SoftmacIfcBridge: %s", softmac_ifc_bridge.status_string());
     return softmac_ifc_bridge.status_value();

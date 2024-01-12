@@ -30,6 +30,7 @@ class DeviceInterface {
   static DeviceInterface* from(void* device) { return static_cast<DeviceInterface*>(device); }
 
   virtual zx_status_t Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
+                            zx_handle_t softmac_ifc_bridge_client_handle,
                             zx::channel* out_sme_channel) = 0;
 
   virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) = 0;

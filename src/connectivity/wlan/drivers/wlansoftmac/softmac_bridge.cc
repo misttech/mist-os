@@ -29,9 +29,11 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   rust_device_interface_t wlansoftmac_rust_ops = {
       .device = static_cast<void*>(softmac_bridge->device_interface_),
       .start = [](void* device_interface, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
+                  zx_handle_t softmac_ifc_bridge_client_handle,
                   zx_handle_t* out_sme_channel) -> zx_status_t {
         zx::channel channel;
-        zx_status_t result = DeviceInterface::from(device_interface)->Start(ifc, &channel);
+        zx_status_t result = DeviceInterface::from(device_interface)
+                                 ->Start(ifc, softmac_ifc_bridge_client_handle, &channel);
         *out_sme_channel = channel.release();
         return result;
       },
