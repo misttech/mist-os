@@ -223,6 +223,21 @@ template("bazel_product_bundle") {
       },
     ]
     directory_timestamp_outputs = [ "${_create_system_target}/images.json" ]
+
+    if (use_bazel_images_only) {
+      _full_label = get_label_info(":${target_name}", "label_with_toolchain")
+      metadata = {
+        assembly_manifests = [
+          {
+            image_name = "fuchsia"
+            label = _full_label
+            assembly_manifest_path = rebase_path(
+                    "${target_out_dir}/${_create_system_target}/images.json",
+                    root_build_dir)
+          },
+        ]
+      }
+    }
   }
 
   if (defined(invoker.bazel_product_config_target)) {
