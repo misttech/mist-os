@@ -19,6 +19,7 @@ in_process_executables = [
   ":basic-dep",
   ":indirect-deps",
   ":passive-abi-basic",
+  ":passive-abi-rdebug",
   ":symbolic-namespace",
   ":many-deps",
   ":init-fini",
@@ -419,6 +420,12 @@ test_shared_library("indirect-deps-c") {
 test_executable("passive-abi-basic") {
   can_be_in_process = true
   sources = [ "passive-abi-basic.cc" ]
+  deps = [ "../.." ]
+}
+
+test_executable("passive-abi-rdebug") {
+  can_be_in_process = true
+  sources = [ "passive-abi-rdebug.cc" ]
   deps = [ "../.." ]
 }
 

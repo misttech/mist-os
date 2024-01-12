@@ -169,6 +169,22 @@ TYPED_TEST(LdLoadTests, PassiveAbiBasic) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, PassiveAbiRdebug) {
+  if constexpr (!TestFixture::kHasPassiveAbi) {
+    GTEST_SKIP() << "test requires passive ABI support";
+  }
+
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("passive-abi-rdebug"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 TYPED_TEST(LdLoadTests, SymbolicNamespace) {
   if constexpr (!TestFixture::kHasPassiveAbi) {
     GTEST_SKIP() << "test requires passive ABI support";

@@ -12,6 +12,7 @@
 #include <lib/elfldltl/relocation.h>
 #include <lib/elfldltl/relro.h>
 #include <lib/elfldltl/resolve.h>
+#include <lib/elfldltl/self.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/static-vector.h>
 #include <lib/ld/load-module.h>
@@ -289,6 +290,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     CheckErrors(diag);
 
     PopulateAbiLoadedModules(modules, std::move(preloaded_modules));
+    PopulateAbiRdebug(modules);
 
     CommitModules(diag, std::move(modules));
   }
@@ -441,6 +443,13 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
 
     ld::mutable_abi.loaded_modules = &modules.begin()->module();
+  }
+
+  static void PopulateAbiRdebug(const List& modules) {
+    ld::mutable_r_debug.version = elfldltl::kRDebugVersion;
+    ld::mutable_r_debug.map = &modules.begin()->module().link_map;
+    assert(ld::mutable_r_debug.state == elfldltl::RDebugState::kConsistent);
+    ld::mutable_r_debug.ldbase = elfldltl::Self<>::LoadBias();
   }
 
   // The passive ABI's TlsModule structs are allocated in a contiguous array
