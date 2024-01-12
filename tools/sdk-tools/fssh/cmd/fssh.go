@@ -63,6 +63,7 @@ Subcommands:
 sync-keys        Sync SSH key files associated with Fuchsia between a local and remote workstation.
 tunnel           Creates a tunnel between a local Fuchsia device and a remote host
 
+Options:
 `, deviceNameFlag, deviceIPFlag, privateKeyFlag, sshConfigFlag, dataPathFlag, verboseFlag, logLevelFlag)
 }
 

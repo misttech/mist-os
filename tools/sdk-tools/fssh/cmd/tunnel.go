@@ -60,6 +60,7 @@ func (*tunnelCmd) Synopsis() string {
 func (*tunnelCmd) Usage() string {
 	return fmt.Sprintf(`fssh tunnel [-%s remote-host -%s device-ip -%s -device-name -%s path-to-ssh-config -%s=NNNN,NNNN -s]:
 Creates tunnel between the specified remote host and local Fuchsia device. Either the %s or %s flag must be set. If both are set the %s flag will take precedence.
+Options:
 `, remoteHostFlag, deviceIPFlag, deviceNameFlag, sshConfigFlag, tunnelPortsFlag, deviceIPFlag, deviceNameFlag, deviceIPFlag)
 }
 

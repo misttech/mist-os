@@ -5,7 +5,7 @@
  to this file.
 
  -->
- 
+
 # tool_with_subcommands.sh
 
 ```none {: style="white-space: break-spaces;" .devsite-disable-click-to-copy}
@@ -13,18 +13,21 @@
 Usage: host-tool-cmd
 Top level tool description
 
+
 ```
 
-__Options:__
+__OPTIONS:__
+
 
 ```none {: style="white-space: break-spaces;" .devsite-disable-click-to-copy}
 
     --help   Display usage information
     --verbose Print progress details
 
+
 ```
 
-__Commands:__
+__SUBCOMMANDS:__
 
 ```none {: style="white-space: break-spaces;" .devsite-disable-click-to-copy}
 
@@ -33,19 +36,16 @@ __Commands:__
     unrecognized Should not show up - returns Unrecognized argument:
     command      Should not be recursed
     subcommand   Should not be recursed
+
 ```
 
 ## command
 
 ```none {: style="white-space: break-spaces;" .devsite-disable-click-to-copy}
 
-```
-
 ## subcommand
 
 ```none {: style="white-space: break-spaces;" .devsite-disable-click-to-copy}
-
-```
 
 ## subcommand1
 
@@ -54,13 +54,16 @@ __Commands:__
 Usage: host-tool-cmd subcommand1 <args>
 Description goes here subcommand1 with <args>
 
+
 ```
 
-__Options:__
+__OPTIONS:__
+
 
 ```none {: style="white-space: break-spaces;" .devsite-disable-click-to-copy}
 
     --sc1   sc1 option for subcommand1
+
 ```
 
 ## subcommand2
@@ -69,6 +72,7 @@ __Options:__
 
 Usage: host-tool-cmd subcommand2
 Description goes here subcommand2
+
 
 ```
 

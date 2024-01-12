@@ -38,7 +38,8 @@ namespace {
 
 void Usage() {
   std::cout
-      << "usage: fidlc [--json JSON_PATH]\n"
+      << "The FIDL compiler\n\n"
+         "usage: fidlc [--json JSON_PATH]\n"
          "             [--available PLATFORM:VERSION]\n"
          "             [--name LIBRARY_NAME]\n"
          "             [--experimental FLAG_NAME]\n"
@@ -49,6 +50,13 @@ void Usage() {
          "             [--files [FIDL_FILE...]...]\n"
          "             [--help]\n"
          "\n"
+         "All of the arguments can also be provided via a response file, denoted as\n"
+         "`@responsefile`. The contents of the file at `responsefile` will be interpreted\n"
+         "as a whitespace-delimited list of arguments. Response files cannot be nested.\n"
+         "\n"
+         "See <https://fuchsia.dev/fuchsia-src/development/languages/fidl/reference/compiler>\n"
+         "for more information.\n"
+         "OPTIONS:\n"
          " * `--json JSON_PATH`. If present, this flag instructs `fidlc` to output the\n"
          "   library's intermediate representation at the given path. The intermediate\n"
          "   representation is JSON that conforms to the schema available via --json-schema.\n"
@@ -89,13 +97,8 @@ void Usage() {
          " * `--werror`. Treats warnings as errors.\n"
          "\n"
          " * `--help`. Prints this help, and exit immediately.\n"
-         "\n"
-         "All of the arguments can also be provided via a response file, denoted as\n"
-         "`@responsefile`. The contents of the file at `responsefile` will be interpreted\n"
-         "as a whitespace-delimited list of arguments. Response files cannot be nested.\n"
-         "\n"
-         "See <https://fuchsia.dev/fuchsia-src/development/languages/fidl/reference/compiler>\n"
-         "for more information.\n";
+         "\n";
+
   std::cout.flush();
 }
 
