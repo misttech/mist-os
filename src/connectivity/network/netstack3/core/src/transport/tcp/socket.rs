@@ -329,10 +329,35 @@ impl<T> AsSingleStack<T> for T {
     }
 }
 
-impl<'a, SS: 'a, DS: AsSingleStack<SS> + 'a, SC, DC>
-    MaybeDualStack<(&'a mut DS, DC), (&'a mut SS, SC)>
-{
-    fn into_single_stack(self) -> (&'a mut SS, MaybeDualStack<DC, SC>) {
+/// Provides access to the current stack of the context.
+///
+/// This is useful when dealing with logic that applies to the current stack
+/// but we want to be version agnostic: we have different associated types for
+/// single-stack and dual-stack contexts, we can use this function to turn them
+/// into the same type that only provides access to the current version of the
+/// stack and trims down access to `I::OtherVersion`.
+// TODO(https://issues.fuchsia.dev/42085913): this trait has similar shape and
+// functionality as `AsSingleStack`, but they have slightly different meanings.
+// The other trait is used as a placeholder so that we can skip some of the
+// dual-stack functionality. It will be useful in that when we fully support
+// dual stack operations, that trait can go away. By contrast, this trait will
+// stay because it is useful to avoid duplications.
+pub trait AsThisStack<T> {
+    /// Get the this stack version of the context.
+    fn as_this_stack(&mut self) -> &mut T;
+}
+
+impl<T> AsThisStack<T> for T {
+    fn as_this_stack(&mut self) -> &mut T {
+        self
+    }
+}
+
+impl<'a, SS: 'a, DS: 'a, SC, DC> MaybeDualStack<(&'a mut DS, DC), (&'a mut SS, SC)> {
+    fn into_single_stack(self) -> (&'a mut SS, MaybeDualStack<DC, SC>)
+    where
+        DS: AsSingleStack<SS>,
+    {
         match self {
             MaybeDualStack::DualStack((ds, dc)) => {
                 (ds.as_single_stack(), MaybeDualStack::DualStack(dc))
@@ -346,10 +371,17 @@ impl<'a, SS: 'a, DS: AsSingleStack<SS> + 'a, SC, DC>
 pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     TcpDemuxContext<I, Self::WeakDeviceId, BC> + IpSocketHandler<I, BC>
 {
+    /// The core context for the current version of the IP protocol. This is
+    /// used to be version agnostic when the operation is on the current stack.
+    type ThisStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + DeviceIpSocketHandler<I, BC>
+        + TcpDemuxContext<I, Self::WeakDeviceId, BC>;
+
     /// The core context that will give access to this version of the IP layer.
     type SingleStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + DeviceIpSocketHandler<I, BC>
-        + TcpDemuxContext<I, Self::WeakDeviceId, BC>;
+        + TcpDemuxContext<I, Self::WeakDeviceId, BC>
+        + AsThisStack<Self::ThisStackIpTransportAndDemuxCtx<'a>>;
 
     /// A collection of type assertions that must be true in the single stack
     /// version, associated types and concrete types must unify and we can
@@ -374,6 +406,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
         > + DeviceIpSocketHandler<I::OtherVersion, BC>
         + TcpDemuxContext<I::OtherVersion, Self::WeakDeviceId, BC>
         + TcpDualStackContext<I>
+        + AsThisStack<Self::ThisStackIpTransportAndDemuxCtx<'a>>
         + AsSingleStack<Self::SingleStackIpTransportAndDemuxCtx<'a>>;
 
     /// A collection of type assertions that must be true in the dual stack
@@ -4040,6 +4073,7 @@ mod tests {
     impl<D: FakeStrongDeviceId, BC: TcpBindingsTypes + IpSocketBindingsContext> TcpContext<Ipv6, BC>
         for TcpCoreCtx<D, BC>
     {
+        type ThisStackIpTransportAndDemuxCtx<'a> = Self;
         // TODO(https://fxbug.dev/42085913): Use `UninstantiableWrapper<Self>` as
         // the single stack ctx once the `AsSingleStack` bound has been dropped
         // from [`TcpSyncCtx::DualStackIpTransportAndDemuxCtx`] (It's not
@@ -4122,6 +4156,7 @@ mod tests {
     impl<D: FakeStrongDeviceId, BC: TcpBindingsTypes + IpSocketBindingsContext> TcpContext<Ipv4, BC>
         for TcpCoreCtx<D, BC>
     {
+        type ThisStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackIpTransportAndDemuxCtx<'a> = Self;
         type SingleStackConverter = ();
         type DualStackIpTransportAndDemuxCtx<'a> = UninstantiableWrapper<Self>;

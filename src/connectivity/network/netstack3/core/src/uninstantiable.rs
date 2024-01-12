@@ -343,6 +343,12 @@ impl<P> tcp_socket::AsSingleStack<P> for UninstantiableWrapper<P> {
     }
 }
 
+impl<P> tcp_socket::AsThisStack<P> for UninstantiableWrapper<P> {
+    fn as_this_stack(&mut self) -> &mut P {
+        self.uninstantiable_unreachable()
+    }
+}
+
 impl<I: tcp_socket::DualStackIpExt, P> tcp_socket::TcpDualStackContext<I>
     for UninstantiableWrapper<P>
 {
