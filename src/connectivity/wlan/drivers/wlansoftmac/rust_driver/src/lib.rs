@@ -10,7 +10,7 @@ use {
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         channel::{mpsc, oneshot},
-        Future, StreamExt,
+        Future, FutureExt, StreamExt,
     },
     std::pin::Pin,
     tracing::{error, info},
@@ -358,9 +358,22 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
     };
 
-    let (_, sme_result) = futures::join!(mlme_fut, sme_fut);
-    if let Err(e) = sme_result {
-        error!("SME shut down with error: {}", e);
+    let mut mlme_fut = mlme_fut.fuse();
+    let mut sme_fut = sme_fut.fuse();
+    loop {
+        futures::select! {
+            () = mlme_fut => info!("MLME future complete"),
+            sme_result = sme_fut =>
+                match sme_result {
+                    Ok(()) => {
+                        info!("SME future complete");
+                    }
+                    Err(e) => {
+                        error!("SME shut down with error: {}", e);
+                    }
+                },
+            complete => return,
+        }
     }
 }
 

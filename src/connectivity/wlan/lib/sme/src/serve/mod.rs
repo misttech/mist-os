@@ -17,6 +17,7 @@ use {
     std::{
         convert::Infallible,
         marker::Unpin,
+        pin::Pin,
         sync::{Arc, Mutex},
     },
     tracing::{error, info, warn},
@@ -131,7 +132,8 @@ pub fn create_sme(
     inspect_node: fuchsia_inspect::Node,
     persistence_req_sender: auto_persist::PersistenceReqSender,
     generic_sme_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
-) -> Result<(MlmeStream, impl Future<Output = Result<(), anyhow::Error>>), anyhow::Error> {
+) -> Result<(MlmeStream, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>), anyhow::Error>
+{
     let device_info = device_info.clone();
     let (server, mlme_req_sink, mlme_req_stream, telemetry_sender, sme_fut) = match device_info.role
     {
@@ -195,7 +197,7 @@ pub fn create_sme(
             feature_support_fut = feature_support_fut.fuse() => feature_support_fut,
         }
     };
-    Ok((mlme_req_stream, unified_fut))
+    Ok((mlme_req_stream, Box::pin(unified_fut)))
 }
 
 async fn handle_feature_support_query(
