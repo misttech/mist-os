@@ -355,7 +355,6 @@ group("output_dir_leaking_allowlist") {
 group("config_data_template_allowlist") {
   visibility = [
     "//build/images/*",
-    "//src/cast:cast_runner_config",
     "//src/cobalt/bin/app:*",
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:config-default",
     "//src/connectivity/policy/netcfg:config-default",
