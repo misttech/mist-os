@@ -107,6 +107,7 @@
           "prebuilt/tools/artifacts": true,
           "prebuilt/tools/buildbucket": true,
           "prebuilt/tools/buildidtool/linux-x64": true,
+          "prebuilt/tools/cas": true,
           "prebuilt/tools/cgpt/linux-x64": true,
           "prebuilt/tools/futility/linux-x64": true,
           "prebuilt/tools/gsutil": true,
