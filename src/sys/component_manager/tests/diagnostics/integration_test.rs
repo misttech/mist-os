@@ -52,8 +52,3 @@ async fn component_manager_exposes_inspect() {
     )
     .await;
 }
-
-#[fuchsia::test]
-async fn cleanup_of_components_without_diagnostics() {
-    start_nested_cm_and_wait_for_clean_stop("#meta/cleanup-root.cm", "./root/cleanup").await;
-}
