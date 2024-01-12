@@ -31,14 +31,12 @@
 #include "buffer_allocator.h"
 #include "device_interface.h"
 #include "softmac_bridge.h"
+#include "softmac_ifc_bridge.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
 
-#define PRE_ALLOC_RECV_BUFFER_SIZE 2000
-
-class SoftmacBinding : public DeviceInterface,
-                       public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
+class SoftmacBinding : public DeviceInterface {
  public:
   static zx::result<std::unique_ptr<SoftmacBinding>> New(
       zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher);
@@ -55,12 +53,6 @@ class SoftmacBinding : public DeviceInterface,
       __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) final;
   zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
-
-  void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
-  void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
-                      ReportTxResultCompleter::Sync& completer) override;
-  void NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
-                          NotifyScanCompleteCompleter::Sync& completer) override;
 
  private:
   // Private constructor to require use of New().
@@ -137,14 +129,10 @@ class SoftmacBinding : public DeviceInterface,
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
   fdf::Dispatcher softmac_ifc_server_dispatcher_;
-  std::unique_ptr<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>
-      softmac_ifc_server_binding_;
+  std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
   // Dispatcher for being a FIDL client firing requests on WlanSoftmac protocol.
   fdf::Dispatcher client_dispatcher_;
-
-  // Preallocated buffer for small frames
-  uint8_t pre_alloc_recv_buffer_[PRE_ALLOC_RECV_BUFFER_SIZE];
 };
 
 }  // namespace wlan::drivers::wlansoftmac

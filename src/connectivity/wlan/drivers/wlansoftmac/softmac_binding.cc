@@ -43,6 +43,8 @@
 
 #include "buffer_allocator.h"
 #include "convert.h"
+#include "softmac_bridge.h"
+#include "softmac_ifc_bridge.h"
 
 namespace wlan::drivers::wlansoftmac {
 
@@ -86,7 +88,7 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
   // The Unbind hook relies on client_dispatcher_ implementing a shutdown
   // handler that performs the following steps in sequence.
   //
-  //   - Asynchronously shutdown softmac_ifc_server_binding_
+  //   - Asynchronously destroy softmac_ifc_bridge_
   //   - Asynchronously call device_unbind_reply()
   //
   // Each step of the sequence must occur on its respective dispatcher
@@ -98,7 +100,7 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
           // Every fidl::ServerBinding must be destroyed on the
           // dispatcher its bound too.
           async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(), [&]() {
-            softmac_ifc_server_binding_.reset();
+            softmac_ifc_bridge_.reset();
             device_unbind_reply(child_device_);
           });
           // Explicitly call destroy since Unbind() calls releases this dispatcher before
@@ -326,7 +328,7 @@ void SoftmacBinding::EthernetImplGetBti(zx_handle_t* out_bti) {
   lerror("WLAN does not support ETHERNET_FEATURE_DMA");
 }
 
-zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
+zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
                                   zx::channel* out_sme_channel) {
   WLAN_TRACE_DURATION();
   debugf("Start");
@@ -339,50 +341,31 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* i
 
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacIfc>();
   if (endpoints.is_error()) {
-    lerror("Creating end point error: %s", zx_status_get_string(endpoints.status_value()));
+    lerror("Creating end point error: %s", endpoints.status_string());
     return endpoints.status_value();
   }
 
-  // Asynchronously bind the WlanSoftmacIfc server
-  async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(),
-                  [&, server_endpoint = std::move(endpoints->server)]() mutable {
-                    softmac_ifc_server_binding_ =
-                        std::make_unique<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>(
-                            fdf::Dispatcher::GetCurrent()->get(), std::move(server_endpoint), this,
-                            [](fidl::UnbindInfo info) {
-                              if (info.is_user_initiated()) {
-                                linfo("WlanSoftmacIfc server closed.");
-                              } else {
-                                lerror("WlanSoftmacIfc unexpectedly closed: %s",
-                                       info.lossy_description());
-                              }
-                            });
-                  });
-
-  // The protocol functions are stored in this class, which will act as
-  // the server end of WlanSoftmacifc FIDL protocol, and this set of function pointers will be
-  // called in the handler functions of FIDL server end.
-  wlan_softmac_ifc_protocol_ops_ =
-      std::make_unique<wlan_softmac_ifc_protocol_ops_t>(wlan_softmac_ifc_protocol_ops_t{
-          .recv = ifc->ops->recv,
-          .report_tx_result = ifc->ops->report_tx_result,
-          .notify_scan_complete = ifc->ops->scan_complete,
-      });
-
-  wlan_softmac_ifc_protocol_ = std::make_unique<wlan_softmac_ifc_protocol_t>();
-  wlan_softmac_ifc_protocol_->ops = wlan_softmac_ifc_protocol_ops_.get();
-  wlan_softmac_ifc_protocol_->ctx = ifc->ctx;
-
-  auto result = client_.sync().buffer(*std::move(arena))->Start(std::move(endpoints->client));
-  if (!result.ok()) {
-    lerror("change channel failed (FIDL error %s)", result.status_string());
-    return result.status();
+  auto softmac_ifc_bridge = SoftmacIfcBridge::New(softmac_ifc_server_dispatcher_, rust_softmac_ifc,
+                                                  std::move(endpoints->server));
+  if (softmac_ifc_bridge.is_error()) {
+    lerror("Failed to create SoftmacIfcBridge: %s", softmac_ifc_bridge.status_string());
+    return softmac_ifc_bridge.status_value();
   }
-  if (result->is_error()) {
-    lerror("change channel failed (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
+  softmac_ifc_bridge_ = *std::move(softmac_ifc_bridge);
+
+  auto start_response =
+      client_.sync().buffer(*std::move(arena))->Start(std::move(endpoints->client));
+  if (!start_response.ok()) {
+    lerror("change channel failed (FIDL error %s)", start_response.status_string());
+    return start_response.status();
   }
-  *out_sme_channel = std::move(result->value()->sme_channel);
+  if (start_response->is_error()) {
+    lerror("change channel failed (status %s)",
+           zx_status_get_string(start_response->error_value()));
+    return start_response->error_value();
+  }
+  *out_sme_channel = std::move(start_response->value()->sme_channel);
+
   return ZX_OK;
 }
 
@@ -439,58 +422,6 @@ zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) {
     ethernet_proxy_.Status(status);
   }
   return ZX_OK;
-}
-
-void SoftmacBinding::Recv(RecvRequestView request, fdf::Arena& arena,
-                          RecvCompleter::Sync& completer) {
-  WLAN_TRACE_DURATION();
-  wlan_rx_packet_t rx_packet;
-
-  bool use_prealloc_recv_buffer =
-      unlikely(request->packet.mac_frame.count() > PRE_ALLOC_RECV_BUFFER_SIZE);
-  uint8_t* rx_packet_buffer;
-  if (use_prealloc_recv_buffer) {
-    rx_packet_buffer = static_cast<uint8_t*>(malloc(request->packet.mac_frame.count()));
-  } else {
-    rx_packet_buffer = pre_alloc_recv_buffer_;
-  }
-
-  zx_status_t status = ConvertRxPacket(request->packet, &rx_packet, rx_packet_buffer);
-  if (status != ZX_OK) {
-    lerror("RxPacket conversion failed: %s", zx_status_get_string(status));
-  }
-
-  wlan_softmac_ifc_protocol_->ops->recv(wlan_softmac_ifc_protocol_->ctx, &rx_packet);
-  if (use_prealloc_recv_buffer) {
-    // Freeing the frame buffer allocated in ConvertRxPacket() above.
-    memset(const_cast<uint8_t*>(rx_packet.mac_frame_buffer), 0, rx_packet.mac_frame_size);
-    free(const_cast<uint8_t*>(rx_packet.mac_frame_buffer));
-  } else {
-    memset(pre_alloc_recv_buffer_, 0, PRE_ALLOC_RECV_BUFFER_SIZE);
-  }
-
-  completer.buffer(arena).Reply();
-}
-
-void SoftmacBinding::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
-                                    ReportTxResultCompleter::Sync& completer) {
-  WLAN_TRACE_DURATION();
-  wlan_tx_result_t tx_result;
-  zx_status_t status = ConvertTxStatus(request->tx_result, &tx_result);
-  if (status != ZX_OK) {
-    lerror("TxStatus conversion failed: %s", zx_status_get_string(status));
-  }
-
-  wlan_softmac_ifc_protocol_->ops->report_tx_result(wlan_softmac_ifc_protocol_->ctx, &tx_result);
-
-  completer.buffer(arena).Reply();
-}
-void SoftmacBinding::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
-                                        NotifyScanCompleteCompleter::Sync& completer) {
-  WLAN_TRACE_DURATION();
-  wlan_softmac_ifc_protocol_->ops->notify_scan_complete(wlan_softmac_ifc_protocol_->ctx,
-                                                        request->status(), request->scan_id());
-  completer.buffer(arena).Reply();
 }
 
 }  // namespace wlan::drivers::wlansoftmac

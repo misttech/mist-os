@@ -52,6 +52,8 @@ source_set("source_set") {
     "softmac_binding.h",
     "softmac_bridge.cc",
     "softmac_bridge.h",
+    "softmac_ifc_bridge.cc",
+    "softmac_ifc_bridge.h",
   ]
 
   public_deps = [

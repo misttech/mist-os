@@ -12,6 +12,7 @@
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
 #include <lib/operation/ethernet.h>
+#include <lib/zx/result.h>
 
 #include "device_interface.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
