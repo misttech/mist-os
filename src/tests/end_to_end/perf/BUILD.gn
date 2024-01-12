@@ -190,7 +190,6 @@ if (is_host) {
     # keep-sorted start
     "fuchsia.fidl_microbenchmarks.go.txt",
     "fuchsia.fidl_microbenchmarks.libfidl.txt",
-    "fuchsia.fidl_microbenchmarks.reference.txt",
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
     "fuchsia.microbenchmarks.tracing.txt",

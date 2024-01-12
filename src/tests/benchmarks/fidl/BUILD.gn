@@ -10,7 +10,6 @@ group("benchmarks-under-migration") {
     "fidlc:fidlc_microbenchmarks",
     "go",
     "lib-fidl",
-    "reference",
   ]
 }
 
@@ -20,6 +19,7 @@ _tests = [
   "driver_llcpp",
   "hlcpp",
   "llcpp",
+  "reference",
   "rust",
 ]
 

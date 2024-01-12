@@ -41,7 +41,9 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("reference") {
+fuchsia_package_with_single_component("fidl_microbenchmarks_reference") {
   testonly = true
+  manifest = "meta/benchmark.cml"
+  component_name = "benchmark"
   deps = [ ":bin" ]
 }

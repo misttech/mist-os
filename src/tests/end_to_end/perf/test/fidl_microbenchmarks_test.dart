@@ -50,8 +50,6 @@ void main(List<String> args) {
 
   runPerftestFidlBenchmark(
       'lib_fidl_microbenchmarks', 'fuchsia.fidl_microbenchmarks.libfidl.txt');
-  runPerftestFidlBenchmark('reference_fidl_microbenchmarks',
-      'fuchsia.fidl_microbenchmarks.reference.txt');
 
   _tests
     ..add(() {
