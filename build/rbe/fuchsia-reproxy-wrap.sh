@@ -290,7 +290,6 @@ _timetrace "Bootstrapping reproxy"
   "$bootstrap" \
   --re_proxy="$reproxy" \
   --cfg="$reproxy_cfg" \
-  "${auth_option[@]}" \
   "${bootstrap_options[@]}" > "$reproxy_logdir"/bootstrap.stdout
 [[ "$verbose" != 1 ]] || {
   cat "$reproxy_logdir"/bootstrap.stdout
