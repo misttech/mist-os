@@ -5,28 +5,14 @@
 //! Common utilities used by both directory and file traits.
 
 use {
-    fidl::endpoints::ServerEnd,
-    fidl::prelude::*,
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
-    futures::StreamExt as _,
-    libc,
-    std::{convert::TryFrom, sync::Arc},
+    fidl::endpoints::ServerEnd, fidl::prelude::*, fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status, futures::StreamExt as _, libc, std::sync::Arc,
 };
 
 pub use vfs_macros::attribute_query;
 
 /// Set of known rights.
 const FS_RIGHTS: fio::OpenFlags = fio::OPEN_RIGHTS;
-
-/// Flags visible to GetFlags. These are flags that have meaning after the open call; all other
-/// flags are only significant at open time.
-pub const GET_FLAGS_VISIBLE: fio::OpenFlags = fio::OpenFlags::empty()
-    .union(fio::OpenFlags::RIGHT_READABLE)
-    .union(fio::OpenFlags::RIGHT_WRITABLE)
-    .union(fio::OpenFlags::RIGHT_EXECUTABLE)
-    .union(fio::OpenFlags::APPEND)
-    .union(fio::OpenFlags::NODE_REFERENCE);
 
 /// Returns true if the rights flags in `flags` do not exceed those in `parent_flags`.
 pub fn stricter_or_same_rights(parent_flags: fio::OpenFlags, flags: fio::OpenFlags) -> bool {
@@ -66,28 +52,6 @@ pub fn inherit_rights_for_clone(
     flags &= !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
 
     Ok(flags)
-}
-
-/// Returns the current time in UTC nanoseconds since the UNIX epoch.
-pub fn current_time() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| u64::try_from(d.as_nanos()).unwrap_or(0u64))
-        .unwrap_or(0u64)
-}
-
-/// Creates a default-initialized NodeAttributes. Exists because NodeAttributes does not implement
-/// Default.
-pub fn node_attributes() -> fio::NodeAttributes {
-    fio::NodeAttributes {
-        id: 0,
-        mode: 0,
-        content_size: 0,
-        storage_size: 0,
-        link_count: 0,
-        modification_time: 0,
-        creation_time: 0,
-    }
 }
 
 /// A helper method to send OnOpen event on the handle owned by the `server_end` in case `flags`

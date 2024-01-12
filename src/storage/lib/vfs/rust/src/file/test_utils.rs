@@ -11,9 +11,6 @@ use crate::{
 
 use {fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, futures::Future, std::sync::Arc};
 
-#[cfg(target_os = "fuchsia")]
-use std::convert::Infallible;
-
 pub use run::{run_client, test_client};
 
 /// A thin wrapper around [`run::run_server_client()`] that sets the `Marker` to be
@@ -88,45 +85,6 @@ macro_rules! assert_vmo_content {
                 String::from_utf8_lossy(expected),
                 String::from_utf8_lossy(&buffer),
             ),
-        }
-    }};
-}
-
-/// Possible errors for the [`report_invalid_vmo_content()`] function.
-pub enum ReportInvalidVmoContentError {
-    /// Failure returned from the `vmo.read()` call.
-    VmoReadFailed(Status),
-}
-
-/// A helper function to panic with a message that includes the VMO content and a specified
-/// `context` message.
-#[cfg(target_os = "fuchsia")]
-pub fn report_invalid_vmo_content(
-    vmo: &fidl::Vmo,
-    context: &str,
-) -> Result<Infallible, ReportInvalidVmoContentError> {
-    // For debugging purposes we print the first 100 bytes.  This is an arbitrary choice.
-    let mut buffer = Vec::with_capacity(100);
-    buffer.resize(100, 0);
-    vmo.read(&mut buffer, 0).map_err(ReportInvalidVmoContentError::VmoReadFailed)?;
-    panic!(
-        "{}.  Content:\n\
-         {:x?}",
-        context, buffer
-    );
-}
-
-/// Wraps a [`report_invalid_vmo_content()`] call, panicking with a descriptive error message for
-/// any `Err` return values.
-#[macro_export]
-macro_rules! report_invalid_vmo_content {
-    ($vmo:expr, $context:expr) => {{
-        use $crate::file::test_utils::{report_invalid_vmo_content, ReportInvalidVmoContentError};
-
-        match report_invalid_vmo_content($vmo, $context).void_unwrap_err() {
-            ReportInvalidVmoContentError::VmoReadFailed(status) => {
-                panic!("`vmo.read(&mut buffer, 0)` failed: {}", status)
-            }
         }
     }};
 }

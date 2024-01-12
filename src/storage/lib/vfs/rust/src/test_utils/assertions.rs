@@ -57,20 +57,6 @@ macro_rules! assert_read_err {
 
 // See comment at the top of the file for why this is a macro.
 #[macro_export]
-macro_rules! assert_read_fidl_err {
-    ($proxy:expr, $expected_error:pat) => {{
-        match $proxy.read(100).await {
-            Err($expected_error) => (),
-            Err(error) => panic!("read() returned unexpected error: {:?}", error),
-            Ok(result) => {
-                panic!("Read succeeded: {:?}", result)
-            }
-        }
-    }};
-}
-
-// See comment at the top of the file for why this is a macro.
-#[macro_export]
 macro_rules! assert_read_fidl_err_closed {
     ($proxy:expr) => {{
         match $proxy.read(100).await {
@@ -144,20 +130,6 @@ macro_rules! assert_write_err {
 
         assert_eq!(result, Err($expected_status));
     }};
-}
-
-// See comment at the top of the file for why this is a macro.
-#[macro_export]
-macro_rules! assert_write_fidl_err {
-    ($proxy:expr, $content:expr, $expected_error:pat) => {
-        match $proxy.write($content.as_bytes()).await {
-            Err($expected_error) => (),
-            Err(error) => panic!("write() returned unexpected error: {:?}", error),
-            Ok(result) => {
-                panic!("Write succeeded: {:?}", result)
-            }
-        }
-    };
 }
 
 // See comment at the top of the file for why this is a macro.
@@ -320,18 +292,6 @@ macro_rules! assert_close {
     }};
 }
 
-// See comment at the top of the file for why this is a macro.
-#[macro_export]
-macro_rules! assert_close_err {
-    ($proxy:expr, $expected_status:expr) => {{
-        use $crate::test_utils::assertions::reexport::Status;
-
-        let status = $proxy.close().await.expect("close failed");
-
-        assert_eq!(Status::from_raw(status), $expected_status);
-    }};
-}
-
 // PartialEq is not defined for FileEvent for the moment.
 // Because of that I can not write a macro that would just accept a FileEvent instance to
 // compare against:
@@ -360,22 +320,6 @@ macro_rules! assert_event {
 
 // See comment at the top of the file for why this is a macro.
 #[macro_export]
-macro_rules! assert_no_event {
-    ($proxy:expr) => {{
-        use $crate::test_utils::assertions::reexport::StreamExt;
-
-        let event_stream = $proxy.take_event_stream();
-        match event_stream.into_future().await {
-            (None, _) => (),
-            (unexpected, _) => {
-                panic!("Unexpected event: {:?}", unexpected);
-            }
-        }
-    }};
-}
-
-// See comment at the top of the file for why this is a macro.
-#[macro_export]
 macro_rules! open_get_proxy_assert {
     ($proxy:expr, $flags:expr, $path:expr, $new_proxy_type:ty, $expected_pattern:pat,
      $expected_assertion:block) => {{
@@ -383,32 +327,6 @@ macro_rules! open_get_proxy_assert {
         let new_proxy = open_get_proxy::<$new_proxy_type>($proxy, $flags, $path);
         assert_event!(new_proxy, $expected_pattern, $expected_assertion);
         new_proxy
-    }};
-}
-
-// See comment at the top of the file for why this is a macro.
-#[macro_export]
-macro_rules! open_get_file_proxy_assert_ok {
-    ($proxy:expr, $flags:expr, $path:expr) => {{
-        use $crate::test_utils::assertions::reexport::{fio, Status};
-
-        open_get_proxy_assert!(
-            $proxy,
-            $flags,
-            $path,
-            fio::FileMarker,
-            fio::FileEvent::OnOpen_ { s, info },
-            {
-                assert_eq!(Status::from_raw(s), Status::OK);
-                assert_eq!(
-                    info,
-                    Some(Box::new(fio::NodeInfoDeprecated::File(fio::FileObject {
-                        event: None,
-                        stream: None
-                    }))),
-                );
-            }
-        )
     }};
 }
 
@@ -510,31 +428,6 @@ macro_rules! clone_get_proxy_assert {
         let new_proxy = clone_get_proxy::<$new_proxy_type, _>($proxy, $flags);
         assert_event!(new_proxy, $expected_pattern, $expected_assertion);
         new_proxy
-    }};
-}
-
-// See comment at the top of the file for why this is a macro.
-#[macro_export]
-macro_rules! clone_get_file_proxy_assert_ok {
-    ($proxy:expr, $flags:expr) => {{
-        use $crate::test_utils::assertions::reexport::{fio, Status};
-
-        clone_get_proxy_assert!(
-            $proxy,
-            $flags,
-            fio::FileMarker,
-            fio::FileEvent::OnOpen_ { s, info },
-            {
-                assert_eq!(Status::from_raw(s), Status::OK);
-                assert_eq!(
-                    info,
-                    Some(Box::new(fio::NodeInfoDeprecated::File(fio::FileObject {
-                        event: None,
-                        stream: None
-                    }))),
-                );
-            }
-        )
     }};
 }
 
@@ -749,11 +642,6 @@ macro_rules! assert_read_dirents_err {
 }
 
 #[macro_export]
-macro_rules! vec_string {
-    ($($x:expr),*) => (vec![$($x.to_string()),*]);
-}
-
-#[macro_export]
 macro_rules! assert_channel_closed {
     ($channel:expr) => {{
         use $crate::test_utils::assertions::reexport::{MessageBuf, Status};
@@ -890,18 +778,6 @@ macro_rules! assert_rename_err {
 
         assert!(status.is_err());
         assert_eq!(status.err().unwrap(), $expected_status.into_raw());
-    }};
-}
-
-// See comment at the top of the file for why this is a macro.
-#[macro_export]
-macro_rules! assert_link {
-    ($proxy:expr, $src:expr, $dst_parent_token:expr, $dst:expr) => {{
-        use $crate::test_utils::assertions::reexport::Status;
-
-        let status = $proxy.link($src, $dst_parent_token, $dst).await.expect("link failed");
-
-        assert_eq!(Status::from_raw(status), Status::OK);
     }};
 }
 

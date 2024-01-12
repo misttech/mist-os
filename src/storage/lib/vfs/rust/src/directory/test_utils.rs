@@ -106,17 +106,6 @@ macro_rules! assert_rewind {
     }};
 }
 
-/// Opens the specified path as a file and checks its content.  Also see all the `assert_*` macros
-/// in `../test_utils.rs`.
-#[macro_export]
-macro_rules! open_as_file_assert_content {
-    ($proxy:expr, $flags:expr, $path:expr, $expected_content:expr) => {{
-        let file = open_get_file_proxy_assert_ok!($proxy, $flags, $path);
-        assert_read!(file, $expected_content);
-        assert_close!(file);
-    }};
-}
-
 /// Opens the specified path as a VMO file and checks its content.  Also see all the `assert_*`
 /// macros in `../test_utils.rs`.
 #[macro_export]
