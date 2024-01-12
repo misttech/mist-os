@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::run_component_features;
 use anyhow::{anyhow, bail, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
@@ -16,7 +17,6 @@ use futures::{channel::oneshot, FutureExt, StreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use starnix_core::{
-    device::run_component_features,
     execution::{
         create_filesystem_from_spec, execute_task_with_prerun_result, parse_numbered_handles,
     },

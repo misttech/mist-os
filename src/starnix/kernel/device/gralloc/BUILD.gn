@@ -1,0 +1,31 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_library("gralloc") {
+  name = "gralloc"
+  edition = "2021"
+  version = "0.1.0"
+  source_root = "lib.rs"
+
+  sources = [
+    "device.rs",
+    "file.rs",
+    "lib.rs",
+  ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.starnix.gralloc:fuchsia.starnix.gralloc_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/starnix/kernel:starnix_core",
+    "//src/starnix/kernel:starnix_logging",
+    "//src/starnix/kernel:starnix_sync",
+    "//src/starnix/lib/starnix-syscalls",
+    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/virtgralloc",
+  ]
+}

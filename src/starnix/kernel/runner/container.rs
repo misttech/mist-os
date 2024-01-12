@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    expose_root, serve_component_runner, serve_container_controller, serve_graphical_presenter,
+    expose_root, get_serial_number, parse_features, run_container_features, serve_component_runner,
+    serve_container_controller, serve_graphical_presenter, Features,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -27,8 +28,9 @@ use fuchsia_zircon::{
 };
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
+use selinux::security_server::SecurityServer;
 use starnix_core::{
-    device::{init_common_devices, parse_features, run_container_features},
+    device::init_common_devices,
     execution::{
         create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
     },
@@ -319,7 +321,7 @@ async fn create_container(
     let features = parse_features(&config.features)?;
     let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
     if features.android_serialno {
-        match starnix_core::device::get_serial_number().await {
+        match get_serial_number().await {
             Ok(serial) => {
                 kernel_cmdline.extend(b" androidboot.serialno=");
                 kernel_cmdline.extend(&*serial);
@@ -342,17 +344,22 @@ async fn create_container(
     };
 
     let node = inspect::component::inspector().root().create_child("container");
+    let security_server = match features.selinux {
+        Some(mode) => Some(SecurityServer::new(mode)),
+        _ => None,
+    };
     let kernel = Kernel::new(
         kernel_cmdline,
-        features,
         svc_dir,
         data_dir,
         profile_provider,
         node.create_child("kernel"),
+        features.aspect_ratio.as_ref(),
+        security_server,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
-    let fs_context =
-        create_fs_context(&kernel, config, &pkg_dir_proxy).source_context("creating FsContext")?;
+    let fs_context = create_fs_context(&kernel, &features, config, &pkg_dir_proxy)
+        .source_context("creating FsContext")?;
     let init_pid = kernel.pids.write().allocate_pid();
     debug_assert!(init_pid == 1);
 
@@ -371,7 +378,7 @@ async fn create_container(
         .source_context("mounting filesystems")?;
 
     // Run all common features that were specified in the .cml.
-    run_container_features(&system_task)?;
+    run_container_features(&system_task, &features)?;
 
     // If there is an init binary path, run it, optionally waiting for the
     // startup_file_path to be created. The task struct is still used
@@ -407,6 +414,7 @@ async fn create_container(
 
 fn create_fs_context(
     kernel: &Arc<Kernel>,
+    features: &Features,
     config: &ConfigWrapper,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error> {
@@ -440,10 +448,10 @@ fn create_fs_context(
     );
     let mut mappings =
         vec![("container".into(), container_fs), ("data".into(), TmpFs::new_fs(kernel))];
-    if kernel.features.custom_artifacts {
+    if features.custom_artifacts {
         mappings.push(("custom_artifacts".into(), TmpFs::new_fs(kernel)));
     }
-    if kernel.features.test_data {
+    if features.test_data {
         mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
     }
     let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());

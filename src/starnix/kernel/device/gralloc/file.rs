@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::MemoryAccessorExt,
-    task::CurrentTask,
-    vfs::{fileops_impl_nonseekable, FileObject, FileOps, InputBuffer, OutputBuffer},
-};
 use fidl_fuchsia_starnix_gralloc as fgralloc;
 use fuchsia_async::LocalExecutor;
+use starnix_core::{
+    mm::MemoryAccessorExt,
+    task::CurrentTask,
+    vfs::{FileObject, FileOps, InputBuffer, OutputBuffer, SeekTarget},
+};
 use starnix_logging::{log_error, log_info, log_warn};
 use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -82,7 +82,19 @@ impl GrallocFile {
 }
 
 impl FileOps for GrallocFile {
-    fileops_impl_nonseekable!();
+    fn is_seekable(&self) -> bool {
+        false
+    }
+
+    fn seek(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _current_offset: starnix_uapi::off_t,
+        _target: SeekTarget,
+    ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
+        error!(ESPIPE)
+    }
 
     fn ioctl(
         &self,

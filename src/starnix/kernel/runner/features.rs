@@ -2,19 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
+use anyhow::{anyhow, Context, Error};
+use bstr::BString;
+use fuchsia_zircon as zx;
+use gralloc::gralloc_device_init;
+use selinux::security_server;
+use starnix_core::{
     device::{
-        ashmem::ashmem_device_init, framebuffer::fb_device_init, gralloc::gralloc_device_init,
-        input::init_input_devices, magma::magma_device_init,
+        ashmem::ashmem_device_init,
+        framebuffer::{fb_device_init, AspectRatio},
+        input::init_input_devices,
+        magma::magma_device_init,
         perfetto_consumer::start_perfetto_consumer_thread,
     },
     task::{CurrentTask, Kernel},
     vfs::FsString,
 };
-use anyhow::{anyhow, Context, Error};
-use bstr::BString;
-use fuchsia_zircon as zx;
-use selinux::security_server;
 use starnix_uapi::{error, errors::Errno};
 use std::sync::Arc;
 
@@ -50,13 +53,6 @@ pub struct Features {
     pub aspect_ratio: Option<AspectRatio>,
 
     pub perfetto: Option<FsString>,
-}
-
-/// An aspect ratio, as defined by the `ASPECT_RATIO` feature.
-#[derive(Default, Debug)]
-pub struct AspectRatio {
-    pub width: u32,
-    pub height: u32,
 }
 
 /// Parses all the featurse in `entries`.
@@ -114,15 +110,15 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
 }
 
 /// Runs all the features that are enabled in `system_task.kernel()`.
-pub fn run_container_features(system_task: &CurrentTask) -> Result<(), Error> {
+pub fn run_container_features(system_task: &CurrentTask, features: &Features) -> Result<(), Error> {
     let kernel = system_task.kernel();
 
     let mut enabled_profiling = false;
-    if kernel.features.framebuffer {
+    if features.framebuffer {
         fb_device_init(system_task);
         init_input_devices(system_task);
     }
-    if kernel.features.gralloc {
+    if features.gralloc {
         // The virtgralloc0 device allows vulkan_selector to indicate to gralloc
         // whether swiftshader or magma will be used. This is separate from the
         // magma feature because the policy choice whether to use magma or
@@ -134,14 +130,14 @@ pub fn run_container_features(system_task: &CurrentTask) -> Result<(), Error> {
         // fail.
         gralloc_device_init(system_task);
     }
-    if kernel.features.magma {
+    if features.magma {
         magma_device_init(system_task);
     }
-    if let Some(socket_path) = kernel.features.perfetto.clone() {
+    if let Some(socket_path) = features.perfetto.clone() {
         start_perfetto_consumer_thread(kernel, socket_path)
             .context("Failed to start perfetto consumer thread")?;
     }
-    if kernel.features.self_profile {
+    if features.self_profile {
         enabled_profiling = true;
         fuchsia_inspect::component::inspector().root().record_lazy_child(
             "self_profile",
@@ -149,7 +145,7 @@ pub fn run_container_features(system_task: &CurrentTask) -> Result<(), Error> {
         );
         fuchsia_inspect_contrib::start_self_profiling();
     }
-    if kernel.features.ashmem {
+    if features.ashmem {
         ashmem_device_init(system_task);
     }
     if !enabled_profiling {

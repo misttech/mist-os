@@ -7,7 +7,7 @@ use super::framebuffer_server::{
     start_flatland_presentation_loop, FramebufferServer,
 };
 use crate::{
-    device::{features::AspectRatio, kobject::DeviceMetadata, DeviceMode, DeviceOps},
+    device::{kobject::DeviceMetadata, DeviceMode, DeviceOps},
     fs::sysfs::DeviceDirectory,
     mm::MemoryAccessorExt,
     task::{CurrentTask, Kernel},
@@ -36,6 +36,12 @@ use starnix_uapi::{
 };
 use std::sync::Arc;
 use zerocopy::AsBytes;
+
+#[derive(Default, Debug)]
+pub struct AspectRatio {
+    pub width: u32,
+    pub height: u32,
+}
 
 pub struct Framebuffer {
     vmo: Arc<zx::Vmo>,

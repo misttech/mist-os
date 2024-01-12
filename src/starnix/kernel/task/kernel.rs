@@ -4,8 +4,10 @@
 
 use crate::{
     device::{
-        framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
-        BinderDriver, DeviceMode, DeviceRegistry, Features,
+        framebuffer::{AspectRatio, Framebuffer},
+        input::InputDevice,
+        loop_device::LoopDeviceRegistry,
+        BinderDriver, DeviceMode, DeviceRegistry,
     },
     fs::proc::SystemLimits,
     mm::{FutexTable, SharedFutexKey},
@@ -103,10 +105,6 @@ pub struct Kernel {
 
     /// The registry of device drivers.
     pub device_registry: DeviceRegistry,
-
-    // The features enabled for the container this kernel is associated with, as specified in
-    // the container's configuration file.
-    pub features: Features,
 
     /// The service directory of the container.
     container_svc: Option<fio::DirectoryProxy>,
@@ -264,25 +262,21 @@ impl InterfacesHandler for InterfacesHandlerImpl {
 impl Kernel {
     pub fn new(
         cmdline: BString,
-        features: Features,
         container_svc: Option<fio::DirectoryProxy>,
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
         profile_provider: Option<ProfileProviderSynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
+        framebuffer_aspect_ratio: Option<&AspectRatio>,
+        security_server: Option<Arc<SecurityServer>>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
         let framebuffer =
-            Framebuffer::new(features.aspect_ratio.as_ref()).expect("Failed to create framebuffer");
+            Framebuffer::new(framebuffer_aspect_ratio).expect("Failed to create framebuffer");
         let input_device = InputDevice::new(framebuffer.clone(), &inspect_node);
 
         let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
-
-        let security_server = match features.selinux {
-            Some(mode) => Some(SecurityServer::new(mode)),
-            _ => None,
-        };
 
         let this = Arc::new_cyclic(|kernel| Kernel {
             kthreads: KernelThreads::new(kernel.clone()),
@@ -303,7 +297,6 @@ impl Kernel {
             security_server,
             trace_fs: OnceCell::new(),
             device_registry: DeviceRegistry::new(),
-            features,
             container_svc,
             container_data_dir,
             loop_device_registry: Default::default(),

@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use super::file::GrallocFile;
-use crate::{
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_starnix_gralloc as fgralloc;
+use starnix_core::{
     device::{kobject::DeviceMetadata, DeviceMode, DeviceOps},
     fs::sysfs::DeviceDirectory,
     task::CurrentTask,
     vfs::{FileOps, FsNode},
 };
-use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_starnix_gralloc as fgralloc;
 use starnix_sync::Mutex;
 use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
 use std::sync::Arc;
