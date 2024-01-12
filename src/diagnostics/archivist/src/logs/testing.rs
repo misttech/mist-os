@@ -7,7 +7,6 @@ use crate::{
     identity::ComponentIdentity,
     logs::{repository::LogsRepository, servers::LogServer},
 };
-use async_trait::async_trait;
 use diagnostics_log_encoding::{encode::Encoder, Record};
 use diagnostics_message::{fx_log_packet_t, MAX_DATAGRAM_LEN};
 use fidl::prelude::*;
@@ -443,18 +442,19 @@ pub struct TestDebugLog {
 }
 type ReadResponse = Result<zx::sys::zx_log_record_t, zx::Status>;
 
-#[async_trait]
 impl crate::logs::debuglog::DebugLog for TestDebugLog {
     fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
         self.read_responses.lock().pop_front().expect("Got more read requests than enqueued")
     }
 
-    async fn ready_signal(&self) -> Result<(), zx::Status> {
-        if self.read_responses.lock().is_empty() {
-            // ready signal should never complete if we have no logs left.
-            futures::future::pending().await
+    fn ready_signal(&self) -> impl Future<Output = Result<(), zx::Status>> + Send {
+        async {
+            if self.read_responses.lock().is_empty() {
+                // ready signal should never complete if we have no logs left.
+                futures::future::pending::<()>().await;
+            }
+            Ok(())
         }
-        Ok(())
     }
 }
 

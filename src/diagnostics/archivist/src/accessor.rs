@@ -13,7 +13,6 @@ use {
         pipeline::Pipeline,
         ImmutableString,
     },
-    async_trait::async_trait,
     diagnostics_data::{Data, DiagnosticsData, Metadata},
     fidl::endpoints::{ControlHandle, RequestStream},
     fidl_fuchsia_diagnostics::{
@@ -31,6 +30,7 @@ use {
     futures::{
         channel::mpsc,
         future::{select, Either},
+        pin_mut,
         prelude::*,
         stream::Peekable,
         StreamExt,
@@ -141,11 +141,11 @@ impl ArchiveAccessorServer {
         self.server_task_sender.lock().disconnect();
     }
 
-    async fn spawn(
+    async fn spawn<R: ArchiveAccessorWriter + Send>(
         pipeline: Arc<Pipeline>,
         inspect_repo: Arc<InspectRepository>,
         log_repo: Arc<LogsRepository>,
-        requests: Box<dyn ArchiveAccessorWriter + Send>,
+        requests: R,
         params: StreamParameters,
         maximum_concurrent_snapshots_per_reader: u64,
     ) -> Result<(), AccessorError> {
@@ -250,6 +250,8 @@ impl ArchiveAccessorServer {
     pub fn spawn_server<RequestStream>(&self, pipeline: Arc<Pipeline>, mut stream: RequestStream)
     where
         RequestStream: ArchiveAccessorTranslator + Send + 'static,
+        <RequestStream as ArchiveAccessorTranslator>::InnerDataRequestChannel:
+            ArchiveAccessorWriter + Send,
     {
         // Self isn't guaranteed to live into the exception handling of the async block. We need to clone self
         // to have a version that can be referenced in the exception handling.
@@ -298,14 +300,16 @@ impl ArchiveAccessorServer {
     }
 }
 
-#[async_trait]
 pub trait ArchiveAccessorWriter {
     /// Writes diagnostics data to the remote side.
-    async fn write(&mut self, results: Vec<FormattedContent>) -> Result<(), IteratorError>;
+    fn write(
+        &mut self,
+        results: Vec<FormattedContent>,
+    ) -> impl Future<Output = Result<(), IteratorError>> + Send;
 
     /// Waits for a buffer to be available for writing into. For sockets, this is a no-op.
-    async fn wait_for_buffer(&mut self) -> anyhow::Result<()> {
-        Ok(())
+    fn wait_for_buffer(&mut self) -> impl Future<Output = anyhow::Result<()>> + Send {
+        futures::future::ready(Ok(()))
     }
 
     /// Takes the control handle from the FIDL stream (or returns None
@@ -315,12 +319,12 @@ pub trait ArchiveAccessorWriter {
     }
 
     /// Sends an on ready event.
-    async fn maybe_respond_ready(&mut self) -> Result<(), AccessorError> {
-        Ok(())
+    fn maybe_respond_ready(&mut self) -> impl Future<Output = Result<(), AccessorError>> + Send {
+        futures::future::ready(Ok(()))
     }
 
     /// Waits for ZX_ERR_PEER_CLOSED
-    async fn wait_for_close(&mut self);
+    fn wait_for_close(&mut self) -> impl Future<Output = ()> + Send;
 }
 
 fn get_buffer_from_formatted_content(
@@ -333,28 +337,32 @@ fn get_buffer_from_formatted_content(
     }
 }
 
-#[async_trait]
 impl ArchiveAccessorWriter for fuchsia_async::Socket {
-    async fn write(&mut self, data: Vec<FormattedContent>) -> Result<(), IteratorError> {
-        if data.is_empty() {
-            return Err(IteratorError::PeerClosed);
-        }
-        let mut buf = vec![0];
-        for value in data {
-            let data = get_buffer_from_formatted_content(value)?;
-            buf.resize(data.size as usize, 0);
-            data.vmo.read(&mut buf, 0)?;
-            let res = self.write_all(&buf).await;
-            if res.is_err() {
-                // connection probably closed.
-                break;
+    fn write(
+        &mut self,
+        data: Vec<FormattedContent>,
+    ) -> impl Future<Output = Result<(), IteratorError>> + Send {
+        async {
+            if data.is_empty() {
+                return Err(IteratorError::PeerClosed);
             }
+            let mut buf = vec![0];
+            for value in data {
+                let data = get_buffer_from_formatted_content(value)?;
+                buf.resize(data.size as usize, 0);
+                data.vmo.read(&mut buf, 0)?;
+                let res = self.write_all(&buf).await;
+                if res.is_err() {
+                    // connection probably closed.
+                    break;
+                }
+            }
+            Ok(())
         }
-        Ok(())
     }
 
-    async fn wait_for_close(&mut self) {
-        let _ = self.on_closed().await;
+    fn wait_for_close(&mut self) -> impl Future<Output = ()> + Send {
+        self.on_closed().map(|_| ())
     }
 }
 
@@ -376,109 +384,131 @@ pub enum IteratorError {
     },
 }
 
-#[async_trait]
 impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
-    async fn write(&mut self, data: Vec<FormattedContent>) -> Result<(), IteratorError> {
-        loop {
-            // TODO(https://fxbug.dev/126547): Fix compiler bug.
-            match __self.next().await {
-                Some(Ok(BatchIteratorRequest::GetNext { responder })) => {
-                    responder.send(Ok(data))?;
-                    return Ok(());
-                }
-                Some(Ok(BatchIteratorRequest::WaitForReady { responder })) => {
-                    responder.send()?;
-                }
-                Some(Ok(BatchIteratorRequest::_UnknownMethod { .. })) => {
-                    return Err(IteratorError::PeerClosed);
-                }
-                Some(Err(err)) => return Err(err.into()),
-                None => {
-                    return Err(IteratorError::PeerClosed);
+    fn write(
+        &mut self,
+        data: Vec<FormattedContent>,
+    ) -> impl Future<Output = Result<(), IteratorError>> + Send {
+        async {
+            loop {
+                match self.next().await {
+                    Some(Ok(BatchIteratorRequest::GetNext { responder })) => {
+                        responder.send(Ok(data))?;
+                        return Ok(());
+                    }
+                    Some(Ok(BatchIteratorRequest::WaitForReady { responder })) => {
+                        responder.send()?;
+                    }
+                    Some(Ok(BatchIteratorRequest::_UnknownMethod { .. })) => {
+                        return Err(IteratorError::PeerClosed);
+                    }
+                    Some(Err(err)) => return Err(err.into()),
+                    None => {
+                        return Err(IteratorError::PeerClosed);
+                    }
                 }
             }
         }
     }
 
-    async fn maybe_respond_ready(&mut self) -> Result<(), AccessorError> {
-        let mut this = Pin::new(self);
-        if matches!(this.as_mut().peek().await, Some(Ok(BatchIteratorRequest::WaitForReady { .. })))
-        {
-            let Some(Ok(BatchIteratorRequest::WaitForReady { responder })) = this.next().await
-            else {
-                unreachable!("We already checked the next request was WaitForReady");
-            };
-            responder.send()?;
+    fn maybe_respond_ready(&mut self) -> impl Future<Output = Result<(), AccessorError>> + Send {
+        async {
+            let mut this = Pin::new(self);
+            if matches!(
+                this.as_mut().peek().await,
+                Some(Ok(BatchIteratorRequest::WaitForReady { .. }))
+            ) {
+                let Some(Ok(BatchIteratorRequest::WaitForReady { responder })) = this.next().await
+                else {
+                    unreachable!("We already checked the next request was WaitForReady");
+                };
+                responder.send()?;
+            }
+            Ok(())
         }
-        Ok(())
     }
 
-    async fn wait_for_buffer(&mut self) -> anyhow::Result<()> {
-        if let Some(Ok(_)) = Pin::new(self).peek().await {
-            Ok(())
-        } else {
+    fn wait_for_buffer(&mut self) -> impl Future<Output = anyhow::Result<()>> + Send {
+        Pin::new(self).peek().map(|result| {
+            if let Some(Ok(_)) = result {
+                return Ok(());
+            }
             Err(IteratorError::PeerClosed.into())
-        }
+        })
     }
 
     fn get_control_handle(&self) -> Option<BatchIteratorControlHandle> {
         Some(self.get_ref().control_handle())
     }
 
-    async fn wait_for_close(&mut self) {
-        let _ = self.get_ref().control_handle().on_closed().await;
+    fn wait_for_close(&mut self) -> impl Future<Output = ()> + Send {
+        async {
+            let _ = self.get_ref().control_handle().on_closed().await;
+        }
     }
 }
 
-pub struct ArchiveIteratorRequest {
+pub struct ArchiveIteratorRequest<R> {
     parameters: StreamParameters,
-    iterator: Box<dyn ArchiveAccessorWriter + Send>,
+    iterator: R,
 }
 
 /// Translation trait used to support both remote and
 /// local ArchiveAccessor implementations.
-#[async_trait]
 pub trait ArchiveAccessorTranslator {
-    async fn next(&mut self) -> Option<ArchiveIteratorRequest>;
+    type InnerDataRequestChannel;
+    fn next(
+        &mut self,
+    ) -> impl Future<Output = Option<ArchiveIteratorRequest<Self::InnerDataRequestChannel>>> + Send;
 }
 
-#[async_trait]
 impl ArchiveAccessorTranslator for fhost::ArchiveAccessorRequestStream {
-    async fn next(&mut self) -> Option<ArchiveIteratorRequest> {
-        let Some(Ok(fhost::ArchiveAccessorRequest::StreamDiagnostics {
-            parameters,
-            responder,
-            stream,
-        })) = StreamExt::next(&mut __self).await
-        else {
-            return None;
-        };
-        // It's fine for the client to send us a socket
-        // and discard the channel without waiting for a response.
-        // Future communication takes place over the socket so
-        // the client may opt to use this as an optimization.
-        let _ = responder.send();
-        Some(ArchiveIteratorRequest {
-            iterator: Box::new(fuchsia_async::Socket::from_socket(stream)),
-            parameters,
+    type InnerDataRequestChannel = fuchsia_async::Socket;
+
+    fn next(
+        &mut self,
+    ) -> impl Future<Output = Option<ArchiveIteratorRequest<Self::InnerDataRequestChannel>>> + Send
+    {
+        StreamExt::next(self).map(|request| {
+            match request {
+                Some(Ok(fhost::ArchiveAccessorRequest::StreamDiagnostics {
+                    parameters,
+                    responder,
+                    stream,
+                })) => {
+                    // It's fine for the client to send us a socket
+                    // and discard the channel without waiting for a response.
+                    // Future communication takes place over the socket so
+                    // the client may opt to use this as an optimization.
+                    let _ = responder.send();
+                    Some(ArchiveIteratorRequest {
+                        iterator: fuchsia_async::Socket::from_socket(stream),
+                        parameters,
+                    })
+                }
+                _ => None,
+            }
         })
     }
 }
 
-#[async_trait]
 impl ArchiveAccessorTranslator for ArchiveAccessorRequestStream {
-    async fn next(&mut self) -> Option<ArchiveIteratorRequest> {
-        let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
-            control_handle: _,
-            result_stream,
-            stream_parameters,
-        })) = StreamExt::next(&mut __self).await
-        else {
-            return None;
-        };
-        Some(ArchiveIteratorRequest {
-            iterator: Box::new(result_stream.into_stream().unwrap().peekable()),
-            parameters: stream_parameters,
+    type InnerDataRequestChannel = Peekable<BatchIteratorRequestStream>;
+
+    fn next(
+        &mut self,
+    ) -> impl Future<Output = Option<ArchiveIteratorRequest<Self::InnerDataRequestChannel>>> + Send
+    {
+        StreamExt::next(self).map(|request| match request {
+            Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
+                control_handle: _,
+                result_stream,
+                stream_parameters,
+            })) => Some(ArchiveIteratorRequest {
+                iterator: result_stream.into_stream().unwrap().peekable(),
+                parameters: stream_parameters,
+            }),
+            _ => None,
         })
     }
 }
@@ -493,8 +523,8 @@ impl SchemaTruncationCounter {
     }
 }
 
-pub(crate) struct BatchIterator {
-    requests: Box<dyn ArchiveAccessorWriter + Send>,
+pub(crate) struct BatchIterator<R> {
+    requests: R,
     stats: Arc<BatchIteratorConnectionStats>,
     data: FormattedStream,
     truncation_counter: Option<Arc<Mutex<SchemaTruncationCounter>>>,
@@ -525,10 +555,13 @@ fn maybe_update_budget(
     }
 }
 
-impl BatchIterator {
+impl<R> BatchIterator<R>
+where
+    R: ArchiveAccessorWriter + Send,
+{
     pub fn new<Items, D>(
         data: Items,
-        requests: Box<dyn ArchiveAccessorWriter + Send>,
+        requests: R,
         mode: StreamMode,
         stats: Arc<BatchIteratorConnectionStats>,
         per_component_byte_limit_opt: Option<usize>,
@@ -613,7 +646,7 @@ impl BatchIterator {
 
     pub fn new_serving_arrays<D, S>(
         data: S,
-        requests: Box<dyn ArchiveAccessorWriter + Send>,
+        requests: R,
         mode: StreamMode,
         stats: Arc<BatchIteratorConnectionStats>,
         parent_trace_id: ftrace::Id,
@@ -638,7 +671,7 @@ impl BatchIterator {
 
     fn new_inner(
         data: FormattedStream,
-        requests: Box<dyn ArchiveAccessorWriter + Send>,
+        requests: R,
         stats: Arc<BatchIteratorConnectionStats>,
         truncation_counter: Option<Arc<Mutex<SchemaTruncationCounter>>>,
         parent_trace_id: ftrace::Id,
@@ -662,11 +695,16 @@ impl BatchIterator {
                 "parent_trace_id" => u64::from(self.parent_trace_id),
                 "trace_id" => u64::from(trace_id)
             );
-            let batch = match select(self.data.next(), self.requests.wait_for_close()).await {
-                // if we get None back, treat that as a terminal batch with an empty vec
-                Either::Left((batch_option, _)) => batch_option.unwrap_or_default(),
-                // if the client closes the channel, stop waiting and terminate.
-                Either::Right(_) => break,
+            let batch = {
+                let wait_for_close = self.requests.wait_for_close();
+                let next_data = self.data.next();
+                pin_mut!(wait_for_close);
+                match select(next_data, wait_for_close).await {
+                    // if we get None back, treat that as a terminal batch with an empty vec
+                    Either::Left((batch_option, _)) => batch_option.unwrap_or_default(),
+                    // if the client closes the channel, stop waiting and terminate.
+                    Either::Right(_) => break,
+                }
             };
 
             // turn errors into epitaphs -- we drop intermediate items if there was an error midway
@@ -698,7 +736,7 @@ impl BatchIterator {
     }
 }
 
-impl Drop for BatchIterator {
+impl<R> Drop for BatchIterator<R> {
     fn drop(&mut self) {
         self.stats.close_connection();
     }
@@ -917,15 +955,18 @@ mod tests {
         let (local, remote) = fuchsia_zircon::Socket::create_stream();
         drop(local);
         let mut remote = fuchsia_async::Socket::from_socket(remote);
-        let remote_writer = &mut remote as &mut dyn ArchiveAccessorWriter;
         {
-            let mut fut = remote_writer.write(vec![FormattedContent::Text(Buffer {
-                size: 1,
-                vmo: fuchsia_zircon::Vmo::create(1).unwrap(),
-            })]);
+            let fut = ArchiveAccessorWriter::write(
+                &mut remote,
+                vec![FormattedContent::Text(Buffer {
+                    size: 1,
+                    vmo: fuchsia_zircon::Vmo::create(1).unwrap(),
+                })],
+            );
+            pin_mut!(fut);
             assert_matches!(executor.run_singlethreaded(&mut fut), Ok(()));
         }
-        let mut fut = remote_writer.wait_for_close();
+        let mut fut = remote.wait_for_close();
         executor.run_singlethreaded(&mut fut);
     }
 
@@ -937,7 +978,7 @@ mod tests {
         // Create a batch iterator that uses a hung stream to serve logs.
         let batch_iterator = BatchIterator::new(
             futures::stream::pending::<diagnostics_data::Data<diagnostics_data::Logs>>(),
-            Box::new(stream.peekable()),
+            stream.peekable(),
             StreamMode::Subscribe,
             Arc::new(AccessorStats::new(Node::default()).new_inspect_batch_iterator()),
             None,

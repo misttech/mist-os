@@ -8,17 +8,19 @@ use crate::{
     identity::ComponentIdentity,
     logs::{error::LogsError, stored_message::StoredMessage},
 };
-use async_trait::async_trait;
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity};
 use fidl::prelude::*;
 use fidl_fuchsia_boot::ReadOnlyLogMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
-use futures::stream::{unfold, Stream};
+use futures::{
+    stream::{unfold, Stream},
+    TryFutureExt,
+};
 use lazy_static::lazy_static;
 use moniker::ExtendedMoniker;
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
 pub const KERNEL_URL: &str = "fuchsia-boot://kernel";
 lazy_static! {
@@ -27,28 +29,26 @@ lazy_static! {
     };
 }
 
-#[async_trait]
 pub trait DebugLog {
     /// Reads a single entry off the debug log into `buffer`.  Any existing
     /// contents in `buffer` are overwritten.
     fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status>;
 
     /// Returns a future that completes when there is another log to read.
-    async fn ready_signal(&self) -> Result<(), zx::Status>;
+    fn ready_signal(&self) -> impl Future<Output = Result<(), zx::Status>> + Send;
 }
 
 pub struct KernelDebugLog {
     debuglogger: zx::DebugLog,
 }
 
-#[async_trait]
 impl DebugLog for KernelDebugLog {
     fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
         self.debuglogger.read()
     }
 
-    async fn ready_signal(&self) -> Result<(), zx::Status> {
-        fasync::OnSignals::new(&self.debuglogger, zx::Signals::LOG_READABLE).await.map(|_| ())
+    fn ready_signal(&self) -> impl Future<Output = Result<(), zx::Status>> + Send {
+        fasync::OnSignals::new(&self.debuglogger, zx::Signals::LOG_READABLE).map_ok(|_| ())
     }
 }
 
