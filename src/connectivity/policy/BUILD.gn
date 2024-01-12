@@ -6,5 +6,8 @@ import("//build/components.gni")
 
 group("tests") {
   testonly = true
-  deps = [ "netcfg:tests" ]
+  deps = [
+    "netcfg:tests",
+    "reachability:tests",
+  ]
 }

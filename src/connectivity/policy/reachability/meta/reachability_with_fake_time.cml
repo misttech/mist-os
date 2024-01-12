@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/connectivity/network/reachability/meta/reachability_base.shard.cml",
+        "//src/connectivity/policy/reachability/meta/reachability_base.shard.cml",
         "//src/lib/fake-clock/lib/client.shard.cml",
     ],
     program: {

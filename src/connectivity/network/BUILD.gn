@@ -126,7 +126,6 @@ group("tests") {
     "netstack:tests",
     "netstack-proxy:tests",
     "netstack3:tests",
-    "reachability:tests",
     "testing:tests",
     "tests",
     "tools:tests",

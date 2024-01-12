@@ -27,7 +27,6 @@ include /src/connectivity/network/dns/OWNERS
 include /src/connectivity/network/net-cli/OWNERS
 include /src/connectivity/network/netlink/OWNERS
 include /src/connectivity/network/netstack3/OWNERS
-include /src/connectivity/network/reachability/OWNERS
 include /src/connectivity/network/testing/netemul/OWNERS
 include /src/connectivity/network/testing/network-test-realm/ffx/OWNERS
 include /src/connectivity/network/tests/benchmarks/OWNERS
@@ -35,6 +34,7 @@ include /src/connectivity/network/tests/fidl/OWNERS
 include /src/connectivity/network/tests/integration/OWNERS
 include /src/connectivity/network/tests/integration/common/OWNERS
 include /src/connectivity/policy/netcfg/OWNERS
+include /src/connectivity/policy/reachability/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/daemon/protocols/repo/OWNERS
