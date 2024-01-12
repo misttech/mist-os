@@ -519,7 +519,9 @@ async fn reflink(src_path: &Utf8Path, dst_path: &Utf8Path) -> Result<(), std::io
                 // The filesystem does not support reflinks.
                 libc::EOPNOTSUPP |
                 // src_path and dst_path are different filesystems.
-                libc::EXDEV => {
+                libc::EXDEV |
+                // An invalid ioctl number was specified in an ioctl system call.
+                libc::ENOTTY => {
                     Err(std::io::Error::new(std::io::ErrorKind::Unsupported, err))
                 }
                 _ => Err(err),
