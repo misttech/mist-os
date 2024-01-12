@@ -47,7 +47,9 @@ go_library("go_fidl_microbenchmarks_lib") {
   sources = [ "main.go" ]
 }
 
-fuchsia_shell_package("go") {
+fuchsia_package_with_single_component("fidl_microbenchmarks_go") {
   testonly = true
+  manifest = "meta/benchmark.cml"
+  component_name = "benchmark"
   deps = [ ":go_fidl_microbenchmarks_bin" ]
 }

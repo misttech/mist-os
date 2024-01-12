@@ -188,7 +188,6 @@ foreach(test, _tests) {
 if (is_host) {
   metric_files = [
     # keep-sorted start
-    "fuchsia.fidl_microbenchmarks.go.txt",
     "fuchsia.fidl_microbenchmarks.libfidl.txt",
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
