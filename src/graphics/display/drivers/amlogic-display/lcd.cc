@@ -24,29 +24,29 @@ namespace amlogic_display {
 
 namespace {
 
-static zx_status_t CheckMipiReg(ddk::DsiImplProtocolClient* dsiimpl, uint8_t reg, size_t count) {
+zx_status_t CheckDsiDeviceRegister(ddk::DsiImplProtocolClient* dsiimpl, uint8_t reg, size_t count) {
   ZX_DEBUG_ASSERT(count > 0);
 
-  const uint8_t payload[3] = {kMipiDsiDtGenShortRead1, 1, reg};
-  uint8_t rsp[count];
+  const uint8_t payload = reg;
+
+  // TODO(https://fxbug.dev/42085293): Replace the VLA with a fixed-size
+  // array with size limits.
+  uint8_t response[count];
+
   mipi_dsi_cmd_t cmd{
       .virt_chn_id = kMipiDsiVirtualChanId,
       .dsi_data_type = kMipiDsiDtGenShortRead1,
-      .pld_data_list = payload,
+      .pld_data_list = &payload,
       .pld_data_count = 1,
-      .rsp_data_list = rsp,
+      .rsp_data_list = response,
       .rsp_data_count = count,
       .flags = MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX,
   };
 
-  zx_status_t status;
-  if ((status = dsiimpl->SendCmd(&cmd, 1)) != ZX_OK) {
-    zxlogf(ERROR, "Could not read register %c", reg);
+  zx_status_t status = dsiimpl->SendCmd(&cmd, 1);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not read register %d", reg);
     return status;
-  }
-  if (cmd.rsp_data_count != count) {
-    zxlogf(ERROR, "MIPI-DSI register read was short: got %zu want %zu. Ignoring",
-           cmd.rsp_data_count, count);
   }
   return ZX_OK;
 }
@@ -150,8 +150,8 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
         if (payload_size != 2) {
           zxlogf(ERROR, "Invalid MIPI-DSI reg check, expected a register and a target value!");
         }
-        status = CheckMipiReg(&dsiimpl_, /*reg=*/encoded_commands[i + 2],
-                              /*count=*/encoded_commands[i + 3]);
+        status = CheckDsiDeviceRegister(&dsiimpl_, /*reg=*/encoded_commands[i + 2],
+                                        /*count=*/encoded_commands[i + 3]);
         if (status != ZX_OK) {
           zxlogf(ERROR, "Error reading MIPI register 0x%x: %s", encoded_commands[i + 2],
                  zx_status_get_string(status));
