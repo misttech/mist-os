@@ -31,13 +31,13 @@ namespace {
 
 template <typename V>
 void AddAnnotation(const std::string& key, const V& value, feedback::Annotations& annotations) {
-  annotations.insert({key, std::to_string(value)});
+  annotations.insert({key, ErrorOrString(std::to_string(value))});
 }
 
 template <>
 void AddAnnotation<std::string>(const std::string& key, const std::string& value,
                                 feedback::Annotations& annotations) {
-  annotations.insert({key, value});
+  annotations.insert({key, ErrorOrString(value)});
 }
 
 }  // namespace

@@ -18,7 +18,7 @@
 namespace forensics::feedback {
 
 struct DeviceIdToAnnotations {
-  Annotations operator()(const ErrorOr<std::string>& device_id);
+  Annotations operator()(const std::string& device_id);
 };
 
 // Fetches the device id from the file at |path|.

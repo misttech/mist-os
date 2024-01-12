@@ -15,8 +15,8 @@ namespace crash_reports {
 // Crash server product associated with the crash report.
 struct Product {
   std::string name;
-  ErrorOr<std::string> version;
-  ErrorOr<std::string> channel;
+  ErrorOrString version;
+  ErrorOrString channel;
 
   bool IsDefaultPlatformProduct() const;
 

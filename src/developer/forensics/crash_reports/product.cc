@@ -12,8 +12,8 @@ bool Product::IsDefaultPlatformProduct() const { return *this == DefaultPlatform
 Product Product::DefaultPlatformProduct() {
   return Product{
       .name = "Fuchsia",
-      .version = Error::kMissingValue,
-      .channel = Error::kMissingValue,
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
   };
 }
 

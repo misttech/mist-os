@@ -21,12 +21,11 @@ TEST(TargetChannelToAnnotationsTest, Convert) {
   TargetChannelToAnnotations convert;
 
   EXPECT_THAT(convert(""), UnorderedElementsAreArray({
-                               Pair(kSystemUpdateChannelTargetKey, ErrorOr<std::string>("")),
+                               Pair(kSystemUpdateChannelTargetKey, ErrorOrString("")),
                            }));
-  EXPECT_THAT(convert("channel"),
-              UnorderedElementsAreArray({
-                  Pair(kSystemUpdateChannelTargetKey, ErrorOr<std::string>("channel")),
-              }));
+  EXPECT_THAT(convert("channel"), UnorderedElementsAreArray({
+                                      Pair(kSystemUpdateChannelTargetKey, ErrorOrString("channel")),
+                                  }));
   EXPECT_THAT(convert(Error::kConnectionError),
               UnorderedElementsAreArray({
                   Pair(kSystemUpdateChannelTargetKey, Error::kConnectionError),

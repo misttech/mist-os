@@ -155,7 +155,7 @@ class DataProviderTest : public UnitTestFixture {
   void SetUpDataProvider(
       const std::set<std::string>& annotation_allowlist = kDefaultAnnotations,
       const feedback::AttachmentKeys& attachment_allowlist = {},
-      const std::map<std::string, ErrorOr<std::string>>& startup_annotations = {},
+      const std::map<std::string, ErrorOrString>& startup_annotations = {},
       const std::map<std::string, feedback::AttachmentProvider*>& attachment_providers = {}) {
     std::set<std::string> allowlist;
     for (const auto& [k, v] : startup_annotations) {
@@ -543,7 +543,7 @@ TEST_F(DataProviderTest, GetSnapshot_SingleAttachmentOnEmptyAttachmentAllowlist)
 
 TEST_F(DataProviderTest, GetSnapshot_ErrorAnnotationsNotInFidl) {
   SetUpDataProvider(kDefaultAnnotations, /*attachment_allowlist=*/{},
-                    {{"annotation1", Error::kMissingValue}});
+                    {{"annotation1", ErrorOrString(Error::kMissingValue)}});
 
   Snapshot snapshot = GetSnapshot();
   EXPECT_FALSE(snapshot.has_annotations());
@@ -551,7 +551,7 @@ TEST_F(DataProviderTest, GetSnapshot_ErrorAnnotationsNotInFidl) {
 
 TEST_F(DataProviderTest, GetSnapshotUnfilteredAnnotations_DoesNotFilterMissingAnnotations) {
   SetUpDataProvider(kDefaultAnnotations, /*attachment_allowlist=*/{},
-                    {{"annotation1", Error::kMissingValue}});
+                    {{"annotation1", ErrorOrString(Error::kMissingValue)}});
 
   auto [annotations, archive] = GetSnapshotInternal();
   EXPECT_EQ(annotations.size(), 1u);

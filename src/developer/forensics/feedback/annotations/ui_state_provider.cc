@@ -67,7 +67,7 @@ void UIStateProvider::StartListening() {
 }
 
 void UIStateProvider::OnDisconnect() {
-  current_state_ = Error::kConnectionError;
+  current_state_ = ErrorOrString(Error::kConnectionError);
   last_transition_time_ = Error::kConnectionError;
 
   if (on_update_) {
@@ -86,7 +86,7 @@ std::set<std::string> UIStateProvider::GetKeys() const {
 
 void UIStateProvider::OnStateChanged(fuchsia::ui::activity::State state, int64_t transition_time,
                                      OnStateChangedCallback callback) {
-  current_state_ = GetUIStateString(state);
+  current_state_ = ErrorOrString(GetUIStateString(state));
   last_transition_time_ = zx::time(transition_time);
   callback();
 
@@ -100,7 +100,8 @@ Annotations UIStateProvider::Get() {
     return {};
   }
   if (std::holds_alternative<Error>(last_transition_time_)) {
-    return {{kSystemUserActivityCurrentDurationKey, std::get<Error>(last_transition_time_)}};
+    return {{kSystemUserActivityCurrentDurationKey,
+             ErrorOrString(std::get<Error>(last_transition_time_))}};
   }
 
   const auto& time = std::get<zx::time>(last_transition_time_);
@@ -108,8 +109,8 @@ Annotations UIStateProvider::Get() {
 
   // FormatDuration returns std::nullopt if duration was negative- if so, send Error::kBadValue as
   // annotation value
-  const auto duration =
-      formatted_duration.has_value() ? ErrorOr(formatted_duration.value()) : Error::kBadValue;
+  const auto duration = formatted_duration.has_value() ? ErrorOrString(formatted_duration.value())
+                                                       : ErrorOrString(Error::kBadValue);
 
   return {{kSystemUserActivityCurrentDurationKey, duration}};
 }

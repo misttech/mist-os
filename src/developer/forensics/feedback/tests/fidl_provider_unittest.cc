@@ -44,7 +44,11 @@ class MonotonicBackoff : public backoff::Backoff {
 using StaticSingleFidlMethodAnnotationProviderTest = UnitTestFixture;
 
 struct ConvertChannel {
-  Annotations operator()(const ErrorOr<std::string>& channel) { return {{kChannelKey, channel}}; }
+  Annotations operator()(const std::string& channel) {
+    return {{kChannelKey, ErrorOrString(channel)}};
+  }
+
+  Annotations operator()(const Error channel) { return {{kChannelKey, ErrorOrString(channel)}}; }
 };
 
 class StaticCurrentChannelProvider
@@ -72,7 +76,8 @@ TEST_F(StaticSingleFidlMethodAnnotationProviderTest, GetAll) {
   provider.GetOnce([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, kChannelValue)}));
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, ErrorOrString(kChannelValue))}));
   EXPECT_EQ(channel_server->NumConnections(), 0u);
 }
 
@@ -96,7 +101,8 @@ TEST_F(StaticSingleFidlMethodAnnotationProviderTest, Reconnects) {
   EXPECT_THAT(annotations, IsEmpty());
 
   RunLoopFor(zx::sec(1));
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, kChannelValue)}));
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, ErrorOrString(kChannelValue))}));
   EXPECT_EQ(channel_server->NumConnections(), 0u);
 }
 
@@ -127,7 +133,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, Get) {
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, kChannelValue)}));
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, ErrorOrString(kChannelValue))}));
   EXPECT_EQ(channel_server->NumConnections(), 1u);
 }
 
@@ -152,7 +159,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, Reconnects) {
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, Error::kConnectionError)}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray(
+                               {Pair(kChannelKey, ErrorOrString(Error::kConnectionError))}));
 
   RunLoopFor(zx::sec(1));
   EXPECT_EQ(channel_server->NumConnections(), 1u);
@@ -160,7 +168,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, Reconnects) {
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, kChannelValue)}));
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, ErrorOrString(kChannelValue))}));
 
   channel_server->CloseAllConnections();
 
@@ -178,7 +187,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, ReconnectsAfterErrorOnInit
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, Error::kConnectionError)}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray(
+                               {Pair(kChannelKey, ErrorOrString(Error::kConnectionError))}));
 
   auto channel_server = std::make_unique<stubs::ChannelControl>(stubs::ChannelControlBase::Params{
       .current = kChannelValue,
@@ -191,7 +201,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, ReconnectsAfterErrorOnInit
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kChannelKey, kChannelValue)}));
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({Pair(kChannelKey, ErrorOrString(kChannelValue))}));
 }
 
 TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, DoesNotReconnectIfUnavailable) {
@@ -215,8 +226,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, DoesNotReconnectIfUnavaila
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kChannelKey, Error::kNotAvailableInProduct)}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray(
+                               {Pair(kChannelKey, ErrorOrString(Error::kNotAvailableInProduct))}));
 
   RunLoopFor(zx::sec(1));
   EXPECT_EQ(channel_server->NumConnections(), 0u);
@@ -224,8 +235,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, DoesNotReconnectIfUnavaila
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kChannelKey, Error::kNotAvailableInProduct)}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray(
+                               {Pair(kChannelKey, ErrorOrString(Error::kNotAvailableInProduct))}));
 }
 
 TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, DoesNotReconnectIfNotFound) {
@@ -249,8 +260,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, DoesNotReconnectIfNotFound
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kChannelKey, Error::kNotAvailableInProduct)}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray(
+                               {Pair(kChannelKey, ErrorOrString(Error::kNotAvailableInProduct))}));
 
   RunLoopFor(zx::sec(1));
   EXPECT_EQ(channel_server->NumConnections(), 0u);
@@ -258,8 +269,8 @@ TEST_F(DynamicSingleFidlMethodAnnotationProviderTest, DoesNotReconnectIfNotFound
   provider.Get([&annotations](Annotations a) { annotations = std::move(a); });
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kChannelKey, Error::kNotAvailableInProduct)}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray(
+                               {Pair(kChannelKey, ErrorOrString(Error::kNotAvailableInProduct))}));
 }
 
 constexpr char kDeviceIdKey[] = "current_device_id";
@@ -269,8 +280,8 @@ constexpr std::array<const char*, 2> kDeviceIdValues = {
 };
 
 struct ConvertDeviceId {
-  Annotations operator()(const ErrorOr<std::string>& device_id) {
-    return {{kDeviceIdKey, device_id}};
+  Annotations operator()(const std::string& device_id) {
+    return {{kDeviceIdKey, ErrorOrString(device_id)}};
   }
 };
 
@@ -311,26 +322,26 @@ TEST_F(HangingGetSingleFidlMethodAnnotationProviderTest, Get) {
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kDeviceIdKey, kDeviceIdValues[0]),
+                               Pair(kDeviceIdKey, ErrorOrString(kDeviceIdValues[0])),
                            }));
 
   device_id_provider_server_->SetDeviceId(kDeviceIdValues[1]);
 
   // |annotations| should the old value because the change hasn't propagated yet.
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kDeviceIdKey, kDeviceIdValues[0]),
+                               Pair(kDeviceIdKey, ErrorOrString(kDeviceIdValues[0])),
                            }));
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kDeviceIdKey, kDeviceIdValues[1]),
+                               Pair(kDeviceIdKey, ErrorOrString(kDeviceIdValues[1])),
                            }));
 
   device_id_provider_server_->CloseConnection();
 
   // |annotations| should contain the old value because the disconnection hasn't propagated.
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kDeviceIdKey, kDeviceIdValues[1]),
+                               Pair(kDeviceIdKey, ErrorOrString(kDeviceIdValues[1])),
                            }));
 }
 

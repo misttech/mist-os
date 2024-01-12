@@ -34,7 +34,7 @@ feedback::Annotations BuildFeedbackAnnotations(
     const std::map<std::string, std::string>& annotations) {
   feedback::Annotations ret_annotations;
   for (const auto& [key, value] : annotations) {
-    ret_annotations.insert({key, value});
+    ret_annotations.insert({key, ErrorOrString(value)});
   }
   return ret_annotations;
 }

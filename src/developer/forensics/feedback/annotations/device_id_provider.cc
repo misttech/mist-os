@@ -58,8 +58,8 @@ void LocalDeviceIdProvider::GetOnUpdate(::fit::function<void(Annotations)> callb
   callback(DeviceIdToAnnotations()(device_id_));
 }
 
-Annotations DeviceIdToAnnotations::operator()(const ErrorOr<std::string>& device_id) {
-  return {{kDeviceFeedbackIdKey, device_id}};
+Annotations DeviceIdToAnnotations::operator()(const std::string& device_id) {
+  return {{kDeviceFeedbackIdKey, ErrorOrString(device_id)}};
 }
 
 std::set<std::string> RemoteDeviceIdProvider::GetKeys() const { return {kDeviceFeedbackIdKey}; }

@@ -67,7 +67,7 @@ void DataRegister::Upsert(fuchsia::feedback::ComponentData data, UpsertCallback 
 
   Annotations new_annotations = namespaced_annotations_[ns];
   for (const auto& [key, value] : data.annotations()) {
-    new_annotations.insert_or_assign(key, value);
+    new_annotations.insert_or_assign(key, ErrorOrString(value));
   }
 
   size_t new_size = new_annotations.size();

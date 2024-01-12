@@ -52,7 +52,7 @@ class CrashServerTest : public UnitTestFixture {
         tags_() {
     annotation_manager_ = std::make_unique<feedback::AnnotationManager>(
         dispatcher(), std::set<std::string>({feedback::kSystemBootIdCurrentKey}),
-        feedback::Annotations({{feedback::kSystemBootIdCurrentKey, "some-value"}}));
+        feedback::Annotations({{feedback::kSystemBootIdCurrentKey, ErrorOrString("some-value")}}));
     RunLoopUntilIdle();
   }
 
@@ -70,8 +70,8 @@ class CrashServerTest : public UnitTestFixture {
     // whenever a snapshot is not persisted
     return MissingSnapshot(annotation_manager_->ImmediatelyAvailable(),
                            {
-                               {feedback::kDebugSnapshotErrorKey, "not persisted"},
-                               {feedback::kDebugSnapshotPresentKey, "false"},
+                               {feedback::kDebugSnapshotErrorKey, ErrorOrString("not persisted")},
+                               {feedback::kDebugSnapshotPresentKey, ErrorOrString("false")},
                            });
   }
 
@@ -277,8 +277,8 @@ TEST_F(CrashServerTest, PreparesAnnotationsErrorSnapshot) {
                       /*minidump=*/std::nullopt};
 
   const feedback::Annotations presence_annotations({
-      {"key3", "value3.1"},
-      {"key4", "value4"},
+      {"key3", ErrorOrString("value3.1")},
+      {"key4", ErrorOrString("value4")},
 
   });
 
@@ -308,8 +308,8 @@ TEST_F(CrashServerTest, PreparesAnnotationsNoCurrentBootId) {
                       /*minidump=*/std::nullopt};
 
   const feedback::Annotations presence_annotations({
-      {"key3", "value3.1"},
-      {"key4", "value4"},
+      {"key3", ErrorOrString("value3.1")},
+      {"key4", ErrorOrString("value4")},
 
   });
 

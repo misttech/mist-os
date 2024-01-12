@@ -21,23 +21,23 @@
 namespace forensics::feedback {
 namespace {
 
-ErrorOr<std::string> ReadAnnotation(const std::string& filepath) {
+ErrorOrString ReadAnnotation(const std::string& filepath) {
   std::string content;
   if (!files::ReadFileToString(filepath, &content)) {
     FX_LOGS(WARNING) << "Failed to read content from " << filepath;
-    return Error::kFileReadFailure;
+    return ErrorOrString(Error::kFileReadFailure);
   }
-  return std::string(fxl::TrimString(content, "\r\n"));
+  return ErrorOrString(std::string(fxl::TrimString(content, "\r\n")));
 }
 
-ErrorOr<std::string> BoardName() {
+ErrorOrString BoardName() {
   fuchsia::sysinfo::SysInfoSyncPtr sysinfo;
 
   if (const zx_status_t status = fdio_service_connect("/svc/fuchsia.sysinfo.SysInfo",
                                                       sysinfo.NewRequest().TakeChannel().release());
       status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Error connecting to sysinfo";
-    return Error::kConnectionError;
+    return ErrorOrString(Error::kConnectionError);
   }
 
   ::fidl::StringPtr out_board_name;
@@ -45,19 +45,18 @@ ErrorOr<std::string> BoardName() {
   if (const zx_status_t status = sysinfo->GetBoardName(&out_status, &out_board_name);
       status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to get device board name";
-    return Error::kConnectionError;
+    return ErrorOrString(Error::kConnectionError);
   }
   if (out_status != ZX_OK) {
     FX_PLOGS(ERROR, out_status) << "Failed to get device board name";
-    return Error::kBadValue;
+    return ErrorOrString(Error::kBadValue);
   }
   if (!out_board_name) {
     FX_PLOGS(ERROR, out_status) << "Failed to get device board name";
-    return Error::kMissingValue;
+    return ErrorOrString(Error::kMissingValue);
   }
 
-  return out_board_name.value();
-  return Error::kMissingValue;
+  return ErrorOrString(out_board_name.value());
 }
 
 std::string IsDebug() {
@@ -79,12 +78,12 @@ Annotations GetStartupAnnotations(const RebootLog& reboot_log) {
       {kBuildLatestCommitDateKey, ReadAnnotation(kBuildCommitDatePath)},
       {kBuildVersionKey, ReadAnnotation(kCurrentBuildVersionPath)},
       {kBuildVersionPreviousBootKey, ReadAnnotation(kPreviousBuildVersionPath)},
-      {kBuildIsDebugKey, IsDebug()},
+      {kBuildIsDebugKey, ErrorOrString(IsDebug())},
       {kDeviceBoardNameKey, BoardName()},
-      {kDeviceNumCPUsKey, NumCPUs()},
+      {kDeviceNumCPUsKey, ErrorOrString(NumCPUs())},
       {kSystemBootIdCurrentKey, ReadAnnotation(kCurrentBootIdPath)},
       {kSystemBootIdPreviousKey, ReadAnnotation(kPreviousBootIdPath)},
-      {kSystemLastRebootReasonKey, LastRebootReasonAnnotation(reboot_log)},
+      {kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))},
       {kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log)},
   };
 }

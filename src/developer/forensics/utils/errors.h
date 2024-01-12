@@ -9,7 +9,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <string>
-#include <type_traits>
 #include <variant>
 
 namespace forensics {
@@ -33,14 +32,13 @@ enum class Error {
   kCustom,
 };
 
-template <typename T>
-class ErrorOr {
+class ErrorOrString {
  public:
-  ErrorOr(T value) : data_(std::move(value)) {}
-  ErrorOr(enum Error error) : data_(error) {}
+  explicit ErrorOrString(std::string value) : data_(std::move(value)) {}
+  explicit ErrorOrString(enum Error error) : data_(error) {}
 
   // Allow construction from a ::fpromise::result.
-  ErrorOr(::fpromise::result<T, Error> result) {
+  explicit ErrorOrString(::fpromise::result<std::string, Error> result) {
     if (result.is_ok()) {
       data_ = std::move(result.value());
     } else {
@@ -48,18 +46,11 @@ class ErrorOr {
     }
   }
 
-  // Allow construction from a type U iff U is convertible to T, but not the otherway around.
-  template <typename U,
-            std::enable_if_t<std::conjunction_v<std::is_convertible<U, T>,
-                                                std::negation<std::is_convertible<T, U>>>,
-                             bool> = true>
-  ErrorOr(U value) : data_(T(std::move(value))) {}
-
   bool HasValue() const { return data_.index() == 0; }
 
-  const T& Value() const {
+  const std::string& Value() const {
     FX_CHECK(HasValue());
-    return std::get<T>(data_);
+    return std::get<std::string>(data_);
   }
 
   enum Error Error() const {
@@ -67,11 +58,13 @@ class ErrorOr {
     return std::get<enum Error>(data_);
   }
 
-  bool operator==(const ErrorOr& other) const { return data_ == other.data_; }
-  bool operator!=(const ErrorOr& other) const { return !(*this == other); }
+  bool operator==(const ErrorOrString& other) const { return data_ == other.data_; }
+  bool operator!=(const ErrorOrString& other) const { return !(*this == other); }
+  bool operator==(const enum Error error) const { return !HasValue() && (Error() == error); }
+  bool operator!=(const enum Error error) const { return !(*this == error); }
 
  private:
-  std::variant<T, enum Error> data_;
+  std::variant<std::string, enum Error> data_;
 };
 
 // Provide a string representation of  |error|.

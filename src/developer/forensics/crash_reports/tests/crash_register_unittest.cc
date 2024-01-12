@@ -219,8 +219,8 @@ TEST_F(CrashRegisterTest, GetProduct_FromUpsert) {
 
   const auto expected = Product{
       .name = "some name",
-      .version = std::string("some version"),
-      .channel = std::string("some channel"),
+      .version = ErrorOrString(std::string("some version")),
+      .channel = ErrorOrString(std::string("some channel")),
   };
   EXPECT_THAT(GetProduct(kComponentUrl), expected);
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -253,16 +253,16 @@ TEST_F(CrashRegisterTest, BuildDefaultProduct) {
   {
     Product actual{
         .name = std::string("Fuchsia"),
-        .version = Error::kMissingValue,
-        .channel = Error::kMissingValue,
+        .version = ErrorOrString(Error::kMissingValue),
+        .channel = ErrorOrString(Error::kMissingValue),
     };
 
     CrashRegister::AddVersionAndChannel(actual, {});
 
     const Product expected{
         .name = std::string("Fuchsia"),
-        .version = Error::kMissingValue,
-        .channel = Error::kMissingValue,
+        .version = ErrorOrString(Error::kMissingValue),
+        .channel = ErrorOrString(Error::kMissingValue),
     };
     EXPECT_EQ(actual, expected);
   }
@@ -270,8 +270,8 @@ TEST_F(CrashRegisterTest, BuildDefaultProduct) {
   {
     Product actual{
         .name = std::string("Fuchsia"),
-        .version = Error::kMissingValue,
-        .channel = Error::kMissingValue,
+        .version = ErrorOrString(Error::kMissingValue),
+        .channel = ErrorOrString(Error::kMissingValue),
     };
 
     CrashRegister::AddVersionAndChannel(actual, {
@@ -280,8 +280,8 @@ TEST_F(CrashRegisterTest, BuildDefaultProduct) {
 
     const Product expected{
         .name = std::string("Fuchsia"),
-        .version = std::string("some version"),
-        .channel = Error::kMissingValue,
+        .version = ErrorOrString(std::string("some version")),
+        .channel = ErrorOrString(Error::kMissingValue),
     };
     EXPECT_EQ(actual, expected);
   }
@@ -289,8 +289,8 @@ TEST_F(CrashRegisterTest, BuildDefaultProduct) {
   {
     Product actual{
         .name = std::string("Fuchsia"),
-        .version = Error::kMissingValue,
-        .channel = Error::kMissingValue,
+        .version = ErrorOrString(Error::kMissingValue),
+        .channel = ErrorOrString(Error::kMissingValue),
     };
 
     CrashRegister::AddVersionAndChannel(
@@ -301,8 +301,8 @@ TEST_F(CrashRegisterTest, BuildDefaultProduct) {
 
     const Product expected{
         .name = std::string("Fuchsia"),
-        .version = std::string("some version"),
-        .channel = std::string("some channel"),
+        .version = ErrorOrString(std::string("some version")),
+        .channel = ErrorOrString(std::string("some channel")),
     };
     EXPECT_EQ(actual, expected);
   }
@@ -332,15 +332,15 @@ TEST_F(CrashRegisterTest, ReinitializesFromJson) {
   MakeNewCrashRegister();
   auto expected = Product{
       .name = "some other name",
-      .version = std::string("some other version"),
-      .channel = std::string("some other channel"),
+      .version = ErrorOrString(std::string("some other version")),
+      .channel = ErrorOrString(std::string("some other channel")),
   };
   EXPECT_THAT(GetProduct(kComponentUrl), expected);
 
   expected = Product{
       .name = "yet another name",
-      .version = std::string("yet another version"),
-      .channel = Error::kMissingValue,
+      .version = ErrorOrString(std::string("yet another version")),
+      .channel = ErrorOrString(Error::kMissingValue),
 
   };
   EXPECT_THAT(GetProduct(kOtherComponentUrl), expected);

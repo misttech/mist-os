@@ -10,7 +10,7 @@ namespace forensics::feedback {
 
 Annotations CurrentChannelToAnnotations::operator()(const std::string& current_channel) {
   return Annotations{
-      {kSystemUpdateChannelCurrentKey, current_channel},
+      {kSystemUpdateChannelCurrentKey, ErrorOrString(current_channel)},
   };
 }
 

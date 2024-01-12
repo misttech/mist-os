@@ -11,7 +11,7 @@ namespace forensics::feedback {
 Annotations FromFidl(const std::vector<fuchsia::feedback::Annotation>& fidl) {
   Annotations annotations;
   for (const auto& annotation : fidl) {
-    annotations.insert({annotation.key, annotation.value});
+    annotations.insert({annotation.key, ErrorOrString(annotation.value)});
   }
 
   return annotations;

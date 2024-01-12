@@ -38,10 +38,10 @@ TEST_F(RemoteDeviceIdProviderTest, DeviceIdToAnnotations) {
   DeviceIdToAnnotations convert;
 
   EXPECT_THAT(convert(""), UnorderedElementsAreArray({
-                               Pair(kDeviceFeedbackIdKey, ErrorOr<std::string>("")),
+                               Pair(kDeviceFeedbackIdKey, ErrorOrString("")),
                            }));
   EXPECT_THAT(convert("id"), UnorderedElementsAreArray({
-                                 Pair(kDeviceFeedbackIdKey, ErrorOr<std::string>("id")),
+                                 Pair(kDeviceFeedbackIdKey, ErrorOrString("id")),
                              }));
 }
 
@@ -64,7 +64,7 @@ TEST(LocalDeviceIdProviderTest, GetOnUpdate) {
         [&annotations](Annotations result) { annotations = std::move(result); });
 
     EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                                 Pair(kDeviceFeedbackIdKey, kDefaultDeviceId),
+                                 Pair(kDeviceFeedbackIdKey, ErrorOrString(kDefaultDeviceId)),
                              }));
     EXPECT_EQ(ReadFile(device_id_path), kDefaultDeviceId);
   }

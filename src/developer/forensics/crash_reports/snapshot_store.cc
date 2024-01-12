@@ -34,25 +34,28 @@ SnapshotStore::SnapshotStore(feedback::AnnotationManager* annotation_manager,
       persistence_(temp_root, persistent_root),
       max_archives_size_(max_archives_size),
       current_archives_size_(0u),
-      garbage_collected_snapshot_(kGarbageCollectedSnapshotUuid,
-                                  feedback::Annotations({
-                                      {feedback::kDebugSnapshotErrorKey, "garbage collected"},
-                                      {feedback::kDebugSnapshotPresentKey, "false"},
-                                  })),
-      not_persisted_snapshot_(kNotPersistedSnapshotUuid,
-                              feedback::Annotations({
-                                  {feedback::kDebugSnapshotErrorKey, "not persisted"},
-                                  {feedback::kDebugSnapshotPresentKey, "false"},
-                              })),
+      garbage_collected_snapshot_(
+          kGarbageCollectedSnapshotUuid,
+          feedback::Annotations({
+              {feedback::kDebugSnapshotErrorKey, ErrorOrString("garbage collected")},
+              {feedback::kDebugSnapshotPresentKey, ErrorOrString("false")},
+          })),
+      not_persisted_snapshot_(
+          kNotPersistedSnapshotUuid,
+          feedback::Annotations({
+              {feedback::kDebugSnapshotErrorKey, ErrorOrString("not persisted")},
+              {feedback::kDebugSnapshotPresentKey, ErrorOrString("false")},
+          })),
       shutdown_snapshot_(kShutdownSnapshotUuid,
                          feedback::Annotations({
-                             {feedback::kDebugSnapshotErrorKey, "system shutdown"},
-                             {feedback::kDebugSnapshotPresentKey, "false"},
+                             {feedback::kDebugSnapshotErrorKey, ErrorOrString("system shutdown")},
+                             {feedback::kDebugSnapshotPresentKey, ErrorOrString("false")},
                          })),
-      no_uuid_snapshot_(kNoUuidSnapshotUuid, feedback::Annotations({
-                                                 {feedback::kDebugSnapshotErrorKey, "missing uuid"},
-                                                 {feedback::kDebugSnapshotPresentKey, "false"},
-                                             })) {
+      no_uuid_snapshot_(kNoUuidSnapshotUuid,
+                        feedback::Annotations({
+                            {feedback::kDebugSnapshotErrorKey, ErrorOrString("missing uuid")},
+                            {feedback::kDebugSnapshotPresentKey, ErrorOrString("false")},
+                        })) {
   // Load the file lines into a set of UUIDs.
   std::ifstream file(garbage_collected_snapshots_path_);
   for (std::string uuid; getline(file, uuid);) {

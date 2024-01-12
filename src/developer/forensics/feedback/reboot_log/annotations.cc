@@ -65,15 +65,15 @@ std::string LastRebootReasonAnnotation(const RebootLog& reboot_log) {
   }
 }
 
-ErrorOr<std::string> LastRebootUptimeAnnotation(const RebootLog& reboot_log) {
+ErrorOrString LastRebootUptimeAnnotation(const RebootLog& reboot_log) {
   if (reboot_log.Uptime().has_value()) {
     const auto uptime = FormatDuration(*reboot_log.Uptime());
     if (uptime.has_value()) {
-      return *uptime;
+      return ErrorOrString(*uptime);
     }
   }
 
-  return Error::kMissingValue;
+  return ErrorOrString(Error::kMissingValue);
 }
 
 }  // namespace forensics::feedback

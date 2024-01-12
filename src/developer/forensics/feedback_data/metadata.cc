@@ -57,7 +57,7 @@ feedback::Annotations AllAnnotations(const std::set<std::string>& allowlist,
     if (all_annotations.find(key) == all_annotations.end()) {
       // There is an annotation in the allowlist that was not produced by any provider. This
       // indicates a logical error on the Feedback-side.
-      all_annotations.insert({key, Error::kLogicError});
+      all_annotations.insert({key, ErrorOrString(Error::kLogicError)});
     }
   }
 

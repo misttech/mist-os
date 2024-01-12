@@ -13,7 +13,8 @@
 namespace forensics::feedback {
 
 struct TargetChannelToAnnotations {
-  Annotations operator()(const ErrorOr<std::string>& target_channel);
+  Annotations operator()(const std::string& target_channel);
+  Annotations operator()(Error error);
 };
 
 // Responsible for collecting annotations for fuchsia.hwinfo/Board.

@@ -12,8 +12,7 @@
 
 namespace forensics::feedback {
 
-using Annotations = std::map<std::string, ErrorOr<std::string>>;
-
+using Annotations = std::map<std::string, ErrorOrString>;
 }
 
 #endif  // SRC_DEVELOPER_FORENSICS_FEEDBACK_ANNOTATIONS_TYPES_H_

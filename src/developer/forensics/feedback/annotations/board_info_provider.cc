@@ -11,16 +11,16 @@ namespace forensics::feedback {
 
 Annotations BoardInfoToAnnotations::operator()(const fuchsia::hwinfo::BoardInfo& info) {
   Annotations annotations{
-      {kHardwareBoardNameKey, Error::kMissingValue},
-      {kHardwareBoardRevisionKey, Error::kMissingValue},
+      {kHardwareBoardNameKey, ErrorOrString(Error::kMissingValue)},
+      {kHardwareBoardRevisionKey, ErrorOrString(Error::kMissingValue)},
   };
 
   if (info.has_name()) {
-    annotations.insert_or_assign(kHardwareBoardNameKey, info.name());
+    annotations.insert_or_assign(kHardwareBoardNameKey, ErrorOrString(info.name()));
   }
 
   if (info.has_revision()) {
-    annotations.insert_or_assign(kHardwareBoardRevisionKey, info.revision());
+    annotations.insert_or_assign(kHardwareBoardRevisionKey, ErrorOrString(info.revision()));
   }
 
   return annotations;

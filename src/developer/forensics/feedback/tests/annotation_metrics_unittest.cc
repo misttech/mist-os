@@ -68,7 +68,7 @@ TEST_P(AnnotationMetricsTest, IndividualKeysTimeout) {
 
   AnnotationMetrics metrics(Cobalt());
   metrics.LogMetrics({
-      {param.key, Error::kTimeout},
+      {param.key, ErrorOrString(Error::kTimeout)},
   });
 
   RunLoopUntilIdle();
@@ -80,7 +80,7 @@ TEST_P(AnnotationMetricsTest, IndividualKeysNonTimeout) {
 
   AnnotationMetrics metrics(Cobalt());
   metrics.LogMetrics({
-      {param.key, Error::kMissingValue},
+      {param.key, ErrorOrString(Error::kMissingValue)},
   });
 
   RunLoopUntilIdle();
@@ -90,7 +90,7 @@ TEST_P(AnnotationMetricsTest, IndividualKeysNonTimeout) {
 TEST_F(AnnotationMetricsTest, UnknownKey) {
   AnnotationMetrics metrics(Cobalt());
   metrics.LogMetrics({
-      {"unknown", Error::kTimeout},
+      {"unknown", ErrorOrString(Error::kTimeout)},
   });
 
   RunLoopUntilIdle();
@@ -100,7 +100,7 @@ TEST_F(AnnotationMetricsTest, UnknownKey) {
 TEST_F(AnnotationMetricsTest, NonTimeout) {
   AnnotationMetrics metrics(Cobalt());
   metrics.LogMetrics({
-      {"unknown", Error::kTimeout},
+      {"unknown", ErrorOrString(Error::kTimeout)},
   });
 
   RunLoopUntilIdle();
@@ -111,17 +111,17 @@ TEST_F(AnnotationMetricsTest, AllAnnotations) {
   AnnotationMetrics metrics(Cobalt());
 
   metrics.LogMetrics({
-      {kHardwareBoardNameKey, Error::kTimeout},
-      {kHardwareBoardRevisionKey, Error::kTimeout},
-      {kHardwareProductLanguageKey, Error::kTimeout},
-      {kHardwareProductLocaleListKey, Error::kTimeout},
-      {kHardwareProductManufacturerKey, Error::kTimeout},
-      {kHardwareProductModelKey, Error::kTimeout},
-      {kHardwareProductNameKey, Error::kTimeout},
-      {kHardwareProductRegulatoryDomainKey, Error::kTimeout},
-      {kHardwareProductSKUKey, Error::kTimeout},
-      {kSystemUpdateChannelCurrentKey, Error::kTimeout},
-      {kSystemUpdateChannelTargetKey, Error::kTimeout},
+      {kHardwareBoardNameKey, ErrorOrString(Error::kTimeout)},
+      {kHardwareBoardRevisionKey, ErrorOrString(Error::kTimeout)},
+      {kHardwareProductLanguageKey, ErrorOrString(Error::kTimeout)},
+      {kHardwareProductLocaleListKey, ErrorOrString(Error::kTimeout)},
+      {kHardwareProductManufacturerKey, ErrorOrString(Error::kTimeout)},
+      {kHardwareProductModelKey, ErrorOrString(Error::kTimeout)},
+      {kHardwareProductNameKey, ErrorOrString(Error::kTimeout)},
+      {kHardwareProductRegulatoryDomainKey, ErrorOrString(Error::kTimeout)},
+      {kHardwareProductSKUKey, ErrorOrString(Error::kTimeout)},
+      {kSystemUpdateChannelCurrentKey, ErrorOrString(Error::kTimeout)},
+      {kSystemUpdateChannelTargetKey, ErrorOrString(Error::kTimeout)},
 
   });
 

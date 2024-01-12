@@ -12,26 +12,26 @@ namespace forensics::feedback {
 
 Annotations ProductInfoToAnnotations::operator()(const fuchsia::hwinfo::ProductInfo& info) {
   Annotations annotations{
-      {kHardwareProductSKUKey, Error::kMissingValue},
-      {kHardwareProductLanguageKey, Error::kMissingValue},
-      {kHardwareProductRegulatoryDomainKey, Error::kMissingValue},
-      {kHardwareProductLocaleListKey, Error::kMissingValue},
-      {kHardwareProductNameKey, Error::kMissingValue},
-      {kHardwareProductModelKey, Error::kMissingValue},
-      {kHardwareProductManufacturerKey, Error::kMissingValue},
+      {kHardwareProductSKUKey, ErrorOrString(Error::kMissingValue)},
+      {kHardwareProductLanguageKey, ErrorOrString(Error::kMissingValue)},
+      {kHardwareProductRegulatoryDomainKey, ErrorOrString(Error::kMissingValue)},
+      {kHardwareProductLocaleListKey, ErrorOrString(Error::kMissingValue)},
+      {kHardwareProductNameKey, ErrorOrString(Error::kMissingValue)},
+      {kHardwareProductModelKey, ErrorOrString(Error::kMissingValue)},
+      {kHardwareProductManufacturerKey, ErrorOrString(Error::kMissingValue)},
   };
 
   if (info.has_sku()) {
-    annotations.insert_or_assign(kHardwareProductSKUKey, info.sku());
+    annotations.insert_or_assign(kHardwareProductSKUKey, ErrorOrString(info.sku()));
   }
 
   if (info.has_language()) {
-    annotations.insert_or_assign(kHardwareProductLanguageKey, info.language());
+    annotations.insert_or_assign(kHardwareProductLanguageKey, ErrorOrString(info.language()));
   }
 
   if (info.has_regulatory_domain() && info.regulatory_domain().has_country_code()) {
     annotations.insert_or_assign(kHardwareProductRegulatoryDomainKey,
-                                 info.regulatory_domain().country_code());
+                                 ErrorOrString(info.regulatory_domain().country_code()));
   }
 
   if (info.has_locale_list() && !info.locale_list().empty()) {
@@ -41,19 +41,20 @@ Annotations ProductInfoToAnnotations::operator()(const fuchsia::hwinfo::ProductI
     const std::string locale_list = std::accumulate(
         std::next(begin), end, begin->id,
         [](auto acc, const auto& locale) { return acc.append(", ").append(locale.id); });
-    annotations.insert_or_assign(kHardwareProductLocaleListKey, locale_list);
+    annotations.insert_or_assign(kHardwareProductLocaleListKey, ErrorOrString(locale_list));
   }
 
   if (info.has_name()) {
-    annotations.insert_or_assign(kHardwareProductNameKey, info.name());
+    annotations.insert_or_assign(kHardwareProductNameKey, ErrorOrString(info.name()));
   }
 
   if (info.has_model()) {
-    annotations.insert_or_assign(kHardwareProductModelKey, info.model());
+    annotations.insert_or_assign(kHardwareProductModelKey, ErrorOrString(info.model()));
   }
 
   if (info.has_manufacturer()) {
-    annotations.insert_or_assign(kHardwareProductManufacturerKey, info.manufacturer());
+    annotations.insert_or_assign(kHardwareProductManufacturerKey,
+                                 ErrorOrString(info.manufacturer()));
   }
 
   return annotations;

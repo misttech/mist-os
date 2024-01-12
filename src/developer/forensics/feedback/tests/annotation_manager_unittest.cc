@@ -28,8 +28,8 @@ using ::testing::UnorderedElementsAreArray;
 constexpr bool kIsMissingNonPlatform = true;
 constexpr bool kNotIsMissingNonPlatform = false;
 
-auto MakePair(const char* key, const char* value) { return Pair(key, ErrorOr<std::string>(value)); }
-auto MakePair(const char* key, const Error error) { return Pair(key, ErrorOr<std::string>(error)); }
+auto MakePair(const char* key, const char* value) { return Pair(key, ErrorOrString(value)); }
+auto MakePair(const char* key, const Error error) { return Pair(key, ErrorOrString(error)); }
 
 class DynamicNonPlatform : public NonPlatformAnnotationProvider {
  public:
@@ -42,7 +42,7 @@ class DynamicNonPlatform : public NonPlatformAnnotationProvider {
       return {};
     }
 
-    return {{"num_calls", std::to_string(calls_)}};
+    return {{"num_calls", ErrorOrString(std::to_string(calls_))}};
   }
 
   bool IsMissingAnnotations() const override { return is_missing_annotations_; }
@@ -56,8 +56,8 @@ using AnnotationManagerTest = UnitTestFixture;
 
 TEST_F(AnnotationManagerTest, ImmediatelyAvailable) {
   const Annotations static_annotations({
-      {"annotation1", "value1"},
-      {"annotation2", Error::kMissingValue},
+      {"annotation1", ErrorOrString("value1")},
+      {"annotation2", ErrorOrString(Error::kMissingValue)},
   });
 
   DynamicNonPlatform non_platform;
@@ -76,8 +76,8 @@ TEST_F(AnnotationManagerTest, ImmediatelyAvailable) {
 
 TEST_F(AnnotationManagerTest, StaticAllowlist) {
   const Annotations static_annotations({
-      {"annotation1", "value1"},
-      {"annotation2", Error::kMissingValue},
+      {"annotation1", ErrorOrString("value1")},
+      {"annotation2", ErrorOrString(Error::kMissingValue)},
   });
 
   DynamicNonPlatform counter;
@@ -181,7 +181,7 @@ class SimpleCachedAsync : public CachedAsyncAnnotationProvider {
 
           Annotations annotations;
           for (const auto& key : keys_) {
-            annotations.insert_or_assign(key, value);
+            annotations.insert_or_assign(key, ErrorOrString(value));
           }
           callback_(annotations);
           PostNext();
@@ -201,8 +201,8 @@ TEST_F(AnnotationManagerTest, GetAllNoStaticAsyncProviders) {
   async::Executor executor(dispatcher());
 
   const Annotations static_annotations({
-      {"annotation1", "value1"},
-      {"annotation2", Error::kMissingValue},
+      {"annotation1", ErrorOrString("value1")},
+      {"annotation2", ErrorOrString(Error::kMissingValue)},
   });
 
   DynamicNonPlatform non_platform;
@@ -232,21 +232,21 @@ TEST_F(AnnotationManagerTest, GetAllStaticAsyncProviders) {
   async::Executor executor(dispatcher());
 
   const Annotations static_annotations({
-      {"annotation1", "value1"},
-      {"annotation2", Error::kMissingValue},
+      {"annotation1", ErrorOrString("value1")},
+      {"annotation2", ErrorOrString(Error::kMissingValue)},
   });
 
   SimpleStaticAsync immediate_static(dispatcher(), {
-                                                       {"annotation3", "value3"},
+                                                       {"annotation3", ErrorOrString("value3")},
                                                    });
   SimpleStaticAsync five_second_static(dispatcher(),
                                        {
-                                           {"annotation4", "value4"},
+                                           {"annotation4", ErrorOrString("value4")},
                                        },
                                        zx::sec(5));
   SimpleStaticAsync ten_second_static(dispatcher(),
                                       {
-                                          {"annotation5", "value5"},
+                                          {"annotation5", ErrorOrString("value5")},
                                       },
                                       zx::sec(10));
   DynamicNonPlatform non_platform;
@@ -335,7 +335,7 @@ class SimpleDynamicAsync : public DynamicAsyncAnnotationProvider {
 
           Annotations annotations;
           for (const auto& key : keys_) {
-            annotations.insert_or_assign(key, value);
+            annotations.insert_or_assign(key, ErrorOrString(value));
           }
           cb(annotations);
         },
@@ -354,8 +354,8 @@ TEST_F(AnnotationManagerTest, GetAllNoDyanmicAsyncProviders) {
   async::Executor executor(dispatcher());
 
   const Annotations static_annotations({
-      {"annotation1", "value1"},
-      {"annotation2", Error::kMissingValue},
+      {"annotation1", ErrorOrString("value1")},
+      {"annotation2", ErrorOrString(Error::kMissingValue)},
   });
 
   DynamicNonPlatform non_platform;
@@ -385,8 +385,8 @@ TEST_F(AnnotationManagerTest, GetAllCachedAsyncProviders) {
   async::Executor executor(dispatcher());
 
   const Annotations static_annotations({
-      {"annotation1", "value1"},
-      {"annotation2", Error::kMissingValue},
+      {"annotation1", ErrorOrString("value1")},
+      {"annotation2", ErrorOrString(Error::kMissingValue)},
   });
 
   SimpleCachedAsync one_second_cached(dispatcher(), {"annotation3"}, zx::sec(1));
@@ -466,8 +466,8 @@ TEST_F(AnnotationManagerTest, GetAllDynamicAsyncProviders) {
   async::Executor executor(dispatcher());
 
   const Annotations static_annotations({
-      {"annotation1", "value1"},
-      {"annotation2", Error::kMissingValue},
+      {"annotation1", ErrorOrString("value1")},
+      {"annotation2", ErrorOrString(Error::kMissingValue)},
   });
 
   SimpleDynamicAsync immediate_dynamic(dispatcher(), {"annotation3"});
@@ -547,11 +547,12 @@ TEST_F(AnnotationManagerTest, GetAll) {
   async::Executor executor(dispatcher());
 
   const Annotations static_annotations({
-      {"annotation1", "value1"},
-      {"annotation2", Error::kMissingValue},
+      {"annotation1", ErrorOrString("value1")},
+      {"annotation2", ErrorOrString(Error::kMissingValue)},
   });
 
-  SimpleStaticAsync three_second_static(dispatcher(), {{"annotation3", "value3"}}, zx::sec(3));
+  SimpleStaticAsync three_second_static(dispatcher(), {{"annotation3", ErrorOrString("value3")}},
+                                        zx::sec(3));
   SimpleCachedAsync one_second_cached(dispatcher(), {"annotation4"}, zx::sec(1));
   SimpleDynamicAsync five_second_dynamic(dispatcher(), {"annotation5"}, zx::sec(5));
   DynamicNonPlatform non_platform;
@@ -630,15 +631,16 @@ TEST_F(AnnotationManagerTest, NoProvider) {
 }
 
 TEST_F(AnnotationManagerTest, MultipleProviders) {
-  SimpleStaticAsync static_async(dispatcher(), {{"annotation", Error::kMissingValue}});
+  SimpleStaticAsync static_async(dispatcher(),
+                                 {{"annotation", ErrorOrString(Error::kMissingValue)}});
   SimpleCachedAsync cached_async(dispatcher(), {"annotation"});
   SimpleDynamicAsync dynamic_async(dispatcher(), {"annotation"});
 
   ASSERT_DEATH(
       {
         AnnotationManager manager(dispatcher(), {"annotation"},
-                                  {{"annotation", Error::kMissingValue}}, nullptr, {},
-                                  {&static_async}, {&cached_async}, {&dynamic_async});
+                                  {{"annotation", ErrorOrString(Error::kMissingValue)}}, nullptr,
+                                  {}, {&static_async}, {&cached_async}, {&dynamic_async});
       },
       HasSubstr("Annotation \"annotation\" collected by 4 providers"));
 }
@@ -676,7 +678,8 @@ class MultipleTypeProvider : public StaticAsyncAnnotationProvider,
 };
 
 TEST_F(AnnotationManagerTest, DuplicateProviders) {
-  MultipleTypeProvider multiple_provider(dispatcher(), {{"annotation", Error::kMissingValue}});
+  MultipleTypeProvider multiple_provider(dispatcher(),
+                                         {{"annotation", ErrorOrString(Error::kMissingValue)}});
   // This should NOT exit abnormally
   AnnotationManager manager(dispatcher(), {"annotation"}, {}, nullptr, {}, {&multiple_provider}, {},
                             {&multiple_provider});

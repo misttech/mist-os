@@ -8,9 +8,15 @@
 
 namespace forensics::feedback {
 
-Annotations TargetChannelToAnnotations::operator()(const ErrorOr<std::string>& target_channel) {
+Annotations TargetChannelToAnnotations::operator()(const std::string& target_channel) {
   return Annotations{
-      {kSystemUpdateChannelTargetKey, target_channel},
+      {kSystemUpdateChannelTargetKey, ErrorOrString(target_channel)},
+  };
+}
+
+Annotations TargetChannelToAnnotations::operator()(const Error error) {
+  return Annotations{
+      {kSystemUpdateChannelTargetKey, ErrorOrString(error)},
   };
 }
 

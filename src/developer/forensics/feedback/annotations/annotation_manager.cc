@@ -42,7 +42,7 @@ void InsertMissing(const std::set<std::string>& keys, const Error error,
       continue;
     }
 
-    out->insert({key, error});
+    out->insert({key, ErrorOrString(error)});
   }
 }
 

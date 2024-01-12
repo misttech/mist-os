@@ -274,12 +274,12 @@ AnnotationMap GetReportAnnotations(const feedback::Annotations& snapshot_annotat
   // triggered before the store is used.
   AnnotationMap added_annotations;
 
-  auto Get = [&snapshot_annotations](const std::string& key) -> ErrorOr<std::string> {
+  auto Get = [&snapshot_annotations](const std::string& key) -> ErrorOrString {
     if (snapshot_annotations.count(key) != 0) {
       return snapshot_annotations.at(key);
     }
 
-    return Error::kMissingValue;
+    return ErrorOrString(Error::kMissingValue);
   };
 
   added_annotations.Set(snapshot_annotations)

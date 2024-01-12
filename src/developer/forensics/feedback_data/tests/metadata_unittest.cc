@@ -259,10 +259,10 @@ TEST_F(MetadataTest, Check_FormatAnnotationsProperly) {
   };
 
   const feedback::Annotations annotations = {
-      {"present annotation 1", ""},
-      {"present annotation 2", ""},
-      {"missing annotation 1", Error::kConnectionError},
-      {"missing annotation 2", Error::kFileWriteFailure},
+      {"present annotation 1", ErrorOrString("")},
+      {"present annotation 2", ErrorOrString("")},
+      {"missing annotation 1", ErrorOrString(Error::kConnectionError)},
+      {"missing annotation 2", ErrorOrString(Error::kFileWriteFailure)},
   };
 
   SetUpMetadata(annotation_allowlist, /*attachment_allowlist=*/{});
@@ -309,7 +309,7 @@ TEST_F(MetadataTest, Check_FormatAttachmentsProperly) {
 
 TEST_F(MetadataTest, Check_NonPlatformAnnotationsComplete) {
   const feedback::Annotations annotations = {
-      {"non-platform annotation", ""},
+      {"non-platform annotation", ErrorOrString("")},
   };
 
   SetUpMetadata(/*annotation_allowlist=*/{}, /*attachment_allowlist=*/{});
@@ -321,7 +321,7 @@ TEST_F(MetadataTest, Check_NonPlatformAnnotationsComplete) {
 
 TEST_F(MetadataTest, Check_NonPlatformAnnotationsPartial) {
   const feedback::Annotations annotations = {
-      {"non-platform annotation", ""},
+      {"non-platform annotation", ErrorOrString("")},
   };
 
   SetUpMetadata(/*annotation_allowlist=*/{}, /*attachment_allowlist=*/{});
@@ -350,11 +350,11 @@ TEST_F(MetadataTest, Check_SmokeTest) {
   };
 
   const feedback::Annotations annotations = {
-      {"present annotation 1", ""},
-      {"present annotation 2", ""},
-      {"missing annotation 1", Error::kConnectionError},
-      {"missing annotation 2", Error::kFileWriteFailure},
-      {"non-platform annotation 1", ""},
+      {"present annotation 1", ErrorOrString("")},
+      {"present annotation 2", ErrorOrString("")},
+      {"missing annotation 1", ErrorOrString(Error::kConnectionError)},
+      {"missing annotation 2", ErrorOrString(Error::kFileWriteFailure)},
+      {"non-platform annotation 1", ErrorOrString("")},
   };
 
   const feedback::AttachmentKeys attachment_allowlist = {
@@ -439,7 +439,7 @@ TEST_F(MetadataTest, Check_UtcMonotonicDifference) {
   };
 
   const feedback::Annotations annotations = {
-      {"annotation 1", "annotation"},
+      {"annotation 1", ErrorOrString("annotation")},
   };
 
   feedback::Attachments attachments;
@@ -484,7 +484,7 @@ TEST_F(MetadataTest, Check_NoUtcMontonicDifferenceAvailable) {
   };
 
   const feedback::Annotations annotations = {
-      {"annotation 1", ""},
+      {"annotation 1", ErrorOrString("")},
   };
 
   feedback::Attachments attachments;
@@ -515,7 +515,7 @@ TEST_F(MetadataTest, Check_NoUtcMonotonicDifferenceMissingFile) {
   };
 
   const feedback::Annotations annotations = {
-      {"annotation 1", "annotation"},
+      {"annotation 1", ErrorOrString("annotation")},
   };
 
   feedback::Attachments attachments;
@@ -572,8 +572,8 @@ INSTANTIATE_TEST_SUITE_P(WithVariousAnnotations, AnnotationsJsonStateTest,
                                          .annotation_allowlist = {"platform"},
                                          .annotations =
                                              {
-                                                 {"platform", ""},
-                                                 {"non-platform", ""},
+                                                 {"platform", ErrorOrString("")},
+                                                 {"non-platform", ErrorOrString("")},
                                              },
                                          .missing_non_platform_annotations = false,
                                          .state = "complete",
@@ -584,8 +584,8 @@ INSTANTIATE_TEST_SUITE_P(WithVariousAnnotations, AnnotationsJsonStateTest,
                                          .annotation_allowlist = {"platform"},
                                          .annotations =
                                              {
-                                                 {"platform", ""},
-                                                 {"non-platform", ""},
+                                                 {"platform", ErrorOrString("")},
+                                                 {"non-platform", ErrorOrString("")},
                                              },
                                          .missing_non_platform_annotations = true,
                                          .state = "partial",
@@ -596,7 +596,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousAnnotations, AnnotationsJsonStateTest,
                                          .annotation_allowlist = {"platform"},
                                          .annotations =
                                              {
-                                                 {"platform", ""},
+                                                 {"platform", ErrorOrString("")},
                                              },
                                          .missing_non_platform_annotations = true,
                                          .state = "partial",
@@ -607,8 +607,8 @@ INSTANTIATE_TEST_SUITE_P(WithVariousAnnotations, AnnotationsJsonStateTest,
                                          .annotation_allowlist = {"platform 1", "platform 2"},
                                          .annotations =
                                              {
-                                                 {"platform 1", ""},
-                                                 {"non-platform", ""},
+                                                 {"platform 1", ErrorOrString("")},
+                                                 {"non-platform", ErrorOrString("")},
                                              },
                                          .missing_non_platform_annotations = false,
                                          .state = "partial",
@@ -619,8 +619,8 @@ INSTANTIATE_TEST_SUITE_P(WithVariousAnnotations, AnnotationsJsonStateTest,
                                          .annotation_allowlist = {"platform 1", "platform 2"},
                                          .annotations =
                                              {
-                                                 {"platform 1", ""},
-                                                 {"non-platform", ""},
+                                                 {"platform 1", ErrorOrString("")},
+                                                 {"non-platform", ErrorOrString("")},
                                              },
                                          .missing_non_platform_annotations = true,
                                          .state = "partial",
@@ -631,7 +631,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousAnnotations, AnnotationsJsonStateTest,
                                          .annotation_allowlist = {"platform 1", "platform 2"},
                                          .annotations =
                                              {
-                                                 {"platform 1", ""},
+                                                 {"platform 1", ErrorOrString("")},
                                              },
                                          .missing_non_platform_annotations = true,
                                          .state = "partial",
@@ -642,7 +642,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousAnnotations, AnnotationsJsonStateTest,
                                          .annotation_allowlist = {"platform"},
                                          .annotations =
                                              {
-                                                 {"non-platform", ""},
+                                                 {"non-platform", ErrorOrString("")},
                                              },
                                          .missing_non_platform_annotations = false,
                                          .state = "partial",
@@ -653,7 +653,7 @@ INSTANTIATE_TEST_SUITE_P(WithVariousAnnotations, AnnotationsJsonStateTest,
                                          .annotation_allowlist = {"platform"},
                                          .annotations =
                                              {
-                                                 {"non-platform", ""},
+                                                 {"non-platform", ErrorOrString("")},
                                              },
                                          .missing_non_platform_annotations = true,
                                          .state = "partial",

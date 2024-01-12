@@ -28,14 +28,14 @@ TEST(BoardInfoToAnnotationsTest, Convert) {
   info.set_name("board_name");
   EXPECT_THAT(convert(info),
               UnorderedElementsAreArray({
-                  Pair(kHardwareBoardNameKey, ErrorOr<std::string>("board_name")),
-                  Pair(kHardwareBoardRevisionKey, ErrorOr<std::string>(Error::kMissingValue)),
+                  Pair(kHardwareBoardNameKey, ErrorOrString("board_name")),
+                  Pair(kHardwareBoardRevisionKey, ErrorOrString(Error::kMissingValue)),
               }));
 
   info.set_revision("revision");
   EXPECT_THAT(convert(info), UnorderedElementsAreArray({
-                                 Pair(kHardwareBoardNameKey, ErrorOr<std::string>("board_name")),
-                                 Pair(kHardwareBoardRevisionKey, ErrorOr<std::string>("revision")),
+                                 Pair(kHardwareBoardNameKey, ErrorOrString("board_name")),
+                                 Pair(kHardwareBoardRevisionKey, ErrorOrString("revision")),
                              }));
 }
 

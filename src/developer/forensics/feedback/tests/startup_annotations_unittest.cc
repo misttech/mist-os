@@ -87,13 +87,15 @@ TEST_F(StartupAnnotationsTest, Values_FilesPresent) {
   EXPECT_THAT(
       startup_annotations,
       UnorderedElementsAre(
-          Pair(kBuildBoardKey, "board"), Pair(kBuildProductKey, "product"),
-          Pair(kBuildLatestCommitDateKey, "commit-date"), Pair(kBuildVersionKey, "current-version"),
-          Pair(kBuildVersionPreviousBootKey, "previous-version"), Pair(kBuildIsDebugKey, _),
-          Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
-          Pair(kSystemBootIdCurrentKey, "current-boot-id"),
-          Pair(kSystemBootIdPreviousKey, "previous-boot-id"),
-          Pair(kSystemLastRebootReasonKey, LastRebootReasonAnnotation(reboot_log)),
+          Pair(kBuildBoardKey, ErrorOrString("board")),
+          Pair(kBuildProductKey, ErrorOrString("product")),
+          Pair(kBuildLatestCommitDateKey, ErrorOrString("commit-date")),
+          Pair(kBuildVersionKey, ErrorOrString("current-version")),
+          Pair(kBuildVersionPreviousBootKey, ErrorOrString("previous-version")),
+          Pair(kBuildIsDebugKey, _), Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
+          Pair(kSystemBootIdCurrentKey, ErrorOrString("current-boot-id")),
+          Pair(kSystemBootIdPreviousKey, ErrorOrString("previous-boot-id")),
+          Pair(kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))),
           Pair(kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log))));
 }
 
@@ -104,15 +106,15 @@ TEST_F(StartupAnnotationsTest, Values_FilesMissing) {
   EXPECT_THAT(
       startup_annotations,
       UnorderedElementsAre(
-          Pair(kBuildBoardKey, Error::kFileReadFailure),
-          Pair(kBuildProductKey, Error::kFileReadFailure),
-          Pair(kBuildLatestCommitDateKey, Error::kFileReadFailure),
-          Pair(kBuildVersionKey, Error::kFileReadFailure),
-          Pair(kBuildVersionPreviousBootKey, Error::kFileReadFailure), Pair(kBuildIsDebugKey, _),
-          Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
-          Pair(kSystemBootIdCurrentKey, Error::kFileReadFailure),
-          Pair(kSystemBootIdPreviousKey, Error::kFileReadFailure),
-          Pair(kSystemLastRebootReasonKey, LastRebootReasonAnnotation(reboot_log)),
+          Pair(kBuildBoardKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildProductKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildLatestCommitDateKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildVersionKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildVersionPreviousBootKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildIsDebugKey, _), Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
+          Pair(kSystemBootIdCurrentKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kSystemBootIdPreviousKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))),
           Pair(kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log))));
 }
 

@@ -177,12 +177,12 @@ class CrashReporterTest : public UnitTestFixture {
             feedback::kSystemUpdateChannelCurrentKey,
         },
         feedback::Annotations{
-            {feedback::kBuildVersionKey, kBuildVersion},
-            {feedback::kBuildBoardKey, kBuildBoard},
-            {feedback::kBuildProductKey, kBuildProduct},
-            {feedback::kBuildLatestCommitDateKey, kBuildLatestCommitDate},
-            {feedback::kDeviceFeedbackIdKey, kDefaultDeviceId},
-            {feedback::kSystemUpdateChannelCurrentKey, kDefaultChannel},
+            {feedback::kBuildVersionKey, ErrorOrString(kBuildVersion)},
+            {feedback::kBuildBoardKey, ErrorOrString(kBuildBoard)},
+            {feedback::kBuildProductKey, ErrorOrString(kBuildProduct)},
+            {feedback::kBuildLatestCommitDateKey, ErrorOrString(kBuildLatestCommitDate)},
+            {feedback::kDeviceFeedbackIdKey, ErrorOrString(kDefaultDeviceId)},
+            {feedback::kSystemUpdateChannelCurrentKey, ErrorOrString(kDefaultChannel)},
         });
     report_store_ = std::make_unique<ScopedTestReportStore>(
         annotation_manager_.get(), info_context_,

@@ -32,42 +32,40 @@ TEST(ProductInfoToAnnotationsTest, Convert) {
                              }));
 
   info.set_sku("sku");
-  EXPECT_THAT(
-      convert(info),
-      UnorderedElementsAreArray({
-          Pair(kHardwareProductSKUKey, ErrorOr<std::string>("sku")),
-          Pair(kHardwareProductLanguageKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductRegulatoryDomainKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductLocaleListKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductNameKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductModelKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductManufacturerKey, ErrorOr<std::string>(Error::kMissingValue)),
-      }));
+  EXPECT_THAT(convert(info),
+              UnorderedElementsAreArray({
+                  Pair(kHardwareProductSKUKey, ErrorOrString("sku")),
+                  Pair(kHardwareProductLanguageKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductRegulatoryDomainKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductLocaleListKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductNameKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductModelKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductManufacturerKey, ErrorOrString(Error::kMissingValue)),
+              }));
 
   info.set_language("language");
-  EXPECT_THAT(
-      convert(info),
-      UnorderedElementsAreArray({
-          Pair(kHardwareProductSKUKey, ErrorOr<std::string>("sku")),
-          Pair(kHardwareProductLanguageKey, ErrorOr<std::string>("language")),
-          Pair(kHardwareProductRegulatoryDomainKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductLocaleListKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductNameKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductModelKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductManufacturerKey, ErrorOr<std::string>(Error::kMissingValue)),
-      }));
+  EXPECT_THAT(convert(info),
+              UnorderedElementsAreArray({
+                  Pair(kHardwareProductSKUKey, ErrorOrString("sku")),
+                  Pair(kHardwareProductLanguageKey, ErrorOrString("language")),
+                  Pair(kHardwareProductRegulatoryDomainKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductLocaleListKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductNameKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductModelKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductManufacturerKey, ErrorOrString(Error::kMissingValue)),
+              }));
 
   fuchsia::intl::RegulatoryDomain regulatory_domain;
   info.set_regulatory_domain(std::move(regulatory_domain.set_country_code("country")));
   EXPECT_THAT(convert(info),
               UnorderedElementsAreArray({
-                  Pair(kHardwareProductSKUKey, ErrorOr<std::string>("sku")),
-                  Pair(kHardwareProductLanguageKey, ErrorOr<std::string>("language")),
-                  Pair(kHardwareProductRegulatoryDomainKey, ErrorOr<std::string>("country")),
-                  Pair(kHardwareProductLocaleListKey, ErrorOr<std::string>(Error::kMissingValue)),
-                  Pair(kHardwareProductNameKey, ErrorOr<std::string>(Error::kMissingValue)),
-                  Pair(kHardwareProductModelKey, ErrorOr<std::string>(Error::kMissingValue)),
-                  Pair(kHardwareProductManufacturerKey, ErrorOr<std::string>(Error::kMissingValue)),
+                  Pair(kHardwareProductSKUKey, ErrorOrString("sku")),
+                  Pair(kHardwareProductLanguageKey, ErrorOrString("language")),
+                  Pair(kHardwareProductRegulatoryDomainKey, ErrorOrString("country")),
+                  Pair(kHardwareProductLocaleListKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductNameKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductModelKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductManufacturerKey, ErrorOrString(Error::kMissingValue)),
               }));
 
   info.set_locale_list({
@@ -75,56 +73,52 @@ TEST(ProductInfoToAnnotationsTest, Convert) {
       fuchsia::intl::LocaleId{.id = "locale2"},
       fuchsia::intl::LocaleId{.id = "locale3"},
   });
-  EXPECT_THAT(
-      convert(info),
-      UnorderedElementsAreArray({
-          Pair(kHardwareProductSKUKey, ErrorOr<std::string>("sku")),
-          Pair(kHardwareProductLanguageKey, ErrorOr<std::string>("language")),
-          Pair(kHardwareProductRegulatoryDomainKey, ErrorOr<std::string>("country")),
-          Pair(kHardwareProductLocaleListKey, ErrorOr<std::string>("locale1, locale2, locale3")),
-          Pair(kHardwareProductNameKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductModelKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductManufacturerKey, ErrorOr<std::string>(Error::kMissingValue)),
-      }));
+  EXPECT_THAT(convert(info),
+              UnorderedElementsAreArray({
+                  Pair(kHardwareProductSKUKey, ErrorOrString("sku")),
+                  Pair(kHardwareProductLanguageKey, ErrorOrString("language")),
+                  Pair(kHardwareProductRegulatoryDomainKey, ErrorOrString("country")),
+                  Pair(kHardwareProductLocaleListKey, ErrorOrString("locale1, locale2, locale3")),
+                  Pair(kHardwareProductNameKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductModelKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductManufacturerKey, ErrorOrString(Error::kMissingValue)),
+              }));
 
   info.set_name("name");
-  EXPECT_THAT(
-      convert(info),
-      UnorderedElementsAreArray({
-          Pair(kHardwareProductSKUKey, ErrorOr<std::string>("sku")),
-          Pair(kHardwareProductLanguageKey, ErrorOr<std::string>("language")),
-          Pair(kHardwareProductRegulatoryDomainKey, ErrorOr<std::string>("country")),
-          Pair(kHardwareProductLocaleListKey, ErrorOr<std::string>("locale1, locale2, locale3")),
-          Pair(kHardwareProductNameKey, ErrorOr<std::string>("name")),
-          Pair(kHardwareProductModelKey, ErrorOr<std::string>(Error::kMissingValue)),
-          Pair(kHardwareProductManufacturerKey, ErrorOr<std::string>(Error::kMissingValue)),
-      }));
+  EXPECT_THAT(convert(info),
+              UnorderedElementsAreArray({
+                  Pair(kHardwareProductSKUKey, ErrorOrString("sku")),
+                  Pair(kHardwareProductLanguageKey, ErrorOrString("language")),
+                  Pair(kHardwareProductRegulatoryDomainKey, ErrorOrString("country")),
+                  Pair(kHardwareProductLocaleListKey, ErrorOrString("locale1, locale2, locale3")),
+                  Pair(kHardwareProductNameKey, ErrorOrString("name")),
+                  Pair(kHardwareProductModelKey, ErrorOrString(Error::kMissingValue)),
+                  Pair(kHardwareProductManufacturerKey, ErrorOrString(Error::kMissingValue)),
+              }));
 
   info.set_model("model");
-  EXPECT_THAT(
-      convert(info),
-      UnorderedElementsAreArray({
-          Pair(kHardwareProductSKUKey, ErrorOr<std::string>("sku")),
-          Pair(kHardwareProductLanguageKey, ErrorOr<std::string>("language")),
-          Pair(kHardwareProductRegulatoryDomainKey, ErrorOr<std::string>("country")),
-          Pair(kHardwareProductLocaleListKey, ErrorOr<std::string>("locale1, locale2, locale3")),
-          Pair(kHardwareProductNameKey, ErrorOr<std::string>("name")),
-          Pair(kHardwareProductModelKey, ErrorOr<std::string>("model")),
-          Pair(kHardwareProductManufacturerKey, ErrorOr<std::string>(Error::kMissingValue)),
-      }));
+  EXPECT_THAT(convert(info),
+              UnorderedElementsAreArray({
+                  Pair(kHardwareProductSKUKey, ErrorOrString("sku")),
+                  Pair(kHardwareProductLanguageKey, ErrorOrString("language")),
+                  Pair(kHardwareProductRegulatoryDomainKey, ErrorOrString("country")),
+                  Pair(kHardwareProductLocaleListKey, ErrorOrString("locale1, locale2, locale3")),
+                  Pair(kHardwareProductNameKey, ErrorOrString("name")),
+                  Pair(kHardwareProductModelKey, ErrorOrString("model")),
+                  Pair(kHardwareProductManufacturerKey, ErrorOrString(Error::kMissingValue)),
+              }));
 
   info.set_manufacturer("manufacturer");
-  EXPECT_THAT(
-      convert(info),
-      UnorderedElementsAreArray({
-          Pair(kHardwareProductSKUKey, ErrorOr<std::string>("sku")),
-          Pair(kHardwareProductLanguageKey, ErrorOr<std::string>("language")),
-          Pair(kHardwareProductRegulatoryDomainKey, ErrorOr<std::string>("country")),
-          Pair(kHardwareProductLocaleListKey, ErrorOr<std::string>("locale1, locale2, locale3")),
-          Pair(kHardwareProductNameKey, ErrorOr<std::string>("name")),
-          Pair(kHardwareProductModelKey, ErrorOr<std::string>("model")),
-          Pair(kHardwareProductManufacturerKey, ErrorOr<std::string>("manufacturer")),
-      }));
+  EXPECT_THAT(convert(info),
+              UnorderedElementsAreArray({
+                  Pair(kHardwareProductSKUKey, ErrorOrString("sku")),
+                  Pair(kHardwareProductLanguageKey, ErrorOrString("language")),
+                  Pair(kHardwareProductRegulatoryDomainKey, ErrorOrString("country")),
+                  Pair(kHardwareProductLocaleListKey, ErrorOrString("locale1, locale2, locale3")),
+                  Pair(kHardwareProductNameKey, ErrorOrString("name")),
+                  Pair(kHardwareProductModelKey, ErrorOrString("model")),
+                  Pair(kHardwareProductManufacturerKey, ErrorOrString("manufacturer")),
+              }));
 }
 
 TEST(ProductInforProvider, Keys) {

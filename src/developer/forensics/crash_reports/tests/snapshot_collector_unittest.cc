@@ -66,7 +66,7 @@ feedback::Annotations BuildFeedbackAnnotations(
     const std::map<std::string, std::string>& annotations) {
   feedback::Annotations ret_annotations;
   for (const auto& [key, value] : annotations) {
-    ret_annotations.insert({key, value});
+    ret_annotations.insert({key, ErrorOrString(value)});
   }
   return ret_annotations;
 }
@@ -143,8 +143,8 @@ class SnapshotCollectorTest : public UnitTestFixture {
 
     Product product{
         .name = "some name",
-        .version = "some version",
-        .channel = "some channel",
+        .version = ErrorOrString("some version"),
+        .channel = ErrorOrString("some channel"),
     };
 
     fuchsia::feedback::CrashReport report;
@@ -322,8 +322,8 @@ TEST_F(SnapshotCollectorTest, Check_Shutdown) {
   auto snapshot = AsMissing(GetSnapshot(report->SnapshotUuid()));
   EXPECT_THAT(snapshot.PresenceAnnotations(),
               IsSupersetOf({
-                  Pair(feedback::kDebugSnapshotErrorKey, "system shutdown"),
-                  Pair(feedback::kDebugSnapshotPresentKey, "false"),
+                  Pair(feedback::kDebugSnapshotErrorKey, ErrorOrString("system shutdown")),
+                  Pair(feedback::kDebugSnapshotPresentKey, ErrorOrString("false")),
               }));
 
   report = std::nullopt;
@@ -335,8 +335,8 @@ TEST_F(SnapshotCollectorTest, Check_Shutdown) {
   snapshot = AsMissing(GetSnapshot(report->SnapshotUuid()));
   EXPECT_THAT(snapshot.PresenceAnnotations(),
               IsSupersetOf({
-                  Pair(feedback::kDebugSnapshotErrorKey, "system shutdown"),
-                  Pair(feedback::kDebugSnapshotPresentKey, "false"),
+                  Pair(feedback::kDebugSnapshotErrorKey, ErrorOrString("system shutdown")),
+                  Pair(feedback::kDebugSnapshotPresentKey, ErrorOrString("false")),
               }));
 }
 
@@ -364,8 +364,8 @@ TEST_F(SnapshotCollectorTest, Check_ShutdownDuringSnapshotCollection) {
   auto snapshot = AsMissing(GetSnapshot(report->SnapshotUuid()));
   EXPECT_THAT(snapshot.PresenceAnnotations(),
               IsSupersetOf({
-                  Pair(feedback::kDebugSnapshotErrorKey, "system shutdown"),
-                  Pair(feedback::kDebugSnapshotPresentKey, "false"),
+                  Pair(feedback::kDebugSnapshotErrorKey, ErrorOrString("system shutdown")),
+                  Pair(feedback::kDebugSnapshotPresentKey, ErrorOrString("false")),
               }));
 }
 
@@ -380,10 +380,11 @@ TEST_F(SnapshotCollectorTest, Check_SetsPresenceAnnotations) {
   RunLoopFor(kWindow);
   ASSERT_TRUE(report.has_value());
 
-  EXPECT_THAT(BuildFeedbackAnnotations(report->Annotations().Raw()),
-              IsSupersetOf({
-                  Pair("debug.snapshot.shared-request.num-clients", std::to_string(1)),
-              }));
+  EXPECT_THAT(
+      BuildFeedbackAnnotations(report->Annotations().Raw()),
+      IsSupersetOf({
+          Pair("debug.snapshot.shared-request.num-clients", ErrorOrString(std::to_string(1))),
+      }));
 }
 
 TEST_F(SnapshotCollectorTest, Check_SetsSnapshotUuidAnnotation) {
@@ -410,7 +411,7 @@ TEST_F(SnapshotCollectorTest, Check_SetsSnapshotUuidAnnotation) {
   ASSERT_TRUE(report.has_value());
   EXPECT_THAT(BuildFeedbackAnnotations(report->Annotations().Raw()),
               IsSupersetOf({
-                  Pair(feedback::kSnapshotUuid, intended_uuid),
+                  Pair(feedback::kSnapshotUuid, ErrorOrString(intended_uuid)),
               }));
 }
 
@@ -439,7 +440,7 @@ TEST_F(SnapshotCollectorTest, Check_SetsSnapshotUuidAnnotationDespiteUnsuccessfu
   ASSERT_TRUE(report.has_value());
   EXPECT_THAT(BuildFeedbackAnnotations(report->Annotations().Raw()),
               IsSupersetOf({
-                  Pair(feedback::kSnapshotUuid, intended_uuid),
+                  Pair(feedback::kSnapshotUuid, ErrorOrString(intended_uuid)),
               }));
 }
 

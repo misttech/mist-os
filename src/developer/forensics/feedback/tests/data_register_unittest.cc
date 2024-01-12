@@ -65,7 +65,7 @@ TEST_F(DataRegisterTest, Upsert_Basic) {
   Upsert(std::move(data));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -84,7 +84,7 @@ TEST_F(DataRegisterTest, Upsert_DefaultNamespaceIfNoNamespaceProvided) {
   Upsert(std::move(data));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("misc.k", "v"),
+                                         Pair("misc.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -130,7 +130,7 @@ TEST_F(DataRegisterTest, Upsert_NoInsertionsOnTooMany) {
   Upsert(std::move(data));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -148,7 +148,7 @@ TEST_F(DataRegisterTest, Upsert_NoInsertionsOnTooMany) {
   Upsert(std::move(data2));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
                                      }));
   EXPECT_TRUE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -168,7 +168,7 @@ TEST_F(DataRegisterTest, Upsert_NoUpdatesOnEmptyAnnotations) {
   Upsert(std::move(data));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -185,7 +185,7 @@ TEST_F(DataRegisterTest, Upsert_NoUpdatesOnEmptyAnnotations) {
   // We check that the DataRegister's namespaced annotations and AttachmentManager's non-platform
   // annotations are still the same.
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -205,7 +205,7 @@ TEST_F(DataRegisterTest, Upsert_InsertIfDifferentNamespaces) {
   Upsert(std::move(data));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -224,8 +224,8 @@ TEST_F(DataRegisterTest, Upsert_InsertIfDifferentNamespaces) {
   Upsert(std::move(data2));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
-                                         Pair("namespace2.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
+                                         Pair("namespace2.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -248,7 +248,7 @@ TEST_F(DataRegisterTest, Upsert_InsertIfDifferentKey) {
   Upsert(std::move(data));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
 
@@ -262,8 +262,8 @@ TEST_F(DataRegisterTest, Upsert_InsertIfDifferentKey) {
   Upsert(std::move(data2));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
-                                         Pair("namespace.k2", "v2"),
+                                         Pair("namespace.k", ErrorOrString("v")),
+                                         Pair("namespace.k2", ErrorOrString("v2")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -284,7 +284,7 @@ TEST_F(DataRegisterTest, Upsert_UpdateIfSameKey) {
   Upsert(std::move(data));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v"),
+                                         Pair("namespace.k", ErrorOrString("v")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -303,7 +303,7 @@ TEST_F(DataRegisterTest, Upsert_UpdateIfSameKey) {
   Upsert(std::move(data2));
 
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace.k", "v2"),
+                                         Pair("namespace.k", ErrorOrString("v2")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
   EXPECT_EQ(ReadRegisterJson(), R"({
@@ -334,10 +334,10 @@ TEST_F(DataRegisterTest, ReinitializesFromJson) {
 
   MakeNewDataRegister();
   EXPECT_THAT(data_register_->Get(), UnorderedElementsAreArray({
-                                         Pair("namespace1.k1", "v1"),
-                                         Pair("namespace1.k2", "v2"),
-                                         Pair("namespace2.k3", "v3"),
-                                         Pair("namespace2.k4", "v4"),
+                                         Pair("namespace1.k1", ErrorOrString("v1")),
+                                         Pair("namespace1.k2", ErrorOrString("v2")),
+                                         Pair("namespace2.k3", ErrorOrString("v3")),
+                                         Pair("namespace2.k4", ErrorOrString("v4")),
                                      }));
   EXPECT_FALSE(data_register_->IsMissingAnnotations());
 }

@@ -27,10 +27,10 @@ namespace {
 Product ToInternalProduct(const fuchsia::feedback::CrashReportingProduct& fidl_product) {
   FX_CHECK(fidl_product.has_name());
   return {.name = fidl_product.name(),
-          .version = fidl_product.has_version() ? ErrorOr<std::string>(fidl_product.version())
-                                                : ErrorOr<std::string>(Error::kMissingValue),
-          .channel = fidl_product.has_channel() ? ErrorOr<std::string>(fidl_product.channel())
-                                                : ErrorOr<std::string>(Error::kMissingValue)};
+          .version = fidl_product.has_version() ? ErrorOrString(fidl_product.version())
+                                                : ErrorOrString(Error::kMissingValue),
+          .channel = fidl_product.has_channel() ? ErrorOrString(fidl_product.channel())
+                                                : ErrorOrString(Error::kMissingValue)};
 }
 
 }  // namespace
@@ -66,11 +66,11 @@ Product CrashRegister::GetProduct(const std::string& program_name) const {
 
 void CrashRegister::AddVersionAndChannel(Product& product, const AnnotationMap& annotations) {
   if (annotations.Contains(feedback::kBuildVersionKey)) {
-    product.version = annotations.Get(feedback::kBuildVersionKey);
+    product.version = ErrorOrString(annotations.Get(feedback::kBuildVersionKey));
   }
 
   if (annotations.Contains(feedback::kSystemUpdateChannelCurrentKey)) {
-    product.channel = annotations.Get(feedback::kSystemUpdateChannelCurrentKey);
+    product.channel = ErrorOrString(annotations.Get(feedback::kSystemUpdateChannelCurrentKey));
   }
 }
 
@@ -171,16 +171,16 @@ void CrashRegister::RestoreFromJson() {
 
     Product internal_product{
         .name = json_product["name"].GetString(),
-        .version = Error::kMissingValue,
-        .channel = Error::kMissingValue,
+        .version = ErrorOrString(Error::kMissingValue),
+        .channel = ErrorOrString(Error::kMissingValue),
     };
 
     if (json_product.HasMember("version") && json_product["version"].IsString()) {
-      internal_product.version = json_product["version"].GetString();
+      internal_product.version = ErrorOrString(json_product["version"].GetString());
     }
 
     if (json_product.HasMember("channel") && json_product["channel"].IsString()) {
-      internal_product.channel = json_product["channel"].GetString();
+      internal_product.channel = ErrorOrString(json_product["channel"].GetString());
     }
 
     component_to_products_.insert_or_assign(component_url, std::move(internal_product));

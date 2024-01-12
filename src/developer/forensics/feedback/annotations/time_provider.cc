@@ -17,14 +17,14 @@
 namespace forensics::feedback {
 namespace {
 
-ErrorOr<std::string> GetUptime() {
+ErrorOrString GetUptime() {
   const auto uptime = FormatDuration(zx::nsec(zx_clock_get_monotonic()));
   if (!uptime) {
     FX_LOGS(ERROR) << "Got negative uptime from zx_clock_get_monotonic()";
-    return Error::kBadValue;
+    return ErrorOrString(Error::kBadValue);
   }
 
-  return *uptime;
+  return ErrorOrString(*uptime);
 }
 
 }  // namespace
@@ -49,12 +49,12 @@ std::set<std::string> TimeProvider::GetKeys() const {
 }
 
 Annotations TimeProvider::Get() {
-  const auto utc_time = [this]() -> ErrorOr<std::string> {
+  const auto utc_time = [this]() -> ErrorOrString {
     if (is_utc_time_accurate_) {
-      return CurrentUtcTime(clock_.get());
+      return ErrorOrString(CurrentUtcTime(clock_.get()));
     }
 
-    return Error::kMissingValue;
+    return ErrorOrString(Error::kMissingValue);
   }();
 
   return {

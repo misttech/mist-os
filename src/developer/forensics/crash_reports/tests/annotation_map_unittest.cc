@@ -22,8 +22,8 @@ TEST(AnnotationMap, SetsCorrectly) {
       .Set("int", 5)
       .Set("true", true)
       .Set("false", false)
-      .Set("error-or-value", ErrorOr<std::string>("value"))
-      .Set("error-or-error", ErrorOr<std::string>(Error::kMissingValue))
+      .Set("error-or-value", ErrorOrString("value"))
+      .Set("error-or-error", ErrorOrString(Error::kMissingValue))
       .Set("error", Error::kMissingValue)
       .Set(::fuchsia::feedback::Annotation{.key = "annotation", .value = "value"});
 

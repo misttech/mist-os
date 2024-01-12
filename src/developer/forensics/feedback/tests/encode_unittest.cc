@@ -25,9 +25,9 @@ namespace {
 
 TEST(EncodeTest, AnnotationsAsFidl) {
   const auto annotations = Encode<fuchsia::feedback::Annotations>(Annotations({
-      {"key1", "value1"},
-      {"key2", "value2"},
-      {"key3", Error::kTimeout},
+      {"key1", ErrorOrString("value1")},
+      {"key2", ErrorOrString("value2")},
+      {"key3", ErrorOrString(Error::kTimeout)},
   }));
 
   const std::vector<fuchsia::feedback::Annotation> expected({
@@ -47,9 +47,9 @@ TEST(EncodeTest, EmptyAnnotationsAsFidl) {
 
 TEST(EncodeTest, AnnotationsAsString) {
   EXPECT_EQ(Encode<std::string>(Annotations({
-                {"key1", "value1"},
-                {"key2", "value2"},
-                {"key3", Error::kTimeout},
+                {"key1", ErrorOrString("value1")},
+                {"key2", ErrorOrString("value2")},
+                {"key3", ErrorOrString(Error::kTimeout)},
             })),
             R"({
     "key1": "value1",

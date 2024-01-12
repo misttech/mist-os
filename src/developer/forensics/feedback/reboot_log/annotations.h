@@ -12,7 +12,7 @@ namespace forensics::feedback {
 
 // Utilities for converting a RebootLog into annotations for snapshots.
 std::string LastRebootReasonAnnotation(const RebootLog& reboot_log);
-ErrorOr<std::string> LastRebootUptimeAnnotation(const RebootLog& reboot_log);
+ErrorOrString LastRebootUptimeAnnotation(const RebootLog& reboot_log);
 
 }  // namespace forensics::feedback
 

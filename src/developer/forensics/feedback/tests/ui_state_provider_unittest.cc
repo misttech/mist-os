@@ -74,7 +74,7 @@ TEST_F(UIStateProviderTest, Get) {
 
   EXPECT_THAT(ui_state_provider_->Get(),
               UnorderedElementsAreArray({
-                  Pair(kSystemUserActivityCurrentDurationKey, "000d00h00m02s"),
+                  Pair(kSystemUserActivityCurrentDurationKey, ErrorOrString("000d00h00m02s")),
               }));
 }
 
@@ -85,28 +85,28 @@ TEST_F(UIStateProviderTest, GetOnUpdate) {
   EXPECT_THAT(annotations, IsEmpty());
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey, "unknown")}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey,
+                                                           ErrorOrString("unknown"))}));
 
   server_.SetState(fuchsia::ui::activity::State::ACTIVE, zx::time(0));
 
   // The change hasn't propagated yet.
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey, "unknown")}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey,
+                                                           ErrorOrString("unknown"))}));
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey, "active")}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey,
+                                                           ErrorOrString("active"))}));
 
   server_.SetState(fuchsia::ui::activity::State::IDLE, zx::time(0));
 
   // The change hasn't propagated yet.
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey, "active")}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey,
+                                                           ErrorOrString("active"))}));
 
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations,
-              UnorderedElementsAreArray({Pair(kSystemUserActivityCurrentStateKey, "idle")}));
+  EXPECT_THAT(annotations, UnorderedElementsAreArray(
+                               {Pair(kSystemUserActivityCurrentStateKey, ErrorOrString("idle"))}));
 }
 
 TEST_F(UIStateProviderTest, OnStateChangedExecutesCallback) {
@@ -126,7 +126,7 @@ TEST_F(UIStateProviderTest, ReconnectsOnProviderDisconnect) {
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemUserActivityCurrentStateKey, "unknown"),
+                               Pair(kSystemUserActivityCurrentStateKey, ErrorOrString("unknown")),
                            }));
 
   server_.CloseConnection();
@@ -136,22 +136,24 @@ TEST_F(UIStateProviderTest, ReconnectsOnProviderDisconnect) {
 
   // Connection should stay closed until Backoff allows it to reconnect
   RunLoopUntilIdle();
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemUserActivityCurrentStateKey, Error::kConnectionError),
-                           }));
-  EXPECT_THAT(ui_state_provider_->Get(),
+  EXPECT_THAT(annotations,
               UnorderedElementsAreArray({
-                  Pair(kSystemUserActivityCurrentDurationKey, Error::kConnectionError),
+                  Pair(kSystemUserActivityCurrentStateKey, ErrorOrString(Error::kConnectionError)),
               }));
+  EXPECT_THAT(
+      ui_state_provider_->Get(),
+      UnorderedElementsAreArray({
+          Pair(kSystemUserActivityCurrentDurationKey, ErrorOrString(Error::kConnectionError)),
+      }));
 
   RunLoopFor(zx::sec(1));
   ASSERT_TRUE(server_.IsBound());
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemUserActivityCurrentStateKey, "active"),
+                               Pair(kSystemUserActivityCurrentStateKey, ErrorOrString("active")),
                            }));
   EXPECT_THAT(ui_state_provider_->Get(),
               UnorderedElementsAreArray({
-                  Pair(kSystemUserActivityCurrentDurationKey, "000d00h00m01s"),
+                  Pair(kSystemUserActivityCurrentDurationKey, ErrorOrString("000d00h00m01s")),
               }));
 }
 
@@ -165,7 +167,7 @@ TEST_F(UIStateProviderTest, ReconnectsOnListenerDisconnect) {
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemUserActivityCurrentStateKey, "unknown"),
+                               Pair(kSystemUserActivityCurrentStateKey, ErrorOrString("unknown")),
                            }));
 
   server_.UnbindListener();
@@ -174,9 +176,10 @@ TEST_F(UIStateProviderTest, ReconnectsOnListenerDisconnect) {
   // Connection should stay closed until Backoff allows it to reconnect
   RunLoopUntilIdle();
   ASSERT_FALSE(server_.IsBound());
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemUserActivityCurrentStateKey, Error::kConnectionError),
-                           }));
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({
+                  Pair(kSystemUserActivityCurrentStateKey, ErrorOrString(Error::kConnectionError)),
+              }));
   EXPECT_THAT(ui_state_provider_->Get(),
               UnorderedElementsAreArray({
                   Pair(kSystemUserActivityCurrentDurationKey, Error::kConnectionError),
@@ -185,11 +188,11 @@ TEST_F(UIStateProviderTest, ReconnectsOnListenerDisconnect) {
   RunLoopFor(zx::sec(1));
   ASSERT_TRUE(server_.IsBound());
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemUserActivityCurrentStateKey, "active"),
+                               Pair(kSystemUserActivityCurrentStateKey, ErrorOrString("active")),
                            }));
   EXPECT_THAT(ui_state_provider_->Get(),
               UnorderedElementsAreArray({
-                  Pair(kSystemUserActivityCurrentDurationKey, "000d00h00m01s"),
+                  Pair(kSystemUserActivityCurrentDurationKey, ErrorOrString("000d00h00m01s")),
               }));
 }
 

@@ -57,9 +57,7 @@ class AnnotationMap {
     return *this;
   }
 
-  // Generic ErrorOrs.
-  template <typename T>
-  AnnotationMap& Set(const std::string& key, const ErrorOr<T>& val) {
+  AnnotationMap& Set(const std::string& key, const ErrorOrString& val) {
     // Set the annotation as with the value or "unknown" and add a value under
     // "debug.$key.error" explaining why.
     return (val.HasValue())

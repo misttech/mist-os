@@ -249,8 +249,9 @@ std::map<std::string, std::string> CrashServer::PrepareAnnotations(
   // annotations to the crash report earlier in the crash reporting flow could result in the values
   // being incorrect if the upload doesn't succeed until a later time.
   std::optional<std::string> formatted_uptime = FormatDuration(zx::duration(uptime.get()));
-  annotations.Set(feedback::kDebugUploadUptime,
-                  formatted_uptime.has_value() ? ErrorOr(*formatted_uptime) : Error::kBadValue);
+  annotations.Set(feedback::kDebugUploadUptime, formatted_uptime.has_value()
+                                                    ? ErrorOrString(*formatted_uptime)
+                                                    : ErrorOrString(Error::kBadValue));
 
   if (const feedback::Annotations immediate_annotations =
           annotation_manager->ImmediatelyAvailable();

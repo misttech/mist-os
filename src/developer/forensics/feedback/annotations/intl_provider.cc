@@ -29,7 +29,7 @@ IntlProvider::IntlProvider(async_dispatcher_t* dispatcher,
 
       Annotations annotations;
       for (const std::string& key : GetKeys()) {
-        annotations.insert({key, Error::kNotAvailableInProduct});
+        annotations.insert({key, ErrorOrString(Error::kNotAvailableInProduct)});
       }
 
       on_update_(annotations);
@@ -64,11 +64,11 @@ void IntlProvider::OnUpdate() {
   Annotations annotations;
 
   if (locale_.has_value()) {
-    annotations.insert({kSystemLocalePrimaryKey, *locale_});
+    annotations.insert({kSystemLocalePrimaryKey, ErrorOrString(*locale_)});
   }
 
   if (timezone_.has_value()) {
-    annotations.insert({kSystemTimezonePrimaryKey, *timezone_});
+    annotations.insert({kSystemTimezonePrimaryKey, ErrorOrString(*timezone_)});
   }
 
   if (!annotations.empty()) {

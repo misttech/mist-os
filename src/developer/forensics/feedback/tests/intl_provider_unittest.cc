@@ -65,19 +65,19 @@ TEST_F(IntlProviderTest, GetOnUpdateLocale) {
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemLocalePrimaryKey, "locale-one"),
+                               Pair(kSystemLocalePrimaryKey, ErrorOrString("locale-one")),
                            }));
 
   server.SetLocale("locale-two");
 
   // The change hasn't propagated yet.
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemLocalePrimaryKey, "locale-one"),
+                               Pair(kSystemLocalePrimaryKey, ErrorOrString("locale-one")),
                            }));
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemLocalePrimaryKey, "locale-two"),
+                               Pair(kSystemLocalePrimaryKey, ErrorOrString("locale-two")),
                            }));
 }
 
@@ -94,19 +94,19 @@ TEST_F(IntlProviderTest, GetOnUpdateTimezone) {
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemTimezonePrimaryKey, "timezone-one"),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-one")),
                            }));
 
   server.SetTimezone("timezone-two");
 
   // The change hasn't propagated yet.
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemTimezonePrimaryKey, "timezone-one"),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-one")),
                            }));
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemTimezonePrimaryKey, "timezone-two"),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-two")),
                            }));
 }
 
@@ -123,24 +123,24 @@ TEST_F(IntlProviderTest, GetOnUpdate) {
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemLocalePrimaryKey, "locale-one"),
-                               Pair(kSystemTimezonePrimaryKey, "timezone-one"),
+                               Pair(kSystemLocalePrimaryKey, ErrorOrString("locale-one")),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-one")),
                            }));
 
   server.SetLocale("locale-two");
   RunLoopUntilIdle();
 
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemLocalePrimaryKey, "locale-two"),
-                               Pair(kSystemTimezonePrimaryKey, "timezone-one"),
+                               Pair(kSystemLocalePrimaryKey, ErrorOrString("locale-two")),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-one")),
                            }));
 
   server.SetTimezone("timezone-two");
   RunLoopUntilIdle();
 
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemLocalePrimaryKey, "locale-two"),
-                               Pair(kSystemTimezonePrimaryKey, "timezone-two"),
+                               Pair(kSystemLocalePrimaryKey, ErrorOrString("locale-two")),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-two")),
                            }));
 }
 
@@ -157,7 +157,7 @@ TEST_F(IntlProviderTest, Reconnects) {
 
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemTimezonePrimaryKey, "timezone-one"),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-one")),
                            }));
 
   server.CloseConnection();
@@ -168,12 +168,12 @@ TEST_F(IntlProviderTest, Reconnects) {
   // The previously cached value should be used.
   RunLoopUntilIdle();
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemTimezonePrimaryKey, "timezone-one"),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-one")),
                            }));
   RunLoopFor(zx::sec(1));
   ASSERT_TRUE(server.IsBound());
   EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemTimezonePrimaryKey, "timezone-two"),
+                               Pair(kSystemTimezonePrimaryKey, ErrorOrString("timezone-two")),
                            }));
 }
 
@@ -199,10 +199,11 @@ TEST_F(IntlProviderTest, DoesNotReconnectIfUnavailable) {
   RunLoopFor(zx::sec(2));
   EXPECT_FALSE(server.IsBound());
 
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemLocalePrimaryKey, Error::kNotAvailableInProduct),
-                               Pair(kSystemTimezonePrimaryKey, Error::kNotAvailableInProduct),
-                           }));
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({
+                  Pair(kSystemLocalePrimaryKey, ErrorOrString(Error::kNotAvailableInProduct)),
+                  Pair(kSystemTimezonePrimaryKey, ErrorOrString(Error::kNotAvailableInProduct)),
+              }));
 }
 
 TEST_F(IntlProviderTest, DoesNotReconnectIfNotFound) {
@@ -227,10 +228,11 @@ TEST_F(IntlProviderTest, DoesNotReconnectIfNotFound) {
   RunLoopFor(zx::sec(2));
   EXPECT_FALSE(server.IsBound());
 
-  EXPECT_THAT(annotations, UnorderedElementsAreArray({
-                               Pair(kSystemLocalePrimaryKey, Error::kNotAvailableInProduct),
-                               Pair(kSystemTimezonePrimaryKey, Error::kNotAvailableInProduct),
-                           }));
+  EXPECT_THAT(annotations,
+              UnorderedElementsAreArray({
+                  Pair(kSystemLocalePrimaryKey, ErrorOrString(Error::kNotAvailableInProduct)),
+                  Pair(kSystemTimezonePrimaryKey, ErrorOrString(Error::kNotAvailableInProduct)),
+              }));
 }
 
 }  // namespace

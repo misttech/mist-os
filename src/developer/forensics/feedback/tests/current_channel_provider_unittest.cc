@@ -20,11 +20,11 @@ TEST(CurrentChannelToAnnotationsTest, Convert) {
   CurrentChannelToAnnotations convert;
 
   EXPECT_THAT(convert(""), UnorderedElementsAreArray({
-                               Pair(kSystemUpdateChannelCurrentKey, ErrorOr<std::string>("")),
+                               Pair(kSystemUpdateChannelCurrentKey, ErrorOrString("")),
                            }));
   EXPECT_THAT(convert("channel"),
               UnorderedElementsAreArray({
-                  Pair(kSystemUpdateChannelCurrentKey, ErrorOr<std::string>("channel")),
+                  Pair(kSystemUpdateChannelCurrentKey, ErrorOrString("channel")),
               }));
 }
 

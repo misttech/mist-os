@@ -64,8 +64,8 @@ using ProductQuotasDeathTest = ProductQuotasTest;
 TEST_F(ProductQuotasTest, HasQuotaRemaining_InsertsProduct) {
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
 
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
@@ -79,8 +79,8 @@ TEST_F(ProductQuotasTest, HasQuotaRemaining_InsertsProduct) {
 TEST_F(ProductQuotasTest, HasQuotaRemaining_InsertsProductWithoutVersion) {
   const Product product{
       .name = "some name",
-      .version = Error::kMissingValue,
-      .channel = Error::kMissingValue,
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
   };
 
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
@@ -96,8 +96,8 @@ TEST_F(ProductQuotasTest, HasQuotaRemaining_Unlimited) {
 
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
 
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
@@ -107,8 +107,8 @@ TEST_F(ProductQuotasTest, HasQuotaRemaining_Unlimited) {
 TEST_F(ProductQuotasTest, DecrementRemainingQuota) {
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
 
   // Query for product to get it inserted first
@@ -127,8 +127,8 @@ TEST_F(ProductQuotasTest, DecrementRemainingQuota_Unlimited) {
 
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
 
   // Query for product to get it (potentially) inserted first
@@ -142,8 +142,8 @@ TEST_F(ProductQuotasDeathTest, DecrementRemainingQuota) {
   MakeNewProductQuotas(1);
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
 
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
@@ -156,8 +156,8 @@ TEST_F(ProductQuotasTest, NoQuotaRemaining) {
   MakeNewProductQuotas(1);
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
 
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
@@ -174,16 +174,16 @@ TEST_F(ProductQuotasTest, NoQuotaRemaining) {
 TEST_F(ProductQuotasTest, ReinitializesFromJson) {
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
 
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
 
   const Product another_product{
       .name = "another name",
-      .version = "another version",
-      .channel = "another channel",
+      .version = ErrorOrString("another version"),
+      .channel = ErrorOrString("another channel"),
   };
 
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(another_product));
@@ -229,8 +229,8 @@ TEST_F(ProductQuotasTest, InsertTimeIntoJson) {
 TEST_F(ProductQuotasTest, Clock_NeverStarts) {
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
   MakeNewProductQuotas(1);
   EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
@@ -274,8 +274,8 @@ TEST_F(ProductQuotasTest, Clock_StartBeforeDeadlineWithNegativeOffset) {
   })";
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
   ASSERT_TRUE(files::WriteFile(QuotasJsonPath(), json));
 
@@ -314,8 +314,8 @@ TEST_F(ProductQuotasTest, Clock_StartBeforeDeadlineWithPositiveOffset) {
   })";
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
   ASSERT_TRUE(files::WriteFile(QuotasJsonPath(), json));
 
@@ -354,8 +354,8 @@ TEST_F(ProductQuotasTest, Clock_StartAfterDeadlineWithNegativeOffset) {
   })";
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
   ASSERT_TRUE(files::WriteFile(QuotasJsonPath(), json));
 
@@ -397,8 +397,8 @@ TEST_F(ProductQuotasTest, Clock_StartAfterDeadlineWithPositiveOffset) {
   })";
   const Product product{
       .name = "some name",
-      .version = "some version",
-      .channel = "some channel",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
   };
   ASSERT_TRUE(files::WriteFile(QuotasJsonPath(), json));
 

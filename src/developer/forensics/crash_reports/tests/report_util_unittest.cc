@@ -69,7 +69,7 @@ TEST(Logname, MakesLognameCorrectly) {
 
 TEST(MakeReport, AddsSnapshotAnnotations) {
   const feedback::Annotations annotations = {
-      {"snapshot_annotation_key", "snapshot_annotation_value"},
+      {"snapshot_annotation_key", ErrorOrString("snapshot_annotation_value")},
   };
 
   fuchsia::feedback::CrashReport crash_report;
@@ -77,8 +77,8 @@ TEST(MakeReport, AddsSnapshotAnnotations) {
 
   Product product{
       .name = "product_name",
-      .version = "product_version",
-      .channel = "product_channel",
+      .version = ErrorOrString("product_version"),
+      .channel = ErrorOrString("product_channel"),
   };
 
   const auto report =
@@ -92,7 +92,7 @@ TEST(MakeReport, AddsSnapshotAnnotations) {
 
 TEST(MakeReport, AddsCrashServerAnnotationsWithoutReportTime) {
   const feedback::Annotations annotations = {
-      {feedback::kDeviceFeedbackIdKey, "device_id"},
+      {feedback::kDeviceFeedbackIdKey, ErrorOrString("device_id")},
   };
 
   fuchsia::feedback::CrashReport crash_report;
@@ -100,8 +100,8 @@ TEST(MakeReport, AddsCrashServerAnnotationsWithoutReportTime) {
 
   Product product{
       .name = "product_name",
-      .version = "product_version",
-      .channel = "product_channel",
+      .version = ErrorOrString("product_version"),
+      .channel = ErrorOrString("product_channel"),
   };
 
   const fpromise::result<Report> report =
@@ -119,7 +119,7 @@ TEST(MakeReport, AddsCrashServerAnnotationsWithoutReportTime) {
 
 TEST(MakeReport, AddsCrashServerAnnotationsWithReportTime) {
   const feedback::Annotations annotations = {
-      {feedback::kDeviceFeedbackIdKey, "device_id"},
+      {feedback::kDeviceFeedbackIdKey, ErrorOrString("device_id")},
   };
 
   fuchsia::feedback::CrashReport crash_report;
@@ -127,8 +127,8 @@ TEST(MakeReport, AddsCrashServerAnnotationsWithReportTime) {
 
   Product product{
       .name = "product_name",
-      .version = "product_version",
-      .channel = "product_channel",
+      .version = ErrorOrString("product_version"),
+      .channel = ErrorOrString("product_channel"),
   };
 
   const fpromise::result<Report> report =
@@ -150,8 +150,8 @@ TEST(MakeReport, AddsRequiredAnnotations) {
 
   Product product{
       .name = "product_name",
-      .version = "product_version",
-      .channel = "product_channel",
+      .version = ErrorOrString("product_version"),
+      .channel = ErrorOrString("product_channel"),
   };
 
   const auto report = MakeReport(std::move(crash_report), /*report_id=*/0, "snapshot_uuid", {},
@@ -175,11 +175,11 @@ TEST(SnapshotAnnotationsTest, GetReportAnnotations_EmptySnapshotAnnotations) {
 
 TEST(SnapshotAnnotationsTest, GetReportAnnotations_Snapshot) {
   const feedback::Annotations startup_annotations = {
-      {feedback::kBuildVersionKey, "version"},
-      {feedback::kSystemUpdateChannelCurrentKey, "channel"},
-      {feedback::kBuildBoardKey, "board"},
-      {feedback::kBuildProductKey, Error::kTimeout},
-      {feedback::kBuildLatestCommitDateKey, Error::kFileReadFailure},
+      {feedback::kBuildVersionKey, ErrorOrString("version")},
+      {feedback::kSystemUpdateChannelCurrentKey, ErrorOrString("channel")},
+      {feedback::kBuildBoardKey, ErrorOrString("board")},
+      {feedback::kBuildProductKey, ErrorOrString(Error::kTimeout)},
+      {feedback::kBuildLatestCommitDateKey, ErrorOrString(Error::kFileReadFailure)},
   };
 
   const AnnotationMap annotations = GetReportAnnotations(startup_annotations);
