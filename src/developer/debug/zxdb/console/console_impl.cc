@@ -78,10 +78,7 @@ ConsoleImpl::~ConsoleImpl() {
 
 fxl::WeakPtr<ConsoleImpl> ConsoleImpl::GetImplWeakPtr() { return impl_weak_factory_.GetWeakPtr(); }
 
-void ConsoleImpl::Init() {
-  LoadHistoryFile();
-  EnableInput();
-}
+void ConsoleImpl::Init() { LoadHistoryFile(); }
 
 void ConsoleImpl::LoadHistoryFile() {
   std::filesystem::path path(getenv("HOME"));
@@ -254,9 +251,9 @@ void ConsoleImpl::ProcessInputLine(const std::string& line, fxl::RefPtr<CommandC
 }
 
 void ConsoleImpl::DisableInput() {
-  if (!InputEnabled()) {
+  // If the counter has just reached below one, we need to stop watching stdin.
+  if (--input_enabled_ != 0)
     return;
-  }
 
   line_input_.Hide();
   // Stop watching for stdin which will stop feeding input to the LineInput. Today, the LineInput
@@ -269,7 +266,8 @@ void ConsoleImpl::DisableInput() {
 }
 
 void ConsoleImpl::EnableInput() {
-  if (InputEnabled())
+  // If the counter has just reached above zero, we need start watching stdin.
+  if (++input_enabled_ != 1)
     return;
 
   // Callback for input passed to WatchFD().

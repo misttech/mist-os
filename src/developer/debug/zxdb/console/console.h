@@ -71,7 +71,6 @@ class Console : debug::LogBackend {
                                 fxl::RefPtr<CommandContext> cmd_context = nullptr,
                                 bool add_to_history = true) = 0;
 
-  virtual bool InputEnabled() const = 0;
   virtual void EnableInput() = 0;
   virtual void DisableInput() = 0;
 

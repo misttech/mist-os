@@ -82,7 +82,6 @@ class MockConsole : public Console {
   // Overrider that uses an OfflineCommandContext by default.
   void ProcessInputLine(const std::string& line, OfflineCommandContext::CompletionCallback cb);
 
-  bool InputEnabled() const override { return false; }
   void EnableInput() override {}
   void DisableInput() override {}
 

@@ -47,6 +47,10 @@ const char kDebugModeHelp[] = R"(  --debug-mode
       Output debug information about zxdb.
       Should only be useful for people developing zxdb.)";
 
+const char kConsoleModeHelp[] = R"(  --console-mode
+      The style in which zxdb interacts with the console. Valid values are
+      "shell" (default) and "shell-after-break".)";
+
 const char kHelpHelp[] = R"(  --help
   -h
       Prints all command-line switches.)";
@@ -146,6 +150,7 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
   parser.AddSwitch("local", 'l', kLocalHelp, &CommandLineOptions::local);
   parser.AddSwitch("core", 0, kCoreHelp, &CommandLineOptions::core);
   parser.AddSwitch("debug-mode", 'd', kDebugModeHelp, &CommandLineOptions::debug_mode);
+  parser.AddSwitch("console-mode", 0, kConsoleModeHelp, &CommandLineOptions::console_mode);
   parser.AddSwitch("attach", 'a', kAttachHelp, &CommandLineOptions::attach);
   parser.AddSwitch("script-file", 'S', kScriptFileHelp, &CommandLineOptions::script_files);
   parser.AddSwitch("execute", 'e', kExecuteCommandHelp, &CommandLineOptions::execute_commands);

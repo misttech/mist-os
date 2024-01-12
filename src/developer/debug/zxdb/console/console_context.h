@@ -19,6 +19,7 @@
 #include "src/developer/debug/zxdb/client/pretty_stack_manager.h"
 #include "src/developer/debug/zxdb/client/process_observer.h"
 #include "src/developer/debug/zxdb/client/session_observer.h"
+#include "src/developer/debug/zxdb/client/setting_store_observer.h"
 #include "src/developer/debug/zxdb/client/system_observer.h"
 #include "src/developer/debug/zxdb/client/target_observer.h"
 #include "src/developer/debug/zxdb/client/thread_observer.h"
@@ -42,6 +43,7 @@ class Session;
 // This class maintains the mapping between objects and IDs.
 class ConsoleContext : public ProcessObserver,
                        public SessionObserver,
+                       public SettingStoreObserver,
                        public SystemObserver,
                        public TargetObserver,
                        public ThreadObserver,
@@ -128,6 +130,8 @@ class ConsoleContext : public ProcessObserver,
   // the client layer manage this object.
   const fxl::RefPtr<PrettyStackManager>& pretty_stack_manager() { return pretty_stack_manager_; }
 
+  void InitConsoleMode();
+
   // SessionObserver implementation:
   void HandleNotification(NotificationType, const std::string&) override;
   void HandlePreviousConnectedProcesses(const std::vector<debug_ipc::ProcessRecord>&) override;
@@ -170,6 +174,9 @@ class ConsoleContext : public ProcessObserver,
   void OnComponentStarted(const std::string& moniker, const std::string& url) override;
   void OnComponentExited(const std::string& moniker, const std::string& url) override;
 
+  // SettingStoreObserver implementation.
+  void OnSettingChanged(const SettingStore&, const std::string& setting_name) override;
+
  private:
   struct ThreadRecord {
     Thread* thread = nullptr;
@@ -195,6 +202,9 @@ class ConsoleContext : public ProcessObserver,
     std::map<int, ThreadRecord> id_to_thread;
     std::map<const Thread*, int> thread_to_id;
   };
+
+  std::string GetConsoleMode();
+  void SetConsoleMode(std::string mode);
 
   // Returns the record for the given target, or null (+ assertion) if not
   // found. These pointers are not stable across target list changes.

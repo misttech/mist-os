@@ -31,6 +31,10 @@ struct ClientSettings {
     static const char* kShowFilePaths;
     static const char* kShowStdout;
 
+    static const char* kConsoleMode;
+    static const char* kConsoleMode_Shell;
+    static const char* kConsoleMode_ShellAfterBreak;
+
     static const char* kLanguage;
     static const char* kLanguage_Cpp;
     static const char* kLanguage_Rust;

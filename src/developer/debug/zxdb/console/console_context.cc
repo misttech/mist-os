@@ -69,6 +69,7 @@ ConsoleContext::ConsoleContext(Session* session) : session_(session) {
   session->component_observers().AddObserver(this);
 
   session->system().AddObserver(this);
+  session->system().settings().AddObserver(ClientSettings::System::kConsoleMode, this);
 
   // Pick up any previously created targets. This will normally just be the
   // default one.
@@ -86,6 +87,7 @@ ConsoleContext::ConsoleContext(Session* session) : session_(session) {
 
 ConsoleContext::~ConsoleContext() {
   // Unregister for all observers.
+  session_->system().settings().RemoveObserver(ClientSettings::System::kConsoleMode, this);
   session_->system().RemoveObserver(this);
   session_->component_observers().RemoveObserver(this);
   session_->target_observers().RemoveObserver(this);
@@ -445,6 +447,25 @@ Err ConsoleContext::FillOutCommand(Command* cmd) const {
   return Err();
 }
 
+std::string ConsoleContext::GetConsoleMode() {
+  return session()->system().settings().GetString(ClientSettings::System::kConsoleMode);
+}
+
+void ConsoleContext::SetConsoleMode(std::string mode) {
+  session()->system().settings().SetString(ClientSettings::System::kConsoleMode, std::move(mode));
+  // If the mode changes, we will get notified via SettingStoreObserver.
+}
+
+void ConsoleContext::InitConsoleMode() {
+  std::string mode = GetConsoleMode();
+  Console* console = Console::get();
+
+  if (mode == ClientSettings::System::kConsoleMode_Shell) {
+    console->EnableInput();
+    console->EnableOutput();
+  }
+}
+
 void ConsoleContext::HandleNotification(NotificationType type, const std::string& msg) {
   OutputBuffer out;
   auto preamble = fxl::StringPrintf("[%s] ", NotificationTypeToString(type));
@@ -783,6 +804,12 @@ void ConsoleContext::OnThreadStopped(Thread* thread, const StopInfo& info) {
   SetActiveFrameIdForThread(thread, 0);
   SetActiveBreakpointForStop(info);
 
+  // We've hit a breakpoint. If we're in kConsoleMode_ShellAfterBreak, it's time to switch to
+  // kConsoleMode_Shell.
+  if (GetConsoleMode() == ClientSettings::System::kConsoleMode_ShellAfterBreak) {
+    SetConsoleMode(ClientSettings::System::kConsoleMode_Shell);
+  }
+
   // Show the location information.
   OutputThreadContext(thread, info);
 
@@ -873,6 +900,23 @@ void ConsoleContext::OnComponentExited(const std::string& moniker, const std::st
   out.Append(Syntax::kVariable, " url");
   out.Append("=" + FormatConsoleString(url));
   Console::get()->Output(out);
+}
+
+void ConsoleContext::OnSettingChanged(const SettingStore&, const std::string& setting_name) {
+  if (setting_name == ClientSettings::System::kConsoleMode) {
+    std::string mode = GetConsoleMode();
+    Console* console = Console::get();
+
+    if (mode == ClientSettings::System::kConsoleMode_Shell) {
+      console->EnableInput();
+      console->EnableOutput();
+    } else {
+      console->DisableInput();
+      console->DisableOutput();
+    }
+  } else {
+    LOGS(Warn) << "Console context handling invalid setting " << setting_name;
+  }
 }
 
 const ConsoleContext::TargetRecord* ConsoleContext::GetTargetRecord(int target_id) const {

@@ -23,6 +23,7 @@
 #include "src/developer/debug/zxdb/console/analytics.h"
 #include "src/developer/debug/zxdb/console/command_line_options.h"
 #include "src/developer/debug/zxdb/console/command_sequence.h"
+#include "src/developer/debug/zxdb/console/console_context.h"
 #include "src/developer/debug/zxdb/console/console_impl.h"
 #include "src/developer/debug/zxdb/console/console_noninteractive.h"
 #include "src/developer/debug/zxdb/console/fd_streamer.h"
@@ -75,6 +76,9 @@ Err SetupActions(const CommandLineOptions& options, std::vector<std::string>* ac
 void InitConsole(zxdb::Console& console) {
   console.Init();
 
+  // We disabled input during startup. Balance that by enabling input now.
+  console.EnableInput();
+
   // Help text.
   OutputBuffer help;
   help.Append(Syntax::kWarning, "👉 ");
@@ -87,6 +91,8 @@ void SetupCommandLineOptions(const CommandLineOptions& options, Session* session
 
   if (options.debug_mode)
     system_settings.SetBool(ClientSettings::System::kDebugMode, true);
+  if (options.console_mode)
+    system_settings.SetString(ClientSettings::System::kConsoleMode, *options.console_mode);
   if (options.auto_attach_limbo)
     system_settings.SetBool(ClientSettings::System::kAutoAttachLimbo, true);
   if (options.symbol_cache)
@@ -233,6 +239,11 @@ int ConsoleMain(int argc, const char* argv[]) {
       console = std::make_unique<ConsoleImpl>(session.get());
     }
 
+    // Suppress input during startup.
+    // Balanced in InitConsole.
+    console->DisableInput();
+    console->context().InitConsoleMode();
+
     std::vector<std::unique_ptr<debug::BufferedFD>> file_streamers;
     for (auto& path : options.stream_files) {
       fbl::unique_fd fd(HANDLE_EINTR(open(path.c_str(), O_RDONLY | O_NONBLOCK)));
@@ -243,8 +254,6 @@ int ConsoleMain(int argc, const char* argv[]) {
       }
       file_streamers.emplace_back(StreamFDToConsole(std::move(fd)));
     }
-
-    console->EnableOutput();
 
     // Run the actions and then initialize the console to enter interactive mode. Errors in
     // running actions should be fatal and quit the debugger.

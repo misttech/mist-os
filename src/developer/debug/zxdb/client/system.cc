@@ -65,6 +65,13 @@ static const char* kShowStdoutDescription =
   output it's stdout/stderr to zxdb. This setting is global but can be overridden
   by each individual process.)";
 
+const char* ClientSettings::System::kConsoleMode = "console-mode";
+static const char* kConsoleModeDescription =
+    R"(  The style in which zxdb interacts with the console. Valid values are
+  "shell" and "shell-after-break".)";
+const char* ClientSettings::System::kConsoleMode_Shell = "shell";
+const char* ClientSettings::System::kConsoleMode_ShellAfterBreak = "shell-after-break";
+
 const char* ClientSettings::System::kLanguage = "language";
 static const char* kLanguageDescription =
     R"(  Programming language for expressions given to commands such as print.
@@ -170,6 +177,10 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
   schema->AddBool(ClientSettings::System::kAutoAttachLimbo, kAutoAttachLimboDescription, true);
   schema->AddBool(ClientSettings::System::kShowFilePaths, kShowFilePathsDescription, false);
   schema->AddBool(ClientSettings::System::kShowStdout, kShowStdoutDescription, true);
+  schema->AddString(ClientSettings::System::kConsoleMode, kConsoleModeDescription,
+                    ClientSettings::System::kConsoleMode_Shell,
+                    {ClientSettings::System::kConsoleMode_Shell,
+                     ClientSettings::System::kConsoleMode_ShellAfterBreak});
   schema->AddString(ClientSettings::System::kLanguage, kLanguageDescription, "auto",
                     {"rust", "c++", "auto"});
   schema->AddList(ClientSettings::System::kSecondChanceExceptions,

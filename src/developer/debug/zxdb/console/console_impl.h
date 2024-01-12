@@ -41,9 +41,6 @@ class ConsoleImpl : public Console {
   void ProcessInputLine(const std::string& line, fxl::RefPtr<CommandContext> cmd_context = nullptr,
                         bool add_to_history = true) override;
 
-  // Returns true if input handling is enabled. False means input is blocked.
-  bool InputEnabled() const override { return stdio_watch_.watching(); }
-
   // Start watching stdio for input. Do nothing if the input is already enabled.
   void EnableInput() override;
 
@@ -54,12 +51,21 @@ class ConsoleImpl : public Console {
  private:
   FRIEND_TEST(ConsoleImplTest, ControlC);
 
+  // Returns true if input handling is enabled. False means input is blocked.
+  bool InputEnabled() const { return stdio_watch_.watching(); }
+
   void DispatchInputLine(const std::string& line, CommandCallback callback = nullptr);
 
   // Searches for history at $HOME/.zxdb_history and loads it if found.
   bool SaveHistoryFile();
   void LoadHistoryFile();
 
+  // A counter for whether the console allow user input..
+  //
+  // Input is enabled if this value is greater than zero and disabled if the value is zero
+  // or lower. Using a counter lets clients balance calls to EnableInput and DisableInput
+  // without needing to coordinate with each other.
+  int input_enabled_ = 0;
   debug::MessageLoop::WatchHandle stdio_watch_;
 
   line_input::ModalLineInput line_input_;
