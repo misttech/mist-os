@@ -65,6 +65,8 @@ impl BitXor for m32x8 {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
+// Tuple member is never used
+#[allow(dead_code)]
 pub struct u8x8([u8; 8]);
 
 impl From<f32x8> for u8x8 {
@@ -83,6 +85,8 @@ impl From<f32x8> for u8x8 {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
+// Tuple member is never used
+#[allow(dead_code)]
 pub struct u8x32([u8; 32]);
 
 impl u8x32 {
