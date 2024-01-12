@@ -38,6 +38,8 @@ use crate::{
     Instant,
 };
 
+pub(crate) mod api;
+
 /// The default maximum number of multicast solicitations as defined in [RFC
 /// 4861 section 10].
 ///
@@ -1458,7 +1460,7 @@ enum NudEvent {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub(crate) struct NudTimerId<I: Ip, D: LinkDevice, DeviceId>(DeviceId, NudTimerInner<I, D>);
+pub struct NudTimerId<I: Ip, D: LinkDevice, DeviceId>(DeviceId, NudTimerInner<I, D>);
 
 impl<I: Ip, D: LinkDevice, DeviceId> NudTimerId<I, D, DeviceId> {
     fn garbage_collection(device_id: DeviceId) -> Self {
@@ -1482,7 +1484,7 @@ enum NudTimerInner<I: Ip, D: LinkDevice> {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-pub(crate) struct NudState<I: Ip, D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> {
+pub struct NudState<I: Ip, D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> {
     // TODO(https://fxbug.dev/126138): Key neighbors by `UnicastAddr`.
     neighbors: HashMap<SpecifiedAddr<I::Addr>, NeighborState<D, Time, N>>,
     last_gc: Option<Time>,
@@ -1543,7 +1545,7 @@ pub struct NeighborStateInspect<LinkAddress: Debug, T: Instant> {
 }
 
 /// The bindings context for NUD.
-pub(crate) trait NudBindingsContext<I: Ip, D: LinkDevice, DeviceId>:
+pub trait NudBindingsContext<I: Ip, D: LinkDevice, DeviceId>:
     TimerContext<NudTimerId<I, D, DeviceId>>
     + LinkResolutionContext<D>
     + EventContext<Event<D::Address, DeviceId, I, <Self as InstantBindingsTypes>::Instant>>
@@ -1584,7 +1586,7 @@ pub trait LinkResolutionNotifier<D: LinkDevice>: Debug + Sized + Send {
 }
 
 /// The execution context for NUD for a link device.
-pub(crate) trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::DeviceId>>:
+pub trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::DeviceId>>:
     DeviceIdContext<D>
 {
     type ConfigCtx<'a>: NudConfigContext<I>;
@@ -1680,7 +1682,7 @@ impl NudUserConfigUpdate {
 
 /// The execution context for NUD that allows accessing NUD configuration (such
 /// as timer durations) for a particular device.
-pub(crate) trait NudConfigContext<I: Ip> {
+pub trait NudConfigContext<I: Ip> {
     /// The amount of time between retransmissions of neighbor probe messages.
     ///
     /// This corresponds to the configurable per-interface `RetransTimer` value
@@ -1709,11 +1711,8 @@ pub(crate) trait NudConfigContext<I: Ip> {
 
 /// The execution context for NUD for a link device that allows sending IP
 /// packets to specific neighbors.
-pub(crate) trait NudSenderContext<
-    I: Ip,
-    D: LinkDevice,
-    BC: NudBindingsContext<I, D, Self::DeviceId>,
->: NudConfigContext<I> + DeviceIdContext<D>
+pub trait NudSenderContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::DeviceId>>:
+    NudConfigContext<I> + DeviceIdContext<D>
 {
     /// Send an IP frame to the neighbor with the specified link address.
     fn send_ip_packet_to_neighbor_link_addr<S>(

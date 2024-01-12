@@ -64,14 +64,14 @@ use crate::{
     },
     ip::{
         device::nud::{
-            LinkResolutionContext, LinkResolutionNotifier, LinkResolutionResult, NudConfigContext,
-            NudContext, NudHandler, NudSenderContext, NudState, NudTimerId, NudUserConfig,
+            LinkResolutionContext, LinkResolutionNotifier, NudConfigContext, NudContext,
+            NudHandler, NudSenderContext, NudState, NudTimerId, NudUserConfig,
         },
         icmp::NdpCounters,
         types::RawMetric,
     },
     sync::{Mutex, RwLock},
-    BindingsContext, CoreCtx, Instant, SyncCtx,
+    BindingsContext, CoreCtx, Instant,
 };
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
@@ -179,7 +179,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDyna
     }
 }
 
-pub(crate) struct CoreCtxWithDeviceId<
+pub struct CoreCtxWithDeviceId<
     'a,
     CC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>,
 > {
@@ -1160,54 +1160,6 @@ pub(super) fn get_mtu<
     })
 }
 
-/// Insert a static entry into this device's ARP table.
-///
-/// This will cause any conflicting dynamic entry to be removed, and
-/// any future conflicting gratuitous ARPs to be ignored.
-pub(super) fn insert_static_arp_table_entry<
-    BC: LinkResolutionContext<EthernetLinkDevice>,
-    CC: NudHandler<Ipv4, EthernetLinkDevice, BC>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
-    addr: SpecifiedAddr<Ipv4Addr>,
-    mac: UnicastAddr<Mac>,
-) {
-    NudHandler::<Ipv4, EthernetLinkDevice, _>::set_static_neighbor(
-        core_ctx,
-        bindings_ctx,
-        device_id,
-        addr,
-        *mac,
-    )
-}
-
-/// Insert a static entry into this device's NDP table.
-///
-/// This will cause any conflicting dynamic entry to be removed, and NDP
-/// messages about `addr` to be ignored.
-pub(super) fn insert_static_ndp_table_entry<
-    BC: LinkResolutionContext<EthernetLinkDevice>,
-    CC: NudHandler<Ipv6, EthernetLinkDevice, BC>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
-    addr: UnicastAddr<Ipv6Addr>,
-    mac: UnicastAddr<Mac>,
-) {
-    NudHandler::<Ipv6, EthernetLinkDevice, _>::set_static_neighbor(
-        core_ctx,
-        bindings_ctx,
-        device_id,
-        addr.into_specified(),
-        *mac,
-    )
-}
-
 impl<
         BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
             + DeviceSocketBindingsContext<CC::DeviceId>,
@@ -1442,46 +1394,6 @@ impl DeviceStateSpec for EthernetLinkDevice {
     const DEBUG_TYPE: &'static str = "Ethernet";
 }
 
-/// Resolve the link-address of an Ethernet device's neighbor.
-///
-/// Lookup the given destination IP address in the neighbor table for given
-/// Ethernet device, returning either the associated link-address if it is
-/// available, or an observer that can be used to wait for link address
-/// resolution to complete.
-pub fn resolve_ethernet_link_addr<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &EthernetDeviceId<BC>,
-    dst: &SpecifiedAddr<I::Addr>,
-) -> LinkResolutionResult<
-    Mac,
-    <<BC as LinkResolutionContext<EthernetLinkDevice>>::Notifier as LinkResolutionNotifier<
-        EthernetLinkDevice,
-    >>::Observer,
-> {
-    let core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let IpInvariant(result) = I::map_ip(
-        (IpInvariant((core_ctx, bindings_ctx, device)), dst),
-        |(IpInvariant((mut core_ctx, bindings_ctx, device)), dst)| {
-            IpInvariant(NudHandler::<Ipv4, EthernetLinkDevice, _>::resolve_link_addr(
-                &mut core_ctx,
-                bindings_ctx,
-                device,
-                dst,
-            ))
-        },
-        |(IpInvariant((mut core_ctx, bindings_ctx, device)), dst)| {
-            IpInvariant(NudHandler::<Ipv6, EthernetLinkDevice, _>::resolve_link_addr(
-                &mut core_ctx,
-                bindings_ctx,
-                device,
-                dst,
-            ))
-        },
-    );
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
@@ -1516,7 +1428,7 @@ mod tests {
         error::NotFoundError,
         ip::{
             device::{
-                nud::{self, DynamicNeighborUpdateSource},
+                nud::{self, api::NeighborApi, DynamicNeighborUpdateSource, LinkResolutionResult},
                 slaac::SlaacConfiguration,
                 IpAddressId as _, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
             },
@@ -1527,6 +1439,7 @@ mod tests {
             add_arp_or_ndp_table_entry, assert_empty, new_rng, Ctx, FakeEventDispatcherBuilder,
             TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
+        SyncCtx,
     };
 
     struct FakeEthernetCtx {
@@ -1968,37 +1881,41 @@ mod tests {
         // Test that we send an Ethernet frame whose size is less than the MTU,
         // and that we don't send an Ethernet frame whose size is greater than
         // the MTU.
-        fn test(size: usize, expect_frames_sent: usize) {
-            let crate::context::testutil::FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
-                crate::context::testutil::FakeCtxWithCoreCtx::with_core_ctx(
-                    FakeCoreCtx::with_inner_and_outer_state(
-                        FakeEthernetCtx::new(
-                            FAKE_CONFIG_V4.local_mac,
-                            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-                        ),
-                        ArpState::default(),
-                    ),
-                );
-
-            insert_static_arp_table_entry(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &FakeDeviceId,
-                FAKE_CONFIG_V4.remote_ip,
-                FAKE_CONFIG_V4.remote_mac,
+        fn test(size: usize, expect_frames_sent: bool) {
+            let mut ctx = crate::context::testutil::FakeCtxWithCoreCtx::with_core_ctx(
+                FakeCoreCtx::with_inner_and_outer_state(
+                    FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
+                    ArpState::default(),
+                ),
             );
-            let _ = send_ip_frame(
-                &mut core_ctx,
-                &mut bindings_ctx,
+            NeighborApi::<Ipv4, EthernetLinkDevice, _>::new(ctx.as_mut())
+                .insert_static_entry(
+                    &FakeDeviceId,
+                    FAKE_CONFIG_V4.remote_ip.get(),
+                    FAKE_CONFIG_V4.remote_mac.get(),
+                )
+                .unwrap();
+            let crate::testutil::ContextPair { core_ctx, bindings_ctx } = &mut ctx;
+            let result = send_ip_frame(
+                core_ctx,
+                bindings_ctx,
                 &FakeDeviceId,
                 FAKE_CONFIG_V4.remote_ip,
                 Buf::new(&mut vec![0; size], ..),
-            );
-            assert_eq!(core_ctx.inner.frames().len(), expect_frames_sent);
+            )
+            .map_err(|_serializer| ());
+            let sent_frames = core_ctx.inner.frames().len();
+            if expect_frames_sent {
+                assert_eq!(sent_frames, 1);
+                result.expect("should succeed");
+            } else {
+                assert_eq!(sent_frames, 0);
+                result.expect_err("should fail");
+            }
         }
 
-        test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap(), 1);
-        test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap() + 1, 0);
+        test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap(), true);
+        test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap() + 1, false);
     }
 
     #[ip_test]

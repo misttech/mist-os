@@ -7,23 +7,23 @@
 //! Traits in this module exist to be exported as markers to bindings without
 //! exposing the internal traits directly.
 
-use net_types::{
-    ethernet::Mac,
-    ip::{Ipv4, Ipv6},
-};
+use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantBindingsTypes, ReferenceNotifiers, RngContext,
-        TimerContext, TracingContext,
+        CounterContext, InstantBindingsTypes, ReferenceNotifiers, RngContext, TimerContext,
+        TracingContext,
     },
     device::{
-        self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetLinkDevice,
-        WeakDeviceId,
+        self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetDeviceId,
+        EthernetLinkDevice, EthernetWeakDeviceId, WeakDeviceId,
     },
     ip::{
         self,
-        device::{IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt},
+        device::{
+            nud::{NudBindingsContext, NudContext},
+            IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
+        },
         icmp::IcmpBindingsContext,
         IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
     },
@@ -70,8 +70,14 @@ pub trait CoreContext<I, BC>:
     + ip::icmp::socket::StateContext<I, BC>
     + ip::icmp::IcmpStateContext
     + IpLayerContext<I, BC>
+    + NudContext<I, EthernetLinkDevice, BC>
     + IpDeviceConfigurationContext<I, BC>
     + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
+    + DeviceIdContext<
+        EthernetLinkDevice,
+        DeviceId = EthernetDeviceId<BC>,
+        WeakDeviceId = EthernetWeakDeviceId<BC>,
+    >
 where
     I: IpExt,
     BC: IpBindingsContext<I>,
@@ -88,8 +94,14 @@ where
         + ip::icmp::socket::StateContext<I, BC>
         + ip::icmp::IcmpStateContext
         + IpLayerContext<I, BC>
+        + NudContext<I, EthernetLinkDevice, BC>
         + IpDeviceConfigurationContext<I, BC>
-        + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>,
+        + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
+        + DeviceIdContext<
+            EthernetLinkDevice,
+            DeviceId = EthernetDeviceId<BC>,
+            WeakDeviceId = EthernetWeakDeviceId<BC>,
+        >,
 {
 }
 
@@ -103,19 +115,12 @@ impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + T
 pub trait IpBindingsContext<I: IpExt>:
     BindingsTypes
     + RngContext
-    + EventContext<
-        ip::device::nud::Event<
-            Mac,
-            device::EthernetDeviceId<Self>,
-            I,
-            <Self as InstantBindingsTypes>::Instant,
-        >,
-    > + UdpStateBindingsContext<I, DeviceId<Self>>
+    + UdpStateBindingsContext<I, DeviceId<Self>>
     + TcpBindingsContext<I, WeakDeviceId<Self>>
     + IcmpBindingsContext<I, DeviceId<Self>>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
     + IpLayerBindingsContext<I, DeviceId<Self>>
-    + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
+    + NudBindingsContext<I, EthernetLinkDevice, EthernetDeviceId<Self>>
     + device::DeviceLayerEventDispatcher
     + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
     + ReferenceNotifiers
@@ -129,19 +134,12 @@ where
     I: IpExt,
     BC: BindingsTypes
         + RngContext
-        + EventContext<
-            ip::device::nud::Event<
-                Mac,
-                device::EthernetDeviceId<Self>,
-                I,
-                <Self as InstantBindingsTypes>::Instant,
-            >,
-        > + UdpStateBindingsContext<I, DeviceId<Self>>
+        + UdpStateBindingsContext<I, DeviceId<Self>>
         + TcpBindingsContext<I, WeakDeviceId<Self>>
         + IcmpBindingsContext<I, DeviceId<Self>>
         + IpDeviceBindingsContext<I, DeviceId<Self>>
         + IpLayerBindingsContext<I, DeviceId<Self>>
-        + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
+        + NudBindingsContext<I, EthernetLinkDevice, EthernetDeviceId<Self>>
         + device::DeviceLayerEventDispatcher
         + device::socket::DeviceSocketBindingsContext<DeviceId<Self>>
         + ReferenceNotifiers

@@ -13,10 +13,7 @@ use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ethernet::Mac,
-    ip::{
-        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr, Mtu,
-    },
+    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6, Ipv6Addr, Mtu},
     BroadcastAddr, MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{Buf, BufferMut};
@@ -47,13 +44,10 @@ use crate::{
         socket::{self, HeldSockets},
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
     },
-    error::{
-        self, ExistsError, NeighborRemovalError, NotSupportedError, SetIpAddressPropertiesError,
-        StaticNeighborInsertionError,
-    },
+    error::{self, ExistsError, NotSupportedError, SetIpAddressPropertiesError},
     ip::{
         device::{
-            nud::{LinkResolutionContext, NeighborStateInspect, NudHandler},
+            nud::{LinkResolutionContext, NeighborStateInspect},
             state::{
                 AddrSubnetAndManualConfigEither, AssignedAddress as _, IpDeviceFlags,
                 Ipv4DeviceConfigurationAndFlags, Ipv6DeviceConfigurationAndFlags, Lifetime,
@@ -1059,185 +1053,6 @@ pub fn del_ip_addr<BC: BindingsContext>(
             crate::ip::device::state::DelIpv6AddrReason::ManualAction,
         ),
     }
-}
-
-// TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these properties.
-fn validate_ipv4_neighbor_addr(addr: Ipv4Addr) -> Option<SpecifiedAddr<Ipv4Addr>> {
-    (!Ipv4::LOOPBACK_SUBNET.contains(&addr)
-        && !Ipv4::MULTICAST_SUBNET.contains(&addr)
-        && addr != Ipv4::LIMITED_BROADCAST_ADDRESS.get())
-    .then_some(())
-    .and_then(|()| SpecifiedAddr::new(addr))
-}
-
-// TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these properties.
-fn validate_ipv6_neighbor_addr(addr: Ipv6Addr) -> Option<UnicastAddr<Ipv6Addr>> {
-    (addr != Ipv6::LOOPBACK_ADDRESS.get() && addr.to_ipv4_mapped().is_none())
-        .then_some(())
-        .and_then(|()| UnicastAddr::new(addr))
-}
-
-/// Inserts a static neighbor entry for a neighbor.
-pub fn insert_static_neighbor_entry<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    addr: I::Addr,
-    mac: Mac,
-) -> Result<(), StaticNeighborInsertionError> {
-    let mac = UnicastAddr::new(mac).ok_or(StaticNeighborInsertionError::MacAddressNotUnicast)?;
-    let IpInvariant(result) = I::map_ip(
-        (IpInvariant((core_ctx, bindings_ctx, device, mac)), addr),
-        |(IpInvariant((core_ctx, bindings_ctx, device, mac)), addr)| {
-            IpInvariant(
-                validate_ipv4_neighbor_addr(addr)
-                    .ok_or(StaticNeighborInsertionError::IpAddressInvalid)
-                    .and_then(|addr| {
-                        insert_static_arp_table_entry(core_ctx, bindings_ctx, device, addr, mac)
-                            .map_err(StaticNeighborInsertionError::NotSupported)
-                    }),
-            )
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, device, mac)), addr)| {
-            IpInvariant(
-                validate_ipv6_neighbor_addr(addr)
-                    .ok_or(StaticNeighborInsertionError::IpAddressInvalid)
-                    .and_then(|addr| {
-                        insert_static_ndp_table_entry(core_ctx, bindings_ctx, device, addr, mac)
-                            .map_err(StaticNeighborInsertionError::NotSupported)
-                    }),
-            )
-        },
-    );
-    result
-}
-
-/// Insert a static entry into this device's ARP table.
-///
-/// This will cause any conflicting dynamic entry to be removed, and
-/// any future conflicting gratuitous ARPs to be ignored.
-pub(crate) fn insert_static_arp_table_entry<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
-    addr: SpecifiedAddr<Ipv4Addr>,
-    mac: UnicastAddr<Mac>,
-) -> Result<(), NotSupportedError> {
-    match device {
-        DeviceId::Ethernet(id) => Ok(self::ethernet::insert_static_arp_table_entry(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            id,
-            addr,
-            mac,
-        )),
-        DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
-    }
-}
-
-/// Insert a static entry into this device's NDP table.
-///
-/// This will cause any conflicting dynamic entry to be removed, and NDP
-/// messages about `addr` to be ignored.
-pub(crate) fn insert_static_ndp_table_entry<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
-    addr: UnicastAddr<Ipv6Addr>,
-    mac: UnicastAddr<Mac>,
-) -> Result<(), NotSupportedError> {
-    match device {
-        DeviceId::Ethernet(id) => Ok(self::ethernet::insert_static_ndp_table_entry(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            id,
-            addr,
-            mac,
-        )),
-        DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
-    }
-}
-
-/// Remove a static or dynamic neighbor table entry.
-pub fn remove_neighbor_table_entry<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    addr: I::Addr,
-) -> Result<(), NeighborRemovalError> {
-    let device = match device {
-        DeviceId::Ethernet(device) => device,
-        DeviceId::Loopback(LoopbackDeviceId { .. }) => return Err(NotSupportedError.into()),
-    };
-    let IpInvariant(result) = I::map_ip(
-        (IpInvariant((core_ctx, bindings_ctx, device)), addr),
-        |(IpInvariant((core_ctx, bindings_ctx, device)), addr)| {
-            IpInvariant(
-                validate_ipv4_neighbor_addr(addr)
-                    .ok_or(NeighborRemovalError::IpAddressInvalid)
-                    .and_then(|addr| {
-                        NudHandler::<Ipv4, EthernetLinkDevice, _>::delete_neighbor(
-                            &mut CoreCtx::new_deprecated(core_ctx),
-                            bindings_ctx,
-                            device,
-                            addr,
-                        )
-                        .map_err(Into::into)
-                    }),
-            )
-        },
-        |(IpInvariant((core_ctx, bindings_ctx, device)), addr)| {
-            IpInvariant(
-                validate_ipv6_neighbor_addr(addr)
-                    .map(UnicastAddr::into_specified)
-                    .ok_or(NeighborRemovalError::IpAddressInvalid)
-                    .and_then(|addr| {
-                        NudHandler::<Ipv6, EthernetLinkDevice, _>::delete_neighbor(
-                            &mut CoreCtx::new_deprecated(core_ctx),
-                            bindings_ctx,
-                            device,
-                            addr,
-                        )
-                        .map_err(Into::into)
-                    }),
-            )
-        },
-    );
-    result
-}
-
-/// Flush neighbor table entries.
-pub fn flush_neighbor_table<I: Ip, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-) -> Result<(), NotSupportedError> {
-    let device = match device {
-        DeviceId::Ethernet(device) => device,
-        DeviceId::Loopback(LoopbackDeviceId { .. }) => return Err(NotSupportedError),
-    };
-    let IpInvariant(()) = I::map_ip(
-        IpInvariant((core_ctx, bindings_ctx)),
-        |IpInvariant((core_ctx, bindings_ctx))| {
-            NudHandler::<Ipv4, EthernetLinkDevice, _>::flush(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                device,
-            );
-            IpInvariant(())
-        },
-        |IpInvariant((core_ctx, bindings_ctx))| {
-            NudHandler::<Ipv6, EthernetLinkDevice, _>::flush(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                device,
-            );
-            IpInvariant(())
-        },
-    );
-    Ok(())
 }
 
 /// Gets the IPv4 configuration and flags for a `device`.

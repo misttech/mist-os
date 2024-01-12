@@ -52,7 +52,7 @@ use crate::{
 /// A link device whose addressing scheme is supported by ARP.
 ///
 /// `ArpDevice` is implemented for all `L: LinkDevice where L::Address: HType`.
-pub(crate) trait ArpDevice: LinkDevice<Address = Self::HType> {
+pub trait ArpDevice: LinkDevice<Address = Self::HType> {
     type HType: HType + LinkUnicastAddress + core::fmt::Debug;
 }
 
@@ -68,7 +68,7 @@ pub(crate) type ArpTimerId<D, DeviceId> = NudTimerId<Ipv4, D, DeviceId>;
 
 /// The metadata associated with an ARP frame.
 #[cfg_attr(test, derive(Debug, PartialEq))]
-pub(crate) struct ArpFrameMetadata<D: ArpDevice, DeviceId> {
+pub struct ArpFrameMetadata<D: ArpDevice, DeviceId> {
     /// The ID of the ARP device.
     pub(super) device_id: DeviceId,
     /// The destination hardware address.
@@ -115,7 +115,7 @@ impl<BC: BindingsContext, L> CounterContext<ArpCounters> for CoreCtx<'_, BC, L> 
 
 /// An execution context for the ARP protocol that allows sending IP packets to
 /// specific neighbors.
-pub(crate) trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
+pub trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
     ArpConfigContext + DeviceIdContext<D>
 {
     /// Send an IP packet to the neighbor with address `dst_link_address`.
@@ -150,7 +150,7 @@ pub(crate) trait ArpSenderContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::
 // for similar reasons).
 
 /// The execution context for the ARP protocol provided by bindings.
-pub(crate) trait ArpBindingsContext<D: ArpDevice, DeviceId>:
+pub trait ArpBindingsContext<D: ArpDevice, DeviceId>:
     TimerContext<ArpTimerId<D, DeviceId>>
     + TracingContext
     + LinkResolutionContext<D>
@@ -172,7 +172,7 @@ impl<
 }
 
 /// An execution context for the ARP protocol.
-pub(crate) trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
+pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
     DeviceIdContext<D> + SendFrameContext<BC, ArpFrameMetadata<D, Self::DeviceId>>
 {
     type ConfigCtx<'a>: ArpConfigContext;
@@ -221,7 +221,7 @@ pub(crate) trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::Device
 
 /// An execution context for the ARP protocol that allows accessing
 /// configuration parameters.
-pub(crate) trait ArpConfigContext {
+pub trait ArpConfigContext {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         NonZeroDuration::new(DEFAULT_ARP_REQUEST_PERIOD).unwrap()
     }
@@ -624,7 +624,7 @@ fn send_arp_request<
 ///
 /// Each device will contain an `ArpState` object for each of the network
 /// protocols that it supports.
-pub(crate) struct ArpState<D: ArpDevice, I: Instant, N: LinkResolutionNotifier<D>> {
+pub struct ArpState<D: ArpDevice, I: Instant, N: LinkResolutionNotifier<D>> {
     pub(crate) nud: NudState<Ipv4, D, I, N>,
 }
 

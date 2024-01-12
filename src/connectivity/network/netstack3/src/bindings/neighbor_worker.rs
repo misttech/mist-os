@@ -21,19 +21,21 @@ use futures::{
 };
 use net_types::{
     ethernet::Mac,
-    ip::{IpAddr, Ipv4, Ipv6},
+    ip::{IpAddr, IpAddress, Ipv4, Ipv6},
     SpecifiedAddr, Witness as _,
 };
 use tracing::{error, info, warn};
 
 use crate::bindings::{
     devices::{BindingId, DeviceIdAndName},
-    BindingsCtx, Ctx, StackTime,
+    BindingsCtx, Ctx, DeviceIdExt as _, StackTime,
 };
 use netstack3_core::{
-    device::EthernetWeakDeviceId,
-    error::{NeighborRemovalError, NotFoundError, NotSupportedError, StaticNeighborInsertionError},
+    device::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
+    error::NotFoundError,
     neighbor,
+    neighbor::{NeighborRemovalError, StaticNeighborInsertionError},
+    IpExt,
 };
 
 #[derive(Debug)]
@@ -424,105 +426,84 @@ pub(super) async fn serve_view(
         .await
 }
 
+fn get_ethernet_id(ctx: &Ctx, interface: u64) -> Result<EthernetDeviceId<BindingsCtx>, zx::Status> {
+    BindingId::new(interface)
+        .and_then(|id| ctx.bindings_ctx().devices.get_core_id(id))
+        .ok_or(zx::Status::NOT_FOUND)?
+        .into_ethernet()
+        .ok_or(zx::Status::NOT_SUPPORTED)
+}
+
+#[netstack3_core::context_ip_bounds(A::Version, BindingsCtx)]
+fn add_static_entry<A: IpAddress>(
+    ctx: &mut Ctx,
+    interface: u64,
+    neighbor: A,
+    mac: fnet::MacAddress,
+) -> Result<(), zx::Status>
+where
+    A::Version: IpExt,
+{
+    let device_id = get_ethernet_id(ctx, interface)?;
+    let mac = mac.into_ext();
+    ctx.api()
+        .neighbor::<A::Version, EthernetLinkDevice>()
+        .insert_static_entry(&device_id, neighbor, mac)
+        .map_err(|e| match e {
+            StaticNeighborInsertionError::MacAddressNotUnicast
+            | StaticNeighborInsertionError::IpAddressInvalid => zx::Status::INVALID_ARGS,
+        })
+}
+
+#[netstack3_core::context_ip_bounds(A::Version, BindingsCtx)]
+fn remove_entry<A: IpAddress>(ctx: &mut Ctx, interface: u64, neighbor: A) -> Result<(), zx::Status>
+where
+    A::Version: IpExt,
+{
+    let device_id = get_ethernet_id(ctx, interface)?;
+    ctx.api()
+        .neighbor::<A::Version, EthernetLinkDevice>()
+        .remove_entry(&device_id, neighbor)
+        .map_err(|e| match e {
+            NeighborRemovalError::IpAddressInvalid => zx::Status::INVALID_ARGS,
+            NeighborRemovalError::NotFound(NotFoundError) => zx::Status::NOT_FOUND,
+        })
+}
+
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn clear_entries<I: IpExt>(ctx: &mut Ctx, interface: u64) -> Result<(), zx::Status> {
+    let device_id = get_ethernet_id(ctx, interface)?;
+    Ok(ctx.api().neighbor::<I, EthernetLinkDevice>().flush_table(&device_id))
+}
+
 pub(super) async fn serve_controller(
     ctx: Ctx,
     stream: ControllerRequestStream,
 ) -> Result<(), fidl::Error> {
     stream
         .try_for_each(|request| async {
-            let mut ctx = ctx.clone();
-            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
+            let mut ctx: Ctx = ctx.clone();
             match request {
                 ControllerRequest::AddEntry { interface, neighbor, mac, responder } => {
-                    let Some(device_id) = BindingId::new(interface)
-                        .and_then(|id| bindings_ctx.devices.get_core_id(id))
-                    else {
-                        return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
-                    };
-                    let mac = mac.into_ext();
                     let result = match neighbor.into_ext() {
-                        IpAddr::V4(v4) => netstack3_core::device::insert_static_neighbor_entry::<
-                            Ipv4,
-                            BindingsCtx,
-                        >(
-                            core_ctx, bindings_ctx, &device_id, v4, mac
-                        ),
-                        IpAddr::V6(v6) => netstack3_core::device::insert_static_neighbor_entry::<
-                            Ipv6,
-                            BindingsCtx,
-                        >(
-                            core_ctx, bindings_ctx, &device_id, v6, mac
-                        ),
-                    }
-                    .map_err(|e| match e {
-                        StaticNeighborInsertionError::MacAddressNotUnicast
-                        | StaticNeighborInsertionError::IpAddressInvalid => {
-                            zx::Status::INVALID_ARGS.into_raw()
-                        }
-                        StaticNeighborInsertionError::NotSupported(NotSupportedError) => {
-                            zx::Status::NOT_SUPPORTED.into_raw()
-                        }
-                    });
-                    responder.send(result)
+                        IpAddr::V4(v4) => add_static_entry(&mut ctx, interface, v4, mac),
+                        IpAddr::V6(v6) => add_static_entry(&mut ctx, interface, v6, mac),
+                    };
+                    responder.send(result.map_err(|e| e.into_raw()))
                 }
                 ControllerRequest::RemoveEntry { interface, neighbor, responder } => {
-                    let Some(device_id) = BindingId::new(interface)
-                        .and_then(|id| bindings_ctx.devices.get_core_id(id))
-                    else {
-                        return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
-                    };
                     let result = match neighbor.into_ext() {
-                        IpAddr::V4(v4) => netstack3_core::device::remove_neighbor_table_entry::<
-                            Ipv4,
-                            BindingsCtx,
-                        >(
-                            core_ctx, bindings_ctx, &device_id, v4
-                        ),
-                        IpAddr::V6(v6) => netstack3_core::device::remove_neighbor_table_entry::<
-                            Ipv6,
-                            BindingsCtx,
-                        >(
-                            core_ctx, bindings_ctx, &device_id, v6
-                        ),
-                    }
-                    .map_err(|e| {
-                        match e {
-                            NeighborRemovalError::IpAddressInvalid => zx::Status::INVALID_ARGS,
-                            NeighborRemovalError::NotFound(NotFoundError) => zx::Status::NOT_FOUND,
-                            NeighborRemovalError::NotSupported(NotSupportedError) => {
-                                zx::Status::NOT_SUPPORTED
-                            }
-                        }
-                        .into_raw()
-                    });
-                    responder.send(result)
+                        IpAddr::V4(v4) => remove_entry(&mut ctx, interface, v4),
+                        IpAddr::V6(v6) => remove_entry(&mut ctx, interface, v6),
+                    };
+                    responder.send(result.map_err(|e| e.into_raw()))
                 }
                 ControllerRequest::ClearEntries { interface, ip_version, responder } => {
-                    let device_id = match BindingId::new(interface)
-                        .and_then(|id| bindings_ctx.devices.get_core_id(id))
-                    {
-                        Some(device_id) => device_id,
-                        None => {
-                            return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
-                        }
-                    };
                     let result = match ip_version {
-                        fnet::IpVersion::V4 => netstack3_core::device::flush_neighbor_table::<
-                            Ipv4,
-                            BindingsCtx,
-                        >(
-                            core_ctx, bindings_ctx, &device_id
-                        ),
-                        fnet::IpVersion::V6 => netstack3_core::device::flush_neighbor_table::<
-                            Ipv6,
-                            BindingsCtx,
-                        >(
-                            core_ctx, bindings_ctx, &device_id
-                        ),
-                    }
-                    .map_err(|NotSupportedError| zx::Status::NOT_SUPPORTED.into_raw());
-                    responder.send(result)
+                        fnet::IpVersion::V4 => clear_entries::<Ipv4>(&mut ctx, interface),
+                        fnet::IpVersion::V6 => clear_entries::<Ipv6>(&mut ctx, interface),
+                    };
+                    responder.send(result.map_err(|e| e.into_raw()))
                 }
                 ControllerRequest::UpdateUnreachabilityConfig {
                     interface: _,

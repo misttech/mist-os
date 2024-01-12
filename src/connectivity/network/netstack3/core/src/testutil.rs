@@ -24,10 +24,10 @@ use net_types::{
         AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6,
         Ipv6Addr, Subnet, SubnetEither,
     },
-    SpecifiedAddr, UnicastAddr,
+    SpecifiedAddr, UnicastAddr, Witness as _,
 };
 #[cfg(test)]
-use net_types::{ip::IpAddr, MulticastAddr, NonMappedAddr, Witness as _};
+use net_types::{ip::IpAddr, MulticastAddr, NonMappedAddr};
 use packet::{Buf, BufferMut};
 #[cfg(test)]
 use packet_formats::ip::IpProto;
@@ -61,9 +61,9 @@ use crate::{
         TracingContext,
     },
     device::{
-        ethernet::MaxEthernetFrameSize, link::LinkDevice, loopback::LoopbackDeviceId, DeviceId,
-        DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId,
-        EthernetWeakDeviceId, WeakDeviceId,
+        ethernet::EthernetLinkDevice, ethernet::MaxEthernetFrameSize, link::LinkDevice,
+        loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
+        DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
     },
     ip::{
         device::{
@@ -1123,27 +1123,20 @@ impl FakeEventDispatcherBuilder {
             .collect();
         for (idx, ip, mac) in arp_table_entries {
             let device = &idx_to_device_id[idx];
-            crate::device::insert_static_arp_table_entry(
-                core_ctx,
-                bindings_ctx,
-                &device.clone().into(),
-                ip,
-                mac,
-            )
-            .expect("error inserting static ARP entry");
+            ctx.core_api()
+                .neighbor::<Ipv4, EthernetLinkDevice>()
+                .insert_static_entry(&device, ip.get(), mac.get())
+                .expect("error inserting static ARP entry");
         }
         for (idx, ip, mac) in ndp_table_entries {
             let device = &idx_to_device_id[idx];
-            crate::device::insert_static_ndp_table_entry(
-                core_ctx,
-                bindings_ctx,
-                &device.clone().into(),
-                ip,
-                mac,
-            )
-            .expect("error inserting static NDP entry");
+            ctx.core_api()
+                .neighbor::<Ipv6, EthernetLinkDevice>()
+                .insert_static_entry(&device, ip.get(), mac.get())
+                .expect("error inserting static NDP entry");
         }
 
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         for (subnet, idx) in device_routes {
             let device = &idx_to_device_id[idx];
             crate::testutil::add_route(

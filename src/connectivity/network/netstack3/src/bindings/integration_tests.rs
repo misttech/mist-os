@@ -23,7 +23,7 @@ use net_types::{
     SpecifiedAddr, Witness as _,
 };
 use netstack3_core::{
-    device::{insert_static_neighbor_entry, resolve_ethernet_link_addr, DeviceId},
+    device::{DeviceId, EthernetLinkDevice},
     error::AddressResolutionFailed,
     ip::{Ipv6DeviceConfigurationUpdate, STABLE_IID_SECRET_KEY_BYTES},
     neighbor::LinkResolutionResult,
@@ -43,7 +43,7 @@ use crate::bindings::{
     devices::{BindingId, Devices},
     routes,
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    Ctx, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
+    Ctx, DeviceIdExt as _, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
 struct LogFormatter;
@@ -1017,29 +1017,23 @@ async fn test_neighbor_table_inspect() {
     let test_stack = t.get(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     test_stack.with_ctx(|ctx| {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let devices: &Devices<_> = bindings_ctx.as_ref();
-        let device = devices.get_core_id(bindings_id).expect("get_core_id failed");
+        let devices: &Devices<_> = ctx.bindings_ctx().as_ref();
+        let device = devices
+            .get_core_id(bindings_id)
+            .and_then(|d| d.into_ethernet())
+            .expect("get_core_id failed");
         let v4_neigh_addr = net_ip_v4!("192.168.0.1");
         let v4_neigh_mac = net_mac!("AA:BB:CC:DD:EE:FF");
-        insert_static_neighbor_entry::<Ipv4, BindingsCtx>(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            v4_neigh_addr,
-            v4_neigh_mac,
-        )
-        .expect("failed to insert static neighbor entry");
+        ctx.api()
+            .neighbor::<Ipv4, EthernetLinkDevice>()
+            .insert_static_entry(&device, v4_neigh_addr, v4_neigh_mac)
+            .expect("failed to insert static neighbor entry");
         let v6_neigh_addr = net_ip_v6!("2001:DB8::1");
         let v6_neigh_mac = net_mac!("00:11:22:33:44:55");
-        insert_static_neighbor_entry::<Ipv6, BindingsCtx>(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            v6_neigh_addr,
-            v6_neigh_mac,
-        )
-        .expect("failed to insert static neighbor entry");
+        ctx.api()
+            .neighbor::<Ipv6, EthernetLinkDevice>()
+            .insert_static_entry(&device, v6_neigh_addr, v6_neigh_mac)
+            .expect("failed to insert static neighbor entry");
     });
     let inspector = test_stack.inspector();
     use diagnostics_hierarchy::DiagnosticsHierarchyGetter;
@@ -1065,7 +1059,7 @@ async fn test_neighbor_table_inspect() {
     t
 }
 
-trait IpExt: Ip {
+trait IpExt: Ip + netstack3_core::IpExt {
     type OtherIp: IpExt;
     const ADDR: SpecifiedAddr<Self::Addr>;
     const PREFIX_LEN: u8;
@@ -1102,6 +1096,7 @@ async fn add_remove_neighbor_entry_v6() {
     add_remove_neighbor_entry::<Ipv6>().await
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
@@ -1113,14 +1108,15 @@ async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     let test_stack = t.get(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     let mut ctx = test_stack.ctx();
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-    let devices: &Devices<_> = bindings_ctx.as_ref();
+    let devices: &Devices<_> = ctx.bindings_ctx().as_ref();
     let ethernet_device_id = assert_matches!(
         devices.get_core_id(bindings_id).expect("get core id"),
         DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
     );
     let observer = assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(core_ctx, bindings_ctx, &ethernet_device_id, &I::ADDR),
+        ctx.api()
+           .neighbor::<I, EthernetLinkDevice>()
+           .resolve_link_addr(&ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(observer) => observer
     );
     let controller = test_stack.connect_proxy::<fnet_neighbor::ControllerMarker>();
@@ -1144,7 +1140,9 @@ async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
         .expect("remove_entry FIDL")
         .expect("remove_entry");
     assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(core_ctx, bindings_ctx, &ethernet_device_id, &I::ADDR),
+        ctx.api()
+            .neighbor::<I, EthernetLinkDevice>()
+            .resolve_link_addr(&ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(_)
     );
 
@@ -1165,6 +1163,7 @@ async fn remove_dynamic_neighbor_entry_v6() {
     remove_dynamic_neighbor_entry::<Ipv6>().await
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
@@ -1181,14 +1180,15 @@ async fn remove_dynamic_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     let test_stack = t.get(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     let mut ctx = test_stack.ctx();
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-    let devices: &Devices<_> = bindings_ctx.as_ref();
+    let devices: &Devices<_> = ctx.bindings_ctx().as_ref();
     let ethernet_device_id = assert_matches!(
         devices.get_core_id(bindings_id).expect("get core id"),
         DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
     );
     let observer = assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(core_ctx, bindings_ctx, &ethernet_device_id, &I::ADDR),
+        ctx.api()
+            .neighbor::<I, EthernetLinkDevice>()
+            .resolve_link_addr(&ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(observer) => observer
     );
 
@@ -1218,6 +1218,8 @@ async fn clear_entries_v6() {
     clear_entries::<Ipv6>().await
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+#[netstack3_core::context_ip_bounds(I::OtherIp, BindingsCtx)]
 async fn clear_entries<I: Ip + IpExt>() -> TestSetup {
     const EP_IDX: usize = 1;
     let mut t = TestSetupBuilder::new()
@@ -1229,8 +1231,7 @@ async fn clear_entries<I: Ip + IpExt>() -> TestSetup {
     let test_stack = t.get(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     let mut ctx = test_stack.ctx();
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-    let devices: &Devices<_> = bindings_ctx.as_ref();
+    let devices: &Devices<_> = ctx.bindings_ctx().as_ref();
     let ethernet_device_id = assert_matches!(
         devices.get_core_id(bindings_id).expect("get core id"),
         DeviceId::Ethernet(ethernet_device_id) => ethernet_device_id
@@ -1252,16 +1253,15 @@ async fn clear_entries<I: Ip + IpExt>() -> TestSetup {
         .expect("clear_entries");
 
     assert_matches!(
-        resolve_ethernet_link_addr::<I, _>(core_ctx, bindings_ctx, &ethernet_device_id, &I::ADDR),
+        ctx.api()
+            .neighbor::<I, EthernetLinkDevice>()
+            .resolve_link_addr(&ethernet_device_id, &I::ADDR),
         LinkResolutionResult::Pending(_)
     );
     assert_matches!(
-        resolve_ethernet_link_addr::<I::OtherIp, _>(
-            core_ctx,
-            bindings_ctx,
-            &ethernet_device_id,
-            &I::OtherIp::ADDR
-        ),
+        ctx.api()
+           .neighbor::<I::OtherIp, EthernetLinkDevice>()
+           .resolve_link_addr(&ethernet_device_id, &I::OtherIp::ADDR),
         LinkResolutionResult::Resolved(mac) => assert_eq!(mac, MAC)
     );
 

@@ -34,7 +34,7 @@ use tracing::{error, info, warn};
 
 use crate::bindings::{
     util::{ConversionContext as _, IntoCore as _, IntoFidl as _},
-    BindingsCtx, Ctx, IpExt, SyncCtx,
+    BindingsCtx, Ctx, IpExt,
 };
 
 // The maximum number of events a client for the `fuchsia.net.routes/Watcher`
@@ -133,8 +133,7 @@ where
         DeviceId::Loopback(_device) => None,
         DeviceId::Ethernet(device) => {
             if let Some(addr) = next_hop_addr {
-                let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-                Some(resolve_ethernet_link_addr(core_ctx, bindings_ctx, device, &addr).await?)
+                Some(resolve_ethernet_link_addr(&mut ctx, device, &addr).await?)
             } else {
                 warn!("Cannot attempt Ethernet link resolution for the unspecified address.");
                 return Err(zx::Status::ADDRESS_UNREACHABLE);
@@ -161,18 +160,16 @@ where
 }
 
 /// Performs link-layer resolution of the remote IP Address on the given device.
+#[netstack3_core::context_ip_bounds(A::Version, BindingsCtx)]
 async fn resolve_ethernet_link_addr<A: IpAddress>(
-    core_ctx: &SyncCtx<BindingsCtx>,
-    bindings_ctx: &mut BindingsCtx,
+    ctx: &mut Ctx,
     device: &EthernetDeviceId<BindingsCtx>,
     remote: &SpecifiedAddr<A>,
-) -> Result<Mac, zx::Status> {
-    match netstack3_core::device::resolve_ethernet_link_addr::<A::Version, _>(
-        core_ctx,
-        bindings_ctx,
-        device,
-        remote,
-    ) {
+) -> Result<Mac, zx::Status>
+where
+    A::Version: IpExt,
+{
+    match ctx.api().neighbor::<A::Version, EthernetLinkDevice>().resolve_link_addr(device, remote) {
         LinkResolutionResult::Resolved(mac) => Ok(mac),
         LinkResolutionResult::Pending(observer) => observer
             .await

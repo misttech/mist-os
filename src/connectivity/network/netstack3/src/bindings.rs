@@ -214,6 +214,9 @@ use crate::bindings::{interfaces_watcher::AddressPropertiesUpdate, util::TaskWai
 trait DeviceIdExt {
     /// Returns the state associated with devices.
     fn external_state(&self) -> DeviceSpecificInfo<'_>;
+
+    /// Gets the contained ethernet ID if this is an ethernet device.
+    fn into_ethernet(self) -> Option<EthernetDeviceId<BindingsCtx>>;
 }
 
 impl DeviceIdExt for DeviceId<BindingsCtx> {
@@ -221,6 +224,13 @@ impl DeviceIdExt for DeviceId<BindingsCtx> {
         match self {
             DeviceId::Ethernet(d) => DeviceSpecificInfo::Netdevice(d.external_state()),
             DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
+        }
+    }
+
+    fn into_ethernet(self) -> Option<EthernetDeviceId<BindingsCtx>> {
+        match self {
+            DeviceId::Ethernet(d) => Some(d),
+            DeviceId::Loopback(_) => None,
         }
     }
 }

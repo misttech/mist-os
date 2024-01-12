@@ -11,6 +11,7 @@ use crate::{
     device::socket::DeviceSocketApi,
     ip::{
         api::{RoutesAnyApi, RoutesApi},
+        device::nud::api::NeighborApi,
         icmp::socket::IcmpEchoSocketApi,
     },
     transport::{tcp::socket::TcpApi, udp::UdpApi},
@@ -68,6 +69,12 @@ where
     pub fn routes_any(self) -> RoutesAnyApi<CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         RoutesAnyApi::new(ctx)
+    }
+
+    /// Gets access to the neighbor API for IP version `I` and device `D`.
+    pub fn neighbor<I: Ip, D>(self) -> NeighborApi<I, D, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        NeighborApi::new(ctx)
     }
 }
 

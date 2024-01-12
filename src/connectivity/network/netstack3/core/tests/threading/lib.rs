@@ -17,6 +17,7 @@ use net_types::{
     SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr,
 };
 use netstack3_core::{
+    device::EthernetLinkDevice,
     device_socket::{Protocol, TargetDevice},
     routes::{AddableEntry, AddableMetric, RawMetric},
     sync::Mutex,
@@ -383,12 +384,13 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
             I::DEVICE_ADDR,
             I::DEVICE_SUBNET,
         );
-        let (FakeCtx { core_ctx, mut bindings_ctx }, indexes_to_device_ids) = builder.build();
+        let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
+        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
 
         netstack3_core::testutil::add_route(
-            &core_ctx,
-            &mut bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             AddableEntry::with_gateway(
                 I::DEVICE_GATEWAY,
                 device.clone().into(),
@@ -404,7 +406,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
 
         // Bind a UDP socket to the device we added so we can trigger link
         // resolution by sending IP packets.
-        let mut udp_api = CoreApi::with_contexts(&core_ctx, &mut bindings_ctx).udp::<I>();
+        let mut udp_api = ctx.core_api().udp::<I>();
         let socket = udp_api.create();
         udp_api
             .listen(
@@ -414,8 +416,6 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
             )
             .unwrap();
         udp_api.set_device(&socket, Some(&device.clone().into())).unwrap();
-
-        let core_ctx = Arc::new(core_ctx);
 
         // Race the following:
         //  - Creation of an INCOMPLETE neighbor entry, caused by queueing an
@@ -427,10 +427,10 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         // atomically with entry insertion, the subsequent timer cancelation
         // will cause a panic.
 
-        let thread_vars = (core_ctx.clone(), bindings_ctx.clone(), socket.clone());
+        let thread_vars = (ctx.clone(), socket.clone());
         let create_incomplete_neighbor = loom::thread::spawn(move || {
-            let (core_ctx, mut bindings_ctx, socket) = thread_vars;
-            CoreApi::with_contexts(&core_ctx, &mut bindings_ctx)
+            let (mut ctx, socket) = thread_vars;
+            ctx.core_api()
                 .udp()
                 .send_to(
                     &socket,
@@ -441,18 +441,13 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
                 .unwrap()
         });
 
-        let thread_vars = (core_ctx.clone(), bindings_ctx.clone(), device.clone());
+        let thread_vars = (ctx.clone(), device.clone());
         let set_static_neighbor = loom::thread::spawn(move || {
-            let (core_ctx, mut bindings_ctx, device) = thread_vars;
-
-            netstack3_core::device::insert_static_neighbor_entry::<I, _>(
-                &core_ctx,
-                &mut bindings_ctx,
-                &device.into(),
-                I::NEIGHBOR_ADDR,
-                NEIGHBOR_MAC,
-            )
-            .unwrap();
+            let (mut ctx, device) = thread_vars;
+            ctx.core_api()
+                .neighbor::<I, EthernetLinkDevice>()
+                .insert_static_entry(&device, I::NEIGHBOR_ADDR, NEIGHBOR_MAC)
+                .unwrap();
         });
 
         create_incomplete_neighbor.join().unwrap();
@@ -461,8 +456,8 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         // Remove the device so that existing references to it get cleaned up
         // before the core context is dropped at the end of the test.
         netstack3_core::testutil::clear_routes_and_remove_ethernet_device(
-            &core_ctx,
-            &mut bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             device,
         );
     })
