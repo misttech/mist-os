@@ -7975,6 +7975,14 @@ support is available.
 
 From //src/starnix/kernel/args.gni:26
 
+### storage_enable_tracing
+
+Whether or not tracing is enabled for storage.
+
+**Current value (from the default):** `false`
+
+From //src/storage/lib/trace/BUILD.gn:10
+
 ### target_cpu
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
