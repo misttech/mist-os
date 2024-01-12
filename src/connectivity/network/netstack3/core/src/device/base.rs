@@ -261,7 +261,7 @@ pub fn inspect_devices<BC: BindingsContext, V: DevicesVisitor<BC>>(
             lock_order::lock::RwLockFor::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>::read_lock(
                 ip,
             );
-        let ipv6_addresses = ipv6.iter().map(|a| IpAddr::from(a.addr().into_addr()));
+        let ipv6_addresses = ipv6.iter().map(|a| IpAddr::from(a.addr().addr()));
         InspectDeviceState { device_id, addresses: ipv4_addresses.chain(ipv6_addresses).collect() }
     });
     visitor.visit_devices(devices)

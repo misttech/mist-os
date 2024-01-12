@@ -9,8 +9,8 @@ use core::convert::Infallible;
 use core::num::{NonZeroU32, NonZeroU8};
 
 use net_types::{
-    ip::{Ip, Ipv6Addr, Mtu},
-    SpecifiedAddr, UnicastAddr,
+    ip::{Ip, Ipv6Addr, Ipv6SourceAddr, Mtu},
+    SpecifiedAddr,
 };
 use packet::{BufferMut, SerializeError, Serializer};
 use thiserror::Error;
@@ -19,8 +19,8 @@ use crate::{
     context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
     device::{AnyDevice, DeviceIdContext},
     ip::{
-        device::state::IpDeviceStateIpExt,
-        types::{NextHop, ResolvedRoute},
+        device::{state::IpDeviceStateIpExt, IpDeviceAddr},
+        types::{NextHop, ResolvedRoute, RoutableIpAddr},
         EitherDeviceId, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, ResolveRouteError,
         SendIpPacketMeta,
     },
@@ -112,8 +112,8 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<SocketIpAddr<I::Addr>>,
-        remote_ip: SocketIpAddr<I::Addr>,
+        local_ip: Option<IpDeviceAddr<I::Addr>>,
+        remote_ip: RoutableIpAddr<I::Addr>,
         proto: I::Proto,
         options: O,
         get_body_from_src_ip: F,
@@ -411,8 +411,8 @@ where
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<&Self::DeviceId>,
-        src_ip: Option<SpecifiedAddr<I::Addr>>,
-        dst_ip: SpecifiedAddr<I::Addr>,
+        src_ip: Option<IpDeviceAddr<I::Addr>>,
+        dst_ip: RoutableIpAddr<I::Addr>,
     ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError>;
 
     /// Send an IP packet to the next-hop node.
@@ -458,18 +458,11 @@ impl<
         // the socket. We do not care about the actual destination here because
         // we will recalculate it when we send a packet so that the best route
         // available at the time is used for each outgoing packet.
-        let ResolvedRoute { src_addr, device: route_device, next_hop: _ } = match self.lookup_route(
-            bindings_ctx,
-            device,
-            local_ip.map(|a| a.into()),
-            remote_ip.into(),
-        ) {
-            Ok(r) => r,
-            Err(e) => return Err((e.into(), options)),
-        };
-        // TODO(https://fxbug.dev/132092): Remove this panic opportunity once
-        // `lookup_route` returns a `NonMappedAddr`.
-        let src_addr = SocketIpAddr::new_from_specified_or_panic(src_addr);
+        let ResolvedRoute { src_addr, device: route_device, next_hop: _ } =
+            match self.lookup_route(bindings_ctx, device, local_ip, remote_ip) {
+                Ok(r) => r,
+                Err(e) => return Err((e.into(), options)),
+            };
 
         // If the source or destination address require a device, make sure to
         // set that in the socket definition. Otherwise defer to what was provided.
@@ -557,8 +550,6 @@ where
 
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto }, options } =
         socket;
-    let remote_ip: SpecifiedAddr<_> = (*remote_ip).into();
-    let local_ip: SpecifiedAddr<_> = (*local_ip).into();
 
     let device = if let Some(device) = device {
         let Some(device) = core_ctx.upgrade_weak_device_id(device) else {
@@ -570,12 +561,14 @@ where
     };
 
     let ResolvedRoute { src_addr: got_local_ip, device, next_hop } =
-        match core_ctx.lookup_route(bindings_ctx, device.as_ref(), Some(local_ip), remote_ip) {
+        match core_ctx.lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip) {
             Ok(o) => o,
             Err(e) => return Err((body, IpSockSendError::Unroutable(e))),
         };
+    assert_eq!(local_ip, &got_local_ip);
 
-    assert_eq!(local_ip, got_local_ip);
+    let remote_ip: SpecifiedAddr<_> = (*remote_ip).into();
+    let local_ip: SpecifiedAddr<_> = (*local_ip).into();
 
     let next_hop = match next_hop {
         NextHop::RemoteAsNeighbor => remote_ip,
@@ -617,12 +610,7 @@ impl<
             .transpose()?;
 
         let ResolvedRoute { src_addr: _, device, next_hop: _ } = self
-            .lookup_route(
-                bindings_ctx,
-                device.as_ref(),
-                Some((*local_ip).into()),
-                (*remote_ip).into(),
-            )
+            .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip)
             .map_err(MmsError::NoDevice)?;
         let mtu = IpDeviceContext::<I, BC>::get_mtu(self, &device);
         // TODO(https://fxbug.dev/121911): Calculate the options size when they
@@ -665,7 +653,7 @@ pub(crate) mod ipv6_source_address_selection {
         remote_ip: Option<SpecifiedAddr<Ipv6Addr>>,
         outbound_device: &D,
         addresses: I,
-    ) -> Option<UnicastAddr<Ipv6Addr>> {
+    ) -> Ipv6SourceAddr {
         // Source address selection as defined in RFC 6724 Section 5.
         //
         // The algorithm operates by defining a partial ordering on available
@@ -677,15 +665,16 @@ pub(crate) mod ipv6_source_address_selection {
         // rule must be consulted, and so on until all of the rules are
         // exhausted.
 
-        addresses
+        let addr = addresses
             // Tentative addresses are not considered available to the source
             // selection algorithm.
             .filter(|SasCandidate { addr_sub: _, flags, device: _ }| flags.assigned)
             .max_by(|a, b| select_ipv6_source_address_cmp(remote_ip, outbound_device, a, b))
-            .map(|SasCandidate { addr_sub, flags: _, device: _ }| addr_sub.addr())
-            // TODO(https://fxbug.dev/42082235): Plumb the `NonMappedAddr` up to
-            // the socket layer.
-            .map(|a: Ipv6DeviceAddr| *a)
+            .map(|SasCandidate { addr_sub, flags: _, device: _ }| addr_sub.addr());
+        match addr {
+            Some(addr) => Ipv6SourceAddr::Unicast(addr),
+            None => Ipv6SourceAddr::Unspecified,
+        }
     }
 
     /// Comparison operator used by `select_ipv6_source_address`.
@@ -1083,15 +1072,15 @@ pub(crate) mod testutil {
         ip_forwarding_ctx: &mut FakeIpForwardingCtx<D>,
         device_state: &HashMap<D, impl AsRef<IpDeviceState<Instant, I>>>,
         device: Option<&D>,
-        local_ip: Option<SpecifiedAddr<I::Addr>>,
-        addr: SpecifiedAddr<I::Addr>,
+        local_ip: Option<IpDeviceAddr<I::Addr>>,
+        addr: RoutableIpAddr<I::Addr>,
     ) -> Result<ResolvedRoute<I, D>, ResolveRouteError> {
         let (destination, ()) = table
-            .lookup_filter_map(ip_forwarding_ctx, device, *addr, |_, d| match &local_ip {
+            .lookup_filter_map(ip_forwarding_ctx, device, addr.addr(), |_, d| match &local_ip {
                 None => Some(()),
-                Some(local_ip) => device_state
-                    .get(d)
-                    .and_then(|state| state.as_ref().addrs.read().find(local_ip).map(|_| ())),
+                Some(local_ip) => device_state.get(d).and_then(|state| {
+                    state.as_ref().addrs.read().find(&local_ip.addr()).map(|_| ())
+                }),
             })
             .next()
             .ok_or(ResolveRouteError::Unreachable)?;
@@ -1127,8 +1116,8 @@ pub(crate) mod testutil {
             &mut self,
             _bindings_ctx: &mut BC,
             device: Option<&Self::DeviceId>,
-            local_ip: Option<SpecifiedAddr<I::Addr>>,
-            addr: SpecifiedAddr<I::Addr>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
+            addr: RoutableIpAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             let FakeIpSocketCtx { device_state, table, ip_forwarding_ctx, counters: _ } = self;
             lookup_route(table, ip_forwarding_ctx, device_state, device, local_ip, addr)
@@ -1166,8 +1155,8 @@ pub(crate) mod testutil {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
             device: Option<&Self::DeviceId>,
-            local_ip: Option<SpecifiedAddr<I::Addr>>,
-            addr: SpecifiedAddr<I::Addr>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
+            addr: RoutableIpAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             self.get_mut().as_mut().lookup_route(bindings_ctx, device, local_ip, addr)
         }
@@ -1568,8 +1557,8 @@ pub(crate) mod testutil {
             &mut self,
             _bindings_ctx: &mut BC,
             device: Option<&Self::DeviceId>,
-            local_ip: Option<SpecifiedAddr<I::Addr>>,
-            addr: SpecifiedAddr<I::Addr>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
+            addr: RoutableIpAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             let Self {
                 table,
@@ -1623,8 +1612,8 @@ pub(crate) mod testutil {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
             device: Option<&Self::DeviceId>,
-            local_ip: Option<SpecifiedAddr<I::Addr>>,
-            addr: SpecifiedAddr<I::Addr>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
+            addr: RoutableIpAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             self.get_mut().lookup_route(bindings_ctx, device, local_ip, addr)
         }

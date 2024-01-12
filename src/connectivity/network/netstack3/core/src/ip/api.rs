@@ -19,7 +19,7 @@ use crate::{
         device::{IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt},
         types::{
             Destination, Entry, EntryAndGeneration, EntryEither, NextHop, OrderedEntry,
-            ResolvedRoute,
+            ResolvedRoute, RoutableIpAddr,
         },
         IpLayerIpExt, IpStateContext,
     },
@@ -75,17 +75,12 @@ where
     /// or `None` if the destination is unreachable.
     pub fn resolve_route(
         &mut self,
-        destination: I::Addr,
+        destination: Option<RoutableIpAddr<I::Addr>>,
     ) -> Result<
         ResolvedRoute<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         ResolveRouteError,
     > {
-        crate::ip::base::resolve_route_to_destination(
-            self.core_ctx(),
-            None,
-            None,
-            SpecifiedAddr::new(destination),
-        )
+        crate::ip::base::resolve_route_to_destination(self.core_ctx(), None, None, destination)
     }
 
     /// Selects the device to use for gateway routes when the device was

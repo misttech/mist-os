@@ -3667,6 +3667,7 @@ mod tests {
                     Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6DadState,
                     Ipv6DeviceState,
                 },
+                IpDeviceAddr,
             },
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
             socket::testutil::FakeDualStackIpSocketCtx,
@@ -3675,7 +3676,7 @@ mod tests {
                 SendOptions,
             },
             testutil::DualStackSendIpPacketMeta,
-            types::ResolvedRoute,
+            types::{ResolvedRoute, RoutableIpAddr},
             HopLimits, IpTransportContext, ResolveRouteError, SendIpPacketMeta, TransportIpContext,
         },
         sync::Mutex,
@@ -4006,8 +4007,8 @@ mod tests {
             &mut self,
             bindings_ctx: &mut BC,
             device: Option<&Self::DeviceId>,
-            local_ip: Option<SpecifiedAddr<I::Addr>>,
-            addr: SpecifiedAddr<I::Addr>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
+            addr: RoutableIpAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             self.inner.get_mut().lookup_route(bindings_ctx, device, local_ip, addr)
         }

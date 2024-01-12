@@ -59,6 +59,7 @@ use crate::{
             GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult,
         },
     },
+    socket::address::SocketIpAddr,
     CoreCtx, Instant,
 };
 
@@ -328,7 +329,13 @@ impl IpDeviceIpExt for Ipv6 {
     type AddressState<I> = Ipv6AddressState<I>;
 }
 
+/// An Ip address that witnesses properties needed to be assigned to a device.
+pub(crate) type IpDeviceAddr<A> = SocketIpAddr<A>;
+
 /// An IPv6 address that witnesses properties needed to be assigned to a device.
+///
+/// Like [`IpDeviceAddr`] but with stricter witnesses that are permitted for
+/// IPv6 addresses.
 pub(crate) type Ipv6DeviceAddr = NonMappedAddr<UnicastAddr<Ipv6Addr>>;
 
 /// IP address assignment states.
@@ -500,8 +507,8 @@ impl<
 
 /// An IP address ID.
 pub trait IpAddressId<A: IpAddress>: Clone + Debug {
-    /// Returns the specified address this ID represents.
-    fn addr(&self) -> SpecifiedAddr<A>;
+    /// Returns the address this ID represents.
+    fn addr(&self) -> IpDeviceAddr<A>;
 
     /// Returns the address subnet this ID represents.
     fn addr_sub(&self) -> AddrSubnet<A, <A::Version as IpDeviceIpExt>::AssignedWitness>
@@ -514,8 +521,15 @@ where
     A::Version: IpDeviceIpExt,
     SpecifiedAddr<A>: From<<A::Version as IpDeviceIpExt>::AssignedWitness>,
 {
-    fn addr(&self) -> SpecifiedAddr<A> {
-        self.to_witness::<SpecifiedAddr<A>>().addr()
+    fn addr(&self) -> IpDeviceAddr<A> {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct WrapIn<I: IpDeviceIpExt>(I::AssignedWitness);
+        A::Version::map_ip(
+            WrapIn(self.addr()),
+            |WrapIn(v4_addr)| IpDeviceAddr::new_ipv4_specified(v4_addr),
+            |WrapIn(v6_addr)| IpDeviceAddr::new_from_ipv6_device_addr(v6_addr),
+        )
     }
 
     fn addr_sub(&self) -> AddrSubnet<A, <A::Version as IpDeviceIpExt>::AssignedWitness> {
@@ -1116,7 +1130,7 @@ fn enable_ipv6_device_with_config<
         .for_each(|addr_id| {
             bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
-                addr: addr_id.addr(),
+                addr: addr_id.addr().into(),
                 state: IpAddressState::Tentative,
             });
             DadHandler::start_duplicate_address_detection(
@@ -1230,7 +1244,7 @@ fn disable_ipv6_device_with_config<
                 );
                 bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
                     device: device_id.clone(),
-                    addr: addr_id.addr(),
+                    addr: addr_id.addr().into(),
                     state: IpAddressState::Unavailable,
                 });
             }
@@ -1268,7 +1282,7 @@ fn enable_ipv4_device_with_config<
         addrs.for_each(|addr| {
             bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
-                addr: addr.addr(),
+                addr: addr.addr().into(),
                 state: IpAddressState::Assigned,
             });
         })
@@ -1297,7 +1311,7 @@ fn disable_ipv4_device_with_config<
         addrs.for_each(|addr| {
             bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
-                addr: addr.addr(),
+                addr: addr.addr().into(),
                 state: IpAddressState::Unavailable,
             });
         })
@@ -1489,7 +1503,7 @@ pub(crate) fn add_ipv4_addr_subnet<
         let Ipv4AddrConfig { valid_until } = addr_config;
 
         core_ctx.add_ip_address(device_id, addr_sub, addr_config).map(|id| {
-            assert_eq!(id.addr(), addr_sub.addr());
+            assert_eq!(id.addr().addr(), addr_sub.addr().get());
             bindings_ctx.on_event(IpDeviceEvent::AddressAdded {
                 device: device_id.clone(),
                 addr: addr_sub,
@@ -1545,7 +1559,7 @@ fn add_ipv6_addr_subnet_with_config<
     _device_config: &Ipv6DeviceConfiguration,
 ) -> Result<CC::AddressId, ExistsError> {
     let addr_id = core_ctx.add_ip_address(device_id, addr_sub, addr_config)?;
-    assert_eq!(addr_id.addr(), addr_sub.addr().into_specified());
+    assert_eq!(addr_id.addr().addr(), addr_sub.addr().get());
 
     let ip_enabled =
         core_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);

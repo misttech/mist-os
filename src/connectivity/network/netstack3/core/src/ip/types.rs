@@ -14,6 +14,8 @@ use net_types::{
     SpecifiedAddr,
 };
 
+use crate::socket::address::SocketIpAddr;
+
 /// The priority of a forwarding entry. Lower metrics are preferred.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct RawMetric(pub u32);
@@ -360,13 +362,16 @@ pub enum NextHop<A> {
     Gateway(SpecifiedAddr<A>),
 }
 
+/// An IP Address that witnesses properties needed to be routed.
+pub type RoutableIpAddr<A> = SocketIpAddr<A>;
+
 /// The resolved route to a destination IP address.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct ResolvedRoute<I: Ip, D> {
     /// The source address to use when forwarding packets towards the
     /// destination.
-    pub src_addr: SpecifiedAddr<I::Addr>,
+    pub src_addr: RoutableIpAddr<I::Addr>,
     /// The device over which this destination can be reached.
     pub device: D,
     /// The next hop via which this destination can be reached.

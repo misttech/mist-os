@@ -283,7 +283,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
             self,
             bindings_ctx,
             &device_id.clone().into(),
-            Some(src_ip),
+            Some(src_ip.into()),
             dst_ip,
             OptionSequenceBuilder::<_>::new(
                 [NdpOptionBuilder::SourceLinkLayerAddress(mac.bytes().as_ref())].iter(),
@@ -1950,14 +1950,14 @@ mod tests {
                 crate::ip::device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
                     &mut CoreCtx::new_deprecated(core_ctx),
                     device,
-                    |mut addrs, _core_ctx| addrs.any(|a| a.addr() == addr),
+                    |mut addrs, _core_ctx| addrs.any(|a| a.addr().addr() == addr.get()),
                 )
             }
             IpAddr::V6(addr) => {
                 crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                     &mut CoreCtx::new_deprecated(core_ctx),
                     device,
-                    |mut addrs, _core_ctx| addrs.any(|a| a.addr() == addr),
+                    |mut addrs, _core_ctx| addrs.any(|a| a.addr().addr() == addr.get()),
                 )
             }
         }

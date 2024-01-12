@@ -205,7 +205,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
                     core_ctx.join_multicast_group(
                         bindings_ctx,
                         device_id,
-                        addr.addr().to_solicited_node_address(),
+                        addr.addr().addr().to_solicited_node_address(),
                     );
                 }
                 DoDadVariation::Continue => {}
@@ -289,12 +289,12 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
     //
     // TODO(https://fxbug.dev/85055): Either panic or guarantee that this error
     // can't happen statically.
-    let dst_ip = addr.addr().to_solicited_node_address();
+    let dst_ip = addr.addr().addr().to_solicited_node_address();
     let _: Result<(), _> = core_ctx.send_dad_packet(
         bindings_ctx,
         device_id,
         dst_ip,
-        NeighborSolicitation::new(addr.addr().get()),
+        NeighborSolicitation::new(addr.addr().addr()),
     );
 }
 
@@ -349,7 +349,7 @@ impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> fo
                     core_ctx.leave_multicast_group(
                         bindings_ctx,
                         device_id,
-                        addr.addr().to_solicited_node_address(),
+                        addr.addr().addr().to_solicited_node_address(),
                     );
                 }
             },
@@ -381,7 +381,10 @@ mod tests {
     use alloc::collections::hash_map::{Entry, HashMap};
     use core::time::Duration;
 
-    use net_types::ip::{AddrSubnet, IpAddress as _};
+    use net_types::{
+        ip::{AddrSubnet, IpAddress as _},
+        Witness as _,
+    };
     use packet::EmptyBuf;
     use packet_formats::icmp::ndp::Options;
 

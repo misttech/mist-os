@@ -2997,13 +2997,15 @@ mod tests {
         },
         ip::{
             device::{
-                route_discovery::Ipv6DiscoveredRoute, state::IpDeviceStateIpExt, IpDeviceHandler,
+                route_discovery::Ipv6DiscoveredRoute, state::IpDeviceStateIpExt, IpDeviceAddr,
+                IpDeviceHandler,
             },
             icmp::socket::{IcmpEchoSocketApi, SocketId, SocketsState, StateContext},
             path_mtu::testutil::FakePmtuState,
             receive_ip_packet,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
+            types::RoutableIpAddr,
             IpCounters, SendIpPacketMeta,
         },
         socket::address::SocketZonedIpAddr,
@@ -3932,8 +3934,8 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             device: Option<&FakeDeviceId>,
-            local_ip: Option<SpecifiedAddr<I::Addr>>,
-            addr: SpecifiedAddr<I::Addr>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
+            addr: RoutableIpAddr<I::Addr>,
         ) -> Result<crate::ip::types::ResolvedRoute<I, FakeDeviceId>, crate::ip::ResolveRouteError>
         {
             self.inner.lookup_route(bindings_ctx, device, local_ip, addr)
@@ -3977,7 +3979,7 @@ mod tests {
             &mut self,
             _device_id: &Self::DeviceId,
             _remote: Option<SpecifiedAddr<Ipv6Addr>>,
-        ) -> Option<SpecifiedAddr<Ipv6Addr>> {
+        ) -> Option<SocketIpAddr<Ipv6Addr>> {
             unimplemented!()
         }
 

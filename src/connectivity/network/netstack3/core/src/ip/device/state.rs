@@ -15,7 +15,7 @@ use net_types::{
         AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr,
         Ipv6, Ipv6Addr,
     },
-    SpecifiedAddr, Witness,
+    SpecifiedAddr,
 };
 use packet_formats::utils::NonZeroDuration;
 
@@ -23,7 +23,7 @@ use crate::{
     ip::{
         device::{
             route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration, IpAddressId,
-            IpDeviceIpExt, Ipv6DeviceAddr,
+            IpDeviceAddr, IpDeviceIpExt, Ipv6DeviceAddr,
         },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
     },
@@ -80,8 +80,8 @@ impl IpDeviceStateIpExt for Ipv4 {
 }
 
 impl<I: Instant> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<I>> {
-    fn addr(&self) -> SpecifiedAddr<Ipv4Addr> {
-        self.addr_sub.addr()
+    fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
+        IpDeviceAddr::new_ipv4_specified(self.addr_sub.addr())
     }
 
     fn addr_sub(&self) -> AddrSubnet<Ipv4Addr> {
@@ -90,8 +90,8 @@ impl<I: Instant> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<I>> {
 }
 
 impl<I: Instant> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<I>> {
-    fn addr(&self) -> SpecifiedAddr<Ipv6Addr> {
-        self.addr_sub.addr().into_specified()
+    fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
+        IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub.addr())
     }
 
     fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
@@ -117,18 +117,18 @@ impl IpDeviceStateIpExt for Ipv6 {
 /// The state associated with an IP address assigned to an IP device.
 pub trait AssignedAddress<A: IpAddress> {
     /// Gets the address.
-    fn addr(&self) -> SpecifiedAddr<A>;
+    fn addr(&self) -> IpDeviceAddr<A>;
 }
 
 impl<I: Instant> AssignedAddress<Ipv4Addr> for Ipv4AddressEntry<I> {
-    fn addr(&self) -> SpecifiedAddr<Ipv4Addr> {
-        self.addr_sub().addr()
+    fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
+        IpDeviceAddr::new_ipv4_specified(self.addr_sub().addr())
     }
 }
 
 impl<I: Instant> AssignedAddress<Ipv6Addr> for Ipv6AddressEntry<I> {
-    fn addr(&self) -> SpecifiedAddr<Ipv6Addr> {
-        self.addr_sub().addr().into_specified()
+    fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
+        IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub().addr())
     }
 }
 
@@ -320,7 +320,7 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
     /// Finds the entry for `addr` if any.
     #[cfg(test)]
     pub(crate) fn find(&self, addr: &I::Addr) -> Option<&PrimaryRc<I::AssignedAddress<Instant>>> {
-        self.addrs.iter().find(|entry| &entry.addr().get() == addr)
+        self.addrs.iter().find(|entry| &entry.addr().addr() == addr)
     }
 
     /// Adds an IP address to this interface.
@@ -346,7 +346,7 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
             .addrs
             .iter()
             .enumerate()
-            .find(|(_, entry)| &entry.addr().get() == addr)
+            .find(|(_, entry)| &entry.addr().addr() == addr)
             .ok_or(crate::error::NotFoundError)?;
         Ok(self.addrs.remove(index))
     }
@@ -977,6 +977,8 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState> for Ipv
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
+
+    use net_types::Witness as _;
 
     impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsRef<Self> for IpDeviceState<Instant, I> {
         fn as_ref(&self) -> &Self {

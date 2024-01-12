@@ -15,7 +15,10 @@ use net_types::{
     NonMappedAddr, ScopeableAddress, SpecifiedAddr, UnicastAddr, Witness, ZonedAddr,
 };
 
-use crate::socket::{AddrVec, DualStackIpExt, SocketMapAddrSpec};
+use crate::{
+    ip::device::Ipv6DeviceAddr,
+    socket::{AddrVec, DualStackIpExt, SocketMapAddrSpec},
+};
 
 /// A [`ZonedAddr`] whose addr is witness to the properties required by sockets.
 #[derive(Copy, Clone, Eq, GenericOverIp, Hash, PartialEq)]
@@ -74,7 +77,8 @@ impl<A: IpAddress, Z> From<ZonedAddr<SpecifiedAddr<A>, Z>> for SocketZonedIpAddr
 /// Requires `NonMappedAddr` because mapped addresses (i.e. ipv4-mapped-ipv6
 /// addresses) are converted from their original IP version to their target IP
 /// version when entering the stack.
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Eq, GenericOverIp, Hash, PartialEq)]
+#[generic_over_ip(A, IpAddress)]
 pub struct SocketIpAddr<A: IpAddress>(NonMappedAddr<SpecifiedAddr<A>>);
 
 impl<A: IpAddress> Display for SocketIpAddr<A> {
@@ -93,29 +97,36 @@ impl<A: IpAddress> Debug for SocketIpAddr<A> {
 
 impl<A: IpAddress> SocketIpAddr<A> {
     #[cfg(test)]
+    /// Constructs a [`SocketIpAddr`] if the address is compliant, else `None`.
     pub(crate) fn new(addr: A) -> Option<SocketIpAddr<A>> {
         Some(SocketIpAddr(NonMappedAddr::new(SpecifiedAddr::new(addr)?)?))
     }
 
-    /// Callers must ensure that the addr is both `Specified` and `NonMapped`.
+    /// Constructs a [`SocketIpAddr`] without verify the address's properties.
+    ///
+    /// Callers must ensure that the addr is both a [`SpecifiedAddr`] and
+    /// a [`NonMappedAddr`].
     #[cfg(test)]
     pub(crate) const unsafe fn new_unchecked(addr: A) -> SocketIpAddr<A> {
         SocketIpAddr(NonMappedAddr::new_unchecked(SpecifiedAddr::new_unchecked(addr)))
     }
 
-    /// Callers must ensure that the addr is `NonMapped`.
+    /// Like [`SocketIpAddr::new_unchecked`], but the address is specified.
+    ///
+    /// Callers must ensure that the addr is a [`NonMappedAddr`].
     pub(crate) const unsafe fn new_from_specified_unchecked(
         addr: SpecifiedAddr<A>,
     ) -> SocketIpAddr<A> {
         SocketIpAddr(NonMappedAddr::new_unchecked(addr))
     }
 
-    pub(crate) fn addr(self) -> A {
+    /// Returns the inner address, dropping all witnesses.
+    pub fn addr(self) -> A {
         let SocketIpAddr(addr) = self;
         **addr
     }
 
-    /// Constructs a `SocktIpAddr` from an addr that is known to be specified.
+    /// Constructs a `SocketIpAddr` from an addr that is known to be specified.
     ///
     /// # Panics
     ///
@@ -136,16 +147,19 @@ impl SocketIpAddr<Ipv4Addr> {
 }
 
 impl SocketIpAddr<Ipv6Addr> {
+    /// Constructs a [`SocketIpAddr`] from the given [`Ipv6DeviceAddr`].
+    pub(crate) fn new_from_ipv6_device_addr(addr: Ipv6DeviceAddr) -> Self {
+        let addr: UnicastAddr<NonMappedAddr<_>> = addr.transpose();
+        let addr: NonMappedAddr<SpecifiedAddr<_>> = addr.into_specified().transpose();
+        SocketIpAddr(addr)
+    }
+
     /// Optionally constructs a [`SocketIpAddr`] from the given
     /// [`Ipv6SourceAddr`], returning `None` if the given addr is `Unspecified`.
     pub(crate) fn new_from_ipv6_source(addr: Ipv6SourceAddr) -> Option<Self> {
         match addr {
             Ipv6SourceAddr::Unspecified => None,
-            Ipv6SourceAddr::Unicast(addr) => {
-                let addr: UnicastAddr<NonMappedAddr<_>> = addr.transpose();
-                let addr: NonMappedAddr<SpecifiedAddr<_>> = addr.into_specified().transpose();
-                Some(SocketIpAddr(addr))
-            }
+            Ipv6SourceAddr::Unicast(addr) => Some(SocketIpAddr::new_from_ipv6_device_addr(addr)),
         }
     }
 }

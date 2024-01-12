@@ -631,7 +631,7 @@ mod tests {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
                 &mut CoreCtx::new_deprecated(core_ctx),
                 &device,
-                |addrs, _core_ctx| addrs.map(|a| a.addr()).collect::<Vec<_>>(),
+                |addrs, _core_ctx| addrs.map(|a| SpecifiedAddr::from(a.addr())).collect::<Vec<_>>(),
             )
         };
 

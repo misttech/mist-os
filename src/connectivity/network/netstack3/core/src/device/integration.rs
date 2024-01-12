@@ -596,7 +596,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
     ) -> (AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, <Ipv6 as IpDeviceIpExt>::AddressConfig<BC::Instant>)
     {
         let primary = with_ip_device_state(self, device_id, |mut state| {
-            state.write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>().remove(&addr.addr())
+            state
+                .write_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
+                .remove(&addr.addr().addr())
         })
         .expect("should exist when address ID exists");
         assert!(PrimaryRc::ptr_eq(&primary, &addr));
@@ -616,7 +618,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
             state
                 .read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>()
                 .iter()
-                .find_map(|a| (a.addr() == addr).then(|| PrimaryRc::clone_strong(a)))
+                .find_map(|a| (a.addr().addr() == *addr).then(|| PrimaryRc::clone_strong(a)))
                 .ok_or(NotFoundError)
         })
     }

@@ -15,7 +15,7 @@ use core::{
 
 use lock_order::{lock::LockFor, relation::LockBefore, wrap::prelude::*};
 use net_types::{
-    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
+    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{BufferMut, EmptyBuf, Serializer};
@@ -51,8 +51,8 @@ use crate::{
                 Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState,
                 Ipv6DeviceConfiguration, SlaacConfig,
             },
-            AddressRemovedReason, DelIpv6Addr, IpAddressId, IpDeviceBindingsContext, IpDeviceIpExt,
-            IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
+            AddressRemovedReason, DelIpv6Addr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
+            IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
         },
         gmp::{
             self,
@@ -339,7 +339,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>
         &mut self,
         device_id: &Self::DeviceId,
         _remote: Option<SpecifiedAddr<Ipv4Addr>>,
-    ) -> Option<SpecifiedAddr<Ipv4Addr>> {
+    ) -> Option<IpDeviceAddr<Ipv4Addr>> {
         device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
             self,
             device_id,
@@ -422,28 +422,29 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         &mut self,
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<Ipv6Addr>>,
-    ) -> Option<SpecifiedAddr<Ipv6Addr>> {
+    ) -> Option<IpDeviceAddr<Ipv6Addr>> {
         device::IpDeviceStateContext::<Ipv6, BC>::with_address_ids(
             self,
             device_id,
             |addrs, core_ctx| {
-                crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
-                    remote,
-                    device_id,
-                    addrs.map(|addr_id| {
-                        device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
-                            core_ctx,
-                            device_id,
-                            &addr_id,
-                            |Ipv6AddressState { flags, config: _ }| SasCandidate {
-                                addr_sub: addr_id.addr_sub(),
-                                flags: *flags,
-                                device: device_id.clone(),
-                            },
-                        )
-                    }),
+                IpDeviceAddr::new_from_ipv6_source(
+                    crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
+                        remote,
+                        device_id,
+                        addrs.map(|addr_id| {
+                            device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
+                                core_ctx,
+                                device_id,
+                                &addr_id,
+                                |Ipv6AddressState { flags, config: _ }| SasCandidate {
+                                    addr_sub: addr_id.addr_sub(),
+                                    flags: *flags,
+                                    device: device_id.clone(),
+                                },
+                            )
+                        }),
+                    ),
                 )
-                .map(|a| a.into_specified())
             },
         )
     }
@@ -952,11 +953,15 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
                 )
             },
         );
+        let src_ip = match src_ip {
+            Ipv6SourceAddr::Unicast(addr) => Some(*addr),
+            Ipv6SourceAddr::Unspecified => None,
+        };
         crate::ip::icmp::send_ndp_packet(
             core_ctx,
             bindings_ctx,
             device_id,
-            src_ip.map(|a| a.into_specified()),
+            src_ip.map(UnicastAddr::into_specified),
             dst_ip,
             body(src_ip),
             IcmpUnusedCode,

@@ -181,7 +181,7 @@ pub mod routes {
     pub use crate::ip::forwarding::AddRouteError;
     pub use crate::ip::types::{
         AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Generation, Metric,
-        NextHop, RawMetric, ResolvedRoute,
+        NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
     };
 }
 
@@ -193,7 +193,7 @@ pub mod socket {
 
     pub(crate) use base::*;
 
-    pub use address::SocketZonedIpAddr;
+    pub use address::{AddrIsMappedError, SocketZonedIpAddr};
     pub use base::{NotDualStackCapableError, SetDualStackEnabledError, ShutdownType};
     pub use datagram::{
         ConnectError, ExpectedConnError, ExpectedUnboundError, MulticastInterfaceSelector,

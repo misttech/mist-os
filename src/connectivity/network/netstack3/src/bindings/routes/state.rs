@@ -108,8 +108,15 @@ async fn resolve_inner<A: IpAddress>(
 where
     A::Version: IpExt,
 {
+    let sanitized_dst = SpecifiedAddr::new(destination)
+        .map(|dst| {
+            netstack3_core::routes::RoutableIpAddr::try_from(dst).map_err(
+                |netstack3_core::socket::AddrIsMappedError {}| zx::Status::ADDRESS_UNREACHABLE,
+            )
+        })
+        .transpose()?;
     let ResolvedRoute { device, src_addr, next_hop } =
-        match ctx.api().routes::<A::Version>().resolve_route(destination) {
+        match ctx.api().routes::<A::Version>().resolve_route(sanitized_dst) {
             Err(e) => {
                 info!("Resolve failed for {}, {:?}", destination, e);
                 return Err(zx::Status::ADDRESS_UNREACHABLE);
@@ -138,7 +145,7 @@ where
     let destination = {
         let address =
             next_hop_addr.map_or(A::Version::UNSPECIFIED_ADDRESS, |a| *a).to_ip_addr().into_fidl();
-        let source_address = src_addr.to_ip_addr().into_fidl();
+        let source_address = src_addr.addr().to_ip_addr().into_fidl();
         let mac = remote_mac.map(|mac| mac.into_fidl());
         let interface_id = ctx.bindings_ctx().get_binding_id(device);
         fnet_routes::Destination {
