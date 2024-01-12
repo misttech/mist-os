@@ -8,20 +8,70 @@
 #include <zircon/types.h>
 
 // Supported panel types
+
+// Panel: BOE TV070WSM-TG1
+// DDIC: Fitipower JD9364
+// Board: Astro, Nelson
+// Touch IC: FocalTech FT3x27 (Astro), Goodix GT6853 (Nelson)
 #define PANEL_TV070WSM_FT UINT8_C(0x00)
+
+// Panel: Innolux P070ACB-DB0
+// DDIC: Fitipower JD9364
+// Board: Astro
+// Touch IC: Goodix GT9293
 #define PANEL_P070ACB_FT UINT8_C(0x01)
+
+// Panel: BOE TV101WXM-LG0
+// DDIC: Fitipower JD9364
+// Board: Sherlock
+// Touch IC: FocalTech FT5726
 #define PANEL_TV101WXM_FT UINT8_C(0x02)
+
+// Panel: Innolux G101B158
+// DDIC: Fitipower JD9364
+// Board: Sherlock
+// Touch IC: FocalTech FT5726
 #define PANEL_G101B158_FT UINT8_C(0x03)
+
 // 0x04 was for PANEL_ILI9881C
 // 0x05 was for PANEL_ST7701S
 // 0x06 was for PANEL_TV080WXM_FT
+
+// Panel: BOE TV101WXM-LG0
+// DDIC: Fitipower JD9365
+// Board: Sherlock
+// Touch IC: FocalTech FT5726
 #define PANEL_TV101WXM_FT_9365 UINT8_C(0x07)
+
+// Panel: BOE TV070WSM-TG1
+// DDIC: Fitipower JD9365
+// Board: Astro, Nelson
+// Touch IC: FocalTech FT3x27 (Astro), Goodix GT6853 (Nelson)
 #define PANEL_TV070WSM_FT_9365 UINT8_C(0x08)
+
+// Panel: K&D KD070D82-39TI-A010
+// DDIC: Fitipower JD9364
+// Board: Nelson
+// Touch IC: Goodix GT6853
 #define PANEL_KD070D82_FT UINT8_C(0x09)
+
+// Panel: K&D KD070D82-39TI-A010
+// DDIC: Fitipower JD9365
+// Board: Nelson
+// Touch IC: Goodix GT6853
 #define PANEL_KD070D82_FT_9365 UINT8_C(0x0a)
+
+// Panel: BOE TV070WSM-TG1
+// DDIC: Sitronix ST7703I
+// Board: Nelson
+// Touch IC: Goodix GT6853
 #define PANEL_TV070WSM_ST7703I UINT8_C(0x0b)
-// Microtech MTF050FHDI-03 LCD panel. Used by Khadas TS050 touchscreen.
-// It has a Novatek NT35596 controller IC.
+
+// Khadas TS-050
+// Panel: Microtech MTF050FHDI-03
+// DDIC: Novatek NT35596
+// Board: VIM3
+// Touch IC: FocalTech FT5336
 #define PANEL_MTF050FHDI_03 UINT8_C(0x0c)
 
 #define PANEL_UNKNOWN UINT8_C(0xFF)
