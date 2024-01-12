@@ -15,7 +15,6 @@
 #include <lib/media/codec_impl/log.h>
 #include <lib/stdcompat/optional.h>
 #include <lib/stdcompat/variant.h>
-#include <lib/syslog/cpp/macros.h>
 #include <threads.h>
 #include <zircon/compiler.h>
 #include <zircon/threads.h>
@@ -25,7 +24,6 @@
 #include <fbl/macros.h>
 
 #include "lib/media/codec_impl/codec_port.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/media/lib/metrics/metrics.cb.h"
 
 // "is_bound_checks" - In several lambdas that just send a message, we check
@@ -252,6 +250,19 @@ void CodecImpl::SetCodecDiagnostics(CodecDiagnostics* codec_diagnostics) {
   codec_adapter_->SetCodecDiagnostics(codec_diagnostics);
 }
 
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
+std::string GetObjectName(zx_handle_t handle) {
+  char name[ZX_MAX_NAME_LEN];
+  zx_status_t status = zx_object_get_property(handle, ZX_PROP_NAME, name, sizeof(name));
+  return status == ZX_OK ? std::string(name) : std::string();
+}
+
 void CodecImpl::BindAsync(fit::closure error_handler) {
   // While it would potentially be safe to call Bind() from a thread other than
   // fidl_thread(), we have no reason to permit that.
@@ -320,7 +331,8 @@ void CodecImpl::BindAsync(fit::closure error_handler) {
         return;
       }
       ZX_DEBUG_ASSERT(!tmp_sysmem_);
-      sysmem_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
+      auto process_name = GetObjectName(zx_process_self());
+      sysmem_->SetDebugClientInfo(process_name, GetKoid(zx_process_self()));
 
       status = binding_.Bind(std::move(tmp_interface_request_), shared_fidl_dispatcher_);
       if (status != ZX_OK) {
@@ -2082,13 +2094,13 @@ bool CodecImpl::AddBufferCommon(CodecBuffer::Info buffer_info, CodecVmoRange vmo
   // BufferCollection VMOs until the driver has re-started and un-quarantined pinned pages (via
   // its BTI), after ensuring the HW is no longer doing DMA from/to the pages.
   //
-  // TODO(https://fxbug.dev/38650): All CodecAdapter(s) that start memory access that can continue beyond
-  // VMO handle closure during process death/termination should have a BTI.  Resolving this TODO
-  // will require updating at least the amlogic-video VP9 decoder to provide a BTI.
+  // TODO(https://fxbug.dev/38650): All CodecAdapter(s) that start memory access that can continue
+  // beyond VMO handle closure during process death/termination should have a BTI.  Resolving this
+  // TODO will require updating at least the amlogic-video VP9 decoder to provide a BTI.
   //
-  // TODO(https://fxbug.dev/38651): Currently OEMCrypto's indirect (via FIDL) SMC calls that take physical
-  // addresses are not guaranteed to be fully over/done before VMO handles are auto-closed by
-  // OEMCrypto assuming OEMCryto's process dies/terminates.
+  // TODO(https://fxbug.dev/38651): Currently OEMCrypto's indirect (via FIDL) SMC calls that take
+  // physical addresses are not guaranteed to be fully over/done before VMO handles are auto-closed
+  // by OEMCrypto assuming OEMCryto's process dies/terminates.
   if (IsCoreCodecHwBased(port) && *core_codec_bti_) {
     zx_status_t status = local_buffer->Pin();
     if (status != ZX_OK) {
@@ -3122,15 +3134,11 @@ void CodecImpl::vFailLocked(bool is_fatal, const char* format, va_list args) {
   LogEvent(media_metrics::
                StreamProcessorEvents2MigratedMetricDimensionEvent_StreamProcessorFailureAnyReason);
   if (is_fatal) {
-    // Logs to syslog for non-driver clients
-    FX_LOGS(ERROR) << buffer.get() << " -- " << message;
     // Default logging to stderr for both driver and non-driver clients
     LOG(ERROR, "%s -- %s", buffer.get(), message);
 
     abort();
   } else {
-    // Logs to syslog for non-driver clients
-    FX_LOGS(WARNING) << buffer.get() << " -- " << message << "\n";
     // Default logging to stderr for both driver and non-driver clients
     LOG(WARNING, "%s -- %s", buffer.get(), message);
 
@@ -3772,8 +3780,8 @@ CodecImpl::PortSettings::~PortSettings() {
   // Close() to avoid causing the LogicalBufferCollection to fail.  Since we're not a crashing
   // process, this is a clean close by definition.
   //
-  // TODO(https://fxbug.dev/37257): Consider _not_ sending Close() for unexpected failures initiated by the
-  // server. Consider whether to have a Close() on StreamProcessor to disambiguate clean vs.
+  // TODO(https://fxbug.dev/37257): Consider _not_ sending Close() for unexpected failures initiated
+  // by the server. Consider whether to have a Close() on StreamProcessor to disambiguate clean vs.
   // unexpected StreamProcessor channel close.
   if (thrd_current() != parent_->fidl_thread()) {
     parent_->PostToSharedFidl([buffer_collection = std::move(buffer_collection_)] {

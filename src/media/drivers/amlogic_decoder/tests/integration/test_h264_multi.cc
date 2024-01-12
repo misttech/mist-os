@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <byteswap.h>
-#include <lib/syslog/cpp/log_settings.h>
 #include <zircon/compiler.h>
 
 #include <gtest/gtest.h>
@@ -80,13 +79,6 @@ class FakeOwner : public AmlogicVideo::Owner {
   void SetThreadProfile(zx::unowned_thread thread, ThreadRole role) const override {}
 };
 
-// Set the min logging level so every log will display.
-static void SetMaxLogging() {
-  fuchsia_logging::LogSettings settings;
-  settings.min_log_level = -10;
-  fuchsia_logging::SetLogSettings(settings);
-}
-
 class TestH264Multi {
  public:
   struct VideoInfo {
@@ -101,7 +93,6 @@ class TestH264Multi {
     bool has_sar;
   };
   static void DecodeSetStream(const VideoInfo& data, bool use_parser) {
-    SetMaxLogging();
     FakeOwner owner;
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
@@ -216,7 +207,6 @@ class TestH264Multi {
 
   static void DecodeUnsplit(const char* input_filename,
                             uint8_t (*input_hashes)[SHA256_DIGEST_LENGTH], const char* filename) {
-    SetMaxLogging();
     FakeOwner owner;
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
@@ -351,7 +341,6 @@ class TestH264Multi {
   }
 
   static void DecodeMultiInstance() {
-    SetMaxLogging();
     FakeOwner owner;
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
@@ -472,7 +461,6 @@ class TestH264Multi {
   }
 
   static void DecodeChangeConfig() {
-    SetMaxLogging();
     FakeOwner owner;
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
@@ -572,7 +560,6 @@ class TestH264Multi {
   static void DecodeWithEos(const char* input_filename,
                             uint8_t (*input_hashes)[SHA256_DIGEST_LENGTH], const char* filename,
                             bool early_eos) {
-    SetMaxLogging();
     FakeOwner owner;
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
@@ -657,7 +644,6 @@ class TestH264Multi {
 
   static void DecodeMalformed(VideoInfo data,
                               const std::vector<std::pair<uint32_t, uint8_t>>& modifications) {
-    SetMaxLogging();
     FakeOwner owner;
     auto video = std::make_unique<AmlogicVideo>(&owner);
     ASSERT_TRUE(video);
