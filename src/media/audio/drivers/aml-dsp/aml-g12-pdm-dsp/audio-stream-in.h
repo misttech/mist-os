@@ -39,7 +39,8 @@ class AudioStreamInDsp : public SimpleAudioStream {
   zx_status_t Start(uint64_t* out_start_time) __TA_REQUIRES(domain_token()) override;
   zx_status_t Stop() __TA_REQUIRES(domain_token()) override;
   zx_status_t SetGain(const audio_proto::SetGainReq& req) override;
-  zx_status_t ChangeActiveChannels(uint64_t mask) __TA_REQUIRES(domain_token()) override {
+  zx_status_t ChangeActiveChannels(uint64_t mask, zx_time_t* set_time_out)
+      __TA_REQUIRES(domain_token()) override {
     return ZX_ERR_NOT_SUPPORTED;
   }
   void RingBufferShutdown() TA_REQ(domain_token()) override;
@@ -64,11 +65,13 @@ class AudioStreamInDsp : public SimpleAudioStream {
 
   zx::duration notification_rate_ = {};
   uint32_t frames_per_second_ = 0;
-  async::TaskClosureMethod<AudioStreamInDsp, &AudioStreamInDsp::ProcessRingNotification>
-      notify_timer_ __TA_GUARDED(domain_token()){this};
+  async::TaskClosureMethod<AudioStreamInDsp,
+                           &AudioStreamInDsp::ProcessRingNotification> notify_timer_
+      __TA_GUARDED(domain_token()){this};
   // Inform DSP FW of ring buffer location information regularly
-  async::TaskClosureMethod<AudioStreamInDsp, &AudioStreamInDsp::RingNotificationReport>
-      position_timer_ __TA_GUARDED(domain_token()){this};
+  async::TaskClosureMethod<AudioStreamInDsp,
+                           &AudioStreamInDsp::RingNotificationReport> position_timer_
+      __TA_GUARDED(domain_token()){this};
 
   std::unique_ptr<AmlPdmDevice> lib_;
   zx::bti bti_;

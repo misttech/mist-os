@@ -244,7 +244,8 @@ class SimpleAudioStream : public SimpleAudioStreamBase,
 
   // Changes which channels are considered active.
   // Drivers can turn off hardware based on the channels that are active.
-  virtual zx_status_t ChangeActiveChannels(uint64_t mask) __TA_REQUIRES(domain_token()) = 0;
+  virtual zx_status_t ChangeActiveChannels(uint64_t mask, zx_time_t* set_time_out)
+      __TA_REQUIRES(domain_token()) = 0;
 
   // RingBuffer interface events
   //

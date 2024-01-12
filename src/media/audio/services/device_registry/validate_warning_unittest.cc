@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
+#include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
 
@@ -15,7 +16,6 @@
 
 #include <gtest/gtest.h>
 
-#include "lib/zx/clock.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
 // These cases unittest the Validate... functions with inputs that cause WARNING log output.

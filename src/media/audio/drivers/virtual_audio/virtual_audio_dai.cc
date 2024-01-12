@@ -193,6 +193,9 @@ void VirtualAudioDai::GetRingBufferFormats(GetRingBufferFormatsCompleter::Sync& 
 void VirtualAudioDai::CreateRingBuffer(CreateRingBufferRequest& request,
                                        CreateRingBufferCompleter::Sync& completer) {
   ring_buffer_format_.emplace(request.ring_buffer_format());
+  ring_buffer_active_channel_mask_ =
+      (1 << ring_buffer_format_->pcm_format()->number_of_channels()) - 1;
+  active_channel_set_time_ = zx::clock::get_monotonic();
   dai_format_.emplace(request.dai_format());
   fidl::OnUnboundFn<fidl::Server<fuchsia_hardware_audio::RingBuffer>> on_unbound =
       [this](fidl::Server<fuchsia_hardware_audio::RingBuffer>*, fidl::UnbindInfo info,
@@ -364,8 +367,21 @@ void VirtualAudioDai::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
 void VirtualAudioDai::SetActiveChannels(
     fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
     SetActiveChannelsCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/81649): Add support.
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  ZX_ASSERT(ring_buffer_format_);  // A RingBuffer must exist, for this FIDL method to be called.
+
+  uint64_t max_channel_bitmask = (1 << ring_buffer_format_->pcm_format()->number_of_channels()) - 1;
+  if (request.active_channels_bitmask() > max_channel_bitmask) {
+    zxlogf(WARNING, "%p: SetActiveChannels(0x%04zx) is out-of-range", this,
+           request.active_channels_bitmask());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (ring_buffer_active_channel_mask_ != request.active_channels_bitmask()) {
+    active_channel_set_time_ = zx::clock::get_monotonic();
+    ring_buffer_active_channel_mask_ = request.active_channels_bitmask();
+  }
+  completer.Reply(zx::ok(active_channel_set_time_.get()));
 }
 
 }  // namespace virtual_audio

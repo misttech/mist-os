@@ -163,7 +163,8 @@ class MockSimpleAudio : public SimpleAudioStream {
     notify_timer_.Cancel();
     return ZX_OK;
   }
-  zx_status_t ChangeActiveChannels(uint64_t mask) __TA_REQUIRES(domain_token()) override {
+  zx_status_t ChangeActiveChannels(uint64_t mask, zx_time_t* set_time_out)
+      __TA_REQUIRES(domain_token()) override {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -191,7 +192,8 @@ class MockSimpleAudio : public SimpleAudioStream {
 class MockSimpleAudioWithExtension : public MockSimpleAudio {
  public:
   explicit MockSimpleAudioWithExtension(zx_device_t* parent) : MockSimpleAudio(parent) {}
-  zx_status_t ChangeActiveChannels(uint64_t mask) override __TA_REQUIRES(domain_token()) {
+  zx_status_t ChangeActiveChannels(uint64_t mask, zx_time_t* set_time_out) override
+      __TA_REQUIRES(domain_token()) {
     return (mask > (1u << kTestNumberOfChannels) - 1u) ? ZX_ERR_INVALID_ARGS : ZX_OK;
   }
 };

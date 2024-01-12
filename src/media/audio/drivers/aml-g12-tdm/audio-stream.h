@@ -14,6 +14,7 @@
 #include <lib/simple-audio-stream/simple-audio-stream.h>
 #include <lib/simple-codec/simple-codec-client.h>
 #include <lib/zx/bti.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 
 #include <memory>
@@ -46,7 +47,8 @@ class AmlG12TdmStream : public SimpleAudioStream {
   zx_status_t Start(uint64_t* out_start_time) __TA_REQUIRES(domain_token()) override;
   zx_status_t Stop() __TA_REQUIRES(domain_token()) override;
   zx_status_t SetGain(const audio_proto::SetGainReq& req) __TA_REQUIRES(domain_token()) override;
-  zx_status_t ChangeActiveChannels(uint64_t mask) __TA_REQUIRES(domain_token()) override;
+  zx_status_t ChangeActiveChannels(uint64_t mask, zx_time_t* set_time_out)
+      __TA_REQUIRES(domain_token()) override;
   void ShutdownHook() __TA_REQUIRES(domain_token()) override;
 
   // Protected for unit test.
@@ -99,6 +101,8 @@ class AmlG12TdmStream : public SimpleAudioStream {
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> enable_gpio_;
   uint64_t active_channels_bitmask_max_ = std::numeric_limits<uint64_t>::max();
   uint64_t active_channels_ = std::numeric_limits<uint64_t>::max();  // Enable all.
+  zx::time active_channels_set_time_;
+
   bool override_mute_ = true;
   zx::interrupt irq_;
   std::atomic<bool> running_ = false;

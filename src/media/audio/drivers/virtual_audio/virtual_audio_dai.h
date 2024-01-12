@@ -91,6 +91,7 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
   const std::weak_ptr<VirtualAudioDeviceImpl> parent_;
   static int instance_count_;
   char instance_name_[64];
+
   fzl::VmoMapper ring_buffer_mapper_;
   uint32_t notifications_per_ring_ = 0;
   uint32_t num_ring_buffer_frames_ = 0;
@@ -100,9 +101,13 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
   std::optional<WatchDelayInfoCompleter::Async> delay_info_completer_;
   bool watch_position_replied_ = false;
   std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_info_completer_;
+
   bool ring_buffer_vmo_fetched_ = false;
   bool ring_buffer_started_ = false;
   std::optional<fuchsia_hardware_audio::Format> ring_buffer_format_;
+  uint64_t ring_buffer_active_channel_mask_;
+  zx::time active_channel_set_time_;
+
   std::optional<fuchsia_hardware_audio::DaiFormat> dai_format_;
   fuchsia_virtualaudio::Configuration config_;
 };

@@ -234,18 +234,11 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
             ZX_OK);
 }
 
-void AdminTest::ActivateChannelsAndExpectSuccess(uint64_t active_channels_bitmask) {
-  ActivateChannels(active_channels_bitmask, true);
-}
-
-void AdminTest::ActivateChannelsAndExpectFailure(uint64_t active_channels_bitmask) {
-  ActivateChannels(active_channels_bitmask, false);
-}
-
-void AdminTest::ActivateChannels(uint64_t active_channels_bitmask, bool expect_success) {
+void AdminTest::ActivateChannelsAndExpectOutcome(uint64_t active_channels_bitmask,
+                                                 SetActiveChannelsOutcome expected_outcome) {
   zx_status_t status = ZX_OK;
-  auto send_time = zx::clock::get_monotonic();
   auto set_time = zx::time(0);
+  auto send_time = zx::clock::get_monotonic();
   ring_buffer_->SetActiveChannels(
       active_channels_bitmask,
       AddCallback("SetActiveChannels",
@@ -266,12 +259,16 @@ void AdminTest::ActivateChannels(uint64_t active_channels_bitmask, bool expect_s
 
   SCOPED_TRACE(testing::Message() << "...during ring_buffer_fidl->SetActiveChannels(0x" << std::hex
                                   << active_channels_bitmask << ")");
-  if (expect_success) {
-    ASSERT_EQ(status, ZX_OK) << "SetActiveChannels failed unexpectedly";
-    EXPECT_GT(set_time, send_time);
-  } else {
+  if (expected_outcome == SetActiveChannelsOutcome::FAILURE) {
     ASSERT_NE(status, ZX_OK) << "SetActiveChannels succeeded unexpectedly";
     EXPECT_EQ(status, ZX_ERR_INVALID_ARGS) << "Unexpected failure code";
+  } else {
+    ASSERT_EQ(status, ZX_OK) << "SetActiveChannels failed unexpectedly";
+    if (expected_outcome == SetActiveChannelsOutcome::NO_CHANGE) {
+      EXPECT_LT(set_time.get(), send_time.get());
+    } else if (expected_outcome == SetActiveChannelsOutcome::CHANGE) {
+      EXPECT_GT(set_time.get(), send_time.get());
+    }
   }
 }
 
@@ -486,18 +483,38 @@ DEFINE_ADMIN_TEST_CLASS(DriverReservesRingBufferSpace, {
   EXPECT_GT(ring_buffer_frames(), page_frame_aligned_rb_frames);
 });
 
-// Verify valid responses: set active channels
-DEFINE_ADMIN_TEST_CLASS(SetActiveChannels, {
+// Verify valid responses: set active channels returns a set_time after the call is made.
+DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsChange, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
-  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannelsAndExpectSuccess(0));
-
-  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
 
   uint64_t all_channels_mask = (1 << ring_buffer_pcm_format().number_of_channels) - 1;
-  ActivateChannelsAndExpectSuccess(all_channels_mask);
+  ASSERT_NO_FAILURE_OR_SKIP(
+      ActivateChannelsAndExpectOutcome(all_channels_mask, SetActiveChannelsOutcome::SUCCESS));
+
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
+  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannelsAndExpectOutcome(0, SetActiveChannelsOutcome::CHANGE));
+
+  WaitForError();
+});
+
+// If no change, the previous set-time should be returned.
+DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsNoChange, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
+
+  uint64_t all_channels_mask = (1 << ring_buffer_pcm_format().number_of_channels) - 1;
+  ASSERT_NO_FAILURE_OR_SKIP(
+      ActivateChannelsAndExpectOutcome(all_channels_mask, SetActiveChannelsOutcome::SUCCESS));
+
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+  ASSERT_NO_FAILURE_OR_SKIP(
+      ActivateChannelsAndExpectOutcome(all_channels_mask, SetActiveChannelsOutcome::NO_CHANGE));
+
+  RequestRingBufferStop();
   WaitForError();
 });
 
@@ -507,7 +524,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsTooHigh, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
   auto channel_mask_too_high = (1 << ring_buffer_pcm_format().number_of_channels);
-  ActivateChannelsAndExpectFailure(channel_mask_too_high);
+  ActivateChannelsAndExpectOutcome(channel_mask_too_high, SetActiveChannelsOutcome::FAILURE);
 });
 
 // Verify that valid start responses are received.
@@ -647,9 +664,11 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
+
+  uint64_t all_channels_mask = (1 << ring_buffer_pcm_format().number_of_channels) - 1;
   ASSERT_NO_FAILURE_OR_SKIP(
-      ActivateChannelsAndExpectSuccess((1 << ring_buffer_pcm_format().number_of_channels) - 1));
+      ActivateChannelsAndExpectOutcome(all_channels_mask, SetActiveChannelsOutcome::SUCCESS));
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStop());
   ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
 
@@ -658,8 +677,7 @@ DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
-  ASSERT_NO_FAILURE_OR_SKIP(
-      ActivateChannelsAndExpectSuccess((1 << ring_buffer_pcm_format().number_of_channels) - 1));
+  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannelsAndExpectOutcome(0, SetActiveChannelsOutcome::SUCCESS));
 
   RequestRingBufferStop();
   WaitForError();
@@ -702,10 +720,11 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
 
     REGISTER_ADMIN_TEST(InternalDelayIsValid, device_entry);
     REGISTER_ADMIN_TEST(ExternalDelayIsValid, device_entry);
-
-    REGISTER_ADMIN_TEST(SetActiveChannels, device_entry);
-    REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoSecondTimeNoResponse, device_entry);
+
+    REGISTER_ADMIN_TEST(SetActiveChannelsChange, device_entry);
+    REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
+    REGISTER_ADMIN_TEST(SetActiveChannelsNoChange, device_entry);
 
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);
@@ -725,10 +744,11 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
 
     REGISTER_ADMIN_TEST(InternalDelayIsValid, device_entry);
     REGISTER_ADMIN_TEST(ExternalDelayIsValid, device_entry);
-
-    REGISTER_ADMIN_TEST(SetActiveChannels, device_entry);
-    REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoSecondTimeNoResponse, device_entry);
+
+    REGISTER_ADMIN_TEST(SetActiveChannelsChange, device_entry);
+    REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
+    REGISTER_ADMIN_TEST(SetActiveChannelsNoChange, device_entry);
 
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);
@@ -748,10 +768,11 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
 
     REGISTER_ADMIN_TEST(InternalDelayIsValid, device_entry);
     REGISTER_ADMIN_TEST(ExternalDelayIsValid, device_entry);
-
-    REGISTER_ADMIN_TEST(SetActiveChannels, device_entry);
-    REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoSecondTimeNoResponse, device_entry);
+
+    REGISTER_ADMIN_TEST(SetActiveChannelsChange, device_entry);
+    REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
+    REGISTER_ADMIN_TEST(SetActiveChannelsNoChange, device_entry);
 
     REGISTER_ADMIN_TEST(RingBufferStart, device_entry);
     REGISTER_ADMIN_TEST(RingBufferStartBeforeGetVmoShouldDisconnect, device_entry);

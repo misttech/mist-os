@@ -445,7 +445,10 @@ closed protocol RingBuffer {
     /// the hardware to activate or deactivate channels is completed. `set_time` does not include
     /// the potential `turn_on_delay`, the driver does not delay the reply waiting for the
     /// hardware to actually turn on, the driver replies with a `set_time` indicating when the
-    /// hardware configuration was completed.
+    /// hardware configuration was completed. If the requested channel configuration is already
+    /// active, the returned `set_time` can be before `SetActiveChannels` was called but must be
+    /// before the reply is sent. If called again with the same configuration, the reply must
+    /// include the same `set_time` value as was previously returned.
     /// For input channels, it is not required that the driver zero-out inactive channels.
     /// If `SetActiveChannels` is called for a second time before the first call has completed,
     /// the channel must be closed with an error `ZX_ERR_BAD_STATE` returned.

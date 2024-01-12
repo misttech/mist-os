@@ -4,6 +4,7 @@
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_composite.h"
 
 #include <lib/ddk/debug.h>
+#include <lib/zx/clock.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
@@ -227,8 +228,8 @@ void VirtualAudioComposite::SetDaiFormat(SetDaiFormatRequest& request,
 void VirtualAudioComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
                                                  GetRingBufferFormatsCompleter::Sync& completer) {
   // This driver is limited to a single ring buffer.
-  // TODO(https://fxbug.dev/124865): Add support for more ring buffers, allowing their configuration and
-  // observability via the virtual audio FIDL APIs.
+  // TODO(https://fxbug.dev/124865): Add support for more ring buffers, allowing their configuration
+  // and observability via the virtual audio FIDL APIs.
   if (request.processing_element_id() != kRingBufferId) {
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
@@ -291,13 +292,16 @@ void VirtualAudioComposite::OnRingBufferClosed(fidl::UnbindInfo info) {
 void VirtualAudioComposite::CreateRingBuffer(CreateRingBufferRequest& request,
                                              CreateRingBufferCompleter::Sync& completer) {
   // One ring buffer is supported by this driver.
-  // TODO(https://fxbug.dev/124865): Add support for more ring buffers, allowing their configuration and
-  // observability via the virtual audio FIDL APIs.
+  // TODO(https://fxbug.dev/124865): Add support for more ring buffers, allowing their configuration
+  // and observability via the virtual audio FIDL APIs.
   if (request.processing_element_id() != kRingBufferId) {
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
   ring_buffer_format_.emplace(std::move(request.format()));
+  ring_buffer_active_channel_mask_ =
+      (1 << ring_buffer_format_->pcm_format()->number_of_channels()) - 1;
+  active_channel_set_time_ = zx::clock::get_monotonic();
   ring_buffer_.emplace(dispatcher(), std::move(request.ring_buffer()), this,
                        std::mem_fn(&VirtualAudioComposite::OnRingBufferClosed));
   completer.Reply(zx::ok());
@@ -462,8 +466,22 @@ void VirtualAudioComposite::WatchDelayInfo(WatchDelayInfoCompleter::Sync& comple
 void VirtualAudioComposite::SetActiveChannels(
     fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
     SetActiveChannelsCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/81649): Add support.
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  ZX_ASSERT(ring_buffer_format_);  // A RingBuffer must exist, for this FIDL method to be called.
+
+  const uint64_t max_channel_bitmask =
+      (1 << ring_buffer_format_->pcm_format()->number_of_channels()) - 1;
+  if (request.active_channels_bitmask() > max_channel_bitmask) {
+    zxlogf(WARNING, "%p: SetActiveChannels(0x%04zx) is out-of-range", this,
+           request.active_channels_bitmask());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (ring_buffer_active_channel_mask_ != request.active_channels_bitmask()) {
+    active_channel_set_time_ = zx::clock::get_monotonic();
+    ring_buffer_active_channel_mask_ = request.active_channels_bitmask();
+  }
+  completer.Reply(zx::ok(active_channel_set_time_.get()));
 }
 
 void VirtualAudioComposite::OnSignalProcessingClosed(fidl::UnbindInfo info) {
@@ -493,8 +511,8 @@ void VirtualAudioComposite::SignalProcessingConnect(
 
 void VirtualAudioComposite::GetElements(GetElementsCompleter::Sync& completer) {
   // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/124865): Add support for more elements provided by the driver (ring buffers,
-  // DAI interconnects and other processing elements), allowing their configuration and
+  // TODO(https://fxbug.dev/124865): Add support for more elements provided by the driver (ring
+  // buffers, DAI interconnects and other processing elements), allowing their configuration and
   // observability via the virtual audio FIDL APIs.
   fuchsia_hardware_audio_signalprocessing::Element ring_buffer;
   fuchsia_hardware_audio_signalprocessing::Endpoint ring_buffer_endpoint;
@@ -519,8 +537,8 @@ void VirtualAudioComposite::GetElements(GetElementsCompleter::Sync& completer) {
 void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
                                               WatchElementStateCompleter::Sync& completer) {
   // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/124865): Add support for more elements provided by the driver (ring buffers,
-  // DAI interconnects and other processing elements), allowing their configuration and
+  // TODO(https://fxbug.dev/124865): Add support for more elements provided by the driver (ring
+  // buffers, DAI interconnects and other processing elements), allowing their configuration and
   // observability via the virtual audio FIDL APIs.
   size_t index = 0;
   switch (request.processing_element_id()) {
@@ -564,8 +582,8 @@ void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
 void VirtualAudioComposite::SetElementState(SetElementStateRequest& request,
                                             SetElementStateCompleter::Sync& completer) {
   // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/124865): Add support for more elements provided by the driver (ring buffers,
-  // DAI interconnects and other processing elements), allowing their configuration and
+  // TODO(https://fxbug.dev/124865): Add support for more elements provided by the driver (ring
+  // buffers, DAI interconnects and other processing elements), allowing their configuration and
   // observability via the virtual audio FIDL APIs.
   uint64_t id = request.processing_element_id();
   if (id != kRingBufferId && id != kDaiId) {
@@ -577,8 +595,8 @@ void VirtualAudioComposite::SetElementState(SetElementStateRequest& request,
 
 void VirtualAudioComposite::GetTopologies(GetTopologiesCompleter::Sync& completer) {
   // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/124865): Add support for more topologies allowing their configuration and
-  // observability via the virtual audio FIDL APIs.
+  // TODO(https://fxbug.dev/124865): Add support for more topologies allowing their configuration
+  // and observability via the virtual audio FIDL APIs.
   fuchsia_hardware_audio_signalprocessing::Topology topology;
   topology.id(kTopologyId);
   fuchsia_hardware_audio_signalprocessing::EdgePair edge;
@@ -590,8 +608,8 @@ void VirtualAudioComposite::GetTopologies(GetTopologiesCompleter::Sync& complete
 
 void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& completer) {
   // This driver is limited to a single ring buffer and a single DAI interconnect.
-  // TODO(https://fxbug.dev/124865): Add support for more topologies allowing their configuration and
-  // observability via the virtual audio FIDL APIs.
+  // TODO(https://fxbug.dev/124865): Add support for more topologies allowing their configuration
+  // and observability via the virtual audio FIDL APIs.
   if (!responded_to_watch_topology_) {
     responded_to_watch_topology_ = true;
     completer.Reply(kTopologyId);
@@ -611,8 +629,8 @@ void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
     completer.Reply(zx::ok());
   } else {
     // This driver is limited to a single ring buffer and a single DAI interconnect.
-    // TODO(https://fxbug.dev/124865): Add support for more topologies allowing their configuration and
-    // observability via the virtual audio FIDL APIs.
+    // TODO(https://fxbug.dev/124865): Add support for more topologies allowing their configuration
+    // and observability via the virtual audio FIDL APIs.
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
   }
 }

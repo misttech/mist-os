@@ -10,6 +10,7 @@
 #include <lib/simple-audio-stream/simple-audio-stream.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <zircon/errors.h>
 
 #include <audio-proto/audio-proto.h>
@@ -81,9 +82,8 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
 
   zx_status_t Start(uint64_t* out_start_time) __TA_REQUIRES(domain_token()) override;
   zx_status_t Stop() __TA_REQUIRES(domain_token()) override;
-  zx_status_t ChangeActiveChannels(uint64_t mask) __TA_REQUIRES(domain_token()) override {
-    return ZX_ERR_NOT_SUPPORTED;  // TODO(https://fxbug.dev/81649): Add support.
-  }
+  zx_status_t ChangeActiveChannels(uint64_t mask, zx_time_t* set_time_out)
+      __TA_REQUIRES(domain_token()) override;
 
   void ShutdownHook() __TA_REQUIRES(domain_token()) override;
   // RingBufferShutdown() is unneeded: no hardware shutdown tasks needed...
@@ -114,6 +114,8 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   fzl::VmoMapper ring_buffer_mapper_ __TA_GUARDED(domain_token());
   zx::vmo ring_buffer_vmo_ __TA_GUARDED(domain_token());
   uint32_t num_ring_buffer_frames_ __TA_GUARDED(domain_token()) = 0;
+  uint64_t ring_buffer_active_channel_mask_ __TA_GUARDED(domain_token());
+  zx::time active_channels_set_time_;
 
   uint32_t max_buffer_frames_ __TA_GUARDED(domain_token());
   uint32_t min_buffer_frames_ __TA_GUARDED(domain_token());

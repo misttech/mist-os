@@ -591,14 +591,14 @@ void SimpleAudioStream::SetGain(audio_fidl::wire::GainState target_state,
 void SimpleAudioStream::SetActiveChannels(SetActiveChannelsRequestView request,
                                           SetActiveChannelsCompleter::Sync& completer) {
   ScopedToken t(domain_token());
-  zx_status_t status = ChangeActiveChannels(request->active_channels_bitmask);
+  zx_time_t set_time;
+  zx_status_t status = ChangeActiveChannels(request->active_channels_bitmask, &set_time);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Error while setting the active channels");
     completer.ReplyError(status);
     return;
   }
   channels_to_use_bitmask_.Set(request->active_channels_bitmask);
-  int64_t set_time = zx::clock::get_monotonic().get();
   completer.ReplySuccess(set_time);
 }
 

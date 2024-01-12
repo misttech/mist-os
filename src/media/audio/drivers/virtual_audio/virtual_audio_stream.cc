@@ -472,6 +472,8 @@ zx_status_t VirtualAudioStream::ChangeFormat(const audio::audio_proto::StreamSet
   sample_format_ = req.sample_format;
 
   num_channels_ = req.channels;
+  ring_buffer_active_channel_mask_ = (1 << num_channels_) - 1;
+  active_channels_set_time_ = zx::clock::get_monotonic();
   bytes_per_sec_ = frame_rate_ * frame_size_;
 
   // (Re)set external_delay_nsec_ and driver_transfer_bytes_ before leaving, if needed.
@@ -643,6 +645,23 @@ zx_status_t VirtualAudioStream::Stop() {
 
   ref_time_to_running_frame_ = affine::Transform(affine::Ratio(0, 1));
 
+  return ZX_OK;
+}
+
+zx_status_t VirtualAudioStream::ChangeActiveChannels(uint64_t active_channels_bitmask,
+                                                     zx_time_t* set_time_out) {
+  const uint64_t max_channel_mask = (1 << num_channels_) - 1;
+  if (active_channels_bitmask > max_channel_mask) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (!set_time_out) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (ring_buffer_active_channel_mask_ != active_channels_bitmask) {
+    ring_buffer_active_channel_mask_ = active_channels_bitmask;
+    active_channels_set_time_ = zx::clock::get_monotonic();
+  }
+  *set_time_out = active_channels_set_time_.get();
   return ZX_OK;
 }
 

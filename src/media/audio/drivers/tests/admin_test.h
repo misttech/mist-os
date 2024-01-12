@@ -43,8 +43,15 @@ class AdminTest : public TestBase {
 
   void RequestRingBufferProperties();
   void RequestBuffer(uint32_t min_ring_buffer_frames, uint32_t notifications_per_ring);
-  void ActivateChannelsAndExpectSuccess(uint64_t active_channels_bitmask);
-  void ActivateChannelsAndExpectFailure(uint64_t active_channels_bitmask);
+
+  enum SetActiveChannelsOutcome {
+    SUCCESS = 1,  // May or may not represent a change
+    CHANGE,       // Successful change of active channels.
+    NO_CHANGE,    // Successful but not a change.
+    FAILURE,      // Unsuccessful.
+  };
+  void ActivateChannelsAndExpectOutcome(uint64_t active_channels_bitmask,
+                                        SetActiveChannelsOutcome expected_outcome);
 
   void RequestRingBufferStart();
   void RequestRingBufferStartAndExpectDisconnect(zx_status_t expected_error);
@@ -76,7 +83,6 @@ class AdminTest : public TestBase {
 
  private:
   void RequestRingBufferChannel();
-  void ActivateChannels(uint64_t active_channels_bitmask, bool expect_success);
 
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer> ring_buffer_;
   std::optional<fuchsia::hardware::audio::RingBufferProperties> ring_buffer_props_;

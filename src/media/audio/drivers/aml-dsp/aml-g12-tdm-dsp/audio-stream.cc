@@ -468,37 +468,42 @@ zx_status_t AmlG12TdmDspStream::UpdateHardwareSettings() {
   return ZX_OK;
 }
 
-zx_status_t AmlG12TdmDspStream::ChangeActiveChannels(uint64_t mask) {
+zx_status_t AmlG12TdmDspStream::ChangeActiveChannels(uint64_t mask, zx_time_t* set_time_out) {
   if (mask > active_channels_bitmask_max_) {
     return ZX_ERR_INVALID_ARGS;
   }
-  uint64_t old_mask = active_channels_;
-  active_channels_ = mask;
-  // Only stop the codecs for channels not active, not the AMLogic HW.
-  for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
-    uint64_t codec_mask = metadata_.codecs.ring_buffer_channels_to_use_bitmask[i];
-    bool enabled = mask & codec_mask;
-    bool old_enabled = old_mask & codec_mask;
-    if (enabled != old_enabled) {
-      if (enabled) {
-        zx_status_t status = StartCodecIfEnabled(i);
-        if (status != ZX_OK) {
-          return status;
+
+  if (mask != active_channels_) {
+    uint64_t old_mask = active_channels_;
+    active_channels_ = mask;
+    // Only stop the codecs for channels not active, not the AMLogic HW.
+    for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
+      uint64_t codec_mask = metadata_.codecs.ring_buffer_channels_to_use_bitmask[i];
+      bool enabled = mask & codec_mask;
+      bool old_enabled = old_mask & codec_mask;
+      if (enabled != old_enabled) {
+        if (enabled) {
+          zx_status_t status = StartCodecIfEnabled(i);
+          if (status != ZX_OK) {
+            return status;
+          }
+        } else {
+          zx_status_t status = codecs_[i]->Stop();
+          if (status != ZX_OK) {
+            zxlogf(ERROR, "Failed to stop the codec");
+            return status;
+          }
+          constexpr uint32_t codecs_turn_off_delay_if_unknown_msec = 50;
+          zx::duration delay = codecs_turn_off_delay_nsec_
+                                   ? zx::nsec(codecs_turn_off_delay_nsec_)
+                                   : zx::msec(codecs_turn_off_delay_if_unknown_msec);
+          zx::nanosleep(zx::deadline_after(delay));
         }
-      } else {
-        zx_status_t status = codecs_[i]->Stop();
-        if (status != ZX_OK) {
-          zxlogf(ERROR, "Failed to stop the codec");
-          return status;
-        }
-        constexpr uint32_t codecs_turn_off_delay_if_unknown_msec = 50;
-        zx::duration delay = codecs_turn_off_delay_nsec_
-                                 ? zx::nsec(codecs_turn_off_delay_nsec_)
-                                 : zx::msec(codecs_turn_off_delay_if_unknown_msec);
-        zx::nanosleep(zx::deadline_after(delay));
       }
     }
+    active_channels_set_time_ = zx::clock::get_monotonic();
   }
+  *set_time_out = active_channels_set_time_.get();
   return ZX_OK;
 }
 

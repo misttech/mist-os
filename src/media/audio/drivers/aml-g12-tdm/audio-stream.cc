@@ -486,11 +486,17 @@ zx_status_t AmlG12TdmStream::StopSocPower() {
   return ZX_OK;
 }
 
-zx_status_t AmlG12TdmStream::ChangeActiveChannels(uint64_t mask) {
-  zx_status_t status = ZX_OK;
+zx_status_t AmlG12TdmStream::ChangeActiveChannels(uint64_t mask, zx_time_t* set_time_out) {
+  if (mask == active_channels_) {
+    *set_time_out = active_channels_set_time_.get();
+    return ZX_OK;
+  }
+
   if (mask > active_channels_bitmask_max_) {
     return ZX_ERR_INVALID_ARGS;
   }
+
+  zx_status_t status = ZX_OK;
   uint64_t old_mask = active_channels_;
   active_channels_ = mask;
 
@@ -532,7 +538,9 @@ zx_status_t AmlG12TdmStream::ChangeActiveChannels(uint64_t mask) {
       return status;
     }
   }
+  active_channels_set_time_ = zx::clock::get_monotonic();
 
+  *set_time_out = active_channels_set_time_.get();
   return ZX_OK;
 }
 
