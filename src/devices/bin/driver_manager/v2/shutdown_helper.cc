@@ -30,14 +30,18 @@ ShutdownHelper::ShutdownHelper(NodeShutdownBridge* bridge, async_dispatcher_t* d
 void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
                             NodeRemovalTracker* removal_tracker) {
   std::stack<std::shared_ptr<Node>> nodes_to_check_for_removal;
-  std::stack<std::shared_ptr<Node>> nodes = std::stack<std::shared_ptr<Node>>({node});
+  std::stack<std::pair<std::shared_ptr<Node>, RemovalSet>> nodes =
+      std::stack<std::pair<std::shared_ptr<Node>, RemovalSet>>({{node, removal_set}});
   while (!nodes.empty()) {
-    std::shared_ptr<Node> node = nodes.top();
+    std::pair<std::shared_ptr<Node>, RemovalSet> removal_record = nodes.top();
     nodes.pop();
+    std::shared_ptr<Node> node = removal_record.first;
+    RemovalSet removal_set = removal_record.second;
 
     ShutdownHelper& shutdown_helper = node->GetShutdownHelper();
     if (!removal_tracker && shutdown_helper.removal_tracker_) {
-      // TODO(https://fxbug.dev/115171): Change this to an error when we track shutdown steps better.
+      // TODO(https://fxbug.dev/115171): Change this to an error when we track shutdown steps
+      // better.
       LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
            node->MakeTopologicalPath().c_str());
     }
@@ -80,7 +84,7 @@ void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
     for (auto& child : node->children()) {
       LOGF(DEBUG, "Node: %s calling remove on child: %s", node->name().c_str(),
            child->name().c_str());
-      nodes.push(child);
+      nodes.emplace(child, removal_set);
     }
     nodes_to_check_for_removal.push(std::move(node));
   }

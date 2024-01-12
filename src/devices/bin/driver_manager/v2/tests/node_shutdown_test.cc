@@ -144,6 +144,7 @@ class NodeShutdownTest : public DriverManagerTestBase {
 
     removal_tracker_ = std::make_unique<NodeRemovalTracker>(dispatcher());
     removal_tracker_->set_all_callback([this]() { remove_all_callback_invoked_ = true; });
+    removal_tracker_->set_pkg_callback([this]() { remove_pkg_callback_invoked_ = true; });
 
     nodes_["root"] = root();
   }
@@ -187,9 +188,19 @@ class NodeShutdownTest : public DriverManagerTestBase {
   }
 
   void AddNode(std::string node) { AddChildNode("root", node); }
-  void AddNodeAndStartDriver(std::string node) { AddChildNodeAndStartDriver("root", node); }
+
+  void AddNodeAndStartDriver(std::string node) { AddNodeAndStartDriver(node, std::nullopt); }
+
+  void AddNodeAndStartDriver(std::string node, std::optional<Collection> collection) {
+    AddChildNodeAndStartDriver("root", node, collection);
+  }
 
   void AddChildNode(std::string parent_name, std::string child_name) {
+    AddChildNode(parent_name, child_name, std::nullopt);
+  }
+
+  void AddChildNode(std::string parent_name, std::string child_name,
+                    std::optional<Collection> collection) {
     // This function should only be called for a new node.
     ASSERT_EQ(nodes_.find(child_name), nodes_.end());
     ASSERT_NE(nodes_.find(parent_name), nodes_.end());
@@ -200,7 +211,12 @@ class NodeShutdownTest : public DriverManagerTestBase {
     for (auto child : parent->children()) {
       ASSERT_NE(child->name(), child_name);
     }
-    nodes_[child_name] = DriverManagerTestBase::CreateNode(child_name, nodes_[parent_name]);
+    std::shared_ptr<Node> child =
+        DriverManagerTestBase::CreateNode(child_name, nodes_[parent_name]);
+    if (collection.has_value()) {
+      child->set_collection(collection.value());
+    }
+    nodes_[child_name] = child;
   }
 
   void AddCompositeNode(std::string composite_name, std::vector<std::string> parents) {
@@ -219,7 +235,12 @@ class NodeShutdownTest : public DriverManagerTestBase {
   std::shared_ptr<Node> GetNode(std::string node_name) { return nodes_[node_name].lock(); }
 
   void AddChildNodeAndStartDriver(std::string parent, std::string child) {
-    AddChildNode(parent, child);
+    AddChildNodeAndStartDriver(parent, child, std::nullopt);
+  }
+
+  void AddChildNodeAndStartDriver(std::string parent, std::string child,
+                                  std::optional<Collection> collection) {
+    AddChildNode(parent, child, collection);
     StartDriver(child);
   }
 
@@ -235,10 +256,12 @@ class NodeShutdownTest : public DriverManagerTestBase {
     RunLoopUntilIdle();
   }
 
-  void InvokeRemoveNode(std::string node_name) {
+  void InvokeRemoveNode(std::string node_name) { InvokeRemoveNode(node_name, RemovalSet::kAll); }
+
+  void InvokeRemoveNode(std::string node_name, RemovalSet set) {
     auto node = nodes_[node_name].lock();
     ASSERT_TRUE(node);
-    node->Remove(RemovalSet::kAll, removal_tracker_.get());
+    node->Remove(set, removal_tracker_.get());
     removal_tracker_->FinishEnumeration();
     RunLoopUntilIdle();
   }
@@ -247,7 +270,7 @@ class NodeShutdownTest : public DriverManagerTestBase {
     RunLoopUntilIdle();
     auto node = nodes_[node_name].lock();
     ASSERT_TRUE(node);
-    ASSERT_EQ(expected_state, node->GetShutdownHelper().node_state());
+    ASSERT_EQ(expected_state, node->GetShutdownHelper().node_state()) << "Node: " << node_name;
   }
 
   void VerifyStates(std::map<std::string, NodeState> expected_states) {
@@ -258,7 +281,8 @@ class NodeShutdownTest : public DriverManagerTestBase {
 
   void VerifyNodeRemovedFromParent(std::string node_name, std::string parent_name) {
     RunLoopUntilIdle();
-    ASSERT_FALSE(nodes_[node_name].lock());
+    ASSERT_FALSE(nodes_[node_name].lock())
+        << " node_name: " << node_name << " parent_name: " << parent_name;
     if (auto parent = nodes_[parent_name].lock(); parent) {
       for (auto child : parent->children()) {
         ASSERT_NE(child->name(), node_name);
@@ -266,7 +290,13 @@ class NodeShutdownTest : public DriverManagerTestBase {
     }
   }
 
-  void VerifyRemovalTrackerCallbackInvoked() { ASSERT_TRUE(remove_all_callback_invoked_); }
+  void VerifyRemovalTrackerPkgCallbackInvoked() { ASSERT_TRUE(remove_pkg_callback_invoked_); }
+
+  void VerifyRemovalTrackerPkgCallbackNotInvoked() { ASSERT_FALSE(remove_pkg_callback_invoked_); }
+
+  void VerifyRemovalTrackerAllCallbackInvoked() { ASSERT_TRUE(remove_all_callback_invoked_); }
+
+  void VerifyRemovalTrackerAllCallbackNotInvoked() { ASSERT_FALSE(remove_all_callback_invoked_); }
 
  protected:
   NodeManager* GetNodeManager() override { return node_manager.get(); }
@@ -279,6 +309,8 @@ class NodeShutdownTest : public DriverManagerTestBase {
   std::unique_ptr<NodeRemovalTracker> removal_tracker_;
 
   bool remove_all_callback_invoked_ = false;
+
+  bool remove_pkg_callback_invoked_ = false;
 
   std::unordered_map<std::string, std::weak_ptr<Node>> nodes_;
 
@@ -334,7 +366,8 @@ TEST_F(NodeShutdownTest, BasicRemoveAllNodes) {
   VerifyState("node_a", NodeState::kWaitingOnDriverComponent);
   InvokeDestroyChildResponse("node_a");
   VerifyNodeRemovedFromParent("node_a", "root");
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
+  VerifyRemovalTrackerPkgCallbackInvoked();
 }
 
 TEST_F(NodeShutdownTest, RemoveCompositeNode) {
@@ -381,7 +414,7 @@ TEST_F(NodeShutdownTest, RemoveCompositeNode) {
   InvokeDestroyChildResponse("node_a");
   VerifyNodeRemovedFromParent("node_a", "root");
 
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
 }
 
 TEST_F(NodeShutdownTest, RemoveLeafNode) {
@@ -398,7 +431,7 @@ TEST_F(NodeShutdownTest, RemoveLeafNode) {
 
   InvokeDestroyChildResponse("node_a_a");
   VerifyNodeRemovedFromParent("node_a_a", "node_a");
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
 }
 
 TEST_F(NodeShutdownTest, RemoveNodeWithNoChildren) {
@@ -411,7 +444,7 @@ TEST_F(NodeShutdownTest, RemoveNodeWithNoChildren) {
 
   InvokeDestroyChildResponse("node_a");
   VerifyNodeRemovedFromParent("node_a", "root");
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
 }
 
 TEST_F(NodeShutdownTest, RemoveNodeWithNoDriverOrChildren) {
@@ -447,7 +480,7 @@ TEST_F(NodeShutdownTest, DriverShutdownWhileWaitingOnChildren) {
 
   InvokeDestroyChildResponse("node_a");
   VerifyNodeRemovedFromParent("node_a", "root");
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
 }
 
 TEST_F(NodeShutdownTest, RemoveAfterBindFailure) {
@@ -465,7 +498,7 @@ TEST_F(NodeShutdownTest, BindFailureDuringRemove) {
 
   GetNode("node_a")->CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
   VerifyNodeRemovedFromParent("node_a", "root");
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
 }
 
 TEST_F(NodeShutdownTest, DriverHostFailure) {
@@ -486,7 +519,7 @@ TEST_F(NodeShutdownTest, RemoveDuringDriverHostStartWithFailure) {
   node_manager->driver_host().InvokeStartCallback("node_a", zx::error(ZX_ERR_INTERNAL));
 
   VerifyNodeRemovedFromParent("node_a", "root");
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
 }
 
 TEST_F(NodeShutdownTest, OverlappingRemoveCalls) {
@@ -543,7 +576,7 @@ TEST_F(NodeShutdownTest, OverlappingRemoveCalls) {
   VerifyState("node_a", NodeState::kWaitingOnDriverComponent);
   InvokeDestroyChildResponse("node_a");
   VerifyNodeRemovedFromParent("node_a", "root");
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
 }
 
 TEST_F(NodeShutdownTest, OverlappingRemoveCalls_DifferentNodes) {
@@ -599,5 +632,148 @@ TEST_F(NodeShutdownTest, OverlappingRemoveCalls_DifferentNodes) {
   VerifyState("node_a", NodeState::kWaitingOnDriverComponent);
   InvokeDestroyChildResponse("node_a");
   VerifyNodeRemovedFromParent("node_a", "root");
-  VerifyRemovalTrackerCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackInvoked();
+}
+
+// Test nodes spread across boot and package collections when we first just
+// stop the package drivers and then ask to stop the boot drivers.
+TEST_F(NodeShutdownTest, NodesInDifferentCollections) {
+  // TEST OUTLINE
+  // Create a root and attach to it three children. The first and third are
+  // package drivers, the second is a boot driver. This arrangement is
+  // intentional because the bug this test was written in response to only
+  // happened when a boot driver child was first and a package driver child
+  // after it as children were process LIFO. We put a boot driver in the middle
+  // in case we reintroduce the bug *and* switch to FIFO processing of nodes.
+  const char* root_name = "node_root";
+  const char* node_pkg1 = "node_package1";
+  const char* node_pkg2 = "node_package2";
+  const char* node_boot = "node_boot";
+
+  // Make the root and put it in the boot collection. We must have the root
+  // in boot because if it were in package it would not matter if one of its
+  // children were a boot driver.
+  AddNodeAndStartDriver(root_name, std::optional<Collection>(Collection::kBoot));
+
+  AddChildNodeAndStartDriver(root_name, node_pkg1, std::optional<Collection>(Collection::kPackage));
+
+  AddChildNodeAndStartDriver(root_name, node_boot, std::optional<Collection>(Collection::kBoot));
+
+  AddChildNodeAndStartDriver(root_name, node_pkg2, std::optional<Collection>(Collection::kPackage));
+
+  // Make the call to remove package-based drivers. This should *NOT* stopt the
+  // boot drivers, but instead put them in a pre-stop state.
+  InvokeRemoveNode(root_name, RemovalSet::kPackage);
+  VerifyStates({{root_name, NodeState::kPrestop},
+                {node_boot, NodeState::kPrestop},
+                {node_pkg1, NodeState::kWaitingOnDriver},
+                {node_pkg2, NodeState::kWaitingOnDriver}});
+
+  // Stop the drivers and components backing the package driver nodes.
+  CloseDriverForNode(node_pkg1);
+  InvokeDestroyChildResponse(node_pkg1);
+  CloseDriverForNode(node_pkg2);
+  InvokeDestroyChildResponse(node_pkg2);
+
+  // Check these children are gone
+  VerifyNodeRemovedFromParent(node_pkg1, root_name);
+  VerifyNodeRemovedFromParent(node_pkg2, root_name);
+
+  // Check remaining nodes are in expected state.
+  VerifyStates({
+      {root_name, NodeState::kPrestop},
+      {node_boot, NodeState::kPrestop},
+  });
+  VerifyRemovalTrackerPkgCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackNotInvoked();
+
+  // Now remove all drivers.
+  InvokeRemoveNode(root_name, RemovalSet::kAll);
+  VerifyStates({
+      {root_name, NodeState::kWaitingOnChildren},
+      {node_boot, NodeState::kWaitingOnDriver},
+  });
+
+  // Take the child of the test root through its stages.
+  CloseDriverForNode(node_boot);
+  VerifyState(node_boot, NodeState::kWaitingOnDriverComponent);
+  InvokeDestroyChildResponse(node_boot);
+
+  // Check the child was removed from the parent.
+  VerifyNodeRemovedFromParent(node_boot, root_name);
+
+  // Now test root just should be waiting on its driver, take it down the rest
+  // of the way.
+  VerifyState(root_name, NodeState::kWaitingOnDriver);
+  CloseDriverForNode(root_name);
+  VerifyState(root_name, NodeState::kWaitingOnDriverComponent);
+  InvokeDestroyChildResponse(root_name);
+
+  // Check the test root was removed from the realm root.
+  VerifyNodeRemovedFromParent(root_name, "root");
+  VerifyRemovalTrackerAllCallbackInvoked();
+}
+
+// Test behavior with nodes in boot and package sets when we shut down all
+// drivers.
+TEST_F(NodeShutdownTest, RemoveAllRemovesEverything) {
+  // TEST OUTLINE
+  // Create a test root node, then create three children. Two of those children
+  // will be package drivers and one will be a boot driver. The root node is a
+  // boot driver as well. We expect that when we issue a shutdown for
+  // RemovalSet::kAll that they all get torn down.
+  const char* root_name = "node_root";
+  const char* node_pkg1 = "node_package1";
+  const char* node_pkg2 = "node_package2";
+  const char* node_boot = "node_boot";
+
+  // Make the root and put it in the boot collection. We must have the root
+  // in boot because if it were in package it would not matter if one of its
+  // children were a boot driver.
+  AddNodeAndStartDriver(root_name, std::optional<Collection>(Collection::kBoot));
+
+  AddChildNodeAndStartDriver(root_name, node_pkg1, std::optional<Collection>(Collection::kPackage));
+
+  AddChildNodeAndStartDriver(root_name, node_boot, std::optional<Collection>(Collection::kBoot));
+
+  AddChildNodeAndStartDriver(root_name, node_pkg2, std::optional<Collection>(Collection::kPackage));
+
+  // Make the call to remove package-based drivers. This should *NOT* stop the
+  // boot drivers, but instead put them in a pre-stop state.
+  InvokeRemoveNode(root_name, RemovalSet::kAll);
+  VerifyStates({{root_name, NodeState::kWaitingOnChildren},
+                {node_boot, NodeState::kWaitingOnDriver},
+                {node_pkg1, NodeState::kWaitingOnDriver},
+                {node_pkg2, NodeState::kWaitingOnDriver}});
+
+  // Stop the drivers and components backing the package driver nodes.
+  CloseDriverForNode(node_pkg1);
+  InvokeDestroyChildResponse(node_pkg1);
+  CloseDriverForNode(node_pkg2);
+  InvokeDestroyChildResponse(node_pkg2);
+
+  // Check these children are gone.
+  VerifyNodeRemovedFromParent(node_pkg1, root_name);
+  VerifyNodeRemovedFromParent(node_pkg2, root_name);
+  VerifyRemovalTrackerPkgCallbackInvoked();
+  VerifyRemovalTrackerAllCallbackNotInvoked();
+
+  // Take the child of the test root through its stages.
+  CloseDriverForNode(node_boot);
+  VerifyState(node_boot, NodeState::kWaitingOnDriverComponent);
+  InvokeDestroyChildResponse(node_boot);
+
+  // Check the child was removed from the parent.
+  VerifyNodeRemovedFromParent(node_boot, root_name);
+
+  // Now test root just should be waiting on its driver, take it down the rest
+  // of the way.
+  VerifyState(root_name, NodeState::kWaitingOnDriver);
+  CloseDriverForNode(root_name);
+  VerifyState(root_name, NodeState::kWaitingOnDriverComponent);
+  InvokeDestroyChildResponse(root_name);
+
+  // Check the test root was removed from the realm root.
+  VerifyNodeRemovedFromParent(root_name, "root");
+  VerifyRemovalTrackerAllCallbackInvoked();
 }
