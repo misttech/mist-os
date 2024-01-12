@@ -2190,7 +2190,9 @@ rust_library("base64-v0_13_0") {
     "--cfg=feature=\"std\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//third_party/alacritty/alacritty_terminal:*" ]
 
   applicable_licenses = [ ":base64-v0_13_0.license" ]
 }

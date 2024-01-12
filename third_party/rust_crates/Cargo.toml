@@ -457,6 +457,9 @@ rustflags = []
 [gn.package.async-trait."0.1.71"]
 rustflags = []
 
+[gn.package.base64."0.13.0"]
+visibility = [":*", "//third_party/alacritty/alacritty_terminal:*" ]
+
 [gn.package.bitflags."1.3.2"]
 visibility = [":*", "//third_party/alacritty/alacritty_terminal:*" ]
 reviewed_features = ["default"]
