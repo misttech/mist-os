@@ -289,6 +289,9 @@ if (current_toolchain != default_toolchain) {
 
     # TODO(https://fxbug.dev/129256): Remove if this doesn't help
     # because that means the timeout is likely not the issue.
+    #
+    # Any changes to this timeout should be reflected in
+    # `//zircon/kernel/phys/boot-shim:devicetree-shim-memory-test`
     timeout = 120
   }
 
