@@ -7,11 +7,10 @@ use {
     async_trait::async_trait,
     fidl::endpoints::{create_endpoints, ServerEnd},
     fidl_fuchsia_io as fio,
-    fsverity_merkle::{MerkleTreeBuilder, Sha256Struct},
+    fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder},
     fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased, Status},
     fxfs_testing::{close_file_checked, open_file_checked, TestFixture},
-    mundane::hash::Digest,
     std::sync::Arc,
     syncio::{
         zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t,
@@ -114,11 +113,13 @@ async fn test_fsverity_enabled() {
                 .expect("open failed"),
         );
         assert!(!attrs.fsverity_enabled);
-        let mut builder = MerkleTreeBuilder::new(Sha256Struct::new(vec![0xFF; 8], 4096));
+        let mut builder = MerkleTreeBuilder::new(FsVerityHasher::Sha256(
+            FsVerityHasherOptions::new(vec![0xFF; 8], 4096),
+        ));
         builder.write(data.as_slice());
         let tree = builder.finish();
         let mut expected_root: [u8; 64] = [0u8; 64];
-        expected_root[0..32].copy_from_slice(&tree.root().bytes());
+        expected_root[0..32].copy_from_slice(tree.root());
 
         // NOTE: The root hash will be calculated and set by the filesystem.
         let expected_descriptor =

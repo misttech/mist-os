@@ -693,6 +693,10 @@ impl DirectoryEntry for FxDirectory {
                         return Err(zx::Status::NOT_SUPPORTED);
                     }
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
+                        if node.verified_file() {
+                            tracing::error!("Tried to expose a verified file as a block device.");
+                            return Err(zx::Status::NOT_SUPPORTED);
+                        }
                         let mut server =
                             BlockServer::new(node, scope, object_request.take().into_channel());
                         Ok(async move {

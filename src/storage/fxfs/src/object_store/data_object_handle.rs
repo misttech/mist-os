@@ -32,9 +32,9 @@ use {
     anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
     fidl_fuchsia_io as fio,
-    fsverity_merkle::{MerkleTreeBuilder, Sha256Struct, Sha512Struct},
+    fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder},
     futures::{stream::FuturesUnordered, TryStreamExt},
-    mundane::hash::Digest,
+    mundane::hash::{Digest, Hasher, Sha256, Sha512},
     std::{
         cmp::min,
         ops::{Bound, Range},
@@ -105,6 +105,49 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 
     pub fn handle(&self) -> &StoreObjectHandle<S> {
         &self.handle
+    }
+
+    /// Verifies contents of `buffer` against the corresponding hashes in the stored merkle tree.
+    /// `offset` is the logical offset in the file that `buffer` starts at. `offset` must be
+    /// block-aligned. Fails on non fsverity-enabled files.
+    async fn verify_data(&self, mut offset: usize, buffer: &[u8]) -> Result<(), Error> {
+        let block_size = self.block_size() as usize;
+        assert!(offset % block_size == 0);
+        let merkle_tree = self.merkle_tree.lock().unwrap();
+        if let Some(merkle_tree) = merkle_tree.clone() {
+            let descriptor = self.fsverity_descriptor.lock().unwrap().clone().ok_or_else(|| {
+                anyhow!(FxfsError::Inconsistent).context("merkle tree exists without descriptor")
+            })?;
+            let (hasher, digest_size) = match descriptor.root_digest {
+                RootDigest::Sha256(_) => {
+                    let hasher = FsVerityHasher::Sha256(FsVerityHasherOptions::new(
+                        descriptor.salt.clone(),
+                        block_size,
+                    ));
+                    (hasher, <Sha256 as Hasher>::Digest::DIGEST_LEN)
+                }
+                RootDigest::Sha512(_) => {
+                    let hasher = FsVerityHasher::Sha512(FsVerityHasherOptions::new(
+                        descriptor.salt.clone(),
+                        block_size,
+                    ));
+                    (hasher, <Sha512 as Hasher>::Digest::DIGEST_LEN)
+                }
+            };
+            let leaf_nodes: Vec<&[u8]> = merkle_tree.chunks(digest_size).collect();
+            fxfs_trace::duration!("fsverity-verify", "len" => buffer.len());
+            // TODO(b/318880297): Consider parallelizing computation.
+            for b in buffer.chunks(block_size) {
+                ensure!(
+                    hasher.hash_block(b) == leaf_nodes[offset / block_size],
+                    anyhow!(FxfsError::Inconsistent).context("Hash mismatch")
+                );
+                offset += block_size;
+            }
+            Ok(())
+        } else {
+            Err(anyhow!("Tried to verify read on a non verity-enabled file"))
+        }
     }
 
     // TODO(b/309656632): This should take a pager-backed vmo instead of a boxed array.
@@ -240,7 +283,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let salt = options.salt.ok_or_else(|| anyhow!("No salt provided"))?;
         let root_digest = match hash_alg {
             fio::HashAlgorithm::Sha256 => {
-                let hasher = Sha256Struct::new(salt.clone(), self.block_size() as usize);
+                let hasher = FsVerityHasher::Sha256(FsVerityHasherOptions::new(
+                    salt.clone(),
+                    self.block_size() as usize,
+                ));
                 let mut builder = MerkleTreeBuilder::new(hasher);
                 let mut offset = 0;
                 let size = self.get_size();
@@ -256,13 +302,17 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 }
                 let tree = builder.finish();
                 let merkle_leaf_nodes: Vec<u8> =
-                    tree.as_ref()[0].iter().flat_map(|x| x.bytes()).collect();
+                    tree.as_ref()[0].iter().flat_map(|x| x.clone()).collect();
                 // TODO(b/314194485): Eventually want streaming writes.
                 self.write_attr(FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes).await?;
-                RootDigest::Sha256(tree.root().bytes())
+                let root: [u8; 32] = tree.root().try_into().unwrap();
+                RootDigest::Sha256(root)
             }
             fio::HashAlgorithm::Sha512 => {
-                let hasher = Sha512Struct::new(salt.clone(), self.block_size() as usize);
+                let hasher = FsVerityHasher::Sha512(FsVerityHasherOptions::new(
+                    salt.clone(),
+                    self.block_size() as usize,
+                ));
                 let mut builder = MerkleTreeBuilder::new(hasher);
                 let mut offset = 0;
                 let size = self.get_size();
@@ -278,10 +328,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 }
                 let tree = builder.finish();
                 let merkle_leaf_nodes: Vec<u8> =
-                    tree.as_ref()[0].iter().flat_map(|x| x.bytes()).collect();
+                    tree.as_ref()[0].iter().flat_map(|x| x.clone()).collect();
                 // TODO(b/314194485): Eventually want streaming writes.
                 self.write_attr(FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes).await?;
-                RootDigest::Sha512(tree.root().bytes().to_vec())
+                RootDigest::Sha512(tree.root().to_vec())
             }
             _ => {
                 bail!(anyhow!(FxfsError::NotSupported)
@@ -1164,7 +1214,10 @@ impl<S: HandleOwner> ReadObjectHandle for DataObjectHandle<S> {
         }
         let length = min(buf.len() as u64, size - offset) as usize;
         buf = buf.subslice_mut(0..length);
-        self.handle.read_unchecked(self.attribute_id(), offset, buf, &guard).await?;
+        self.handle.read_unchecked(self.attribute_id(), offset, buf.reborrow(), &guard).await?;
+        if self.verified_file() {
+            self.verify_data(offset as usize, buf.as_slice()).await?;
+        }
         Ok(length)
     }
 
@@ -2096,6 +2149,50 @@ mod tests {
                 .expect("open_object failed");
 
         assert!(handle.verified_file());
+
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_verify_data_corrupt_file() {
+        let fs: OpenFxFilesystem = test_filesystem().await;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let store = fs.root_store();
+        let object = Arc::new(
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
+        );
+
+        transaction.commit().await.unwrap();
+
+        let mut buf = object.allocate_buffer(5 * fs.block_size() as usize).await;
+        buf.as_mut_slice().fill(123);
+        object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
+
+        object
+            .enable_verity(fio::VerificationOptions {
+                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                salt: Some(vec![]),
+                ..Default::default()
+            })
+            .await
+            .expect("set verified file metadata failed");
+
+        // Change file contents and ensure verification fails
+        buf.as_mut_slice().fill(234);
+        object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
+        object.read(0, buf.as_mut()).await.expect_err("verification during read should fail");
 
         fs.close().await.expect("Close failed");
     }

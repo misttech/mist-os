@@ -546,6 +546,7 @@ impl PagerBacked for FxFile {
         self.handle.uncached_size()
     }
     async fn aligned_read(&self, range: Range<u64>) -> Result<(buffer::Buffer<'_>, usize), Error> {
+        fxfs_trace::duration!("aligned_read", "len" => (range.end - range.start) as usize);
         let buffer = self.handle.read_uncached(range).await?;
         let buffer_len = buffer.len();
         Ok((buffer, buffer_len))
@@ -566,13 +567,12 @@ mod tests {
         },
         anyhow::format_err,
         fidl_fuchsia_io as fio,
-        fsverity_merkle::{MerkleTreeBuilder, Sha256Struct},
+        fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder},
         fuchsia_async as fasync,
         fuchsia_fs::file,
         fuchsia_zircon::Status,
         futures::join,
         fxfs::object_handle::INVALID_OBJECT_ID,
-        mundane::hash::Digest,
         rand::{thread_rng, Rng},
         std::sync::{
             atomic::{self, AtomicBool},
@@ -1693,10 +1693,12 @@ mod tests {
                 .expect("write failed");
         }
 
-        let mut builder = MerkleTreeBuilder::new(Sha256Struct::new(vec![0xFF; 8], 4096));
+        let mut builder = MerkleTreeBuilder::new(FsVerityHasher::Sha256(
+            FsVerityHasherOptions::new(vec![0xFF; 8], 4096),
+        ));
         builder.write(data.as_slice());
         let tree = builder.finish();
-        let mut expected_root = tree.root().bytes().to_vec();
+        let mut expected_root = tree.root().to_vec();
         expected_root.extend_from_slice(&[0; 32]);
 
         let expected_descriptor = fio::VerificationOptions {
@@ -1727,6 +1729,83 @@ mod tests {
             immutable_attributes.root_hash.expect("root hash not present in immutable attributes"),
             expected_root
         );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_fsverity_enabled_file_verified_reads() {
+        let mut data: Vec<u8> = vec![0x00u8; 1052672];
+        thread_rng().fill(&mut data[..]);
+        let mut num_chunks = 0;
+
+        let reused_device = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let file = open_file_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "foo",
+            )
+            .await;
+
+            for chunk in data.chunks(fio::MAX_BUF as usize) {
+                file.write(chunk)
+                    .await
+                    .expect("FIDL call failed")
+                    .map_err(Status::from_raw)
+                    .expect("write failed");
+                num_chunks += 1;
+            }
+
+            let descriptor = fio::VerificationOptions {
+                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                salt: Some(vec![0xFF; 8]),
+                ..Default::default()
+            };
+
+            file.enable_verity(&descriptor)
+                .await
+                .expect("FIDL transport error")
+                .expect("enable verity failed");
+
+            assert!(file.sync().await.expect("Sync failed").is_ok());
+            close_file_checked(file).await;
+            fixture.close().await
+        };
+
+        let fixture = TestFixture::open(
+            reused_device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        for chunk in 0..num_chunks {
+            let buffer = file
+                .read(fio::MAX_BUF)
+                .await
+                .expect("transport error on read")
+                .expect("read failed");
+            let start = chunk * fio::MAX_BUF as usize;
+            assert_eq!(&buffer, &data[start..start + buffer.len()]);
+        }
 
         fixture.close().await;
     }
