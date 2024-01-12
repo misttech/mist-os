@@ -7,8 +7,6 @@ pub mod directory_benchmarks;
 pub mod filesystem;
 pub mod io_benchmarks;
 pub mod testing;
-#[macro_use]
-mod trace;
 
 use {
     async_trait::async_trait,

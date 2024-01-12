@@ -10,16 +10,11 @@ rustc_library("trace") {
   name = "fxfs_trace"
   edition = "2021"
   sources = [ "src/lib.rs" ]
-  deps = [ "//src/storage/fxfs/trace/macros:fxfs_trace_macros" ]
+  deps = [
+    "//src/storage/fxfs/trace/macros:fxfs_trace_macros",
+    "//src/storage/lib/trace",
+  ]
   visibility = [ "//src/storage/fxfs/*" ]
-
-  if (is_fuchsia) {
-    deps += [ "//src/lib/trace/rust:trace" ]
-    features = [ "tracing" ]
-    sources += [ "src/fuchsia.rs" ]
-  } else {
-    sources += [ "src/portable.rs" ]
-  }
 }
 
 rustc_test("fxfs-trace-tests") {

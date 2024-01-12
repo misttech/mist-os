@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        trace_duration, Benchmark, CacheClearableFilesystem, Filesystem, OperationDuration,
-        OperationTimer,
-    },
+    crate::{Benchmark, CacheClearableFilesystem, Filesystem, OperationDuration, OperationTimer},
     async_trait::async_trait,
     std::{
         collections::VecDeque,
@@ -103,7 +100,7 @@ impl WalkDirectoryTreeCold {
 #[async_trait]
 impl<T: CacheClearableFilesystem> Benchmark<T> for WalkDirectoryTreeCold {
     async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-        trace_duration!(
+        storage_trace::duration!(
             "benchmark",
             "WalkDirectoryTreeCold",
             "files_per_directory" => self.dts.files_per_directory,
@@ -117,7 +114,7 @@ impl<T: CacheClearableFilesystem> Benchmark<T> for WalkDirectoryTreeCold {
         let mut durations = Vec::new();
         for i in 0..self.iterations {
             fs.clear_cache().await;
-            trace_duration!("benchmark", "WalkDirectoryTree", "iteration" => i);
+            storage_trace::duration!("benchmark", "WalkDirectoryTree", "iteration" => i);
             let timer = OperationTimer::start();
             walk_directory_tree(root.clone(), max_pending);
             durations.push(timer.stop());
@@ -150,7 +147,7 @@ impl WalkDirectoryTreeWarm {
 #[async_trait]
 impl<T: Filesystem> Benchmark<T> for WalkDirectoryTreeWarm {
     async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-        trace_duration!(
+        storage_trace::duration!(
             "benchmark",
             "WalkDirectoryTreeWarm",
             "files_per_directory" => self.dts.files_per_directory,
@@ -163,7 +160,7 @@ impl<T: Filesystem> Benchmark<T> for WalkDirectoryTreeWarm {
         let max_pending = self.dts.max_pending() as usize;
         let mut durations = Vec::new();
         for i in 0..self.iterations {
-            trace_duration!("benchmark", "WalkDirectoryTree", "iteration" => i);
+            storage_trace::duration!("benchmark", "WalkDirectoryTree", "iteration" => i);
             let timer = OperationTimer::start();
             walk_directory_tree(root.clone(), max_pending);
             durations.push(timer.stop());
@@ -186,7 +183,7 @@ fn walk_directory_tree(root: PathBuf, max_pending: usize) {
     pending.reserve(max_pending);
     pending.push_back(root);
     while let Some(dir) = pending.pop_front() {
-        trace_duration!("benchmark", "read_dir");
+        storage_trace::duration!("benchmark", "read_dir");
         for entry in std::fs::read_dir(&dir).unwrap() {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_dir() {
@@ -212,7 +209,7 @@ impl StatPath {
 #[async_trait]
 impl<T: Filesystem> Benchmark<T> for StatPath {
     async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-        trace_duration!("benchmark", "StatPath");
+        storage_trace::duration!("benchmark", "StatPath");
 
         let root = fs.benchmark_dir().to_path_buf();
         for i in 0..self.file_count {
@@ -225,7 +222,7 @@ impl<T: Filesystem> Benchmark<T> for StatPath {
         let mut durations = Vec::with_capacity(self.file_count as usize);
         for i in 0..self.file_count {
             let path = path_buf_to_c_string(file_name(i));
-            trace_duration!("benchmark", "stat", "file" => i);
+            storage_trace::duration!("benchmark", "stat", "file" => i);
             let timer = OperationTimer::start();
             stat_path_at(&root_fd, &path).unwrap();
             durations.push(timer.stop());
@@ -254,7 +251,7 @@ impl OpenFile {
 #[async_trait]
 impl<T: Filesystem> Benchmark<T> for OpenFile {
     async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-        trace_duration!("benchmark", "OpenFile");
+        storage_trace::duration!("benchmark", "OpenFile");
 
         let root = fs.benchmark_dir().to_path_buf();
         for i in 0..self.file_count {
@@ -269,7 +266,7 @@ impl<T: Filesystem> Benchmark<T> for OpenFile {
             let path = path_buf_to_c_string(file_name(i));
             // Pull the file outside of the trace so it doesn't capture the close call.
             let _file = {
-                trace_duration!("benchmark", "open", "file" => i);
+                storage_trace::duration!("benchmark", "open", "file" => i);
                 let timer = OperationTimer::start();
                 let file = open_path_at(&root_fd, &path, libc::O_RDWR);
                 durations.push(timer.stop());
@@ -309,7 +306,7 @@ impl OpenDeeplyNestedFile {
 #[async_trait]
 impl<T: Filesystem> Benchmark<T> for OpenDeeplyNestedFile {
     async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-        trace_duration!("benchmark", "OpenDeeplyNestedFile");
+        storage_trace::duration!("benchmark", "OpenDeeplyNestedFile");
 
         let root = fs.benchmark_dir().to_path_buf();
         for i in 0..self.file_count {
@@ -326,7 +323,7 @@ impl<T: Filesystem> Benchmark<T> for OpenDeeplyNestedFile {
             let path = path_buf_to_c_string(self.dir_path(i).join(file_name(i)));
             // Pull the file outside of the trace so it doesn't capture the close call.
             let _file = {
-                trace_duration!("benchmark", "open", "file" => i);
+                storage_trace::duration!("benchmark", "open", "file" => i);
                 let timer = OperationTimer::start();
                 let file = open_path_at(&root_fd, &path, libc::O_RDWR);
                 durations.push(timer.stop());
@@ -369,13 +366,13 @@ impl GitStatus {
     /// Stat all of the paths in `paths`. This mimics git checking to see if any of the files in its
     /// index have been modified.
     fn stat_paths(&self, root: &OpenFd, paths: &Vec<CString>) {
-        trace_duration!("benchmark", "GitStatus::stat_paths");
+        storage_trace::duration!("benchmark", "GitStatus::stat_paths");
         std::thread::scope(|scope| {
             for thread in 0..self.stat_threads {
                 scope.spawn(move || {
                     let paths = &paths;
                     for path in batch_range(paths.len(), self.stat_threads, thread) {
-                        trace_duration!("benchmark", "stat");
+                        storage_trace::duration!("benchmark", "stat");
                         stat_path_at(root, &paths[path]).unwrap();
                     }
                 });
@@ -385,7 +382,7 @@ impl GitStatus {
 
     /// Performs a recursive depth first traversal of the directory tree.
     fn walk_repo(&self, dir: &Path) {
-        trace_duration!("benchmark", "GitStatus::walk_repo");
+        storage_trace::duration!("benchmark", "GitStatus::walk_repo");
         for entry in std::fs::read_dir(&dir).unwrap() {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_dir() {
@@ -409,7 +406,7 @@ impl<T: Filesystem> Benchmark<T> for GitStatus {
 
         let mut durations = Vec::new();
         for i in 0..self.iterations {
-            trace_duration!("benchmark", "GitStatus", "iteration" => i);
+            storage_trace::duration!("benchmark", "GitStatus", "iteration" => i);
             let timer = OperationTimer::start();
             self.stat_paths(&root_fd, &paths);
             self.walk_repo(&root);

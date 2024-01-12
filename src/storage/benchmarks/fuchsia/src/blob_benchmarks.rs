@@ -22,7 +22,7 @@ use {
         vec::Vec,
     },
     storage_benchmarks::{
-        trace_duration, Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
+        Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
     },
 };
 
@@ -44,7 +44,7 @@ macro_rules! open_and_get_vmo_benchmark {
             async fn run_test(&self, pkgdir: &fio::DirectoryProxy) -> OperationDuration {
                 let timer = OperationTimer::start();
                 let file = {
-                    trace_duration!("benchmark", "open-file");
+                    storage_trace::duration!("benchmark", "open-file");
                     fuchsia_fs::directory::open_file(
                         pkgdir,
                         &self.resource_path,
@@ -53,7 +53,7 @@ macro_rules! open_and_get_vmo_benchmark {
                     .await
                     .expect("failed to open blob")
                 };
-                trace_duration!("benchmark", "get-vmo");
+                storage_trace::duration!("benchmark", "get-vmo");
                 let _ = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
 
                 timer.stop()
@@ -63,7 +63,7 @@ macro_rules! open_and_get_vmo_benchmark {
         #[async_trait]
         impl Benchmark<PkgDirInstance> for $benchmark {
             async fn run(&self, fs: &mut PkgDirInstance) -> Vec<OperationDuration> {
-                trace_duration!("benchmark", stringify!($benchmark));
+                storage_trace::duration!("benchmark", stringify!($benchmark));
                 let package = PackageBuilder::new("pkg")
                     .add_resource_at(&self.resource_path, "data".as_bytes())
                     .build()
@@ -72,7 +72,7 @@ macro_rules! open_and_get_vmo_benchmark {
                 let (meta, map) = package.contents();
 
                 {
-                    trace_duration!("benchmark", "write-package");
+                    storage_trace::duration!("benchmark", "write-package");
                     fs.write_blob(&DeliveryBlob::new(meta.contents, CompressionMode::Always)).await;
                     for (_, content) in map.clone() {
                         fs.write_blob(&DeliveryBlob::new(content, CompressionMode::Always)).await;
@@ -130,7 +130,7 @@ macro_rules! page_in_benchmark {
         #[async_trait]
         impl<T:BlobFilesystem> Benchmark<T> for $benchmark {
             async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-                trace_duration!(
+                storage_trace::duration!(
                     "benchmark",
                     stringify!($benchmark),
                     "blob_size" => self.blob_size
@@ -170,7 +170,7 @@ impl WriteBlob {
 #[async_trait]
 impl<T: BlobFilesystem> Benchmark<T> for WriteBlob {
     async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-        trace_duration!(
+        storage_trace::duration!(
             "benchmark",
             "WriteBlob",
             "blob_size" => self.blob_size
@@ -204,7 +204,7 @@ impl WriteRealisticBlobs {
 #[async_trait]
 impl<T: BlobFilesystem> Benchmark<T> for WriteRealisticBlobs {
     async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
-        trace_duration!("benchmark", "WriteRealisticBlobs");
+        storage_trace::duration!("benchmark", "WriteRealisticBlobs");
         // Only write 2 blobs at once to match pkg-cache.
         const CONCURRENT_WRITE_COUNT: usize = 2;
 
@@ -347,7 +347,7 @@ async fn page_in_blob_benchmark(
     page_iter: impl Iterator<Item = usize>,
 ) -> Vec<OperationDuration> {
     {
-        trace_duration!("benchmark", "write-blob");
+        storage_trace::duration!("benchmark", "write-blob");
         fs.write_blob(&blob).await;
     };
 
@@ -358,7 +358,7 @@ async fn page_in_blob_benchmark(
     let data = mapped_blob.data();
     let mut durations = Vec::new();
     for i in page_iter {
-        trace_duration!("benchmark", "page_in", "offset" => i);
+        storage_trace::duration!("benchmark", "page_in", "offset" => i);
         let timer = OperationTimer::start();
         std::hint::black_box(data[i]);
         durations.push(timer.stop());

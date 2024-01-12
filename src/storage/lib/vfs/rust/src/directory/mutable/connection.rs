@@ -20,7 +20,7 @@ use crate::{
     node::OpenNode,
     path::Path,
     token_registry::{TokenInterface, TokenRegistry, Tokenizable},
-    trace, ObjectRequestRef, ProtocolsExt,
+    ObjectRequestRef, ProtocolsExt,
 };
 
 use {
@@ -31,6 +31,7 @@ use {
     futures::{pin_mut, TryStreamExt as _},
     pin_project::pin_project,
     std::{future::Future, pin::Pin, sync::Arc},
+    storage_trace as trace,
 };
 
 #[pin_project]

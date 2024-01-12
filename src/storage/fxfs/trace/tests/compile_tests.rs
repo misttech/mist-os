@@ -211,14 +211,6 @@ fn test_duration() {
 }
 
 #[fuchsia::test]
-fn test_instant() {
-    let tace_only_var = 6;
-    fxfs_trace::instant!("some-instant");
-    fxfs_trace::instant!("some-instant", "arg" => 5);
-    fxfs_trace::instant!("some-instant", "arg" => 5, "arg2" => tace_only_var);
-}
-
-#[fuchsia::test]
 fn test_flow_begin() {
     let tace_only_var = 6;
     let flow_id = 5u64;

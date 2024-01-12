@@ -117,18 +117,6 @@ pub use vfs_macros::mut_pseudo_directory;
 pub use object_request::{ObjectRequest, ObjectRequestRef, ToObjectRequest};
 pub use protocols::ProtocolsExt;
 
-pub(crate) mod trace {
-    #[cfg(target_os = "fuchsia")]
-    pub use fuchsia_trace::duration;
-    #[cfg(not(target_os = "fuchsia"))]
-    macro_rules! duration {
-        ($($discard:tt)*) => {};
-    }
-
-    #[cfg(not(target_os = "fuchsia"))]
-    pub(crate) use duration;
-}
-
 // This allows the pseudo_directory! macro to use absolute paths within this crate to refer to the
 // helper functions. External crates that use pseudo_directory! will rely on the pseudo_directory
 // export above.

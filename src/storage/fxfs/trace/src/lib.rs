@@ -2,14 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(feature = "tracing")]
-mod fuchsia;
-#[cfg(feature = "tracing")]
-pub use fuchsia::*;
-
-#[cfg(not(feature = "tracing"))]
-mod portable;
-#[cfg(not(feature = "tracing"))]
-pub use portable::*;
-
 pub use fxfs_trace_macros::*;
+pub use storage_trace::{self, TraceFutureExt};
+
+#[macro_export]
+macro_rules! duration {
+    ($name:expr $(, $key:expr => $val:expr)*) => {
+        $crate::storage_trace::duration!("fxfs", $name $(,$key => $val)*);
+    }
+}
+
+#[macro_export]
+macro_rules! flow_begin {
+    ($name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
+        $crate::storage_trace::flow_begin!("fxfs", $name, $flow_id $(,$key => $val)*);
+    }
+}
+
+#[macro_export]
+macro_rules! flow_step {
+    ($name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
+        $crate::storage_trace::flow_step!("fxfs", $name, $flow_id $(,$key => $val)*);
+    }
+}
+
+#[macro_export]
+macro_rules! flow_end {
+    ($name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
+        $crate::storage_trace::flow_end!("fxfs", $name, $flow_id $(,$key => $val)*);
+    }
+}
+
+#[macro_export]
+macro_rules! trace_future_args {
+    ($name:expr $(, $key:expr => $val:expr)*) => {
+        $crate::storage_trace::trace_future_args!("fxfs", $name $(,$key => $val)*);
+    };
+}

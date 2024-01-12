@@ -7,7 +7,6 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver,
     fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _},
-    fuchsia_trace as trace,
     fuchsia_zircon::sys::zx_handle_t,
     fuchsia_zircon::{self as zx, HandleBased as _},
     futures::{channel::oneshot, executor::block_on},
@@ -25,6 +24,7 @@ use {
         },
         task::{Context, Poll, Waker},
     },
+    storage_trace::{self as trace, TraceFutureExt},
 };
 
 pub use cache::Cache;
@@ -321,39 +321,42 @@ impl Common {
 
     // Sends the request and waits for the response.
     async fn send(&self, mut request: BlockFifoRequest) -> Result<(), Error> {
-        let _guard = trace::async_enter!(
-            trace::Id::new(),
+        let trace_args = storage_trace::trace_future_args!(
             "storage",
             "BlockOp",
             "op" => opcode_str(request.command.opcode)
         );
-        let (request_id, trace_flow_id) = {
-            let mut state = self.fifo_state.lock().unwrap();
-            if state.fifo.is_none() {
-                // Fifo has been closed.
-                return Err(zx::Status::CANCELED.into());
-            }
-            trace::duration!("storage", "BlockOp::start");
-            let request_id = state.next_request_id;
-            let trace_flow_id = generate_trace_flow_id(request_id);
-            state.next_request_id = state.next_request_id.overflowing_add(1).0;
-            assert!(
-                state.map.insert(request_id, RequestState::default()).is_none(),
-                "request id in use!"
-            );
-            request.reqid = request_id;
-            request.trace_flow_id = generate_trace_flow_id(request_id);
-            trace::flow_begin!("storage", "BlockOp", trace_flow_id.into());
-            state.queue.push_back(request);
-            if let Some(waker) = state.poller_waker.clone() {
-                state.poll_send_requests(&mut Context::from_waker(&waker));
-            }
-            (request_id, trace_flow_id)
-        };
-        ResponseFuture::new(self.fifo_state.clone(), request_id).await?;
-        trace::duration!("storage", "BlockOp::end");
-        trace::flow_end!("storage", "BlockOp", trace_flow_id.into());
-        Ok(())
+        async move {
+            let (request_id, trace_flow_id) = {
+                let mut state = self.fifo_state.lock().unwrap();
+                if state.fifo.is_none() {
+                    // Fifo has been closed.
+                    return Err(zx::Status::CANCELED.into());
+                }
+                trace::duration!("storage", "BlockOp::start");
+                let request_id = state.next_request_id;
+                let trace_flow_id = generate_trace_flow_id(request_id);
+                state.next_request_id = state.next_request_id.overflowing_add(1).0;
+                assert!(
+                    state.map.insert(request_id, RequestState::default()).is_none(),
+                    "request id in use!"
+                );
+                request.reqid = request_id;
+                request.trace_flow_id = generate_trace_flow_id(request_id);
+                trace::flow_begin!("storage", "BlockOp", trace_flow_id);
+                state.queue.push_back(request);
+                if let Some(waker) = state.poller_waker.clone() {
+                    state.poll_send_requests(&mut Context::from_waker(&waker));
+                }
+                (request_id, trace_flow_id)
+            };
+            ResponseFuture::new(self.fifo_state.clone(), request_id).await?;
+            trace::duration!("storage", "BlockOp::end");
+            trace::flow_end!("storage", "BlockOp", trace_flow_id);
+            Ok(())
+        }
+        .trace(trace_args)
+        .await
     }
 }
 

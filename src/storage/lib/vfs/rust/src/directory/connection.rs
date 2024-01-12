@@ -17,7 +17,7 @@ use crate::{
     node::{Node as _, OpenNode},
     object_request::Representation,
     path::Path,
-    trace, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
+    ObjectRequestRef, ProtocolsExt, ToObjectRequest,
 };
 
 use {
@@ -28,6 +28,7 @@ use {
     fuchsia_zircon_status::Status,
     futures::future::poll_fn,
     std::{convert::TryInto as _, default::Default, sync::Arc, task::Poll},
+    storage_trace as trace,
 };
 
 /// Return type for `BaseConnection::handle_request` and [`DerivedConnection::handle_request`].

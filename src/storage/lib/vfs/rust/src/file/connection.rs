@@ -18,7 +18,7 @@ use {
         node::OpenNode,
         object_request::Representation,
         path::Path,
-        trace, ObjectRequestRef, ProtocolsExt,
+        ObjectRequestRef, ProtocolsExt,
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -34,6 +34,7 @@ use {
         ops::{Deref, DerefMut},
         sync::Arc,
     },
+    storage_trace as trace,
 };
 
 #[cfg(target_os = "fuchsia")]
