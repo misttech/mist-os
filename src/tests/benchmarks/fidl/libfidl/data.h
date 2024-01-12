@@ -7,8 +7,8 @@
 // go run src/tests/benchmarks/fidl/lib-fidl/gen.go > src/tests/benchmarks/fidl/lib-fidl/data.h
 // fx format-code --files=src/tests/benchmarks/fidl/lib-fidl/data.h
 
-#ifndef SRC_TESTS_BENCHMARKS_FIDL_LIB_FIDL_DATA_H_
-#define SRC_TESTS_BENCHMARKS_FIDL_LIB_FIDL_DATA_H_
+#ifndef SRC_TESTS_BENCHMARKS_FIDL_LIBFIDL_DATA_H_
+#define SRC_TESTS_BENCHMARKS_FIDL_LIBFIDL_DATA_H_
 
 namespace lib_fidl_microbenchmarks {
 
@@ -10945,4 +10945,4 @@ const char Ascii_S_65536[] =
 
 }  // namespace lib_fidl_microbenchmarks
 
-#endif  // SRC_TESTS_BENCHMARKS_FIDL_LIB_FIDL_DATA_H_
+#endif  // SRC_TESTS_BENCHMARKS_FIDL_LIBFIDL_DATA_H_

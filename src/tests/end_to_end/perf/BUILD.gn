@@ -100,10 +100,7 @@ shards = [
   "10",
 ]
 total_shards = "11"
-shard_test_list = [
-  "fidl_microbenchmarks_test",
-  "netstack_iperf_test",
-]
+shard_test_list = [ "netstack_iperf_test" ]
 
 foreach(test, shard_test_list) {
   foreach(shard, shards) {
@@ -188,7 +185,6 @@ foreach(test, _tests) {
 if (is_host) {
   metric_files = [
     # keep-sorted start
-    "fuchsia.fidl_microbenchmarks.libfidl.txt",
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
     "fuchsia.microbenchmarks.tracing.txt",
@@ -253,9 +249,6 @@ group("test") {
 
   deps += [
     "//third_party/sbase:sbase-pkgs",
-
-    # Used by the FIDL benchmarks.
-    "//src/tests/benchmarks/fidl:benchmarks-under-migration",
 
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",

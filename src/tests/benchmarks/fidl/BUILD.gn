@@ -4,20 +4,13 @@
 
 import("//build/testing/perf/test.gni")
 
-group("benchmarks-under-migration") {
-  testonly = true
-  deps = [
-    "fidlc:fidlc_microbenchmarks",
-    "lib-fidl",
-  ]
-}
-
 _tests = [
   "cpp",
   "driver_cpp",
   "driver_llcpp",
   "hlcpp",
   "go",
+  "libfidl",
   "llcpp",
   "reference",
   "rust",
