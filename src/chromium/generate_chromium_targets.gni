@@ -5,7 +5,6 @@
 import("//build/packages/prebuilt_test_manifest.gni")
 import("//src/chromium/build_args.gni")
 import("//src/chromium/generate_pkg.gni")
-import("//src/lib/icu/tzdata/icu_tzdata_config_data.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 prebuilt_archive_root_path = "//prebuilt/third_party"
