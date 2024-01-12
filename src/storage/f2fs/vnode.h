@@ -50,6 +50,8 @@ enum class InodeInfoFlag {
   kFlagSize,
 };
 
+inline bool IsValidNameLength(std::string_view name) { return name.length() <= kMaxNameLen; }
+
 class VnodeF2fs : public fs::PagedVnode,
                   public fbl::Recyclable<VnodeF2fs>,
                   public fbl::WAVLTreeContainable<VnodeF2fs *>,
@@ -60,7 +62,7 @@ class VnodeF2fs : public fs::PagedVnode,
 
   uint32_t InlineDataOffset() const {
     return kPageSize - sizeof(NodeFooter) -
-           sizeof(uint32_t) * (kAddrsPerInode + kNidsPerInode - 1) + GetExtraISize();
+           sizeof(uint32_t) * (kAddrsPerInode + kNidsPerInode - 1) + extra_isize_;
   }
   size_t MaxInlineData() const { return sizeof(uint32_t) * (GetAddrsPerInode() - 1); }
   size_t MaxInlineDentry() const {
@@ -68,8 +70,8 @@ class VnodeF2fs : public fs::PagedVnode,
   }
   size_t GetAddrsPerInode() const {
     return safemath::checked_cast<size_t>(
-        (safemath::CheckSub(kAddrsPerInode, safemath::CheckDiv(GetExtraISize(), sizeof(uint32_t))) -
-         GetInlineXattrAddrs())
+        (safemath::CheckSub(kAddrsPerInode, safemath::CheckDiv(extra_isize_, sizeof(uint32_t))) -
+         inline_xattr_size_)
             .ValueOrDie());
   }
 
@@ -77,13 +79,14 @@ class VnodeF2fs : public fs::PagedVnode,
   static zx_status_t Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out);
   static zx_status_t Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out);
 
-  void Init();
+  void Init(LockedPage &node_page) __TA_EXCLUDES(mutex_);
   void InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
 
   ino_t GetKey() const { return ino_; }
 
   void Sync(SyncCallback closure) override;
-  zx_status_t SyncFile(loff_t start, loff_t end, int datasync) __TA_EXCLUDES(f2fs::GetGlobalLock());
+  zx_status_t SyncFile(loff_t start, loff_t end, int datasync)
+      __TA_EXCLUDES(f2fs::GetGlobalLock(), mutex_);
 
   void fbl_recycle() { RecycleNode(); }
 
@@ -91,8 +94,8 @@ class VnodeF2fs : public fs::PagedVnode,
 
   ino_t Ino() const { return ino_; }
 
-  zx_status_t GetAttributes(fs::VnodeAttributes *a) final __TA_EXCLUDES(info_mutex_);
-  zx_status_t SetAttributes(fs::VnodeAttributesUpdate attr) final __TA_EXCLUDES(info_mutex_);
+  zx_status_t GetAttributes(fs::VnodeAttributes *a) final __TA_EXCLUDES(mutex_);
+  zx_status_t SetAttributes(fs::VnodeAttributesUpdate attr) final __TA_EXCLUDES(mutex_);
 
   fs::VnodeProtocolSet GetProtocols() const override;
 
@@ -113,16 +116,9 @@ class VnodeF2fs : public fs::PagedVnode,
   void ReleasePagedVmoUnsafe() __TA_REQUIRES(mutex_);
   void ReleasePagedVmo() __TA_EXCLUDES(mutex_);
 
-#if 0  // porting needed
-  // void F2fsSetInodeFlags();
-  // int F2fsIgetTest(void *data);
-  // static int GetDataBlockRo(inode *inode, sector_t iblock,
-  //      buffer_head *bh_result, int create);
-#endif
-
-  zx::result<LockedPage> NewInodePage();
+  zx::result<LockedPage> NewInodePage() __TA_EXCLUDES(mutex_);
   zx_status_t RemoveInodePage();
-  void UpdateInodePage(LockedPage &inode_page);
+  void UpdateInodePage(LockedPage &inode_page) __TA_EXCLUDES(mutex_);
 
   void TruncateNode(LockedPage &page);
 
@@ -173,7 +169,6 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t WatchDir(fs::FuchsiaVfs *vfs, fuchsia_io::wire::WatchMask mask, uint32_t options,
                        fidl::ServerEnd<fuchsia_io::DirectoryWatcher> watcher) final;
 
-  ExtentTree &GetExtentTree() { return *extent_tree_; }
   bool ExtentCacheAvailable();
   void InitExtentTree();
   void UpdateExtentCache(pgoff_t file_offset, block_t blk_addr, uint32_t len = 1);
@@ -200,23 +195,17 @@ class VnodeF2fs : public fs::PagedVnode,
   bool IsMeta() const;
   bool IsNode() const;
 
-  // Coldness identification:
-  //  - Mark cold files in InodeInfo
-  //  - Mark cold node blocks in their node footer
-  //  - Mark cold data pages in page cache
-  bool IsColdFile() { return IsAdviseSet(FAdvise::kCold); }
-
-  void SetName(std::string_view name) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  void SetName(std::string_view name) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
     name_ = name;
   }
-  bool IsSameName(std::string_view name) __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return (name_.GetStringView().compare(name) == 0);
+  bool IsSameName(std::string_view name) __TA_EXCLUDES(mutex_) {
+    fs::SharedLock rlock(mutex_);
+    return std::string_view(name_).compare(name) == 0;
   }
-  std::string_view GetNameView() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return name_.GetStringView();
+  std::string_view GetNameView() __TA_EXCLUDES(mutex_) {
+    fs::SharedLock rlock(mutex_);
+    return std::string_view(name_);
   }
 
   // stat_lock
@@ -235,7 +224,7 @@ class VnodeF2fs : public fs::PagedVnode,
     num_blocks_.store(safemath::checked_cast<block_t>(blocks), std::memory_order_release);
   }
   bool HasBlocks() const {
-    block_t xattr_block = GetXattrNid() ? 1 : 0;
+    block_t xattr_block = xattr_nid_ ? 1 : 0;
     return (GetBlocks() > xattr_block);
   }
 
@@ -250,131 +239,61 @@ class VnodeF2fs : public fs::PagedVnode,
   block_t GetDirtyPageCount() const { return dirty_pages_.load(std::memory_order_acquire); }
 
   void SetGeneration(const uint32_t &gen) { generation_ = gen; }
-  uint32_t GetGeneration() const { return generation_; }
-
   void SetUid(const uid_t &uid) { uid_ = uid; }
-  uid_t GetUid() const { return uid_; }
-
   void SetGid(const gid_t &gid) { gid_ = gid; }
-  gid_t GetGid() const { return gid_; }
 
-  timespec GetATime() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return atime_;
-  }
-  void SetATime(const timespec &time) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  void SetATime(const timespec &time) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
     atime_ = time;
   }
-  void SetATime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  void SetATime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
     atime_.tv_sec = sec;
     atime_.tv_nsec = nsec;
   }
-  timespec GetMTime() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return mtime_;
-  }
-  void SetMTime(const timespec &time) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  void SetMTime(const timespec &time) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
     mtime_ = time;
   }
-  void SetMTime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  void SetMTime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
     mtime_.tv_sec = sec;
     mtime_.tv_nsec = nsec;
   }
-  timespec GetCTime() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return ctime_;
-  }
-  void SetCTime(const timespec &time) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  void SetCTime(const timespec &time) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
     ctime_ = time;
   }
-  void SetCTime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  void SetCTime(const uint64_t &sec, const uint32_t &nsec) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
     ctime_.tv_sec = sec;
     ctime_.tv_nsec = nsec;
   }
 
-  void SetInodeFlags(const uint32_t flags) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
-    inode_flags_ = flags;
-  }
-  uint32_t GetInodeFlags() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return inode_flags_;
-  }
+  // Coldness identification:
+  //  - Mark cold files in InodeInfo
+  //  - Mark cold node blocks in their node footer
+  //  - Mark cold data pages in page cache
+  bool IsColdFile() __TA_EXCLUDES(mutex_);
+  void SetColdFile() __TA_EXCLUDES(mutex_);
 
-  void ClearAdvise(const FAdvise bit) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
-    advise_ &= ~GetMask(1, static_cast<size_t>(bit));
-  }
-  void SetAdvise(const FAdvise bit) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  void SetAdvise(const FAdvise bit) __TA_REQUIRES(mutex_) {
     advise_ |= GetMask(1, static_cast<size_t>(bit));
   }
-  uint8_t GetAdvise() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return advise_;
-  }
-  void SetAdvise(const uint8_t bits) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
-    advise_ = bits;
-  }
-  bool IsAdviseSet(const FAdvise bit) __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
+  bool IsAdviseSet(const FAdvise bit) __TA_REQUIRES_SHARED(mutex_) {
     return (GetMask(1, static_cast<size_t>(bit)) & advise_) != 0;
   }
 
-  uint64_t GetDirHashLevel() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return clevel_;
-  }
-  bool IsSameDirHash(const f2fs_hash_t hash) __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return (chash_ == hash);
-  }
-  void ClearDirHash() __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
-    chash_ = 0;
-  }
-  void SetDirHash(const f2fs_hash_t hash, const uint64_t &level) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
-    chash_ = hash;
-    clevel_ = level;
-  }
-  uint64_t GetCurDirDepth() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return current_depth_;
-  }
-  void SetCurDirDepth(const uint64_t depth) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
-    current_depth_ = depth;
-  }
-
-  uint8_t GetDirLevel() __TA_EXCLUDES(info_mutex_) {
-    fs::SharedLock lock(info_mutex_);
-    return dir_level_;
-  }
-  void SetDirLevel(const uint8_t level) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
-    dir_level_ = level;
-  }
-  void UpdateVersion(const uint64_t version) __TA_EXCLUDES(info_mutex_) {
-    std::lock_guard lock(info_mutex_);
+  // Set dirty flag and insert |this| to VnodeCache::dirty_list_.
+  bool SetDirty();
+  bool ClearDirty();
+  bool IsDirty();
+  void UpdateVersion(const uint64_t version) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
     data_version_ = version;
   }
 
-  nid_t GetXattrNid() const { return xattr_nid_; }
-  void SetXattrNid(const nid_t nid) { xattr_nid_ = nid; }
-  void ClearXattrNid() { xattr_nid_ = 0; }
-  uint16_t GetInlineXattrAddrs() const { return inline_xattr_size_; }
   void SetInlineXattrAddrs(const uint16_t addrs) { inline_xattr_size_ = addrs; }
-
-  uint16_t GetExtraISize() const { return extra_isize_; }
-  void SetExtraISize(const uint16_t size) { extra_isize_ = size; }
 
   // Release-acquire ordering for Set/ClearFlag and TestFlag
   bool SetFlag(const InodeInfoFlag &flag) {
@@ -396,11 +315,6 @@ class VnodeF2fs : public fs::PagedVnode,
   void Deactivate();
   bool IsActive() const;
   void WaitForDeactive(std::mutex &mutex);
-
-  // Set dirty flag and insert |this| to VnodeCache::dirty_list_.
-  bool SetDirty() __TA_EXCLUDES(info_mutex_);
-  bool ClearDirty() __TA_EXCLUDES(info_mutex_);
-  bool IsDirty() __TA_EXCLUDES(info_mutex_);
 
   bool IsBad() const { return TestFlag(InodeInfoFlag::kBad); }
 
@@ -439,17 +353,24 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->InvalidatePages(start, end, zero);
   }
   void ResetFileCache(pgoff_t start = 0, pgoff_t end = kPgOffMax) { file_cache_->Reset(); }
-  void SetOrphan();
+  void SetOrphan() __TA_EXCLUDES(mutex_);
 
-  // For testing
-  bool HasPagedVmo() __TA_EXCLUDES(mutex_) {
-    fs::SharedLock rlock(mutex_);
-    return paged_vmo().is_valid();
-  }
-
-  VmoManager &GetVmoManager() const { return vmo_manager(); }
-
+  VmoManager &GetVmoManager() { return vmo_manager(); }
+  const VmoManager &GetVmoManager() const { return vmo_manager(); }
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
+  void InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
+
+  // for testing
+  ExtentTree &GetExtentTree() { return *extent_tree_; }
+  uint8_t GetDirLevel() TA_NO_THREAD_SAFETY_ANALYSIS { return dir_level_; }
+  timespec GetMTime() TA_NO_THREAD_SAFETY_ANALYSIS { return mtime_; }
+  bool HasPagedVmo() TA_NO_THREAD_SAFETY_ANALYSIS { return paged_vmo().is_valid(); }
+  void ClearAdvise(const FAdvise bit) TA_NO_THREAD_SAFETY_ANALYSIS {
+    advise_ &= ~GetMask(1, static_cast<size_t>(bit));
+  }
+  void SetDirLevel(const uint8_t level) TA_NO_THREAD_SAFETY_ANALYSIS { dir_level_ = level; }
+  timespec GetATime() TA_NO_THREAD_SAFETY_ANALYSIS { return atime_; }
+  timespec GetCTime() TA_NO_THREAD_SAFETY_ANALYSIS { return ctime_; }
 
  protected:
   block_t GetBlockAddrOnDataSegment(LockedPage &page);
@@ -461,8 +382,8 @@ class VnodeF2fs : public fs::PagedVnode,
   void ReportPagerErrorUnsafe(const uint32_t op, const uint64_t offset, const uint64_t length,
                               const zx_status_t err) __TA_REQUIRES_SHARED(mutex_);
   SuperblockInfo &superblock_info_;
+  std::string name_ __TA_GUARDED(mutex_);
 
- private:
   zx_status_t OpenNode(ValidatedOptions options, fbl::RefPtr<Vnode> *out_redirect) final
       __TA_EXCLUDES(mutex_);
   zx_status_t CloseNode() final;
@@ -489,25 +410,21 @@ class VnodeF2fs : public fs::PagedVnode,
       ATOMIC_FLAG_INIT};
   std::condition_variable_any flag_cvar_;
 
-  fs::SharedMutex info_mutex_;
-  uint64_t current_depth_ __TA_GUARDED(info_mutex_) = 0;  // use only in directory structure
-  uint64_t data_version_ __TA_GUARDED(info_mutex_) = 0;   // lastest version of data for fsync
-  uint64_t clevel_ __TA_GUARDED(info_mutex_) = 0;         // maximum level of given file name
-  uint32_t inode_flags_ __TA_GUARDED(info_mutex_) = 0;    // keep an inode flags for ioctl
-  uint16_t extra_isize_ = 0;                              // extra inode attribute size in bytes
-  uint16_t inline_xattr_size_ = 0;                        // inline xattr size
-  [[maybe_unused]] umode_t acl_mode_ = 0;                 // keep file acl mode temporarily
-  uint8_t advise_ __TA_GUARDED(info_mutex_) = 0;          // use to give file attribute hints
-  uint8_t dir_level_ __TA_GUARDED(info_mutex_) = 0;       // use for dentry level for large dir
-  f2fs_hash_t chash_ __TA_GUARDED(info_mutex_);           // hash value of given file name
+  uint64_t current_depth_ __TA_GUARDED(mutex_) = 1;  // use only in directory structure
+  uint64_t data_version_ __TA_GUARDED(mutex_) = 0;   // lastest version of data for fsync
+  uint32_t inode_flags_ __TA_GUARDED(mutex_) = 0;    // keep an inode flags for ioctl
+  uint16_t extra_isize_ = 0;                         // extra inode attribute size in bytes
+  uint16_t inline_xattr_size_ = 0;                   // inline xattr size
+  [[maybe_unused]] umode_t acl_mode_ = 0;            // keep file acl mode temporarily
+  uint8_t advise_ __TA_GUARDED(mutex_) = 0;          // use to give file attribute hints
+  uint8_t dir_level_ __TA_GUARDED(mutex_) = 0;       // use for dentry level for large dir
   // TODO: revisit thread annotation when xattr is available.
   nid_t xattr_nid_ = 0;  // node id that contains xattrs
-  NameString name_ __TA_GUARDED(info_mutex_);
-  timespec atime_ __TA_GUARDED(info_mutex_) = {0, 0};
-  timespec mtime_ __TA_GUARDED(info_mutex_) = {0, 0};
-  timespec ctime_ __TA_GUARDED(info_mutex_) = {0, 0};
+  timespec atime_ __TA_GUARDED(mutex_) = {0, 0};
+  timespec mtime_ __TA_GUARDED(mutex_) = {0, 0};
+  timespec ctime_ __TA_GUARDED(mutex_) = {0, 0};
 
-  std::unique_ptr<ExtentTree> extent_tree_ = nullptr;
+  std::unique_ptr<ExtentTree> extent_tree_;
 
   const ino_t ino_ = 0;
   F2fs *const fs_ = nullptr;

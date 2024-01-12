@@ -7,19 +7,19 @@
 namespace f2fs {
 
 namespace {
-bool IsOverlap(const ExtentInfo &x, const ExtentInfo &y) {
+static bool IsOverlap(const ExtentInfo &x, const ExtentInfo &y) {
   return (x.fofs < y.fofs + y.len && y.fofs < x.fofs + x.len);
 }
 
-bool IsMergeable(const ExtentInfo &front, const ExtentInfo &back) {
+static bool IsMergeable(const ExtentInfo &front, const ExtentInfo &back) {
   return (front.fofs + front.len == back.fofs && front.blk_addr + front.len == back.blk_addr);
 }
 
-bool IsFrontSplitable(const ExtentInfo &front, const ExtentInfo &back) {
+static bool IsFrontSplitable(const ExtentInfo &front, const ExtentInfo &back) {
   return (front.fofs < back.fofs && front.fofs + front.len > back.fofs);
 }
 
-bool IsBackSplitable(const ExtentInfo &front, const ExtentInfo &back) {
+static bool IsBackSplitable(const ExtentInfo &front, const ExtentInfo &back) {
   return (back.fofs < front.fofs + front.len && back.fofs + back.len > front.fofs + front.len);
 }
 }  // namespace
@@ -111,7 +111,7 @@ zx::result<> ExtentTree::InsertExtent(ExtentInfo target_extent_info) {
       largest_extent_info_ = extent_info;
     }
 
-    extent_node_tree_.insert(std::make_unique<ExtentNode>(*this, extent_info));
+    extent_node_tree_.insert(std::make_unique<ExtentNode>(extent_info));
   }
 
   return zx::ok();

@@ -69,7 +69,7 @@ TEST_F(VnodeTest, Time) {
   test_vnode = nullptr;
 }
 
-TEST_F(VnodeTest, Advise) {
+TEST_F(VnodeTest, Advise) TA_NO_THREAD_SAFETY_ANALYSIS {
   fbl::RefPtr<fs::Vnode> test_fs_vnode;
   std::string dir_name("test");
   ASSERT_EQ(root_dir_->Create(dir_name, S_IFDIR, &test_fs_vnode), ZX_OK);
@@ -92,7 +92,7 @@ TEST_F(VnodeTest, Advise) {
 
   ASSERT_FALSE(file_vnode->IsAdviseSet(FAdvise::kCold));
 
-  test_dir_ptr->SetColdFile(*file_vnode);
+  file_vnode->SetColdFile();
   ASSERT_TRUE(file_vnode->IsAdviseSet(FAdvise::kCold));
 
   file_vnode->ClearAdvise(FAdvise::kCold);

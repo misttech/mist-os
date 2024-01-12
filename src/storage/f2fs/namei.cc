@@ -21,7 +21,7 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   }
   vnode->SetUid(getuid());
   if (HasGid()) {
-    vnode->SetGid(GetGid());
+    vnode->SetGid(gid_);
     if (S_ISDIR(mode))
       mode |= S_ISGID;
   } else {
@@ -57,31 +57,6 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   return ZX_OK;
 }
 
-bool Dir::IsMultimediaFile(VnodeF2fs &vnode, std::string_view sub) {
-  // compare lower case
-  if (cpp20::ends_with(vnode.GetNameView(), sub))
-    return true;
-
-  // compare upper case
-  std::string upper_sub(sub);
-  std::transform(upper_sub.cbegin(), upper_sub.cend(), upper_sub.begin(), ::toupper);
-  return cpp20::ends_with(vnode.GetNameView(), upper_sub.c_str());
-}
-
-/**
- * Set multimedia files as cold files for hot/cold data separation
- */
-void Dir::SetColdFile(VnodeF2fs &vnode) {
-  const std::vector<std::string> &extension_list = superblock_info_.GetExtensionList();
-
-  for (const auto &extension : extension_list) {
-    if (IsMultimediaFile(vnode, extension)) {
-      vnode.SetAdvise(FAdvise::kCold);
-      break;
-    }
-  }
-}
-
 zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out) {
   fbl::RefPtr<VnodeF2fs> vnode_refptr;
   VnodeF2fs *vnode = nullptr;
@@ -96,7 +71,7 @@ zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::V
   vnode->SetName(name);
 
   if (!superblock_info_.TestOpt(MountOption::kDisableExtIdentify))
-    SetColdFile(*vnode);
+    vnode->SetColdFile();
 
   if (zx_status_t err = AddLink(name, vnode); err != ZX_OK) {
     vnode->ClearNlink();
@@ -113,7 +88,7 @@ zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::V
 
 zx::result<> Dir::RecoverLink(VnodeF2fs &vnode) {
   fs::SharedLock lock(f2fs::GetGlobalLock());
-  std::lock_guard dir_lock(dir_mutex_);
+  std::lock_guard dir_lock(mutex_);
   fbl::RefPtr<Page> page;
   auto dir_entry = FindEntry(vnode.GetNameView(), &page);
   if (dir_entry == nullptr) {
@@ -125,8 +100,7 @@ zx::result<> Dir::RecoverLink(VnodeF2fs &vnode) {
       return zx::error(err);
     }
     DeleteEntry(dir_entry, page, old_vnode_refptr.get());
-    ZX_ASSERT(FindEntry(vnode.GetNameView()).status_value() == ZX_ERR_NOT_FOUND);
-    AddLink(vnode.GetNameView(), &vnode);
+    ZX_ASSERT(AddLink(vnode.GetNameView(), &vnode) == ZX_OK);
   }
   return zx::ok();
 }
@@ -147,8 +121,8 @@ zx_status_t Dir::Link(std::string_view name, fbl::RefPtr<fs::Vnode> new_child) {
       return ZX_ERR_NOT_FILE;
     }
 
-    std::lock_guard dir_lock(dir_mutex_);
-    if (auto old_entry = FindEntry(name); !old_entry.is_error()) {
+    std::lock_guard dir_lock(mutex_);
+    if (auto old_entry = FindEntry(name); old_entry.is_ok()) {
       return ZX_ERR_ALREADY_EXISTS;
     }
 
@@ -175,7 +149,7 @@ zx_status_t Dir::DoLookup(std::string_view name, fbl::RefPtr<fs::Vnode> *out) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (auto dir_entry = FindEntry(name); !dir_entry.is_error()) {
+  if (auto dir_entry = LookUpEntries(name); !dir_entry.is_error()) {
     nid_t ino = LeToCpu((*dir_entry).ino);
     if (zx_status_t ret = VnodeF2fs::Vget(fs(), ino, &vn); ret != ZX_OK)
       return ret;
@@ -189,7 +163,7 @@ zx_status_t Dir::DoLookup(std::string_view name, fbl::RefPtr<fs::Vnode> *out) {
 }
 
 zx_status_t Dir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode> *out) {
-  fs::SharedLock dir_read_lock(dir_mutex_);
+  fs::SharedLock dir_read_lock(mutex_);
   return DoLookup(name, out);
 }
 
@@ -343,7 +317,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
       return ZX_ERR_INVALID_ARGS;
     }
 
-    std::lock_guard dir_lock(dir_mutex_);
+    std::lock_guard dir_lock(mutex_);
 
     timespec cur_time;
     clock_gettime(CLOCK_REALTIME, &cur_time);
@@ -404,8 +378,6 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
         return err;
       }
 
-      ZX_DEBUG_ASSERT(new_vnode->IsSameName(newname));
-
       if (!new_vnode->IsDir() && (src_must_be_dir || dst_must_be_dir)) {
         return ZX_ERR_NOT_DIR;
       }
@@ -427,6 +399,8 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
         return ZX_ERR_NOT_EMPTY;
       }
 
+      ZX_DEBUG_ASSERT(this != new_vnode.get());
+      ZX_DEBUG_ASSERT(new_vnode->IsSameName(newname));
       old_vnode->SetName(newname);
       if (is_same_dir) {
         SetLink(new_entry, new_page, old_vnode.get());
@@ -506,7 +480,7 @@ zx_status_t Dir::Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vn
   }
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
-    std::lock_guard dir_lock(dir_mutex_);
+    std::lock_guard dir_lock(mutex_);
     if (GetNlink() == 0)
       return ZX_ERR_NOT_FOUND;
 
@@ -539,7 +513,7 @@ zx_status_t Dir::Unlink(std::string_view name, bool must_be_dir) {
   }
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
-    std::lock_guard dir_lock(dir_mutex_);
+    std::lock_guard dir_lock(mutex_);
     fbl::RefPtr<VnodeF2fs> removed = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(vnode));
     zx_status_t ret;
     if (removed->IsDir()) {

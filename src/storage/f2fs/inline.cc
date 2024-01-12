@@ -11,7 +11,7 @@ namespace f2fs {
 uint8_t *Dir::InlineDentryBitmap(Page *page) {
   Inode &inode = page->GetAddress<Node>()->i;
   return reinterpret_cast<uint8_t *>(
-      &inode.i_addr[GetExtraISize() / sizeof(uint32_t) + kInlineStartOffset]);
+      &inode.i_addr[extra_isize_ / sizeof(uint32_t) + kInlineStartOffset]);
 }
 
 uint64_t Dir::InlineDentryBitmapSize() const {
@@ -172,7 +172,7 @@ zx_status_t Dir::ConvertInlineDir() {
   ClearFlag(InodeInfoFlag::kInlineDentry);
 
   if (!TestFlag(InodeInfoFlag::kInlineXattr)) {
-    SetInlineXattrAddrs(0);
+    inline_xattr_size_ = 0;
   }
 
   if (GetSize() < kPageSize) {
@@ -263,8 +263,7 @@ void Dir::DeleteInlineEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs
 
   timespec cur_time;
   clock_gettime(CLOCK_REALTIME, &cur_time);
-  SetCTime(cur_time);
-  SetMTime(cur_time);
+  ctime_ = mtime_ = cur_time;
 
   if (vnode && vnode->IsDir()) {
     DropNlink();

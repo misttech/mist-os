@@ -18,6 +18,8 @@ VnodeF2fs::VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode)
   if (IsMeta() || IsNode()) {
     InitFileCache();
   }
+  SetFlag(InodeInfoFlag::kInit);
+  Activate();
 }
 
 fs::VnodeProtocolSet VnodeF2fs::GetProtocols() const { return fs::VnodeProtocol::kFile; }
@@ -76,7 +78,7 @@ zx::result<size_t> VnodeF2fs::CreatePagedVmo(size_t size) {
 void VnodeF2fs::SetPagedVmoName() {
   fbl::StringBuffer<ZX_MAX_NAME_LEN> name;
   name.Clear();
-  name.AppendPrintf("%s-%.8s-%u", "f2fs", GetNameView().data(), GetKey());
+  name.AppendPrintf("%s-%.8s-%u", "f2fs", name_.data(), GetKey());
   paged_vmo().set_property(ZX_PROP_NAME, name.data(), name.size());
 }
 
@@ -264,7 +266,6 @@ zx_status_t VnodeF2fs::Allocate(F2fs *fs, ino_t ino, umode_t mode, fbl::RefPtr<V
     } else {
       *out = fbl::MakeRefCounted<File>(fs, ino, mode);
     }
-    (*out)->Init();
     return ZX_OK;
   }
   return ZX_ERR_NOT_FOUND;
@@ -292,64 +293,7 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
     return status;
   }
 
-  vnode->SetName(name);
-  vnode->SetUid(LeToCpu(inode.i_uid));
-  vnode->SetGid(LeToCpu(inode.i_gid));
-  vnode->SetNlink(LeToCpu(inode.i_links));
-  // Don't count the in-memory inode.i_blocks for compatibility with the generic
-  // filesystem including linux f2fs.
-  vnode->SetBlocks(safemath::CheckSub<uint64_t>(LeToCpu(inode.i_blocks), 1).ValueOrDie());
-  vnode->SetATime(LeToCpu(inode.i_atime), LeToCpu(inode.i_atime_nsec));
-  vnode->SetCTime(LeToCpu(inode.i_ctime), LeToCpu(inode.i_ctime_nsec));
-  vnode->SetMTime(LeToCpu(inode.i_mtime), LeToCpu(inode.i_mtime_nsec));
-  vnode->SetGeneration(LeToCpu(inode.i_generation));
-  vnode->SetParentNid(LeToCpu(inode.i_pino));
-  vnode->SetCurDirDepth(LeToCpu(inode.i_current_depth));
-  vnode->SetXattrNid(LeToCpu(inode.i_xattr_nid));
-  vnode->SetInodeFlags(LeToCpu(inode.i_flags));
-  vnode->SetDirLevel(inode.i_dir_level);
-  vnode->UpdateVersion(superblock_info.GetCheckpointVer() - 1);
-  vnode->SetAdvise(inode.i_advise);
-
-  if (inode.i_inline & kInlineDentry) {
-    vnode->SetFlag(InodeInfoFlag::kInlineDentry);
-    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
-  }
-  if (inode.i_inline & kInlineData) {
-    vnode->SetFlag(InodeInfoFlag::kInlineData);
-  }
-  if (inode.i_inline & kInlineXattr) {
-    vnode->SetFlag(InodeInfoFlag::kInlineXattr);
-    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
-  }
-  if (inode.i_inline & kExtraAttr) {
-    vnode->SetExtraISize(LeToCpu(inode.i_extra_isize));
-    if (inode.i_inline & kInlineXattr) {
-      vnode->SetInlineXattrAddrs(LeToCpu(inode.i_inline_xattr_size));
-    }
-  }
-  if (inode.i_inline & kDataExist) {
-    vnode->SetFlag(InodeInfoFlag::kDataExist);
-  }
-
-  if (vnode->IsReg()) {
-    vnode->InitExtentTree();
-    if (inode.i_ext.blk_addr) {
-      auto extent_info = ExtentInfo{.fofs = LeToCpu(inode.i_ext.fofs),
-                                    .blk_addr = LeToCpu(inode.i_ext.blk_addr),
-                                    .len = LeToCpu(inode.i_ext.len)};
-      if (auto result = vnode->GetExtentTree().InsertExtent(extent_info); result.is_error()) {
-        vnode->SetFlag(InodeInfoFlag::kNoExtent);
-      }
-    }
-  }
-
-  // If the roll-forward recovery creates it, it will initialize its cache from the latest inode
-  // block later.
-  if (!fs->IsOnRecovery() || !vnode->GetNlink()) {
-    vnode->InitFileCache(LeToCpu(inode.i_size));
-  }
-
+  vnode->Init(node_page);
   *out = std::move(vnode);
   return ZX_OK;
 }
@@ -362,11 +306,8 @@ zx_status_t VnodeF2fs::OpenNode([[maybe_unused]] ValidatedOptions options,
 zx_status_t VnodeF2fs::CloseNode() { return ZX_OK; }
 
 void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
-  {
-    std::lock_guard lock(mutex_);
-    ZX_ASSERT_MSG(open_count() == 0, "RecycleNode[%s:%u]: open_count must be zero (%lu)",
-                  GetNameView().data(), GetKey(), open_count());
-  }
+  ZX_ASSERT_MSG(open_count() == 0, "RecycleNode[%s:%u]: open_count must be zero (%lu)",
+                GetNameView().data(), GetKey(), open_count());
   if (GetNlink()) {
     // It should not happen since f2fs removes the last reference of dirty vnodes at checkpoint time
     // during which any file operations are not allowed.
@@ -388,7 +329,7 @@ void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
     }
     Deactivate();
     file_cache_->Reset();
-    ReleasePagedVmo();
+    ReleasePagedVmoUnsafe();
     delete this;
   }
 }
@@ -396,7 +337,7 @@ void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
 zx_status_t VnodeF2fs::GetAttributes(fs::VnodeAttributes *a) {
   *a = fs::VnodeAttributes();
 
-  fs::SharedLock rlock(info_mutex_);
+  fs::SharedLock rlock(mutex_);
   a->mode = mode_;
   a->inode = ino_;
   a->content_size = GetSize();
@@ -522,19 +463,20 @@ zx_status_t VnodeF2fs::Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
 
 void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
   inode_page->WaitOnWriteback();
+  fs::SharedLock lock(mutex_);
   Inode &inode = inode_page->GetAddress<Node>()->i;
 
   inode.i_mode = CpuToLe(GetMode());
-  inode.i_advise = GetAdvise();
-  inode.i_uid = CpuToLe(GetUid());
-  inode.i_gid = CpuToLe(GetGid());
+  inode.i_advise = advise_;
+  inode.i_uid = CpuToLe(uid_);
+  inode.i_gid = CpuToLe(gid_);
   inode.i_links = CpuToLe(GetNlink());
   inode.i_size = CpuToLe(GetSize());
   // For on-disk i_blocks, we keep counting inode block for backward compatibility.
   inode.i_blocks = CpuToLe(safemath::CheckAdd<uint64_t>(GetBlocks(), 1).ValueOrDie());
 
   if (ExtentCacheAvailable()) {
-    auto extent_info = GetExtentTree().GetLargestExtent();
+    auto extent_info = extent_tree_->GetLargestExtent();
     inode.i_ext.blk_addr = CpuToLe(extent_info.blk_addr);
     inode.i_ext.fofs = CpuToLe(static_cast<uint32_t>(extent_info.fofs));
     inode.i_ext.len = CpuToLe(extent_info.len);
@@ -542,20 +484,20 @@ void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
     std::memset(&inode.i_ext, 0, sizeof(inode.i_ext));
   }
 
-  inode.i_atime = CpuToLe(static_cast<uint64_t>(GetATime().tv_sec));
-  inode.i_ctime = CpuToLe(static_cast<uint64_t>(GetCTime().tv_sec));
-  inode.i_mtime = CpuToLe(static_cast<uint64_t>(GetMTime().tv_sec));
-  inode.i_atime_nsec = CpuToLe(static_cast<uint32_t>(GetATime().tv_nsec));
-  inode.i_ctime_nsec = CpuToLe(static_cast<uint32_t>(GetCTime().tv_nsec));
-  inode.i_mtime_nsec = CpuToLe(static_cast<uint32_t>(GetMTime().tv_nsec));
-  inode.i_current_depth = CpuToLe(static_cast<uint32_t>(GetCurDirDepth()));
-  inode.i_xattr_nid = CpuToLe(GetXattrNid());
-  inode.i_flags = CpuToLe(GetInodeFlags());
+  inode.i_atime = CpuToLe(static_cast<uint64_t>(atime_.tv_sec));
+  inode.i_ctime = CpuToLe(static_cast<uint64_t>(ctime_.tv_sec));
+  inode.i_mtime = CpuToLe(static_cast<uint64_t>(mtime_.tv_sec));
+  inode.i_atime_nsec = CpuToLe(static_cast<uint32_t>(atime_.tv_nsec));
+  inode.i_ctime_nsec = CpuToLe(static_cast<uint32_t>(ctime_.tv_nsec));
+  inode.i_mtime_nsec = CpuToLe(static_cast<uint32_t>(mtime_.tv_nsec));
+  inode.i_current_depth = CpuToLe(static_cast<uint32_t>(current_depth_));
+  inode.i_xattr_nid = CpuToLe(xattr_nid_);
+  inode.i_flags = CpuToLe(inode_flags_);
   inode.i_pino = CpuToLe(GetParentNid());
-  inode.i_generation = CpuToLe(GetGeneration());
-  inode.i_dir_level = GetDirLevel();
+  inode.i_generation = CpuToLe(generation_);
+  inode.i_dir_level = dir_level_;
 
-  std::string_view name = GetNameView();
+  std::string_view name(name_);
   // double check |name|
   ZX_DEBUG_ASSERT(IsValidNameLength(name));
   auto size = safemath::checked_cast<uint32_t>(name.size());
@@ -572,11 +514,11 @@ void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
   } else {
     inode.i_inline &= ~kInlineDentry;
   }
-  if (GetExtraISize()) {
+  if (extra_isize_) {
     inode.i_inline |= kExtraAttr;
-    inode.i_extra_isize = GetExtraISize();
+    inode.i_extra_isize = extra_isize_;
     if (TestFlag(InodeInfoFlag::kInlineXattr)) {
-      inode.i_inline_xattr_size = GetInlineXattrAddrs();
+      inode.i_inline_xattr_size = CpuToLe(inline_xattr_size_);
     }
   }
   if (TestFlag(InodeInfoFlag::kDataExist)) {
@@ -732,13 +674,17 @@ void VnodeF2fs::EvictVnode() {
 }
 
 void VnodeF2fs::InitFileCache(uint64_t nbytes) {
+  std::lock_guard lock(mutex_);
+  InitFileCacheUnsafe(nbytes);
+}
+
+void VnodeF2fs::InitFileCacheUnsafe(uint64_t nbytes) {
   zx::vmo vmo;
   VmoMode mode;
   size_t vmo_node_size = 0;
 
   ZX_DEBUG_ASSERT(!file_cache_);
   if (IsReg()) {
-    std::lock_guard lock(mutex_);
     if (auto size_or = CreatePagedVmo(nbytes); size_or.is_ok()) {
       zx_rights_t right = ZX_RIGHTS_BASIC | ZX_RIGHT_MAP | ZX_RIGHTS_PROPERTY | ZX_RIGHT_READ |
                           ZX_RIGHT_WRITE | ZX_RIGHT_RESIZE;
@@ -756,35 +702,81 @@ void VnodeF2fs::InitFileCache(uint64_t nbytes) {
   file_cache_ = std::make_unique<FileCache>(this, vmo_manager_.get());
 }
 
-void VnodeF2fs::Init() {
-  SetCurDirDepth(1);
-  SetFlag(InodeInfoFlag::kInit);
-  Activate();
+void VnodeF2fs::Init(LockedPage &node_page) {
+  std::lock_guard lock(mutex_);
+  Inode &inode = node_page->GetAddress<Node>()->i;
+  std::string_view name(reinterpret_cast<char *>(inode.i_name),
+                        std::min(kMaxNameLen, inode.i_namelen));
+
+  name_ = name;
+  uid_ = LeToCpu(inode.i_uid);
+  gid_ = LeToCpu(inode.i_gid);
+  SetNlink(LeToCpu(inode.i_links));
+  // Don't count the in-memory inode.i_blocks for compatibility with the generic
+  // filesystem including linux f2fs.
+  SetBlocks(safemath::CheckSub<uint64_t>(LeToCpu(inode.i_blocks), 1).ValueOrDie());
+  atime_.tv_sec = LeToCpu(inode.i_atime);
+  atime_.tv_nsec = LeToCpu(inode.i_atime_nsec);
+  ctime_.tv_sec = LeToCpu(inode.i_ctime);
+  ctime_.tv_nsec = LeToCpu(inode.i_ctime_nsec);
+  mtime_.tv_sec = LeToCpu(inode.i_mtime);
+  mtime_.tv_nsec = LeToCpu(inode.i_mtime_nsec);
+  generation_ = LeToCpu(inode.i_generation);
+  SetParentNid(LeToCpu(inode.i_pino));
+  current_depth_ = LeToCpu(inode.i_current_depth);
+  xattr_nid_ = LeToCpu(inode.i_xattr_nid);
+  inode_flags_ = LeToCpu(inode.i_flags);
+  dir_level_ = inode.i_dir_level;
+  data_version_ = superblock_info_.GetCheckpointVer() - 1;
+  advise_ = inode.i_advise;
+
+  if (inode.i_inline & kInlineDentry) {
+    SetFlag(InodeInfoFlag::kInlineDentry);
+    inline_xattr_size_ = kInlineXattrAddrs;
+  }
+  if (inode.i_inline & kInlineData) {
+    SetFlag(InodeInfoFlag::kInlineData);
+  }
+  if (inode.i_inline & kInlineXattr) {
+    SetFlag(InodeInfoFlag::kInlineXattr);
+    inline_xattr_size_ = kInlineXattrAddrs;
+  }
+  if (inode.i_inline & kExtraAttr) {
+    extra_isize_ = LeToCpu(inode.i_extra_isize);
+    if (inode.i_inline & kInlineXattr) {
+      inline_xattr_size_ = LeToCpu(inode.i_inline_xattr_size);
+    }
+  }
+  if (inode.i_inline & kDataExist) {
+    SetFlag(InodeInfoFlag::kDataExist);
+  }
+  InitExtentTree();
+  if (extent_tree_ && inode.i_ext.blk_addr) {
+    auto extent_info = ExtentInfo{.fofs = LeToCpu(inode.i_ext.fofs),
+                                  .blk_addr = LeToCpu(inode.i_ext.blk_addr),
+                                  .len = LeToCpu(inode.i_ext.len)};
+    if (auto result = extent_tree_->InsertExtent(extent_info); result.is_error()) {
+      SetFlag(InodeInfoFlag::kNoExtent);
+    }
+  }
+
+  // If the roll-forward recovery creates it, it will initialize its cache from the latest inode
+  // block later.
+  if (!fs()->IsOnRecovery() || !GetNlink()) {
+    InitFileCacheUnsafe(LeToCpu(inode.i_size));
+  }
 }
 
 bool VnodeF2fs::SetDirty() {
   if (IsNode() || IsMeta() || !IsValid()) {
     return false;
   }
-  std::lock_guard lock(info_mutex_);
-  if (fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer()) {
-    return false;
-  }
   return fs()->GetVCache().AddDirty(*this) == ZX_OK;
 }
 
-bool VnodeF2fs::ClearDirty() {
-  std::lock_guard lock(info_mutex_);
-  if (!fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer()) {
-    return false;
-  }
-  return fs()->GetVCache().RemoveDirty(this) == ZX_OK;
-}
+bool VnodeF2fs::ClearDirty() { return fs()->GetVCache().RemoveDirty(this) == ZX_OK; }
 
-bool VnodeF2fs::IsDirty() {
-  fs::SharedLock lock(info_mutex_);
-  return fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer();
-}
+bool VnodeF2fs::IsDirty() { return fs()->GetVCache().IsDirty(*this); }
 
 void VnodeF2fs::Sync(SyncCallback closure) {
   closure(SyncFile(0, safemath::checked_cast<loff_t>(GetSize()), 0));
@@ -888,8 +880,8 @@ void VnodeF2fs::InitExtentTree() {
 
   // Because the lifecycle of an extent_tree is tied to the lifecycle of a vnode, the extent tree
   // should not exist when the vnode is created.
-  ZX_DEBUG_ASSERT(extent_tree_ == nullptr);
-  extent_tree_ = std::make_unique<ExtentTree>(Ino());
+  ZX_DEBUG_ASSERT(!extent_tree_);
+  extent_tree_ = std::make_unique<ExtentTree>();
 }
 
 void VnodeF2fs::Activate() { SetFlag(InodeInfoFlag::kActive); }
@@ -1186,12 +1178,12 @@ zx_status_t VnodeF2fs::RemoveInodePage() {
     return err;
   }
 
-  if (nid_t nid = GetXattrNid(); nid > 0) {
+  if (xattr_nid_ > 0) {
     LockedPage page;
-    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(nid, &page); err != ZX_OK) {
+    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(xattr_nid_, &page); err != ZX_OK) {
       return err;
     }
-    ClearXattrNid();
+    xattr_nid_ = 0;
     TruncateNode(page);
   }
   ZX_DEBUG_ASSERT(!GetBlocks());
@@ -1262,6 +1254,30 @@ pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
     }
   }
   return nwritten;
+}
+
+// Set multimedia files as cold files for hot/cold data separation
+void VnodeF2fs::SetColdFile() {
+  std::lock_guard lock(mutex_);
+  const std::vector<std::string> &extension_list = superblock_info_.GetExtensionList();
+  for (const auto &extension : extension_list) {
+    if (cpp20::ends_with(std::string_view(name_), std::string_view(extension))) {
+      SetAdvise(FAdvise::kCold);
+      break;
+    }
+    // compare upper case
+    std::string upper_sub(extension);
+    std::transform(upper_sub.cbegin(), upper_sub.cend(), upper_sub.begin(), ::toupper);
+    if (cpp20::ends_with(std::string_view(name_), std::string_view(upper_sub))) {
+      SetAdvise(FAdvise::kCold);
+      break;
+    }
+  }
+}
+
+bool VnodeF2fs::IsColdFile() {
+  fs::SharedLock lock(mutex_);
+  return IsAdviseSet(FAdvise::kCold);
 }
 
 }  // namespace f2fs

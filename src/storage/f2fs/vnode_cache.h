@@ -36,6 +36,7 @@ class VnodeCache {
   // It tries to add |vnode| to vnode_list_.
   // It returns ZX_ERR_ALREADY_EXISTS if |vnode| is already in the list.
   zx_status_t AddDirty(VnodeF2fs& vnode);
+  bool IsDirty(VnodeF2fs& vnode);
   // It tries to remove |vnode| from dirty_list_.
   zx_status_t RemoveDirty(VnodeF2fs* vnode) __TA_EXCLUDES(list_lock_);
   zx_status_t RemoveDirtyUnsafe(VnodeF2fs* vnode) __TA_REQUIRES(list_lock_);

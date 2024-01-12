@@ -212,6 +212,14 @@ zx_status_t VnodeCache::AddDirty(VnodeF2fs& vnode) {
   return ZX_OK;
 }
 
+bool VnodeCache::IsDirty(VnodeF2fs& vnode) {
+  fs::SharedLock lock(list_lock_);
+  if (vnode.fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer()) {
+    return true;
+  }
+  return false;
+}
+
 zx_status_t VnodeCache::RemoveDirty(VnodeF2fs* vnode) {
   std::lock_guard lock(list_lock_);
   return RemoveDirtyUnsafe(vnode);

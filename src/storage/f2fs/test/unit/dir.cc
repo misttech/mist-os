@@ -129,7 +129,7 @@ TEST_F(DirectoryTest, DentryBucket) {
   }
 
   // check level 1, bucket 0
-  auto bidx = Dir::DirBlockIndex(1, 0, 0);
+  auto bidx = DirBlockIndex(1, 0, 0);
   FileTester::CheckChildrenInBlock(test_dir_ptr, bidx, first_bucket_child);
 
   // delete all children in level 1, bucket 0
@@ -140,7 +140,7 @@ TEST_F(DirectoryTest, DentryBucket) {
   FileTester::CheckChildrenInBlock(test_dir_ptr, bidx, empty_set);
 
   // check level 1, bucket 1
-  bidx = Dir::DirBlockIndex(1, 0, 1);
+  bidx = DirBlockIndex(1, 0, 1);
   FileTester::CheckChildrenInBlock(test_dir_ptr, bidx, second_bucket_child);
 
   // delete all children in level 1, bucket 1
@@ -268,7 +268,7 @@ TEST_F(DirectoryTest, SetDentryLevel1DoWriteAndRead) {
   }
 
   // check level 0, bucket 0
-  auto bidx = Dir::DirBlockIndex(0, 1, 0);
+  auto bidx = DirBlockIndex(0, 1, 0);
   FileTester::CheckChildrenInBlock(test_dir_ptr, bidx, first_bucket_child);
 
   // delete all children in level 0, bucket 0
@@ -279,7 +279,7 @@ TEST_F(DirectoryTest, SetDentryLevel1DoWriteAndRead) {
   FileTester::CheckChildrenInBlock(test_dir_ptr, bidx, empty_set);
 
   // check level 0, bucket 1
-  bidx = Dir::DirBlockIndex(0, 1, 1);
+  bidx = DirBlockIndex(0, 1, 1);
   FileTester::CheckChildrenInBlock(test_dir_ptr, bidx, second_bucket_child);
 
   // delete all children in level 0, bucket 1

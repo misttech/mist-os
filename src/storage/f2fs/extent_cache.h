@@ -29,34 +29,29 @@ struct ExtentInfo {
 class ExtentTree;
 class ExtentNode : public fbl::WAVLTreeContainable<std::unique_ptr<ExtentNode>> {
  public:
-  explicit ExtentNode(ExtentTree &extent_tree, ExtentInfo extent_info)
-      : extent_tree_(extent_tree), extent_info_(extent_info) {}
+  explicit ExtentNode(const ExtentInfo &extent_info) : extent_info_(extent_info) {}
   ExtentNode(const ExtentNode &) = delete;
   ExtentNode &operator=(const ExtentNode &) = delete;
-  ExtentNode(const ExtentNode &&) = delete;
-  ExtentNode &operator=(const ExtentNode &&) = delete;
+  ExtentNode(ExtentNode &&) = delete;
+  ExtentNode &operator=(ExtentNode &&) = delete;
   virtual ~ExtentNode() { ZX_DEBUG_ASSERT(!InContainer()); }
 
   pgoff_t GetKey() const { return extent_info_.fofs; }
 
   ExtentInfo &GetExtentInfo() { return extent_info_; }
-  ExtentTree &GetExtentTree() { return extent_tree_; }
 
  private:
-  ExtentTree &extent_tree_;
   ExtentInfo extent_info_;
 };
 
 class ExtentTree : public fbl::WAVLTreeContainable<ExtentTree *> {
  public:
-  explicit ExtentTree(ino_t ino) : ino_(ino) {}
+  ExtentTree() = default;
   ExtentTree(const ExtentTree &) = delete;
   ExtentTree &operator=(const ExtentTree &) = delete;
-  ExtentTree(const ExtentTree &&) = delete;
-  ExtentTree &operator=(const ExtentTree &&) = delete;
+  ExtentTree(ExtentTree &&) = delete;
+  ExtentTree &operator=(ExtentTree &&) = delete;
   virtual ~ExtentTree() { Reset(); }
-
-  ino_t GetKey() const { return ino_; }
 
   zx::result<> InsertExtent(ExtentInfo extent_info) __TA_EXCLUDES(tree_lock_);
   zx::result<ExtentInfo> LookupExtent(pgoff_t file_offset) __TA_EXCLUDES(tree_lock_);
@@ -72,8 +67,6 @@ class ExtentTree : public fbl::WAVLTreeContainable<ExtentTree *> {
   fs::SharedMutex tree_lock_;
   ExtentNodeTree extent_node_tree_ __TA_GUARDED(tree_lock_);
   std::optional<ExtentInfo> largest_extent_info_ __TA_GUARDED(tree_lock_);
-
-  const ino_t ino_;
 };
 
 }  // namespace f2fs

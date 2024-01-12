@@ -30,7 +30,7 @@ void VnodeF2fs::UpdateExtentCache(pgoff_t file_offset, block_t blk_addr, uint32_
     return;
   }
 
-  if (auto result = GetExtentTree().InsertExtent(ExtentInfo{file_offset, blk_addr, len});
+  if (auto result = extent_tree_->InsertExtent(ExtentInfo{file_offset, blk_addr, len});
       result.is_error()) {
     SetFlag(InodeInfoFlag::kNoExtent);
     return;
@@ -44,7 +44,7 @@ zx::result<block_t> VnodeF2fs::LookupExtentCacheBlock(pgoff_t file_offset) {
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
 
-  auto extent_info = GetExtentTree().LookupExtent(file_offset);
+  auto extent_info = extent_tree_->LookupExtent(file_offset);
   if (extent_info.is_error()) {
     return extent_info.take_error();
   }
