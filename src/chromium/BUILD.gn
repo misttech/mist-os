@@ -17,8 +17,8 @@ group("chromium") {
   visibility += [ "//src:*" ]
 }
 
-# There is no (non-flavor) suffix for targets generated in this file.
-archive_path_suffix = ""
+# This file only supports latest prebuilts.
+archive_path_suffix = "_latest"
 
 # TODO(crbug.com/1385930): Change this to "chromium.org".
 # Also override or templatize `./config/web_context_provider.core_shard.cml.
@@ -26,24 +26,11 @@ repository = "fuchsia.com"
 
 declare_args() {
   # Whether to use the most recent (canary) version of prebuilt Chromium
-  # components. Otherwise, the qualified "release" version is used.
-  use_chromium_canary = false
+  # components. This is the only supported configuration.
+  # TODO(https://fxbug.dev/42149832): Remove once all builds setting it have been updated.
+  use_chromium_canary = true
 }
-
-# TODO(https://fxbug.dev/70573): Replace with solution that does not rely on GN args.
-# Consider abstracting the `_pkg` aspect of the target name.
-if (use_chromium_canary) {
-  package_flavor_selections += [
-    {
-      name = "web_engine_pkg"
-      flavor = "canary"
-    },
-    {
-      name = "web_engine_shell_pkg"
-      flavor = "canary"
-    },
-  ]
-}
+assert(use_chromium_canary)
 
 generate_fuchsia_web_targets("chromium") {
 }
@@ -51,25 +38,13 @@ generate_fuchsia_web_targets("chromium") {
 generate_fuchsia_web_test_targets("chromium") {
 }
 
-# The targets below do not use generate_package_flavors(), so the paths must be
-# modified manually.
-# TODO(https://fxbug.dev/70573, https://fxbug.dev/119526): Replace with a solution that
-# does not rely on GN args.
-if (use_chromium_canary) {
-  _flavor_suffix = "_latest"
-} else {
-  _flavor_suffix = ""
-}
-
 if (is_host) {
   if (is_linux && host_cpu == "x64") {
     generate_host_targets("chromium") {
-      archive_path_suffix = "${archive_path_suffix}${_flavor_suffix}"
     }
   }
 } else {
   generate_test_targets("chromium") {
-    archive_path_suffix = "${archive_path_suffix}${_flavor_suffix}"
   }
 }
 

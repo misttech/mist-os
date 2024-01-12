@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/packages/prebuilt_test_manifest.gni")
-import("//src/chromium/build_args.gni")
 import("//src/chromium/generate_pkg.gni")
 import("//src/sys/core/build/core_shard.gni")
 
@@ -28,22 +27,7 @@ template("generate_fuchsia_web_targets") {
   assert(defined(invoker.repository))
   not_needed([ "target_name" ])
 
-  # TODO(https://fxbug.dev/70573): Remove this once flavors are selected at a higher
-  # level than the chromium BUILD.gn and thus before this file is imported.
-  package_flavor_selections += invoker.package_flavor_selections
-
   repository = invoker.repository
-
-  # Always use the custom build when the GN arg is specified.
-  if (chromium_build_dir != "") {
-    print("Using fuchsia.web prebuilts from ", chromium_build_dir)
-    package_flavor_selections += [
-      {
-        name = "web_engine_pkg"
-        flavor = "custom"
-      },
-    ]
-  }
 
   # WebEngine - a Chromium implementation of `fuchsia.web`.
   # Only Products that want to include WebEngine should depend on this target.
@@ -98,7 +82,6 @@ template("generate_fuchsia_web_targets") {
 
     prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
     custom_package_path = "${build_output_gen_base_path}/fuchsia_web/webengine/${target_name}/${target_name}.far"
-    selections = package_flavor_selections
   }
 
   # TODO(crbug.com/1385930): Templatize the shard file to allow specification of
@@ -127,22 +110,7 @@ template("generate_fuchsia_web_test_targets") {
   assert(defined(invoker.repository))
   not_needed([ "target_name" ])
 
-  # TODO(https://fxbug.dev/70573): Remove this once flavors are selected at a higher
-  # level than the chromium BUILD.gn and thus before this file is imported.
-  package_flavor_selections += invoker.package_flavor_selections
-
   repository = invoker.repository
-
-  # Always use the custom build when the GN arg is specified.
-  if (chromium_build_dir != "") {
-    print("Using fuchsia.web test prebuilts from ", chromium_build_dir)
-    package_flavor_selections += [
-      {
-        name = "web_engine_shell_pkg"
-        flavor = "custom"
-      },
-    ]
-  }
 
   group("web_engine_shell") {
     visibility += [ "*" ]
@@ -156,7 +124,6 @@ template("generate_fuchsia_web_test_targets") {
 
     prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
     custom_package_path = "${build_output_gen_base_path}/fuchsia_web/shell/${target_name}/${target_name}.far"
-    selections = package_flavor_selections
 
     testonly = true
   }
@@ -196,7 +163,8 @@ if (current_cpu == "riscv64") {
       nuc_env,
     ]
 
-    archive_dir = "${prebuilt_archive_root_path}/web_engine_tests${invoker.archive_path_suffix}/arch/${target_cpu}"
+    _prebuilt_archive_base_path = "${prebuilt_archive_root_path}/web_engine_tests${invoker.archive_path_suffix}"
+    archive_dir = "${_prebuilt_archive_base_path}/arch/${target_cpu}"
 
     # The specific tests binaries are specified by the "tests" target in
     # https://source.chromium.org/chromium/chromium/src/+/main:build/fuchsia/cipd/BUILD.gn.

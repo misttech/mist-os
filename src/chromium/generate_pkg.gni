@@ -100,28 +100,31 @@ template("generate_fuchsia_web_package_flavors") {
                              "custom_package_path",
                              "deps",
                              "repository",
-                             "selections",
                              "testonly",
                              "visibility",
                            ])
 
-    default_flavor = "release"
+    default_flavor = "canary"
 
     available_flavors = [
       {
-        name = "release"
+        name = "canary"
         archive = "${invoker.prebuilt_archive_base_path}/arch/$target_cpu/${target_name}.far"
 
         # TODO(https://fxbug.dev/70573): Add support for overriding this.
         production_safe = false
       },
-      {
-        name = "canary"
-        archive = "${invoker.prebuilt_archive_base_path}_latest/arch/$target_cpu/${target_name}.far"
-
-        # TODO(https://fxbug.dev/70573): Add support for overriding this.
-        production_safe = false
-      },
     ]
+
+    # Always use the custom build when the GN arg is specified.
+    if (chromium_build_dir != "") {
+      print("Using ${target_name} prebuilts from ", chromium_build_dir)
+      selections = [
+        {
+          name = target_name
+          flavor = "custom"
+        },
+      ]
+    }
   }
 }
