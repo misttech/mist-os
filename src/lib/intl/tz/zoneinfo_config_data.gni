@@ -22,12 +22,6 @@ import("//build/config.gni")
 #   Currently supported: { `"2"` }
 #   Default: `"2"`
 #
-# - `include_revision_file` (optional)
-#   [boolean] If false, `/config/data/tzdata/revision.txt` will be omitted.
-#   Useful in case there's also an `icu_tzdata_config_data` target with the same
-#   `for_pkg`.
-#   Default: `true`
-#
 # Example:
 #
 # ```
@@ -42,10 +36,6 @@ template("zoneinfo_config_data") {
     tzif_version = invoker.tzif_version
   }
   assert(tzif_version == "2", "Unsupported TZif version")
-
-  if (!defined(invoker.include_revision_file)) {
-    invoker.include_revision_file = true
-  }
 
   version_name = "tzif${tzif_version}"
 
