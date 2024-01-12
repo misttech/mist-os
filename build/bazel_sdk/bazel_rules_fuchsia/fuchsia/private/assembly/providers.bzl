@@ -89,7 +89,8 @@ This should only be provided by the single exported target of a
 fuchsia_product_assembly_bundle repository.
 """,
     fields = {
-        "dir": "Path to the bundle directory",
+        "dir": "(deprecated) Path to the bundle directory",
+        "root": "A file located at the root of this AIB",
         "files": "All files contained in the bundle",
     },
 )
