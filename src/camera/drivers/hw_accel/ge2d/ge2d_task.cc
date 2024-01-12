@@ -6,15 +6,12 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/syslog/cpp/macros.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
 #include <memory>
 
 #include <fbl/algorithm.h>
-
-constexpr auto kTag = "ge2d";
 
 namespace ge2d {
 
@@ -35,11 +32,9 @@ void ScopedCanvasId::Reset() {
   if (canvas_.has_value()) {
     fidl::WireResult result = fidl::WireCall(canvas_.value())->Free(id_);
     if (!result.ok()) {
-      FX_LOGST(WARNING, kTag) << "Failed to call Canvas Free: "
-                              << result.error().FormatDescription().c_str();
+      zxlogf(WARNING, "Failed to call Canvas Free: %s", result.error().FormatDescription().c_str());
     } else if (result->is_error()) {
-      FX_LOGST(WARNING, kTag) << "Canvas Free failed: "
-                              << zx_status_get_string(result->error_value());
+      zxlogf(WARNING, "Canvas Free failed: %s", zx_status_get_string(result->error_value()));
     }
   }
   canvas_ = std::nullopt;
@@ -58,14 +53,12 @@ zx_status_t CanvasConfig(fidl::UnownedClientEnd<fuchsia_hardware_amlogiccanvas::
 
   fidl::WireResult result = fidl::WireCall(canvas)->Config(zx::vmo(vmo_dup), offset, info);
   if (!result.ok()) {
-    FX_LOGST(WARNING, kTag) << "Failed to call Canvas Config: "
-                            << result.error().FormatDescription().c_str();
+    zxlogf(WARNING, "Failed to call Canvas Config: %s", result.error().FormatDescription().c_str());
     return result.error().status();
   }
 
   if (result->is_error()) {
-    FX_LOGST(WARNING, kTag) << "Canvas Config failed: "
-                            << zx_status_get_string(result->error_value());
+    zxlogf(WARNING, "Canvas Config failed: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
@@ -314,7 +307,7 @@ zx_status_t Ge2dTask::Init(const buffer_collection_info_2_t* input_buffer_collec
                               frame_callback, res_callback, remove_task_callback);
   }
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "InitBuffers Failed";
+    zxlogf(ERROR, "InitBuffers Failed");
     return status;
   }
 
@@ -341,7 +334,7 @@ zx_status_t Ge2dTask::InitResize(
            output_image_format_table_list, output_image_format_table_count,
            output_image_format_index, frame_callback, res_callback, remove_task_callback, bti);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Init Failed";
+    zxlogf(ERROR, "Init Failed");
     return status;
   }
 
@@ -370,7 +363,7 @@ zx_status_t Ge2dTask::InitializeWatermarkImages(
     auto& wm = wm_.back();
     if (wm_info[i].wm_image_format.pixel_format.type !=
         static_cast<uint32_t>(fuchsia_sysmem::PixelFormatType::kR8G8B8A8)) {
-      FX_LOGST(ERROR, kTag) << "Image format type not supported";
+      zxlogf(ERROR, "Image format type not supported");
       return ZX_ERR_NOT_SUPPORTED;
     }
 
@@ -412,14 +405,14 @@ zx_status_t Ge2dTask::InitializeWatermarkImages(
     status = mapped_watermark_input_vmo.Map(*zx::unowned_vmo(wm_info[i].watermark_vmo), 0,
                                             rounded_input_vmo_size, ZX_VM_PERM_READ);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to get map for watermark input VMO";
+      zxlogf(ERROR, "Unable to get map for watermark input VMO");
       return status;
     }
     fzl::VmoMapper mapped_contig_vmo;
     status =
         mapped_contig_vmo.Map(wm.watermark_input_vmo, 0, 0, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to get map contig watermark VMO";
+      zxlogf(ERROR, "Unable to get map contig watermark VMO");
       return status;
     }
 
@@ -467,7 +460,7 @@ zx_status_t Ge2dTask::InitContiguousWatermarkVmo(zx::vmo& contiguous_watermark_v
     if (contiguous_watermark_vmo_size >= size) {
       status = contiguous_watermark_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &result);
       if (status == ZX_OK) {
-        FX_LOGST(DEBUG, kTag) << "Reusing contiguous " << vmo_name.c_str() << " watermark VMO";
+        zxlogf(DEBUG, "Reusing contiguous %s watermark VMO", vmo_name.c_str());
         return ZX_OK;
       }
     }
@@ -475,11 +468,9 @@ zx_status_t Ge2dTask::InitContiguousWatermarkVmo(zx::vmo& contiguous_watermark_v
 
   // Fallback: the passed-in VMO was either invalid or not large enough, so create a new contiguous
   // memory VMO for the result.
-  FX_LOGST(WARNING, kTag) << "Fallback: creating contiguous " << vmo_name.c_str()
-                          << " watermark VMO";
+  zxlogf(WARNING, "Fallback: creating contiguous %s watermark VMO", vmo_name.c_str());
   status = zx::vmo::create_contiguous(bti, size, 0, &result);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Unable to get create contiguous " << vmo_name.c_str();
     return status;
   }
 
@@ -487,8 +478,8 @@ zx_status_t Ge2dTask::InitContiguousWatermarkVmo(zx::vmo& contiguous_watermark_v
   // so that it can be reused the next time watermarks are initialized.
   status = result.duplicate(ZX_RIGHT_SAME_RIGHTS, &contiguous_watermark_vmo);
   if (status != ZX_OK) {
-    FX_LOGST(WARNING, kTag) << "Unable to duplicate newly created contiguous " << vmo_name.c_str()
-                            << " watermark VMO for reuse";
+    zxlogf(WARNING, "Unable to duplicate newly created contiguous %s watermark VMO for reuse",
+           vmo_name.c_str());
   }
 
   return ZX_OK;
@@ -510,7 +501,7 @@ zx_status_t Ge2dTask::InitWatermark(
                             image_format_table_list, image_format_table_count, image_format_index,
                             frame_callback, res_callback, remove_task_callback, bti);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Init Failed";
+    zxlogf(ERROR, "Init Failed");
     return status;
   }
   task_type_ = GE2D_WATERMARK;
@@ -535,7 +526,7 @@ zx_status_t Ge2dTask::InitInPlaceWatermark(
            image_format_index, image_format_table_list, image_format_table_count,
            image_format_index, frame_callback, res_callback, remove_task_callback, bti);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Init Failed";
+    zxlogf(ERROR, "Init Failed");
     return status;
   }
   task_type_ = GE2D_IN_PLACE_WATERMARK;

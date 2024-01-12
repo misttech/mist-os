@@ -9,7 +9,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/image-format/image_format.h>
-#include <lib/syslog/cpp/macros.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 #include <zircon/threads.h>
@@ -25,8 +24,6 @@
 namespace gdc {
 
 namespace {
-
-constexpr auto kTag = "gdc";
 
 constexpr uint32_t kHiu = 0;
 constexpr uint32_t kGdc = 1;
@@ -91,7 +88,7 @@ zx_status_t GdcDevice::GdcInitTask(const buffer_collection_info_2_t* input_buffe
                  output_image_format_index, config_vmo_list, config_vmos_count,
                  gdc_config_contig_vmos_, frame_callback, res_callback, remove_task_callback, bti_);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Task Creation Failed";
+    zxlogf(ERROR, "Task Creation Failed");
     return status;
   }
 
@@ -344,7 +341,7 @@ void GdcDevice::ProcessTask(TaskInfo& info) {
 }
 
 int GdcDevice::FrameProcessingThread() {
-  FX_LOGST(TRACE, kTag) << "start";
+  zxlogf(INFO, "start");
   for (;;) {
     fbl::AutoLock al(&processing_queue_lock_);
     while (processing_queue_.empty() && !shutdown_) {
@@ -477,7 +474,7 @@ void GdcDevice::GdcReleaseFrame(uint32_t task_index, uint32_t buffer_index) {
     // RemoveTask and FrameReady are asynchronous, so it's possible for a client to receive a frame
     // after it has requested task removal. If the client then returns this frame, the task may
     // already be gone, so just log it as a warning and continue.
-    FX_LOGS(WARNING) << "spurious ReleaseFrame(" << buffer_index << ") for task " << task_index;
+    zxlogf(WARNING, "spurious ReleaseFrame(%u) for task %u", buffer_index, task_index);
     return;
   }
 
@@ -489,48 +486,48 @@ void GdcDevice::GdcReleaseFrame(uint32_t task_index, uint32_t buffer_index) {
 zx_status_t GdcDevice::Setup(void* /*ctx*/, zx_device_t* parent, std::unique_ptr<GdcDevice>* out) {
   auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
-    FX_LOGST(ERROR, kTag) << "ZX_PROTOCOL_PDEV not available";
+    zxlogf(ERROR, "ZX_PROTOCOL_PDEV not available");
     return ZX_ERR_NO_RESOURCES;
   }
 
   std::optional<fdf::MmioBuffer> clk_mmio;
   zx_status_t status = pdev.MapMmio(kHiu, &clk_mmio);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "pdev_.MapMmio failed";
+    zxlogf(ERROR, "pdev_.MapMmio failed");
     return status;
   }
 
   std::optional<fdf::MmioBuffer> gdc_mmio;
   status = pdev.MapMmio(kGdc, &gdc_mmio);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "pdev_.MapMmio failed";
+    zxlogf(ERROR, "pdev_.MapMmio failed");
     return status;
   }
 
   zx::interrupt gdc_irq;
   status = pdev.GetInterrupt(0, &gdc_irq);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "pdev_.GetInterrupt failed";
+    zxlogf(ERROR, "pdev_.GetInterrupt failed");
     return status;
   }
 
   zx::port port;
   status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "port create failed";
+    zxlogf(ERROR, "port create failed");
     return status;
   }
 
   status = gdc_irq.bind(port, kPortKeyIrqMsg, 0 /*options*/);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "interrupt bind failed";
+    zxlogf(ERROR, "interrupt bind failed");
     return status;
   }
 
   zx::bti bti;
   status = pdev.GetBti(0, &bti);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "could not obtain bti";
+    zxlogf(ERROR, "could not obtain bti");
     return status;
   }
 
@@ -539,7 +536,7 @@ zx_status_t GdcDevice::Setup(void* /*ctx*/, zx_device_t* parent, std::unique_ptr
     zx::vmo vmo;
     status = zx::vmo::create_contiguous(bti, kGdcConfigurationSize, 0, &vmo);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to create contiguous memory for GDC configuration VMO";
+      zxlogf(ERROR, "Unable to create contiguous memory for GDC configuration VMO");
       return ZX_ERR_NO_MEMORY;
     }
     gdc_config_contig_vmos.push(std::move(vmo));
@@ -571,17 +568,17 @@ zx_status_t GdcBind(void* ctx, zx_device_t* device) {
   std::unique_ptr<GdcDevice> gdc_device;
   zx_status_t status = gdc::GdcDevice::Setup(ctx, device, &gdc_device);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Could not setup gdc device";
+    zxlogf(ERROR, "Could not setup gdc device");
     return status;
   }
 
   status = gdc_device->DdkAdd(ddk::DeviceAddArgs("gdc"));
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Could not add gdc device";
+    zxlogf(ERROR, "Could not add gdc device");
     return status;
   }
 
-  FX_LOGST(INFO, kTag) << "gdc driver added";
+  zxlogf(INFO, "gdc driver added");
 
   // gdc device intentionally leaked as it is now held by DevMgr.
   [[maybe_unused]] auto* dev = gdc_device.release();

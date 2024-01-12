@@ -5,13 +5,10 @@
 #include "src/camera/drivers/hw_accel/gdc/gdc_task.h"
 
 #include <lib/ddk/debug.h>
-#include <lib/syslog/cpp/macros.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
 #include <memory>
-
-constexpr auto kTag = "gdc";
 
 namespace gdc {
 
@@ -30,7 +27,7 @@ zx_status_t GdcTask::PinConfigVmos(const gdc_config_info* config_vmo_list, size_
     uint64_t size;
     auto status = vmo.get_size(&size);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to get VMO size";
+      zxlogf(ERROR, "Unable to get VMO size");
       return status;
     }
 
@@ -47,7 +44,7 @@ zx_status_t GdcTask::PinConfigVmos(const gdc_config_info* config_vmo_list, size_
     zx::vmo contig_vmo;
     status = InitContiguousConfigVmo(gdc_config_contig_vmo, size, bti, contig_vmo);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to get create contiguous VMO";
+      zxlogf(ERROR, "Unable to get create contiguous VMO");
       return status;
     }
 
@@ -58,14 +55,14 @@ zx_status_t GdcTask::PinConfigVmos(const gdc_config_info* config_vmo_list, size_
     fzl::VmoMapper mapped_buffer_vmo;
     status = mapped_buffer_vmo.Map(vmo, 0, 0, ZX_VM_PERM_READ);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to get map VMO";
+      zxlogf(ERROR, "Unable to get map VMO");
       return status;
     }
 
     fzl::VmoMapper mapped_buffer_contig_vmo;
     status = mapped_buffer_contig_vmo.Map(contig_vmo, 0, 0, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to get map contig VMO";
+      zxlogf(ERROR, "Unable to get map contig VMO");
       return status;
     }
 
@@ -74,17 +71,17 @@ zx_status_t GdcTask::PinConfigVmos(const gdc_config_info* config_vmo_list, size_
     // Clean and invalidate the contiguous VMO.
     status = contig_vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, size, nullptr, 0);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to clean and invalidate the cache";
+      zxlogf(ERROR, "Unable to clean and invalidate the cache");
       return status;
     }
 
     status = pinned_config_vmos_[i].Pin(contig_vmo, bti, ZX_BTI_CONTIGUOUS | ZX_VM_PERM_READ);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Failed to pin config VMO";
+      zxlogf(ERROR, "Failed to pin config VMO");
       return status;
     }
     if (pinned_config_vmos_[i].region_count() != 1) {
-      FX_LOGST(ERROR, kTag) << "Buffer is not contiguous";
+      zxlogf(ERROR, "Buffer is not contiguous");
       return ZX_ERR_NO_MEMORY;
     }
 
@@ -109,13 +106,13 @@ zx_status_t GdcTask::InitContiguousConfigVmo(zx::vmo& contiguous_config_vmo, siz
     uint64_t contiguous_config_vmo_size = 0;
     status = contiguous_config_vmo.get_size(&contiguous_config_vmo_size);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Failed to get size of GDC config VMO";
+      zxlogf(ERROR, "Failed to get size of GDC config VMO");
       return status;
     }
     if (contiguous_config_vmo_size >= size) {
       status = contiguous_config_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &result);
       if (status == ZX_OK) {
-        FX_LOGST(DEBUG, kTag) << "Reusing contiguous GDC config VMO";
+        zxlogf(DEBUG, "Reusing contiguous GDC config VMO");
         return ZX_OK;
       }
     }
@@ -123,10 +120,10 @@ zx_status_t GdcTask::InitContiguousConfigVmo(zx::vmo& contiguous_config_vmo, siz
 
   // Fallback: the passed-in VMO was either invalid or not large enough, so create a new contiguous
   // memory VMO for the result.
-  FX_LOGST(WARNING, kTag) << "Fallback: creating contiguous GDC config VMO";
+  zxlogf(WARNING, "Fallback: creating contiguous GDC config VMO");
   status = zx::vmo::create_contiguous(bti, size, 0, &result);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Unable to get create contiguous GDC config VMO";
+    zxlogf(ERROR, "Unable to get create contiguous GDC config VMO");
     return status;
   }
 
@@ -134,8 +131,7 @@ zx_status_t GdcTask::InitContiguousConfigVmo(zx::vmo& contiguous_config_vmo, siz
   // so that it can be reused the next time GDC configs are initialized.
   status = result.duplicate(ZX_RIGHT_SAME_RIGHTS, &contiguous_config_vmo);
   if (status != ZX_OK) {
-    FX_LOGST(WARNING, kTag)
-        << "Unable to duplicate newly created contiguous GDC config VMO for reuse";
+    zxlogf(WARNING, "Unable to duplicate newly created contiguous GDC config VMO for reuse");
     return status;
   }
 
@@ -165,7 +161,7 @@ zx_status_t GdcTask::Init(const buffer_collection_info_2_t* input_buffer_collect
   zx_status_t status =
       PinConfigVmos(config_vmo_list, config_vmos_count, gdc_config_contig_vmos, bti);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "PinConfigVmo Failed";
+    zxlogf(ERROR, "PinConfigVmo Failed");
     return status;
   }
 
@@ -174,7 +170,7 @@ zx_status_t GdcTask::Init(const buffer_collection_info_2_t* input_buffer_collect
                        output_image_format_index, bti, frame_callback, res_callback,
                        remove_task_callback);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "InitBuffers Failed";
+    zxlogf(ERROR, "InitBuffers Failed");
     return status;
   }
 
