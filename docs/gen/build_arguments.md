@@ -8422,11 +8422,12 @@ From //build/toolchain/ccache.gni:9
 ### use_chromium_canary
 
 Whether to use the most recent (canary) version of prebuilt Chromium
-components. Otherwise, the qualified "release" version is used.
+components. This is the only supported configuration.
+TODO(https://fxbug.dev/42149832): Remove once all builds setting it have been updated.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
-From //src/chromium/BUILD.gn:30
+From //src/chromium/BUILD.gn:31
 
 ### use_dbus
 
