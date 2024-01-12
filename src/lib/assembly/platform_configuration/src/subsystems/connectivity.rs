@@ -6,7 +6,7 @@ use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::bail;
 use assembly_config_schema::platform_config::connectivity_config::{
-    NetstackVersion, NetworkingConfig, PlatformConnectivityConfig,
+    NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanRecoveryProfile,
 };
 use assembly_util::FileEntry;
 
@@ -172,6 +172,20 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 if has_softmac {
                     builder.platform_bundle("wlan_softmac_support");
                 }
+
+                // Add in the recovery characteristics specified by the product config.
+                let recovery_profile = match connectivity_config.wlan.recovery_profile {
+                    None => String::from(""),
+                    Some(WlanRecoveryProfile::ThresholdedRecovery) => {
+                        String::from("thresholded_recovery")
+                    }
+                };
+
+                builder
+                    .package("wlancfg")
+                    .component("meta/wlancfg.cm")?
+                    .field("recovery_profile", recovery_profile)?
+                    .field("recovery_enabled", connectivity_config.wlan.recovery_enabled.clone())?;
             }
 
             if connectivity_config.network.include_tun {

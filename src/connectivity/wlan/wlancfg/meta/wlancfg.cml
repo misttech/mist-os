@@ -63,4 +63,15 @@
             from: "self",
         },
     ],
+    config: {
+        recovery_profile: {
+            type: "string",
+            max_size: 512,
+            mutability: [ "parent" ],
+        },
+        recovery_enabled: {
+            type: "bool",
+            mutability: [ "parent" ],
+        },
+    },
 }

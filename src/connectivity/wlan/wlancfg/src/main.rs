@@ -30,7 +30,7 @@ use {
     pin_utils::pin_mut,
     std::{convert::Infallible, sync::Arc},
     tracing::{error, info, warn},
-    wlan_trace as wtrace,
+    wlan_trace as wtrace, wlancfg_config,
     wlancfg_lib::{
         access_point::AccessPoint,
         client::{
@@ -367,12 +367,15 @@ async fn run_all_futures() -> Result<(), Error> {
 
     let (recovery_sender, recovery_receiver) =
         mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
+    // Get the recovery settings.
+    let cfg = wlancfg_config::Config::take_from_startup_handle();
+    info!("Recovery Profile: {}", cfg.recovery_profile);
+    info!("Recovery Enabled: {}", cfg.recovery_enabled);
+
     let phy_manager = Arc::new(Mutex::new(PhyManager::new(
         monitor_svc.clone(),
-        // The recovery profile is initially hard-coded to not provide any recovery recommendations.
-        // Future changes will make this configurable.
-        recovery::lookup_recovery_profile(""),
-        false,
+        recovery::lookup_recovery_profile(&cfg.recovery_profile),
+        cfg.recovery_enabled,
         component::inspector().root().create_child("phy_manager"),
         telemetry_sender.clone(),
         recovery_sender,

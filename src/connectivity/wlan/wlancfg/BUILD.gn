@@ -149,6 +149,7 @@ rustc_binary("bin") {
 
   deps = [
     ":lib",
+    ":wlancfg-config",
     "//sdk/fidl/fuchsia.location.namedplace:fuchsia.location.namedplace_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel_rust",
@@ -178,9 +179,17 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_component("service") {
+fuchsia_component_manifest("wlancfg-manifest") {
   component_name = "wlancfg"
   manifest = "meta/wlancfg.cml"
+}
+
+fuchsia_structured_config_rust_lib("wlancfg-config") {
+  cm_label = ":wlancfg-manifest"
+}
+
+fuchsia_component("service") {
+  cm_label = ":wlancfg-manifest"
   deps = [ ":bin" ]
 }
 
@@ -192,6 +201,7 @@ group("for_transition") {
 
 fuchsia_package("wlancfg") {
   deps = [ ":service" ]
+  validate_structured_config = false
 }
 
 fuchsia_component("wlancfg_lib_test") {

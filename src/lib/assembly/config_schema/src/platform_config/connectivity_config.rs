@@ -84,6 +84,16 @@ pub struct PlatformWlanConfig {
     /// Enable the use of legacy security types like WEP and/or WPA1.
     #[serde(default)]
     pub legacy_privacy_support: bool,
+    #[serde(default)]
+    pub recovery_profile: Option<WlanRecoveryProfile>,
+    #[serde(default)]
+    pub recovery_enabled: bool,
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum WlanRecoveryProfile {
+    ThresholdedRecovery,
 }
 
 /// Platform configuration options to use for the mdns area.
