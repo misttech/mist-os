@@ -6,6 +6,7 @@ use crate::subpackage_blobs_package::construct_subpackage_blobs_package;
 use anyhow::{Context, Result};
 use assembly_manifest::{AssemblyManifest, PackagesMetadata};
 use assembly_partitions_config::PartitionsConfig;
+use assembly_tool::SdkToolProvider;
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use epoch::EpochFile;
@@ -92,7 +93,8 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
         builder.add_slot_images(Slot::Recovery(manifest));
     }
 
-    builder.build()?;
+    let tools = SdkToolProvider::try_new()?;
+    builder.build(Box::new(tools))?;
     Ok(())
 }
 

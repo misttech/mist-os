@@ -6,7 +6,9 @@
 
 use crate::tool::{Tool, ToolCommand, ToolCommandLog, ToolProvider};
 use anyhow::Result;
-use std::path::PathBuf;
+use assembly_util::write_json_file;
+use serde_json::json;
+use std::path::{Path, PathBuf};
 use utf8_path::PathToStringExt;
 
 /// A provider for tools that no-op, but log their execution so it can be asserted in a test.
@@ -16,6 +18,20 @@ pub struct FakeToolProvider {
     log: ToolCommandLog,
     /// Function called for each tool invocation.
     side_effect: fn(&str, &[String]) -> (),
+}
+
+/// A default side-effect when running a fake blobfs tool.
+/// This side-effect will write the blobs.json file.
+pub fn blobfs_side_effect(_name: &str, args: &[String]) {
+    assert_eq!(args[0], "--json-output");
+    write_json_file(
+        Path::new(&args[1]),
+        &json!([{
+            "merkle": "b62ee413090825c2ae70fe143b34cbd851f055932cfd5e7ca4ef0efbb802da2a",
+            "size": 73i32
+        }]),
+    )
+    .unwrap();
 }
 
 impl FakeToolProvider {

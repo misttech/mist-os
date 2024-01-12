@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 use ::update_package::{ImageMetadata, ImagePackagesManifest};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use assembly_blob_size::BlobSizeCalculator;
+use assembly_images_config::BlobfsLayout;
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_partitions_config::PartitionsConfig;
+use assembly_tool::ToolProvider;
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
@@ -15,6 +18,9 @@ use fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use utf8_path::PathToStringExt;
+
+/// Maximum size of 200 KiB.
+const UPDATE_PACKAGE_BUDGET: u64 = 200 * 1024 * 1024;
 
 /// The result of the builder.
 pub struct UpdatePackage {
@@ -258,7 +264,7 @@ impl UpdatePackageBuilder {
     }
 
     /// Build the update package and associated update images packages.
-    pub fn build(self) -> Result<UpdatePackage> {
+    pub fn build(self, tools: Box<dyn ToolProvider>) -> Result<UpdatePackage> {
         use serde_json::to_string;
 
         // Keep track of all the packages that were built, so that they can be returned.
@@ -369,6 +375,26 @@ impl UpdatePackageBuilder {
         builder.package.add_contents_as_blob("board", &self.board_name, &self.gendir)?;
         builder.package.add_file_as_blob("version", self.version_file.path_to_string()?)?;
         let (_, manifest) = builder.build()?;
+
+        // Ensure the update package is within size budget.
+        // We use the worse layout for compression just in case.
+        let blob_size_calculator = BlobSizeCalculator::new(tools, BlobfsLayout::DeprecatedPadded);
+        let manifest_path = self.outdir.join("update_package_manifest.json");
+        let blobs = blob_size_calculator
+            .calculate(&vec![&manifest_path])
+            .context("Calculating update package blob sizes")?;
+        let mut total: u64 = 0;
+        for blob in blobs {
+            total += blob.size;
+        }
+        if total > UPDATE_PACKAGE_BUDGET {
+            bail!(
+                "Update package is over budget\nbudget: {}\nactual: {}",
+                UPDATE_PACKAGE_BUDGET,
+                total
+            );
+        }
+
         let merkle = manifest.hash();
         package_manifests.push(manifest);
 
@@ -382,10 +408,13 @@ mod tests {
     use assembly_manifest::Image;
     use assembly_partitions_config::Slot as PartitionSlot;
     use assembly_partitions_config::{BootloaderPartition, Partition, PartitionsConfig};
+    use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use assembly_update_packages_manifest::UpdatePackagesManifest;
+    use assembly_util::write_json_file;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_hash::{Hash, HASH_SIZE};
     use fuchsia_pkg::{PackageManifest, PackagePath};
+    use serde_json::json;
     use std::fs::File;
     use std::io::{BufReader, Write};
     use std::str::FromStr;
@@ -431,7 +460,8 @@ mod tests {
         }));
 
         builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
-        builder.build().unwrap();
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+        builder.build(tool_provider).unwrap();
 
         let file = File::open(outdir.join("images.json")).unwrap();
         let reader = BufReader::new(file);
@@ -594,7 +624,8 @@ mod tests {
 
         // Build and ensure the output is correct.
         builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
-        let update_package = builder.build().unwrap();
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+        let update_package = builder.build(tool_provider).unwrap();
         assert_eq!(
             update_package.merkle,
             "e14832faa860680fe05f242e0caa634e66809438832e2e52b78fed727003b3da".parse().unwrap()
@@ -744,7 +775,8 @@ mod tests {
             &outdir,
         );
 
-        builder.build().unwrap();
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+        builder.build(tool_provider).unwrap();
 
         // Ensure the generated images.json manifest is empty.
         let file = File::open(outdir.join("images.json")).unwrap();
@@ -780,12 +812,44 @@ mod tests {
             &outdir,
         );
         builder.set_name("update_2");
-        assert!(builder.build().is_ok());
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+        assert!(builder.build(tool_provider).is_ok());
 
         // Read the package manifest and ensure it contains the updated name.
         let manifest_path = outdir.join("update_package_manifest.json");
         let manifest = PackageManifest::try_load_from(manifest_path).unwrap();
         assert_eq!("update_2", manifest.name().as_ref());
+    }
+
+    #[test]
+    fn over_budget() {
+        let tmp = tempdir().unwrap();
+        let outdir = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let mut fake_version = NamedTempFile::new().unwrap();
+        writeln!(fake_version, "1.2.3.4").unwrap();
+        let mut builder = UpdatePackageBuilder::new(
+            PartitionsConfig::default(),
+            "board",
+            fake_version.path().to_path_buf(),
+            EpochFile::Version1 { epoch: 0 },
+            Some(0xECDB841C251A8CB9),
+            &outdir,
+        );
+        builder.set_name("update_2");
+        let tool_provider =
+            Box::new(FakeToolProvider::new_with_side_effect(|_name: &str, args: &[String]| {
+                assert_eq!(args[0], "--json-output");
+                write_json_file(
+                    Path::new(&args[1]),
+                    &json!([{
+                      "merkle": "b62ee413090825c2ae70fe143b34cbd851f055932cfd5e7ca4ef0efbb802da2a",
+                      "size": UPDATE_PACKAGE_BUDGET + 1,
+                    }]),
+                )
+                .unwrap();
+            }));
+        assert!(builder.build(tool_provider).is_err());
     }
 
     #[test]
@@ -815,7 +879,8 @@ mod tests {
         list2.add(PackagePath::from_str("four/0").unwrap(), hash.clone(), None).unwrap();
         builder.add_packages(list2);
 
-        assert!(builder.build().is_ok());
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+        assert!(builder.build(tool_provider).is_ok());
 
         // Read the package list and ensure it contains the correct contents.
         let package_list_path = outdir.join("packages.json");

@@ -2,36 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::operations::size_check_package::BlobJsonEntry;
 use anyhow::{Context, Result};
+use assembly_blobfs::BlobFSBuilder;
 use assembly_images_config::BlobfsLayout;
 use assembly_tool::ToolProvider;
 use assembly_util::read_config;
 use camino::Utf8Path;
+use fuchsia_hash::Hash;
+use serde::Deserialize;
 use tempfile::NamedTempFile;
 use tempfile::TempDir;
 
+/// The result of a blob size measurement.
+#[derive(Debug, Deserialize, PartialEq)]
+pub struct BlobSize {
+    /// The merkle of the blob.
+    pub merkle: Hash,
+    /// The size of the blob in bytes.
+    pub size: u64,
+}
+
 /// Collect all the blob size entries for a given set of packages.
-pub struct BlobJsonGenerator {
+pub struct BlobSizeCalculator {
     /// The layout format of the blobs.
     layout: BlobfsLayout,
     /// The tools provider that contains the blobfs tool.
     tools: Box<dyn ToolProvider>,
 }
 
-impl BlobJsonGenerator {
+impl BlobSizeCalculator {
     /// Reads the specified configuration and return an object capable to build blobfs.
-    pub fn new(tools: Box<dyn ToolProvider>, layout: BlobfsLayout) -> Result<BlobJsonGenerator> {
-        Ok(BlobJsonGenerator { layout, tools })
+    pub fn new(tools: Box<dyn ToolProvider>, layout: BlobfsLayout) -> Self {
+        BlobSizeCalculator { layout, tools }
     }
 
     /// Returns information blobs used by the specified packages.
     #[allow(clippy::ptr_arg)]
-    pub fn build(&self, package_manifests: &Vec<&Utf8Path>) -> Result<Vec<BlobJsonEntry>> {
-        let mut builder = assembly_blobfs::BlobFSBuilder::new(
-            self.tools.get_tool("blobfs")?,
-            self.layout.to_string(),
-        );
+    pub fn calculate(&self, package_manifests: &Vec<&Utf8Path>) -> Result<Vec<BlobSize>> {
+        let mut builder =
+            BlobFSBuilder::new(self.tools.get_tool("blobfs")?, self.layout.to_string());
         // Currently, we only care about doing size checks on products with compressed blobfs. We
         // can make this dynamic if the need arises.
         builder.set_compressed(true);
@@ -59,7 +68,6 @@ mod tests {
     use assembly_tool::testing::FakeToolProvider;
     use assembly_util::write_json_file;
     use camino::Utf8Path;
-    use fuchsia_hash::Hash;
     use serde_json::json;
     use std::path::Path;
     use std::str::FromStr;
@@ -116,10 +124,10 @@ mod tests {
                 )
                 .unwrap();
             }));
-        let gen = BlobJsonGenerator::new(tool_provider, BlobfsLayout::DeprecatedPadded).unwrap();
-        let blob_entries = gen.build(&vec![&manifest_path]).unwrap();
+        let gen = BlobSizeCalculator::new(tool_provider, BlobfsLayout::DeprecatedPadded);
+        let blob_entries = gen.calculate(&vec![&manifest_path]).unwrap();
         assert_eq!(
-            vec!(BlobJsonEntry {
+            vec!(BlobSize {
                 merkle: Hash::from_str(
                     "b62ee413090825c2ae70fe143b34cbd851f055932cfd5e7ca4ef0efbb802da2a"
                 )

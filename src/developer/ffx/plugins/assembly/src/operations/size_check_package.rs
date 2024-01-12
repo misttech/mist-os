@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::blob_json_generator::BlobJsonGenerator;
 use crate::operations::size_check::{PackageBlobSizeInfo, PackageSizeInfo};
 use anyhow::anyhow;
 use anyhow::format_err;
 use anyhow::Context;
 use anyhow::Result;
+use assembly_blob_size::BlobSizeCalculator;
 use assembly_tool::SdkToolProvider;
 use assembly_tool::ToolProvider;
 use assembly_util::read_config;
@@ -131,7 +131,7 @@ fn verify_budgets_with_tools(
     args: PackageSizeCheckArgs,
     tools: Box<dyn ToolProvider>,
 ) -> Result<()> {
-    let blobfs_builder = BlobJsonGenerator::new(tools, args.blobfs_layout)?;
+    let blob_size_calculator = BlobSizeCalculator::new(tools, args.blobfs_layout);
 
     // Read the budget configuration file.
     let config: BudgetConfig = read_config(&args.budgets)?;
@@ -144,7 +144,7 @@ fn verify_budgets_with_tools(
     // Read blob json file if any, and collect sizes on target.
     let blobs = load_blob_info(&args.blob_sizes)?;
     // Count how many times blobs are used.
-    let blob_count_by_hash = count_blobs(&blobs, &package_budget_blobs, &blobfs_builder)?;
+    let blob_count_by_hash = count_blobs(&blobs, &package_budget_blobs, &blob_size_calculator)?;
 
     // Find blobs to be charged on the resource budget, and compute each budget usage.
     let mut results =
@@ -343,7 +343,7 @@ fn index_blobs_by_hash(
 fn count_blobs(
     blob_sizes: &Vec<BlobJsonEntry>,
     blob_usages: &Vec<BudgetBlobs>,
-    blobfs_builder: &BlobJsonGenerator,
+    blob_size_calculator: &BlobSizeCalculator,
 ) -> Result<BTreeMap<Hash, BlobSizeAndCount>> {
     // Index blobs by hash.
     let mut blob_count_by_hash: BTreeMap<Hash, BlobSizeAndCount> = BTreeMap::new();
@@ -361,10 +361,12 @@ fn count_blobs(
 
     // If a builder is provided, attempts to build blobfs and complete the blobs database.
     if !incomplete_packages.is_empty() {
-        let blobs = blobfs_builder.build(&incomplete_packages).unwrap_or_else(|e| {
+        let mut blobs = blob_size_calculator.calculate(&incomplete_packages).unwrap_or_else(|e| {
             tracing::warn!("Failed to build the blobfs: {:?}", e);
             Vec::default()
         });
+        let blobs =
+            blobs.iter_mut().map(|b| BlobJsonEntry { merkle: b.merkle, size: b.size }).collect();
         index_blobs_by_hash(&blobs, &mut blob_count_by_hash)?;
     }
 

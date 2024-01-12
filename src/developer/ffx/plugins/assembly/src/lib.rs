@@ -9,7 +9,6 @@ use ffx_assembly_args::*;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter};
 
 mod base_package;
-mod blob_json_generator;
 mod blobfs;
 mod compiled_package;
 mod extra_hash_descriptor;

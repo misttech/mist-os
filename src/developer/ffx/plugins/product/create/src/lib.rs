@@ -8,6 +8,7 @@
 use anyhow::{bail, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
 use assembly_partitions_config::{Partition, PartitionsConfig};
+use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -42,7 +43,8 @@ pub async fn pb_create(cmd: CreateCommand) -> Result<()> {
         SdkVersion::InTree => in_tree_sdk_version(),
         SdkVersion::Unknown => bail!("Unable to determine SDK version"),
     };
-    pb_create_with_sdk_version(cmd, &sdk_version).await
+    let tools = SdkToolProvider::try_new()?;
+    pb_create_with_sdk_version(cmd, &sdk_version, Box::new(tools)).await
 }
 
 /// Returns the default delivery blob type a particular assembly manifest requires. Some products
@@ -59,7 +61,11 @@ fn default_delivery_blob_type(partitions_config: &PartitionsConfig) -> Option<u3
 }
 
 /// Create a product bundle using the provided sdk.
-pub async fn pb_create_with_sdk_version(cmd: CreateCommand, sdk_version: &str) -> Result<()> {
+pub async fn pb_create_with_sdk_version(
+    cmd: CreateCommand,
+    sdk_version: &str,
+    tools: Box<dyn ToolProvider>,
+) -> Result<()> {
     // We build an update package if `update_version_file` or `update_epoch` is provided.
     // If we decide to build an update package, we need to ensure that both of them
     // are provided.
@@ -122,7 +128,7 @@ pub async fn pb_create_with_sdk_version(cmd: CreateCommand, sdk_version: &str) -
             if let Some(manifest) = &system_r {
                 builder.add_slot_images(Slot::Recovery(manifest.clone()));
             }
-            let update_package = builder.build()?;
+            let update_package = builder.build(tools)?;
             (Some(gen_dir), Some(update_package.merkle), update_package.package_manifests)
         } else {
             (None, None, vec![])
@@ -415,6 +421,7 @@ fn copy_file(source: impl AsRef<Utf8Path>, out_dir: impl AsRef<Utf8Path>) -> Res
 #[cfg(test)]
 mod test {
     use super::*;
+    use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use fuchsia_repo::test_utils;
     use sdk_metadata::VirtualDeviceV1;
     use std::io::Write;
@@ -492,6 +499,8 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+
         pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
@@ -510,6 +519,7 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
+            tool_provider,
         )
         .await
         .unwrap();
@@ -545,6 +555,8 @@ mod test {
         let system_path = tempdir.join("system.json");
         AssemblyManifest::default().write(&system_path).unwrap();
 
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+
         pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
@@ -563,6 +575,7 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
+            tool_provider,
         )
         .await
         .unwrap();
@@ -603,6 +616,8 @@ mod test {
         ];
         manifest.write(&system_path).unwrap();
 
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+
         assert!(pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
@@ -621,6 +636,7 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
+            tool_provider,
         )
         .await
         .is_err());
@@ -642,6 +658,8 @@ mod test {
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);
 
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+
         pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
@@ -660,6 +678,7 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
+            tool_provider,
         )
         .await
         .unwrap();
@@ -708,6 +727,8 @@ mod test {
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);
 
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+
         pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
@@ -726,6 +747,7 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
+            tool_provider,
         )
         .await
         .unwrap();
@@ -779,6 +801,8 @@ mod test {
         vd_file1.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
         vd_file2.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
 
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+
         pb_create_with_sdk_version(
             CreateCommand {
                 product_name: String::default(),
@@ -797,6 +821,7 @@ mod test {
                 with_deprecated_flash_manifest: true,
             },
             /*sdk_version=*/ "",
+            tool_provider,
         )
         .await
         .unwrap();
@@ -865,6 +890,8 @@ mod test {
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);
 
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+
         // We don't specify delivery blob type since it should use the default value for Fxfs.
         pb_create_with_sdk_version(
             CreateCommand {
@@ -884,6 +911,7 @@ mod test {
                 with_deprecated_flash_manifest: false,
             },
             /*sdk_version=*/ "",
+            tool_provider,
         )
         .await
         .unwrap();

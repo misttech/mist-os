@@ -134,6 +134,7 @@ pub mod test {
     use assembly_partitions_config::Partition;
     use assembly_partitions_config::PartitionsConfig;
     use assembly_partitions_config::Slot as PartitionSlot;
+    use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use assembly_update_package::Slot;
     use assembly_update_package::UpdatePackageBuilder;
     use camino::Utf8Path;
@@ -189,7 +190,8 @@ pub mod test {
         builder.add_slot_images(Slot::Primary(AssemblyManifest {
             images: vec![Image::ZBI { path: zbi_path.to_path_buf(), signed: true }],
         }));
-        let update_package = builder.build().expect("build update package");
+        let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
+        let update_package = builder.build(tool_provider).expect("build update package");
 
         let pkg_manifest = PackageManifest::try_load_from(
             Utf8Path::from_path(&pkg_dir.path().join("update_package_manifest.json"))
