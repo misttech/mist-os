@@ -22,7 +22,7 @@
       "optionality": "optional",
       "long": "--id",
       "short": null,
-      "description": "device id. stream device node id from /dev/class/audio-input/, or /dev/class/audio-output/.\n        If not specified, command will default to first device alphabetically listed.",
+      "description": "device id. stream device node id from /dev/class/audio-input/,/dev/class/audio-output/, or /dev/class/audio-composite/.\n        If not specified, command will default to first device alphabetically listed.",
       "hidden": false
     },
     {
@@ -35,6 +35,18 @@
       "long": "--direction",
       "short": null,
       "description": "device direction. Accepted values: input, output. Play and record will use output and input respectively by default.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "type"
+        }
+      },
+      "optionality": "optional",
+      "long": "--type",
+      "short": null,
+      "description": "device type. Accepted values: StreamConfig, Composite. If not specified, defaults to StreamConfig",
       "hidden": false
     }
   ],

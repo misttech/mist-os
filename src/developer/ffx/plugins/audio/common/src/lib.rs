@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub mod device_info;
+
 use {
     anyhow::Error,
     blocking::Unblock,
@@ -31,6 +33,7 @@ pub struct RecordResult {
 pub enum DeviceResult {
     Play(PlayResult),
     Record(RecordResult),
+    Info(device_info::DeviceInfoResult),
 }
 
 pub async fn play(
@@ -154,7 +157,13 @@ pub async fn cancel_on_keypress(
 }
 
 pub mod tests {
-    use fidl_fuchsia_audio_controller::{DeviceControlProxy, RecorderProxy, RecorderRequest};
+    use fidl_fuchsia_audio_controller::{
+        CompositeDeviceInfo, DeviceControlGetDeviceInfoResponse, DeviceControlProxy,
+        DeviceControlRequest, DeviceInfo, RecorderProxy, RecorderRequest, StreamConfigDeviceInfo,
+    };
+    use fidl_fuchsia_hardware_audio::{
+        CompositeProperties, DeviceType, StreamProperties, SupportedFormats,
+    };
     use futures::AsyncWriteExt;
     use listener_utils::stop_listener;
     use timeout::timeout;
@@ -187,7 +196,63 @@ pub mod tests {
 
     pub fn fake_audio_daemon() -> DeviceControlProxy {
         let callback = |req| match req {
-            _ => {}
+            DeviceControlRequest::GetDeviceInfo { payload, responder } => match payload.device {
+                Some(device_selector) => {
+                    let result = match device_selector.device_type.unwrap() {
+                        DeviceType::StreamConfig => {
+                            let stream_device_info = StreamConfigDeviceInfo {
+                                stream_properties: Some(StreamProperties {
+                                    unique_id: Some([
+                                        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+                                    ]),
+                                    is_input: Some(true),
+                                    can_mute: Some(true),
+                                    can_agc: Some(true),
+                                    min_gain_db: Some(-32.0),
+                                    max_gain_db: Some(60.0),
+                                    gain_step_db: Some(0.5),
+                                    plug_detect_capabilities: None,
+                                    manufacturer: Some(format!("Spacely Sprockets")),
+                                    product: Some(format!("Test Microphone")),
+                                    clock_domain: Some(2),
+                                    ..Default::default()
+                                }),
+                                supported_formats: Some(vec![SupportedFormats {
+                                    pcm_supported_formats: None,
+                                    ..Default::default()
+                                }]),
+                                gain_state: None,
+                                plug_state: None,
+                                ..Default::default()
+                            };
+                            DeviceInfo::StreamConfig(stream_device_info)
+                        }
+                        DeviceType::Composite => {
+                            let composite_device_info = CompositeDeviceInfo {
+                                composite_properties: Some(CompositeProperties {
+                                    clock_domain: Some(0),
+                                    ..Default::default()
+                                }),
+                                supported_dai_formats: None,
+                                supported_ring_buffer_formats: None,
+                                ..Default::default()
+                            };
+
+                            DeviceInfo::Composite(composite_device_info)
+                        }
+                        _ => unimplemented!(),
+                    };
+
+                    responder
+                        .send(Ok(DeviceControlGetDeviceInfoResponse {
+                            device_info: Some(result),
+                            ..Default::default()
+                        }))
+                        .unwrap();
+                }
+                None => unimplemented!(),
+            },
+            _ => unimplemented!(),
         };
         fho::testing::fake_proxy(callback)
     }

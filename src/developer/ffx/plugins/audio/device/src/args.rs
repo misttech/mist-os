@@ -37,8 +37,8 @@ pub struct DeviceCommand {
 
     #[argh(
         option,
-        description = "device id. stream device node id from /dev/class/audio-input/, or \
-        /dev/class/audio-output/.
+        description = "device id. stream device node id from /dev/class/audio-input/,\
+        /dev/class/audio-output/, or /dev/class/audio-composite/.
         If not specified, command will default to first device alphabetically listed."
     )]
     pub id: Option<String>,
@@ -50,6 +50,16 @@ pub struct DeviceCommand {
         Play and record will use output and input respectively by default."
     )]
     pub device_direction: Option<DeviceDirection>,
+
+    #[argh(
+        option,
+        long = "type",
+        description = "device type. Accepted values: StreamConfig, Composite. \
+        If not specified, defaults to StreamConfig",
+        from_str_fn(parse_device_type),
+        default = "fidl_fuchsia_hardware_audio::DeviceType::StreamConfig"
+    )]
+    pub device_type: fidl_fuchsia_hardware_audio::DeviceType,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -65,16 +75,13 @@ pub enum SubCommand {
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "info", description = "List information about a specific audio device.")]
-pub struct InfoCommand {
-    #[argh(
-        option,
-        description = "output format: accepted options are 'text' for readable text, or 'json' \
-        for a JSON dictionary. Default: text",
-        default = "InfoOutputFormat::Text"
-    )]
-    pub output: InfoOutputFormat,
-}
+#[argh(
+    subcommand,
+    name = "info",
+    description = "List information about a specific audio device.",
+    example = "ffx audio device --type StreamConfig --direction input info"
+)]
+pub struct InfoCommand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "play", description = "Send audio data directly to device ring buffer.")]
@@ -181,6 +188,16 @@ impl FromStr for DeviceDirection {
                 "invalid device direction, {}. Expected one of: input, output",
                 s
             )),
+        }
+    }
+}
+
+fn parse_device_type(value: &str) -> Result<fidl_fuchsia_hardware_audio::DeviceType, String> {
+    match value.to_lowercase().as_str() {
+        "composite" => Ok(fidl_fuchsia_hardware_audio::DeviceType::Composite),
+        "streamconfig" => Ok(fidl_fuchsia_hardware_audio::DeviceType::StreamConfig),
+        _ => {
+            Err(format!("invalid device type, {}. Expected one of: Composite, StreamConfig", value))
         }
     }
 }
