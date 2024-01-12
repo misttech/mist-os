@@ -29,10 +29,12 @@ def main():
             "Bazel launcher does not exist: %s" % args.bazel_launcher
         )
 
+    # Query for @fuchsia_sdk//:BUILD.bazel, which will force the creation
+    # of the @fuchsia_sdk repository if it does not exist, or needs updating.
     cmd = [
         args.bazel_launcher,
-        "build",
-        "--verbose_failures",
+        "query",
+        "--config=quiet",
         "@fuchsia_sdk//:BUILD.bazel",
     ]
     ret = subprocess.run(cmd)
