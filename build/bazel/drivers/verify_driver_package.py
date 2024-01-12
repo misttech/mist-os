@@ -9,6 +9,9 @@ import json
 import sys
 from typing import Sequence, Dict, AbstractSet, Any
 from pathlib import Path
+from enum import Enum
+
+SizeCheckMode = Enum("SizeCheckMode", ["EQUAL", "BAZEL_SMALLER"])
 
 
 class Package:
@@ -45,7 +48,10 @@ class Package:
 
 
 def calculate_diff(
-    gn_package: Package, bazel_package: Package, size_check_blobs: Sequence[str]
+    gn_package: Package,
+    bazel_package: Package,
+    size_check_blobs: Sequence[str],
+    size_check_mode: SizeCheckMode,
 ) -> Sequence[str]:
     # If the blobs have the same merkle for their meta/ directory then they can
     # be considered the same and we will return no findings. However, if they
@@ -85,9 +91,19 @@ def calculate_diff(
     def compare_blob_size(path):
         gn_size: int = gn_package.blob_size(path)
         bazel_size: int = bazel_package.blob_size(path)
-        if gn_size != bazel_size:
+        if size_check_mode == SizeCheckMode.EQUAL:
+            if gn_size != bazel_size:
+                findings.append(
+                    f"Blobs at '{path}' have different sizes '{gn_size}' != '{bazel_size}'"
+                )
+        elif size_check_mode == SizeCheckMode.BAZEL_SMALLER:
+            if bazel_size > gn_size:
+                findings.append(
+                    f"Bazel blob at '{path}' is larger than GN blob '{bazel_size}' > '{gn_size}'"
+                )
+        else:
             findings.append(
-                f"Blobs at '{path}' have different sizes '{gn_size}' != '{bazel_size}'"
+                "Unknown size check mode passed to compare_blob_size"
             )
 
     for blob in common_blobs:
@@ -128,6 +144,12 @@ def main(argv: Sequence[str]):
         help="List of blob install paths to ignore.",
         required=False,
     )
+    parser.add_argument(
+        "--require-exact-sizes",
+        action="store_true",
+        help="""Whether sizes should be compared exactly.
+        If false, size checks will assert that bazel is always smaller""",
+    )
     args = parser.parse_args(argv)
 
     gn_package = Package(
@@ -137,10 +159,26 @@ def main(argv: Sequence[str]):
         args.bazel_package_manifest, ignored_blobs=args.blobs_to_ignore
     )
 
-    findings = calculate_diff(gn_package, bazel_package, args.size_check_blobs)
+    size_check_mode = (
+        SizeCheckMode.EQUAL
+        if args.require_exact_sizes
+        else SizeCheckMode.BAZEL_SMALLER
+    )
+    findings = calculate_diff(
+        gn_package, bazel_package, args.size_check_blobs, size_check_mode
+    )
 
     if len(findings) > 0:
-        args.output.write("\n".join(findings) + "\n")
+        findings_string = "\n".join(findings) + "\n"
+        args.output.write(findings_string)
+        print(
+            """---------------
+        Found diffs when comparing bazel and gn built driver.
+        {}
+        """.format(
+                findings_string
+            )
+        )
         return 1
     else:
         args.output.write("no issues\n")

@@ -140,5 +140,11 @@ template("verify_driver_package") {
       args += [ "--size-check-blobs" ]
       args += invoker.size_check_blobs
     }
+
+    if (!is_debug) {
+      # In debug mode the gn drivers are larger, we just want to check that
+      # bazel doesn't grow larger than gn in this case
+      args += [ "--require-exact-sizes" ]
+    }
   }
 }
