@@ -14,7 +14,6 @@ import (
 	"syscall/zx/fidl"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
@@ -68,7 +67,7 @@ type rootRoutesV4Impl struct {
 }
 
 func (r *rootRoutesV4Impl) GlobalRouteSet(ctx_ fidl.Context, request routesadmin.RouteSetV4WithCtxInterfaceRequest) error {
-	return bindV4RouteSet(request.Channel, routeSet[fuchsianet.Ipv4Address]{ns: r.ns, id: routetypes.GlobalRouteSet()})
+	return bindV4RouteSet(request.Channel, makeGlobalRouteSet[fuchsianet.Ipv4Address](r.ns))
 }
 
 var _ root.RoutesV6WithCtx = (*rootRoutesV6Impl)(nil)
@@ -78,5 +77,5 @@ type rootRoutesV6Impl struct {
 }
 
 func (r *rootRoutesV6Impl) GlobalRouteSet(ctx_ fidl.Context, request routesadmin.RouteSetV6WithCtxInterfaceRequest) error {
-	return bindV6RouteSet(request.Channel, routeSet[fuchsianet.Ipv6Address]{ns: r.ns, id: nil})
+	return bindV6RouteSet(request.Channel, makeGlobalRouteSet[fuchsianet.Ipv6Address](r.ns))
 }

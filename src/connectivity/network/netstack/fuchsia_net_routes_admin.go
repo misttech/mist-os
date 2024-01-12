@@ -43,6 +43,13 @@ func makeUserRouteSet[A fidlconv.IpAddress](ns *Netstack) routeSet[A] {
 	}
 }
 
+func makeGlobalRouteSet[A fidlconv.IpAddress](ns *Netstack) routeSet[A] {
+	return routeSet[A]{
+		ns: ns,
+		id: routetypes.GlobalRouteSet(),
+	}
+}
+
 // addRoute adds a route to the routeSet and returns whether the route is new
 // to the routeSet.
 func (r *routeSet[A]) addRoute(route fidlconv.Route[A]) (bool, error) {
