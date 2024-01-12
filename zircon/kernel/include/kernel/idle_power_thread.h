@@ -99,21 +99,22 @@ class IdlePowerThread final {
       TA_EXCL(TransitionLock::Get());
 
   // The result of a request to wake up the suspended or suspending boot CPU.
-  enum class WakeResult : bool {
+  enum class WakeResult : uint8_t {
     Resumed,
     SuspendAborted,
+    BadState,
   };
 
-  // Transitions the boot CPU from Suspend to Wakeup to begin resuming the system or to abort an
-  // incomplete suspend sequence.
+  // Triggers a wakeup that resumes the system or aborts an incomplete suspend sequence.
   //
-  // Must be called with interrupts and preempt disabled and active_cpus_suspended() == true.
+  // Must be called with interrupts and preempt disabled.
   //
   // Returns:
-  //  - WakeResult::Resumed if this or another wake trigger resumed the boot CPU.
+  //  - WakeResult::Resumed if this or another wake trigger resumed the system.
   //  - WakeResult::SuspendAborted if this wake trigger occurred before suspend completed.
+  //  - WakeResult::BadState if this wake trigger occurred when the system is active.
   //
-  static WakeResult WakeBootCpu();
+  static WakeResult TriggerSystemWake();
 
   // Implements the run loop executed by the CPU's idle/power thread.
   static int Run(void* arg);
@@ -125,9 +126,9 @@ class IdlePowerThread final {
   Thread& thread() { return thread_; }
   const Thread& thread() const { return thread_; }
 
-  // Accessor to the global active CPU suspend state.
-  static bool active_cpus_suspended() {
-    return active_cpus_suspended_.load(ktl::memory_order_acquire);
+  // Accessor to the global system suspend state.
+  static bool system_suspended() {
+    return system_suspend_state_.load(ktl::memory_order_acquire) != SystemSuspendState::Active;
   }
 
  private:
@@ -156,6 +157,7 @@ class IdlePowerThread final {
   }
   TransitionResult TransitionFromTo(State expected_state, State target_state, zx_time_t timeout_at)
       TA_REQ(TransitionLock::Get());
+  static WakeResult WakeBootCpu();
 
   ktl::atomic<StateMachine> state_{};
   AutounsignalMpUnplugEvent complete_;
@@ -165,7 +167,16 @@ class IdlePowerThread final {
 
   DECLARE_SINGLETON_MUTEX(TransitionLock);
 
-  inline static ktl::atomic<bool> active_cpus_suspended_{false};
+  enum class SystemSuspendState : uint8_t {
+    SuspendedBit = 1 << 0,
+    ResumePendingBit = 1 << 1,
+
+    Active = 0,
+    Suspended = SuspendedBit,
+    ResumePending = SuspendedBit | ResumePendingBit,
+  };
+
+  inline static ktl::atomic<SystemSuspendState> system_suspend_state_{SystemSuspendState::Active};
   inline static Timer resume_timer_ TA_GUARDED(TransitionLock::Get()){};
 };
 

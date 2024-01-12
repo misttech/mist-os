@@ -177,9 +177,9 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
   }
 
   // Set the global suspended flag so that other subsystems can act appropriately during suspend.
-  active_cpus_suspended_.store(true, ktl::memory_order_release);
-  auto restore_suspend_flag =
-      fit::defer([] { active_cpus_suspended_.store(false, ktl::memory_order_release); });
+  system_suspend_state_.store(SystemSuspendState::Suspended, ktl::memory_order_release);
+  auto restore_suspend_flag = fit::defer(
+      [] { system_suspend_state_.store(SystemSuspendState::Active, ktl::memory_order_release); });
 
   // Move to the boot CPU which will be suspended last.
   auto restore_affinity = fit::defer(
@@ -232,7 +232,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
             // Verify this handler is running in the correct context.
             DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
 
-            const WakeResult wake_result = WakeBootCpu();
+            const WakeResult wake_result = TriggerSystemWake();
             const char* message_prefix = wake_result == WakeResult::SuspendAborted
                                              ? "Wakeup before suspend completed. Aborting suspend"
                                              : "Resuming boot CPU";
@@ -315,7 +315,9 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
 }
 
 IdlePowerThread::WakeResult IdlePowerThread::WakeBootCpu() {
-  DEBUG_ASSERT(active_cpus_suspended());
+  DEBUG_ASSERT(system_suspended());
+  DEBUG_ASSERT(arch_ints_disabled());
+  DEBUG_ASSERT(Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false);
 
   // Poke the boot CPU when preemption is reenabled to ensure it responds to the potential state
   // change.
@@ -350,6 +352,21 @@ IdlePowerThread::WakeResult IdlePowerThread::WakeBootCpu() {
   DEBUG_ASSERT_MSG(expected == kSuspendToWakeup || expected == kWakeup, "current=%s target=%s",
                    ToString(expected.current), ToString(expected.target));
   return WakeResult::Resumed;
+}
+
+IdlePowerThread::WakeResult IdlePowerThread::TriggerSystemWake() {
+  DEBUG_ASSERT(arch_ints_disabled());
+  DEBUG_ASSERT(Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false);
+
+  SystemSuspendState expected = system_suspend_state_.load(ktl::memory_order_relaxed);
+  if (expected == SystemSuspendState::Suspended) {
+    if (system_suspend_state_.compare_exchange_strong(expected, SystemSuspendState::ResumePending,
+                                                      ktl::memory_order_acq_rel,
+                                                      ktl::memory_order_relaxed)) {
+      return WakeBootCpu();
+    }
+  }
+  return expected == SystemSuspendState::Active ? WakeResult::BadState : WakeResult::Resumed;
 }
 
 #include <lib/console.h>
