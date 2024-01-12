@@ -287,13 +287,15 @@ impl TargetCollection {
     }
 
     pub fn remove_target(&self, target_id: String) -> bool {
-        if let Ok(Some(t)) = self.query_any_single_target(&target_id.into(), |_| true) {
+        if let Ok(Some(t)) = self.query_any_single_target(&target_id.clone().into(), |_| true) {
             let target = self.targets.borrow_mut().remove(&t.id());
             if let Some(target) = target {
                 target.disable();
             }
+            tracing::debug!("TargetCollection: removed target {}", target_id);
             true
         } else {
+            tracing::debug!("TargetCollection: Requested to remove target {}, but was not found in our collection", target_id);
             false
         }
     }

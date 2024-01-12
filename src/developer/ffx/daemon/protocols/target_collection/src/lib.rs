@@ -19,6 +19,8 @@ use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+#[cfg(test)]
+use futures::channel::oneshot::Sender;
 use futures::TryStreamExt;
 use manual_targets;
 use protocols::prelude::*;
@@ -44,6 +46,11 @@ pub struct TargetCollectionProtocol {
     // With manual_targets, we have access to the targets.manual field of the configuration (a
     // vector of strings). Each target is defined by an IP address and a port.
     manual_targets: Rc<dyn manual_targets::ManualTargets>,
+
+    // Only used in tests.
+    // If is Some, will send signal after manual targets have been successfully loaded
+    #[cfg(test)]
+    manual_targets_loaded_signal: Option<Sender<()>>,
 }
 
 impl Default for TargetCollectionProtocol {
@@ -53,7 +60,12 @@ impl Default for TargetCollectionProtocol {
         #[cfg(test)]
         let manual_targets = manual_targets::Mock::default();
 
-        Self { tasks: Default::default(), manual_targets: Rc::new(manual_targets) }
+        Self {
+            tasks: Default::default(),
+            manual_targets: Rc::new(manual_targets),
+            #[cfg(test)]
+            manual_targets_loaded_signal: None,
+        }
     }
 }
 
@@ -111,9 +123,7 @@ async fn add_manual_target(
     // address is running in fastboot over tcp or not
     let is_fastboot_tcp = target_is_fastboot_tcp(addr).await;
 
-    if is_fastboot_tcp {
-        tracing::debug!("Manual target is fastboot");
-    }
+    tracing::debug!("Is manual target in Fastboot over TCP: {}", is_fastboot_tcp);
 
     let mut update = TargetUpdateBuilder::new()
         .manual_target(timeout)
@@ -178,21 +188,21 @@ async fn remove_manual_target(
             let _ = manual_targets.remove(format!("{}", sockaddr)).await.map_err(|e| {
                 tracing::error!("Unable to persist target removal: {}", e);
             });
+            tracing::debug!("Removed {:#?} from manual target collection", sockaddr)
         }
     }
     tc.remove_target(target_id)
 }
 
 impl TargetCollectionProtocol {
-    #[tracing::instrument(skip(self, tc))]
+    #[tracing::instrument(skip(cx, manual_targets))]
     async fn load_manual_targets(
-        &self,
-        tc: &TargetCollection,
-        overnet_node: &Arc<overnet_core::Router>,
-    ) {
+        cx: &Context,
+        manual_targets: Rc<dyn manual_targets::ManualTargets>,
+    ) -> Result<()> {
         // The FFX config value for a manual target contains a target ID (typically the IP:PORT
         // combo) and a timeout (which is None, if the target is indefinitely persistent).
-        for (unparsed_addr, val) in self.manual_targets.get_or_default().await {
+        for (unparsed_addr, val) in manual_targets.get_or_default().await {
             let (addr, scope, port) = match netext::parse_address_parts(unparsed_addr.as_str()) {
                 Ok(res) => res,
                 Err(e) => {
@@ -216,33 +226,38 @@ impl TargetCollectionProtocol {
                 IpAddr::V4(i) => std::net::SocketAddr::V4(SocketAddrV4::new(i, port)),
                 IpAddr::V6(i) => std::net::SocketAddr::V6(SocketAddrV6::new(i, port, 0, scope_id)),
             };
-            let secs = val.as_u64();
-            if secs.is_some() {
-                // If the manual target has a lifetime specified, we need to include it in the
-                // reloaded entry.
-                let lifetime_from_epoch = Duration::from_secs(secs.unwrap());
-                let now = SystemTime::now();
-                if let Ok(elapsed) = now.duration_since(UNIX_EPOCH) {
-                    let remaining = if lifetime_from_epoch < elapsed {
-                        Duration::ZERO
+
+            let (should_load, lifetime) = match val.as_u64() {
+                Some(lifetime) => {
+                    // If the manual target has a lifetime specified, we need to include it in the
+                    // reloaded entry.
+                    let lifetime_from_epoch = Duration::from_secs(lifetime);
+                    let now = SystemTime::now();
+                    if let Ok(elapsed) = now.duration_since(UNIX_EPOCH) {
+                        let remaining = if lifetime_from_epoch < elapsed {
+                            Duration::ZERO
+                        } else {
+                            lifetime_from_epoch - elapsed
+                        };
+                        (true, Some(remaining))
                     } else {
-                        lifetime_from_epoch - elapsed
-                    };
-                    add_manual_target(
-                        self.manual_targets.clone(),
-                        tc,
-                        sa,
-                        Some(remaining),
-                        overnet_node,
-                    )
-                    .await;
+                        tracing::debug!("Skipping load of manual target as the current time ({:?}) is earlier than the unix epoch", now);
+                        (false, None)
+                    }
                 }
-            } else {
-                // Manual targets without a lifetime are always reloaded.
-                tracing::debug!("Loading manual target: {:?}", sa);
-                add_manual_target(self.manual_targets.clone(), tc, sa, None, overnet_node).await;
+                None => {
+                    // Manual targets without a lifetime are always reloaded.
+                    (true, None)
+                }
+            };
+            if should_load {
+                let tc = cx.get_target_collection().await?;
+                let overnet_node = cx.overnet_node()?;
+                tracing::debug!("Adding manual target: {:?}", sa);
+                add_manual_target(manual_targets.clone(), &tc, sa, lifetime, &overnet_node).await;
             }
         }
+        Ok(())
     }
 }
 
@@ -478,9 +493,31 @@ impl FidlProtocol for TargetCollectionProtocol {
     }
 
     async fn start(&mut self, cx: &Context) -> Result<()> {
-        let target_collection = cx.get_target_collection().await?;
         let node = cx.overnet_node()?;
-        self.load_manual_targets(&target_collection, &node).await;
+        let load_manual_cx = cx.clone();
+        let manual_targets_collection = self.manual_targets.clone();
+        #[cfg(test)]
+        let signal = if self.manual_targets_loaded_signal.is_some() {
+            Some(self.manual_targets_loaded_signal.take().unwrap())
+        } else {
+            None
+        };
+        self.tasks.spawn(async move {
+            tracing::warn!("In start: spawned task to load manual targets");
+            if let Err(e) = TargetCollectionProtocol::load_manual_targets(
+                &load_manual_cx,
+                manual_targets_collection,
+            )
+            .await
+            {
+                tracing::warn!("Got error loading manual targets: {}", e);
+            }
+            #[cfg(test)]
+            if let Some(s) = signal {
+                tracing::debug!("Sending signal that manual target loading is complete");
+                let _ = s.send(());
+            }
+        });
         let mdns = self.open_mdns_proxy(cx).await?;
         let fastboot = self.open_fastboot_target_stream_proxy(cx).await?;
         let tc = cx.get_target_collection().await?;
@@ -648,6 +685,7 @@ mod tests {
     use async_channel::{Receiver, Sender};
     use ffx_config::{query, ConfigLevel};
     use fidl_fuchsia_net::{IpAddress, Ipv6Address};
+    use futures::channel::oneshot::channel;
     use protocols::testing::FakeDaemonBuilder;
     use serde_json::{json, Map, Value};
     use std::{cell::RefCell, path::Path, str::FromStr};
@@ -951,7 +989,9 @@ mod tests {
         let temp = tempdir().expect("cannot get tempdir");
         init_test_config(&env, temp.path()).await;
 
+        let (manual_targets_loaded_sender, manual_targets_loaded_receiver) = channel::<()>();
         let tc_impl = Rc::new(RefCell::new(TargetCollectionProtocol::default()));
+        tc_impl.borrow_mut().manual_targets_loaded_signal.replace(manual_targets_loaded_sender);
         let fake_daemon = FakeDaemonBuilder::new()
             .register_fidl_protocol::<FakeMdns>()
             .register_fidl_protocol::<FakeFastboot>()
@@ -969,13 +1009,16 @@ mod tests {
             .add("127.0.0.1:8023".to_string(), Some(expiry))
             .await
             .unwrap();
-        let target_collection =
-            Context::new(fake_daemon.clone()).get_target_collection().await.unwrap();
-        tc_impl
-            .borrow()
-            .load_manual_targets(&target_collection, &overnet_core::Router::new(None).unwrap())
-            .await;
+
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
+        let res = list_targets(None, &proxy).await;
+        // List targets will be unstable as the manual targets have not yet loaded
+        // we can be sure, however that there should be less than 3 at this
+        // point as we have only added two manual targets thus far
+        assert!(res.len() < 3);
+        // Wait here... listing targets initializes the proxy which calls `start` on the target collection
+        // need to wait for it to load the manual targets
+        manual_targets_loaded_receiver.await.unwrap();
         let res = list_targets(None, &proxy).await;
         assert_eq!(2, res.len());
         assert!(proxy.remove_target("127.0.0.1:8022").await.unwrap());
@@ -1202,13 +1245,14 @@ mod tests {
             .await
             .unwrap();
 
-        let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
+        let cx = Context::new(fake_daemon);
+        let target_collection = cx.get_target_collection().await.unwrap();
         // This happens in FidlProtocol::start(), but we want to avoid binding the
         // network sockets in unit tests, thus not calling start.
-        tc_impl
-            .borrow()
-            .load_manual_targets(&target_collection, &overnet_core::Router::new(None).unwrap())
-            .await;
+        let manual_targets_collection = tc_impl.borrow().manual_targets.clone();
+        TargetCollectionProtocol::load_manual_targets(&cx, manual_targets_collection)
+            .await
+            .expect("Problem loading manual targets");
 
         let target = target_collection
             .query_single_enabled_target(&"127.0.0.1:8022".into())
