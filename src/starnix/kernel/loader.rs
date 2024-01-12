@@ -574,6 +574,14 @@ mod tests {
             todo!()
         }
 
+        fn vmo_read_memory<'a>(
+            &self,
+            _addr: UserAddress,
+            _bytes: &'a mut [MaybeUninit<u8>],
+        ) -> Result<&'a mut [u8], Errno> {
+            todo!()
+        }
+
         fn read_memory_partial_until_null_byte<'a>(
             &self,
             _addr: UserAddress,
@@ -582,7 +590,7 @@ mod tests {
             todo!()
         }
 
-        fn vmo_read_memory<'a>(
+        fn vmo_read_memory_partial_until_null_byte<'a>(
             &self,
             _addr: UserAddress,
             _bytes: &'a mut [MaybeUninit<u8>],

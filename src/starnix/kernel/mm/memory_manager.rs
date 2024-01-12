@@ -1918,6 +1918,16 @@ pub trait MemoryAccessor {
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno>;
 
+    /// Like `read_memory_partial_until_null_byte` but always reads the memory
+    /// through a VMO.
+    ///
+    /// Useful when the address may not be mapped in the current address space.
+    fn vmo_read_memory_partial_until_null_byte<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno>;
+
     /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
     /// or no more bytes can be read from the target.
     ///
@@ -2453,8 +2463,16 @@ impl MemoryAccessor for MemoryManager {
                 Ok(read_bytes)
             }
         } else {
-            self.state.read().read_memory_partial_until_null_byte(addr, bytes)
+            self.vmo_read_memory_partial_until_null_byte(addr, bytes)
         }
+    }
+
+    fn vmo_read_memory_partial_until_null_byte<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.state.read().read_memory_partial_until_null_byte(addr, bytes)
     }
 
     fn read_memory_partial<'a>(

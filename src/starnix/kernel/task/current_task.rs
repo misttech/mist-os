@@ -1545,6 +1545,14 @@ impl MemoryAccessor for CurrentTask {
         self.mm().read_memory_partial_until_null_byte(addr, bytes)
     }
 
+    fn vmo_read_memory_partial_until_null_byte<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.mm().vmo_read_memory_partial_until_null_byte(addr, bytes)
+    }
+
     fn read_memory_partial<'a>(
         &self,
         addr: UserAddress,

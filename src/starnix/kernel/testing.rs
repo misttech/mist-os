@@ -428,6 +428,13 @@ impl MemoryAccessor for AutoReleasableTask {
     ) -> Result<&'a mut [u8], Errno> {
         (**self).read_memory_partial_until_null_byte(addr, bytes)
     }
+    fn vmo_read_memory_partial_until_null_byte<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        (**self).vmo_read_memory_partial_until_null_byte(addr, bytes)
+    }
     fn read_memory_partial<'a>(
         &self,
         addr: UserAddress,
