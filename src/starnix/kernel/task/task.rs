@@ -1254,7 +1254,11 @@ impl MemoryAccessor for Task {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.mm().read_memory(addr, bytes)
+        // Using a `Task` to read memory generally indicates that the memory
+        // is being read from a task different than the `CurrentTask`. When
+        // this `Task` is not current, its address space is not mapped
+        // so we need to go through the VMO.
+        self.vmo_read_memory(addr, bytes)
     }
 
     fn vmo_read_memory<'a>(
@@ -1270,7 +1274,11 @@ impl MemoryAccessor for Task {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.mm().read_memory_partial_until_null_byte(addr, bytes)
+        // Using a `Task` to read memory generally indicates that the memory
+        // is being read from a task different than the `CurrentTask`. When
+        // this `Task` is not current, its address space is not mapped
+        // so we need to go through the VMO.
+        self.vmo_read_memory_partial_until_null_byte(addr, bytes)
     }
 
     fn vmo_read_memory_partial_until_null_byte<'a>(
@@ -1286,7 +1294,11 @@ impl MemoryAccessor for Task {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.mm().read_memory_partial(addr, bytes)
+        // Using a `Task` to read memory generally indicates that the memory
+        // is being read from a task different than the `CurrentTask`. When
+        // this `Task` is not current, its address space is not mapped
+        // so we need to go through the VMO.
+        self.vmo_read_memory_partial(addr, bytes)
     }
 
     fn vmo_read_memory_partial<'a>(
@@ -1298,7 +1310,11 @@ impl MemoryAccessor for Task {
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm().write_memory(addr, bytes)
+        // Using a `Task` to write memory generally indicates that the memory
+        // is being written to a task different than the `CurrentTask`. When
+        // this `Task` is not current, its address space is not mapped
+        // so we need to go through the VMO.
+        self.vmo_write_memory(addr, bytes)
     }
 
     fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -1306,7 +1322,11 @@ impl MemoryAccessor for Task {
     }
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm().write_memory_partial(addr, bytes)
+        // Using a `Task` to write memory generally indicates that the memory
+        // is being written to a task different than the `CurrentTask`. When
+        // this `Task` is not current, its address space is not mapped
+        // so we need to go through the VMO.
+        self.vmo_write_memory_partial(addr, bytes)
     }
 
     fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -1314,7 +1334,11 @@ impl MemoryAccessor for Task {
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.mm().zero(addr, length)
+        // Using a `Task` to zero memory generally indicates that the memory
+        // is being zeroed from a task different than the `CurrentTask`. When
+        // this `Task` is not current, its address space is not mapped
+        // so we need to go through the VMO.
+        self.vmo_zero(addr, length)
     }
 
     fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
