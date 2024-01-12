@@ -2823,7 +2823,11 @@ impl MemoryAccessor for RemoteResourceAccessor {
         error!(ENOTSUP)
     }
 
-    fn zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.vmo_zero(addr, length)
+    }
+
+    fn vmo_zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
         error!(ENOTSUP)
     }
 }

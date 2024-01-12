@@ -463,6 +463,9 @@ impl MemoryAccessor for AutoReleasableTask {
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         (**self).zero(addr, length)
     }
+    fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        (**self).vmo_zero(addr, length)
+    }
 }
 
 struct TestFs;

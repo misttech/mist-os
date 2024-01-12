@@ -1972,6 +1972,11 @@ pub trait MemoryAccessor {
     ///
     /// Returns the number of bytes that were zeroed.
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
+
+    /// Like `zero` but always zeroes the bytes through a VMO.
+    ///
+    /// Useful when the address may not be mapped in the current address space.
+    fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
 }
 
 // TODO(https://fxbug.dev/129310): replace this with MaybeUninit::as_bytes_mut.
@@ -2515,6 +2520,38 @@ impl MemoryAccessor for MemoryManager {
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        {
+            let page_size = *PAGE_SIZE as usize;
+            // Get the page boundary immediately following `addr` if `addr` is
+            // not page aligned.
+            let next_page_boundary = round_up_to_system_page_size(addr.ptr())?;
+            // The number of bytes needed to zero at least a full page (not just
+            // a pages worth of bytes) starting at `addr`.
+            let length_with_atleast_one_full_page = page_size + (next_page_boundary - addr.ptr());
+            // If at least one full page is being zeroed, go through the VMO since
+            // Zircon can swap the mapped pages with the zero page which should be
+            // cheaper than zeroing out a pages worth of bytes manually.
+            //
+            // If we are not zeroing out a full page, then go through usercopy
+            // if unified aspaces is enabled.
+            if length >= length_with_atleast_one_full_page {
+                return self.vmo_zero(addr, length);
+            }
+        }
+
+        if let Some(usercopy) = usercopy() {
+            profile_duration!("UsercopyZero");
+            if usercopy.zero(addr.ptr(), length) == length {
+                Ok(length)
+            } else {
+                error!(EFAULT)
+            }
+        } else {
+            self.vmo_zero(addr, length)
+        }
+    }
+
+    fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.state.read().zero(addr, length)
     }
 }

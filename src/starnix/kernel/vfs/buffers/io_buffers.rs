@@ -498,7 +498,11 @@ impl<'a, const USE_VMO: bool> OutputBuffer for UserBuffersOutputBuffer<'a, USE_V
                 continue;
             }
 
-            let count = self.mm.zero(buffer.address, buffer.length)?;
+            let count = if USE_VMO {
+                self.mm.vmo_zero(buffer.address, buffer.length)
+            } else {
+                self.mm.zero(buffer.address, buffer.length)
+            }?;
             buffer.advance(count)?;
             bytes_written += count;
 

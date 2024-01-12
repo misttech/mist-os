@@ -630,6 +630,10 @@ mod tests {
         fn zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
             todo!()
         }
+
+        fn vmo_zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
+            todo!()
+        }
     }
 
     #[::fuchsia::test]

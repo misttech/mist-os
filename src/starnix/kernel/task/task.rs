@@ -1308,6 +1308,10 @@ impl MemoryAccessor for Task {
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.mm().zero(addr, length)
     }
+
+    fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.mm().vmo_zero(addr, length)
+    }
 }
 
 impl fmt::Debug for Task {

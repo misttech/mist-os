@@ -1580,6 +1580,10 @@ impl MemoryAccessor for CurrentTask {
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.mm().zero(addr, length)
     }
+
+    fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.mm().vmo_zero(addr, length)
+    }
 }
 
 pub enum ExceptionResult {
