@@ -44,6 +44,17 @@ class VideoInputUnit {
   static zx::result<std::unique_ptr<VideoInputUnit>> Create(ddk::PDevFidl* pdev,
                                                             inspect::Node* video_input_unit_node);
 
+  // Creates a VideoInputUnit with `vpu_mmio`, `rdma` injected and
+  // `layer_image_size` / `display_contents_size` set.
+  //
+  // This factory method must only be used for testing.
+  static zx::result<std::unique_ptr<VideoInputUnit>> CreateForTesting(
+      fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma, PixelGridSize2D layer_image_size,
+      PixelGridSize2D display_contents_size);
+
+  // Production code should prefer using the `Create()` factory method instead.
+  VideoInputUnit(fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
+
   VideoInputUnit(VideoInputUnit& other) = delete;
 
   // Disable the OSD layer and set the latest stamp to |config_stamp|.
@@ -78,9 +89,11 @@ class VideoInputUnit {
 
   void SetMinimumRgb(uint8_t minimum_rgb);
 
- private:
-  VideoInputUnit(fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma);
+  PixelGridSize2D layer_image_size() const { return layer_image_size_; }
 
+  PixelGridSize2D display_contents_size() const { return display_contents_size_; }
+
+ private:
   // Configures the video input unit hardware blocks so that the VIU displays a
   // single layer of unscaled image (of size `layer_image_size`) on the display
   // (of size `display_contents_size`).

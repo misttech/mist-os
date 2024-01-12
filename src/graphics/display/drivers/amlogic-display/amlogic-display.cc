@@ -701,17 +701,19 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     SetDefaultImageFormatConstraints(fuchsia_sysmem::wire::PixelFormatType::kBgr24,
                                      fuchsia_sysmem::wire::kFormatModifierLinear,
                                      image_constraints);
-    image_constraints.min_coded_width = vout_->display_width();
-    image_constraints.max_coded_width = vout_->display_width();
-    image_constraints.min_coded_height = vout_->display_height();
-    image_constraints.max_coded_height = vout_->display_height();
+
+    const PixelGridSize2D display_contents_size = video_input_unit_->display_contents_size();
+    image_constraints.min_coded_width = display_contents_size.width;
+    image_constraints.max_coded_width = display_contents_size.width;
+    image_constraints.min_coded_height = display_contents_size.height;
+    image_constraints.max_coded_height = display_contents_size.height;
     // Amlogic display capture engine (VDIN) outputs in formats with 3 bytes per
     // pixel.
     constexpr uint32_t kCaptureImageBytesPerPixel = 3;
     image_constraints.min_bytes_per_row =
-        fbl::round_up(vout_->display_width() * kCaptureImageBytesPerPixel, kBufferAlignment);
+        fbl::round_up(display_contents_size.width * kCaptureImageBytesPerPixel, kBufferAlignment);
     image_constraints.max_coded_width_times_coded_height =
-        vout_->display_width() * vout_->display_height();
+        display_contents_size.width * display_contents_size.height;
     buffer_name = "Display capture";
   } else {
     // TODO(https://fxbug.dev/94535): Currently the buffer collection constraints are

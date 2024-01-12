@@ -11,10 +11,13 @@
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <zircon/syscalls/object.h>
 
+#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -332,6 +335,9 @@ class FakeCanvasProtocol : public fidl::WireServer<fuchsia_hardware_amlogiccanva
 
 class FakeSysmemTest : public testing::Test {
  public:
+  static constexpr int kWidth = 1024;
+  static constexpr int kHeight = 600;
+
   FakeSysmemTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   void SetUp() override {
@@ -346,9 +352,23 @@ class FakeSysmemTest : public testing::Test {
     display_->SetCanvasForTesting(std::move(endpoints.value().client));
 
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result = Vout::CreateDsiVoutForTesting(
-        /*panel_type=*/PANEL_TV070WSM_FT, /*width=*/1024, /*height=*/600);
+        /*panel_type=*/PANEL_TV070WSM_FT, /*width=*/kWidth, /*height=*/kHeight);
     ASSERT_OK(create_dsi_vout_result.status_value());
-    display_->SetVoutForTesting(std::move(create_dsi_vout_result.value()));
+    display_->SetVoutForTesting(std::move(create_dsi_vout_result).value());
+
+    PixelGridSize2D layer_image_size = {
+        .width = kWidth,
+        .height = kHeight,
+    };
+    PixelGridSize2D display_contents_size = {
+        .width = kWidth,
+        .height = kHeight,
+    };
+    zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_result =
+        VideoInputUnit::CreateForTesting(vpu_mmio_.GetMmioBuffer(), /*rdma=*/nullptr,
+                                         layer_image_size, display_contents_size);
+    ASSERT_OK(video_input_unit_result.status_value());
+    display_->SetVideoInputUnitForTesting(std::move(video_input_unit_result).value());
 
     allocator_ = std::make_unique<MockAllocator>(loop_.dispatcher());
     allocator_->set_mock_buffer_collection_builder([] {
@@ -377,6 +397,8 @@ class FakeSysmemTest : public testing::Test {
  protected:
   async::Loop loop_;
 
+  ddk_fake::FakeMmioRegRegion vpu_mmio_ =
+      ddk_fake::FakeMmioRegRegion(/*reg_size=*/4, /*reg_count=*/0x10000);
   std::unique_ptr<AmlogicDisplay> display_;
   std::unique_ptr<MockAllocator> allocator_;
   async_patterns::TestDispatcherBound<FakeCanvasProtocol> canvas_{loop_.dispatcher(),
@@ -560,8 +582,8 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
 
   // Driver sets BufferCollection buffer memory constraints.
   const image_t kDefaultConfig = {
-      .width = 1024,
-      .height = 768,
+      .width = kWidth,
+      .height = kHeight,
       .type = IMAGE_TYPE_CAPTURE,
       .handle = 0,
   };

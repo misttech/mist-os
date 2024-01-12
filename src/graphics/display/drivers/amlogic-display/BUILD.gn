@@ -164,6 +164,7 @@ test("amlogic-display-test") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/gpio/testing/fake-gpio",
+    "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-mmio-range",
     "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",

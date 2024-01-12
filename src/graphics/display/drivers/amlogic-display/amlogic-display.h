@@ -159,6 +159,10 @@ class AmlogicDisplay
 
   void SetVoutForTesting(std::unique_ptr<Vout> vout) { vout_ = std::move(vout); }
 
+  void SetVideoInputUnitForTesting(std::unique_ptr<VideoInputUnit> video_input_unit) {
+    video_input_unit_ = std::move(video_input_unit);
+  }
+
   void SetSysmemAllocatorForTesting(
       fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client) {
     sysmem_ = std::move(sysmem_allocator_client);

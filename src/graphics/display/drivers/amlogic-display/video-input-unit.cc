@@ -27,6 +27,7 @@
 
 #include <ddktl/device.h>
 #include <fbl/algorithm.h>
+#include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
@@ -841,10 +842,10 @@ zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
     return rdma_result.take_error();
   }
 
-  fbl::AllocChecker ac;
-  std::unique_ptr<VideoInputUnit> self(
-      new (&ac) VideoInputUnit(std::move(vpu_mmio_result).value(), std::move(rdma_result).value()));
-  if (!ac.check()) {
+  fbl::AllocChecker alloc_checker;
+  auto self = fbl::make_unique_checked<VideoInputUnit>(
+      &alloc_checker, std::move(vpu_mmio_result).value(), std::move(rdma_result).value());
+  if (!alloc_checker.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -855,6 +856,22 @@ zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
   }
 
   return zx::ok(self.release());
+}
+
+// static
+zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::CreateForTesting(
+    fdf::MmioBuffer vpu_mmio, std::unique_ptr<RdmaEngine> rdma, PixelGridSize2D layer_image_size,
+    PixelGridSize2D display_contents_size) {
+  fbl::AllocChecker alloc_checker;
+  auto self = fbl::make_unique_checked<VideoInputUnit>(&alloc_checker, std::move(vpu_mmio),
+                                                       std::move(rdma));
+  if (!alloc_checker.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  self->layer_image_size_ = layer_image_size;
+  self->display_contents_size_ = display_contents_size;
+  return zx::ok(std::move(self));
 }
 
 }  // namespace amlogic_display
