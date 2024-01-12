@@ -65,11 +65,12 @@ void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch
 [[noreturn]] void RestrictedState::ArchEnterRestricted(const zx_restricted_state_t& state) {
   DEBUG_ASSERT(arch_ints_disabled());
 
-  // Create an iframe for restricted mode and set the status to a reasonable
-  // initial value.
+  uint64_t fp_status = riscv64_csr_read(RISCV64_CSR_SSTATUS) & RISCV64_CSR_SSTATUS_FS_MASK;
+
+  // Create an iframe for restricted mode and set the status to a reasonable initial value. Keep FP
+  // status since the FP registers should be preserved when entering/exiting restricted mode.
   iframe_t iframe{
-      .status =
-          RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT | RISCV64_CSR_SSTATUS_FS_INITIAL,
+      .status = RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT | fp_status,
       .regs = state,
   };
 
@@ -106,9 +107,10 @@ void RestrictedState::ArchSaveRestrictedIframeState(zx_restricted_state_t& state
   // Set the program counter so we jump to vector_table in normal mode.
   iframe.regs.pc = vector_table;
 
-  // Set status to a valid initial value, but assume the FPU is dirty.
-  iframe.status =
-      RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT | RISCV64_CSR_SSTATUS_FS_DIRTY;
+  // Set status to a valid initial value. Keep FP status since the FP registers should be preserved
+  // when entering/exiting restricted mode.
+  uint64_t fp_status = riscv64_csr_read(RISCV64_CSR_SSTATUS) & RISCV64_CSR_SSTATUS_FS_MASK;
+  iframe.status = RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT | fp_status;
 
   // Enter normal mode.
   arch_enter_uspace(&iframe);
