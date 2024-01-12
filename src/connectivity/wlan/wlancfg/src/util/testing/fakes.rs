@@ -7,8 +7,9 @@ use {
     crate::{
         client::{
             connection_selection::{
-                bss_selection, local_roam_manager::LocalRoamManagerApi, EWMA_SMOOTHING_FACTOR,
-                EWMA_VELOCITY_SMOOTHING_FACTOR,
+                bss_selection,
+                local_roam_manager::{roam_monitor::RoamMonitorApi, LocalRoamManagerApi},
+                EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
             },
             scan, types as client_types,
         },
@@ -280,55 +281,54 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
     }
 }
 
+/// Stubbed instance of LocalRoamManagerApi for testing, and for creating FakeRoamMonitors.
 pub struct FakeLocalRoamManager {
-    /// This is used to check what connection stats are sent to the FakeLocalRoamManager. It may be
-    /// None if the test does not care about the values.
     stats_sender: Option<mpsc::UnboundedSender<fidl_internal::SignalReportIndication>>,
-    /// This is what will be returned by get_signal_data. It is set in handle_connection_start and
-    /// updated in handle_connection_stats for the sake of state_machine_tests.
-    signal_data: Option<SignalData>,
 }
 
 impl LocalRoamManagerApi for FakeLocalRoamManager {
-    fn handle_connection_stats(
-        &mut self,
-        stats: fidl_internal::SignalReportIndication,
-        _responder: mpsc::UnboundedSender<client_types::ScannedCandidate>,
-    ) -> Result<u8, anyhow::Error> {
-        if let Some(sender) = &self.stats_sender {
-            sender
-                .clone()
-                .unbounded_send(stats)
-                .expect("failed to send fake roam manager stats out");
-        }
-        return Ok(u8::MIN);
-    }
-
-    fn handle_connection_start(
+    fn get_roam_monitor(
         &mut self,
         quality_data: bss_selection::BssQualityData,
-        _connection_start_time: fasync::Time,
-        _network: client_types::NetworkIdentifier,
-        _credential: Credential,
-        _bssid: client_types::Bssid,
-    ) {
-        self.signal_data = Some(quality_data.signal_data);
-    }
-
-    fn get_signal_data(&self) -> Option<SignalData> {
-        self.signal_data
+        _currently_fulfilled_connection: client_types::ConnectSelection,
+        _roam_sender: mpsc::UnboundedSender<client_types::ScannedCandidate>,
+    ) -> Box<dyn RoamMonitorApi> {
+        Box::new(FakeRoamMonitor {
+            stats_sender: self.stats_sender.clone(),
+            signal_data: Some(quality_data.signal_data),
+        })
     }
 }
 
 impl FakeLocalRoamManager {
     pub fn new() -> Self {
-        Self { stats_sender: None, signal_data: None }
+        Self { stats_sender: None }
     }
 
-    pub fn new_with_stats_channel(
-    ) -> (Self, mpsc::UnboundedReceiver<fidl_internal::SignalReportIndication>) {
-        let (sender, receiver) = mpsc::unbounded();
-        (Self { stats_sender: Some(sender), signal_data: None }, receiver)
+    pub fn new_with_roam_monitor_stats_sender(
+        stats_sender: mpsc::UnboundedSender<fidl_internal::SignalReportIndication>,
+    ) -> Self {
+        Self { stats_sender: Some(stats_sender) }
+    }
+}
+
+/// Stubbed instance of RoamMonitorApi for testing.
+pub struct FakeRoamMonitor {
+    stats_sender: Option<mpsc::UnboundedSender<fidl_internal::SignalReportIndication>>,
+    signal_data: Option<SignalData>,
+}
+impl RoamMonitorApi for FakeRoamMonitor {
+    fn handle_connection_stats(
+        &mut self,
+        stats: fidl_internal::SignalReportIndication,
+    ) -> Result<u8, anyhow::Error> {
+        if let Some(sender) = &self.stats_sender {
+            sender.clone().unbounded_send(stats).expect("failed to send stats via fake sender");
+        }
+        return Ok(u8::MIN);
+    }
+    fn get_signal_data(&self) -> SignalData {
+        self.signal_data.expect("signal data not set.")
     }
 }
 

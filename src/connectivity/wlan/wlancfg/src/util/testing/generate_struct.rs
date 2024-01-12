@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
+use crate::util::historical_list::HistoricalList;
+
 use {
     crate::{
-        client::types,
+        client::{connection_selection::bss_selection::BssQualityData, types},
         config_management::{Credential, HistoricalListsByBssid},
+        util::pseudo_energy::SignalData,
     },
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
@@ -328,4 +331,22 @@ pub fn generate_connect_selection() -> types::ConnectSelection {
         target: generate_random_scanned_candidate(),
         reason: generate_random_connect_reason(),
     }
+}
+
+pub fn generate_random_signal_data() -> SignalData {
+    let mut rng = rand::thread_rng();
+    SignalData::new(
+        rng.gen_range(-80..-20),
+        rng.gen_range(0..80),
+        rng.gen_range(0..10) as usize,
+        rng.gen_range(0..10) as usize,
+    )
+}
+
+pub fn generate_random_bss_quality_data() -> BssQualityData {
+    BssQualityData::new(
+        generate_random_signal_data(),
+        generate_random_channel(),
+        HistoricalList::new(10),
+    )
 }

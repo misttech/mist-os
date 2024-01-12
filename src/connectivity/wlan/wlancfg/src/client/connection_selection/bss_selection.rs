@@ -18,13 +18,15 @@ use {
     tracing::{info, trace},
 };
 
-/// Threshold for BSS signal scores (bound from 0-100), under which a BSS's signal is considered
-/// suboptimal. Used to determine if roaming should be considered.
-const SUBOPTIMAL_SIGNAL_THRESHOLD: u8 = 45;
+const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
+const LOCAL_ROAM_THRESHOLD_RSSI_5G: f64 = -75.0;
+const LOCAL_ROAM_THRESHOLD_SNR_2G: f64 = 20.0;
+const LOCAL_ROAM_THRESHOLD_SNR_5G: f64 = 17.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RoamReason {
-    SuboptimalSignal,
+    RssiBelowThreshold,
+    SnrBelowThreshold,
 }
 
 /// Aggregated information about the current BSS's connection quality, used for evaluation.
@@ -108,26 +110,25 @@ pub async fn select_bss(
     }
 }
 
-/// Evaluates BssQualityData for an existing connection.
-pub fn evaluate_current_bss(bss: &BssQualityData) -> (u8, Vec<RoamReason>) {
-    let signal_score = scoring_functions::score_current_connection_signal_data(bss.signal_data);
-    let roam_reasons = generate_roam_reasons(bss);
-
-    return (signal_score, roam_reasons);
-}
-
-fn generate_roam_reasons(bss: &BssQualityData) -> Vec<RoamReason> {
+// Returns a set of RoamReasons and a score (for metrics).
+pub fn evaluate_current_bss(bss: &BssQualityData) -> (Vec<RoamReason>, u8) {
     let mut roam_reasons: Vec<RoamReason> = vec![];
 
-    // Add RoamReasons based on the raw signal score
-    match scoring_functions::score_current_connection_signal_data(bss.signal_data) {
-        u8::MIN..=SUBOPTIMAL_SIGNAL_THRESHOLD => {
-            roam_reasons.push(RoamReason::SuboptimalSignal);
-        }
-        _ => {}
+    let (rssi_threshold, snr_threshold) = if bss.channel.is_5ghz() {
+        (LOCAL_ROAM_THRESHOLD_RSSI_5G, LOCAL_ROAM_THRESHOLD_SNR_5G)
+    } else {
+        (LOCAL_ROAM_THRESHOLD_RSSI_2G, LOCAL_ROAM_THRESHOLD_SNR_2G)
+    };
+
+    if bss.signal_data.ewma_rssi.get() <= rssi_threshold {
+        roam_reasons.push(RoamReason::RssiBelowThreshold)
+    }
+    if bss.signal_data.ewma_snr.get() <= snr_threshold {
+        roam_reasons.push(RoamReason::SnrBelowThreshold)
     }
 
-    roam_reasons
+    let signal_score = scoring_functions::score_current_connection_signal_data(bss.signal_data);
+    return (roam_reasons, signal_score);
 }
 
 #[cfg(test)]
@@ -214,17 +215,9 @@ mod test {
             channel::Channel::new(11, channel::Cbw::Cbw20),
             PastConnectionList::default(),
         );
-        let (_, roam_reasons) = evaluate_current_bss(&weak_signal_bss);
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SuboptimalSignal));
-
-        // Moderate RSSI, low SNR
-        let low_snr_bss = BssQualityData::new(
-            SignalData::new(-65, 5, 10, EWMA_VELOCITY_SMOOTHING_FACTOR),
-            channel::Channel::new(11, channel::Cbw::Cbw20),
-            PastConnectionList::default(),
-        );
-        let (_, roam_reasons) = evaluate_current_bss(&low_snr_bss);
-        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SuboptimalSignal));
+        let (roam_reasons, _) = evaluate_current_bss(&weak_signal_bss);
+        assert!(roam_reasons.iter().any(|&r| r == RoamReason::SnrBelowThreshold));
+        assert!(roam_reasons.iter().any(|&r| r == RoamReason::RssiBelowThreshold));
     }
 
     #[fuchsia::test]

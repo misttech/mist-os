@@ -555,8 +555,6 @@ async fn connected_state(
 ) -> Result<State, ExitReason> {
     debug!("Entering connected state");
     let mut connect_start_time = fasync::Time::now();
-    // Used to receive roam requests. The sender is cloned to send to the RoamManager.
-    let (roam_sender, mut roam_receiver) = mpsc::unbounded::<types::ScannedCandidate>();
 
     // Initialize connection data
     let past_connections = common_options
@@ -580,13 +578,13 @@ async fn connected_state(
         options.ap_state.tracked.channel,
         past_connections,
     );
-    let (initial_score, _) = bss_selection::evaluate_current_bss(&bss_quality_data);
-    common_options.roam_manager.lock().await.handle_connection_start(
+    let (_, initial_score) = bss_selection::evaluate_current_bss(&bss_quality_data);
+    // Used to receive roam requests. The sender is cloned to send to the RoamManager.
+    let (roam_sender, mut roam_receiver) = mpsc::unbounded::<types::ScannedCandidate>();
+    let mut roam_monitor = common_options.roam_manager.lock().await.get_roam_monitor(
         bss_quality_data,
-        connect_start_time,
-        options.currently_fulfilled_connection.target.network.clone(),
-        options.currently_fulfilled_connection.target.credential.clone(),
-        options.ap_state.original().bssid,
+        options.currently_fulfilled_connection.clone(),
+        roam_sender,
     );
 
     // Keep track of the connection's average signal strength for future scoring.
@@ -622,13 +620,13 @@ async fn connected_state(
 
                             // Record data about the connection and disconnect for future network
                             // selection.
-                            let signal_data = common_options.roam_manager.lock().await.get_signal_data();
+                            let signal_data = roam_monitor.get_signal_data();
                             record_disconnect(
                                 &common_options,
                                 &options,
                                 connect_start_time,
                                 types::DisconnectReason::DisconnectDetectedFromSme,
-                                signal_data,
+                                Some(signal_data),
                             ).await;
 
                             !fidl_info.is_sme_reconnecting
@@ -661,9 +659,7 @@ async fn connected_state(
                             options.ap_state.tracked.signal.snr_db = ind.snr_db;
                             avg_rssi.add(DecibelMilliWatt(ind.rssi_dbm));
 
-                            // This await shouldn't really wait since RoamManager's functions
-                            // themselves shouldn't await on other operations.
-                            let score = common_options.roam_manager.lock().await.handle_connection_stats(ind, roam_sender.clone());
+                            let score = roam_monitor.handle_connection_stats(ind);
                             if let Ok(score) = score {
                                 options.past_connection_scores.add(TimestampedConnectionScore::new(score, fasync::Time::now()));
                             }
@@ -697,13 +693,13 @@ async fn connected_state(
                 match req {
                     Some(ManualRequest::Disconnect((reason, responder))) => {
                         debug!("Disconnect requested");
-                        let signal_data = common_options.roam_manager.lock().await.get_signal_data();
+                        let signal_data = roam_monitor.get_signal_data();
                         record_disconnect(
                             &common_options,
                             &options,
                             connect_start_time,
                             reason,
-                            signal_data
+                            Some(signal_data)
                         ).await;
                         let ConnectedOptions {ap_state, past_connection_scores, currently_fulfilled_connection, ..} = options;
                         let options = DisconnectingOptions {
@@ -733,13 +729,13 @@ async fn connected_state(
                                 types::DisconnectReason::Unknown
                             });
 
-                            let signal_data = common_options.roam_manager.lock().await.get_signal_data();
+                            let signal_data = roam_monitor.get_signal_data();
                             record_disconnect(
                                 &common_options,
                                 &options,
                                 connect_start_time,
                                 disconnect_reason,
-                                signal_data
+                                Some(signal_data)
                             ).await;
 
 
@@ -887,7 +883,6 @@ mod tests {
         update_receiver: mpsc::UnboundedReceiver<listener::ClientListenerMessage>,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         defect_receiver: mpsc::UnboundedReceiver<Defect>,
-        /// This receives the messages sent to the FakeLocalRoamManager.
         stats_receiver: mpsc::UnboundedReceiver<fidl_internal::SignalReportIndication>,
     }
 
@@ -902,7 +897,8 @@ mod tests {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let (defect_sender, defect_receiver) = mpsc::unbounded();
-        let (roam_manager, stats_receiver) = FakeLocalRoamManager::new_with_stats_channel();
+        let (stats_sender, stats_receiver) = mpsc::unbounded();
+        let roam_manager = FakeLocalRoamManager::new_with_roam_monitor_stats_sender(stats_sender);
         let roam_manager = Arc::new(Mutex::new(roam_manager));
 
         TestValues {
