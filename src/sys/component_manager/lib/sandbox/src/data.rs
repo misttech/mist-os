@@ -4,7 +4,7 @@
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 
-use crate::{AnyCast, Capability, RemoteError};
+use crate::{Capability, RemoteError};
 
 /// A capability that holds immutable data.
 #[derive(Capability, Debug, Clone, PartialEq, Eq)]

@@ -4,7 +4,7 @@
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 
-use crate::{AnyCast, Capability};
+use crate::Capability;
 
 #[derive(Capability, Debug, Clone, Default, PartialEq, Eq)]
 pub struct Unit;

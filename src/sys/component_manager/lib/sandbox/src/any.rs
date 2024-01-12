@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::{
-    registry, Capability, ConversionError, Data, Dict, Directory, Optional, Receiver, RemoteError,
-    Sender, Unit,
+    registry, Capability, ConversionError, Data, Dict, Directory, Open, Optional, Receiver,
+    RemoteError, Sender, Unit,
 };
 use crate_local::ObjectSafeCapability;
 use dyn_clone::{clone_trait_object, DynClone};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_zircon::{AsHandleRef, HandleRef};
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::fmt::Debug;
 use std::ops::DerefMut;
 
@@ -26,11 +26,6 @@ use std::ops::DerefMut;
 /// [AnyCapability] implements [Capability] and clients call its non-object-safe trait methods.
 /// The common [Capability] API is used for both concrete and type-erased capabilities.
 /// [ErasedCapability] traits are used internally in this module.
-///
-/// For example, [Capability.try_into_capability] on an [AnyCapability] calls the object-safe
-/// [ObjectSafeCapability.try_into_capability], which then calls [Capability.try_into_capability]
-/// on the underlying Capability type. The [Capability] traits are both entry and exit points, with
-/// [ErasedCapability] traits in the middle, performing object safety conversions.
 pub trait ErasedCapability:
     AnyCast + ObjectSafeCapability + DynClone + Debug + Send + Sync
 {
@@ -45,24 +40,18 @@ pub(crate) mod crate_local {
 
     /// An object-safe version of the [Capability] trait that operates on boxed types.
     pub trait ObjectSafeCapability {
-        fn try_into_capability(
-            self: Box<Self>,
-            type_id: TypeId,
-        ) -> Result<Box<dyn Any>, ConversionError>;
-
         fn into_fidl(self: Box<Self>) -> fsandbox::Capability;
+
+        fn try_into_open(self: Box<Self>) -> Result<Open, ConversionError>;
     }
 
     impl<T: Capability> ObjectSafeCapability for T {
-        fn try_into_capability(
-            self: Box<Self>,
-            type_id: TypeId,
-        ) -> Result<Box<dyn Any>, ConversionError> {
-            (*self).try_into_capability(type_id)
-        }
-
         fn into_fidl(self: Box<Self>) -> fsandbox::Capability {
             (*self).into()
+        }
+
+        fn try_into_open(self: Box<Self>) -> Result<Open, ConversionError> {
+            (*self).try_into_open()
         }
     }
 }
@@ -72,12 +61,13 @@ pub type AnyCapability = Box<dyn ErasedCapability>;
 
 impl Capability for AnyCapability {
     #[inline]
-    fn try_into_capability(self, type_id: TypeId) -> Result<Box<dyn Any>, ConversionError> {
-        self.try_into_capability(type_id)
-    }
-
     fn into_fidl(self) -> fsandbox::Capability {
         self.into_fidl()
+    }
+
+    #[inline]
+    fn try_into_open(self) -> Result<Open, ConversionError> {
+        self.try_into_open()
     }
 }
 
@@ -210,6 +200,10 @@ impl<T: Any> AnyCast for T {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use fidl_fuchsia_io as fio;
+    use fuchsia_zircon as zx;
+    use std::sync::mpsc;
+    use vfs::execution_scope::ExecutionScope;
 
     /// Tests that [AnyCapability] can be converted to a FIDL Capability.
     ///
@@ -223,21 +217,29 @@ mod tests {
         assert_eq!(fidl_capability, fsandbox::Capability::Unit(fsandbox::UnitCapability {}));
     }
 
-    /// Tests that AnyCapability can be converted.
+    /// Tests that AnyCapability can be converted to Open.
     ///
-    /// This exercises that the [convert] implementation delegates to the the underlying
-    /// Capability's [convert] through [ObjectSafeCapability].
+    /// This exercises that the [try_into_open] implementation delegates to the the underlying
+    /// Capability's [try_into_open] through [ObjectSafeCapability].
     #[test]
-    fn test_any_convert() {
-        let unit = Unit::default();
-        let any: AnyCapability = Box::new(unit);
+    fn test_any_try_into_open() {
+        let (tx, rx) = mpsc::channel::<()>();
+        let open = Open::new(
+            move |_scope: ExecutionScope,
+                  _flags: fio::OpenFlags,
+                  _relative_path: vfs::path::Path,
+                  _server_end: zx::Channel| {
+                tx.send(()).unwrap();
+            },
+            fio::DirentType::Unknown,
+        );
+        let any: AnyCapability = Box::new(open);
 
-        // Convert the Unit to Unit.
-        let cap = <AnyCapability as Capability>::try_into_capability(any, TypeId::of::<Unit>())
-            .expect("failed to convert")
-            .downcast::<Unit>()
-            .unwrap();
-        assert_eq!(*cap, Unit::default());
+        // Convert the Any back to Open.
+        let open = any.try_into_open().unwrap();
+        let (ch1, _ch2) = zx::Channel::create();
+        open.open(ExecutionScope::new(), fio::OpenFlags::empty(), vfs::path::Path::dot(), ch1);
+        rx.recv().unwrap();
     }
 
     /// Tests that an AnyCapability can be cloned.

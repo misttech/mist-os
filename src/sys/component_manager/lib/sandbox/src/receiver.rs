@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{registry, AnyCast, Capability, Message, Sender};
+use crate::{registry, Capability, Message, Sender};
 use derivative::Derivative;
 use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;

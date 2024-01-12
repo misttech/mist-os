@@ -11,7 +11,7 @@ use futures::{future::BoxFuture, FutureExt};
 use std::sync::{Arc, Mutex};
 use vfs::execution_scope::ExecutionScope;
 
-use crate::{registry, AnyCast, Capability, ConversionError, Open};
+use crate::{registry, Capability, Open};
 
 /// A capability that is a `fuchsia.io` directory.
 ///
@@ -113,17 +113,7 @@ impl Clone for Directory {
     }
 }
 
-impl Capability for Directory {
-    fn try_into_capability(
-        self,
-        type_id: std::any::TypeId,
-    ) -> Result<Box<dyn std::any::Any>, ConversionError> {
-        if type_id == std::any::TypeId::of::<Self>() {
-            return Ok(Box::new(self).into_any());
-        }
-        Err(ConversionError::NotSupported)
-    }
-}
+impl Capability for Directory {}
 
 impl From<ClientEnd<fio::DirectoryMarker>> for Directory {
     fn from(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {

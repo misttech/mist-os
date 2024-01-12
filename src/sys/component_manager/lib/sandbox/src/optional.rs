@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 use fidl_fuchsia_component_sandbox as fsandbox;
 
-use crate::{AnyCapability, AnyCast, Capability, ConversionError};
+use crate::{AnyCapability, Capability};
 
 /// A capability that contains an Option of a capability.
 #[derive(Capability, Clone, Debug)]
@@ -27,20 +27,7 @@ impl Optional {
     }
 }
 
-impl Capability for Optional {
-    fn try_into_capability(
-        self,
-        type_id: std::any::TypeId,
-    ) -> Result<Box<dyn std::any::Any>, ConversionError> {
-        if type_id == std::any::TypeId::of::<Self>() {
-            return Ok(Box::new(self).into_any());
-        }
-        match self.0 {
-            None => Err(ConversionError::NotSupported),
-            Some(cap) => cap.try_into_capability(type_id),
-        }
-    }
-}
+impl Capability for Optional {}
 
 impl From<Optional> for fsandbox::OptionalCapability {
     fn from(optional: Optional) -> Self {
@@ -86,17 +73,6 @@ mod test {
 
         assert!(optional.0.is_some());
         assert!(optional.0.unwrap().as_any().is::<Unit>());
-    }
-
-    // Tests that `try_into_capability` can convert the inner Some value to its concrete type.
-    #[test]
-    fn test_try_into_inner() {
-        let cap: AnyCapability = Box::new(Unit::default());
-        let optional_any: AnyCapability = Box::new(Optional(Some(cap)));
-
-        let unit: Unit = optional_any.try_into().expect("failed to convert to Unit");
-
-        assert_eq!(unit, Unit::default());
     }
 
     #[test]

@@ -26,11 +26,11 @@ use vfs::{
         immutable::simple as pfs,
     },
     execution_scope::ExecutionScope,
-    name::Name,
+    name::{Name, ParseNameError},
     path::Path,
 };
 
-use crate::{registry, AnyCapability, AnyCast, Capability, ConversionError, Directory, Open};
+use crate::{registry, AnyCapability, Capability, ConversionError, Open};
 
 pub type Key = String;
 
@@ -250,20 +250,36 @@ impl From<Dict> for fsandbox::Capability {
     }
 }
 
-impl TryInto<Open> for Dict {
-    type Error = TryIntoOpenError;
+/// This error is returned when a [Dict] cannot be converted into an [Open] capability.
+#[derive(Error, Debug)]
+enum TryIntoOpenError {
+    /// A key is not a valid `fuchsia.io` node name.
+    #[error("key is not a valid `fuchsia.io` node name")]
+    ParseNameError(#[from] vfs::name::ParseNameError),
 
+    /// A value could not be converted into an [Open] capability.
+    #[error("value at '{key}' could not be converted into an Open capability")]
+    ConvertIntoOpen {
+        key: String,
+        #[source]
+        err: ConversionError,
+    },
+}
+
+impl Capability for Dict {
     /// Convert this [Dict] capability into [Open] by recursively converting the entries
     /// to [Open], then building a VFS directory where each entry is a remote VFS node.
     /// The resulting [Open] capability will speak `fuchsia.io/Directory` when remoted.
-    fn try_into(self: Self) -> Result<Open, Self::Error> {
+    fn try_into_open(self: Self) -> Result<Open, ConversionError> {
         let dir = pfs::simple();
         for (key, value) in self.lock_entries().iter() {
-            let open: Open = value
-                .clone()
-                .try_into()
-                .map_err(|err| TryIntoOpenError::ConvertIntoOpen { key: key.clone(), err })?;
-            let key: Name = key.clone().try_into().map_err(TryIntoOpenError::ParseNameError)?;
+            let open: Open = value.clone().try_into_open().map_err(|err| {
+                anyhow::Error::from(TryIntoOpenError::ConvertIntoOpen { key: key.clone(), err })
+            })?;
+            let key: Name = key.clone().try_into().map_err(|err: ParseNameError| {
+                let err: TryIntoOpenError = err.into();
+                anyhow::Error::from(err)
+            })?;
 
             match dir.add_entry_impl(key, open.into_remote(), false) {
                 Ok(()) => {}
@@ -287,44 +303,6 @@ impl TryInto<Open> for Dict {
             },
             fio::DirentType::Directory,
         ))
-    }
-}
-
-/// This error is returned when a [Dict] cannot be converted into an [Open] capability.
-#[derive(Error, Debug)]
-pub enum TryIntoOpenError {
-    /// A key is not a valid `fuchsia.io` node name.
-    #[error("key is not a valid `fuchsia.io` node name")]
-    ParseNameError(#[from] vfs::name::ParseNameError),
-
-    /// A value could not be converted into an [Open] capability.
-    #[error("value at '{key}' could not be converted into an Open capability")]
-    ConvertIntoOpen {
-        key: String,
-        #[source]
-        err: ConversionError,
-    },
-}
-
-impl Capability for Dict {
-    fn try_into_capability(
-        self,
-        type_id: std::any::TypeId,
-    ) -> Result<Box<dyn std::any::Any>, ConversionError> {
-        if type_id == std::any::TypeId::of::<Self>() {
-            return Ok(Box::new(self).into_any());
-        } else if type_id == std::any::TypeId::of::<Open>() {
-            let open: Open = self.try_into().map_err(anyhow::Error::from)?;
-            return Ok(Box::new(open));
-        } else if type_id == std::any::TypeId::of::<Directory>() {
-            let open: Open = self.try_into().map_err(anyhow::Error::from)?;
-            // TODO(https://fxbug.dev/129636): Remove RIGHT_READABLE when `opendir` no longer
-            // requires READABLE.
-            let directory =
-                open.into_directory(fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE);
-            return Ok(Box::new(directory));
-        }
-        Err(ConversionError::NotSupported)
     }
 }
 
@@ -718,10 +696,7 @@ mod tests {
     async fn try_into_open_error_not_supported() {
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(Unit::default()));
-        assert_matches!(
-            TryInto::<Open>::try_into(dict),
-            Err(TryIntoOpenError::ConvertIntoOpen { .. })
-        );
+        assert_matches!(dict.try_into_open(), Err(ConversionError::Other { .. }));
     }
 
     #[fuchsia::test]
@@ -739,7 +714,7 @@ mod tests {
         // This string is too long to be a valid fuchsia.io name.
         let bad_name = "a".repeat(10000);
         dict.lock_entries().insert(bad_name, Box::new(placeholder_open));
-        assert_matches!(TryInto::<Open>::try_into(dict), Err(TryIntoOpenError::ParseNameError(_)));
+        assert_matches!(dict.try_into_open(), Err(ConversionError::Other { .. }));
     }
 
     /// Convert a dict `{ CAP_KEY: open }` to [Open].
@@ -762,7 +737,7 @@ mod tests {
         );
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(open));
-        let dict_open: Open = dict.try_into().expect("convert dict into Open capability");
+        let dict_open = dict.try_into_open().expect("convert dict into Open capability");
 
         let remote = dict_open.into_remote();
         let scope = ExecutionScope::new();
@@ -805,7 +780,7 @@ mod tests {
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(inner_dict));
 
-        let dict_open: Open = dict.try_into().expect("convert dict into Open capability");
+        let dict_open = dict.try_into_open().expect("convert dict into Open capability");
 
         let remote = dict_open.into_remote();
         let scope = ExecutionScope::new();

@@ -106,9 +106,14 @@ impl NamespaceBuilder {
             .flatten()
             .into_iter()
             .map(|(path, cap)| -> Result<NamespaceEntry, BuildNamespaceError> {
-                let directory: Directory = cap.try_into().map_err(|err| {
-                    BuildNamespaceError::Conversion { path: path.clone(), err: Arc::new(err) }
-                })?;
+                let directory: Directory = if (&*cap).as_any().is::<Directory>() {
+                    cap.try_into().unwrap()
+                } else {
+                    let open = cap.try_into_open().map_err(|err| {
+                        BuildNamespaceError::Conversion { path: path.clone(), err: Arc::new(err) }
+                    })?;
+                    open.into_directory(fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE)
+                };
                 let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
                 Ok(NamespaceEntry { path, directory: client_end.into() })
             })

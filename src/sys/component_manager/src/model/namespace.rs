@@ -306,7 +306,7 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                     match result {
                         Ok(capability) => {
                             let open: Open = capability
-                                .try_into()
+                                .try_into_open()
                                 .expect("router returned unexpected capability type");
                             open.open(scope, flags, relative_path, server_end);
                             return;

@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 use anyhow::{anyhow, Context};
 use core::fmt;
-use fidl::{
-    endpoints::{create_endpoints, ClientEnd, ServerEnd},
-    epitaph::ChannelEpitaphExt,
-};
+use fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
@@ -17,7 +14,7 @@ use std::fmt::Debug;
 use std::sync::{Arc, OnceLock};
 use vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope};
 
-use crate::{registry, AnyCast, Capability, ConversionError, Directory, OneShotHandle, Sender};
+use crate::{registry, Capability, ConversionError, Directory, OneShotHandle};
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
 /// a [zx::Channel], usually treated as the server endpoint of some FIDL protocol.
@@ -181,14 +178,8 @@ impl fmt::Debug for Open {
 }
 
 impl Capability for Open {
-    fn try_into_capability(
-        self,
-        type_id: std::any::TypeId,
-    ) -> Result<Box<dyn std::any::Any>, ConversionError> {
-        if type_id == std::any::TypeId::of::<Self>() {
-            return Ok(Box::new(self).into_any());
-        }
-        Err(ConversionError::NotSupported)
+    fn try_into_open(self) -> Result<Open, ConversionError> {
+        Ok(self)
     }
 }
 
@@ -217,23 +208,6 @@ impl From<ClientEnd<fio::DirectoryMarker>> for Open {
     fn from(value: ClientEnd<fio::DirectoryMarker>) -> Self {
         let openable: ClientEnd<fio::OpenableMarker> = value.into_channel().into();
         openable.into()
-    }
-}
-
-impl<T: Default + Debug + Send + Sync + 'static> From<Sender<T>> for Open {
-    fn from(value: Sender<T>) -> Open {
-        let open_fn = move |_scope: ExecutionScope,
-                            flags: fio::OpenFlags,
-                            path: vfs::path::Path,
-                            server_end: zx::Channel| {
-            if !path.is_empty() {
-                // Only an empty path is valid.
-                let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
-                return;
-            }
-            let _ = value.send_channel(server_end.into(), flags);
-        };
-        Open::new(open_fn, fio::DirentType::Service)
     }
 }
 
@@ -673,7 +647,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_sender_into_open() {
         let (receiver, sender) = Receiver::<()>::new();
-        let open: Open = sender.into();
+        let open: Open = sender.try_into_open().unwrap();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), ".".to_owned(), server_end);
@@ -689,7 +663,7 @@ mod tests {
         let mut ex = fasync::TestExecutor::new();
 
         let (receiver, sender) = Receiver::<()>::new();
-        let open: Open = sender.into();
+        let open: Open = sender.try_into_open().unwrap();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "foo".to_owned(), server_end);
@@ -713,7 +687,7 @@ mod tests {
         let (receiver, sender) = Receiver::<()>::new();
         dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
 
-        let open: Open = dict.try_into().unwrap();
+        let open: Open = dict.try_into_open().unwrap();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "echo".to_owned(), server_end);
@@ -733,7 +707,7 @@ mod tests {
         let (receiver, sender) = Receiver::<()>::new();
         dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
 
-        let open: Open = dict.try_into().unwrap();
+        let open: Open = dict.try_into_open().unwrap();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
         open.open(scope, fio::OpenFlags::empty(), "echo/foo".to_owned(), server_end);

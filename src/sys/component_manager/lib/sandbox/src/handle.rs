@@ -1,15 +1,16 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::{Context, Error};
+use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
+use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use std::sync::{Arc, Mutex};
 
-use crate::{registry, AnyCast, Capability, ConversionError, Open};
+use crate::{registry, Capability, ConversionError, Open};
 
 /// A capability that vends a single Zircon handle.
 #[derive(Capability, Clone, Debug)]
@@ -75,17 +76,40 @@ impl OneShotHandle {
 }
 
 impl Capability for OneShotHandle {
-    fn try_into_capability(
-        self,
-        type_id: std::any::TypeId,
-    ) -> Result<Box<dyn std::any::Any>, ConversionError> {
-        if type_id == std::any::TypeId::of::<Self>() {
-            return Ok(Box::new(self).into_any());
-        } else if type_id == std::any::TypeId::of::<Open>() {
-            let open: Open = self.try_into()?;
-            return Ok(Box::new(open));
+    /// Attempts to convert into an Open that calls `fuchsia.io.Openable/Open` on the handle.
+    ///
+    /// The handle must be a channel that speaks the `Openable` protocol.
+    fn try_into_open(self) -> Result<Open, ConversionError> {
+        let handle = self.get_handle().map_err(|err| anyhow!("could not get handle: {:?}", err))?;
+
+        let basic_info = handle
+            .basic_info()
+            .map_err(|status| anyhow!("failed to get handle info: {}", status))?;
+        if basic_info.object_type != zx::ObjectType::CHANNEL {
+            return Err(ConversionError::NotSupported);
         }
-        Err(ConversionError::NotSupported)
+
+        let openable = ClientEnd::<fio::OpenableMarker>::from(handle)
+            .into_proxy()
+            .context("failed to convert to proxy")?;
+
+        Ok(Open::new(
+            move |_scope: vfs::execution_scope::ExecutionScope,
+                  flags: fio::OpenFlags,
+                  relative_path: vfs::path::Path,
+                  server_end: zx::Channel| {
+                // TODO(b/306037927): Calling Open on a channel that doesn't speak Openable may
+                // inadvertently close the channel.
+                let _ = openable.open(
+                    flags,
+                    fio::ModeType::empty(),
+                    relative_path.as_str(),
+                    server_end.into(),
+                );
+            },
+            // TODO(b/298112397): Determine a more accurate dirent type.
+            fio::DirentType::Unknown,
+        ))
     }
 }
 

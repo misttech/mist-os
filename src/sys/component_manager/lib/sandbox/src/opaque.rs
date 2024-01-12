@@ -5,7 +5,7 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::fmt;
 
-use crate::{registry, AnyCast, Capability};
+use crate::{registry, Capability};
 
 /// A capability that represents an arbitrary, internal Rust object.
 ///

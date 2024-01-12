@@ -1,16 +1,17 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{registry, AnyCast, Capability, ConversionError, Open};
+use crate::{registry, Capability, ConversionError, Open};
 use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, RequestStream, ServerEnd};
+use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{channel::mpsc, TryStreamExt};
-use std::any;
 use std::fmt::Debug;
 use tracing::warn;
+use vfs::execution_scope::ExecutionScope;
 
 #[derive(Debug)]
 pub struct Message<T: Default + Debug + Send + Sync + 'static> {
@@ -101,18 +102,26 @@ impl<T: Default + Debug + Send + Sync + 'static> Sender<T> {
     }
 }
 
+impl<T: Default + Debug + Send + Sync + 'static> From<Sender<T>> for Open {
+    fn from(sender: Sender<T>) -> Self {
+        let open_fn = move |_scope: ExecutionScope,
+                            flags: fio::OpenFlags,
+                            path: vfs::path::Path,
+                            server_end: zx::Channel| {
+            if !path.is_empty() {
+                // Only an empty path is valid.
+                let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
+                return;
+            }
+            let _ = sender.send_channel(server_end.into(), flags);
+        };
+        Self::new(open_fn, fio::DirentType::Service)
+    }
+}
+
 impl<T: Default + Debug + Send + Sync + 'static> Capability for Sender<T> {
-    fn try_into_capability(
-        self,
-        type_id: any::TypeId,
-    ) -> Result<Box<dyn any::Any>, ConversionError> {
-        if type_id == any::TypeId::of::<Self>() {
-            return Ok(Box::new(self) as Box<dyn any::Any>);
-        }
-        if type_id == any::TypeId::of::<Open>() {
-            return Ok(Box::new(Open::from(self)) as Box<dyn any::Any>);
-        }
-        Err(ConversionError::NotSupported)
+    fn try_into_open(self) -> Result<Open, ConversionError> {
+        Ok(self.into())
     }
 }
 

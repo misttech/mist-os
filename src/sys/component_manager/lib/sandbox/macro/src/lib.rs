@@ -36,15 +36,6 @@ struct CapabilityAttributes {}
 /// let downcast: MyCapability = any.try_into()?;
 /// ```
 ///
-/// The capability can be converted to a different type, provided that its
-/// [Convert.try_into_capability] implementation allows it:
-///
-/// ```
-/// let cap = MyCapability {};
-/// let any: AnyCapability = Box::new(cap);
-/// let some_other: SomeOtherCapability = any.try_into()?;
-/// ```
-///
 /// # `TryFrom<&dyn ErasedCapability>`, `TryFrom<&AnyCapability>`, and `&mut` references
 ///
 /// The derived Capability also implements conversion from a (mutable) reference to a type-erased
@@ -100,11 +91,12 @@ pub fn derive_capability(input: TokenStream) -> TokenStream {
             type Error = ::sandbox::ConversionError;
 
             fn try_from(value: ::sandbox::AnyCapability) -> Result<Self, Self::Error> {
-                if value.as_any().is::<Self>() {
-                    return Ok(*value.into_any().downcast::<Self>().unwrap());
+                use ::sandbox::AnyCast;
+                if (&*value).as_any().is::<Self>() {
+                    Ok(*value.into_any().downcast::<Self>().unwrap())
+                } else {
+                    Err(::sandbox::ConversionError::NotSupported)
                 }
-                let converted = <::sandbox::AnyCapability as ::sandbox::Capability>::try_into_capability(value, std::any::TypeId::of::<Self>())?;
-                Ok(*converted.downcast::<Self>().unwrap())
             }
         }
 

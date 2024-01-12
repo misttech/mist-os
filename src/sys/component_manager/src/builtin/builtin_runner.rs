@@ -16,7 +16,7 @@ use fuchsia_zircon::{self as zx, Clock};
 use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
-use sandbox::{Dict, Open, Receiver};
+use sandbox::{Capability, Dict, Receiver};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
@@ -272,7 +272,7 @@ impl ElfRunnerProgram {
     /// Serves requests coming from `outgoing_dir` using `self.output`.
     fn serve_outgoing(&self, outgoing_dir: ServerEnd<fio::DirectoryMarker>) {
         let output = self.output.clone();
-        let open: Open = output.try_into().unwrap();
+        let open = output.try_into_open().unwrap();
         open.open(
             self.execution_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
