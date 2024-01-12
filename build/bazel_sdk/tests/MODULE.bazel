@@ -5,12 +5,6 @@
 module(
     name = "sdk-integration",
     version = "1.0",
-    # TODO(https://fxbug.dev/107744) Migrate to register_toolchains
-    toolchains_to_register = [
-        "@fuchsia_sdk//:fuchsia_toolchain_sdk",
-        "@fuchsia_clang//:cc-x86_64",
-        "@fuchsia_clang//:cc-aarch64",
-    ],
 )
 
 bazel_dep(name = "fuchsia_workspace", version = "")
@@ -26,3 +20,9 @@ use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
 
 fuchsia_clang_ext = use_extension("@fuchsia_workspace//fuchsia:deps.bzl", "fuchsia_clang_ext")
 use_repo(fuchsia_clang_ext, "fuchsia_clang")
+
+register_toolchains(
+    "@fuchsia_sdk//:fuchsia_toolchain_sdk",
+    "@fuchsia_clang//:cc-x86_64",
+    "@fuchsia_clang//:cc-aarch64",
+)
