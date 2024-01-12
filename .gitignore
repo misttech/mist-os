@@ -153,6 +153,12 @@ tables_generator_tests_*.txt
 /third_party/ubpf/src
 !/third_party/github.com/google/cppdap
 /third_party/github.com/google/cppdap/src
+!/third_party/github.com/python/mypy
+/third_party/github.com/python/mypy/src
+!/third_party/github.com/python/mypy_extensions
+/third_party/github.com/python/mypy_extensions/src
+!/third_party/github.com/python/typing_extensions
+/third_party/github.com/python/typing_extensions/src
 !/third_party/pyjson5
 /third_party/pyjson5/src
 !/third_party/chre
