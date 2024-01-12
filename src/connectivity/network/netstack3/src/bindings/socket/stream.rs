@@ -25,7 +25,7 @@ use fuchsia_zircon::{self as zx, Peered as _};
 use futures::{future::FusedFuture as _, FutureExt as _, StreamExt as _};
 use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{
-    device::{DeviceId, WeakDeviceId},
+    device::WeakDeviceId,
     socket::ShutdownType,
     tcp::{
         self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
@@ -46,9 +46,8 @@ use crate::bindings::{
     },
     trace_duration,
     util::{
-        AllowBindingIdFromWeak, ConversionContext, DeviceNotFoundError, IntoCore, IntoFidl,
-        NeedsDataNotifier, NeedsDataWatcher, TryFromFidlWithContext, TryIntoCoreWithContext,
-        TryIntoFidlWithContext,
+        AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, NeedsDataNotifier,
+        NeedsDataWatcher, TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
     BindingsCtx, Ctx,
 };
@@ -441,12 +440,10 @@ struct BindingData<I: IpExt> {
     send_task_abort: Option<futures::channel::oneshot::Sender<()>>,
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I> BindingData<I>
 where
     I: IpExt,
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
 {
     fn new(ctx: &mut Ctx, properties: SocketWorkerProperties) -> Self {
         let (local, peer) = zx::Socket::create_stream();
@@ -471,14 +468,8 @@ enum InitialSocketState {
     Connected,
 }
 
-impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
-where
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
-    DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-{
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
     type Request = fposix_socket::StreamSocketRequest;
     type RequestStream = fposix_socket::StreamSocketRequestStream;
     type CloseResponder = fposix_socket::StreamSocketCloseResponder;
@@ -637,18 +628,14 @@ impl IntoErrno for ConnectionError {
 
 /// Spawns a task that sends more data from the `socket` each time we observe
 /// a wakeup through the `watcher`.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 fn spawn_send_task<I: IpExt>(
     mut ctx: crate::bindings::Ctx,
     socket: Arc<zx::Socket>,
     mut watcher: NeedsDataWatcher,
     id: TcpSocketId<I>,
     spawner: &worker::SocketScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
-) -> futures::channel::oneshot::Sender<()>
-where
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
-{
+) -> futures::channel::oneshot::Sender<()> {
     let (sender, abort) = futures::channel::oneshot::channel();
     let abort = abort.map(|r| r.expect("send task abort dropped without signaling"));
     let watch_fut = async move {
@@ -702,14 +689,8 @@ struct RequestHandler<'a, I: IpExt> {
     ctx: &'a mut Ctx,
 }
 
-impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I>
-where
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
-    DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-{
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let Self {
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
@@ -1551,6 +1532,7 @@ where
     }
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     ctx: Ctx,
     accepted: TcpSocketId<I>,
@@ -1559,13 +1541,7 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     local_socket: Arc<zx::Socket>,
     watcher: NeedsDataWatcher,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
-) where
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
-    DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-    WeakDeviceId<BindingsCtx>: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-{
+) {
     spawner.spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
         ctx,
         move |_: &mut Ctx, SocketWorkerProperties {}| BindingData {

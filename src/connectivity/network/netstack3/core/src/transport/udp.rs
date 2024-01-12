@@ -2442,7 +2442,6 @@ mod tests {
         socket::{self, datagram::MulticastInterfaceSelector},
         testutil::{set_logger_for_test, TestIpExt as _},
         uninstantiable::UninstantiableWrapper,
-        CoreContext, UnlockedCoreCtx,
     };
 
     /// A packet received on a socket.
@@ -6489,12 +6488,10 @@ mod tests {
     #[ip_test]
     #[test_case(true; "bind to device")]
     #[test_case(false; "no bind to device")]
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     fn loopback_bind_to_device<I: Ip + crate::IpExt + crate::testutil::TestIpExt>(
         bind_to_device: bool,
-    ) where
-        for<'a> UnlockedCoreCtx<'a, crate::testutil::FakeBindingsCtx>:
-            CoreContext<I, crate::testutil::FakeBindingsCtx>,
-    {
+    ) {
         set_logger_for_test();
         const HELLO: &'static [u8] = b"Hello";
         let (mut ctx, local_device_ids) = I::FAKE_CONFIG.into_builder().build();

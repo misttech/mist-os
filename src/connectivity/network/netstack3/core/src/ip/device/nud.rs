@@ -2652,7 +2652,7 @@ mod tests {
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         transport::tcp,
-        CoreContext, CoreCtx, SyncCtx, UnlockedCoreCtx,
+        CoreCtx, SyncCtx, UnlockedCoreCtx,
     };
 
     struct FakeNudContext<I: Ip, D: LinkDevice> {
@@ -5502,6 +5502,7 @@ mod tests {
         (net, local_device, remote_device)
     }
 
+    #[netstack3_macros::context_ip_bounds(I, testutil::FakeBindingsCtx, crate)]
     fn bind_and_connect_sockets<
         I: testutil::TestIpExt + crate::IpExt,
         L: FakeNetworkLinks<
@@ -5516,11 +5517,7 @@ mod tests {
         I,
         WeakDeviceId<testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx,
-    >
-    where
-        for<'a> UnlockedCoreCtx<'a, testutil::FakeBindingsCtx>:
-            CoreContext<I, testutil::FakeBindingsCtx>,
-    {
+    > {
         const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
 
         net.with_context("remote", |ctx| {
@@ -5551,13 +5548,13 @@ mod tests {
     }
 
     #[ip_test]
+    #[netstack3_macros::context_ip_bounds(I, testutil::FakeBindingsCtx, crate)]
     fn upper_layer_confirmation_tcp_handshake<I: Ip + testutil::TestIpExt + crate::IpExt>()
     where
         for<'a> UnlockedCoreCtx<'a, testutil::FakeBindingsCtx>: DeviceIdContext<
                 EthernetLinkDevice,
                 DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
-            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>
-            + CoreContext<I, testutil::FakeBindingsCtx>,
+            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx: TimerContext<
             NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
         >,
@@ -5634,16 +5631,16 @@ mod tests {
     }
 
     #[ip_test]
+    #[netstack3_macros::context_ip_bounds(I, testutil::FakeBindingsCtx, crate)]
     fn upper_layer_confirmation_tcp_ack<I: Ip + testutil::TestIpExt + crate::IpExt>()
     where
         for<'a> UnlockedCoreCtx<'a, testutil::FakeBindingsCtx>: DeviceIdContext<
                 EthernetLinkDevice,
                 DeviceId = EthernetDeviceId<testutil::FakeBindingsCtx>,
-            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>
-            + CoreContext<I, testutil::FakeBindingsCtx>,
+            > + NudContext<I, EthernetLinkDevice, testutil::FakeBindingsCtx>,
         testutil::FakeBindingsCtx: TimerContext<
-                NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
-            > + crate::IpBindingsContext<I>,
+            NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeBindingsCtx>>,
+        >,
     {
         let (mut net, local_device, remote_device) = new_test_net::<I>();
 

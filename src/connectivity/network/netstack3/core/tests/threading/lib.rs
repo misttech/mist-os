@@ -229,11 +229,8 @@ impl TestIpExt for Ipv6 {
 }
 
 #[ip_test]
-fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>()
-where
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, FakeBindingsCtx>:
-        netstack3_core::CoreContext<I, FakeBindingsCtx>,
-{
+#[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
+fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
     // Per the loom docs [1], it can take a significant amount of time to
     // exhaustively check complex models. Rather than running a completely
     // exhaustive check, you can configure loom to skip executions that it deems
@@ -377,11 +374,8 @@ where
 }
 
 #[ip_test]
-fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>()
-where
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, FakeBindingsCtx>:
-        netstack3_core::CoreContext<I, FakeBindingsCtx>,
-{
+#[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
+fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
     loom::model(move || {
         let mut builder = FakeEventDispatcherBuilder::default();
         let dev_index = builder.add_device_with_ip(

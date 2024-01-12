@@ -371,12 +371,10 @@ pub(crate) struct Changes<A: IpAddress> {
     sender: mpsc::UnboundedSender<WorkItem<A>>,
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I> State<I>
 where
     I: IpExt,
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
 {
     pub(crate) async fn run_changes(&mut self, mut ctx: Ctx) {
         let State { receiver, table, update_dispatcher } = self;
@@ -417,6 +415,7 @@ fn to_entry<I: Ip>(
     addable_entry.resolve_metric(device_metric)
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 async fn handle_change<I>(
     table: &mut Table<I::Addr>,
     ctx: &mut Ctx,
@@ -425,9 +424,6 @@ async fn handle_change<I>(
 ) -> Result<ChangeOutcome, Error>
 where
     I: IpExt,
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
 {
     tracing::debug!("routes::handle_change {change:?}");
 

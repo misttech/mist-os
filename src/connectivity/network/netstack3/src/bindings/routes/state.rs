@@ -28,7 +28,6 @@ use netstack3_core::{
     error::AddressResolutionFailed,
     neighbor::{LinkResolutionContext, LinkResolutionResult},
     routes::{NextHop, ResolvedRoute},
-    CoreContext, IpBindingsContext, UnlockedCoreCtx,
 };
 use thiserror::Error;
 use tracing::{error, info, warn};
@@ -101,14 +100,13 @@ async fn resolve(
 }
 
 /// The inner implementation of [`resolve`] that's generic over `Ip`.
+#[netstack3_core::context_ip_bounds(A::Version, BindingsCtx)]
 async fn resolve_inner<A: IpAddress>(
     destination: A,
     mut ctx: Ctx,
 ) -> Result<fnet_routes::Resolved, zx::Status>
 where
     A::Version: IpExt,
-    BindingsCtx: IpBindingsContext<A::Version>,
-    for<'a> UnlockedCoreCtx<'a, BindingsCtx>: CoreContext<A::Version, BindingsCtx>,
 {
     let ResolvedRoute { device, src_addr, next_hop } =
         match ctx.api().routes::<A::Version>().resolve_route(destination) {

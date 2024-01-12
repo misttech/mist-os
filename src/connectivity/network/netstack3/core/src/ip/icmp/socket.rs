@@ -782,9 +782,7 @@ mod tests {
     use super::*;
     use crate::{
         api::CoreApi,
-        context::UnlockedCoreCtx,
         ip::icmp::tests::FakeIcmpCtx,
-        marker::CoreContext,
         testutil::{handle_queued_rx_packets, Ctx, TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
@@ -816,14 +814,12 @@ mod tests {
     #[test_case(IcmpConnectionType::Local, IcmpSendType::SendTo, false)]
     #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, false)]
     #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, false)]
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt + crate::marker::IpExt>(
         conn_type: IcmpConnectionType,
         send_type: IcmpSendType,
         bind_to_device: bool,
-    ) where
-        for<'a> UnlockedCoreCtx<'a, crate::testutil::FakeBindingsCtx>:
-            CoreContext<I, crate::testutil::FakeBindingsCtx>,
-    {
+    ) {
         crate::testutil::set_logger_for_test();
 
         let config = I::FAKE_CONFIG;

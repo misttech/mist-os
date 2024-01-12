@@ -266,4 +266,7 @@ pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext,
 pub use state::StackState;
 pub use time::{handle_timer, Instant, TimerId};
 
+// Re-export useful macros.
+pub use netstack3_macros::context_ip_bounds;
+
 pub(crate) use trace::trace_duration;

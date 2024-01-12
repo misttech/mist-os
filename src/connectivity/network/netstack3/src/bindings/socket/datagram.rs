@@ -375,12 +375,10 @@ impl OptionFromU16 for NonZeroU16 {
     }
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I> TransportState<I> for Udp
 where
     I: IpExt + SocketCollectionIpExt<Self>,
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
 {
     type ConnectError = ConnectError;
     type ListenError = Either<ExpectedUnboundError, LocalAddressError>;
@@ -604,12 +602,10 @@ impl OptionFromU16 for u16 {
     }
 }
 
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I> TransportState<I> for IcmpEcho
 where
     I: IpExt + SocketCollectionIpExt<Self>,
-    BindingsCtx: netstack3_core::IpBindingsContext<I>,
-    for<'a> netstack3_core::UnlockedCoreCtx<'a, BindingsCtx>:
-        netstack3_core::CoreContext<I, BindingsCtx>,
 {
     type ConnectError = ConnectError;
     type ListenError = Either<ExpectedUnboundError, LocalAddressError>;

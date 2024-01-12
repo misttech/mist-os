@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
+use syn::spanned::Spanned;
 
 /// Instantiates an impl block as separate Ipv4 and Ipv6 blocks.
 ///
@@ -132,4 +133,89 @@ pub fn instantiate_ip_impl_block(attr: TokenStream, input: TokenStream) -> Token
     );
 
     quote! { #v4 #v6 }.into()
+}
+
+struct IpBoundsArgs {
+    ip_ident: syn::Path,
+    bindings_ctx: syn::Path,
+    ns3_core: syn::Path,
+}
+
+impl syn::parse::Parse for IpBoundsArgs {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let args =
+            syn::punctuated::Punctuated::<syn::Path, syn::Token![,]>::parse_terminated(input)?;
+        let args_span = args.span();
+        let mut args = args.into_iter();
+        let ip_ident = args
+            .next()
+            .ok_or_else(|| syn::Error::new(args_span, "missing IP identifier argument"))?;
+        let bindings_ctx = args
+            .next()
+            .ok_or_else(|| syn::Error::new(args_span, "missing bindings context argument"))?;
+
+        // If a third argument is not provided, default to `netstack3_core`.
+        let ns3_core = args.next().unwrap_or_else(|| syn::parse_quote! { netstack3_core });
+        Ok(Self { ip_ident, bindings_ctx, ns3_core })
+    }
+}
+
+fn context_ip_bounds_inner(attr: TokenStream, input: TokenStream) -> syn::Result<TokenStream> {
+    let IpBoundsArgs { ip_ident, bindings_ctx, ns3_core } = syn::parse::<IpBoundsArgs>(attr)?;
+    let mut item = syn::parse::<syn::Item>(input)?;
+    let generics = match &mut item {
+        syn::Item::Impl(item_impl) => &mut item_impl.generics,
+        syn::Item::Fn(item_fn) => &mut item_fn.sig.generics,
+        o => return Err(syn::Error::new_spanned(o, "not supported for this input"))?,
+    };
+    let where_clause = generics.make_where_clause();
+    where_clause.predicates.push(syn::parse_quote! {
+        for<'a> #ns3_core::UnlockedCoreCtx<'a, #bindings_ctx>:
+            #ns3_core::CoreContext< #ip_ident, #bindings_ctx >
+    });
+    where_clause.predicates.push(syn::parse_quote! {
+        #bindings_ctx : #ns3_core::IpBindingsContext< #ip_ident >
+    });
+
+    Ok(item.into_token_stream().into())
+}
+
+/// Generates common bounds for `netstack3_core::UnlockedCoreCtx`.
+///
+/// This macro is used to emit a common `where` clause when writing code that is
+/// generic over IP version that wants to call into netstack3 core.
+///
+/// It takes up to three arguments:
+///
+/// ```
+/// #[context_ip_bounds(IpIdentifier, BindingsCtx [,netstack3_core]]
+/// ```
+///
+/// * `IpIdentifier` is the generic IP type for the targeted item. Required.
+/// * `BindingsCtx` is the bindings context implementation in use. Required.
+/// * `netstack3_core` is the path to the root of the netstack3 core crate.
+///   Optional, assumed to be `netstack3_core` if omitted.
+///
+/// Example:
+///
+/// ```
+/// #[context_ip_bounds(I, FooBindingsCtx)]
+/// impl<I: netstack3_core::IpExt> Foo {}
+/// ```
+///
+/// Expands to:
+///
+/// ```
+/// impl<I: netstack3_core::IpExt> Foo
+/// where
+///     for<'a> netstack3_core::UnlockedCoreCtx<'a, FooBindingsCtx>:
+///             netstack3_core::CoreContext<I, FooBindingsCtx>,
+///     FooBindingsCtx: netstack3_core::IpBindingsContext<I> {}
+/// ```
+#[proc_macro_attribute]
+pub fn context_ip_bounds(attr: TokenStream, input: TokenStream) -> TokenStream {
+    match context_ip_bounds_inner(attr, input) {
+        Ok(t) => t,
+        Err(e) => e.into_compile_error().into(),
+    }
 }
