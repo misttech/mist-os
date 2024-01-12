@@ -17,8 +17,8 @@ use {
         Completer, Request, Router,
     },
     anyhow::format_err,
-    cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, UseDeclCommon},
-    cm_types::Name,
+    cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
+    cm_types::{Name, SeparatedPath},
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Dict, Receiver},
     std::{collections::HashMap, iter, sync::Arc},
@@ -58,10 +58,10 @@ pub fn build_component_sandbox(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
-    component_input: &Router,
+    component_input_dict: &Dict,
     component_output_dict: &Dict,
     program_input_dict: &Dict,
-    program_output: &Router,
+    program_output_dict: &Dict,
     collection_dicts: &mut HashMap<Name, Dict>,
 ) -> ComponentSandbox {
     let mut output = ComponentSandbox::default();
@@ -79,20 +79,21 @@ pub fn build_component_sandbox(
         extend_dict_with_use(
             component,
             children,
-            component_input,
+            component_input_dict,
             program_input_dict,
-            program_output,
+            program_output_dict,
             use_,
             &mut output.sources_and_receivers,
         );
     }
 
     for offer in &decl.offers {
-        // We only support protocol capabilities right now
+        // We only support protocol and dictionary capabilities right now
         match &offer {
-            cm_rust::OfferDecl::Protocol(_) => (),
+            cm_rust::OfferDecl::Protocol(_) | cm_rust::OfferDecl::Dictionary(_) => (),
             _ => continue,
         }
+        let mut _placeholder_dict = None;
         let target_dict = match offer.target() {
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
@@ -102,16 +103,24 @@ pub fn build_component_sandbox(
             cm_rust::OfferTarget::Collection(name) => {
                 collection_dicts.entry(name.clone()).or_insert(Dict::new())
             }
-            cm_rust::OfferTarget::Capability(_name) => {
-                // TODO(https://fxbug.dev/301674053): Support dictionary routing.
-                continue;
+            cm_rust::OfferTarget::Capability(name) => {
+                let mut entries = program_output_dict.lock_entries();
+                _placeholder_dict = Some(
+                    entries
+                        .entry(name.to_string())
+                        .or_insert_with(|| Box::new(Dict::new()))
+                        .clone(),
+                );
+                let ref_: &mut Dict =
+                    _placeholder_dict.as_mut().unwrap().try_into().expect("wrong type in dict");
+                ref_
             }
         };
         extend_dict_with_offer(
             component,
             children,
-            component_input,
-            program_output,
+            component_input_dict,
+            program_output_dict,
             offer,
             target_dict,
             &mut output.sources_and_receivers,
@@ -122,7 +131,7 @@ pub fn build_component_sandbox(
         extend_dict_with_expose(
             component,
             children,
-            program_output,
+            program_output_dict,
             expose,
             component_output_dict,
             &mut output.sources_and_receivers,
@@ -137,8 +146,8 @@ pub fn build_component_sandbox(
 pub fn extend_dict_with_offers(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input: &Router,
-    program_output: &Router,
+    component_input_dict: &Dict,
+    program_output_dict: &Dict,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_dict: &mut Dict,
 ) -> Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)> {
@@ -147,8 +156,8 @@ pub fn extend_dict_with_offers(
         extend_dict_with_offer(
             component,
             children,
-            component_input,
-            program_output,
+            component_input_dict,
+            program_output_dict,
             offer,
             target_dict,
             &mut sources_and_receivers,
@@ -160,9 +169,9 @@ pub fn extend_dict_with_offers(
 fn extend_dict_with_use(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input: &Router,
+    component_input_dict: &Dict,
     program_input_dict: &Dict,
-    program_output: &Router,
+    program_output_dict: &Dict,
     use_: &cm_rust::UseDecl,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
@@ -172,13 +181,27 @@ fn extend_dict_with_use(
         _ => return,
     }
 
-    let source_name = use_.source_name();
-    let cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl { target_path, .. }) = use_ else {
+    let cm_rust::UseDecl::Protocol(use_protocol) = use_ else {
         unreachable!();
     };
+    let source_path = use_protocol.source_path();
     let router = match use_.source() {
-        cm_rust::UseSource::Parent => component_input.clone().with_name(source_name.as_str()),
-        cm_rust::UseSource::Self_ => program_output.clone().with_name(source_name.as_str()),
+        cm_rust::UseSource::Parent => {
+            let Some(router) =
+                component_input_dict.get_routable::<Router>(source_path.iter_segments())
+            else {
+                return;
+            };
+            router
+        }
+        cm_rust::UseSource::Self_ => {
+            let Some(router) =
+                program_output_dict.get_routable::<Router>(source_path.iter_segments())
+            else {
+                return;
+            };
+            router
+        }
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child) = children.get(&child_name) else { return };
@@ -186,17 +209,17 @@ fn extend_dict_with_use(
             new_forwarding_router_to_child(
                 component,
                 weak_child,
-                source_name.clone(),
+                source_path.to_owned(),
                 RoutingError::use_from_child_expose_not_found(
                     child.moniker.leaf().unwrap(),
                     &child.moniker.parent().unwrap(),
-                    source_name.clone(),
+                    use_protocol.source_name.clone(),
                 ),
             )
         }
         cm_rust::UseSource::Framework => {
             let (receiver, sender) = Receiver::new();
-            let source_name = source_name.clone();
+            let source_name = use_protocol.source_name.clone();
             sources_and_receivers.push((
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name.clone()),
@@ -221,7 +244,7 @@ fn extend_dict_with_use(
         _ => return, // unsupported
     };
     program_input_dict.insert_capability(
-        target_path.iter_segments(),
+        use_protocol.target_path.iter_segments(),
         router.with_availability(*use_.availability()),
     );
 }
@@ -229,20 +252,20 @@ fn extend_dict_with_use(
 fn extend_dict_with_offer(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input: &Router,
-    program_output: &Router,
+    component_input_dict: &Dict,
+    program_output_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
-    // We only support protocol capabilities right now
+    // We only support protocol and dictionary capabilities right now
     match &offer {
-        cm_rust::OfferDecl::Protocol(_) => (),
+        cm_rust::OfferDecl::Protocol(_) | cm_rust::OfferDecl::Dictionary(_) => (),
         _ => return,
     }
     let source_name = offer.source_name();
     let target_name = offer.target_name();
-    if target_dict.get_capability::<Router>(iter::once(target_name.as_str())).is_some() {
+    if target_dict.get_routable::<Router>(iter::once(target_name.as_str())).is_some() {
         warn!(
             "duplicate sources for protocol {} in a dict, unable to populate dict entry",
             target_name
@@ -251,8 +274,32 @@ fn extend_dict_with_offer(
         return;
     }
     let router = match offer.source() {
-        cm_rust::OfferSource::Parent => component_input.clone().with_name(source_name.as_str()),
-        cm_rust::OfferSource::Self_ => program_output.clone().with_name(source_name.as_str()),
+        cm_rust::OfferSource::Parent => {
+            let Some(router) =
+                component_input_dict.get_routable::<Router>(iter::once(source_name.as_str()))
+            else {
+                return;
+            };
+            router
+        }
+        cm_rust::OfferSource::Self_ => match offer {
+            cm_rust::OfferDecl::Dictionary(_) => {
+                let Some(router) =
+                    program_output_dict.get_routable::<Dict>(iter::once(source_name.as_str()))
+                else {
+                    return;
+                };
+                router
+            }
+            _ => {
+                let Some(router) =
+                    program_output_dict.get_routable::<Router>(iter::once(source_name.as_str()))
+                else {
+                    return;
+                };
+                router
+            }
+        },
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             let Some(child) = children.get(&child_name) else { return };
@@ -260,7 +307,7 @@ fn extend_dict_with_offer(
             new_forwarding_router_to_child(
                 component,
                 weak_child,
-                source_name.clone(),
+                SeparatedPath { basename: source_name.to_string(), dirname: None },
                 RoutingError::offer_from_child_expose_not_found(
                     child.moniker.leaf().unwrap(),
                     &child.moniker.parent().unwrap(),
@@ -299,14 +346,14 @@ fn extend_dict_with_offer(
 fn extend_dict_with_expose(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    program_output: &Router,
+    program_output_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
-    // We only support protocol capabilities right now
+    // We only support protocol and dictionary capabilities right now
     match &expose {
-        cm_rust::ExposeDecl::Protocol(_) => (),
+        cm_rust::ExposeDecl::Protocol(_) | cm_rust::ExposeDecl::Dictionary(_) => (),
         _ => return,
     }
     // We only support exposing to the parent right now
@@ -317,7 +364,24 @@ fn extend_dict_with_expose(
     let target_name = expose.target_name();
 
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => program_output.clone().with_name(source_name.as_str()),
+        cm_rust::ExposeSource::Self_ => match expose {
+            cm_rust::ExposeDecl::Dictionary(_) => {
+                let Some(router) =
+                    program_output_dict.get_routable::<Dict>(iter::once(source_name.as_str()))
+                else {
+                    return;
+                };
+                router
+            }
+            _ => {
+                let Some(router) =
+                    program_output_dict.get_routable::<Router>(iter::once(source_name.as_str()))
+                else {
+                    return;
+                };
+                router
+            }
+        },
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
             if let Some(child) = children.get(&child_name) {
@@ -325,7 +389,7 @@ fn extend_dict_with_expose(
                 new_forwarding_router_to_child(
                     component,
                     weak_child,
-                    source_name.clone(),
+                    SeparatedPath { basename: source_name.to_string(), dirname: None },
                     RoutingError::expose_from_child_expose_not_found(
                         child.moniker.leaf().unwrap(),
                         &child.moniker.parent().unwrap(),
@@ -376,14 +440,14 @@ fn new_router_for_cm_hosted_receiver(
 fn new_forwarding_router_to_child(
     component: &Arc<ComponentInstance>,
     weak_child: WeakComponentInstance,
-    capability_name: Name,
+    capability_path: SeparatedPath,
     expose_not_found_error: RoutingError,
 ) -> Router {
     let task_group = component.nonblocking_task_group().as_weak();
     Router::new(move |request: Request, completer: Completer| {
         task_group.spawn(forward_request_to_child(
             weak_child.clone(),
-            capability_name.clone(),
+            capability_path.clone(),
             expose_not_found_error.clone(),
             request,
             completer,
@@ -393,7 +457,7 @@ fn new_forwarding_router_to_child(
 
 async fn forward_request_to_child(
     weak_child: WeakComponentInstance,
-    capability_name: Name,
+    capability_path: SeparatedPath,
     expose_not_found_error: RoutingError,
     request: Request,
     completer: Completer,
@@ -402,10 +466,9 @@ async fn forward_request_to_child(
     let res: Result<(), ModelError> = async {
         let child = weak_child.upgrade()?;
         let child_state = child.lock_resolved_state().await?;
-
         if let Some(router) = child_state
             .component_output_dict
-            .get_capability::<Router>(iter::once(capability_name.as_str()))
+            .get_routable::<Router>(capability_path.iter_segments())
         {
             router.route(request, completer.take().unwrap());
             return Ok(());

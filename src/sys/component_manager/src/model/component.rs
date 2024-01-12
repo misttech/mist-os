@@ -1429,19 +1429,14 @@ pub struct ResolvedInstanceState {
     /// The dict containing all capabilities that the parent wished to provide to us.
     pub component_input_dict: Dict,
 
-    /// The router containing all capabilities that the parent wished to provide to us.
-    component_input: Router,
-
     /// The dict containing all capabilities that we expose.
     pub component_output_dict: Dict,
 
     /// The dict containing all capabilities that we use.
     pub program_input_dict: Dict,
 
-    /// The router containing all capabilities that we declare.
-    ///
-    /// Requesting capabilities from this router will start the component.
-    program_output: Router,
+    /// The dict containing all capabilities that we declare.
+    program_output_dict: Dict,
 
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these dicts (which is potentially extended by
@@ -1467,10 +1462,7 @@ impl ResolvedInstanceState {
         )?;
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let decl = resolved_component.decl.clone();
-
         let program_output_dict = Self::build_program_output_dict(component, &decl);
-        let program_output = Router::from_routable(program_output_dict);
-        let component_input = Router::from_routable(component_input_dict.clone());
 
         let mut state = Self {
             weak_component,
@@ -1486,10 +1478,9 @@ impl ResolvedInstanceState {
             address,
             anonymized_services: HashMap::new(),
             component_input_dict,
-            component_input,
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
-            program_output,
+            program_output_dict,
             collection_dicts: HashMap::new(),
         };
         state.add_static_children(component).await?;
@@ -1498,10 +1489,10 @@ impl ResolvedInstanceState {
             component,
             &state.children,
             &decl,
-            &state.component_input,
+            &state.component_input_dict,
             &state.component_output_dict,
             &state.program_input_dict,
-            &state.program_output,
+            &state.program_output_dict,
             &mut state.collection_dicts,
         );
         state.discover_static_children(component_sandbox.child_dicts).await;
@@ -1521,30 +1512,36 @@ impl ResolvedInstanceState {
         component: &Arc<ComponentInstance>,
         decl: &ComponentDecl,
     ) -> Dict {
-        let started = Self::start_component_on_request(component, decl);
-
         // Wrap the started router with policy checks, such that we don't perform extra work
         // given requests that violate policy.
         let program_output_dict = Dict::new();
         let weak_component = WeakComponentInstance::new(component);
         for capability in &decl.capabilities {
-            // We only support protocol capabilities right now
+            // We only support protocol and directory capabilities right now
             match &capability {
-                cm_rust::CapabilityDecl::Protocol(_) => (),
+                cm_rust::CapabilityDecl::Protocol(p) => {
+                    let router = Self::start_component_on_request(
+                        component,
+                        decl,
+                        capability.name().clone(),
+                    );
+                    let router = router.with_policy_check(
+                        CapabilitySource::Component {
+                            capability: ComponentCapability::Protocol(p.clone()),
+                            component: weak_component.clone(),
+                        },
+                        component.policy_checker().clone(),
+                    );
+                    program_output_dict
+                        .insert_capability(iter::once(capability.name().as_str()), router);
+                }
+                cm_rust::CapabilityDecl::Dictionary(_) => {
+                    // The dictionary will be filled in by [build_component_sandbox].
+                    program_output_dict
+                        .insert_capability(iter::once(capability.name().as_str()), Dict::new());
+                }
                 _ => continue,
             }
-            let router = started.clone().with_name(capability.name().as_str());
-            let router = router.with_policy_check(
-                CapabilitySource::Component {
-                    capability: ComponentCapability::Protocol(match capability {
-                        cm_rust::CapabilityDecl::Protocol(p) => p.clone(),
-                        _ => panic!("we currently only support protocols"),
-                    }),
-                    component: weak_component.clone(),
-                },
-                component.policy_checker().clone(),
-            );
-            program_output_dict.insert_capability(iter::once(capability.name().as_str()), router);
         }
         program_output_dict
     }
@@ -1554,27 +1551,30 @@ impl ResolvedInstanceState {
     fn start_component_on_request(
         component: &Arc<ComponentInstance>,
         decl: &ComponentDecl,
+        capability_name: Name,
     ) -> Router {
         if decl.program.is_none() {
             return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable.into());
         }
         let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
         let weak_component = WeakComponentInstance::new(component);
-        Router::new(move |request, completer| {
+        Router::new(move |mut request, completer| {
             if let Ok(component) = weak_component.upgrade() {
                 let component_clone = component.clone();
                 let outgoing_dict = outgoing_dict.clone();
+                let capability_name = capability_name.clone();
                 component.nonblocking_task_group().spawn(async move {
                     let target: WeakComponentInstance = request.target.unwrap();
                     let target_moniker = target.moniker;
-                    // The path segments may be empty if one requested the entire program output.
-                    let name = request.relative_path.peek().map(String::as_str).unwrap_or("");
-                    let name = name.parse().unwrap();
+                    request.relative_path.prepend(capability_name.to_string());
 
                     // If the component is already started, this will be a no-op.
                     match component_clone
                         .start(
-                            &StartReason::AccessCapability { target: target_moniker, name },
+                            &StartReason::AccessCapability {
+                                target: target_moniker,
+                                name: capability_name,
+                            },
                             None,
                             vec![],
                             vec![],
@@ -1934,8 +1934,8 @@ impl ResolvedInstanceState {
             let sources_and_receivers = extend_dict_with_offers(
                 component,
                 &self.children,
-                &self.component_input,
-                &self.program_output,
+                &self.component_input_dict,
+                &self.program_output_dict,
                 &dynamic_offers,
                 &mut child_dict,
             );

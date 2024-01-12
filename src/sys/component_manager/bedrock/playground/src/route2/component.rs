@@ -6,7 +6,7 @@ use anyhow::Result;
 use cm_types::Availability;
 use futures::channel::oneshot::{self};
 use replace_with::replace_with;
-use routing::{Routable, Router};
+use routing::{Completer, Request, Routable, Router};
 use sandbox::{Data, Dict, Opaque, Open};
 use std::{
     collections::HashMap,
@@ -158,7 +158,12 @@ fn route_from(
             child.clone()
         }
     };
-    Ok(source.with_name(cap_name.clone()))
+    let cap_name = cap_name.clone();
+    let route_fn = move |mut request: Request, completer: Completer| {
+        request.relative_path.prepend(cap_name.clone());
+        source.route(request, completer);
+    };
+    Ok(Router::new(route_fn))
 }
 
 /// Resolving a component creates the program and children, and returns an output

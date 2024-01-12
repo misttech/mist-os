@@ -13,7 +13,9 @@ use {
     namespace::{Path as NamespacePath, PathError},
     serde::{de, ser},
     serde::{Deserialize, Serialize},
-    std::{cmp, default::Default, fmt, iter, path::PathBuf, str::FromStr},
+    std::{
+        cmp, default::Default, fmt, iter, iter::DoubleEndedIterator, path::PathBuf, str::FromStr,
+    },
     thiserror::Error,
     url,
 };
@@ -305,7 +307,7 @@ impl Path {
         self.0.split()
     }
 
-    pub fn iter_segments(&self) -> impl Iterator<Item = &str> {
+    pub fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0.iter_segments()
     }
 
@@ -427,11 +429,11 @@ impl RelativePath {
         &*self.0
     }
 
-    pub fn iter_segments(&self) -> impl Iterator<Item = &str> {
+    pub fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.0
             .as_str()
-            .split("/")
-            // `split("/")` produces empty segments if there is nothing before or after a slash.
+            .split('/')
+            // `split('/')` produces empty segments if there is nothing before or after a slash.
             .filter(|s| !s.is_empty())
     }
 }
@@ -524,7 +526,7 @@ pub struct BorrowedSeparatedPath<'a> {
 
 impl BorrowedSeparatedPath<'_> {
     /// Returns an iterator over the segments in this path.
-    pub fn iter_segments(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+    pub fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
         if let Some(d) = self.dirname {
             Box::new(d.iter_segments().chain(iter::once(self.basename)))
         } else {
@@ -549,7 +551,7 @@ pub struct SeparatedPath {
 
 impl SeparatedPath {
     /// Returns an iterator over the segments in this path.
-    pub fn iter_segments(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+    pub fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
         if let Some(d) = &self.dirname {
             Box::new(d.iter_segments().chain(iter::once(self.basename.as_str())))
         } else {

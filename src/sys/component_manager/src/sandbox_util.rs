@@ -21,6 +21,7 @@ use {
     futures::future::BoxFuture,
     lazy_static::lazy_static,
     sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Message, Open, Receiver, Sender},
+    std::iter,
     std::sync::{self, Arc},
     tracing::{info, warn},
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
@@ -79,6 +80,12 @@ pub trait DictExt {
     where
         C: ErasedCapability + Capability;
 
+    /// Returns a router configured to route at `path`, if a [Routable]
+    /// capability exists at `path.first()`. / Returns None otherwise.
+    fn get_routable<'a, C>(&self, path: impl DoubleEndedIterator<Item = &'a str>) -> Option<Router>
+    where
+        C: ErasedCapability + Capability + Routable;
+
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
     fn insert_capability<'a, C>(&self, path: impl Iterator<Item = &'a str>, capability: C)
     where
@@ -129,6 +136,31 @@ impl DictExt for Dict {
                 }
             }
         }
+    }
+
+    fn get_routable<'a, C>(
+        &self,
+        mut path: impl DoubleEndedIterator<Item = &'a str>,
+    ) -> Option<Router>
+    where
+        C: ErasedCapability + Capability + Routable,
+    {
+        let first = path.next().unwrap();
+        let Some(capability) = self.get_capability::<C>(iter::once(first)) else {
+            return None;
+        };
+        let router = Router::from_routable(capability);
+        let segments: Vec<_> = path.map(|s| s.to_string()).rev().collect();
+        if segments.is_empty() {
+            return Some(router);
+        }
+        let route_fn = move |mut request: Request, completer: Completer| {
+            for name in &segments {
+                request.relative_path.prepend(name.clone());
+            }
+            router.route(request, completer);
+        };
+        Some(Router::new(route_fn))
     }
 
     fn insert_capability<'a, C>(&self, mut path: impl Iterator<Item = &'a str>, capability: C)

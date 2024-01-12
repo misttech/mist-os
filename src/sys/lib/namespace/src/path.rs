@@ -9,6 +9,7 @@ use std::{
     borrow::Borrow,
     ffi::{CString, IntoStringError},
     fmt,
+    iter::DoubleEndedIterator,
 };
 use thiserror::Error;
 
@@ -97,11 +98,11 @@ impl Path {
     }
 
     /// Iterate the path segments as separated by "/".
-    pub fn iter_segments(&self) -> impl Iterator<Item = &str> {
+    pub fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &str> {
         self.path
             .as_str()
-            .split("/")
-            // `split("/")` produces empty segments if there is nothing before or after a slash.
+            .split('/')
+            // `split('/')` produces empty segments if there is nothing before or after a slash.
             .filter(|s| !s.is_empty())
     }
 

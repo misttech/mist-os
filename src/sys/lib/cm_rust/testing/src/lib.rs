@@ -125,6 +125,12 @@ impl ComponentDeclBuilder {
         self
     }
 
+    /// Add a custom dictionary declaration.
+    pub fn dictionary(mut self, dictionary: cm_rust::DictionaryDecl) -> Self {
+        self.result.capabilities.push(cm_rust::CapabilityDecl::Dictionary(dictionary));
+        self
+    }
+
     /// Add a custom directory declaration.
     pub fn directory(mut self, directory: cm_rust::DirectoryDecl) -> Self {
         self.result.capabilities.push(cm_rust::CapabilityDecl::Directory(directory));
@@ -409,6 +415,34 @@ impl From<ProtocolDeclBuilder> for cm_rust::ProtocolDecl {
     }
 }
 
+// A convenience builder for constructing [DictionaryDecl]s.
+#[derive(Debug)]
+pub struct DictionaryDeclBuilder(cm_rust::DictionaryDecl);
+
+impl DictionaryDeclBuilder {
+    /// Creates a new builder.
+    pub fn new(name: &str) -> Self {
+        Self(cm_rust::DictionaryDecl { name: name.parse().unwrap(), source: None, source_dictionary: None })
+    }
+
+    /// Sets the source dictionary.
+    pub fn source_dictionary(mut self, source: cm_rust::DictionarySource, source_dictionary: &str) -> Self {
+        self.0.source = Some(source);
+        self.0.source_dictionary = Some(source_dictionary.parse().unwrap());
+        self
+    }
+
+    /// Consumes the builder and returns a DictionaryDecl.
+    pub fn build(self) -> cm_rust::DictionaryDecl {
+        self.0
+    }
+}
+
+impl From<DictionaryDeclBuilder> for cm_rust::DictionaryDecl {
+    fn from(builder: DictionaryDeclBuilder) -> Self {
+        builder.build()
+    }
+}
 // A convenience builder for constructing ServiceDecls.
 #[derive(Debug)]
 pub struct ServiceDeclBuilder(cm_rust::ServiceDecl);
