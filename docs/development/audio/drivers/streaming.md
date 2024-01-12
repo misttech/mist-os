@@ -221,9 +221,9 @@ Notes:
 *   By default, non-floating point PCM encodings are assumed expressed using
     [two's complement](https://en.wikipedia.org/wiki/Two%27s_complement) signed
     integers. eg. the bit values for a 16 bit PCM sample format would range from
-    [0x8000, 0x7FFF] with 0x0000 representing zero speaker deflection. If the
-    `PCM_UNSIGNED` sample format is used, the bit values would range from [0x0000,
-    0xFFFF] with 0x8000 representing zero deflection.
+    \[0x8000, 0x7FFF\] with 0x0000 representing zero speaker deflection. If the
+    `PCM_UNSIGNED` sample format is used, the bit values would range from \[0x0000,
+    0xFFFF\] with 0x8000 representing zero deflection.
 *   When encoding a smaller sample size in a larger channel (e.g. 20 or 24-bit in
     32), the most significant bits of the 32-bit container are used while the
     least significant bits will be ignored (left justified). e.g. a 20-bit sample would be mapped

@@ -649,8 +649,8 @@ control those costs, with respect to the amount of memory saved.
 Although compressed pages might have co-located storage, the process of
 accessing this storage is defined such that there are no transitive dependencies
 on VMOs that could lead to measurable channels. This is intentionally done to
-avoid attacks that might be similar to [memory-deduplication attacks]
-(https://arxiv.org/abs/2111.08553).
+avoid attacks that might be similar to
+[memory-deduplication attacks](https://arxiv.org/abs/2111.08553).
 
 Despite a lack of transitive dependencies a timing channel could still
 potentially be created if an attacker can control data that gets co-located in

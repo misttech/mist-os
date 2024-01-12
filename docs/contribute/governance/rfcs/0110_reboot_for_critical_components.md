@@ -319,7 +319,7 @@ component in its payload, such as the moniker or URL. In general, events can
 carry sensitive information in their payloads such as component monikers or
 URLs, which we wish to expose only on a need-to-know basis. Because the
 supervisor does not need this information,
-[component-scoped events](#component-scoped events) will not provide information
+[component-scoped events](#component-scoped-events) will not provide information
 about the identity of the component that generated the event. The remainder of
 the information in the payload is a timestamp and the termination status, which
 is not sensitive.

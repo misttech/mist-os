@@ -27,7 +27,7 @@ This RFC has two goals:
 
 A side-effect of both (1) and (2) is that optionality (nullability) can be
 efficiently implemented for all types, not just structs, handles, vectors,
-strings, tables and (extensible) unions[[1]](#footnote1)
+strings, tables and (extensible) unions[^1].
 
 ## Motivation
 
@@ -254,7 +254,7 @@ However, we still advocate using the envelope-based representation, since
 *   using an envelope for an optional handle is consistent with using
     envelopes for any optional type,
 *   optional handles are relatively rare in a FIDL message vs other message
-    types[[2]](#footnote2), so the extra 4 bytes of envelope overhead should
+    types[^2], so the extra 4 bytes of envelope overhead should
     not significantly impact message size,
 *   keeping the existing `uint32` wire format for optional handles would
     result in three encodings and three separate code paths for handles:
@@ -416,7 +416,7 @@ This RFC requires that out-of-line envelopes have the correct (recursive)
 size for present out-of-line data.
 This requirement can impose additional burden on an encoder, since if the
 envelope's type is expected to be known by the receiver, the size field is
-unnecessary since the decoder can compute the size[[3]](#footnote3).
+unnecessary since the decoder can compute the size [^3].
 Thus, the encoder is arguably performing additional work for no apparent
 benefit.
 This argument also applies to the handle count.
@@ -609,7 +609,7 @@ need to happen (e.g. a proposed ordinal size change).
 Note that this is an easier transition than FIDL1 to FIDL2, which changed
 language bindings significantly.
 We do not propose calling this FIDL3 since there are no user-visible
-changes[[4]](#footnote4)
+changes[^4].
 
 ## Backwards compatibility
 
@@ -789,26 +789,22 @@ space past 48 bits ([ARM64][arm-physical], [x64-64 5-level
 paging][x86-physical]), so stealing more pointer bits may not be very
 future-proof.
 
---------------------------------------------------------------------------------
+<!-- footnotes. These must be 1 line; continuations indented 4 spaces. -->
 
-##### Footnote1
-Envelopes _enable_ optionality for all types; however, exposing this
-optionality to end-users can (and perhaps should) be done separately.
+[^1]: Envelopes _enable_ optionality for all types; however, exposing this
+    optionality to end-users can (and perhaps should) be done separately.
 
-##### Footnote2
-As of 1/28/19, there appears to be 37 uses of optional handles in the Fuchsia
-code base.
-This is a conservative number, as it does not count optional protocol
-handles, nor protocol request handles.
+[^2]: As of 1/28/19, there appears to be 37 uses of optional handles in
+    the Fuchsia code base. This is a conservative number, as it does not
+    count optional protocol handles, nor protocol request handles.
 
-##### Footnote3
-This only applies to envelopes in non-extensible containers, i.e. structs and
-static unions.
-Extensible containers must encode the recursive size since decoders may not
-know the type, and need to know how much data to ignore.
+[^3]: This only applies to envelopes in non-extensible containers,
+    i.e. structs and static unions. Extensible containers must encode
+    the recursive size since decoders may not know the type, and need
+    to know how much data to ignore.
 
-##### Footnote4
-Except allowing optionality on more types, if we wish to do that simultaneously.
+[^4]: Except allowing optionality on more types, if we wish to do that
+    simultaneously.
 
 <!-- xrefs -->
 [RFC-0032]: /docs/contribute/governance/rfcs/0032_efficient_envelopes.md

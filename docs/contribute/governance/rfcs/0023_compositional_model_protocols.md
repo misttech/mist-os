@@ -250,7 +250,7 @@ This larger set of changes will require a multi-step approach, bumping the schem
 ### Breakage at a Distance, and the Use of `[FragileBase]`
 
 The status of the possibility of breakage at a distance is unchanged by this proposal,
-and we therefore reaffirm the use of `[FragileBase]` for any protocol being extended[[1](#Footnote-1)].
+and we therefore reaffirm the use of `[FragileBase]` for any protocol being extended[^1].
 
 ### Guidance to Bindings Authors
 
@@ -386,7 +386,7 @@ on interface and embedding.
 
 **Why**: Doesn't look like inheritance, reuses existing keyword to indicate names
 being brought into scope.
-Less likely to be confused with a method declaration or a "property[[2](#Footnote-2)]."
+Less likely to be confused with a method declaration or a "property[^2]."
 
 **Example**:
 
@@ -416,16 +416,18 @@ Nothing specific.
 [Cap'n Proto](https://capnproto.org/language.html#interfaces) has interfaces that support
 inheritance, including multiple inheritance (in the style of mixins).
 
+<!-- footnotes. These must be 1 line; continuations indented 4 spaces. -->
 
-##### Footnote 1
-The introduction of [Ordinal Hashing](/docs/contribute/governance/rfcs/0020_interface_ordinal_hashing.md) for methods, combined with an
-intended change to up method ordinals from 32 bits to 64 bits in a future proposal,
-will likely make this breakage at a distance inexistant (in practical terms), and
-will revisit the use of [FragileBase] then.
+[^1]: The introduction of [Ordinal Hashing](/docs/contribute/governance/rfcs/0020_interface_ordinal_hashing.md)
+    for methods, combined with an intended change to up method ordinals
+    from 32 bits to 64 bits in a future proposal, will likely make this
+    breakage at a distance inexistent (in practical terms), and will
+    revisit the use of `FragileBase` then.
 
-##### Footnote 2
-Property: A hypothetical FIDL extension to facilitate observation / data binding.
-Loosely speaking, the bindings would produce methods for accessing, modifying, and/or observing a value exposed by the interface.
+[^2]: Property: A hypothetical FIDL extension to facilitate
+    observation / data binding. Loosely speaking, the bindings
+    would produce methods for accessing, modifying, and/or
+    observing a value exposed by the interface.
 
 <!-- xref table -->
 [fidl-api]: /docs/development/api/fidl.md

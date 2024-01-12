@@ -218,7 +218,7 @@ In contrast, here are examples of changes that didn't rise to being FTPs:
   Creating new bindings is expected, and can be done without any ratification<br />
   from the Fuchsia FIDL team.
 
-* Make references to enum members explicit[[1]](#footnote1):<br />
+* Make references to enum members explicit[^1]:<br />
   Before the change `my.library.MY_ENUM_MEMBER` was supported, and it was
   replaced by explicit syntax `my.library.MyEnum.MY_ENUM_MEMBER`. Despite
   changing the language grammar, this change is a bug fix of a feature that
@@ -322,13 +322,10 @@ evolutions are expected.
 
 Many. One is the 'Eng Review' process that Fuchsia has adopted.
 
---------------------------------------------------------------------------------
-
-##### Footnote1
-
-CLs
-[fxr/299869](https://fuchsia-review.googlesource.com/c/fuchsia/+/299869/),
-[fxr/301089](https://fuchsia-review.googlesource.com/c/fuchsia/+/301089/),
-[fxr/300672](https://fuchsia-review.googlesource.com/c/fuchsia/+/300672/),
-[fxr/302294](https://fuchsia-review.googlesource.com/c/fuchsia/+/302294/),
-[fxr/302728](https://fuchsia-review.googlesource.com/c/fuchsia/+/302728/).
+<!-- footnotes. These must be 1 line; continuations indented 4 spaces. -->
+[^1]: CLs
+    [fxr/299869](https://fuchsia-review.googlesource.com/c/fuchsia/+/299869/),
+    [fxr/301089](https://fuchsia-review.googlesource.com/c/fuchsia/+/301089/),
+    [fxr/300672](https://fuchsia-review.googlesource.com/c/fuchsia/+/300672/),
+    [fxr/302294](https://fuchsia-review.googlesource.com/c/fuchsia/+/302294/),
+    [fxr/302728](https://fuchsia-review.googlesource.com/c/fuchsia/+/302728/).

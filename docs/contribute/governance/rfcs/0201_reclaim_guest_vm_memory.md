@@ -411,7 +411,7 @@ pressure without affecting host/guest performance too much.
 [Constant balloon resizes cause many TLB shootdowns]: https://buganizer.corp.google.com/issues/202098603#comment26
 [Virtio Balloon. slides]:https://static.sched.com/hosted_files/kvmforum2020/8e/KVM%20Forum%202020%20Virtio-%28balloon%20pmem%20mem%29%20Managing%20Guest%20Memory.pdf
 [Virtio Balloon. video]: https://youtu.be/Fq47WCCm-HM?t=199
-[Free page reporting: by Alexander Duyck ( Intel ). Slide 10]: https://static.sched.com/hosted_files/kvmforum2020/8e/KVM%20Forum%202020%20Virtio-%28balloon%20pmem%20mem%29%20Managing%20Guest%20Memory.pdf)
+[Free page reporting: by Alexander Duyck ( Intel ). Slide 10]: https://static.sched.com/hosted_files/kvmforum2020/8e/KVM%20Forum%202020%20Virtio-(balloon%20pmem%20mem)%20Managing%20Guest%20Memory.pdf#10
 [Linux Page Cache Basics]: https://www.thomas-krenn.com/en/wiki/Linux_Page_Cache_Basics
 [Virtual memory]: https://en.wikipedia.org/wiki/Virtual_memory
 [Linux stress tool]: https://linux.die.net/man/1/stress

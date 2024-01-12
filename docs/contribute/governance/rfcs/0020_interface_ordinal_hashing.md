@@ -10,7 +10,7 @@ _"60% of the time, it's the answer to an interview question"_
 ## Summary
 
 We propose removing the programmer's ability to manually
-specify the ordinal for interface methods [1](#Footnote1).
+specify the ordinal for interface methods [^1].
 Instead, the compiler generates the ordinal based on a hash of the
 fully-qualified method name, i.e. the library name, interface name & method
 name. Method renames will be ABI-compatible via a new `Selector` attribute
@@ -87,7 +87,7 @@ interface Science {
     - FTP-010 (**rejected**) proposed an `OrdinalRange` attribute so that
       interface
       inheritance could be more predictable; it was rejected.
-    - `FragileBase` [[2]](#Footnote2) is the current stop-gap solution,
+    - `FragileBase` [^2] is the current stop-gap solution,
       but doesn't solve the core problem of ensuring that ordinals don't
       clash.
     - If ordinals are hashed and the interface and library name are used
@@ -185,7 +185,7 @@ If a hashed ordinal results in a clash or conflict with another
 hashed ordinal in the same interface, the compiler will emit an
 error, and rely on a human to specify a
 [`Selector`](#the-selector-attribute-method-renaming) attribute
-to resolve the conflict [[3]](#Footnote3).
+to resolve the conflict [^3].
 
 For example, if the method name `Hypothesize` conflicts with the
 method name `Investigate`, we could add `Selector` to
@@ -256,7 +256,7 @@ the ergonomics and the compiler implementation.
 ### Events
 
 This FTP also covers events, which are considered a subset of
-methods by the FIDL language docs [[4]](#Footnote4).
+methods by the FIDL language docs [^4].
 
 ### Compiler & Bindings Changes
 
@@ -379,7 +379,7 @@ to be cryptographically strong; we do not believe there are security issues sinc
 
 Truncation of the SHA-256 hash may also concern some, but again, we do not
 believe there are security issues since the FIDL compiler statically checks for
-hash collisions [[5]](#Footnote5).
+hash collisions [^5].
 
 ## Testing
 ianloic@google.com has analyzed existing FIDL interfaces and determined
@@ -490,54 +490,43 @@ apang@google.com suggested ordinal hashing for tables in ctiller@google.com's
 Phickle proposal. ianloic@google.com and apang@google.com met on Thu 2018/10/18 to
 whiteboard this.
 
---------------------------------------------------------------------------------------------
+<!-- footnotes. These must be 1 line; continuations indented 4 spaces. -->
 
-##### Footnote1
 
-Mojo/FIDL1 also didn't require the programmer to specify ordinals;
-instead, they were sequentially generated (similarly to FlatBuffers's
-implicit tag numbering for table fields).
+[^1]: Mojo/FIDL1 also didn't require the programmer to specify ordinals;
+    instead, they were sequentially generated (similarly to FlatBuffers's
+    implicit tag numbering for table fields).
 
-##### Footnote2
+[^2]: Previously, you could create a FIDL interface that inherited from
+    whichever other FIDL interface you liked.
+    However, the interface and the superinterface share the same ordinal space,
+    which means if you added a method to an interface you might break a
+    subinterface in some other, far away library.
+    There are several proposals kicking around FIDL-land for resolving the
+    inheritance / ordinal collision problem, but until we figured out how we
+    want to solve this problem, we've switched the default for interfaces to
+    forbid inheritance.
+    An interface can still opt in to allowing subinterfaces using the
+    `[FragileBase]` attribute.
+    If you run into this issue, the compiler should print out an error message
+    with a brief explanation.
+    I (abarth@google.com) have added the `[FragileBase]` attribute
+    everywhere we use FIDL interface inheritance in the Platform Source Tree
+    (hopefully!).
+    Please let me know if you have any questions or run into any trouble.
+    --abarth@google.com
 
-Previously, you could create a FIDL interface that inherited from
-whichever other FIDL interface you liked.
-However, the interface and the superinterface share the same ordinal space,
-which means if you added a method to an interface you might break a
-subinterface in some other, far away library.
+[^3]: We do not believe that there'll be sufficient ordinal clashes to warrant
+    any extra implementation and cognitive complexity added by automatic
+    conflict resolution. We can revisit this decision without breaking
+    backward-compatibility if data shows that ordinal clashing becomes
+    problematic.
 
-There are several proposals kicking around FIDL-land for resolving the
-inheritance / ordinal collision problem, but until we figured out how we
-want to solve this problem, we've switched the default for interfaces to
-forbid inheritance.
-An interface can still opt in to allowing subinterfaces using the
-`[FragileBase]` attribute.
+[^4]: If only results are declared, the method is referred to as an event.
+    It then defines an unsolicited message from the server.
 
-If you run into this issue, the compiler should print out an error message
-with a brief explanation.
-I (abarth@google.com) have added the `[FragileBase]` attribute
-everywhere we use FIDL interface inheritance in the Platform Source Tree
-(hopefully!).
-
-Please let me know if you have any questions or run into any trouble.
---abarth@google.com
-
-##### Footnote3
-
-We do not believe that there'll be sufficient ordinal clashes to warrant any
-extra implementation and cognitive complexity added by automatic conflict
-resolution. We can revisit this decision without breaking
-backward-compatibility if data shows that ordinal clashing becomes problematic.
-
-##### Footnote4
-
-If only results are declared, the method is referred to as an event.
-It then defines an unsolicited message from the server.
-
-##### Footnote5
-
-jln@google.com writes, "Yes it's ok to truncate SHA-2 and no,
-it doesn't matter where you truncate."
+[^5]: jln@google.com writes, "Yes it's ok to truncate SHA-2 and no,
+    it doesn't matter where you truncate."
 
 <!-- xrefs -->
 [transactional-messages]: /docs/reference/fidl/language/wire-format/README.md#transactional-messages

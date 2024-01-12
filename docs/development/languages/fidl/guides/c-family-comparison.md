@@ -303,7 +303,7 @@ Refer to the [HLCPP tutorial][hlcpp-tutorial] to get started.
 Category                           | New C++ with wire types                   | New C++ with natural types             | High-level C++
 -----------------------------------|-----------------------------------------------|--------------------------------------------|--------------------
 **audience**                       | drivers and performance-critical applications | high-level services                        | high-level services
-**abstraction overhead**           | RAII closing of handles [[1]](#footnote1)     | heap allocation, construction, destruction | heap allocation, construction, destruction
+**abstraction overhead**           | RAII closing of handles [^1]                  | heap allocation, construction, destruction | heap allocation, construction, destruction
 **type safe types**                | enums, structs, unions, handles, protocols    | enums, structs, unions, handles, protocols | enums, structs, unions, handles, protocols
 **storage**                        | stack, user-provided buffer, or heap          | heap                                       | heap
 **lifecycle**                      | manual or automatic free                      | automatic free (RAII)                      | automatic free (RAII)
@@ -312,34 +312,27 @@ Category                           | New C++ with wire types                   |
 **calling protocol methods**       | free functions or proxy                       | free functions or proxy                    | call through proxies, register callbacks
 **implementing protocol methods**  | manual dispatch or implement stub interface   | implement stub interface                   | implement stub object, invoke callbacks
 **async client**                   | yes                                           | yes                                        | yes
-**async server**                   | yes (unbounded) [[2]](#footnote2)             | yes (unbounded) [[2]](#footnote2)          | yes (unbounded)
-**parallel server dispatch**       | yes [[3]](#footnote3)                         | yes [[3]](#footnote3)                      | no
+**async server**                   | yes (unbounded) [^2]                          | yes (unbounded) [^2]                       | yes (unbounded)
+**parallel server dispatch**       | yes [^3]                                      | yes [^3]                                   | no
 **generated code footprint**       | large                                         | large                                      | large
 
---------------------------------------------------------------------------------
+<!-- footnotes. These must be 1 line; continuations indented 4 spaces. -->
 
-##### Footnote1
+[^1]: Generated types own all handles stored inline. Out-of-line handles
+    e.g. those behind a pointer indirection are not closed when the containing
+    object of the pointer goes away. In those cases, the bindings provide a
+    `fidl::DecodedValue` object to manage all handles associated with a call.
 
-Generated types own all handles stored inline. Out-of-line handles e.g. those
-behind a pointer indirection are not closed when the containing object of the
-pointer goes away. In those cases, the bindings provide a `fidl::DecodedValue`
-object to manage all handles associated with a call.
+[^2]: The bindings library defined in [lib/fidl](/sdk/lib/fidl/cpp/wire) can
+    dispatch an unbounded number of in-flight transactions via `fidl::BindServer`
+    defined in
+    [lib/fidl/cpp/wire/channel.h](/sdk/lib/fidl/cpp/wire/include/lib/fidl/cpp/wire/channel.h).
 
-##### Footnote2
-
-The bindings library defined in [lib/fidl](/sdk/lib/fidl/cpp/wire) can
-dispatch an unbounded number of in-flight transactions via `fidl::BindServer`
-defined in
-[lib/fidl/cpp/wire/channel.h](/sdk/lib/fidl/cpp/wire/include/lib/fidl/cpp/wire/channel.h).
-
-##### Footnote3
-
-The bindings library [lib/fidl](/sdk/lib/fidl/cpp/wire) enables parallel
-dispatch using the `EnableNextDispatch()` API defined in
-[lib/fidl/cpp/wire/async_transaction.h](/sdk/lib/fidl/cpp/wire/include/lib/fidl/cpp/wire/async_transaction.h).
+[^3]: The bindings library [lib/fidl](/sdk/lib/fidl/cpp/wire) enables parallel
+    dispatch using the `EnableNextDispatch()` API defined in
+    [lib/fidl/cpp/wire/async_transaction.h](/sdk/lib/fidl/cpp/wire/include/lib/fidl/cpp/wire/async_transaction.h).
 
 <!-- xrefs -->
-[layout-attribute]: /docs/reference/fidl/language/attributes.md#layout
 [cpp-tutorial]: /docs/development/languages/fidl/tutorials/cpp
 [cpp-prefer-natural]: /docs/development/languages/fidl/tutorials/cpp/README.md#natural_and_wire_domain_objects
 [hlcpp-tutorial]: /docs/development/languages/fidl/tutorials/hlcpp

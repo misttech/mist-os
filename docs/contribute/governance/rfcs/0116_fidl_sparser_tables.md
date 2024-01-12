@@ -367,8 +367,7 @@ there is a 64-element region in which it locally takes constant time. The
 benefit of this is that for the first 64-elements indexing takes constant
 time.
 
-![Indexing access time]
-(resources/0116_fidl_sparser_tables/indexing_access_time.png)
+![Indexing access time](resources/0116_fidl_sparser_tables/indexing_access_time.png)
 
 #### Builder
 

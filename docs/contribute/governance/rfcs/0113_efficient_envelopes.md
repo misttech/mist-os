@@ -195,10 +195,8 @@ Dec 1<sup>st</sup>, 2019.
 > The stabilization effort spanned multiple changes:
 >
 > * **Major** [RFC-0061: Extensible Unions](0061_extensible_unions.md)
-> * [RFC-0032: Efficient Envelopes]
-  (0032_efficient_envelopes.md), i.e. this RFC
-> * [RFC-0037: Transactional Message Header v3]
-  (0037_transactional_message_header_v3.md)
+> * [RFC-0032: Efficient Envelopes](0032_efficient_envelopes.md), i.e. this RFC
+> * [RFC-0037: Transactional Message Header v3](0037_transactional_message_header_v3.md)
 > * [RFC-0048: Explicit Union Ordinals](0048_explicit_union_ordinals.md)
 >
 > However, as the work unfolded, and the Dec 1<sup>st</sup> deadline loomed, the
@@ -234,6 +232,8 @@ implement it.
 
 This RFC is a slimmed-down version of [rfc-0026], which was rejected since
 there wasn't enough consensus around the whole RFC.
+
+<!-- footnotes. These must be 1 line; continuations indented 4 spaces. -->
 
 [^1]: This RFC is based on [rfc-0026], but with _only_ the out-of-line envelope
     proposal. Inlining, envelopes everywhere, and moving the string/vector count

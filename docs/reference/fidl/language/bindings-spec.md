@@ -254,7 +254,7 @@ with something like:
 do_stuff(my_union_with_variant(bar));
 ```
 
-These factory methods SHOULD be named as "[Type]-with-[Variant]", cased properly
+These factory methods SHOULD be named as `[Type]-with-[Variant]`, cased properly
 for the target language.
 
 Examples of this exist for the

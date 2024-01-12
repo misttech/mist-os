@@ -172,24 +172,24 @@ The following sections define the scheduler in more precise terms.
 
 ### Per-Thread Scheduling State
 
-For each thread **P[i]** we define the following state:
+For each thread **P\[i\]** we define the following state:
 
-* Weight **w[i]**: Real number representing the relative weight of the thread.
-* Start Time **s[i]**: The start time of the thread in the CPU's virtual
+* Weight **w\[i\]**: Real number representing the relative weight of the thread.
+* Start Time **s\[i\]**: The start time of the thread in the CPU's virtual
   timeline.
-* Finish Time **f[i]**: The finish time of the thread in the CPU's virtual
+* Finish Time **f\[i\]**: The finish time of the thread in the CPU's virtual
   timeline.
-* Time Slice **t[i]**: The size of the time slice for the current period.
+* Time Slice **t\[i\]**: The size of the time slice for the current period.
 
 ### Per-CPU Scheduling State
 
-For each CPU **C[j]** we define the following state:
+For each CPU **C\[j\]** we define the following state:
 
-* Number of Threads **n[j]**: The number of runnable threads competing on the
+* Number of Threads **n\[j\]**: The number of runnable threads competing on the
   CPU.
-* Scheduling Period **p[j]**: The period in which all competing threads on the
+* Scheduling Period **p\[j\]**: The period in which all competing threads on the
   CPU execute approximately once.
-* Total Weight **W[j]**: The sum of the weights of the threads competing on the
+* Total Weight **W\[j\]**: The sum of the weights of the threads competing on the
   CPU.
 
 When a thread enters competition for a CPU, its weight is added to the CPU's
@@ -219,11 +219,13 @@ potentially power consumption. When the number of threads is too large the
 scheduling period stretches such that each task receives at least the _minimum
 granularity_ time slice.
 
-Let **N** be the maximum number of competing threads before period stretching.
+Let `N` be the maximum number of competing threads before period stretching.
 
-**N** = floor(**L** / **M**)
+```none
+ N = floor(L / M)
 
-**p[j]** = **n[j]** > **N** --> **M** * **n[j]**, **L**
+p[j] = n[j] > N --> M * n[j], L
+```
 
 #### Virtual Timeline
 
@@ -242,31 +244,35 @@ idealized uniform time slice for the _virtual timeline_, because its value
 changes less dramatically. Using a uniform value for all threads avoids skewing
 the _virtual timeline_ unfairly in favor threads that join early.
 
-Let **T** be the system time of CPU **C[j]** when thread **P[i]** enters the run
+Let `T` be the system time of CPU `C[j]` when thread `P[i]` enters the run
 queue.
 
-**s[i]** = **T**
+```none
+s[i] = T
 
-**f[i]** = **s[i]** + **p[j]** / **w[i]**
+f[i] = s[i] + p[j] / w[i]
+```
 
 ### Time Slice
 
 When a thread is selected to run, its time slice is calculated based on its
 relative rate and the scheduling period.
 
-Let **g** be the integer number of _minimum granularity_ units **M** in the
-current _scheduling period_ **p[j]** of CPU **C[j]**.
+Let `g` be the integer number of _minimum granularity_ units `M` in the
+current _scheduling period_ `p[j]` of CPU `C[j]`.
 
-Let **R** be the relative rate of thread **P[i]**.
+Let `R` be the relative rate of thread `P[i]`.
 
-**g** = floor(**p[j]** / **M**)
+```none
+ g = floor(p[j] / M)
 
-**R** = **w[i]** / **W[j]**
+ R = w[i] / W[j]
 
-**t[i]** = ceil(**g** * **R**) * **M**
+ t[i] = ceil(g * R) * M
+```
 
-This definition ensures that **t[i]** is an integer multiple of the _minimum
-granularity_ **M**, while remaining approximately proportional to the relative
+This definition ensures that `t[i]` is an integer multiple of the _minimum
+granularity_ `M`, while remaining approximately proportional to the relative
 rate of the thread.
 
 ### Yield

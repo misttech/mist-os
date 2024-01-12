@@ -195,7 +195,7 @@ and
 in the source tree. See these files for a full list.
 
 Only one of these categories may be specified at a time.
-[Later we'll provide more control over what data to collect.]
+_\[Later we'll provide more control over what data to collect.\]_
 
 A small selection of useful categories:
 

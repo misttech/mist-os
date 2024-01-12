@@ -105,7 +105,7 @@ Each language has a specific fuzzer GN template:
       ```
 
 When a [fuzzing variant][variants] is [selected](#fx-set), these templates will build a fuzzer
-binary by linking the [libFuzzer] compiler runtime with the provided `sources`, `deps` or both. This
+binary by linking the \[libFuzzer\] compiler runtime with the provided `sources`, `deps` or both. This
 code must provide a [fuzz target][fuzz-target]{:.external} function.
 
 Otherwise, a fuzzer unit test is built by linking a [test harness][test-harness] with the provided

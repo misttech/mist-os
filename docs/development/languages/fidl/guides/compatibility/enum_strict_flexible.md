@@ -240,7 +240,7 @@ fn reader(color: fidl_lib::Color) -> &'static str {
 ## Update FIDL Library {#step-2}
 
 - Change from `strict` to `flexible`
-- If the enum had a member representing an unknown enum, add the `[Unknown]` attribute to it
+- If the enum had a member representing an unknown enum, add the `@unknown` attribute to it
 
 ```diff
 - type Color = strict enum : int32 {
@@ -257,7 +257,7 @@ fn reader(color: fidl_lib::Color) -> &'static str {
 
 ### Dart {#dart-3}
 
-- If using a custom unknown with the [Unknown] attribute, update readers and writers to use `isUnknown` and `$unknown`.
+- If using a custom unknown with the `@unknown` attribute, update readers and writers to use `isUnknown` and `$unknown`.
 
 ```diff
   fidllib.Color writer(String s) {
@@ -291,7 +291,7 @@ fn reader(color: fidl_lib::Color) -> &'static str {
 
 ### Go {#go-3}
 
-- If using a custom unknown with the [Unknown] attribute, update readers and writers to use `IsUnknown` and the `_Unknown` constant.
+- If using a custom unknown with the `@unknown` attribute, update readers and writers to use `IsUnknown` and the `_Unknown` constant.
 - You can now use any flexible enum specific APIs
 
 ```diff
@@ -322,13 +322,11 @@ fn reader(color: fidl_lib::Color) -> &'static str {
   		return "", errors.New("invalid color enum")
   	}
   }
-  
-
 ```
 
 ### HLCPP {#hlcpp-3}
 
-- If using a custom unknown with the [Unknown] attribute, update readers and writers to use `IsUnknown` and `Unknown`.
+- If using a custom unknown with the `@unknown` attribute, update readers and writers to use `IsUnknown` and `Unknown`.
 - You can now use any flexible enum specific APIs
 
 ```diff
@@ -363,7 +361,7 @@ fn reader(color: fidl_lib::Color) -> &'static str {
 
 ### LLCPP {#llcpp-3}
 
-- If using a custom unknown with the [Unknown] attribute, update readers and writers to use `IsUnknown` and `Unknown`.
+- If using a custom unknown with the `@unknown` attribute, update readers and writers to use `IsUnknown` and `Unknown`.
 - You can now use any flexible enum specific APIs
 
 ```diff
@@ -398,7 +396,7 @@ fn reader(color: fidl_lib::Color) -> &'static str {
 
 ### Rust {#rust-3}
 
-- If using a custom unknown with the [Unknown] attribute, update readers and writers to use the `ColorUnknown!` macro (or `is_unknown` outside of match statements) and `unknown`.
+- If using a custom unknown with the `@unknown` attribute, update readers and writers to use the `ColorUnknown!` macro (or `is_unknown` outside of match statements) and `unknown`.
 - You can now use any flexible enum specific APIs
 
 ```diff

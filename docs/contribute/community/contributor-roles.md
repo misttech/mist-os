@@ -339,7 +339,7 @@ detailed above.
 ### API Reviewer {#api-reviewer}
 
 An API Reviewer is accountable for the quality and long-term
-health of the [Fuchsia API surface](/docs/glossary/README.md#Fuchsia API Surface).
+health of the [Fuchsia API surface](/docs/glossary/README.md#Fuchsia-API-Surface).
 API Reviewers collectively form the API
 Council.
 

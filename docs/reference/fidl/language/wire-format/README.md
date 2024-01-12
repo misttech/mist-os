@@ -229,7 +229,7 @@ Handles are moved from one application's context to the other's.
 
 ![drawing](images/handlexlate.png)
 
-The value zero can be used to indicate a optional handle is absent[[1]](#Footnote-1).
+The value zero can be used to indicate a optional handle is absent[^1].
 
 See [Life of a handle] for a detailed example of transferring a handle over
 FIDL.
@@ -408,7 +408,7 @@ Going through the layout in detail:
 Overall, this structure takes 48 bytes.
 
 By moving the `dashed bool` to be immediately after the `filled bool`, though,
-you can realize significant space savings [[2]](#Footnote-2):
+you can realize significant space savings [^2]:
 
 ![drawing](images/struct-reorg.png)
 
@@ -847,16 +847,16 @@ Conformant FIDL bindings must check all of the following integrity constraints:
 | 1       | Unused                                                       |             |
 | 0       | Unused                                                       |             |
 
-#### Footnote 1
+<!-- footnotes. These must be 1 line; continuations indented 4 spaces. -->
 
-Defining the zero handle to mean "there is no handle" means it is safe to
-default-initialize wire format structures to all zeros. Zero is also the value
-of the `ZX_HANDLE_INVALID` constant.
+[^1]: Defining the zero handle to mean "there is no handle" means it is safe to
+    default-initialize wire format structures to all zeros. Zero is also the
+    value of the `ZX_HANDLE_INVALID` constant.
 
-#### Footnote 2
+[^2]: Read [The Lost Art of Structure Packing][lostart]{:.external} for an in-depth
+    treatise on the subject.
 
-Read [The Lost Art of Structure Packing][lostart]{:.external} for an in-depth
-treatise on the subject.
+<!-- xrefs -->
 
 [channel call]: /reference/syscalls/channel_call.md
 [channel write]: /reference/syscalls/channel_write.md

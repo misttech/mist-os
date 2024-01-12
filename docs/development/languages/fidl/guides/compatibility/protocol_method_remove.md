@@ -237,13 +237,13 @@ async fn example_service(chan: fasync::Channel) -> Result<(), fidl::Error> {
 
 ### Rust {#rust-2}
 
-- Add #[allow(unreachable_patterns)] to the server's request stream match.
+- Add `#[allow(unreachable_patterns)]` to the server's request stream match.
 - Replace the match arm for the method that is being removed with a catchall (`_`) arm.
 - Remove any references to the method in client code (e.g. as part of implementations of the `ProxyInterface`).
 
 ```diff
   struct ExampleFakeProxy;
-  
+
   impl fidl_lib::ExampleProxyInterface for ExampleFakeProxy {
       fn existing_method(&self) -> Result<(), fidl::Error> {
 -         Ok(())

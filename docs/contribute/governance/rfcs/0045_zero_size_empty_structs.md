@@ -84,7 +84,7 @@ typedef struct {
 
 The above code snippet asserts to `sizeof(Empty) == 0` for both C & C++.
 In practice, generated code for bindings should turn off various warnings
-for C and C++[[1]](#Footnote1); a [Github Gist] shows a more complete
+for C and C++[^1]; a [Github Gist] shows a more complete
 example of generated C & C++ bindings.
 
 ## Design #2: Omit Emitting Empty Structs Altogether
@@ -93,7 +93,7 @@ FIDL structs are required to be cast to equivalent structs in C and C++.
 Empty structs are a special case, since C and C++ differ in how they treat
 empty structs:
 
-*   C leaves the size of an empty struct undefined[[2]](#Footnote2).
+*   C leaves the size of an empty struct undefined[^2].
     Many compilers (e.g., `gcc` & `clang`) therefore define an empty
     struct to be
     [zero-sized](https://gcc.gnu.org/onlinedocs/gcc/Empty-Structures.html).
@@ -157,7 +157,7 @@ Since the empty struct contains no information, not having access to the
 `.options` member carries little consequence.
 If the struct later changes to become non-empty, the containing struct can
 emit the formerly empty struct member `options` in a source
-compatible way [[3]](#Footnote3).
+compatible way [^3].
 
 One reasonable operation that people may wish to to do is to take the
 address of an empty struct, i.e. `&(foo.options)`, which will no longer be
@@ -263,29 +263,24 @@ Note that
 - the two languages have different size implementations
 - C++ notionally requires that
 - zero-length array
-- C++ [[no_unique_address]]
+- C++ \[\[no_unique_address\]\]
 
 ## Prior art and references
 
 [https://herbsutter.com/2009/09/02/when-is-a-zero-length-array-okay/](https://herbsutter.com/2009/09/02/when-is-a-zero-length-array-okay/)
 
---------------------------------------
+<!-- Footnotes need to be 1 line or indented 4 spaces -->
 
-Footnotes
----------
-##### Footnote1
-`-Wzero-length-array`, with `-Wc++-compat` for C and `-Wextern-c-compat`
-for C++.
-The warnings can be scoped with the commonly supported `#pragma`
-diagnostic push/ignored/pop compiler directive, so that warnings apply
-only to the empty struct code.
+[^1]: `-Wzero-length-array`, with `-Wc++-compat` for C and `-Wextern-c-compat`
+    for C++.
+    The warnings can be scoped with the commonly supported `#pragma`
+    diagnostic push/ignored/pop compiler directive, so that warnings apply
+    only to the empty struct code.
 
-##### Footnote2
-C99, 6.7.2.1: [...] If the `struct-declaration-list` contains no named
-members, the behavior is undefined.
+[^2]: C99, 6.7.2.1: \[...\] If the `struct-declaration-list` contains no named
+    members, the behavior is undefined.
 
-##### Footnote3
-Note that most changes to structs are ABI-breaking changes.
+[^3]: Note that most changes to structs are ABI-breaking changes.
 
 <!-- xrefs -->
 [Github Gist]: https://gist.github.com/andrep/f94d432ec9b207deac13a22d9b710071

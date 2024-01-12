@@ -262,7 +262,7 @@ their messages.
 Further, we do not want a mixed mode, where some messages (e.g., enums)
 are strict by default, and others (e.g., tables) are not.
 
-#### Alternative: [Strict] attribute instead of a new keyword
+#### Alternative: \[Strict\] attribute instead of a new keyword
 
 It's an important-enough idea to deserve its own keyword.
 There's enough precedent for similar features in other languages that it
