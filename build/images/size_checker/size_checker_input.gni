@@ -85,6 +85,7 @@ declare_args() {
   }
 
   # How much the size of Update Package can be increased in one CL.
+  # Deprecated
   update_package_size_creep_limit = 90112  # 0.085 MiB
 
   # How much the size of BlobFS contents can be increased in one CL.

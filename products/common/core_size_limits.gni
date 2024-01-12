@@ -283,5 +283,3 @@ size_checker_input = {
     },
   ]
 }
-
-update_package_size_creep_limit = 147456  # 144.0 KiB

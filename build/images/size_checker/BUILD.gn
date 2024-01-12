@@ -89,29 +89,9 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
     _output_dir =
         get_label_info(":convert_size_limits_to_size_budgets", "target_out_dir")
     _size_budgets_blobfs_file = "${_output_dir}/size_budgets.json"
-    _size_budgets_non_blobfs_file = "${_output_dir}/update_package_budget.json"
     _blobs_config = "${_output_dir}/../fuchsia/fuchsia/gen/blobs.json"
     _image_assembly_config =
         "${_output_dir}/../fuchsia/fuchsia/image_assembly.json"
-
-    generated_file("update_package_budget_json") {
-      outputs = [ _size_budgets_non_blobfs_file ]
-      contents = {
-        package_set_budgets = [
-          {
-            name = "Update Package"
-            budget_bytes = blobfs_capacity - max_blob_contents_size -
-                           max_blob_contents_size
-            creep_budget_bytes = update_package_size_creep_limit
-            merge = false
-            packages = [
-              "obj/build/images/fuchsia/update/update_package_manifest.json",
-            ]
-          },
-        ]
-      }
-      output_conversion = "json"
-    }
 
     action("convert_size_limits_to_size_budgets") {
       script = "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/convert_size_limits.py"
@@ -180,7 +160,7 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
       ]
       outputs = [
         "$target_out_dir/size_report_blobfs.json",
-        "$target_out_dir/verbose_output_blobfs.json",
+        "$target_out_dir/verbose_output.json",
       ]
       testonly = true
       ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
@@ -200,95 +180,19 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
         "--gerrit-output",
         rebase_path("$target_out_dir/size_report_blobfs.json", root_build_dir),
         "--verbose-json-output",
-        rebase_path("$target_out_dir/verbose_output_blobfs.json",
-                    root_build_dir),
-      ]
-    }
-
-    _non_blobfs_hermetic_inputs =
-        "${_output_dir}/verify_size_budget_non_blobfs.hi"
-    _non_blobfs_hermetic_inputs_target =
-        "create_verify_size_budget_non_blobfs_hermetic_inputs"
-
-    python_hermetic_inputs_action(_non_blobfs_hermetic_inputs_target) {
-      binary_label = "//build/assembly/scripts:check_size_hermetic_inputs"
-      inputs = [ _size_budgets_non_blobfs_file ]
-      outputs = [ _non_blobfs_hermetic_inputs ]
-      deps = [
-        ":update_package_budget_json",
-        "//build/images/fuchsia:update",
-      ]
-      testonly = true
-      args = [
-        "--with-package-content",
-        "--budgets",
-        rebase_path(_size_budgets_non_blobfs_file, root_build_dir),
-        "--output",
-        rebase_path(_non_blobfs_hermetic_inputs, root_build_dir),
-      ]
-    }
-
-    ffx_action("verify_size_budget_non_blobfs") {
-      deps = [
-        ":update_package_budget_json",
-        "//build/images/fuchsia:update",
-      ]
-      hermetic_inputs_target = ":${_non_blobfs_hermetic_inputs_target}"
-      hermetic_inputs_file = _non_blobfs_hermetic_inputs
-      inputs = [
-        _size_budgets_non_blobfs_file,
-        "$root_build_dir/obj/build/images/fuchsia/update/update_package_manifest.json",
-      ]
-      outputs = [
-        "$target_out_dir/size_report_non_blobfs.json",
-        "$target_out_dir/verbose_output_non_blobfs.json",
-      ]
-      testonly = true
-      ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
-      ffx_tool_output_name = "ffx-assembly"
-      args = [
-        "--config",
-        "assembly_enabled=true",
-        "assembly",
-        "size-check",
-        "package",
-        "--budgets",
-        rebase_path(_size_budgets_non_blobfs_file, root_build_dir),
-        "--blobfs-layout",
-        "deprecated_padded",
-        "--gerrit-output",
-        rebase_path("$target_out_dir/size_report_non_blobfs.json",
-                    root_build_dir),
-        "--verbose-json-output",
-        rebase_path("$target_out_dir/verbose_output_non_blobfs.json",
-                    root_build_dir),
-      ]
-    }
-
-    json_merge("verbose_output.json") {
-      sources = [
-        "$target_out_dir/verbose_output_blobfs.json",
-        "$target_out_dir/verbose_output_non_blobfs.json",
-      ]
-      testonly = true
-      deps = [
-        ":verify_size_budget_blobfs",
-        ":verify_size_budget_non_blobfs",
+        rebase_path("$target_out_dir/verbose_output.json", root_build_dir),
       ]
     }
 
     json_merge("size_report.json") {
       sources = [
         "$target_out_dir/size_report_blobfs.json",
-        "$target_out_dir/size_report_non_blobfs.json",
         "$target_out_dir/size_report_product.json",
       ]
       testonly = true
       deps = [
         ":run_product_size_checker",
-        ":verbose_output.json",
         ":verify_size_budget_blobfs",
-        ":verify_size_budget_non_blobfs",
       ]
       metadata = {
         gerrit_size_reports =
