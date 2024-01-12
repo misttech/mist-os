@@ -8,7 +8,7 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 
 #include <string>
 #include <unordered_map>
@@ -27,7 +27,7 @@ class Metrics {
   using CaptureCb = fit::function<zx_status_t(memory::Capture*)>;
   using DigestCb = fit::function<void(const memory::Capture&, memory::Digest*)>;
   Metrics(const std::vector<memory::BucketMatch>& bucket_matches, zx::duration poll_frequency,
-          async_dispatcher_t* dispatcher, sys::ComponentInspector* inspector,
+          async_dispatcher_t* dispatcher, inspect::ComponentInspector* inspector,
           fuchsia::metrics::MetricEventLogger_Sync* logger, CaptureCb capture_cb,
           DigestCb digest_cb);
 
@@ -68,7 +68,7 @@ class Metrics {
 
   // The component inspector to publish data to.
   // Not owned.
-  sys::ComponentInspector* inspector_;
+  inspect::ComponentInspector* inspector_;
   inspect::Node platform_metric_node_;
   inspect::Node metric_memory_node_;
   std::map<std::string, inspect::UintProperty> inspect_memory_usages_;

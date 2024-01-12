@@ -141,7 +141,7 @@ class MetricsUnitTest : public gtest::RealLoopFixture {
 TEST_F(MetricsUnitTest, Inspect) {
   CaptureSupplier cs(Template());
   cobalt::StubMetricEventLogger_Sync logger;
-  sys::ComponentInspector inspector(context_provider_.context());
+  inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
       kBucketMatches, zx::min(5), dispatcher(), &inspector, &logger,
       [&cs](Capture* c) {
@@ -152,7 +152,7 @@ TEST_F(MetricsUnitTest, Inspect) {
 
   // [START get_hierarchy]
   fpromise::result<inspect::Hierarchy> hierarchy;
-  RunPromiseToCompletion(inspect::ReadFromInspector(*inspector.inspector())
+  RunPromiseToCompletion(inspect::ReadFromInspector(inspector.inspector())
                              .then([&](fpromise::result<inspect::Hierarchy>& result) {
                                hierarchy = std::move(result);
                              }));
@@ -174,7 +174,7 @@ TEST_F(MetricsUnitTest, Inspect) {
 TEST_F(MetricsUnitTest, All) {
   CaptureSupplier cs(Template());
   cobalt::StubMetricEventLogger_Sync logger;
-  sys::ComponentInspector inspector(context_provider_.context());
+  inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
       kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
       [&cs](Capture* c) {
@@ -345,7 +345,7 @@ TEST_F(MetricsUnitTest, One) {
           },
   }});
   cobalt::StubMetricEventLogger_Sync logger;
-  sys::ComponentInspector inspector(context_provider_.context());
+  inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
       kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
       [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
@@ -380,7 +380,7 @@ TEST_F(MetricsUnitTest, Undigested) {
           },
   }});
   cobalt::StubMetricEventLogger_Sync logger;
-  sys::ComponentInspector inspector(context_provider_.context());
+  inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
       kBucketMatches, zx::msec(10), dispatcher(), &inspector, &logger,
       [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },

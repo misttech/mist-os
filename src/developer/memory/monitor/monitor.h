@@ -10,6 +10,7 @@
 #include <fuchsia/memory/inspection/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/trace/observer.h>
 #include <lib/zx/socket.h>
@@ -18,7 +19,6 @@
 
 #include <memory>
 
-#include "lib/sys/inspect/cpp/component.h"
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
 #include "src/developer/memory/monitor/debugger.h"
@@ -92,7 +92,7 @@ class Monitor : public fuchsia::memory::Monitor, public fuchsia::memory::inspect
   fidl::BindingSet<fuchsia::memory::inspection::Collector> bindings_;
   fidl::BindingSet<fuchsia::memory::Monitor> deprecated_bindings_;
   trace::TraceObserver trace_observer_;
-  sys::ComponentInspector inspector_;
+  inspect::ComponentInspector inspector_;
   Logger logger_;
   std::unique_ptr<Metrics> metrics_;
   std::unique_ptr<PressureNotifier> pressure_notifier_;

@@ -142,7 +142,7 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
     return hierarchy;
   }
 
-  inspect::Inspector Inspector() { return *(monitor_->inspector_.inspector()); }
+  inspect::Inspector Inspector() { return monitor_->inspector_.inspector(); }
 
  private:
   void CreateMetrics() {

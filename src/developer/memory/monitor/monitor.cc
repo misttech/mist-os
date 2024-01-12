@@ -134,7 +134,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       delay_(zx::sec(1)),
       dispatcher_(dispatcher),
       component_context_(std::move(context)),
-      inspector_(component_context_.get()),
+      inspector_(dispatcher_, {}),
       logger_(
           dispatcher_,
           [this](Capture* c) {
@@ -162,12 +162,10 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
     CreateMetrics(bucket_matches);
 
   // Expose lazy values under the root, populated from the Inspect method.
-  inspector_.root().CreateLazyValues(
-      "memory_measurements",
-      [this, bucket_matches = std::move(bucket_matches)] {
+  inspector_.root().RecordLazyValues(
+      "memory_measurements", [this, bucket_matches = std::move(bucket_matches)] {
         return fpromise::make_result_promise(fpromise::ok(Inspect(bucket_matches)));
-      },
-      &inspector_);
+      });
 
   zx_status_t status = component_context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
   FX_CHECK(status == ZX_OK);

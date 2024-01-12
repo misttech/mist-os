@@ -42,7 +42,7 @@ static const std::map<zx_duration_t, TimeSinceBoot> UptimeLevelMap = {
 // information about the memory Digests to Cobalt, in the form of several Events.
 Metrics::Metrics(const std::vector<memory::BucketMatch>& bucket_matches,
                  zx::duration poll_frequency, async_dispatcher_t* dispatcher,
-                 sys::ComponentInspector* inspector,
+                 inspect::ComponentInspector* inspector,
                  fuchsia::metrics::MetricEventLogger_Sync* logger, CaptureCb capture_cb,
                  DigestCb digest_cb)
     : poll_frequency_(poll_frequency),
