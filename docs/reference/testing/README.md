@@ -6,6 +6,10 @@ Reference documentation for Fuchsia test frameworks, platform, ABI, and tools.
 
 * [What tests to write](what-tests-to-write.md)
 
+## Tools
+
+* [User guide for fx test](fx-test.md)
+
 ## File formats
 
 * [Test output format](test-output-format.md)

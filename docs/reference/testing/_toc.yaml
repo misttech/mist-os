@@ -11,6 +11,9 @@ toc:
 - heading: "Guides"
 - title: "What tests to write"
   path: /docs/reference/testing/what-tests-to-write.md
+- heading: "Tools"
+- title: "User guide for fx test"
+  path: /docs/reference/testing/fx-test.md
 - heading: "File formats"
 - title: "Test output format"
   path: /docs/reference/testing/test-output-format.md

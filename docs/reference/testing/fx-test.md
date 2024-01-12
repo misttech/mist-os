@@ -1,0 +1,314 @@
+# User guide for `fx test`
+
+`fx test` is the developer entrypoint to run tests in a checkout of fuchsia.git.
+
+This document provides a developer-oriented guide to using `fx test`
+for your in-tree testing.
+
+Important: This document describes the new `fx test`, which is currently
+opt-in behind a flag. To opt-in, set this environment variable:
+`export FUCHSIA_DISABLED_legacy_fxtest=1`. See
+[this page][fxtest-source]
+for more details on the current status of the new tool.
+
+## Basic usage
+
+To get started, simply run `fx test`:
+
+```posix-terminal
+fx test
+```
+
+This will do several things:
+
+1. Identify tests included in your current build.
+1. Select a subset of included tests based on selection criteria.
+1. Rebuild and republish those tests.
+1. Check that an appropriate Fuchsia device exists to run tests on.
+1. In parallel, start running tests on that device and provide status output.
+1. Write a log file describing the operations that occurred.
+
+If you did not include any tests in your build, `fx test` will exit.
+Try `fx set core.x64`**`--with //src/diagnostics:tests`** on your
+`fx set` command line to include some tests as an example.
+
+## Basic concepts
+
+`fx test` is a **Test Executor**, which means it ingests a list of
+available tests and is responsible for scheduling and observing
+their execution. The source of this data is
+[`tests.json`](tests-json-format.md).
+
+Each test listed in `tests.json` is a **Test Suite** which may each
+contain any number of **Test Cases**. That is, a Test Suite is a
+single binary or Fuchsia Component, and it contains Test Cases
+which are defined in a way specific to each test framework (e.g.
+C++ `TEST`, Rust `#[test]`, Python `unittest.TestCase`). Enumerating
+and executing on-device Test Cases is the responsibility of the
+[Test Runner
+Framework][trf-docs].
+
+### Basic test selection
+
+`fx test` supports selecting individual Test Suites using command
+line options.  This allows you to include a large number of tests
+in your build and then only execute a subset of those tests.
+
+Any non-flag argument to `fx test` is a **selection** that is
+fuzzy-matched against each test in the input:
+
+```posix-terminal
+fx test archivist --dry
+```
+
+Note: The examples in this section pass `--dry` to do a dry-run.
+This will simply list selected tests without running them.
+
+By default, the following fields are searched:
+
+|Field|Description|
+|---|---|
+|name|The full name of the test. This is component URL for on-device tests and test binary path for host tests.|
+|label|The build label for the test. For example, `//src/examples:my_test`.|
+|component name|The name of the component manifest (excluding `.cm`) for on-device tests only.|
+|package name|The name of the Fuchsia package for on-device tests only.|
+
+You can select all tests below a directory in the source tree by
+listing the prefix:
+
+```posix-terminal
+fx test //src/diagnostics/tests --dry
+```
+
+By default all of the above fields are matched, but you can select
+specific fields using `--package` or `--component`:
+
+```posix-terminal
+fx test --package archivist_unittests --dry
+```
+
+By default, multiple selections on the command line implement an
+inclusive-OR operation. Test selection supports composite AND
+operations as follows:
+
+```posix-terminal
+fx test --package archivist --and unittests
+```
+
+This command selects all tests where the package matches `archivist` and any field
+matches `unittests`.
+
+If you know the exact name of the test you want to execute, you may
+use the `--exact` flag to select only that test:
+
+```posix-terminal
+fx test --exact fuchsia-pkg://fuchsia.com/archivist-tests#meta/archivist-unittests.cm --dry
+```
+
+If no tests match your selection, `fx test` will try to heuristically match
+tests in your source checkout and suggest `fx set` arguments to include them:
+
+```bash {:.devsite-disable-click-to-copy}
+$ fx test driver-tests --dry
+...
+For `driver-tests`, did you mean any of the following?
+
+driver_tools_tests (91.67% similar)
+    --with //src/devices/bin/driver_tools:driver_tools_tests
+driver-runner-tests (90.96% similar)
+    --with //src/devices/bin/driver_manager/v2:driver-runner-tests
+driver-inspect-test (90.96% similar)
+    --with //src/devices/tests/driver-inspect-test:driver-inspect-test
+```
+
+You can then add the necessary packages to your build.
+
+## Configuration options
+
+`fx test` is highly configurable, and a full list of options is
+available at `fx test --help`.
+
+This section describes how configuration options are specified and
+what they mean. Configuration options are categorized as Utility,
+Build, Test Selection, Execution, or Output Options. They may be
+specified on the command line or in a configuration file.
+
+### Configuration file
+
+All arguments for `fx test` are set on the command line, but defaults may be set
+per-user. If you place a file called `.fxtestrc` in your HOME directory, the arguments in that file will be the new defaults for future `fx test` invocations.
+
+For example:
+
+```
+# ~/.fxtestrc
+# Lines starting with "#" are comments and ignored.
+# The below config roughly matches the behavior of the old Dart-based `fx test`.
+
+# Default parallel to 1.
+--parallel 1
+
+# Disable status output.
+--no-status
+```
+
+The above file overrides the defaults for `--parallel` and `--status`
+flags, which normally default to `4` and `false` respectively. The new defaults
+may still be overridden on the command line when invoking `fx test`.
+
+### Utility options
+
+Utility options change the overall behavior of `fx test`.
+
+**`--dry`** performs a "dry-run." `fx test` will complete test selection, but
+will then simply print the list of selected test suites rather than executing
+any of them.
+
+**`--list`** runs `fx test` in "list mode." Rather than executing
+tests, this command lists all test *cases* within each test suite.
+It outputs the appropriate command line to run each individual case.
+Note that this does require access to a Fuchsia device or emulator
+because cases are enumerated by Test Manager on device.
+
+### Build options
+
+`fx test` builds and updates selected tests by default. This is
+useful when running `fx -i test`, which will detect changes to your
+source directory and re-invoke `fx test` following each file
+modification. Test rebuilding works as follows (with overrides listed inline).
+
+- All selected tests are rebuilt by calling `fx build <targets>`
+for each `fx test` invocation.
+  - Use `--[no-]build` to toggle this behavior.
+- If selected tests are in the "base packages" for your build (specified using `fx set --with-base`), the `updates` package will be built and an OTA will be performed.
+  - Use `--[no-]updateifinbase` to toggle this behavior.
+  - Warning: OTA will fail when targeting an emulator.
+
+### Test selection options
+
+The following options affect which tests are selected by `fx test` and how
+selections are applied.
+
+**`--host`** and **`--device`** select only host or device tests
+respectively. This is a global setting and they cannot be combined.
+
+**`--[no-]e2e`** controls whether to run end-to-end (E2E) tests.
+E2E tests are not run by default because they have the potential
+to put the device in an invalid state. **`--only-e2e`** implies
+`--e2e`, and ensures that only E2E tests are selected.
+
+**`--package`** (`-p`) and **`--component`** (`-c`) select within package or
+component names respectively. Names preceded by neither select any test field.
+Multiple selections may be changed by **`--and`** (`-a`). For example:
+
+```posix-terminal
+fx test --package foo -a --component bar //src/other --and --package my-tests
+```
+
+The above command line contains two selection clauses:
+
+1. Package "foo" AND component "bar" (e.g. fuchsia-pkg://fuchsia.com/foo#meta/bar.cm).
+1. Package "my-tests" AND //src/other.
+
+Tests matching either of the above clauses are selected.
+
+Test selections are fuzzy-matched using a Damerau-Levenshtein
+distance of 3 by default (e.g. "my_tset" will match "my-test").
+**`--fuzzy <N>`** can be used to override this value to `N`, where
+0 means not to do fuzzy matching.
+
+Suggestions are shown by default if no test matches a selection
+clause. The number of suggestions (default 6) can be overridden using
+**`--suggestions-count N`**, and suggestions can be disabled or enabled using
+**`--[no-]show-suggestions`**.
+
+### Execution options
+
+Tests are executed in a specific way that maximizes throughput and
+stability, but each element of this default may be overridden. Tests
+are executed as follows (with overrides listed inline):
+
+- Each selected test is executed in the order they appear within `tests.json`
+  - Use `--random` to randomize this execution order.
+- All selected tests are run, starting at the beginning of the ordered list above.
+  - Use `--offset N` to skip `N` tests at the beginning of the list. Default is 0.
+  - Use `--limit N` to run at most `N` tests from the offset. Default is no limit.
+- At most 4 tests may run in parallel, such that at most one of
+those tests is "non-hermetic" (as determined by `test-list.json`).
+  - Use `--parallel N` to change this default. `--parallel 1` means to execute
+  each test serially.
+- Tests run until they terminate themselves.
+  - Use `--timeout N` to wait at most `N` seconds per test.
+- Each test runs one time.
+  - Use `--count N` to run each test `N` times.
+- All test cases are run from each test.
+  - Use `--test-filter` to run only specifically named test cases.
+- Failed tests are recorded and execution continues with the next selected test.
+  - Use `--fail` (`-f`) to terminate all tests following the first failure.
+- Tests that specify a maximum log level in `tests.json` will fail
+if logs at a higher severity are seen.
+  - Use `--[no-]restrict-logs` to toggle this behavior.
+- Tests components themselves choose the minimum log severity to emit.
+  - Use `--min-severity-logs` to override this minimum for all test components.
+- Test components are run using the Merkle root hash from build
+artifacts, which ensures that the latest version built was successfully
+pushed to the target and is being run.
+  - Use `--[no-]use-package-hash` to toggle this behavior.
+- Test cases that are disabled are not run.
+  - Use `--also-run-disabled-tests` to run disabled test cases anyway.
+- Test output logs contain only the last segment of the component
+moniker, so they are easier to visually inspect.
+  - Use `--[no-]show-full-moniker-in-logs` to toggle this behavior.
+
+### Output options
+
+`fx test` is intended for developer use cases and includes a simple terminal UI
+that displays the status of tests as they are executing. The default output
+behavior is as follows (with overrides listed inline):
+
+- A status display is shown at the bottom of the terminal, and it
+is automatically updated to show what operations are currently
+executing.
+  - Use `--[no-]status` to toggle status display.
+  - Use `--status-lines N` to change the number of status output lines.
+  - Use `--status-delay N` to change the refresh rate (default is
+  0.033 or approximately 30hz). If your terminal is slow you may
+  want to change this to 0.5 or 1.
+- Output is styled with ANSI terminal colors.
+  - Use `--[no-]style` to toggle this behavior.
+  - Use `--simple` as shorthand for `--no-style --no-status`.
+- Test outputs are only shown for tests that fail.
+  - Use `--output` (`-o`) to show all test output (combine with
+  `--parallel 1` to prevent interleaving).
+- Logs are written to a timestamped `.json.gz` file under the build
+directory specified by `fx status`.
+  - Use `--[no-]log` to toggle logging entirely.
+  - Use `--logpath` to change the output path of the log.
+- Test artifacts are not streamed off of the device.
+  - Use `--ffx-output-directory` to specify a directory where
+  artifacts may be streamed in the `ffx test` output format.
+- Debug printing is suppressed.
+  - Use `--verbose` (`-v`) to print debug information to the console.
+  This data is *extremely* verbose, and is only useful to debug `fx
+  test` itself.
+
+## Log Format
+
+`fx test` is designed to support external tooling by representing every
+user-visible output as an "event" which is logged to a file during execution.
+
+Log files are compressed using gzip. Each line of the decompressed
+file is a single JSON object representing one event. The event
+schema is currently defined in [this][fxtest-rewrite-event] Python
+file.
+
+When the format is stabilized, it will be possible to build interactive
+viewers and converters to other formats (such as [Build Event
+Protocol][build-event-protocol]{:.external}).
+
+<!-- Reference links -->
+
+[build-event-protocol]: https://bazel.build/remote/bep
+[fxtest-rewrite-event]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite/event.py
+[fxtest-source]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite
+[trf-docs]: /docs/development/testing/components/test_runner_framework.md
