@@ -12,5 +12,7 @@ using fuchsia.testing.harness;
 open protocol RealmFactory {
     flexible CreateRealm(resource table {
         1: realm_server server_end:fuchsia.testing.harness.RealmProxy;
+        2: display_rotation uint32;
+        3: device_pixel_ratio float32;
     }) -> () error fuchsia.testing.harness.OperationError;
 };
