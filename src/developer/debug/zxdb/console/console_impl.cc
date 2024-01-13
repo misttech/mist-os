@@ -161,7 +161,7 @@ void ConsoleImpl::ModalGetOption(const line_input::ModalPromptOptions& options,
 }
 
 void ConsoleImpl::Quit() {
-  line_input_.Hide();
+  DisableInput();
   debug::MessageLoop::Current()->QuitNow();
 }
 
