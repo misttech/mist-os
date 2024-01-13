@@ -1573,7 +1573,7 @@ mod tests {
                 bindings_ctx,
                 None, // device
                 None, // local_ip
-                SocketIpAddr::new_from_specified_or_panic(FAKE_CONFIG_V4.remote_ip),
+                SocketIpAddr::try_from(FAKE_CONFIG_V4.remote_ip).unwrap(),
                 Ipv4Proto::Icmp,
                 DefaultSendOptions,
                 |_| {
@@ -1744,7 +1744,7 @@ mod tests {
                 bindings_ctx,
                 None, // device
                 None, // local_ip
-                SocketIpAddr::new_from_specified_or_panic(FAKE_CONFIG_V4.remote_ip),
+                SocketIpAddr::try_from(FAKE_CONFIG_V4.remote_ip).unwrap(),
                 Ipv4Proto::Icmp,
                 DefaultSendOptions,
                 |_| {

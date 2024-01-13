@@ -2947,8 +2947,8 @@ mod tests {
     where
         I: Ip + TestIpExt,
     {
-        let local_ip = SocketIpAddr::new_from_specified_or_panic(local_ip::<I>());
-        let remote_ip = SocketIpAddr::new_from_specified_or_panic(remote_ip::<I>());
+        let local_ip = SocketIpAddr::try_from(local_ip::<I>()).unwrap();
+        let remote_ip = SocketIpAddr::try_from(remote_ip::<I>()).unwrap();
         ConnAddr {
             ip: ConnIpAddr {
                 local: (local_ip, LOCAL_PORT),
@@ -2965,7 +2965,7 @@ mod tests {
     where
         I: Ip + TestIpExt,
     {
-        let local_ip = SocketIpAddr::new_from_specified_or_panic(local_ip::<I>());
+        let local_ip = SocketIpAddr::try_from(local_ip::<I>()).unwrap();
         ListenerAddr { ip: ListenerIpAddr { identifier: LOCAL_PORT, addr: Some(local_ip) }, device }
             .into()
     }
@@ -3002,11 +3002,8 @@ mod tests {
     #[ip_test]
     fn test_iter_receiving_addrs<I: Ip + TestIpExt>() {
         let addr = ConnIpAddr {
-            local: (SocketIpAddr::new_from_specified_or_panic(local_ip::<I>()), LOCAL_PORT),
-            remote: (
-                SocketIpAddr::new_from_specified_or_panic(remote_ip::<I>()),
-                REMOTE_PORT.into(),
-            ),
+            local: (SocketIpAddr::try_from(local_ip::<I>()).unwrap(), LOCAL_PORT),
+            remote: (SocketIpAddr::try_from(remote_ip::<I>()).unwrap(), REMOTE_PORT.into()),
         };
         assert_eq!(
             iter_receiving_addrs::<I, _>(addr, FakeWeakDeviceId(FakeDeviceId)).collect::<Vec<_>>(),
@@ -6288,7 +6285,7 @@ mod tests {
         ip: I::Addr,
         port: u16,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, Udp> {
-        let addr = SpecifiedAddr::new(ip).map(SocketIpAddr::new_from_specified_or_panic);
+        let addr = SpecifiedAddr::new(ip).map(|a| SocketIpAddr::try_from(a).unwrap());
         let port = NonZeroU16::new(port).expect("port must be nonzero");
         AddrVec::Listen(ListenerAddr {
             ip: ListenerIpAddr { addr, identifier: port },
@@ -6301,7 +6298,7 @@ mod tests {
         port: u16,
         device: FakeWeakDeviceId<FakeDeviceId>,
     ) -> AddrVec<I, FakeWeakDeviceId<FakeDeviceId>, Udp> {
-        let addr = SpecifiedAddr::new(ip).map(SocketIpAddr::new_from_specified_or_panic);
+        let addr = SpecifiedAddr::new(ip).map(|a| SocketIpAddr::try_from(a).unwrap());
         let port = NonZeroU16::new(port).expect("port must be nonzero");
         AddrVec::Listen(ListenerAddr {
             ip: ListenerIpAddr { addr, identifier: port },

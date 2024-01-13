@@ -125,17 +125,6 @@ impl<A: IpAddress> SocketIpAddr<A> {
         let SocketIpAddr(addr) = self;
         **addr
     }
-
-    /// Constructs a `SocketIpAddr` from an addr that is known to be specified.
-    ///
-    /// # Panics
-    ///
-    /// If the given addr is mapped.
-    // TODO(https://fxbug.dev/132092): Remove this function and it's callsites
-    // once `SocketIpAddr` is the defacto address type in NS3's socket layer.
-    pub(crate) fn new_from_specified_or_panic(addr: SpecifiedAddr<A>) -> Self {
-        SocketIpAddr(NonMappedAddr::new(addr).expect("should be called with a non-mapped addr"))
-    }
 }
 
 impl SocketIpAddr<Ipv4Addr> {

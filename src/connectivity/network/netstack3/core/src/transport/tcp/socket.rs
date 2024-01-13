@@ -2769,11 +2769,23 @@ where
         error: IcmpErrorCode,
     ) {
         let (core_ctx, bindings_ctx) = self.contexts();
+
+        let orig_src_ip = match SocketIpAddr::try_from(orig_src_ip) {
+            Ok(ip) => ip,
+            Err(AddrIsMappedError {}) => {
+                trace!("ignoring ICMP error from IPv4-mapped-IPv6 source: {}", orig_src_ip);
+                return;
+            }
+        };
+        let orig_dst_ip = match SocketIpAddr::try_from(orig_dst_ip) {
+            Ok(ip) => ip,
+            Err(AddrIsMappedError {}) => {
+                trace!("ignoring ICMP error to IPv4-mapped-IPv6 destination: {}", orig_dst_ip);
+                return;
+            }
+        };
+
         let id = core_ctx.with_demux(|DemuxState { socketmap, .. }| {
-            // TODO(https://fxbug.dev/132092): Remove panic opportunities once
-            // `SocketHandler` functions take `SocketIpAddr`.
-            let orig_src_ip = SocketIpAddr::new_from_specified_or_panic(orig_src_ip);
-            let orig_dst_ip = SocketIpAddr::new_from_specified_or_panic(orig_dst_ip);
             socketmap
                 .conns()
                 .get_by_addr(&ConnAddr {

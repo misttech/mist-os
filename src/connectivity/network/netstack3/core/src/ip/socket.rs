@@ -2033,8 +2033,8 @@ mod tests {
             .map(|d| DeviceIdContext::downgrade_device_id(&CoreCtx::new_deprecated(core_ctx), d));
         let template = IpSock {
             definition: IpSockDefinition {
-                remote_ip: SocketIpAddr::new_from_specified_or_panic(to_ip),
-                local_ip: SocketIpAddr::new_from_specified_or_panic(expected_from_ip),
+                remote_ip: SocketIpAddr::try_from(to_ip).unwrap(),
+                local_ip: SocketIpAddr::try_from(expected_from_ip).unwrap(),
                 device: weak_local_device.clone(),
                 proto,
             },
@@ -2045,8 +2045,8 @@ mod tests {
             &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             weak_local_device.as_ref().map(EitherDeviceId::Weak),
-            from_ip.map(SocketIpAddr::new_from_specified_or_panic),
-            SocketIpAddr::new_from_specified_or_panic(to_ip),
+            from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
+            SocketIpAddr::try_from(to_ip).unwrap(),
             proto,
             WithHopLimit(None),
         )
@@ -2060,8 +2060,8 @@ mod tests {
                 &mut CoreCtx::new_deprecated(core_ctx),
                 &mut bindings_ctx,
                 weak_local_device.as_ref().map(EitherDeviceId::Weak),
-                from_ip.map(SocketIpAddr::new_from_specified_or_panic),
-                SocketIpAddr::new_from_specified_or_panic(to_ip),
+                from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
+                SocketIpAddr::try_from(to_ip).unwrap(),
                 proto,
                 WithHopLimit(Some(SPECIFIED_HOP_LIMIT)),
             )
@@ -2159,8 +2159,8 @@ mod tests {
             &mut CoreCtx::new_deprecated(core_ctx),
             &mut bindings_ctx,
             None,
-            from_ip.map(SocketIpAddr::new_from_specified_or_panic),
-            SocketIpAddr::new_from_specified_or_panic(to_ip),
+            from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
+            SocketIpAddr::try_from(to_ip).unwrap(),
             I::ICMP_IP_PROTO,
             DefaultSendOptions,
         )
@@ -2223,7 +2223,7 @@ mod tests {
             &mut bindings_ctx,
             None,
             None,
-            SocketIpAddr::new_from_specified_or_panic(remote_ip),
+            SocketIpAddr::try_from(remote_ip).unwrap(),
             proto,
             socket_options,
         )
@@ -2422,8 +2422,8 @@ mod tests {
 
         // Send to two remote addresses: `remote_ip` and `other_remote_ip` and
         // check that the frames were sent with the correct hop limits.
-        send_to(SocketIpAddr::new_from_specified_or_panic(remote_ip));
-        send_to(SocketIpAddr::new_from_specified_or_panic(other_remote_ip));
+        send_to(SocketIpAddr::try_from(remote_ip).unwrap());
+        send_to(SocketIpAddr::try_from(other_remote_ip).unwrap());
 
         let frames = bindings_ctx.frames_sent();
         let [df_remote, df_other_remote] = assert_matches!(&frames[..], [df1, df2] => [df1, df2]);
@@ -2521,7 +2521,7 @@ mod tests {
             &mut bindings_ctx,
             None,
             None,
-            SocketIpAddr::new_from_specified_or_panic(I::multicast_addr(1)),
+            SocketIpAddr::try_from(I::multicast_addr(1)).unwrap(),
             I::ICMP_IP_PROTO,
             WithHopLimit(None),
         )

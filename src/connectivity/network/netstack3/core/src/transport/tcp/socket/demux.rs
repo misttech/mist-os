@@ -1045,14 +1045,8 @@ mod test {
         let serializer = super::tcp_serialize_segment(
             segment,
             ConnIpAddr {
-                local: (
-                    SocketIpAddr::new_from_specified_or_panic(I::FAKE_CONFIG.local_ip),
-                    SOURCE_PORT,
-                ),
-                remote: (
-                    SocketIpAddr::new_from_specified_or_panic(I::FAKE_CONFIG.remote_ip),
-                    DEST_PORT,
-                ),
+                local: (SocketIpAddr::try_from(I::FAKE_CONFIG.local_ip).unwrap(), SOURCE_PORT),
+                remote: (SocketIpAddr::try_from(I::FAKE_CONFIG.remote_ip).unwrap(), DEST_PORT),
             },
         );
 
