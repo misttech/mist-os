@@ -90,10 +90,9 @@ The VENC stage has the encoders below.
 * ENCL (LCD panel encoder) - designed for DSI signals
 * ENCT (TV panel encoder) - not documented
 
-The ENCI and ENCP encoders have attached TDMS encoders (ENCI_DVI, ENCP_DVI),
-which produce signals compatible with the HDMI and DVI standards. The AMLogic
-documentation uses "ENCI" and "ENCP" to refer both to the raw encoder outputs
-and the TDMS encoder outputs.
+The ENCI and ENCP encoders output the pixel color signal and timing signals,
+including Display Enabled (DE), Vertical Sync (VSYNC) and Horizontal Sync
+(HSYNC). These signals are compatible with the HDMI / DVI transmitter.
 
 #### Analog front-end
 
@@ -101,14 +100,17 @@ The analog front-end stage contains PHY (physical layer) transmitters for the
 following display connectors.
 
 * CVBS - outputs the ENCI signal via a VDAC (Video DAC)
-* HDMI - can receive the signal from ENCI_DVI or ENCP_DVI
+* HDMI - can receive the signals from ENCI or ENCP
 * MIPI DSI - receives signal from ENCL
 
-The HDMI block embeds a Synopsis DWC (DesignWare Core) HDMI Controller IP, which
-is connected to an HDMI PHY. The AMLogic documentation refers to the DesignWare
-IP as "HDMI TX Controller IP", and to the integration glue as "HDMITX Top-Level"
-(HDMI_TOP and HDMITX_TOP). Driving the HDMI block entails configuring registers
-in both the AMLogic TOP and in the DesignWare IP.
+The HDMI block embeds a Synopsis DWC (DesignWare Core) HDMI Transmitter
+Controller IP, which transcodes the encoder output to TMDS signals and sends
+them to the HDMI PHY.
+
+The AMLogic documentation refers to the DesignWare IP as "HDMI TX Controller
+IP", and to the integration glue as "HDMITX Top-Level" (HDMI_TOP and
+HDMITX_TOP). Driving the HDMI block entails configuring registers in both the
+AMLogic TOP and in the DesignWare IP.
 
 The MIPI DSI block follows a similar structure.
 
