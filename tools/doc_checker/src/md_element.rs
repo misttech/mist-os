@@ -337,8 +337,8 @@ This is an example [link](https://somewhere.com)
             ),
             Some(vec![
                 Link(Inline, Borrowed("/docs/something.md"), Borrowed(""),
-                 vec![Text(Borrowed("something-two-line"), DocLine { line_num: 3,file_name: "/docs/README.md".into() })],
-                 DocLine { line_num: 3, file_name: "/docs/README.md".into() })
+                 vec![Text(Borrowed("something-two-line"), DocLine { line_num: 4,file_name: "/docs/README.md".into() })],
+                 DocLine { line_num: 4, file_name: "/docs/README.md".into() })
             ])
         ),
         (
@@ -352,8 +352,8 @@ This is an example [link](https://somewhere.com)
             ),
             Some(vec![
                 Link(Inline, Borrowed("/docs/in-list-item.md"), Borrowed(""),
-                vec![Text(Borrowed("something"), DocLine { line_num: 4, file_name: "/docs/README.md".into() })],
-                DocLine { line_num: 4, file_name: "/docs/README.md".into() })
+                vec![Text(Borrowed("something"), DocLine { line_num: 5, file_name: "/docs/README.md".into() })],
+                DocLine { line_num: 5, file_name: "/docs/README.md".into() })
             ])
         ),
         (
@@ -368,8 +368,8 @@ This is an example [link](https://somewhere.com)
             ),
             Some(vec![
                 Link(Inline, Borrowed("/docs/in-list-item-pp.md"), Borrowed(""),
-                vec![Text(Borrowed("something"), DocLine { line_num: 5, file_name: "/docs/README.md".into() })],
-                DocLine { line_num: 5, file_name: "/docs/README.md".into() })
+                vec![Text(Borrowed("something"), DocLine { line_num: 6, file_name: "/docs/README.md".into() })],
+                DocLine { line_num: 6, file_name: "/docs/README.md".into() })
             ])
         ),
         ];

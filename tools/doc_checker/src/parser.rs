@@ -25,12 +25,8 @@ pub(crate) fn element_from_event<'a>(
         // Start indicates the start of a Tag.
         Start(Tag::Heading(_)) => {
             let mut element = parse_tag_element(event, doc_context);
-            if let Some(line_num) = doc_context.line_number_of(span) {
-                element.set_line_num(line_num);
-                doc_context.line_num = line_num + 1;
-            } else {
-                doc_context.line_num += newlines;
-            }
+            // update the line number in doc_context, returning the line_number of the element.
+            element.set_line_num(update_line_number(doc_context, span, newlines));
             element
         }
         Start(Tag::Paragraph) => {
@@ -44,18 +40,21 @@ pub(crate) fn element_from_event<'a>(
             panic!("Got End event unexpectedly: {:?}", event)
         }
         Text(text) => {
-            let element = Element::Text(text, doc_context.line());
-            doc_context.line_num += newlines;
+            let mut element = Element::Text(text, doc_context.line());
+            // update the line number in doc_context, returning the line_number of the element.
+            element.set_line_num(update_line_number(doc_context, span, newlines));
             element
         }
         Code(text) => {
-            let element = Element::Code(text, doc_context.line());
-            doc_context.line_num += newlines;
+            let mut element = Element::Code(text, doc_context.line());
+            // update the line number in doc_context, returning the line_number of the element.
+            element.set_line_num(update_line_number(doc_context, span, newlines));
             element
         }
         Html(text) => {
-            let element = Element::Html(text, doc_context.line());
-            doc_context.line_num += newlines;
+            let mut element = Element::Html(text, doc_context.line());
+            // update the line number in doc_context, returning the line_number of the element.
+            element.set_line_num(update_line_number(doc_context, span, newlines));
             element
         }
         FootnoteReference(text) => Element::FootnoteReference(text, doc_context.line()),
@@ -78,6 +77,17 @@ pub(crate) fn element_from_event<'a>(
         TaskListMarker(checked) => Element::TaskListMarker(checked, doc_context.line()),
     };
     element
+}
+
+fn update_line_number<'a>(doc_context: &mut DocContext<'a>, span: &str, newlines: usize) -> usize {
+    let current_line_num = doc_context.line_num;
+    if let Some(line_num) = doc_context.line_number_of(span) {
+        doc_context.line_num = line_num + 1;
+        return line_num;
+    } else {
+        doc_context.line_num += newlines;
+    }
+    current_line_num
 }
 
 fn parse_tag_element<'a>(event: Event<'a>, doc_context: &mut DocContext<'a>) -> Element<'a> {
