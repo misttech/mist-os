@@ -321,10 +321,8 @@ Attaching/Removing Processes
   the example above, use "pr 2 kill" to kill the process named
   "some-other-process-that-crashed".
 
-  The default setting to automatically attach to all processes in Process Limbo
-  can be overridden via the -n switch or --no-auto-attach-limbo when invoking
-  "ffx debug connect" or interactively with "set auto-attach-limbo" at the
-  [zxdb] prompt.
+  To automatically attach the processes in Process Limbo, use "ffx debug crash"
+  or use the "set auto-attach-limbo" command at the [zxdb] prompt.
 )";
 
 const char kHelpShortHelp[] = R"(help / h: Help.)";

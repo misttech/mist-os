@@ -98,10 +98,6 @@ async fn connect_tool_impl(
 
     let mut debugger = Debugger::from_socket(socket).await?;
 
-    if cmd.no_auto_attach_limbo {
-        debugger.command.push_str("--no-auto-attach-limbo");
-    }
-
     debugger.command.attach_each(&cmd.attach);
     debugger.command.execute_each(&cmd.execute);
     debugger.command.extend(&cmd.zxdb_args);

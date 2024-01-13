@@ -54,14 +54,6 @@
       "short": "e",
       "description": "execute one zxdb command. Multiple commands will be executed sequentially.",
       "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--no-auto-attach-limbo",
-      "short": "n",
-      "description": "do not automatically attach to processes found in Process Limbo upon successful connection. convenience switch for the zxdb option of the same name.",
-      "hidden": false
     }
   ],
   "notes": [],
