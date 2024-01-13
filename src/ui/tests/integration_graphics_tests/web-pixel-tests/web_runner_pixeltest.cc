@@ -252,15 +252,17 @@ class StaticHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
+// TODO(https://fxbug.dev/42182658): Reenable tests for Vulkan once flakiness is resolved.
 INSTANTIATE_TEST_SUITE_P(ParameterizedStaticHtmlPixelTests, StaticHtmlPixelTests,
-                         ::testing::Bool());
+                         ::testing::Values(false));
 
 TEST_P(StaticHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
   const auto num_pixels = display_size().width * display_size().height;
 
-  // TODO(https://fxbug.dev/116631): Find a better replacement for screenshot loops to verify that content has
-  // been rendered on the display. Take screenshot until we see the web page's background color.
+  // TODO(https://fxbug.dev/116631): Find a better replacement for screenshot loops to verify that
+  // content has been rendered on the display. Take screenshot until we see the web page's
+  // background color.
   ASSERT_TRUE(TakeScreenshotUntil(
       [num_pixels](const ui_testing::Screenshot& screenshot) {
         screenshot.LogHistogramTopPixels();
@@ -299,8 +301,9 @@ class DynamicHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
+// TODO(https://fxbug.dev/42182658): Reenable tests for Vulkan once flakiness is resolved.
 INSTANTIATE_TEST_SUITE_P(ParameterizedDynamicHtmlPixelTests, DynamicHtmlPixelTests,
-                         ::testing::Bool());
+                         ::testing::Values(false));
 
 TEST_P(DynamicHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
@@ -347,7 +350,9 @@ class VideoHtmlPixelTests : public WebRunnerPixelTest {
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(ParameterizedVideoHtmlPixelTests, VideoHtmlPixelTests, ::testing::Bool());
+// TODO(https://fxbug.dev/42182658): Reenable tests for Vulkan once flakiness is resolved.
+INSTANTIATE_TEST_SUITE_P(ParameterizedVideoHtmlPixelTests, VideoHtmlPixelTests,
+                         ::testing::Values(false));
 
 TEST_P(VideoHtmlPixelTests, ValidPixelTest) {
   // BGRA values,
@@ -360,8 +365,8 @@ TEST_P(VideoHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
 
   // The web page should render the scene as shown above.
-  // TODO(https://fxbug.dev/116631): Find a better replacement for screenshot loops to verify that content has
-  // been rendered on the display.
+  // TODO(https://fxbug.dev/116631): Find a better replacement for screenshot loops to verify that
+  // content has been rendered on the display.
   ASSERT_TRUE(TakeScreenshotUntil(
       [&](const ui_testing::Screenshot& screenshot) {
         const auto& top = screenshot.LogHistogramTopPixels();
