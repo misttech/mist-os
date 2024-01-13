@@ -1207,6 +1207,10 @@ config("werror") {
   }
 }
 
+config("no-template-backtrace-limit") {
+  cflags_cc = [ "-ftemplate-backtrace-limit=0" ]
+}
+
 config("no-stack-protector") {
   cflags = [ "-fno-stack-protector" ]
 }

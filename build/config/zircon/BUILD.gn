@@ -239,10 +239,6 @@ config("default_icf") {
   }
 }
 
-config("default_template_backtrace_limit") {
-  cflags_cc = [ "-ftemplate-backtrace-limit=0" ]
-}
-
 config("no_threadsafe_statics") {
   cflags_cc = [ "-fno-threadsafe-statics" ]
   cflags_objcc = cflags_cc

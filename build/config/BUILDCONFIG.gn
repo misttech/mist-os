@@ -419,6 +419,7 @@ if (zircon_toolchain == false) {
     "//build/config/rust:target",
     "//build/config/rust:2018_idioms",
     "//build/config:werror",
+    "//build/config:no-template-backtrace-limit",
   ]
 
   if (is_analysis) {
@@ -505,12 +506,12 @@ if (zircon_toolchain == false) {
     "//build/config:symbol_visibility_hidden",
     "//build/config:thread_safety_annotations",
     "//build/config:werror",
+    "//build/config:no-template-backtrace-limit",
     "//build/config/zircon:compiler",
     "//build/config/zircon:machine",
     "//build/config/zircon:default_assert_level",
     "//build/config/zircon:default_icf",
     "//build/config/zircon:default_include_dirs",
-    "//build/config/zircon:default_template_backtrace_limit",
   ]
 
   # NOTE: Contrary to the Fuchsia build, we start by removing common configs
