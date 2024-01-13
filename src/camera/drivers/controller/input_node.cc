@@ -5,8 +5,8 @@
 #include "src/camera/drivers/controller/input_node.h"
 
 #include <fuchsia/hardware/isp/c/banjo.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
-#include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -14,8 +14,6 @@
 #include "src/devices/lib/sysmem/sysmem.h"
 
 namespace camera {
-
-constexpr auto kTag = "camera_controller_input_node";
 
 InputNode::InputNode(async_dispatcher_t* dispatcher, BufferAttachments attachments,
                      FrameCallback frame_callback, const ddk::IspProtocolClient& isp)
@@ -51,7 +49,7 @@ fpromise::result<std::unique_ptr<InputNode>, zx_status_t> InputNode::Create(
       reinterpret_cast<const frame_rate_t*>(&inode.output_frame_rate), isp_stream_type,
       pnode->GetHwFrameReadyCallback(), &isp_stream_protocol);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Failed to create output stream on ISP";
+    zxlogf(ERROR, "Failed to create output stream on ISP");
     return fpromise::error(status);
   }
   pnode->stream_ = ddk::OutputStreamProtocolClient(&isp_stream_protocol);
@@ -98,7 +96,7 @@ void InputNode::HwFrameReady(frame_available_info_t info) {
     constexpr auto kErrorFrameMinLogInterval = zx::sec(1);
     auto now = zx::clock::get_monotonic();
     if (now >= last_frame_error_logged_ + kErrorFrameMinLogInterval) {
-      FX_LOGST(ERROR, kTag) << "failed input frame: " << static_cast<uint32_t>(info.frame_status);
+      zxlogf(ERROR, "failed input frame: %i", static_cast<int>(info.frame_status));
       TRACE_INSTANT("camera", "bad_status", TRACE_SCOPE_THREAD, "frame_status",
                     static_cast<uint32_t>(info.frame_status));
       last_frame_error_logged_ = now;
@@ -106,7 +104,7 @@ void InputNode::HwFrameReady(frame_available_info_t info) {
     return;
   }
   if (info.metadata.timestamp == 0) {
-    FX_LOGST(ERROR, kTag) << "missing timestamp on input buffer " << info.buffer_id;
+    zxlogf(ERROR, "missing timestamp on input buffer %u", info.buffer_id);
     stream_.ReleaseFrame(info.buffer_id);
     return;
   }

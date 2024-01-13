@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "src/camera/lib/formatting/macros.h"
-#include "src/lib/fsl/handles/object_info.h"
 
 namespace camera::formatting {
 
@@ -101,10 +100,17 @@ PropertyListPtr Dump(const bool& x) {
   return p;
 }
 
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
 template <>
 PropertyListPtr Dump(const zx::vmo& x) {
   auto p = PropertyList::New();
-  p->properties.push_back({.name = "koid", .value = std::to_string(fsl::GetKoid(x.get()))});
+  p->properties.push_back({.name = "koid", .value = std::to_string(GetKoid(x.get()))});
   return p;
 }
 

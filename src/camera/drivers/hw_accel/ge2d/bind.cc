@@ -3,31 +3,27 @@
 // found in the LICENSE file.
 
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
 #include <lib/driver-unit-test/utils.h>
-#include <lib/syslog/cpp/macros.h>
 
 #include "src/camera/drivers/hw_accel/ge2d/ge2d.h"
 
 namespace ge2d {
-namespace {
-
-constexpr auto kTag = "ge2d";
-}
 zx_status_t Ge2dBind(void* ctx, zx_device_t* device) {
   std::unique_ptr<Ge2dDevice> ge2d_device;
   zx_status_t status = ge2d::Ge2dDevice::Setup(device, &ge2d_device);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Could not setup ge2d device";
+    zxlogf(ERROR, "Could not setup ge2d device");
     return status;
   }
 
   status = ge2d_device->DdkAdd(ddk::DeviceAddArgs("ge2d"));
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Could not add ge2d device";
+    zxlogf(ERROR, "Could not add ge2d device");
     return status;
   }
 
-  FX_LOGST(INFO, kTag) << "ge2d driver added";
+  zxlogf(INFO, "ge2d driver added");
 
   // ge2d device intentionally leaked as it is now held by DevMgr.
   [[maybe_unused]] auto* dev = ge2d_device.release();
