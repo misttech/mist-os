@@ -366,7 +366,7 @@ managed by the kernel. It is unclear whether filesystems running longer will
 have a significant negative impact on memory.
 
 [halt-token]: https://fuchsia-review.googlesource.com/c/fuchsia/+/574141
-[memory-monitor]: https://cs.opensource.google.com/fuchsia/fuchsia/+/main:src/developer/memory/monitor
+[memory-monitor]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/memory/monitor
 [rfc-0091]: /docs/contribute/governance/rfcs/0091_getevent_imminent_oom.md
 [rfc-0110]: /docs/contribute/governance/rfcs/0110_reboot_for_critical_components.md
 [sys-get-event-call]: /reference/syscalls/system_get_event.md

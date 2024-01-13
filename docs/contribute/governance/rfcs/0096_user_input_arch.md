@@ -738,7 +738,7 @@ future but was deemed too heavyweight for the current use-cases.
 [scenegraph]: /docs/concepts/ui/scenic/index.md#scenes
 [viewref]: /docs/development/graphics/scenic/concepts/view_ref.md
 [focuschain]: /docs/development/graphics/scenic/concepts/focus_chain.md
-[latencyreference]: https://www-user.tu-chemnitz.de/~attig/Attig-Rauh-Franke-Krems_2017_LatencyGuidelines.pdf
+[latencyreference]: https://www.researchgate.net/publication/317801643_System_Latency_Guidelines_Then_and_Now_-_Is_Zero_Latency_Really_Considered_Necessary
 [inputmethod]: https://en.wikipedia.org/wiki/Input_method
 [i18n]: /docs/development/internationalization/README.md
 [root-presenter]: /src/ui/bin/root_presenter/README.md
