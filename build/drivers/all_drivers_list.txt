@@ -366,7 +366,7 @@
 //src/ui/input/drivers/goldfish_sensor:sensor_fuchsia_driver
 //src/ui/input/drivers/goodix:goodix-module-driver
 //src/ui/input/drivers/gt6853:gt6853-module-driver
-//src/ui/input/drivers/hid-buttons:hid-buttons-driver
+//src/ui/input/drivers/buttons:buttons-driver
 //src/ui/input/drivers/hid-input-report:hid-input-report-driver
 //src/ui/input/drivers/hid-input-report:hid-input-report-driver-v2
 //src/ui/input/drivers/hid:hid-driver

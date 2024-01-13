@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_INPUT_DRIVERS_HID_BUTTONS_HID_BUTTONS_H_
-#define SRC_UI_INPUT_DRIVERS_HID_BUTTONS_HID_BUTTONS_H_
+#ifndef SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_H_
+#define SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.input.report/cpp/wire.h>
@@ -40,12 +40,12 @@ constexpr uint64_t kPortKeyPollTimer = 0x1000;
 // Debounce threshold.
 constexpr uint64_t kDebounceThresholdNs = 50'000'000;
 
-class HidButtonsDevice;
+class ButtonsDevice;
 using DeviceType =
-    ddk::Device<HidButtonsDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin,
+    ddk::Device<ButtonsDevice, ddk::Messageable<fuchsia_input_report::InputDevice>::Mixin,
                 ddk::Unbindable>;
 
-class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
+class ButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
   struct Gpio {
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client;
@@ -53,7 +53,7 @@ class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
     buttons_gpio_config_t config;
   };
 
-  explicit HidButtonsDevice(zx_device_t* device, async_dispatcher_t* dispatcher)
+  explicit ButtonsDevice(zx_device_t* device, async_dispatcher_t* dispatcher)
       : DeviceType(device), dispatcher_(dispatcher) {
     metrics_root_ = inspector_.GetRoot().CreateChild("hid-input-report-touch");
     average_latency_usecs_ = metrics_root_.CreateUint("average_latency_usecs", 0);
@@ -61,7 +61,7 @@ class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
     total_report_count_ = metrics_root_.CreateUint("total_report_count", 0);
     last_event_timestamp_ = metrics_root_.CreateUint("last_event_timestamp", 0);
   }
-  virtual ~HidButtonsDevice() = default;
+  virtual ~ButtonsDevice() = default;
 
   // fuchsia_input_report::InputDevice required methods
   void GetInputReportsReader(GetInputReportsReaderRequestView request,
@@ -94,7 +94,7 @@ class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
   zx::port port_;
 
  private:
-  friend class HidButtonsDeviceTest;
+  friend class ButtonsDeviceTest;
   static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
 
   int Thread();
@@ -164,4 +164,4 @@ class HidButtonsDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
 
 }  // namespace buttons
 
-#endif  // SRC_UI_INPUT_DRIVERS_HID_BUTTONS_HID_BUTTONS_H_
+#endif  // SRC_UI_INPUT_DRIVERS_BUTTONS_BUTTONS_H_

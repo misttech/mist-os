@@ -43,7 +43,7 @@ zx::result<> Vim3::ButtonsInit() {
   fpbus::Node dev = {{.name = "vim3-buttons",
                       .vid = PDEV_VID_GENERIC,
                       .pid = PDEV_PID_GENERIC,
-                      .did = PDEV_DID_HID_BUTTONS,
+                      .did = PDEV_DID_BUTTONS,
                       .metadata = std::vector<fpbus::Metadata>{
                           {{.type = DEVICE_METADATA_BUTTONS_BUTTONS,
                             .data = std::vector<uint8_t>(

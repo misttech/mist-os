@@ -10,6 +10,7 @@ group("drivers") {
   testonly = true
   deps = [
     "drivers/adc-buttons",
+    "drivers/buttons",
     "drivers/ctaphid",
     "drivers/focaltech",
     "drivers/focaltech:focaltech-sherlock",
@@ -17,7 +18,6 @@ group("drivers") {
     "drivers/goodix",
     "drivers/gt6853:gt6853-module",
     "drivers/hid",
-    "drivers/hid-buttons",
     "drivers/hid-input-report",
     "drivers/hid-input-report:hid-input-report-v2",
     "drivers/hidctl",

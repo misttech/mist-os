@@ -7,9 +7,9 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("hid-buttons-bind") {
-  rules = "hid-buttons.bind"
-  bind_output = "hid-buttons.bindbc"
+driver_bind_rules("buttons-bind") {
+  rules = "buttons.bind"
+  bind_output = "buttons.bindbc"
   tests = "bind-tests.json"
   disable_fragment_gen = true
   deps = [
@@ -18,8 +18,8 @@ driver_bind_rules("hid-buttons-bind") {
   ]
 }
 
-fuchsia_driver("hid-buttons-driver") {
-  output_name = "hid-buttons"
+fuchsia_driver("buttons-driver") {
+  output_name = "buttons"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -28,25 +28,25 @@ fuchsia_driver("hid-buttons-driver") {
   deps = [ ":common" ]
 }
 
-fuchsia_driver_component("hid-buttons") {
+fuchsia_driver_component("buttons") {
   visibility = [ ":*" ]
-  component_name = "hid-buttons"
-  deps = [ ":hid-buttons-driver" ]
-  info = "hid-buttons-info.json"
-  manifest = "meta/hid-buttons.cml"
+  component_name = "buttons"
+  deps = [ ":buttons-driver" ]
+  info = "buttons-info.json"
+  manifest = "meta/buttons.cml"
 }
 
 fuchsia_driver_package("package") {
-  package_name = "hid-buttons"
-  driver_components = [ ":hid-buttons" ]
+  package_name = "buttons"
+  driver_components = [ ":buttons" ]
 }
 
 source_set("common") {
   configs += [ "//build/config:all_source" ]
-  sources = [ "hid-buttons.cc" ]
+  sources = [ "buttons.cc" ]
 
   public_deps = [
-    ":hid-buttons-bind",
+    ":buttons-bind",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//src/devices/lib/driver",
@@ -54,7 +54,6 @@ source_set("common") {
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
-    "//src/ui/input/lib/hid",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -69,10 +68,10 @@ source_set("common") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-test("hid-buttons-test") {
+test("buttons-test") {
   configs += [ "//build/config:all_source" ]
-  output_name = "hid-buttons-test"
-  sources = [ "hid-buttons-test.cc" ]
+  output_name = "buttons-test"
+  sources = [ "buttons-test.cc" ]
   deps = [
     ":common",
     "//sdk/lib/async_patterns/testing/cpp",
@@ -84,15 +83,15 @@ test("hid-buttons-test") {
   ]
 }
 
-fuchsia_unittest_package("hid-buttons-test-package") {
-  package_name = "hid-buttons-test"
-  deps = [ ":hid-buttons-test" ]
+fuchsia_unittest_package("buttons-test-package") {
+  package_name = "buttons-test"
+  deps = [ ":buttons-test" ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":hid-buttons-bind_test",
-    ":hid-buttons-test-package",
+    ":buttons-bind_test",
+    ":buttons-test-package",
   ]
 }

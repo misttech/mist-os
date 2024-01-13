@@ -48,6 +48,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   FAKE_BATTERY = 0x33,
   TCS3400_LIGHT = 0x34,
   ADC_BUTTONS = 0x35,
+  BUTTONS = 0x36,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {

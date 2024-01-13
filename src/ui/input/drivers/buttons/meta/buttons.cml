@@ -9,9 +9,9 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/hid-buttons.bindbc",
+        bind: "meta/bind/buttons.bindbc",
         colocate: "false",
-        compat: "driver/hid-buttons.so",
+        compat: "driver/buttons.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "hid-buttons.h"
+#include "buttons.h"
 
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/hid/descriptor.h>
 #include <lib/zx/clock.h>
 #include <string.h>
 #include <threads.h>
@@ -28,7 +27,7 @@
 
 namespace buttons {
 
-void HidButtonsDevice::ButtonsInputReport::ToFidlInputReport(
+void ButtonsDevice::ButtonsInputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
     fidl::AnyArena& allocator) {
   fidl::VectorView<fuchsia_input_report::wire::ConsumerControlButton> buttons_rpt(
@@ -96,11 +95,10 @@ void HidButtonsDevice::ButtonsInputReport::ToFidlInputReport(
   input_report.event_time(event_time.get()).consumer_control(consumer_control.Build());
 }
 
-void HidButtonsDevice::Notify(uint32_t button_index) {
-  // HID Report
+void ButtonsDevice::Notify(uint32_t button_index) {
   auto result = GetInputReport();
   if (result.is_error()) {
-    zxlogf(ERROR, "HidbusGetReport failed %d", result.error_value());
+    zxlogf(ERROR, "GetInputReport failed %s", zx_status_get_string(result.error_value()));
   } else if (!last_report_.has_value() || *last_report_ != result.value()) {
     last_report_ = result.value();
     readers_.SendReportToAllReaders(*last_report_);
@@ -132,7 +130,7 @@ void HidButtonsDevice::Notify(uint32_t button_index) {
   debounce_states_[button_index].timestamp = zx::time::infinite_past();
 }
 
-int HidButtonsDevice::Thread() {
+int ButtonsDevice::Thread() {
   thread_started_.Signal();
   if (poll_period_ != zx::duration::infinite()) {
     poll_timer_.set(zx::deadline_after(poll_period_), zx::duration(0));
@@ -208,8 +206,8 @@ int HidButtonsDevice::Thread() {
   return thrd_success;
 }
 
-void HidButtonsDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
-                                             GetInputReportsReaderCompleter::Sync& completer) {
+void ButtonsDevice::GetInputReportsReader(GetInputReportsReaderRequestView request,
+                                          GetInputReportsReaderCompleter::Sync& completer) {
   auto initial_report = GetInputReport();
   if (initial_report.is_error()) {
     zxlogf(ERROR, "Failed to get initial report %d", initial_report.error_value());
@@ -222,11 +220,13 @@ void HidButtonsDevice::GetInputReportsReader(GetInputReportsReaderRequestView re
   }
 }
 
-void HidButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
+void ButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   fidl::Arena<kFeatureAndDescriptorBufferSize> arena;
 
   fuchsia_input_report::wire::DeviceInfo device_info;
   device_info.vendor_id = static_cast<uint32_t>(fuchsia_input_report::VendorId::kGoogle);
+  // Product id is "HID" buttons only for backward compatibility with users of this driver.
+  // There is no HID support in this driver anymore.
   device_info.product_id =
       static_cast<uint32_t>(fuchsia_input_report::VendorGoogleProductId::kHidButtons);
 
@@ -252,7 +252,7 @@ void HidButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
 }
 
 // Requires interrupts to be disabled for all rows/cols.
-bool HidButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay) {
+bool ButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay) {
   auto& gpio_col = gpios_[col];
   {
     fidl::WireResult result = gpio_col.client->ConfigIn(
@@ -296,7 +296,7 @@ bool HidButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t dela
   return static_cast<bool>(read_result.value()->value);
 }
 
-zx::result<HidButtonsDevice::ButtonsInputReport> HidButtonsDevice::GetInputReport() {
+zx::result<ButtonsDevice::ButtonsInputReport> ButtonsDevice::GetInputReport() {
   ButtonsInputReport input_rpt;
 
   for (size_t i = 0; i < buttons_.size(); ++i) {
@@ -336,8 +336,8 @@ zx::result<HidButtonsDevice::ButtonsInputReport> HidButtonsDevice::GetInputRepor
   return zx::ok(input_rpt);
 }
 
-void HidButtonsDevice::GetInputReport(GetInputReportRequestView request,
-                                      GetInputReportCompleter::Sync& completer) {
+void ButtonsDevice::GetInputReport(GetInputReportRequestView request,
+                                   GetInputReportCompleter::Sync& completer) {
   if (request->device_type != fuchsia_input_report::DeviceType::kConsumerControl) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
@@ -354,7 +354,7 @@ void HidButtonsDevice::GetInputReport(GetInputReportRequestView request,
   completer.ReplySuccess(input_report.Build());
 }
 
-uint8_t HidButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
+uint8_t ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
   zxlogf(DEBUG, "gpio %u port %lu", idx, int_port);
   uint8_t current = 0, old;
   auto& gpio = gpios_[idx];
@@ -407,7 +407,7 @@ uint8_t HidButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
   return current;
 }
 
-zx_status_t HidButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
+zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
   zxlogf(DEBUG, "gpio %u port %lu", idx, int_port);
   zx_status_t status;
   uint8_t current = 0;
@@ -464,8 +464,8 @@ zx_status_t HidButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port
   return ZX_OK;
 }
 
-zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
-                                   fbl::Array<buttons_button_config_t> buttons) {
+zx_status_t ButtonsDevice::Bind(fbl::Array<Gpio> gpios,
+                                fbl::Array<buttons_button_config_t> buttons) {
   zx_status_t status;
 
   buttons_ = std::move(buttons);
@@ -584,13 +584,13 @@ zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
     }
   }
 
-  auto f = [](void* arg) -> int { return reinterpret_cast<HidButtonsDevice*>(arg)->Thread(); };
-  int rc = thrd_create_with_name(&thread_, f, this, "hid-buttons-thread");
+  auto f = [](void* arg) -> int { return reinterpret_cast<ButtonsDevice*>(arg)->Thread(); };
+  int rc = thrd_create_with_name(&thread_, f, this, "buttons-thread");
   if (rc != thrd_success) {
     return ZX_ERR_INTERNAL;
   }
 
-  status = DdkAdd(ddk::DeviceAddArgs("hid-buttons")
+  status = DdkAdd(ddk::DeviceAddArgs("buttons")
                       .set_inspect_vmo(inspector_.DuplicateVmo())
                       .set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
@@ -602,7 +602,7 @@ zx_status_t HidButtonsDevice::Bind(fbl::Array<Gpio> gpios,
   return ZX_OK;
 }
 
-void HidButtonsDevice::ShutDown() {
+void ButtonsDevice::ShutDown() {
   zx_port_packet packet = {kPortKeyShutDown, ZX_PKT_TYPE_USER, ZX_OK, {}};
   zx_status_t status = port_.queue(&packet);
   ZX_ASSERT(status == ZX_OK);
@@ -613,16 +613,16 @@ void HidButtonsDevice::ShutDown() {
   }
 }
 
-void HidButtonsDevice::DdkUnbind(ddk::UnbindTxn txn) {
+void ButtonsDevice::DdkUnbind(ddk::UnbindTxn txn) {
   ShutDown();
   txn.Reply();
 }
 
-void HidButtonsDevice::DdkRelease() { delete this; }
+void ButtonsDevice::DdkRelease() { delete this; }
 
-static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
+static zx_status_t buttons_bind(void* ctx, zx_device_t* parent) {
   fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<buttons::HidButtonsDevice>(
+  auto dev = fbl::make_unique_checked<buttons::ButtonsDevice>(
       &ac, parent, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
@@ -649,7 +649,7 @@ static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
   size_t n_gpios = configs->size();
 
   // Prepare gpios array.
-  auto gpios = fbl::Array(new (&ac) HidButtonsDevice::Gpio[n_gpios], n_gpios);
+  auto gpios = fbl::Array(new (&ac) ButtonsDevice::Gpio[n_gpios], n_gpios);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -698,13 +698,13 @@ static zx_status_t hid_buttons_bind(void* ctx, zx_device_t* parent) {
   return status;
 }
 
-static constexpr zx_driver_ops_t hid_buttons_driver_ops = []() {
+static constexpr zx_driver_ops_t buttons_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = hid_buttons_bind;
+  ops.bind = buttons_bind;
   return ops;
 }();
 
 }  // namespace buttons
 
-ZIRCON_DRIVER(hid_buttons, buttons::hid_buttons_driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(buttons, buttons::buttons_driver_ops, "zircon", "0.1");

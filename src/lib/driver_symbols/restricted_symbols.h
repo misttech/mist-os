@@ -96,7 +96,7 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/gt6853.cm",
     "#meta/gvnic.cm",
     "#meta/hdmi-audio-codec.cm",
-    "#meta/hid-buttons.cm",
+    "#meta/buttons.cm",
     "#meta/hidctl.cm",
     "#meta/hid-input-report.cm",
     "#meta/hid-input-report-v2.cm",

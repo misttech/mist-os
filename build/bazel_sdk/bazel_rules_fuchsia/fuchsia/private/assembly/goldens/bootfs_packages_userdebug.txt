@@ -6,6 +6,7 @@ asix-88772b
 block-core
 bootstrap
 bt-transport-usb
+buttons
 clock
 ?config
 console
@@ -21,7 +22,6 @@ fvm
 gpio
 gpt
 hid
-hid-buttons
 hid-input-report
 i2c
 ?live-usb

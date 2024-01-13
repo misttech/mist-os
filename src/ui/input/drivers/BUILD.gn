@@ -5,12 +5,12 @@
 group("drivers") {
   deps = [
     "adc-buttons",
+    "buttons",
     "ctaphid",
     "focaltech",
     "goldfish_sensor",
     "goodix",
     "hid",
-    "hid-buttons",
     "hid-input-report",
     "hid-input-report:hid-input-report-v2",
     "hidctl",
@@ -27,13 +27,13 @@ group("tests") {
 
   deps = [
     "adc-buttons:tests",
+    "buttons:tests",
     "ctaphid:tests",
     "focaltech:tests",
     "goldfish_sensor:tests",
     "goodix:tests",
     "gt6853:tests",
     "hid:tests",
-    "hid-buttons:tests",
     "hid-input-report:tests",
     "hidctl:tests",
     "i2c-hid:tests",

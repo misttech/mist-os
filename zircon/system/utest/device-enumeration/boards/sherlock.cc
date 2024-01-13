@@ -55,7 +55,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-56/focaltech_touch",
       "sys/platform/00:00:e/tee/optee",
       "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
-      "sys/platform/00:00:13/sherlock-buttons/hid-buttons",
+      "sys/platform/00:00:36/sherlock-buttons/buttons",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:04:1a/aml_securemem/aml-securemem",

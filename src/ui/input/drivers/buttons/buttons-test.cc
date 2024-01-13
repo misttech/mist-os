@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "hid-buttons.h"
+#include "buttons.h"
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -101,10 +101,10 @@ static const buttons_gpio_config_t gpios_duplicate[] = {
 
 namespace buttons {
 
-class HidButtonsDeviceTest : public HidButtonsDevice {
+class ButtonsDeviceTest : public ButtonsDevice {
  public:
-  explicit HidButtonsDeviceTest(zx_device_t* fake_parent, async_dispatcher_t* dispatcher)
-      : HidButtonsDevice(fake_parent, dispatcher) {}
+  explicit ButtonsDeviceTest(zx_device_t* fake_parent, async_dispatcher_t* dispatcher)
+      : ButtonsDevice(fake_parent, dispatcher) {}
 
   void FakeInterrupt(uint32_t i = 0) {
     // Issue the first interrupt.
@@ -119,7 +119,7 @@ class HidButtonsDeviceTest : public HidButtonsDevice {
   }
 
   void Notify(uint32_t type) override {
-    HidButtonsDevice::Notify(type);
+    ButtonsDevice::Notify(type);
     sync_completion_signal(&debounce_threshold_passed_);
   }
 
@@ -127,7 +127,7 @@ class HidButtonsDeviceTest : public HidButtonsDevice {
   sync_completion_t debounce_threshold_passed_;
 };
 
-class HidButtonsTest : public zxtest::Test {
+class ButtonsTest : public zxtest::Test {
  public:
   void SetUp() override { ASSERT_OK(gpio_loop_.StartThread("gpios")); }
 
@@ -149,7 +149,7 @@ class HidButtonsTest : public zxtest::Test {
     }
 
     const size_t n_gpios = gpios_config_size;
-    auto gpios = fbl::Array(new HidButtonsDevice::Gpio[n_gpios], n_gpios);
+    auto gpios = fbl::Array(new ButtonsDevice::Gpio[n_gpios], n_gpios);
     const size_t n_buttons = buttons_config_size;
     auto buttons = fbl::Array(new buttons_button_config_t[n_buttons], n_buttons);
     for (size_t i = 0; i < n_gpios; ++i) {
@@ -171,7 +171,7 @@ class HidButtonsTest : public zxtest::Test {
     }
 
     auto device =
-        std::make_unique<HidButtonsDeviceTest>(fake_parent_.get(), input_report_loop_.dispatcher());
+        std::make_unique<ButtonsDeviceTest>(fake_parent_.get(), input_report_loop_.dispatcher());
     ASSERT_OK(device->Bind(std::move(gpios), std::move(buttons)));
     // devmgr is now in charge of the memory for dev.
     device_ = device.release();
@@ -213,7 +213,7 @@ class HidButtonsTest : public zxtest::Test {
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>& GetGpio(size_t index) {
     return *gpios_[index];
   }
-  HidButtonsDeviceTest& device() { return *device_; }
+  ButtonsDeviceTest& device() { return *device_; }
 
   async::Loop input_report_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
@@ -258,14 +258,14 @@ class HidButtonsTest : public zxtest::Test {
   std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
   async::Loop gpio_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   std::vector<std::unique_ptr<async_patterns::TestDispatcherBound<fake_gpio::FakeGpio>>> gpios_;
-  HidButtonsDeviceTest* device_;
+  ButtonsDeviceTest* device_;
 };
 
-TEST_F(HidButtonsTest, DirectButtonBind) {
+TEST_F(ButtonsTest, DirectButtonBind) {
   BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
 }
 
-TEST_F(HidButtonsTest, DirectButtonPush) {
+TEST_F(ButtonsTest, DirectButtonPush) {
   BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
 
   // Reconfigure Polarity due to interrupt.
@@ -275,7 +275,7 @@ TEST_F(HidButtonsTest, DirectButtonPush) {
   device().DebounceWait();
 }
 
-TEST_F(HidButtonsTest, DirectButtonPushUnpushedReport) {
+TEST_F(ButtonsTest, DirectButtonPushUnpushedReport) {
   BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
 
   auto reader = GetReader();
@@ -336,7 +336,7 @@ TEST_F(HidButtonsTest, DirectButtonPushUnpushedReport) {
   EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
 }
 
-TEST_F(HidButtonsTest, DirectButtonPushedReport) {
+TEST_F(ButtonsTest, DirectButtonPushedReport) {
   BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
 
   auto reader = GetReader();
@@ -369,7 +369,7 @@ TEST_F(HidButtonsTest, DirectButtonPushedReport) {
   EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
 }
 
-TEST_F(HidButtonsTest, DirectButtonPushUnpushPush) {
+TEST_F(ButtonsTest, DirectButtonPushUnpushPush) {
   BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
 
   // Reconfigure Polarity due to interrupt.
@@ -391,7 +391,7 @@ TEST_F(HidButtonsTest, DirectButtonPushUnpushPush) {
   device().DebounceWait();
 }
 
-TEST_F(HidButtonsTest, DirectButtonFlaky) {
+TEST_F(ButtonsTest, DirectButtonFlaky) {
   BindDevice(gpios_direct, std::size(gpios_direct), buttons_direct, std::size(buttons_direct));
 
   // Reconfigure Polarity due to interrupt and keep checking until correct.
@@ -429,11 +429,11 @@ TEST_F(HidButtonsTest, DirectButtonFlaky) {
   device().DebounceWait();
 }
 
-TEST_F(HidButtonsTest, MatrixButtonBind) {
+TEST_F(ButtonsTest, MatrixButtonBind) {
   BindDevice(gpios_matrix, std::size(gpios_matrix), buttons_matrix, std::size(buttons_matrix));
 }
 
-TEST_F(HidButtonsTest, MatrixButtonPush) {
+TEST_F(ButtonsTest, MatrixButtonPush) {
   BindDevice(gpios_matrix, std::size(gpios_matrix), buttons_matrix, std::size(buttons_matrix));
 
   auto reader = GetReader();
@@ -504,7 +504,7 @@ TEST_F(HidButtonsTest, MatrixButtonPush) {
             (gpio_3_states.end() - 1)->sub_state);  // Restore column.
 }
 
-TEST_F(HidButtonsTest, DuplicateReports) {
+TEST_F(ButtonsTest, DuplicateReports) {
   BindDevice(gpios_duplicate, std::size(gpios_duplicate), buttons_duplicate,
              std::size(buttons_duplicate));
 
@@ -582,7 +582,7 @@ TEST_F(HidButtonsTest, DuplicateReports) {
   EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
 }
 
-TEST_F(HidButtonsTest, CamMute) {
+TEST_F(ButtonsTest, CamMute) {
   BindDevice(gpios_multiple, std::size(gpios_multiple), buttons_multiple,
              std::size(buttons_multiple));
 
@@ -649,7 +649,7 @@ TEST_F(HidButtonsTest, CamMute) {
   EXPECT_EQ(input_report_loop_.Run(), ZX_ERR_CANCELED);
 }
 
-TEST_F(HidButtonsTest, PollOneButton) {
+TEST_F(ButtonsTest, PollOneButton) {
   BindDevice(gpios_multiple_one_polled, std::size(gpios_multiple_one_polled), buttons_multiple,
              std::size(buttons_multiple));
 

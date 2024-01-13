@@ -54,7 +54,7 @@ zx_status_t Astro::ButtonsInit() {
   fpbus::Node dev = {{.name = "astro-buttons",
                       .vid = PDEV_VID_GENERIC,
                       .pid = PDEV_PID_GENERIC,
-                      .did = PDEV_DID_HID_BUTTONS,
+                      .did = PDEV_DID_BUTTONS,
                       .metadata = std::vector<fpbus::Metadata>{
                           {{.type = DEVICE_METADATA_BUTTONS_BUTTONS,
                             .data = std::vector<uint8_t>(

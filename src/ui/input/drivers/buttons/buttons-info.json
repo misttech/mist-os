@@ -1,5 +1,5 @@
 {
-    "short_description": "Generic HID buttons driver",
+    "short_description": "Generic buttons driver",
     "manufacturer": "",
     "families": [
         "generic"

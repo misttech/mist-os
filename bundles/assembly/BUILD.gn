@@ -267,8 +267,8 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/hid.cm" ]
     },
     {
-      package_target = "//src/ui/input/drivers/hid-buttons:package"
-      driver_components = [ "meta/hid-buttons.cm" ]
+      package_target = "//src/ui/input/drivers/buttons:package"
+      driver_components = [ "meta/buttons.cm" ]
     },
     {
       package_target = "//src/ui/input/drivers/hid-input-report:package"
