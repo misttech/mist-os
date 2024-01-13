@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2089
+From //build/config/BUILDCONFIG.gn:2090
 
 ### allowed_test_device_types
 
@@ -445,7 +445,7 @@ How much the size of BlobFS contents can be increased in one CL.
 
 **Current value (from the default):** `102400`
 
-From //build/images/size_checker/size_checker_input.gni:91
+From //build/images/size_checker/size_checker_input.gni:92
 
 ### board_bootfs_labels
 
@@ -3139,7 +3139,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1824
+From //build/config/BUILDCONFIG.gn:1825
 
 ### extra_vbmeta_descriptors
 
@@ -4280,7 +4280,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1629
+From //build/config/BUILDCONFIG.gn:1630
 
 ### legacy_base_package_labels
 
@@ -7721,7 +7721,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2079
+From //build/config/BUILDCONFIG.gn:2080
 
 ### select_variant_canonical
 
@@ -7731,7 +7731,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2084
+From //build/config/BUILDCONFIG.gn:2085
 
 ### select_variant_shortcuts
 
@@ -7789,7 +7789,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1870
+From //build/config/BUILDCONFIG.gn:1871
 
 ### size_checker_input
 
@@ -8309,7 +8309,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1854
+From //build/config/BUILDCONFIG.gn:1855
 
 ### universe_package_labels
 
@@ -8359,10 +8359,11 @@ From //build/images/args.gni:41
 ### update_package_size_creep_limit
 
 How much the size of Update Package can be increased in one CL.
+Deprecated
 
 **Current value (from the default):** `90112`
 
-From //build/images/size_checker/size_checker_input.gni:88
+From //build/images/size_checker/size_checker_input.gni:89
 
 ### update_product_epoch
 
