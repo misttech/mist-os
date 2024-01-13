@@ -193,12 +193,24 @@ closed protocol Codec {
     });
 
     /// Returns whether a codec is bridgeable.
+    //
+    // # Deprecation
+    //
+    // Not supported anymore, bridged configurations are no longer changeable at runtime.
+    // A driver can still be configured to operate in bridged mode or not at boot time.
+    @available(deprecated=17)
     strict IsBridgeable() -> (struct {
         supports_bridged_mode bool;
     });
 
     /// Sets a codec's bridged mode. This method is required, but it only needs to take action if
     /// the codec supports bridged mode as specified by its reply to `IsBridgeable`.
+    //
+    // # Deprecation
+    //
+    // Not supported anymore, bridged configurations are no longer changeable at runtime.
+    // A driver can still be configured to operate in bridged mode or not at boot time.
+    @available(deprecated=17)
     strict SetBridgedMode(struct {
         enable_bridged_mode bool;
     });

@@ -115,13 +115,10 @@ glitches or errors in the codec operation.
 
 ### Bridged Mode {#bridged-mode}
 
-Before specifying the DAI format the controller must query the codec for its
-bridging capabilities. If the codec is bridgeable, then the controller must
-enable or disable bridging based on its knowledge of the system configuration.
-Note that this is a singular property of a codec, i.e. a codec either supports
-bridging or not, and it can be set in bridged mode or not. This protocol allows
-configuring as bridged only 2 channel stereo codecs, with the 2 outputs of the
-codec electrically bridged.
+At boot time a driver may or may not be configured to set a device in bridged mode.
+A driver will only advertise the DAI formats the driver supports in the currently
+configured mode. Hence the list of supported DAI formats may be different
+depending on driver boot configuration.
 
 ### DAI Format {#dai-format}
 
