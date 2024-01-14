@@ -27,11 +27,11 @@
 // Touch IC: FocalTech FT5726
 #define PANEL_TV101WXM_FT UINT8_C(0x02)
 
-// Panel: Innolux G101B158
+// Panel: Innolux P101DEZ-DD0
 // DDIC: Fitipower JD9364
 // Board: Sherlock
 // Touch IC: FocalTech FT5726
-#define PANEL_G101B158_FT UINT8_C(0x03)
+#define PANEL_P101DEZ_FT UINT8_C(0x03)
 
 // 0x04 was for PANEL_ILI9881C
 // 0x05 was for PANEL_ST7701S
@@ -108,7 +108,7 @@ const display_setting_t kDisplaySettingP070ACB_FT = {
     .vsync_bp = 20,
     .vsync_pol = 0,
 };
-const display_setting_t kDisplaySettingG101B158_FT = {
+const display_setting_t kDisplaySettingP101DEZ_FT = {
     .lane_num = 4,
     .bit_rate_max = 566,
     .lcd_clock = 70701600,

@@ -39,9 +39,9 @@ constexpr PanelConfig kTv101wxmFtPanelConfig = {
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
 };
 
-constexpr PanelConfig kG101b158FtPanelConfig = {
-    .name = "G101B158_FT",
-    .dsi_on = lcd_init_sequence_G101B158_FT,
+constexpr PanelConfig kP101dezFtPanelConfig = {
+    .name = "P101DEZ_FT",
+    .dsi_on = lcd_init_sequence_P101DEZ_FT,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
@@ -106,8 +106,8 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
       return &kP070acbFtPanelConfig;
     case PANEL_TV101WXM_FT:
       return &kTv101wxmFtPanelConfig;
-    case PANEL_G101B158_FT:
-      return &kG101b158FtPanelConfig;
+    case PANEL_P101DEZ_FT:
+      return &kP101dezFtPanelConfig;
     case PANEL_TV101WXM_FT_9365:
       return &kTv101wxmFt9365PanelConfig;
     case PANEL_TV070WSM_FT_9365:

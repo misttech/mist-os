@@ -686,7 +686,7 @@ constexpr uint8_t lcd_init_sequence_P070ACB_FT[] = {
     0xff, 20,
 };
 
-constexpr uint8_t lcd_init_sequence_G101B158_FT[] = {
+constexpr uint8_t lcd_init_sequence_P101DEZ_FT[] = {
     0xff, 10,
     0xf0, 3, 0, 1, 30,
     0xf0, 3, 0, 0, 10,

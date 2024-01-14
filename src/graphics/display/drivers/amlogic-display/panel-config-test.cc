@@ -32,10 +32,10 @@ TEST(PanelConfig, Tv101wxmFt) {
   EXPECT_STREQ(config_tv101wxm_ft->name, "TV101WXM_FT");
 }
 
-TEST(PanelConfig, G101b158Ft) {
-  const PanelConfig* config_g101b158_ft = GetPanelConfig(PANEL_G101B158_FT);
-  ASSERT_NE(config_g101b158_ft, nullptr);
-  EXPECT_STREQ(config_g101b158_ft->name, "G101B158_FT");
+TEST(PanelConfig, P101dezFt) {
+  const PanelConfig* config_p101dez_ft = GetPanelConfig(PANEL_P101DEZ_FT);
+  ASSERT_NE(config_p101dez_ft, nullptr);
+  EXPECT_STREQ(config_p101dez_ft->name, "P101DEZ_FT");
 }
 
 TEST(PanelConfig, Tv101wxmFt9365) {

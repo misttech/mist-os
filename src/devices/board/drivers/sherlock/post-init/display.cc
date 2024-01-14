@@ -100,7 +100,7 @@ zx::result<> PostInit::InitDisplay() {
   };
 
   if (display_vendor_) {
-    display_panel_info[0].panel_type = PANEL_G101B158_FT;
+    display_panel_info[0].panel_type = PANEL_P101DEZ_FT;
   } else {
     if (ddic_version_) {
       display_panel_info[0].panel_type = PANEL_TV101WXM_FT;

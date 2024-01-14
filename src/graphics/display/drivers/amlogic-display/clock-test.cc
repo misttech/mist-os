@@ -16,7 +16,7 @@ namespace amlogic_display {
 namespace {
 
 const display_setting_t kDisplayTypes[] = {
-    kDisplaySettingTV070WSM_FT, kDisplaySettingP070ACB_FT,  kDisplaySettingG101B158_FT,
+    kDisplaySettingTV070WSM_FT, kDisplaySettingP070ACB_FT,  kDisplaySettingP101DEZ_FT,
     kDisplaySettingTV101WXM_FT, kDisplaySettingKD070D82_FT, kDisplaySettingTV070WSM_ST7703I,
 };
 
@@ -51,10 +51,10 @@ TEST(AmlogicDisplayClock, PllTimingHdmiPllClockRatioCalculatedCorrectly) {
   EXPECT_OK(pll_p070acb_ft.status_value());
   EXPECT_EQ(kExpectedHdmiPllClockRatioP070acbFt, static_cast<int>(pll_p070acb_ft->clock_factor));
 
-  zx::result<PllConfig> pll_g101b158_ft = Clock::GenerateHPLL(kDisplaySettingG101B158_FT);
-  static constexpr int kExpectedHdmiPllClockRatioG101b158 = 8;
-  EXPECT_OK(pll_g101b158_ft.status_value());
-  EXPECT_EQ(kExpectedHdmiPllClockRatioG101b158, static_cast<int>(pll_g101b158_ft->clock_factor));
+  zx::result<PllConfig> pll_p101dez_ft = Clock::GenerateHPLL(kDisplaySettingP101DEZ_FT);
+  static constexpr int kExpectedHdmiPllClockRatioP101dezFt = 8;
+  EXPECT_OK(pll_p101dez_ft.status_value());
+  EXPECT_EQ(kExpectedHdmiPllClockRatioP101dezFt, static_cast<int>(pll_p101dez_ft->clock_factor));
 
   zx::result<PllConfig> pll_tv101wxm_ft = Clock::GenerateHPLL(kDisplaySettingTV101WXM_FT);
   static constexpr int kExpectedHdmiPllClockRatioTv101wxmFt = 8;
