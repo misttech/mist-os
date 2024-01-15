@@ -3394,6 +3394,7 @@ impl MemoryManager {
                 MappingBacking::Vmo(backing) => {
                     let vmo_info = backing.vmo.info().map_err(|_| errno!(EIO))?;
                     let committed_bytes = vmo_info.committed_bytes as usize;
+                    let populated_bytes = vmo_info.populated_bytes as usize;
 
                     result.vm_rss += committed_bytes;
 
@@ -3401,6 +3402,7 @@ impl MemoryManager {
                         && !mapping.flags.contains(MappingFlags::SHARED)
                     {
                         result.rss_anonymous += committed_bytes;
+                        result.vm_swap += populated_bytes - committed_bytes;
                     }
 
                     if vmo_info.share_count > 1 {
@@ -3566,6 +3568,7 @@ pub struct MemoryStats {
     pub vm_data: usize,
     pub vm_stack: usize,
     pub vm_exe: usize,
+    pub vm_swap: usize,
 }
 
 #[derive(Clone)]

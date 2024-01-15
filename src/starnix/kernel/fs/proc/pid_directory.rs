@@ -1030,6 +1030,7 @@ impl DynamicFileSource for StatusFile {
             writeln!(sink, "VmData:\t{} kB", mem_stats.vm_data / 1024)?;
             writeln!(sink, "VmStk:\t{} kB", mem_stats.vm_stack / 1024)?;
             writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
+            writeln!(sink, "VmSwap:\t{} kB", mem_stats.vm_swap / 1024)?;
         }
 
         // There should be at least on thread in Zombie processes.
