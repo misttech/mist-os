@@ -504,8 +504,12 @@ impl FxFilesystem {
         self.journal.stop_compactions().await;
         let sync_status =
             self.journal.sync(SyncOptions { flush_device: true, ..Default::default() }).await;
-        if let Err(e) = &sync_status {
-            error!(error = ?e, "Failed to sync filesystem; data may be lost");
+        match &sync_status {
+            Ok(checkpoint) => info!(
+                "Filesystem closed (checkpoint: {})",
+                checkpoint.as_ref().unwrap().0.file_offset
+            ),
+            Err(e) => error!(error = ?e, "Failed to sync filesystem; data may be lost"),
         }
         self.journal.terminate();
         let flush_task = self.flush_task.lock().unwrap().take();
@@ -734,6 +738,7 @@ impl FxFilesystem {
         options: transaction::Options<'a>,
     ) -> Result<(MetadataReservation, Option<&'a Reservation>, Option<Hold<'a>>), Error> {
         if !options.skip_journal_checks {
+            self.maybe_start_flush_task();
             self.journal.check_journal_space().await?;
         }
 
@@ -884,14 +889,16 @@ mod tests {
         super::{FxFilesystem, FxFilesystemBuilder, SyncOptions},
         crate::{
             fsck::{fsck, fsck_volume},
+            log::*,
             lsm_tree::{types::Item, Operation},
-            object_handle::{ObjectHandle, WriteObjectHandle},
+            object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
             object_store::{
                 directory::replace_child,
                 directory::Directory,
                 journal::JournalOptions,
                 transaction::{lock_keys, LockKey, Options},
                 volume::root_volume,
+                HandleOptions, ObjectStore,
             },
         },
         fuchsia_async as fasync,
@@ -1192,70 +1199,239 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_power_fail() {
-        let (store_id, device) = {
-            let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
-            let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
-            let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        // This test randomly discards blocks, so we run it a few times to increase the chances
+        // of catching an issue in a single run.
+        for _ in 0..10 {
+            let (store_id, device, test_file_object_id) = {
+                let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
+                let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+                let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
 
-            fs.sync(SyncOptions { flush_device: true, ..SyncOptions::default() })
-                .await
-                .expect("sync failed");
+                fs.sync(SyncOptions { flush_device: true, ..SyncOptions::default() })
+                    .await
+                    .expect("sync failed");
 
-            let store = root_volume
-                .new_volume("test", Some(Arc::new(InsecureCrypt::new())))
-                .await
-                .expect("new_volume failed");
-            let mut transaction = fs
-                .clone()
-                .new_transaction(
-                    lock_keys![LockKey::object(
-                        store.store_object_id(),
-                        store.root_directory_object_id()
-                    )],
-                    Options::default(),
+                let store = root_volume
+                    .new_volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .await
+                    .expect("new_volume failed");
+                let root_directory = Directory::open(&store, store.root_directory_object_id())
+                    .await
+                    .expect("open failed");
+
+                // Create a number of files with the goal of using up more than one journal block.
+                async fn create_files(store: &Arc<ObjectStore>, prefix: &str) {
+                    let fs = store.filesystem();
+                    let root_directory = Directory::open(store, store.root_directory_object_id())
+                        .await
+                        .expect("open failed");
+                    for i in 0..100 {
+                        let mut transaction = fs
+                            .clone()
+                            .new_transaction(
+                                lock_keys![LockKey::object(
+                                    store.store_object_id(),
+                                    store.root_directory_object_id()
+                                )],
+                                Options::default(),
+                            )
+                            .await
+                            .expect("new_transaction failed");
+                        root_directory
+                            .create_child_file(&mut transaction, &format!("{prefix} {i}"), None)
+                            .await
+                            .expect("create_child_file failed");
+                        transaction.commit().await.expect("commit failed");
+                    }
+                }
+
+                // Create one batch of files.
+                create_files(&store, "A").await;
+
+                // Create a file and write something to it.  This will make sure there's a
+                // transaction present that includes a checksum.
+                let mut transaction = fs
+                    .clone()
+                    .new_transaction(
+                        lock_keys![LockKey::object(
+                            store.store_object_id(),
+                            store.root_directory_object_id()
+                        )],
+                        Options::default(),
+                    )
+                    .await
+                    .expect("new_transaction failed");
+                let object = root_directory
+                    .create_child_file(&mut transaction, "test", None)
+                    .await
+                    .expect("create_child_file failed");
+                transaction.commit().await.expect("commit failed");
+
+                let mut transaction =
+                    object.new_transaction().await.expect("new_transaction failed");
+                let mut buffer = object.allocate_buffer(4096).await;
+                buffer.as_mut_slice().fill(0xed);
+                object
+                    .txn_write(&mut transaction, 0, buffer.as_ref())
+                    .await
+                    .expect("txn_write failed");
+                transaction.commit().await.expect("commit failed");
+
+                // Create another batch of files.
+                create_files(&store, "B").await;
+
+                // Sync the device, but don't flush the device. We want to do this so we can
+                // randomly discard blocks below.
+                fs.sync(SyncOptions::default()).await.expect("sync failed");
+
+                // When we call `sync` above on the filesystem, it will pad the journal so that it
+                // will get written, but it doesn't wait for the write to occur.  We wait for a
+                // short time here to give allow time for the journal to be written.  Adding timers
+                // isn't great, but this test already isn't deterministic since we randomly discard
+                // blocks.
+                fasync::Timer::new(Duration::from_millis(10)).await;
+
+                (
+                    store.store_object_id(),
+                    fs.device().snapshot().expect("snapshot failed"),
+                    object.object_id(),
+                )
+            };
+
+            // Randomly discard blocks since the last flush.  This simulates what might happen in
+            // the case of power-loss.  This will be an uncontrolled unmount.
+            device
+                .discard_random_since_last_flush()
+                .expect("discard_random_since_last_flush failed");
+
+            let fs = FxFilesystem::open(device).await.expect("open failed");
+            fsck(fs.clone()).await.expect("fsck failed");
+
+            let mut check_test_file = false;
+
+            // If we replayed and the store exists (i.e. the transaction that created the store
+            // made it out), start by running fsck on it.
+            let object_id = if fs.object_manager().store(store_id).is_some() {
+                fsck_volume(&fs, store_id, Some(Arc::new(InsecureCrypt::new())))
+                    .await
+                    .expect("fsck_volume failed");
+
+                // Now we want to create another file, unmount cleanly, and then finally check that
+                // the new file exists.  This checks that we can continue to use the filesystem
+                // after an unclean unmount.
+                let store = root_volume(fs.clone())
+                    .await
+                    .expect("root_volume failed")
+                    .volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .await
+                    .expect("volume failed");
+
+                let root_directory = Directory::open(&store, store.root_directory_object_id())
+                    .await
+                    .expect("open failed");
+
+                let mut transaction = fs
+                    .clone()
+                    .new_transaction(
+                        lock_keys![LockKey::object(
+                            store.store_object_id(),
+                            store.root_directory_object_id()
+                        )],
+                        Options::default(),
+                    )
+                    .await
+                    .expect("new_transaction failed");
+                let object = root_directory
+                    .create_child_file(&mut transaction, &format!("C"), None)
+                    .await
+                    .expect("create_child_file failed");
+                transaction.commit().await.expect("commit failed");
+
+                // Write again to the test file if it exists.
+                if let Ok(test_file) = ObjectStore::open_object(
+                    &store,
+                    test_file_object_id,
+                    HandleOptions::default(),
+                    None,
                 )
                 .await
-                .expect("new_transaction failed");
-            let root_directory = Directory::open(&store, store.root_directory_object_id())
-                .await
-                .expect("open failed");
-            let object = root_directory
-                .create_child_file(&mut transaction, "test", None)
-                .await
-                .expect("create_child_file failed");
-            transaction.commit().await.expect("commit failed");
+                {
+                    // Check it has the contents we expect.
+                    let mut buffer = test_file.allocate_buffer(4096).await;
+                    let bytes = test_file.read(0, buffer.as_mut()).await.expect("read failed");
+                    if bytes == 4096 {
+                        let expected = [0xed; 4096];
+                        assert_eq!(buffer.as_slice(), &expected);
+                    } else {
+                        // If the write didn't make it, the file should have zero bytes.
+                        assert_eq!(bytes, 0);
+                    }
 
-            let mut transaction = object.new_transaction().await.expect("new_transaction failed");
-            let mut buffer = object.allocate_buffer(4096).await;
-            buffer.as_mut_slice().fill(0xed);
-            object.txn_write(&mut transaction, 0, buffer.as_ref()).await.expect("txn_write failed");
-            transaction.commit().await.expect("commit failed");
+                    // Modify the test file.
+                    let mut transaction =
+                        test_file.new_transaction().await.expect("new_transaction failed");
+                    buffer.as_mut_slice().fill(0x37);
+                    test_file
+                        .txn_write(&mut transaction, 0, buffer.as_ref())
+                        .await
+                        .expect("txn_write failed");
+                    transaction.commit().await.expect("commit failed");
+                    check_test_file = true;
+                }
 
-            // Sync the device, but don't flush the device. We want to do this so we can randomly
-            // discard blocks below.
-            fs.sync(SyncOptions::default()).await.expect("sync failed");
+                object.object_id()
+            } else {
+                INVALID_OBJECT_ID
+            };
 
-            // When we call `sync` above on the filesystem, it will pad the journal so that it will
-            // get written, but it doesn't wait for the write to occur.  We wait for a short time
-            // here to give allow time for the journal to be written.  Adding timers isn't great,
-            // but this test already isn't deterministic since we randomly discard blocks.
-            fasync::Timer::new(Duration::from_millis(10)).await;
+            // This will do a controlled unmount.
+            fs.close().await.expect("close failed");
+            let device = fs.take_device().await;
+            device.reopen(false);
 
-            (store.store_object_id(), fs.device().snapshot().expect("snapshot failed"))
-        };
+            let fs = FxFilesystem::open(device).await.expect("open failed");
+            fsck(fs.clone()).await.expect("fsck failed");
 
-        // Randomly discard blocks since the last flush.  This simulates what might happen in the
-        // case of power-loss.
-        device.discard_random_since_last_flush().expect("discard_random_since_last_flush failed");
+            // As mentioned above, make sure that the object we created before the clean unmount
+            // exists.
+            if object_id != INVALID_OBJECT_ID {
+                fsck_volume(&fs, store_id, Some(Arc::new(InsecureCrypt::new())))
+                    .await
+                    .expect("fsck_volume failed");
 
-        let fs = FxFilesystem::open(device).await.expect("open failed");
-        fsck(fs.clone()).await.expect("fsck failed");
+                let store = root_volume(fs.clone())
+                    .await
+                    .expect("root_volume failed")
+                    .volume("test", Some(Arc::new(InsecureCrypt::new())))
+                    .await
+                    .expect("volume failed");
+                // We should be able to open the C object.
+                ObjectStore::open_object(&store, object_id, HandleOptions::default(), None)
+                    .await
+                    .expect("open_object failed");
 
-        if fs.object_manager().store(store_id).is_some() {
-            fsck_volume(&fs, store_id, Some(Arc::new(InsecureCrypt::new())))
-                .await
-                .expect("fsck_volume failed");
+                // If we made the modification to the test file, check it.
+                if check_test_file {
+                    info!("Checking test file for modification");
+                    let test_file = ObjectStore::open_object(
+                        &store,
+                        test_file_object_id,
+                        HandleOptions::default(),
+                        None,
+                    )
+                    .await
+                    .expect("open_object failed");
+                    let mut buffer = test_file.allocate_buffer(4096).await;
+                    assert_eq!(
+                        test_file.read(0, buffer.as_mut()).await.expect("read failed"),
+                        4096
+                    );
+                    let expected = [0x37; 4096];
+                    assert_eq!(buffer.as_slice(), &expected);
+                }
+            }
+
+            fs.close().await.expect("close failed");
         }
-        fs.close().await.expect("close failed");
     }
 }

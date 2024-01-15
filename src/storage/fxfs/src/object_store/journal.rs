@@ -53,7 +53,7 @@ use {
             NewChildStoreOptions, ObjectStore, INVALID_OBJECT_ID,
         },
         range::RangeExt,
-        round::{round_div, round_down, round_up},
+        round::{round_div, round_down},
         serialized_types::{migrate_to_version, Migrate, Version, Versioned, LATEST_VERSION},
     },
     anyhow::{anyhow, bail, Context, Error},
@@ -702,6 +702,13 @@ impl Journal {
             .context("Failed to complete replay for root store")?;
         allocator.open().await.context("Failed to open allocator")?;
 
+        let discarded_to =
+            if last_checkpoint.file_offset != reader.journal_file_checkpoint().file_offset {
+                Some(reader.journal_file_checkpoint().file_offset)
+            } else {
+                None
+            };
+
         // Configure the journal writer so that we can continue.
         {
             if last_checkpoint.file_offset < super_block.super_block_journal_file_offset {
@@ -726,12 +733,15 @@ impl Journal {
             })?;
             let _ = self.handle.set(handle);
             let mut inner = self.inner.lock().unwrap();
+            reader.skip_to_end_of_block();
             let mut writer_checkpoint = reader.journal_file_checkpoint();
+
+            // Make sure we don't accidentally use the reader from now onwards.
+            std::mem::drop(reader);
+
             // Reset the stream to indicate that we've remounted the journal.
             writer_checkpoint.checksum ^= RESET_XOR;
             writer_checkpoint.version = LATEST_VERSION;
-            writer_checkpoint.file_offset =
-                round_up(writer_checkpoint.file_offset, BLOCK_SIZE).unwrap();
             inner.device_flushed_offset = device_flushed_offset;
             inner.flushed_offset = writer_checkpoint.file_offset;
             inner.writer.seek(writer_checkpoint);
@@ -750,15 +760,7 @@ impl Journal {
         // Tell the allocator where we know the device has been flushed to.
         self.objects.allocator().did_flush_device(device_flushed_offset).await;
 
-        if last_checkpoint.file_offset != reader.journal_file_checkpoint().file_offset {
-            info!(
-                checkpoint = last_checkpoint.file_offset,
-                discarded_to = reader.journal_file_checkpoint().file_offset,
-                "replay complete"
-            );
-        } else {
-            info!(checkpoint = reader.journal_file_checkpoint().file_offset, "replay complete");
-        }
+        info!(checkpoint = last_checkpoint.file_offset, discarded_to, "replay complete");
         Ok(())
     }
 
@@ -1147,7 +1149,10 @@ impl Journal {
             let size = handle.get_size();
             let size = if file_offset + self.chunk_size() > size { Some(size) } else { None };
 
-            if size.is_none() && inner.zero_offset.is_none() {
+            if size.is_none()
+                && inner.zero_offset.is_none()
+                && !self.objects.needs_borrow_for_journal(file_offset)
+            {
                 return Ok(());
             }
 

@@ -721,6 +721,14 @@ impl ObjectManager {
             .boxed()
         });
     }
+
+    /// Normally, we make new transactions pay for overheads incurred by the journal, such as
+    /// checksums and padding, but if the journal has discarded a significant amount after a replay,
+    /// we run the risk of there not being enough reserved.  To handle this, if the amount is
+    /// significant, we force the journal to borrow the space (using a journal created transaction).
+    pub fn needs_borrow_for_journal(&self, checkpoint: u64) -> bool {
+        checkpoint.checked_sub(self.inner.read().unwrap().last_end_offset).unwrap() > 256
+    }
 }
 
 /// ReservationUpdate is an associated object that sets the amount reserved for an object
