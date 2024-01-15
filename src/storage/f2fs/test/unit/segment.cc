@@ -296,21 +296,36 @@ TEST_F(SegmentManagerTest, SelectBGVictims) TA_NO_THREAD_SAFETY_ANALYSIS {
   DirtySeglistInfo *dirty_info = &fs_->GetSegmentManager().GetDirtySegmentInfo();
   auto &bitmap = dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)];
 
+  const size_t elapsed_time = 100;
   size_t invalid_ratio = 2;
-  zx::nanosleep(zx::deadline_after(zx::sec(2)));
+  SitInfo &segments = fs_->GetSegmentManager().GetSitInfo();
+  // Adjust mount time
+  segments.mounted_time = time(nullptr) - elapsed_time;
+
   // Make a dirty segment with 98% of valid blocks
+  CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegWarmData);
+  uint32_t expected_by_bg = curseg->segno;
   MakeDirtySegments(invalid_ratio, 1);
   ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 1U);
+  SegmentEntry &bg_victim = segments.sentries[expected_by_bg];
 
-  // Make a dirty segment with 97% of valid blocks after 2 sec
-  zx::nanosleep(zx::deadline_after(zx::sec(2)));
+  // Make a dirty segment with 97% of valid blocks
+  curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegWarmData);
+  uint32_t expected_by_fg = curseg->segno;
   MakeDirtySegments(invalid_ratio + 1, 1);
   ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 2U);
+  SegmentEntry &fg_victim = segments.sentries[expected_by_fg];
 
-  // Make a dirty segment with 99% of valid blocks after 2 sec
-  zx::nanosleep(zx::deadline_after(zx::sec(2)));
+  // Make a dirty segment with 99% of valid blocks
+  curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegWarmData);
   MakeDirtySegments(invalid_ratio - 1, 1);
   ASSERT_EQ(CountBits(bitmap, 0, bitmap.size()), 3U);
+  SegmentEntry &dirty = segments.sentries[curseg->segno];
+
+  // Adjust the modification time for dirty segments
+  bg_victim.mtime = 1;
+  fg_victim.mtime = elapsed_time / 2;
+  dirty.mtime = elapsed_time;
 
   size_t valid_blocks_98 = CheckedDivRoundUp<size_t>(
       fs_->GetSuperblockInfo().GetBlocksPerSeg() * (100 - invalid_ratio), 100);
@@ -322,6 +337,7 @@ TEST_F(SegmentManagerTest, SelectBGVictims) TA_NO_THREAD_SAFETY_ANALYSIS {
       GcType::kFgGc, CursegType::kNoCheckType, AllocMode::kLFS);
   ASSERT_TRUE(victim_seg_or.is_ok());
   ASSERT_EQ(fs_->GetSegmentManager().GetValidBlocks(*victim_seg_or, true), valid_blocks_97);
+  ASSERT_EQ(expected_by_fg, *victim_seg_or);
   fs_->GetSegmentManager().SetCurVictimSec(kNullSecNo);
 
   // GcType::kBgGc should select a victim according to the segment age and valid blocks
@@ -329,6 +345,7 @@ TEST_F(SegmentManagerTest, SelectBGVictims) TA_NO_THREAD_SAFETY_ANALYSIS {
       GcType::kBgGc, CursegType::kNoCheckType, AllocMode::kLFS);
   ASSERT_TRUE(victim_seg_or.is_ok());
   ASSERT_EQ(fs_->GetSegmentManager().GetValidBlocks(*victim_seg_or, true), valid_blocks_98);
+  ASSERT_EQ(expected_by_bg, *victim_seg_or);
 
   // When a victim that GcType::kBgGc chooses is not handled yet, GcType::kFgGc should select the
   // victim
@@ -339,7 +356,7 @@ TEST_F(SegmentManagerTest, SelectBGVictims) TA_NO_THREAD_SAFETY_ANALYSIS {
   fs_->GetSegmentManager().SetCurVictimSec(kNullSecNo);
 
   // Even after system time is modified, it can select a victim correctly.
-  fs_->GetSegmentManager().GetSitInfo().min_mtime = time(nullptr);
+  fs_->GetSegmentManager().GetSitInfo().min_mtime = LLONG_MAX;
   victim_seg_or = fs_->GetSegmentManager().GetVictimByDefault(
       GcType::kBgGc, CursegType::kNoCheckType, AllocMode::kLFS);
   ASSERT_TRUE(victim_seg_or.is_ok());
