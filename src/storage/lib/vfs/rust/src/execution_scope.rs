@@ -346,12 +346,14 @@ mod tests {
     use {
         fuchsia_async::{Task, TestExecutor, Timer},
         futures::{channel::oneshot, task::Poll, Future},
-        pin_utils::pin_mut,
-        std::sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
+        std::{
+            pin::pin,
+            sync::{
+                atomic::{AtomicBool, Ordering},
+                Arc,
+            },
+            time::Duration,
         },
-        std::time::Duration,
     };
 
     #[cfg(target_os = "fuchsia")]
@@ -366,8 +368,11 @@ mod tests {
 
         let test = get_test(scope);
 
-        pin_mut!(test);
-        assert_eq!(exec.run_until_stalled(&mut test), Poll::Ready(()), "Test did not complete");
+        assert_eq!(
+            exec.run_until_stalled(&mut pin!(test)),
+            Poll::Ready(()),
+            "Test did not complete"
+        );
     }
 
     #[cfg(not(target_os = "fuchsia"))]
@@ -387,8 +392,7 @@ mod tests {
         let test =
             get_test(scope).on_stalled(Duration::from_secs(30), || panic!("Test did not complete"));
 
-        pin_mut!(test);
-        exec.run_singlethreaded(&mut test);
+        exec.run_singlethreaded(&mut pin!(test));
     }
 
     #[test]

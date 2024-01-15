@@ -11,21 +11,16 @@ use crate::{
 
 use {
     fidl_fuchsia_io as fio,
-    fuchsia_async::Channel,
     futures::{
         channel::mpsc::{self, UnboundedSender},
-        select,
-        task::{Context, Poll},
-        Future, FutureExt,
+        select, FutureExt,
     },
-    pin_utils::unsafe_pinned,
-    std::{ops::Drop, pin::Pin},
 };
 
 #[cfg(not(target_os = "fuchsia"))]
-pub use fuchsia_async::emulated_handle::MessageBuf;
+use fuchsia_async::emulated_handle::MessageBuf;
 #[cfg(target_os = "fuchsia")]
-pub use fuchsia_zircon::MessageBuf;
+use fuchsia_zircon::MessageBuf;
 
 /// `done` is not guaranteed to be called if the task failed to start.  It should only happen
 /// in case the return value is an `Err`.  Unfortunately, there is no way to return the `done`
@@ -39,21 +34,21 @@ pub(crate) fn new(
 ) -> Controller {
     use futures::StreamExt as _;
 
-    let (sender, mut receiver) = mpsc::unbounded();
+    let (sender, mut receiver) = mpsc::unbounded::<Vec<u8>>();
 
     let task = async move {
+        let _done = CallOnDrop(Some(done));
         let mut buf = MessageBuf::new();
         let mut recv_msg = watcher.channel().recv_msg(&mut buf).fuse();
         loop {
             select! {
                 command = receiver.next() => match command {
-                    Some(Command::Send(buffer)) => {
-                        let success = handle_send(watcher.channel(), buffer);
-                        if !success {
+                    Some(message) => {
+                        let result = watcher.channel().write(&*message, &mut []);
+                        if result.is_err() {
                             break;
                         }
                     },
-                    Some(Command::Disconnect) => break,
                     None => break,
                 },
                 _ = recv_msg => {
@@ -67,13 +62,13 @@ pub(crate) fn new(
         }
     };
 
-    scope.spawn(Box::pin(FutureWithDrop::new(task, done)));
-    Controller { mask, commands: sender }
+    scope.spawn(task);
+    Controller { mask, messages: sender }
 }
 
 pub struct Controller {
     mask: fio::WatchMask,
-    commands: UnboundedSender<Command>,
+    messages: UnboundedSender<Vec<u8>>,
 }
 
 impl Controller {
@@ -85,7 +80,7 @@ impl Controller {
             return;
         }
 
-        if self.commands.unbounded_send(Command::Send(buffer())).is_ok() {
+        if self.messages.unbounded_send(buffer()).is_ok() {
             return;
         }
 
@@ -107,7 +102,7 @@ impl Controller {
 
         while producer.prepare_for_next_buffer() {
             let buffer = producer.buffer();
-            if self.commands.unbounded_send(Command::Send(buffer)).is_ok() {
+            if self.messages.unbounded_send(buffer).is_ok() {
                 continue;
             }
 
@@ -119,76 +114,13 @@ impl Controller {
 
         return true;
     }
-
-    /// Initiates disconnection between the watcher and this controller.  `disconnect` exits
-    /// immediately, after sending a command that still need to be processed by the watcher task.
-    /// It is the responsibility of the watcher task to remove the controller from the list of
-    /// controllers in the [`EntryContainer`] this controller was added to.
-    pub(crate) fn disconnect(&self) {
-        if self.commands.unbounded_send(Command::Disconnect).is_ok() {
-            return;
-        }
-
-        // An error to send indicates the execution task has been disconnected.  Controller should
-        // always be removed from the watchers list before it is destroyed.  So this is some
-        // logical bug.
-        debug_assert!(false, "Watcher controller failed to send a command to the watcher.");
-    }
 }
 
-enum Command {
-    Send(Vec<u8>),
-    Disconnect,
-}
+/// Calls the function when this object is dropped.
+struct CallOnDrop<F: FnOnce()>(Option<F>);
 
-fn handle_send(channel: &Channel, buffer: Vec<u8>) -> bool {
-    channel.write(&*buffer, &mut vec![]).is_ok()
-}
-
-struct FutureWithDrop<Wrapped, Done>
-where
-    Wrapped: Future<Output = ()>,
-    Done: FnOnce() + Send + 'static,
-{
-    task: Wrapped,
-    done: Option<Done>,
-}
-
-impl<Wrapped, Done> FutureWithDrop<Wrapped, Done>
-where
-    Wrapped: Future<Output = ()>,
-    Done: FnOnce() + Send + 'static,
-{
-    // unsafe: `Self::drop` does not move the `task` value.  `Self` also does not implement
-    // `Unpin`.  `task` is not `#[repr(packed)]`.
-    unsafe_pinned!(task: Wrapped);
-
-    fn new(task: Wrapped, done: Done) -> Self {
-        Self { task, done: Some(done) }
-    }
-}
-
-impl<Wrapped, Done> Future for FutureWithDrop<Wrapped, Done>
-where
-    Wrapped: Future<Output = ()>,
-    Done: FnOnce() + Send + 'static,
-{
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.as_mut().task().poll_unpin(cx)
-    }
-}
-
-impl<Wrapped, Done> Drop for FutureWithDrop<Wrapped, Done>
-where
-    Wrapped: Future<Output = ()>,
-    Done: FnOnce() + Send + 'static,
-{
+impl<F: FnOnce()> Drop for CallOnDrop<F> {
     fn drop(&mut self) {
-        match self.done.take() {
-            Some(done) => done(),
-            None => debug_assert!(false, "FutureWithDrop was destroyed twice?"),
-        }
+        self.0.take().unwrap()();
     }
 }
