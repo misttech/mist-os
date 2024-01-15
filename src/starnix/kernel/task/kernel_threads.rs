@@ -4,7 +4,7 @@
 
 use crate::{
     dynamic_thread_spawner::DynamicThreadSpawner,
-    task::{CurrentTask, Kernel, ThreadGroup},
+    task::{CurrentTask, Kernel, Task, ThreadGroup},
 };
 use fragile::Fragile;
 use fuchsia_async as fasync;
@@ -12,8 +12,14 @@ use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use pin_project::pin_project;
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::{errno, errors::Errno, ownership::Releasable};
+use starnix_uapi::{
+    errno, error,
+    errors::Errno,
+    ownership::{Releasable, WeakRef},
+};
 use std::{
+    cell::RefCell,
+    ffi::CString,
     future::Future,
     pin::Pin,
     sync::{Arc, Weak},
@@ -98,6 +104,38 @@ impl Drop for KernelThreads {
             system_task.system_task.into_inner().release(());
         }
     }
+}
+
+thread_local! {
+    static LOCAL_TASK: RefCell<Option<CurrentTask>> = const { RefCell::new(None) };
+}
+
+/// Execute the given closure with the currently registered `CurrentTask` for the thread.
+pub fn with_current_task<F, R>(f: F) -> R
+where
+    F: FnOnce(&CurrentTask) -> R,
+{
+    LOCAL_TASK.with(|current_task| f(current_task.borrow().as_ref().unwrap()))
+}
+
+/// Create a new system task, register it on the thread and run the given closure with it.
+pub fn with_new_current_task<F, R>(system_task: &WeakRef<Task>, f: F) -> Result<R, Errno>
+where
+    F: FnOnce(&CurrentTask) -> R,
+{
+    let current_task = {
+        let Some(system_task) = system_task.upgrade() else {
+            return error!(ESRCH);
+        };
+        CurrentTask::create_kernel_thread(&system_task, CString::new("[kthreadd]").unwrap())?
+    };
+    Ok(LOCAL_TASK.with(|task_option| {
+        *task_option.borrow_mut() = Some(current_task);
+        let result = f(task_option.borrow().as_ref().unwrap());
+        let current_task = task_option.borrow_mut().take();
+        current_task.release(());
+        result
+    }))
 }
 
 struct SystemTask {

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{CurrentTask, Task};
+use crate::task::{with_new_current_task, CurrentTask, Task};
 use futures::{channel::oneshot, TryFutureExt};
 use starnix_logging::log_error;
-use starnix_sync::Mutex;
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::{
     errno,
     errors::Errno,
@@ -166,22 +165,7 @@ impl RunningThread {
                 .name("kthread-dynamic-worker".to_string())
                 .spawn(move || {
                     let mut locked = Unlocked::new();
-                    let current_task = {
-                        let Some(system_task) = system_task.upgrade() else {
-                            return;
-                        };
-                        match CurrentTask::create_kernel_thread(
-                            &system_task,
-                            CString::new("[kthreadd]").unwrap(),
-                        ) {
-                            Ok(task) => task,
-                            Err(e) => {
-                                log_error!("Unable to create a kernel thread: {e:?}");
-                                return;
-                            }
-                        }
-                    };
-                    release_after!(current_task, (), {
+                    let result = with_new_current_task(&system_task, |current_task| {
                         while let Ok(f) = receiver.recv() {
                             f(&mut locked, &current_task);
 
@@ -190,14 +174,17 @@ impl RunningThread {
                             let mut state = state.lock();
                             state.idle_threads += 1;
                             if state.idle_threads > state.max_idle_threads {
-                                // If the number of idle thread is greater than the max, the thread terminates.
-                                // This disconnects the receiver, which will ensure that the thread will be
-                                // joined and remove from the list of available threads the next time the
-                                // pool tries to use it.
+                                // If the number of idle thread is greater than the max, the thread
+                                // terminates.  This disconnects the receiver, which will ensure
+                                // that the thread will be joined and remove from the list of
+                                // available threads the next time the pool tries to use it.
                                 return;
                             }
                         }
                     });
+                    if let Err(e) = result {
+                        log_error!("Unable to create a kernel thread: {e:?}");
+                    }
                 })
                 .expect("able to create threads"),
         );
