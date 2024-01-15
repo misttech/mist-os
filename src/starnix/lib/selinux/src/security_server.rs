@@ -9,7 +9,7 @@ use crate::{
 };
 
 use anyhow;
-use selinux_policy::{parse_policy_by_value, parser::ByValue, Policy};
+use selinux_policy::{metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, Policy};
 use starnix_sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 
@@ -23,7 +23,7 @@ pub enum Mode {
 
 struct LoadedPolicy {
     /// Parsed policy structure.
-    _parsed: Policy<ByValue<Vec<u8>>>,
+    parsed: Policy<ByValue<Vec<u8>>>,
 
     /// The binary policy that was previously passed to `load_policy()`.
     binary: Vec<u8>,
@@ -100,13 +100,13 @@ impl SecurityServer {
         // Parse the supplied policy, and reject the load operation if it is
         // malformed or invalid.
         let (parsed, binary) = parse_policy_by_value(binary_policy)?;
-        let _parsed = parsed.validate()?;
+        let parsed = parsed.validate()?;
 
         // Bundle the binary policy together with a parsed copy for the
         // [`SecurityServer`] to use to answer queries. This will fail if the
         // supplied policy cannot be parsed due to being malformed, or if the
         // parsed policy is not valid.
-        let policy = Arc::new(LoadedPolicy { _parsed, binary });
+        let policy = Arc::new(LoadedPolicy { parsed, binary });
 
         // Replace any existing policy.
         // TODO(b/315531456): Update the policy load count for "status".
@@ -128,6 +128,19 @@ impl SecurityServer {
     /// Returns the active policy in binary form.
     pub fn get_binary_policy(&self) -> Vec<u8> {
         self.state.lock().policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
+    }
+
+    /// Returns the behaviour of unknown object class / permissions, according
+    /// to the loaded policy. If no policy is loaded then unknown interactions
+    /// are allowed.
+    pub fn handle_unknown(&self) -> HandleUnknown {
+        if self.is_fake() {
+            return HandleUnknown::Allow;
+        }
+        match self.state.lock().policy.as_ref() {
+            Some(policy) => policy.parsed.handle_unknown().clone(),
+            None => HandleUnknown::Allow,
+        }
     }
 
     pub fn compute_access_vector(

@@ -154,7 +154,7 @@ impl<PS: ParseStrategy> Validate for Config<PS> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum HandleUnknown {
     Deny,
     Reject,

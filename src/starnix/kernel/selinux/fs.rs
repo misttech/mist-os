@@ -15,7 +15,7 @@ use crate::{
 };
 
 use selinux::{security_context::SecurityContext, security_server::SecurityServer};
-use selinux_policy::SUPPORTED_POLICY_VERSION;
+use selinux_policy::{metadata::HandleUnknown, SUPPORTED_POLICY_VERSION};
 use starnix_logging::{log_error, log_info, not_implemented};
 use starnix_sync::Mutex;
 use starnix_uapi::{
@@ -59,7 +59,7 @@ impl SeLinuxFs {
 
         // There should always be a SecurityServer if SeLinuxFs is active.
         let security_server = match kernel.security_server.as_ref() {
-            Some(security_server) => security_server.clone(),
+            Some(security_server) => security_server,
             None => {
                 return error!(EINVAL);
             }
@@ -76,8 +76,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "deny_unknown".into(),
-            // Allow all unknown object classes/permissions.
-            BytesFile::new_node(b"0:0\n".to_vec()),
+            SeDenyUnknown::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
         dir.subdir(current_task, "initial_contexts".into(), 0o555, |dir| {
@@ -238,6 +237,30 @@ impl BytesFileOps for SeEnforce {
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(serialize_u32_file(self.security_server.enforcing() as u32).into())
+    }
+}
+
+struct SeDenyUnknown {
+    security_server: Arc<SecurityServer>,
+}
+
+impl SeDenyUnknown {
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        BytesFile::new_node(Self { security_server })
+    }
+}
+
+impl BytesFileOps for SeDenyUnknown {
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        // "deny_unknown" contains two boolean values, expressing whether the
+        // policy denies and/or rejects unknown object classes / permissions.
+        let result = match self.security_server.handle_unknown() {
+            HandleUnknown::Allow => b"0:0\n",
+            HandleUnknown::Deny => b"1:0\n",
+            HandleUnknown::Reject => b"1:1\n",
+        };
+
+        Ok(result.to_vec().into())
     }
 }
 
