@@ -34,10 +34,9 @@ struct Value<FixedFormat<Integer, FractionalBits>> {
 // Predicate to determine whether the given integer type and number of
 // fractional bits is valid.
 template <typename Integer, size_t FractionalBits>
-static constexpr bool FormatIsValid = (std::is_signed_v<Integer> &&
-                                       FractionalBits < sizeof(Integer) * 8) ||
-                                      (std::is_unsigned_v<Integer> &&
-                                       FractionalBits <= sizeof(Integer) * 8);
+static constexpr bool FormatIsValid =
+    (std::is_signed_v<Integer> && FractionalBits < sizeof(Integer) * 8) ||
+    (std::is_unsigned_v<Integer> && FractionalBits <= sizeof(Integer) * 8);
 
 // Type representing the format of a fixed-point value in terms of the
 // underlying integer type and fractional precision. Provides key constants and
@@ -113,28 +112,32 @@ struct FixedFormat {
   //
   // uint8_t value = vvvphmmm
   //
-  // PlaceBit   = 00010000 -> 000p0000
-  // PlaceMask  = 11110000 -> vvvp0000
-  // HalfBit    = 00001000 -> 0000h000
-  // HalfMask   = 00000111 -> 00000mmm
-  // PlaceShift = 2
+  // PlaceBit      = 00010000 -> 000p0000
+  // PlaceMask     = 11110000 -> vvvp0000
+  // HalfBit       = 00001000 -> 0000h000
+  // BelowHalfMask = 00000111 -> 00000mmm
   //
   // Rounding half to even is computed as follows:
   //
-  //    PlaceBit = 00010000
-  //    value    = vvvvvvvv
-  // &  -------------------
-  //               000p0000
-  //    PlaceShift        2
-  // >> -------------------
-  //    odd_bit    00000p00
-  //    HalfMask   00000111
-  //    value      vvvvvvvv
-  // +  -------------------
-  //               rrrrxxxx
-  //    PlaceMask  11110000
-  // &  -------------------
-  //    rounded    rrrr0000
+  //    PlaceBit        00010000
+  //    BelowHalfMask   00000111
+  // |  ------------------------
+  //                    00010111
+  //    value           vvvvvvvv
+  // &  ------------------------
+  //                    000v0vvv
+  //                    non-zero
+  // ?  ------------------------
+  //    HalfBit         00001000
+  // :  zero            00000000
+  //    ------------------------
+  //    round_bit       0000r000
+  //    value           vvvvvvvv
+  // +  ------------------------
+  //    rounded         rrrrxxxx
+  //    PlaceMask       11110000
+  // &  ------------------------
+  //    result          rrrr0000
   //
   template <size_t Place, typename = std::enable_if_t<(Place < PositiveBits)>>
   static constexpr Integer Round(Integer value, Bit<Place>) {
@@ -146,14 +149,11 @@ struct FixedFormat {
     // Bit representing one half of the significant figure to round to
     // and mask of the bits below it, if any.
     const Integer HalfBit = Integer{1} << (Place - 1);
-    const Integer HalfMask = Place > 1 ? HalfBit - 1 : 0;
-
-    // Shift representing where to add the odd bit when rounding to even.
-    const size_t PlaceShift = Place > 1 ? 2 : 1;
+    const Integer BelowHalfMask = ~PlaceMask >> 1;
 
     // Round half to even.
-    const Integer odd_bit = (value & PlaceBit) >> PlaceShift;
-    const Integer rounded = SaturateAddAs<Integer>(value, HalfMask + odd_bit);
+    const Integer round_bit = (value & (PlaceBit | BelowHalfMask)) ? HalfBit : 0;
+    const Integer rounded = SaturateAddAs<Integer>(value, round_bit);
     return rounded & PlaceMask;
   }
 

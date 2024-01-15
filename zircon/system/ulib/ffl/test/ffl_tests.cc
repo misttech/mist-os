@@ -735,38 +735,31 @@ static_assert(TestSaturatingFixedPointArithmeticVaryRightHand<uint32_t>());
 static_assert(TestSaturatingFixedPointArithmeticVaryRightHand<uint64_t>());
 
 // Fixed-to-fixed comparisons promote to the least resolution and greatest
-// precision.
-static_assert(Fixed<int, 0>{1} > Fixed<int, 1>::FromRaw(0));
-static_assert(Fixed<int, 0>{1} > Fixed<int, 1>::FromRaw(1));
-static_assert(Fixed<int, 0>{1} > Fixed<int, 2>::FromRaw(1));
-static_assert(Fixed<int, 0>{1} > Fixed<int, 2>::FromRaw(2));
-static_assert(Fixed<int, 0>{1} == Fixed<int, 2>::FromRaw(3));  // Round half to even.
-static_assert(Fixed<int, 0>{1} == Fixed<int, 2>::FromRaw(4));  // Round half to even.
-static_assert(Fixed<int, 0>{1} == Fixed<int, 2>::FromRaw(5));  // Round half to even.
+// precision using convergent rounding. The digit separator ' is used to mark
+// the binary point in binary literals.
+static_assert(Fixed<int, 0>{0} == Fixed<int, 1>::FromRaw(0b0000'0));
+static_assert(Fixed<int, 0>{0} == Fixed<int, 1>::FromRaw(0b0000'1)); // Round half to even.
+static_assert(Fixed<int, 0>{1} == Fixed<int, 1>::FromRaw(0b0001'0));
+static_assert(Fixed<int, 0>{2} == Fixed<int, 1>::FromRaw(0b0001'1)); // Round half to even.
+static_assert(Fixed<int, 0>{2} == Fixed<int, 1>::FromRaw(0b0010'0));
 
-static_assert(Fixed<int, 0>{1} >= Fixed<int, 1>::FromRaw(0));
-static_assert(Fixed<int, 0>{1} >= Fixed<int, 1>::FromRaw(1));
-static_assert(Fixed<int, 0>{1} >= Fixed<int, 2>::FromRaw(1));
-static_assert(Fixed<int, 0>{1} >= Fixed<int, 2>::FromRaw(2));
-static_assert(Fixed<int, 0>{1} >= Fixed<int, 2>::FromRaw(3));  // Round half to even.
-static_assert(Fixed<int, 0>{1} >= Fixed<int, 2>::FromRaw(4));  // Round half to even.
-static_assert(Fixed<int, 0>{1} >= Fixed<int, 2>::FromRaw(5));  // Round half to even.
-
-static_assert(Fixed<int, 1>::FromRaw(0) < Fixed<int, 0>{1});
-static_assert(Fixed<int, 1>::FromRaw(1) < Fixed<int, 0>{1});
-static_assert(Fixed<int, 2>::FromRaw(1) < Fixed<int, 0>{1});
-static_assert(Fixed<int, 2>::FromRaw(2) < Fixed<int, 0>{1});
-static_assert(Fixed<int, 2>::FromRaw(3) == Fixed<int, 0>{1});  // Round half to even.
-static_assert(Fixed<int, 2>::FromRaw(4) == Fixed<int, 0>{1});  // Round half to even.
-static_assert(Fixed<int, 2>::FromRaw(5) == Fixed<int, 0>{1});  // Round half to even.
-
-static_assert(Fixed<int, 1>::FromRaw(0) <= Fixed<int, 0>{1});
-static_assert(Fixed<int, 1>::FromRaw(1) <= Fixed<int, 0>{1});
-static_assert(Fixed<int, 2>::FromRaw(1) <= Fixed<int, 0>{1});
-static_assert(Fixed<int, 2>::FromRaw(2) <= Fixed<int, 0>{1});
-static_assert(Fixed<int, 2>::FromRaw(3) <= Fixed<int, 0>{1});  // Round half to even.
-static_assert(Fixed<int, 2>::FromRaw(4) <= Fixed<int, 0>{1});  // Round half to even.
-static_assert(Fixed<int, 2>::FromRaw(5) <= Fixed<int, 0>{1});  // Round half to even.
+static_assert(Fixed<int, 0>{0} == Fixed<int, 3>::FromRaw(0b00'000));
+static_assert(Fixed<int, 0>{0} == Fixed<int, 3>::FromRaw(0b00'001));
+static_assert(Fixed<int, 0>{0} == Fixed<int, 3>::FromRaw(0b00'010));
+static_assert(Fixed<int, 0>{0} == Fixed<int, 3>::FromRaw(0b00'011));
+static_assert(Fixed<int, 0>{0} == Fixed<int, 3>::FromRaw(0b00'100)); // Round half to even.
+static_assert(Fixed<int, 0>{1} == Fixed<int, 3>::FromRaw(0b00'101));
+static_assert(Fixed<int, 0>{1} == Fixed<int, 3>::FromRaw(0b00'110));
+static_assert(Fixed<int, 0>{1} == Fixed<int, 3>::FromRaw(0b00'111));
+static_assert(Fixed<int, 0>{1} == Fixed<int, 3>::FromRaw(0b01'000));
+static_assert(Fixed<int, 0>{1} == Fixed<int, 3>::FromRaw(0b01'001));
+static_assert(Fixed<int, 0>{1} == Fixed<int, 3>::FromRaw(0b01'010));
+static_assert(Fixed<int, 0>{1} == Fixed<int, 3>::FromRaw(0b01'011));
+static_assert(Fixed<int, 0>{2} == Fixed<int, 3>::FromRaw(0b01'100));  // Round half to even.
+static_assert(Fixed<int, 0>{2} == Fixed<int, 3>::FromRaw(0b01'101));
+static_assert(Fixed<int, 0>{2} == Fixed<int, 3>::FromRaw(0b01'110));
+static_assert(Fixed<int, 0>{2} == Fixed<int, 3>::FromRaw(0b01'111));
+static_assert(Fixed<int, 0>{2} == Fixed<int, 3>::FromRaw(0b10'000));
 
 #if 0 || TEST_DOES_NOT_COMPILE
 static_assert(Fixed<int, 2>{1} == Fixed<unsigned, 2>{1});
