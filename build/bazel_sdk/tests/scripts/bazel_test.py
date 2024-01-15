@@ -253,6 +253,12 @@ def main():
         metavar="CFG",
         action="append",
     )
+    parser.add_argument(
+        "--bazel-build-events-log-json",
+        type=Path,
+        help="Output path to JSON-formatted Build Event Protocol log file",
+        metavar="LOG",
+    )
     parser.add_argument("extra_args", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
@@ -568,6 +574,15 @@ def main():
             "--show_result=0",
             "--test_output=errors",
             "--test_summary=none",
+        ]
+
+    if args.bazel_build_events_log_json:
+        args.bazel_build_events_log_json.parent.mkdir(
+            parents=True, exist_ok=True
+        )
+        bazel_test_args += [
+            "--build_event_json_file=%s"
+            % args.bazel_build_events_log_json.resolve()
         ]
 
     if args.clean:

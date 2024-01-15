@@ -175,6 +175,7 @@ build_api_module("api") {
     ":args",
     ":assembly_input_archives",
     ":assembly_manifests",
+    ":bazel_build_events_logs",
     ":bazel_sdk_info",
     ":binaries",
     ":boards",
@@ -328,6 +329,34 @@ build_api_module("bazel_sdk_info") {
   testonly = true
   data_keys = [ "bazel_sdk_info" ]
   deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
+}
+
+# Describes the location of Bazel build events log files
+# for all Bazel invocations from Ninja. For context, see
+# https://bazel.build/remote/bep
+#
+# Type: list(scope)
+#
+#  gn_label
+#    Required: GN label of action invoking a Bazel build command.
+#    Type: string
+#
+#  build_events_log
+#    Required: Path to build event log file.
+#    Type: Path relative to build directory.
+#
+#  format
+#    Required: Format of log file, can be "binary", "text" or "json"
+#    Type: string
+#
+#
+build_api_module("bazel_build_events_logs") {
+  testonly = true
+  data_keys = [ "bazel_build_events_log" ]
+  deps = [
+    ":default",
+    "//build/bazel/bazel_sdk:bazel_sdk_tests",
+  ]
 }
 
 # This describes all the binaries linked by the build.

@@ -272,8 +272,15 @@ template("bazel_action") {
   _ninja_outputs = _ninja_output_list
   _outputs = []
   foreach(path, _ninja_outputs) {
-    _outputs += [ target_out_dir + "/" + path ]
+    _outputs += [ "${target_out_dir}/${path}" ]
   }
+
+  # Write the log of build events to a target-specific file.
+  # See https://bazel.build/remote/bep for details.
+  # For now, produce in JSON output since we lack a tool to convert from
+  # binary to other formats in the tree.
+  _bazel_build_events_log_json =
+      "$target_out_dir/$target_name.bazel_events.log.json"
 
   _bazel_inputs = []
   if (defined(invoker.bazel_inputs)) {
@@ -314,7 +321,6 @@ template("bazel_action") {
                              "no_output_dir_leaks",
                              "testonly",
                              "visibility",
-                             "metadata",
                            ])
 
     script = "//build/bazel/scripts/bazel_action.py"
@@ -378,6 +384,15 @@ template("bazel_action") {
       args += [ "--allow-directory-in-outputs" ]
     }
 
+    if (invoker.command == "build") {
+      outputs += [ _bazel_build_events_log_json ]
+
+      args += [
+        "--bazel-build-events-log-json",
+        rebase_path(_bazel_build_events_log_json, root_build_dir),
+      ]
+    }
+
     args += [ "--" ]
 
     # Ensure that the default platform is set correctly when this build action
@@ -408,6 +423,24 @@ template("bazel_action") {
       # Note that --show_result=0 is not supported by `bazel query`.
       if (invoker.command != "query") {
         args += [ "--show_result=0" ]
+      }
+    }
+
+    metadata = {
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata, "*")
+      }
+
+      if (invoker.command == "build") {
+        # Used by //:bazel_build_events_logs Build API module.
+        bazel_build_events_log = [
+          {
+            gn_label = get_label_info(":$target_name", "label_no_toolchain")
+            build_events_log =
+                rebase_path(_bazel_build_events_log_json, root_build_dir)
+            format = "json"
+          },
+        ]
       }
     }
 
@@ -482,5 +515,8 @@ template("bazel_action") {
     # This action definitely cannot be hermetic. Callers should add
     # themselves to the //build:non_hermetic_deps visibility list.
     hermetic_deps = false
+
+    # The build events log contains absolute paths written by Bazel!
+    no_output_dir_leaks = false
   }
 }

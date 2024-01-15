@@ -847,6 +847,11 @@ def main():
         "--bazel-outputs", default=[], nargs="*", help="Bazel output paths"
     )
     parser.add_argument(
+        "--bazel-build-events-log-json",
+        help="Path to JSON formatted event log for build actions.",
+    )
+
+    parser.add_argument(
         "--ninja-outputs",
         default=[],
         nargs="*",
@@ -1081,20 +1086,13 @@ def main():
         # Bazel only generates repositories on demand, and if this is the
         # first bazel build command being performed in a clean build, that
         # directory might not be generated yet. To enforce this, run
-        # `bazel build @legacy_ninja_build_outputs//:BUILD.bazel`
-        #
-        # Use --ui_event_filters=-info,-warning to remove a warning that is
-        # printed because Bazel will complain that BUILD.bazel file is a
-        # source file and that nothing needs to be built. However, doing
-        # this command is the only way to force Bazel to generate the
-        # repository's content.
+        # `bazel query @legacy_ninja_build_outputs//:BUILD.bazel`
         if not os.path.exists(legacy_inputs_repository_dir):
             ret = subprocess.run(
                 [
                     args.bazel_launcher,
-                    "build",
+                    "query",
                     "--config=quiet",
-                    "--ui_event_filters=-info,-warning",
                     "@legacy_ninja_build_outputs//:BUILD.bazel",
                 ]
             )
@@ -1111,6 +1109,18 @@ def main():
             return 1
 
     cmd = [args.bazel_launcher, args.command]
+
+    if args.bazel_build_events_log_json:
+        # Create parent directory to avoid Bazel complaining it cannot
+        # write the events log file.
+        os.makedirs(
+            os.path.dirname(args.bazel_build_events_log_json), exist_ok=True
+        )
+        cmd += [
+            "--build_event_json_file="
+            + os.path.abspath(args.bazel_build_events_log_json),
+        ]
+
     cmd += configured_args + args.bazel_targets
 
     ret = subprocess.run(cmd)

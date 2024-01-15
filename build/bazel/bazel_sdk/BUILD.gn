@@ -131,7 +131,10 @@ template("bazel_sdk_tests_for") {
     testonly = true
     script = "//build/bazel_sdk/tests/scripts/bazel_test.py"
     inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
-    outputs = [ "$target_gen_dir/$target_name.stamp" ]
+    outputs = [
+      "$target_gen_dir/$target_name.stamp",
+      "$target_out_dir/$target_name.bazel_events_logs.json",
+    ]
     depfile = "$target_gen_dir/$target_name.d"
 
     # Provide a distinct output_base for each test. This is because the
@@ -218,13 +221,32 @@ template("bazel_sdk_tests_for") {
       "--prebuilt-clang-version-file",
       rebase_path(_prebuilt_clang_content_hash, root_build_dir),
     ]
+
+    args += [
+      "--bazel-build-events-log-json",
+      rebase_path(outputs[1], root_build_dir),
+    ]
+
+    metadata = {
+      # Used by //:bazel_build_events_logs Build API module
+      bazel_build_events_log = [
+        {
+          gn_label = get_label_info(":$target_name", "label_no_toolchain")
+          build_events_log = rebase_path(outputs[1], root_build_dir)
+          format = "json"
+        },
+      ]
+    }
+
     deps += [
       ":prebuilt_clang_content_hash",
       ":prebuilt_python_content_hash",
     ]
     pool = "//:console"
     hermetic_deps = false
-    no_output_dir_leaks = true
+
+    # The build events log contains absolute paths written by Bazel!
+    no_output_dir_leaks = false
   }
 }
 
