@@ -7,7 +7,8 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/host_test_data.gni")
 
-rustc_library("selinux_policy") {
+rustc_library("policy") {
+  name = "selinux_policy"
   edition = "2021"
   with_unit_tests = true
   deps = [
@@ -30,7 +31,7 @@ rustc_library("selinux_policy") {
 }
 
 fuchsia_unittest_package("selinux_policy-tests") {
-  deps = [ ":selinux_policy_test" ]
+  deps = [ ":policy_test" ]
 }
 
 if (is_host) {
@@ -43,8 +44,8 @@ if (is_host) {
   policy_files = []
   expectation_files = []
   foreach(file, testdata_policies) {
-    policy_files += [ "testdata/policies/$file" ]
-    expectation_files += [ "testdata/expectations/$file" ]
+    policy_files += [ "../testdata/policies/$file" ]
+    expectation_files += [ "../testdata/expectations/$file" ]
   }
 
   host_test_data("testdata_policies") {
@@ -70,8 +71,8 @@ if (is_host) {
   micro_policy_files = []
   foreach(file, testdata_micro_policies) {
     micro_policy_files += [
-      "testdata/micro_policies/${file}_policy.conf",
-      "testdata/micro_policies/${file}_policy.pp",
+      "../testdata/micro_policies/${file}_policy.conf",
+      "../testdata/micro_policies/${file}_policy.pp",
     ]
   }
 
@@ -90,7 +91,7 @@ if (is_host) {
     source_root = "host_tests/lib.rs"
     sources = [ "host_tests/lib.rs" ]
     deps = [
-      ":selinux_policy",
+      ":policy",
       ":testdata_expectations",
       ":testdata_micro_policies",
       ":testdata_policies",

@@ -1,40 +1,12 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
-import("//build/rust/rustc_library.gni")
-
-rustc_library("selinux") {
-  edition = "2021"
-  with_unit_tests = true
-  deps = [
-    "//src/starnix/kernel:starnix_sync",
-    "//src/starnix/lib/selinux_policy",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:bitflags",
-  ]
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:rand",
-  ]
-  sources = [
-    "src/access_vector_cache.rs",
-    "src/hooks.rs",
-    "src/lib.rs",
-    "src/permission_check.rs",
-    "src/security_context.rs",
-    "src/security_server.rs",
-  ]
-  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
-}
-
-fuchsia_unittest_package("selinux-tests") {
-  deps = [ ":selinux_test" ]
-}
-
 group("tests") {
   testonly = true
-  deps = [ ":selinux-tests" ]
+
+  deps = [
+    "core:tests",
+    "policy:tests",
+  ]
 }

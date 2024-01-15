@@ -6,8 +6,8 @@ group("lib") {
   deps = [
     "linux_uapi",
     "magma",
-    "selinux",
-    "selinux_policy",
+    "selinux/core",
+    "selinux/policy",
     "starnix-uapi",
     "syncio",
   ]
@@ -20,7 +20,6 @@ group("tests") {
     "extended_pstate:tests",
     "range_map:tests",
     "selinux:tests",
-    "selinux_policy:tests",
     "starnix-uapi:tests",
     "syncio:tests",
     "ubpf:tests",

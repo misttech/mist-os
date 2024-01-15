@@ -185,6 +185,8 @@ impl Query for SecurityServer {
 mod tests {
     use super::*;
 
+    const MINIMAL_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/minimal");
+
     #[fuchsia::test]
     fn sid_to_security_context() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t")
@@ -247,14 +249,13 @@ mod tests {
         assert_eq!(fake_security_server.is_fake(), true);
     }
 
-    // TODO(b/318559679): Re-enable this test with a valid minimal policy.
-    //#[fuchsia::test]
-    //fn loaded_policy_can_be_retrieved() {
-    //    let not_really_a_policy = "not a real policy".as_bytes().to_vec();
-    //    let security_server = SecurityServer::new(Mode::Enable);
-    //    assert!(security_server.load_policy(not_really_a_policy.clone()).is_ok());
-    //    assert_eq!(security_server.get_binary_policy(), not_really_a_policy);
-    //}
+    #[fuchsia::test]
+    fn loaded_policy_can_be_retrieved() {
+        let policy_bytes = MINIMAL_BINARY_POLICY.to_vec();
+        let security_server = SecurityServer::new(Mode::Enable);
+        assert!(security_server.load_policy(policy_bytes).is_ok());
+        assert_eq!(MINIMAL_BINARY_POLICY, security_server.get_binary_policy().as_slice());
+    }
 
     #[fuchsia::test]
     fn loaded_policy_is_validated() {
