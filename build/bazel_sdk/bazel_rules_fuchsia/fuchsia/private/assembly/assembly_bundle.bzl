@@ -8,7 +8,6 @@ load(":providers.bzl", "FuchsiaProductAssemblyBundleInfo")
 
 def _assembly_bundle_impl(ctx):
     return [FuchsiaProductAssemblyBundleInfo(
-        dir = ctx.file.dir,
         root = ctx.file.config,
         files = ctx.files.files,
     )]

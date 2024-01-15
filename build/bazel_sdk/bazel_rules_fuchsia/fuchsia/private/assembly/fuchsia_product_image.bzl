@@ -60,7 +60,7 @@ def _fuchsia_product_assembly_impl(ctx):
         executable = ctx.executable._create_platform_aibs_file,
         arguments = [
             "--platform-aibs",
-            platform_aibs.dir.path,
+            platform_aibs.root.dirname,
             "--output",
             platform_aibs_file.path,
         ],
@@ -118,8 +118,8 @@ def _fuchsia_product_assembly_impl(ctx):
         "OUTDIR": out_dir.path,
         "PRODUCT_CONFIG_PATH": product_config_file.path,
         "BOARD_CONFIG_PATH": board_config_file_path,
-        "LEGACY_AIB": legacy_aib.dir.path,
-        "PLATFORM_AIB_DIR": platform_aibs.dir.path,
+        "LEGACY_AIB": legacy_aib.root.dirname,
+        "PLATFORM_AIB_DIR": platform_aibs.root.dirname,
     }
 
     for (key, value) in shell_env.items():

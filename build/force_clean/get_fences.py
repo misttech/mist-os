@@ -32,6 +32,9 @@ def print_fences():
     print(
         "After fxr/898958, assembly complains about fshost equivalence in zedboot even though zedboot should not be built in user/userdebug."
     )
+    print(
+        "After fxr/973216, Bazel build complains about dangling symlinks, see http://b/319069000#comment4"
+    )
     pass
 
 
