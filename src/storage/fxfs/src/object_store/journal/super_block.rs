@@ -28,7 +28,10 @@ use {
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject},
         log::*,
-        lsm_tree::{types::MutableLayer, LSMTree, LayerSet},
+        lsm_tree::{
+            types::{LayerIterator, MutableLayer},
+            LSMTree, LayerSet,
+        },
         metrics,
         object_handle::ObjectHandle as _,
         object_store::{
@@ -337,7 +340,7 @@ async fn write<S: HandleOwner>(
     super_block_header.serialize_with_version(&mut writer.writer)?;
 
     let mut merger = items.merger();
-    let mut iter = LSMTree::major_iter(Box::new(merger.seek(Bound::Unbounded).await?)).await?;
+    let mut iter = LSMTree::major_iter(merger.seek(Bound::Unbounded).await?).await?;
     while let Some(item) = iter.get() {
         writer.maybe_extend().await?;
         SuperBlockRecord::ObjectItem(item.cloned()).serialize_into(&mut writer.writer)?;
@@ -372,7 +375,7 @@ pub async fn compact_root_parent(
     let layer_set = tree.layer_set();
     {
         let mut merger = layer_set.merger();
-        let mut iter = LSMTree::major_iter(Box::new(merger.seek(Bound::Unbounded).await?)).await?;
+        let mut iter = LSMTree::major_iter(merger.seek(Bound::Unbounded).await?).await?;
         let new_layer = LSMTree::new_mutable_layer();
         while let Some(item_ref) = iter.get() {
             new_layer.insert(item_ref.cloned()).await?;

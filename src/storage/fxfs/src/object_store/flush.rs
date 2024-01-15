@@ -10,7 +10,7 @@ use {
         log::*,
         lsm_tree::{
             layers_from_handles,
-            types::{BoxedLayerIterator, ItemRef, LayerIterator},
+            types::{ItemRef, LayerIterator},
             LSMTree,
         },
         object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
@@ -27,7 +27,6 @@ use {
     },
     anyhow::Context,
     anyhow::Error,
-    async_trait::async_trait,
     once_cell::sync::OnceCell,
     std::sync::atomic::Ordering,
 };
@@ -638,20 +637,17 @@ mod tests {
     }
 }
 
-#[async_trait]
 impl tree::MajorCompactable<ObjectKey, ObjectValue> for LSMTree<ObjectKey, ObjectValue> {
     async fn major_iter(
-        iter: BoxedLayerIterator<'_, ObjectKey, ObjectValue>,
-    ) -> Result<BoxedLayerIterator<'_, ObjectKey, ObjectValue>, Error> {
-        Ok(Box::new(
-            iter.filter(|item: ItemRef<'_, _, _>| match item {
-                // Object Tombstone.
-                ItemRef { value: ObjectValue::None, .. } => false,
-                // Deleted extent.
-                ItemRef { value: ObjectValue::Extent(ExtentValue::None), .. } => false,
-                _ => true,
-            })
-            .await?,
-        ))
+        iter: impl LayerIterator<ObjectKey, ObjectValue>,
+    ) -> Result<impl LayerIterator<ObjectKey, ObjectValue>, Error> {
+        iter.filter(|item: ItemRef<'_, _, _>| match item {
+            // Object Tombstone.
+            ItemRef { value: ObjectValue::None, .. } => false,
+            // Deleted extent.
+            ItemRef { value: ObjectValue::Extent(ExtentValue::None), .. } => false,
+            _ => true,
+        })
+        .await
     }
 }

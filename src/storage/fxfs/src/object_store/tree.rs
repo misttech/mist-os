@@ -5,26 +5,27 @@
 use {
     crate::{
         lsm_tree::{
-            types::{BoxedLayerIterator, MergeableKey, Value},
+            types::{LayerIterator, MergeableKey, Value},
             LSMTree, LockedLayer,
         },
         object_handle::WriteBytes,
         object_store::journal,
     },
     anyhow::{Context, Error},
-    async_trait::async_trait,
-    std::ops::Bound,
+    std::{
+        future::{ready, Future},
+        ops::Bound,
+    },
 };
 
-#[async_trait]
 pub trait MajorCompactable<K: 'static, V: 'static> {
     /// Returns an iterator that wraps another iterator that is appropriate for major compactions.
     /// Such an iterator should elide items that don't need to be written if a major compaction is
     /// taking place.
-    async fn major_iter(
-        iter: BoxedLayerIterator<'_, K, V>,
-    ) -> Result<BoxedLayerIterator<'_, K, V>, Error> {
-        Ok(iter)
+    fn major_iter(
+        iter: impl LayerIterator<K, V>,
+    ) -> impl Future<Output = Result<impl LayerIterator<K, V>, Error>> + Send {
+        ready(Ok(iter))
     }
 }
 
@@ -80,13 +81,16 @@ where
     let layers_to_keep = layer_set.layers.split_off(split_index);
 
     {
-        let mut merger = layer_set.merger();
-        let mut iter: BoxedLayerIterator<'_, K, V> = Box::new(merger.seek(Bound::Unbounded).await?);
-        if layers_to_keep.is_empty() {
-            iter = LSMTree::<K, V>::major_iter(iter).await?;
-        }
         let block_size = writer.block_size();
-        tree.compact_with_iterator(iter, writer, block_size).await.context("ObjectStore::flush")?;
+        let mut merger = layer_set.merger();
+        let iter = merger.seek(Bound::Unbounded).await?;
+        if layers_to_keep.is_empty() {
+            let major_iter = LSMTree::<K, V>::major_iter(iter).await?;
+            tree.compact_with_iterator(major_iter, writer, block_size).await
+        } else {
+            tree.compact_with_iterator(iter, writer, block_size).await
+        }
+        .context("ObjectStore::flush")?;
     }
 
     Ok((layers_to_keep, layer_set.layers))
