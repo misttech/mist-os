@@ -189,6 +189,12 @@ enum class EncoderClockSource : uint32_t {
 // S905D3 Datasheet, Section 6.7.6 Register Descriptions, Page 131.
 class VideoClock2Divider : public hwreg::RegisterBase<VideoClock2Divider, uint32_t> {
  public:
+  static constexpr int kMinDivider2 = 1;
+  static constexpr int kMaxDivider2 = 256;
+  static_assert(kMaxDivider2 == 1 << (7 - 0 + 1));
+
+  static hwreg::RegisterAddr<VideoClock2Divider> Get() { return {0x4a * sizeof(uint32_t)}; }
+
   DEF_ENUM_FIELD(EncoderClockSource, 31, 28, video_dac_clock_selection);
 
   // Bits 27-24 and 23-20 document the DAC1 and DAC2 clock selections in A311D,
@@ -218,9 +224,6 @@ class VideoClock2Divider : public hwreg::RegisterBase<VideoClock2Divider, uint32
   //
   // Prefer `Divider2()` and `SetDivider2()` to accessing the field directly.
   DEF_FIELD(7, 0, divider2_minus_one);
-  static constexpr int kMinDivider2 = 1;
-  static constexpr int kMaxDivider2 = 256;
-  static_assert(kMaxDivider2 == 1 << (7 - 0 + 1));
 
   VideoClock2Divider& SetDivider2(int divider2) {
     ZX_DEBUG_ASSERT(divider2 >= kMinDivider2);
@@ -229,8 +232,6 @@ class VideoClock2Divider : public hwreg::RegisterBase<VideoClock2Divider, uint32
   }
 
   int Divider2() const { return divider2_minus_one() + 1; }
-
-  static auto Get() { return hwreg::RegisterAddr<VideoClock2Divider>(0x4a * sizeof(uint32_t)); }
 };
 
 // HHI_VIID_CLK_CNTL
@@ -240,6 +241,8 @@ class VideoClock2Divider : public hwreg::RegisterBase<VideoClock2Divider, uint32
 // S905D3 Datasheet, Section 6.7.6 Register Descriptions, Page 132.
 class VideoClock2Control : public hwreg::RegisterBase<VideoClock2Control, uint32_t> {
  public:
+  static hwreg::RegisterAddr<VideoClock2Control> Get() { return {0x4b * sizeof(uint32_t)}; }
+
   DEF_RSVDZ_FIELD(31, 20);
 
   // If false, the input and output signals for the video clock 2 divider are
@@ -263,8 +266,6 @@ class VideoClock2Control : public hwreg::RegisterBase<VideoClock2Control, uint32
   DEF_BIT(2, div4_enabled);
   DEF_BIT(1, div2_enabled);
   DEF_BIT(0, div1_enabled);
-
-  static auto Get() { return hwreg::RegisterAddr<VideoClock2Control>(0x4b * sizeof(uint32_t)); }
 };
 
 // HHI_VID_CLK_DIV
@@ -274,6 +275,16 @@ class VideoClock2Control : public hwreg::RegisterBase<VideoClock2Control, uint32
 // S905D3 Datasheet, Section 6.7.6 Register Descriptions, Page 129.
 class VideoClock1Divider : public hwreg::RegisterBase<VideoClock1Divider, uint32_t> {
  public:
+  static constexpr int kMinDivider1 = 1;
+  static constexpr int kMaxDivider1 = 256;
+  static_assert(kMaxDivider1 == 1 << (15 - 8 + 1));
+
+  static constexpr int kMinDivider0 = 1;
+  static constexpr int kMaxDivider0 = 256;
+  static_assert(kMaxDivider0 == 1 << (7 - 0 + 1));
+
+  static hwreg::RegisterAddr<VideoClock1Divider> Get() { return {0x59 * sizeof(uint32_t)}; }
+
   DEF_ENUM_FIELD(EncoderClockSource, 31, 28, enci_clock_selection);
 
   DEF_ENUM_FIELD(EncoderClockSource, 27, 24, encp_clock_selection);
@@ -294,9 +305,6 @@ class VideoClock1Divider : public hwreg::RegisterBase<VideoClock1Divider, uint32
   //
   // Prefer `Divider1()` and `SetDivider1()` to accessing the field directly.
   DEF_FIELD(15, 8, divider1_minus_one);
-  static constexpr int kMinDivider1 = 1;
-  static constexpr int kMaxDivider1 = 256;
-  static_assert(kMaxDivider1 == 1 << (15 - 8 + 1));
 
   VideoClock1Divider& SetDivider1(int divider1) {
     ZX_DEBUG_ASSERT(divider1 >= kMinDivider1);
@@ -310,9 +318,6 @@ class VideoClock1Divider : public hwreg::RegisterBase<VideoClock1Divider, uint32
   //
   // Prefer `Divider0()` and `SetDivider0()` to accessing the field directly.
   DEF_FIELD(7, 0, divider0_minus_one);
-  static constexpr int kMinDivider0 = 1;
-  static constexpr int kMaxDivider0 = 256;
-  static_assert(kMaxDivider0 == 1 << (7 - 0 + 1));
 
   VideoClock1Divider& SetDivider0(int divider0) {
     ZX_DEBUG_ASSERT(divider0 >= kMinDivider0);
@@ -321,8 +326,6 @@ class VideoClock1Divider : public hwreg::RegisterBase<VideoClock1Divider, uint32
   }
 
   int Divider0() const { return divider0_minus_one() + 1; }
-
-  static auto Get() { return hwreg::RegisterAddr<VideoClock1Divider>(0x59 * sizeof(uint32_t)); }
 };
 
 // HHI_VID_CLK_CNTL
@@ -332,6 +335,13 @@ class VideoClock1Divider : public hwreg::RegisterBase<VideoClock1Divider, uint32
 // S905D3 Datasheet, Section 6.7.6 Register Descriptions, Page 129-130.
 class VideoClock1Control : public hwreg::RegisterBase<VideoClock1Control, uint32_t> {
  public:
+  enum class LcdAnalogClockSelection : uint32_t {
+    kVideoClock1Div6 = 0,
+    kVideoClock1Div12 = 1,
+  };
+
+  static hwreg::RegisterAddr<VideoClock1Control> Get() { return {0x5f * sizeof(uint32_t)}; }
+
   // Bits 31-21 control the clock generation module for timing controller clock
   // (cts_tcon). The subfield definition is not in the register description
   // table but is mentioned in the clock tree diagram.
@@ -363,10 +373,6 @@ class VideoClock1Control : public hwreg::RegisterBase<VideoClock1Control, uint32
   // Enables the mux for the clock "lcd_an_clk_ph2" and "lcd_an_clk_ph3".
   DEF_BIT(14, lcd_analog_clock_mux_enabled);
 
-  enum class LcdAnalogClockSelection : uint32_t {
-    kVideoClock1Div6 = 0,
-    kVideoClock1Div12 = 1,
-  };
   // "Video Clock Tree" diagrams use the bit 11 on register 0x1a
   // (HHI_GP1_PLL_CNTL2) which doesn't match the register definitions on the
   // same datasheet. Experiments on VIM3 (Amlogic A311D) shows that this bit
@@ -380,8 +386,6 @@ class VideoClock1Control : public hwreg::RegisterBase<VideoClock1Control, uint32
   DEF_BIT(2, div4_enabled);
   DEF_BIT(1, div2_enabled);
   DEF_BIT(0, div1_enabled);
-
-  static auto Get() { return hwreg::RegisterAddr<VideoClock1Control>(0x5f * sizeof(uint32_t)); }
 };
 
 // HHI_VID_CLK_CNTL2
@@ -391,6 +395,8 @@ class VideoClock1Control : public hwreg::RegisterBase<VideoClock1Control, uint32
 // S905D3 Datasheet, Section 6.7.6 Register Descriptions, Page 130.
 class VideoClockOutputControl : public hwreg::RegisterBase<VideoClockOutputControl, uint32_t> {
  public:
+  static hwreg::RegisterAddr<VideoClockOutputControl> Get() { return {0x65 * sizeof(uint32_t)}; }
+
   DEF_RSVDZ_FIELD(15, 9);
 
   DEF_BIT(8, analog_tv_demodulator_video_dac_clock_enabled);
@@ -402,10 +408,6 @@ class VideoClockOutputControl : public hwreg::RegisterBase<VideoClockOutputContr
   DEF_BIT(2, encoder_progressive_enabled);
   DEF_BIT(1, encoder_tv_enabled);
   DEF_BIT(0, encoder_interlaced_enabled);
-
-  static auto Get() {
-    return hwreg::RegisterAddr<VideoClockOutputControl>(0x65 * sizeof(uint32_t));
-  }
 };
 
 // HHI_HDMI_CLK_CNTL - Configures "cts_hdmitx_sys_clk" and
@@ -464,7 +466,7 @@ class HdmiClockControl : public hwreg::RegisterBase<HdmiClockControl, uint32_t> 
   static constexpr int kMaxHdmiTxSystemClockDivider = 128;
   static_assert(kMaxHdmiTxSystemClockDivider == 1 << (6 - 0 + 1));
 
-  static auto Get() { return hwreg::RegisterAddr<HdmiClockControl>(0x73 * sizeof(uint32_t)); }
+  static hwreg::RegisterAddr<HdmiClockControl> Get() { return {0x73 * sizeof(uint32_t)}; }
 
   DEF_RSVDZ_FIELD(31, 20);
 
@@ -572,7 +574,7 @@ class VpuClockCControl : public hwreg::RegisterBase<VpuClockCControl, uint32_t> 
   static constexpr int kMinBranchMuxDivider = 1;
   static constexpr int kMaxBranchMuxDivider = 128;
 
-  static auto Get() { return hwreg::RegisterAddr<VpuClockCControl>(0x6d * sizeof(uint32_t)); }
+  static hwreg::RegisterAddr<VpuClockCControl> Get() { return {0x6d * sizeof(uint32_t)}; }
 
   DEF_ENUM_FIELD(FinalMuxSource, 31, 31, final_mux_selection);
   DEF_RSVDZ_FIELD(30, 29);
@@ -653,7 +655,7 @@ class VpuClockControl : public hwreg::RegisterBase<VpuClockControl, uint32_t> {
   static constexpr int kMinBranchMuxDivider = 1;
   static constexpr int kMaxBranchMuxDivider = 128;
 
-  static auto Get() { return hwreg::RegisterAddr<VpuClockControl>(0x6f * sizeof(uint32_t)); }
+  static hwreg::RegisterAddr<VpuClockControl> Get() { return {0x6f * sizeof(uint32_t)}; }
 
   DEF_ENUM_FIELD(FinalMuxSource, 31, 31, final_mux_selection);
   DEF_RSVDZ_FIELD(30, 29);
@@ -736,8 +738,8 @@ class VideoAdvancedPeripheralBusClockControl
   static constexpr int kMinBranchMuxDivider = 1;
   static constexpr int kMaxBranchMuxDivider = 128;
 
-  static auto Get() {
-    return hwreg::RegisterAddr<VideoAdvancedPeripheralBusClockControl>(0x7d * sizeof(uint32_t));
+  static hwreg::RegisterAddr<VideoAdvancedPeripheralBusClockControl> Get() {
+    return {0x7d * sizeof(uint32_t)};
   }
 
   DEF_ENUM_FIELD(FinalMuxSource, 31, 31, final_mux_selection);
@@ -830,7 +832,7 @@ class VpuClockBControl : public hwreg::RegisterBase<VpuClockBControl, uint32_t> 
   static constexpr int kMinDivider2 = 1;
   static constexpr int kMaxDivider2 = 256;
 
-  static auto Get() { return hwreg::RegisterAddr<VpuClockBControl>(0x83 * sizeof(uint32_t)); }
+  static hwreg::RegisterAddr<VpuClockBControl> Get() { return {0x83 * sizeof(uint32_t)}; }
 
   DEF_RSVDZ_FIELD(31, 25);
 
@@ -901,8 +903,8 @@ class VideoInputMeasureClockControl
   static constexpr int kMinVideoInputMeasureClockDivider = 1;
   static constexpr int kMaxVideoInputMeasureClockDivider = 128;
 
-  static auto Get() {
-    return hwreg::RegisterAddr<VideoInputMeasureClockControl>(0x94 * sizeof(uint32_t));
+  static hwreg::RegisterAddr<VideoInputMeasureClockControl> Get() {
+    return {0x94 * sizeof(uint32_t)};
   }
 
   DEF_RSVDZ_FIELD(31, 24);
@@ -986,7 +988,7 @@ class MipiDsiPhyClockControl : public hwreg::RegisterBase<MipiDsiPhyClockControl
   static constexpr int kMaxDivider = 128;
   static_assert(kMaxDivider == 1 << (6 - 0 + 1));
 
-  static auto Get() { return hwreg::RegisterAddr<MipiDsiPhyClockControl>(0x95 * sizeof(uint32_t)); }
+  static hwreg::RegisterAddr<MipiDsiPhyClockControl> Get() { return {0x95 * sizeof(uint32_t)}; }
 
   DEF_ENUM_FIELD(ClockSource, 14, 12, clock_source);
 
@@ -1040,7 +1042,7 @@ enum class HdmiClockTreePatternGeneratorModeSource : uint32_t {
 //   6.7.6 Register Descriptions, Page 131.
 class HdmiClockTreeControl : public hwreg::RegisterBase<HdmiClockTreeControl, uint32_t> {
  public:
-  static auto Get() { return hwreg::RegisterAddr<HdmiClockTreeControl>(0x68 * sizeof(uint32_t)); }
+  static hwreg::RegisterAddr<HdmiClockTreeControl> Get() { return {0x68 * sizeof(uint32_t)}; }
 
   // Bits 31-24 are reserved.
   DEF_RSVDZ_FIELD(23, 20);

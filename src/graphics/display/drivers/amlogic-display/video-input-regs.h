@@ -30,48 +30,11 @@ enum class VideoInputModuleId {
 // S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 713-714, 736-737.
 class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandControl, uint32_t> {
  public:
-  DEF_BIT(31, bypass_mpeg_noise_reduction);
-  DEF_BIT(30, mpeg_field_info);
-
-  // Trigger a go_field (Vsync) pulse on the video input module when true is
-  // written.
-  DEF_BIT(29, trigger_go_field_pulse);
-
-  // Trigger a go_line (Hsync) pulse on the video input module when true is
-  // written.
-  DEF_BIT(28, trigger_go_line_pulse);
-
-  DEF_BIT(27, mpeg_go_field_input_signal_enabled);
-
-  // Not documented for this register; for fields of the same name in other
-  // registers (VD1_IF0_GEN_REG, DI_IF0_GEN_REG, etc.), `hold_lines` is the
-  // number of lines to hold after go_field pulse and before the module is
-  // enabled.
-  DEF_FIELD(26, 20, hold_lines);
-
-  // Whether the `go_field` pulse is delayed for the video input module.
-  DEF_BIT(19, go_field_pulse_delayed);
-
-  // Number of lines that `go_field` pulse is delayed, if
-  // `go_field_pulse_delayed` is true.
-  DEF_FIELD(18, 12, go_field_pulse_delay_lines);
-
   enum class ComponentInput : uint32_t {
     kComponentInput0 = 0b00,
     kComponentInput1 = 0b01,
     kComponentInput2 = 0b10,
   };
-
-  // Seems unused for internal loopback mode.
-  DEF_ENUM_FIELD(ComponentInput, 11, 10, component2_output_selection);
-  DEF_ENUM_FIELD(ComponentInput, 9, 8, component1_output_selection);
-  DEF_ENUM_FIELD(ComponentInput, 7, 6, component0_output_selection);
-
-  // Indicates whether the video input is cropped using a window specified by
-  // `VDIN0/1_WIN_H_START_END` and `VDIN0/1_WIN_V_START_END` registers.
-  DEF_BIT(5, video_input_cropped);
-
-  DEF_BIT(4, video_input_enabled);
 
   // Values for the `input_source_selection` field.
   enum class InputSource : uint32_t {
@@ -102,6 +65,53 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
     kSecondBt656 = 10,
   };
 
+  static hwreg::RegisterAddr<VideoInputCommandControl> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x1202 * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x1302 * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
+  DEF_BIT(31, bypass_mpeg_noise_reduction);
+  DEF_BIT(30, mpeg_field_info);
+
+  // Trigger a go_field (Vsync) pulse on the video input module when true is
+  // written.
+  DEF_BIT(29, trigger_go_field_pulse);
+
+  // Trigger a go_line (Hsync) pulse on the video input module when true is
+  // written.
+  DEF_BIT(28, trigger_go_line_pulse);
+
+  DEF_BIT(27, mpeg_go_field_input_signal_enabled);
+
+  // Not documented for this register; for fields of the same name in other
+  // registers (VD1_IF0_GEN_REG, DI_IF0_GEN_REG, etc.), `hold_lines` is the
+  // number of lines to hold after go_field pulse and before the module is
+  // enabled.
+  DEF_FIELD(26, 20, hold_lines);
+
+  // Whether the `go_field` pulse is delayed for the video input module.
+  DEF_BIT(19, go_field_pulse_delayed);
+
+  // Number of lines that `go_field` pulse is delayed, if
+  // `go_field_pulse_delayed` is true.
+  DEF_FIELD(18, 12, go_field_pulse_delay_lines);
+
+  // Seems unused for internal loopback mode.
+  DEF_ENUM_FIELD(ComponentInput, 11, 10, component2_output_selection);
+  DEF_ENUM_FIELD(ComponentInput, 9, 8, component1_output_selection);
+  DEF_ENUM_FIELD(ComponentInput, 7, 6, component0_output_selection);
+
+  // Indicates whether the video input is cropped using a window specified by
+  // `VDIN0/1_WIN_H_START_END` and `VDIN0/1_WIN_V_START_END` registers.
+  DEF_BIT(5, video_input_cropped);
+
+  DEF_BIT(4, video_input_enabled);
+
   // If the input source doesn't equal to any value specified in `InputSource`,
   // no input is provided to the video input module.
   DEF_ENUM_FIELD(InputSource, 3, 0, input_source_selection);
@@ -120,11 +130,9 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
       case InputSource::kWritebackMux1:
       case InputSource::kSecondBt656:
         return set_input_source_selection(input_source);
-      default:
-        ZX_DEBUG_ASSERT_MSG(false, "Unsupported input source: %u",
-                            static_cast<uint32_t>(input_source));
-        return set_input_source_selection(InputSource::kNoInput);
     }
+    ZX_DEBUG_ASSERT_MSG(false, "Unsupported input source: %" PRIu32, static_cast<uint32_t>(input_source));
+    return set_input_source_selection(InputSource::kNoInput);
   }
 
   InputSource GetInputSource() const {
@@ -142,23 +150,8 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
       case InputSource::kWritebackMux1:
       case InputSource::kSecondBt656:
         return input_source;
-      default:
-        return InputSource::kNoInput;
     }
-  }
-
-  static constexpr uint32_t kVideoInput0RegAddr = 0x1202 * sizeof(uint32_t);
-  static constexpr uint32_t kVideoInput1RegAddr = 0x1302 * sizeof(uint32_t);
-  static auto Get(VideoInputModuleId video_input) {
-    switch (video_input) {
-      case VideoInputModuleId::kVideoInputModule0:
-        return hwreg::RegisterAddr<VideoInputCommandControl>(kVideoInput0RegAddr);
-      case VideoInputModuleId::kVideoInputModule1:
-        return hwreg::RegisterAddr<VideoInputCommandControl>(kVideoInput1RegAddr);
-      default:
-        ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d",
-                            static_cast<int>(video_input));
-    }
+    return InputSource::kNoInput;
   }
 };
 
@@ -171,6 +164,16 @@ class VideoInputCommandControl : public hwreg::RegisterBase<VideoInputCommandCon
 // S905D3 Datasheet, Section 8.2.3.41 VDIN, Pages 714, 737
 class VideoInputCommandStatus0 : public hwreg::RegisterBase<VideoInputCommandStatus0, uint32_t> {
  public:
+  static hwreg::RegisterAddr<VideoInputCommandStatus0> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x1205 * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x1305 * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
   // Bits 17-3` are defined differently for VDIN0_COM_STATUS0 and
   // VDIN0_COM_STATUS0, in all the datasheets mentioned above.
   //
@@ -204,20 +207,6 @@ class VideoInputCommandStatus0 : public hwreg::RegisterBase<VideoInputCommandSta
   //
   // Unused for progressive inputs.
   DEF_BIT(0, current_field);
-
-  static auto Get(VideoInputModuleId video_input) {
-    switch (video_input) {
-      case VideoInputModuleId::kVideoInputModule0:
-        static constexpr uint32_t kVideoInput0RegAddr = 0x1205 * sizeof(uint32_t);
-        return hwreg::RegisterAddr<VideoInputCommandStatus0>(kVideoInput0RegAddr);
-      case VideoInputModuleId::kVideoInputModule1:
-        static constexpr uint32_t kVideoInput1RegAddr = 0x1305 * sizeof(uint32_t);
-        return hwreg::RegisterAddr<VideoInputCommandStatus0>(kVideoInput1RegAddr);
-      default:
-        ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d",
-                            static_cast<int>(video_input));
-    }
-  }
 };
 
 // There are multiple video input channels (VDIs, possibly shorthand for Video
@@ -247,8 +236,19 @@ class VideoInputCommandStatus0 : public hwreg::RegisterBase<VideoInputCommandSta
 class VideoInputChannelFifoControl2
     : public hwreg::RegisterBase<VideoInputChannelFifoControl2, uint32_t> {
  public:
-  // Bits 25 and 23-20 further configure decimation. This driver does not
-  // support decimation, so we do not define the bits.
+  static hwreg::RegisterAddr<VideoInputChannelFifoControl2> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x120f * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x130f * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
+  // Bits 25 and 23-20 provide additional configuration on decimation.
+  // These bits are not defined because this driver currently does not support
+  // decimation.
 
   // True iff input decimation subsampling is enabled.
   DEF_BIT(24, decimation_data_enabled);
@@ -257,21 +257,8 @@ class VideoInputChannelFifoControl2
   // Setting this field to zero effectively disables decimation.
   DEF_FIELD(19, 16, decimation_ratio_minus_1);
 
-  // Bits 7-0 configure VDI 5.
-  // Currently this driver doesn't use VDI channel 5, so we don't define these
-  // bits.
-
-  static auto Get(VideoInputModuleId video_input) {
-    switch (video_input) {
-      case VideoInputModuleId::kVideoInputModule0:
-        static constexpr uint32_t kVideoInput0RegAddr = 0x120f * sizeof(uint32_t);
-        return hwreg::RegisterAddr<VideoInputChannelFifoControl2>(kVideoInput0RegAddr);
-      case VideoInputModuleId::kVideoInputModule1:
-        static constexpr uint32_t kVideoInput1RegAddr = 0x130f * sizeof(uint32_t);
-        return hwreg::RegisterAddr<VideoInputChannelFifoControl2>(kVideoInput1RegAddr);
-    }
-    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
-  }
+  // Bits 7-0 configure VDI 5. These bits are not defined because this driver
+  // currently does not support decimation.
 };
 
 // VDIN0_ASFIFO_CTRL3, VDIN1_ASFIFO_CTRL3
@@ -282,6 +269,16 @@ class VideoInputChannelFifoControl2
 class VideoInputChannelFifoControl3
     : public hwreg::RegisterBase<VideoInputChannelFifoControl3, uint32_t> {
  public:
+  static hwreg::RegisterAddr<VideoInputChannelFifoControl3> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x126f * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x136f * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
   // Bits 31-24 configure VDI 9.
   // Currently this driver doesn't use VDI channel 9, so we don't define these
   // bits.
@@ -349,20 +346,6 @@ class VideoInputChannelFifoControl3
   // This bit is a "level signal" bit. Drivers reset the FIFO by first setting
   // it to 1, and then to 0.
   DEF_BIT(0, channel6_async_fifo_software_reset);
-
-  static auto Get(VideoInputModuleId video_input) {
-    switch (video_input) {
-      case VideoInputModuleId::kVideoInputModule0:
-        static constexpr uint32_t kVideoInput0RegAddr = 0x126f * sizeof(uint32_t);
-        return hwreg::RegisterAddr<VideoInputChannelFifoControl3>(kVideoInput0RegAddr);
-      case VideoInputModuleId::kVideoInputModule1:
-        static constexpr uint32_t kVideoInput1RegAddr = 0x136f * sizeof(uint32_t);
-        return hwreg::RegisterAddr<VideoInputChannelFifoControl3>(kVideoInput1RegAddr);
-      default:
-        ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d",
-                            static_cast<int>(video_input));
-    }
-  }
 };
 
 // Selects the clock or data source for a writeback mux.
@@ -406,7 +389,11 @@ enum class WritebackMuxSource : uint32_t {
 // Sherlock (Amlogic T931) show that the register exists and has the same layout
 // and functionality as that in S905D3.
 class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint32_t> {
- public:  // Selects the data path from VIU/Encoder to writeback mux 1.
+ public:
+  static hwreg::RegisterAddr<WritebackMuxControl> Get() { return {0x2783 * sizeof(uint32_t)}; }
+
+  // Selects the data path from VIU/Encoder to writeback mux 1.
+  //
   // This field is effective when a `VideoInputCommandControl` register selects
   // the `kWritebackMux1` input ("VDIN0/1 source input 9" in the datasheet).
   //
@@ -417,6 +404,7 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
   DEF_ENUM_FIELD(WritebackMuxSource, 28, 24, mux1_data_selection);
 
   // Selects the clock path from VIU/Encoder to writeback mux 1.
+  //
   // This field is effective when a `VideoInputCommandControl` register selects
   // the `kWritebackMux1` input ("VDIN0/1 source input 9" in the datasheet).
   //
@@ -427,6 +415,7 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
   DEF_ENUM_FIELD(WritebackMuxSource, 20, 16, mux1_clock_selection);
 
   // Selects the data path from VIU/Encoder to writeback mux 0.
+  //
   // This field is effective when a `VideoInputCommandControl` register selects
   // the `kWritebackMux0` input ("VDIN0/1 source input 7" in the datasheet).
   //
@@ -437,6 +426,7 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
   DEF_ENUM_FIELD(WritebackMuxSource, 12, 8, mux0_data_selection);
 
   // Selects the clock path from VIU/Encoder to writeback mux 0.
+  //
   // This field is effective when a `VideoInputCommandControl` register selects
   // the `kWritebackMux0` input ("VDIN0/1 source input 7" in the datasheet).
   //
@@ -507,8 +497,6 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
                         static_cast<uint32_t>(mux_selection));
     return *this;
   }
-
-  static auto Get() { return hwreg::RegisterAddr<WritebackMuxControl>(0x2783 * sizeof(uint32_t)); }
 };
 
 }  // namespace amlogic_display

@@ -63,6 +63,9 @@ namespace amlogic_display {
 //     Summary" page 86
 class AlwaysOnGeneralPowerSleep : public hwreg::RegisterBase<AlwaysOnGeneralPowerSleep, uint32_t> {
  public:
+  // Register space: RTI
+  static hwreg::RegisterAddr<AlwaysOnGeneralPowerSleep> Get() { return {0x3a * sizeof(uint32_t)}; }
+
   // S905D3 only. The bits are documented as "unused" on A311D and S905D2.
   DEF_BIT(19, ge2d_powered_off_s905d3);
   DEF_BIT(18, pci_comb_powered_off_s905d3);
@@ -90,11 +93,6 @@ class AlwaysOnGeneralPowerSleep : public hwreg::RegisterBase<AlwaysOnGeneralPowe
 
   // Bits 0-7 are different between S905D3 and A311D. This driver does not use
   // the bits, so we omit them, instead of creating two register definitions.
-
-  // Register space: RTI
-  static auto Get() {
-    return hwreg::RegisterAddr<AlwaysOnGeneralPowerSleep>(0x3a * sizeof(uint32_t));
-  }
 };
 
 // AO_RTI_GEN_PWR_ISO0 with S905D3 fields
@@ -117,6 +115,11 @@ class AlwaysOnGeneralPowerSleep : public hwreg::RegisterBase<AlwaysOnGeneralPowe
 class AlwaysOnGeneralPowerIsolationS905D3
     : public hwreg::RegisterBase<AlwaysOnGeneralPowerIsolationS905D3, uint32_t> {
  public:
+  // Register space: RTI
+  static hwreg::RegisterAddr<AlwaysOnGeneralPowerIsolationS905D3> Get() {
+    return {0x3b * sizeof(uint32_t)};
+  }
+
   // The bit-level encoding is documented in the S905D3 datasheet.
 
   // S905D3 only. The bits are documented as "unused" on A311D and S905D2.
@@ -136,11 +139,6 @@ class AlwaysOnGeneralPowerIsolationS905D3
   // Sections 6.2.3.2 - 6.2.3.7, which have the same mismatch against the
   // register-level documentation.
   DEF_BIT(8, vpu_hdmi_output_isolation_enabled);
-
-  // Register space: RTI
-  static auto Get() {
-    return hwreg::RegisterAddr<AlwaysOnGeneralPowerIsolationS905D3>(0x3b * sizeof(uint32_t));
-  }
 };
 
 // AO_RTI_GEN_PWR_ACK0
@@ -156,6 +154,9 @@ class AlwaysOnGeneralPowerIsolationS905D3
 class AlwaysOnGeneralPowerStatus
     : public hwreg::RegisterBase<AlwaysOnGeneralPowerStatus, uint32_t> {
  public:
+  // Register space: RTI
+  static hwreg::RegisterAddr<AlwaysOnGeneralPowerSleep> Get() { return {0x3c * sizeof(uint32_t)}; }
+
   // The bit-level encoding is documented in the S905D3 datasheet, Section
   // 6.2.3.2 "EE Top Level Power Modes" > "VPU".
 
@@ -174,11 +175,6 @@ class AlwaysOnGeneralPowerStatus
   // Bits 0-7 are different between S905D3 and A311D / S905D2. This driver does
   // not use the bits, so we omit them, instead of creating two register
   // definitions.
-
-  // Register space: RTI
-  static auto Get() {
-    return hwreg::RegisterAddr<AlwaysOnGeneralPowerSleep>(0x3c * sizeof(uint32_t));
-  }
 };
 
 // The A311D datasheet Section 8.7.5 "Clock" > "Register Description" states
@@ -205,6 +201,9 @@ enum class MemoryPowerDomainMode {
 //    VPU power sequence, "HDMI Memory PD" entry
 class MemoryPower0 : public hwreg::RegisterBase<MemoryPower0, uint32_t> {
  public:
+  // Register space: HIU
+  static hwreg::RegisterAddr<MemoryPower0> Get() { return {0x40 * sizeof(uint32_t)}; }
+
   // The S905D3 datasheet documents the GE2D power sequence, which includes
   // flipping bits 25-18. The other datasheets mention the GE2D unit, but don't
   // document any power sequence for it.
@@ -233,9 +232,6 @@ class MemoryPower0 : public hwreg::RegisterBase<MemoryPower0, uint32_t> {
 
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 5, 4, audio_memory1_power);
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 3, 2, ethernet_memory_power);
-
-  // Register space: HIU
-  static auto Get() { return hwreg::RegisterAddr<MemoryPower0>(0x40 * sizeof(uint32_t)); }
 };
 
 // HHI_VPU_MEM_PD_REG0
@@ -248,6 +244,9 @@ class MemoryPower0 : public hwreg::RegisterBase<MemoryPower0, uint32_t> {
 //    VPU power sequence, "VPU Memory PD" entry
 class VpuMemoryPower0 : public hwreg::RegisterBase<VpuMemoryPower0, uint32_t> {
  public:
+  // Register space: HIU
+  static hwreg::RegisterAddr<VpuMemoryPower0> Get() { return {0x41 * sizeof(uint32_t)}; }
+
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 31, 30, sharpener_power);
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 29, 28, deinterlacer_post_power);
 
@@ -271,9 +270,6 @@ class VpuMemoryPower0 : public hwreg::RegisterBase<VpuMemoryPower0, uint32_t> {
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 5, 4, vd1_memory_power);
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 3, 2, osd2_memory_power);
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 1, 0, osd1_memory_power);
-
-  // Register space: HIU
-  static auto Get() { return hwreg::RegisterAddr<VpuMemoryPower0>(0x41 * sizeof(uint32_t)); }
 };
 
 // HHI_VPU_MEM_PD_REG1
@@ -286,6 +282,9 @@ class VpuMemoryPower0 : public hwreg::RegisterBase<VpuMemoryPower0, uint32_t> {
 //     pages 130-131; VPU power sequence, "VPU Memory PD" entry
 class VpuMemoryPower1 : public hwreg::RegisterBase<VpuMemoryPower1, uint32_t> {
  public:
+  // Register space: HIU
+  static hwreg::RegisterAddr<VpuMemoryPower1> Get() { return {0x42 * sizeof(uint32_t)}; }
+
   // On A311D and S905D2, xvycc LUT and ATV demodulator.
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 31, 30, vd2_osd_scaler_power);
 
@@ -329,9 +328,6 @@ class VpuMemoryPower1 : public hwreg::RegisterBase<VpuMemoryPower1, uint32_t> {
   // The S905D2 datasheet leaves these bits undocumented.
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 3, 2, viu2_output_fifo_power);
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 1, 0, viu2_osd1_power);
-
-  // Register space: HIU
-  static auto Get() { return hwreg::RegisterAddr<VpuMemoryPower1>(0x42 * sizeof(uint32_t)); }
 };
 
 // HHI_VPU_MEM_PD_REG3
@@ -343,13 +339,13 @@ class VpuMemoryPower1 : public hwreg::RegisterBase<VpuMemoryPower1, uint32_t> {
 //     page 79; VPU power sequence
 class VpuMemoryPower3 : public hwreg::RegisterBase<VpuMemoryPower3, uint32_t> {
  public:
+  // Register space: HIU
+  static hwreg::RegisterAddr<VpuMemoryPower3> Get() { return {0x43 * sizeof(uint32_t)}; }
+
   // All bits are marked reserved and default to 1. However, the S905D3 VPU
   // power sequence includes setting all bits to 0 (for power on) or 1 (for
   // power off). AMLogic-supplied bringup code flips each group of 2 bits at a
   // time, and pauses 5us between flips.
-
-  // Register space: HIU
-  static auto Get() { return hwreg::RegisterAddr<VpuMemoryPower3>(0x43 * sizeof(uint32_t)); }
 };
 
 // HHI_VPU_MEM_PD_REG4
@@ -361,6 +357,9 @@ class VpuMemoryPower3 : public hwreg::RegisterBase<VpuMemoryPower3, uint32_t> {
 //     page 79; VPU power sequence
 class VpuMemoryPower4 : public hwreg::RegisterBase<VpuMemoryPower4, uint32_t> {
  public:
+  // Register space: HIU
+  static hwreg::RegisterAddr<VpuMemoryPower4> Get() { return {0x44 * sizeof(uint32_t)}; }
+
   // Bits 31-6 are marked reserved. However, the S905D3 VPU power sequence
   // includes setting all the register's bits to 0 (for power on) or 1 (for
   // power off).  AMLogic-supplied bringup code flips each group of 2 bits at a
@@ -373,9 +372,6 @@ class VpuMemoryPower4 : public hwreg::RegisterBase<VpuMemoryPower4, uint32_t> {
   // flips.
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 3, 2, axi_arbiter2_power);
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 1, 0, axi_arbiter1_power);
-
-  // Register space: HIU
-  static auto Get() { return hwreg::RegisterAddr<VpuMemoryPower4>(0x44 * sizeof(uint32_t)); }
 };
 
 // HHI_VPU_MEM_PD_REG2
@@ -387,6 +383,9 @@ class VpuMemoryPower4 : public hwreg::RegisterBase<VpuMemoryPower4, uint32_t> {
 // S905D2 datasheet Section 6.6.6 "Clock" > "Register Description" page 132
 class VpuMemoryPower2 : public hwreg::RegisterBase<VpuMemoryPower2, uint32_t> {
  public:
+  // Register space: HIU
+  static hwreg::RegisterAddr<VpuMemoryPower2> Get() { return {0x4d * sizeof(uint32_t)}; }
+
   // Not documented in any of the datasheets. These bits are documented and
   // flipped in AMLogic-supplied bringup code.
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 31, 30, rdma_power);
@@ -424,9 +423,6 @@ class VpuMemoryPower2 : public hwreg::RegisterBase<VpuMemoryPower2, uint32_t> {
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 3, 2, tcon_power_a311d);
 
   DEF_ENUM_FIELD(MemoryPowerDomainMode, 1, 0, vpp_watermark_power);
-
-  // Register space: HIU
-  static auto Get() { return hwreg::RegisterAddr<VpuMemoryPower2>(0x4d * sizeof(uint32_t)); }
 };
 
 }  // namespace amlogic_display

@@ -663,6 +663,21 @@ class OsdPathMiscCtrlReg : public RegisterBase<OsdPathMiscCtrlReg, uint32_t> {
 class VideoInputUnitEncoderMuxControl
     : public hwreg::RegisterBase<VideoInputUnitEncoderMuxControl, uint32_t> {
  public:
+  enum class Encoder : uint32_t {
+    // ENCL (LVDS / LCD Encoder)
+    kLcd = 0,
+    // ENCI (Interlaced encoder)
+    kInterlaced = 1,
+    // ENCP (Progressive encoder)
+    kProgressive = 2,
+    // ENCT (TV Panel encoder)
+    kTvPanel = 3,
+  };
+
+  static hwreg::RegisterAddr<VideoInputUnitEncoderMuxControl> Get() {
+    return {0x271a * sizeof(uint32_t)};
+  }
+
   // Bit 20 is defined differently in A311D / T931 / S905D2 and S905D3
   // documentations.
   //
@@ -700,17 +715,6 @@ class VideoInputUnitEncoderMuxControl
   // and the the register layout is the same as that in S905D3, so we only keep
   // the S905D3 register layout in our code.
 
-  enum class Encoder : uint32_t {
-    // ENCL (LVDS / LCD Encoder)
-    kLcd = 0,
-    // ENCI (Interlaced encoder)
-    kInterlaced = 1,
-    // ENCP (Progressive encoder)
-    kProgressive = 2,
-    // ENCT (TV Panel encoder)
-    kTvPanel = 3,
-  };
-
   // The encoder whose Vsync is connected to VIU1.
   //
   // Only used when `vsync_shared_by_viu_blocks` is true.
@@ -727,11 +731,6 @@ class VideoInputUnitEncoderMuxControl
   // If `vsync_shared_by_viu_blocks` is false, the same encoder's Vsync signal
   // will also be encoded to VIU1.
   DEF_ENUM_FIELD(Encoder, 1, 0, viu1_encoder_selection);
-
-  static auto Get() {
-    constexpr uint32_t kRegAddr = 0x271a * sizeof(uint32_t);
-    return hwreg::RegisterAddr<VideoInputUnitEncoderMuxControl>(kRegAddr);
-  }
 };
 
 class VpuHdmiFmtCtrlReg : public hwreg::RegisterBase<VpuHdmiFmtCtrlReg, uint32_t> {
