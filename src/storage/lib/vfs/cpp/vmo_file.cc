@@ -20,7 +20,7 @@ namespace fio = fuchsia_io;
 
 namespace fs {
 
-VmoFile::VmoFile(zx::vmo vmo, size_t length, bool writable, VmoSharing vmo_sharing)
+VmoFile::VmoFile(zx::vmo vmo, size_t length, bool writable, DefaultSharingMode vmo_sharing)
     : vmo_(std::move(vmo)), length_(length), writable_(writable), vmo_sharing_(vmo_sharing) {
   ZX_ASSERT(vmo_.is_valid());
 }
@@ -117,15 +117,15 @@ zx_status_t VmoFile::GetVmo(fio::wire::VmoFlags flags, zx::vmo* out_vmo) {
     return vmo_.duplicate(rights, out_vmo);
   }
   switch (vmo_sharing_) {
-    case VmoSharing::NONE:
+    case DefaultSharingMode::kNone:
       return ZX_ERR_NOT_SUPPORTED;
-    case VmoSharing::DUPLICATE:
+    case DefaultSharingMode::kDuplicate:
       // As size changes are currently untracked, we remove WRITE and SET_PROPERTY rights before
       // duplicating the VMO handle. If this restriction needs to be eased in the future, size
       // changes need to be tracked accordingly, or a fixed-size child slice should be provided.
       rights &= ~(ZX_RIGHT_WRITE | ZX_RIGHT_SET_PROPERTY);
       return vmo_.duplicate(rights, out_vmo);
-    case VmoSharing::CLONE_COW: {
+    case DefaultSharingMode::kCloneCow: {
       zx::vmo vmo;
       if (zx_status_t status =
               vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0, length_, &vmo);

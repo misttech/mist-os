@@ -27,9 +27,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   }
 
   size_t length = fuzzed_data.ConsumeIntegral<size_t>();
-  fs::VmoFile::VmoSharing vmo_sharing = fuzzed_data.PickValueInArray(
-      {fs::VmoFile::VmoSharing::NONE, fs::VmoFile::VmoSharing::DUPLICATE,
-       fs::VmoFile::VmoSharing::CLONE_COW});
+  fs::VmoFile::DefaultSharingMode vmo_sharing = fuzzed_data.PickValueInArray(
+      {fs::VmoFile::DefaultSharingMode::kNone, fs::VmoFile::DefaultSharingMode::kDuplicate,
+       fs::VmoFile::DefaultSharingMode::kCloneCow});
 
   auto vmo_file =
       fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), length, true /*writable*/, vmo_sharing);

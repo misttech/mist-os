@@ -8,6 +8,8 @@ import("//build/rust/rustc_test.gni")
 
 # Full list of io1 conformance tests should be included here. Add deps to the
 # test packages for additional filesystem conformance tests and test harnesses.
+# TODO(https://fxbug.dev/293947862): Remove the `io1` suffix from the harnesses and update
+# nomenclature once io1 and io2 have been merged.
 group("tests") {
   testonly = true
   deps = [
@@ -17,6 +19,7 @@ group("tests") {
     "//src/storage/conformance/conformance_harness/minfs:minfs-io1-conformance-test",
     "//src/storage/conformance/conformance_harness/rustvfs:rustvfs-io1-conformance-test",
     "//src/storage/conformance/conformance_harness/sdkcpp:sdkcpp-io1-conformance-test",
+    "//src/storage/conformance/conformance_harness/sdkcpp_new:sdkcpp-new-io1-conformance-test",
   ]
 }
 

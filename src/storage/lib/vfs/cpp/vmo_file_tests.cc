@@ -82,7 +82,6 @@ TEST(VmoFile, Constructor) {
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), zx_system_get_page_size());
     EXPECT_EQ(zx_system_get_page_size(), file->length());
     EXPECT_FALSE(file->is_writable());
-    EXPECT_EQ(fs::VmoFile::VmoSharing::DUPLICATE, file->vmo_sharing());
   }
 
   // everything explicit
@@ -91,10 +90,9 @@ TEST(VmoFile, Constructor) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), PAGE_2 + 1u, true,
-                                                 fs::VmoFile::VmoSharing::CLONE_COW);
+                                                 fs::VmoFile::DefaultSharingMode::kCloneCow);
     EXPECT_EQ(PAGE_2 + 1u, file->length());
     EXPECT_TRUE(file->is_writable());
-    EXPECT_EQ(fs::VmoFile::VmoSharing::CLONE_COW, file->vmo_sharing());
   }
 }
 
@@ -388,19 +386,19 @@ TEST(VmoFile, Getattr) {
 
 TEST(VmoFile, GetNodeInfo) {
   {
-    SCOPED_TRACE("VmoSharing::NONE");
+    SCOPED_TRACE("DefaultSharingMode::kNone");
     zx::vmo abc;
     CreateVmoABC(&abc);
 
     fs::VnodeRepresentation info;
-    auto file =
-        fbl::MakeRefCounted<fs::VmoFile>(std::move(abc), 23u, false, fs::VmoFile::VmoSharing::NONE);
+    auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(abc), 23u, false,
+                                                 fs::VmoFile::DefaultSharingMode::kNone);
     EXPECT_EQ(ZX_OK, file->GetNodeInfo(fs::Rights::ReadOnly(), &info));
     EXPECT_TRUE(info.is_file());
   }
 
   {
-    SCOPED_TRACE("VmoSharing::DUPLICATE,read-only");
+    SCOPED_TRACE("DefaultSharingMode::kDuplicate,read-only");
     zx::vmo abc;
     CreateVmoABC(&abc);
 
@@ -408,7 +406,7 @@ TEST(VmoFile, GetNodeInfo) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 23u, false,
-                                                 fs::VmoFile::VmoSharing::DUPLICATE);
+                                                 fs::VmoFile::DefaultSharingMode::kDuplicate);
     zx::vmo vmo;
     EXPECT_EQ(ZX_OK, file->GetVmo(fuchsia_io::wire::VmoFlags::kRead, &vmo));
 
@@ -424,7 +422,7 @@ TEST(VmoFile, GetNodeInfo) {
   }
 
   {
-    SCOPED_TRACE("VmoSharing::DUPLICATE,read-write");
+    SCOPED_TRACE("DefaultSharingMode::kDuplicate,read-write");
     zx::vmo abc;
     CreateVmoABC(&abc);
 
@@ -432,7 +430,7 @@ TEST(VmoFile, GetNodeInfo) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 23u, true,
-                                                 fs::VmoFile::VmoSharing::DUPLICATE);
+                                                 fs::VmoFile::DefaultSharingMode::kDuplicate);
     zx::vmo vmo;
     EXPECT_EQ(ZX_OK, file->GetVmo(fuchsia_io::wire::VmoFlags::kRead, &vmo));
 
@@ -440,7 +438,7 @@ TEST(VmoFile, GetNodeInfo) {
     EXPECT_EQ(GetKoid(abc.get()), GetKoid(vmo.get()));
 
     // As the VmoFile implementation does not currently track size changes, we ensure that the
-    // handle provided in DUPLICATE sharing mode is not writable.
+    // handle provided in kDuplicate sharing mode is not writable.
     EXPECT_EQ(ZX_RIGHTS_BASIC | ZX_RIGHT_MAP | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_READ,
               GetRights(vmo.get()));
     uint64_t size;
@@ -451,7 +449,7 @@ TEST(VmoFile, GetNodeInfo) {
   }
 
   {
-    SCOPED_TRACE("VmoSharing::DUPLICATE,write-only");
+    SCOPED_TRACE("DefaultSharingMode::kDuplicate,write-only");
     zx::vmo abc;
     CreateVmoABC(&abc);
 
@@ -459,14 +457,14 @@ TEST(VmoFile, GetNodeInfo) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 23u, true,
-                                                 fs::VmoFile::VmoSharing::DUPLICATE);
+                                                 fs::VmoFile::DefaultSharingMode::kDuplicate);
     zx::vmo vmo;
     EXPECT_EQ(ZX_OK, file->GetVmo({}, &vmo));
 
     EXPECT_NE(abc.get(), vmo.get());
     EXPECT_EQ(GetKoid(abc.get()), GetKoid(vmo.get()));
     // As the VmoFile implementation does not currently track size changes, we ensure that the
-    // handle provided in DUPLICATE sharing mode is not writable.
+    // handle provided in kDuplicate sharing mode is not writable.
     EXPECT_EQ(ZX_RIGHTS_BASIC | ZX_RIGHT_MAP | ZX_RIGHT_GET_PROPERTY, GetRights(vmo.get()));
     uint64_t size;
     EXPECT_EQ(ZX_OK, vmo.get_prop_content_size(&size));
@@ -474,7 +472,7 @@ TEST(VmoFile, GetNodeInfo) {
   }
 
   {
-    SCOPED_TRACE("VmoSharing::CLONE_COW,read-only");
+    SCOPED_TRACE("DefaultSharingMode::kCloneCow,read-only");
     zx::vmo abc;
     CreateVmoABC(&abc);
 
@@ -482,7 +480,7 @@ TEST(VmoFile, GetNodeInfo) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 23u, false,
-                                                 fs::VmoFile::VmoSharing::CLONE_COW);
+                                                 fs::VmoFile::DefaultSharingMode::kCloneCow);
     zx::vmo vmo;
     // There is non-trivial lazy initialization happening here - repeat it
     // to make sure it's nice and deterministic.
@@ -502,7 +500,7 @@ TEST(VmoFile, GetNodeInfo) {
   }
 
   {
-    SCOPED_TRACE("VmoSharing::CLONE_COW,read-write");
+    SCOPED_TRACE("DefaultSharingMode::kCloneCow,read-write");
     zx::vmo abc;
     CreateVmoABC(&abc);
 
@@ -510,7 +508,7 @@ TEST(VmoFile, GetNodeInfo) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 23u, true,
-                                                 fs::VmoFile::VmoSharing::CLONE_COW);
+                                                 fs::VmoFile::DefaultSharingMode::kCloneCow);
     zx::vmo vmo;
     EXPECT_EQ(
         ZX_OK,
@@ -533,7 +531,7 @@ TEST(VmoFile, GetNodeInfo) {
   }
 
   {
-    SCOPED_TRACE("VmoSharing::CLONE_COW,write-only");
+    SCOPED_TRACE("DefaultSharingMode::kCloneCow,write-only");
     zx::vmo abc;
     CreateVmoABC(&abc);
 
@@ -541,7 +539,7 @@ TEST(VmoFile, GetNodeInfo) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 23u, true,
-                                                 fs::VmoFile::VmoSharing::CLONE_COW);
+                                                 fs::VmoFile::DefaultSharingMode::kCloneCow);
     zx::vmo vmo;
     EXPECT_EQ(ZX_OK, file->GetVmo(fuchsia_io::wire::VmoFlags::kWrite, &vmo));
 

@@ -23,11 +23,14 @@ class VmoFile : public Vnode {
  public:
   // Construct with fbl::MakeRefCounted.
 
-  // Specifies the desired behavior when a client asks for the file's
-  // underlying VMO.
-  enum class VmoSharing {
-    // The VMO is not shared with the client.
-    NONE,
+  // Specifies the default behavior when a client asks for the file's underlying VMO, but does not
+  // specify if a duplicate handle or copy-on-write clone is required.
+  //
+  // *NOTE*: This does not affect the behavior of requests that specify the required sharing mode,
+  // those requests will still be fulfilled.
+  enum class DefaultSharingMode : uint8_t {
+    // NOT_SUPPORTED will be returned, unless a sharing mode is specified in the request.
+    kNone,
 
     // The VMO handle is duplicated for each client.
     //
@@ -41,7 +44,7 @@ class VmoFile : public Vnode {
     //
     // As size changes are currently untracked, all handles given out in this
     // mode will lack ZX_RIGHT_WRITE and ZX_RIGHT_SET_PROPERTY.
-    DUPLICATE,
+    kDuplicate,
 
     // The VMO range spanned by the file is cloned on demand, using
     // copy-on-write semantics to isolate modifications of clients which open
@@ -50,7 +53,7 @@ class VmoFile : public Vnode {
     // This is appropriate when clients need to be restricted from accessing
     // portions of the VMO outside of the range of the file and when file
     // modifications by clients should not be visible to each other.
-    CLONE_COW,
+    kCloneCow,
   };
 
   // The underlying VMO handle.
@@ -62,9 +65,6 @@ class VmoFile : public Vnode {
   // True if the file is writable.
   // If false, attempts to open the file for write will fail.
   bool is_writable() const { return writable_; }
-
-  // The VMO sharing mode of the file.
-  VmoSharing vmo_sharing() const { return vmo_sharing_; }
 
   // |Vnode| implementation:
   VnodeProtocolSet GetProtocols() const final;
@@ -82,7 +82,7 @@ class VmoFile : public Vnode {
 
   // Creates a file node backed by a VMO.
   VmoFile(zx::vmo vmo, size_t length, bool writable = false,
-          VmoSharing vmo_sharing = VmoSharing::DUPLICATE);
+          DefaultSharingMode vmo_sharing = DefaultSharingMode::kDuplicate);
 
   ~VmoFile() override;
 
@@ -90,7 +90,7 @@ class VmoFile : public Vnode {
   zx::vmo vmo_;
   size_t const length_;
   bool const writable_;
-  VmoSharing const vmo_sharing_;
+  DefaultSharingMode const vmo_sharing_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmoFile);
 };
