@@ -17,7 +17,7 @@ use crate::{
         buffers::InputBuffer,
         fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
         fs_node_impl_not_dir,
-        fuse::new_fuse_fs,
+        fuse::{new_fuse_fs, new_fusectl_fs},
         socket::{SocketAddress, SocketHandle, UnixSocket},
         DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf, DynamicFileSource, FdEvents,
         FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle,
@@ -712,6 +712,7 @@ impl FileSystemCreator for CurrentTask {
 
         match &**fs_type {
             b"fuse" => new_fuse_fs(self, options),
+            b"fusectl" => new_fusectl_fs(self, options),
             b"devpts" => Ok(dev_pts_fs(self, options).clone()),
             b"devtmpfs" => Ok(dev_tmp_fs(self).clone()),
             b"ext4" => ExtFilesystem::new_fs(kernel, self, options),

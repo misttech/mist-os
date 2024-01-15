@@ -19,6 +19,7 @@ use crate::{
     },
     vdso::vdso_loader::Vdso,
     vfs::{
+        fuse::FuseCtlFs,
         socket::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
@@ -102,6 +103,8 @@ pub struct Kernel {
     pub security_server: Option<Arc<SecurityServer>>,
     // Owned by tracefs/fs.rs
     pub trace_fs: OnceCell<FileSystemHandle>,
+    // Owned by vfs/fuse.rs
+    pub fusectl_fs: OnceCell<Arc<FuseCtlFs>>,
 
     /// The registry of device drivers.
     pub device_registry: DeviceRegistry,
@@ -286,16 +289,17 @@ impl Kernel {
                 vsock_address_maker,
             ),
             cmdline,
-            anon_fs: OnceCell::new(),
-            pipe_fs: OnceCell::new(),
-            dev_tmp_fs: OnceCell::new(),
-            dev_pts_fs: OnceCell::new(),
-            proc_fs: OnceCell::new(),
-            socket_fs: OnceCell::new(),
-            sys_fs: OnceCell::new(),
-            selinux_fs: OnceCell::new(),
+            anon_fs: Default::default(),
+            pipe_fs: Default::default(),
+            dev_tmp_fs: Default::default(),
+            dev_pts_fs: Default::default(),
+            proc_fs: Default::default(),
+            socket_fs: Default::default(),
+            sys_fs: Default::default(),
+            selinux_fs: Default::default(),
             security_server,
-            trace_fs: OnceCell::new(),
+            trace_fs: Default::default(),
+            fusectl_fs: Default::default(),
             device_registry: DeviceRegistry::new(),
             container_svc,
             container_data_dir,

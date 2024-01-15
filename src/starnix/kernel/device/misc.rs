@@ -9,7 +9,7 @@ use crate::{
     },
     fs::sysfs::DeviceDirectory,
     task::CurrentTask,
-    vfs::fuse::DevFuse,
+    vfs::fuse::open_fuse_device,
 };
 use starnix_uapi::device_type::DeviceType;
 
@@ -31,7 +31,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
         DeviceMetadata::new("fuse".into(), DeviceType::FUSE, DeviceMode::Char),
         misc_class.clone(),
         DeviceDirectory::new,
-        simple_device_ops::<DevFuse>,
+        open_fuse_device,
     );
     registry.add_and_register_device(
         current_task,

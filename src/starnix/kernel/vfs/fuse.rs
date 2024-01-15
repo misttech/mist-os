@@ -8,13 +8,16 @@ use crate::{
     vfs::{
         buffers::{Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
-        fs_args, CacheConfig, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FallocMode,
-        FdEvents, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        PeekBufferSegmentsCallback, SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
+        fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, DirEntry, DirectoryEntryType,
+        DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode, FdEvents, FdNumber,
+        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback,
+        SeekTarget, SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget, ValueOrSize,
+        VecDirectory, VecDirectoryEntry, XattrOp,
     },
 };
 use bstr::B;
+use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, not_implemented};
 use starnix_sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult};
@@ -24,7 +27,7 @@ use starnix_uapi::{
     errno, errno_from_code, error,
     errors::{Errno, EINTR, EINVAL, ENOSYS},
     file_mode::{Access, FileMode},
-    off_t,
+    mode, off_t,
     open_flags::OpenFlags,
     statfs,
     time::time_from_timespec,
@@ -32,19 +35,34 @@ use starnix_uapi::{
 };
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
 const CONFIGURATION_AVAILABLE_EVENT: u64 = u64::MAX;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DevFuse {
     connection: Arc<FuseConnection>,
 }
 
+pub fn open_fuse_device(
+    current_task: &CurrentTask,
+    _id: DeviceType,
+    _node: &FsNode,
+    _flags: OpenFlags,
+) -> Result<Box<dyn FileOps>, Errno> {
+    let fusectl_fs = fusectl_fs(current_task);
+    let connection = fusectl_fs.new_connection(current_task);
+    Ok(Box::new(DevFuse { connection }))
+}
+
 impl FileOps for DevFuse {
     fileops_impl_nonseekable!();
+
+    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+        self.connection.disconnect();
+    }
 
     fn read(
         &self,
@@ -126,6 +144,27 @@ pub fn new_fuse_fs(
     Ok(fs)
 }
 
+fn fusectl_fs(current_task: &CurrentTask) -> &Arc<FuseCtlFs> {
+    current_task.kernel().fusectl_fs.get_or_init(|| Default::default())
+}
+
+pub fn new_fusectl_fs(
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    let fs = FileSystem::new(
+        current_task.kernel(),
+        CacheMode::Uncached,
+        Arc::clone(fusectl_fs(current_task)),
+        options,
+    );
+    let root_node = FsNode::new_root_with_properties(FuseCtlConnectionsDirectory {}, |info| {
+        info.chmod(mode!(IFDIR, 0o755));
+    });
+    fs.set_root_node(root_node);
+    Ok(fs)
+}
+
 #[derive(Debug)]
 struct FuseFs {
     connection: Arc<FuseConnection>,
@@ -188,6 +227,193 @@ impl FileSystemOps for FuseFs {
     }
     fn unmount(&self) {
         self.connection.disconnect();
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct FuseCtlFs {
+    connections: Mutex<Vec<Weak<FuseConnection>>>,
+    next_identifier: AtomicU64Counter,
+}
+
+impl FuseCtlFs {
+    fn new_connection(&self, current_task: &CurrentTask) -> Arc<FuseConnection> {
+        let connection = Arc::new(FuseConnection {
+            id: self.next_identifier.next(),
+            creds: current_task.as_fscred(),
+            state: Default::default(),
+        });
+        self.connections.lock().push(Arc::downgrade(&connection));
+        connection
+    }
+
+    fn for_each<F>(&self, mut f: F)
+    where
+        F: FnMut(Arc<FuseConnection>),
+    {
+        self.connections.lock().retain(|connection| {
+            if let Some(connection) = connection.upgrade() {
+                f(connection);
+                true
+            } else {
+                false
+            }
+        });
+    }
+}
+
+impl FileSystemOps for Arc<FuseCtlFs> {
+    fn rename(
+        &self,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+        _old_parent: &FsNodeHandle,
+        _old_name: &FsStr,
+        _new_parent: &FsNodeHandle,
+        _new_name: &FsStr,
+        _renamed: &FsNodeHandle,
+        _replaced: Option<&FsNodeHandle>,
+    ) -> Result<(), Errno> {
+        error!(ENOTSUP)
+    }
+
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+        // Magic number has been extracted from the stat utility.
+        const FUSE_CTL_MAGIC: u32 = 0x65735543;
+        Ok(statfs::default(FUSE_CTL_MAGIC))
+    }
+
+    fn name(&self) -> &'static FsStr {
+        "fusectl".into()
+    }
+}
+
+#[derive(Debug)]
+struct FuseCtlConnectionsDirectory;
+
+impl FsNodeOps for FuseCtlConnectionsDirectory {
+    fs_node_impl_dir_readonly!();
+
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        let fs = fusectl_fs(current_task);
+        let mut entries = vec![];
+        fs.for_each(|connection| {
+            entries.push(VecDirectoryEntry {
+                entry_type: DirectoryEntryType::DIR,
+                name: connection.id.to_string().into(),
+                inode: None,
+            });
+        });
+        Ok(VecDirectory::new_file(entries))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
+        let id = name.parse::<u64>().map_err(|_| errno!(ENOENT))?;
+        let fs = fusectl_fs(current_task);
+        let mut connection = None;
+        fs.for_each(|c| {
+            if c.id == id {
+                connection = Some(c);
+            }
+        });
+        let Some(connection) = connection else {
+            return error!(ENOENT);
+        };
+        let fs = node.fs();
+        let mut dir = StaticDirectoryBuilder::new(&fs);
+        dir.set_mode(mode!(IFDIR, 0o500));
+        dir.dir_creds(connection.creds);
+        dir.node(
+            "abort".into(),
+            fs.create_node(
+                current_task,
+                AbortFile::new_node(connection.clone()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o200), connection.creds),
+            ),
+        );
+        dir.node(
+            "waiting".into(),
+            fs.create_node(
+                current_task,
+                WaitingFile::new_node(connection.clone()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o400), connection.creds),
+            ),
+        );
+
+        Ok(dir.build(current_task))
+    }
+}
+
+#[derive(Debug)]
+struct AbortFile {
+    connection: Arc<FuseConnection>,
+}
+
+impl AbortFile {
+    fn new_node(connection: Arc<FuseConnection>) -> impl FsNodeOps {
+        SimpleFileNode::new(move || Ok(Self { connection: connection.clone() }))
+    }
+}
+
+impl FileOps for AbortFile {
+    fileops_impl_nonseekable!();
+
+    fn read(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        Ok(0)
+    }
+
+    fn write(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        let drained = data.drain();
+        if drained > 0 {
+            self.connection.disconnect();
+        }
+        Ok(drained)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct WaitingFile {
+    connection: Arc<FuseConnection>,
+}
+
+impl WaitingFile {
+    fn new_node(connection: Arc<FuseConnection>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { connection })
+    }
+}
+
+impl DynamicFileSource for WaitingFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let value = {
+            let state = self.connection.state.lock();
+            state.operations.len() + state.message_queue.len()
+        };
+        let value = format!("{value}\n");
+        sink.write(value.as_bytes());
+        Ok(())
     }
 }
 
@@ -909,8 +1135,14 @@ enum FuseConnectionState {
     Disconnected,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct FuseConnection {
+    /// Connection identifier for fusectl.
+    id: u64,
+
+    /// Credentials of the task that opened the connection.
+    creds: FsCred,
+
     /// Mutable state of the connection.
     state: Mutex<FuseMutableState>,
 }
@@ -930,7 +1162,7 @@ impl FuseConnection {
         }
         loop {
             if !state.is_connected() {
-                return error!(EINTR);
+                return error!(ECONNABORTED);
             }
             let waiter = Waiter::new();
             state.waiters.wait_async_value(&waiter, CONFIGURATION_AVAILABLE_EVENT);
@@ -1097,8 +1329,8 @@ impl FuseMutableState {
         self.state = FuseConnectionState::Connected;
     }
 
-    /// Disconnect the mount. Happens on unmount. Every filesystem operation will fail with EINTR,
-    /// and every read/write on the /dev/fuse fd will fail with ENODEV.
+    /// Disconnect the mount. Happens on unmount. Every filesystem operation will fail with
+    /// ECONNABORTED, and every read/write on the /dev/fuse fd will fail with ENODEV.
     fn disconnect(&mut self) {
         if matches!(self.state, FuseConnectionState::Disconnected) {
             return;
@@ -1106,7 +1338,7 @@ impl FuseMutableState {
         self.state = FuseConnectionState::Disconnected;
         self.message_queue.clear();
         for operation in &mut self.operations {
-            operation.1.response = Some(error!(EINTR));
+            operation.1.response = Some(error!(ECONNABORTED));
         }
         self.waiters.notify_all();
     }
@@ -1124,7 +1356,7 @@ impl FuseMutableState {
     ) -> Result<u64, Errno> {
         debug_assert!(waiter.is_some() == operation.has_response(), "{operation:?}");
         if !self.is_connected() {
-            return error!(EINTR);
+            return error!(ECONNABORTED);
         }
         let operation = Arc::new(operation);
         self.last_unique_id += 1;
