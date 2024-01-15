@@ -34,8 +34,7 @@ use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
     log_error, log_trace, log_warn, not_implemented, trace_category_starnix, trace_duration,
 };
-use starnix_sync::InterruptibleEvent;
-use starnix_sync::{Mutex, MutexGuard, RwLock};
+use starnix_sync::{InterruptibleEvent, Mutex, MutexGuard, RwLock};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::ArcKey,
@@ -134,10 +133,12 @@ pub struct BinderDriver {
     next_identifier: AtomicU64Counter,
 }
 
-impl Drop for BinderDriver {
-    fn drop(&mut self) {
+impl Releasable for BinderDriver {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(mut self, context: Self::Context<'_>) {
         for binder_process in std::mem::take(self.procs.get_mut()).into_values() {
-            binder_process.release(());
+            binder_process.release(context);
         }
     }
 }
@@ -171,16 +172,8 @@ impl BinderConnection {
         if process.pid == current_task.get_pid() {
             Ok(process)
         } else {
-            process.release(());
+            process.release(&current_task);
             error!(EINVAL)
-        }
-    }
-
-    pub fn close(&self) {
-        log_trace!("closing BinderConnection id={}", self.identifier);
-        if let Some(binder_process) = self.driver.procs.write().remove(&self.identifier) {
-            binder_process.close();
-            binder_process.release(());
         }
     }
 
@@ -190,17 +183,22 @@ impl BinderConnection {
             binder_process.interrupt();
         }
     }
-}
 
-impl Drop for BinderConnection {
-    fn drop(&mut self) {
-        log_trace!("dropping BinderConnection id={}", self.identifier);
-        self.close();
+    fn close(&self, current_task: &CurrentTask) {
+        log_trace!("closing BinderConnection id={}", self.identifier);
+        if let Some(binder_process) = self.driver.procs.write().remove(&self.identifier) {
+            binder_process.close();
+            binder_process.release(current_task);
+        }
     }
 }
 
 impl FileOps for BinderConnection {
     fileops_impl_nonseekable!();
+
+    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+        self.close(current_task);
+    }
 
     fn query_events(
         &self,
@@ -208,7 +206,7 @@ impl FileOps for BinderConnection {
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let binder_process = self.proc(current_task);
-        release_after!(binder_process, (), {
+        release_after!(binder_process, current_task, {
             Ok(match &binder_process {
                 Ok(binder_process) => {
                     let binder_thread =
@@ -233,7 +231,7 @@ impl FileOps for BinderConnection {
     ) -> Option<WaitCanceler> {
         log_trace!("binder wait_async");
         let binder_process = self.proc(current_task);
-        release_after!(binder_process, (), {
+        release_after!(binder_process, current_task, {
             match &binder_process {
                 Ok(binder_process) => {
                     let binder_thread =
@@ -262,7 +260,7 @@ impl FileOps for BinderConnection {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         let binder_process = self.proc(current_task)?;
-        release_after!(binder_process, (), {
+        release_after!(binder_process, current_task, {
             self.driver.ioctl(current_task, &binder_process, request, arg)
         })
     }
@@ -289,7 +287,7 @@ impl FileOps for BinderConnection {
         filename: NamespaceNode,
     ) -> Result<UserAddress, Errno> {
         let binder_process = self.proc(current_task)?;
-        release_after!(binder_process, (), {
+        release_after!(binder_process, current_task, {
             self.driver.mmap(
                 current_task,
                 &binder_process,
@@ -327,7 +325,7 @@ impl FileOps for BinderConnection {
     fn flush(&self, _file: &FileObject, current_task: &CurrentTask) {
         // Errors are not meaningful on flush.
         let Ok(binder_process) = self.proc(current_task) else { return };
-        release_after!(binder_process, (), { binder_process.kick_all_threads() });
+        release_after!(binder_process, current_task, { binder_process.kick_all_threads() });
     }
 }
 
@@ -345,7 +343,9 @@ impl RemoteBinderConnection {
         mapped_address: u64,
     ) -> Result<(), Errno> {
         let binder_process = self.binder_connection.proc(current_task)?;
-        release_after!(binder_process, (), { binder_process.map_external_vmo(vmo, mapped_address) })
+        release_after!(binder_process, current_task, {
+            binder_process.map_external_vmo(vmo, mapped_address)
+        })
     }
 
     pub fn ioctl(
@@ -355,7 +355,7 @@ impl RemoteBinderConnection {
         arg: SyscallArg,
     ) -> Result<(), Errno> {
         let binder_process = self.binder_connection.proc(current_task)?;
-        release_after!(binder_process, (), {
+        release_after!(binder_process, current_task, {
             self.binder_connection
                 .driver
                 .ioctl(current_task, &binder_process, request, arg)
@@ -367,8 +367,8 @@ impl RemoteBinderConnection {
         self.binder_connection.interrupt();
     }
 
-    pub fn close(&self) {
-        self.binder_connection.close();
+    pub fn close(&self, current_task: &CurrentTask) {
+        self.binder_connection.close(current_task);
     }
 }
 
@@ -461,9 +461,9 @@ struct ActiveTransaction {
 }
 
 impl Releasable for ActiveTransaction {
-    type Context<'a> = ();
+    type Context<'a> = &'a CurrentTask;
 
-    fn release(self, context: ()) {
+    fn release(self, context: Self::Context<'_>) {
         self.state.release(context);
     }
 }
@@ -490,8 +490,9 @@ struct TransactionState {
 }
 
 impl Releasable for TransactionState {
-    type Context<'a> = ();
-    fn release(self, _: ()) {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(self, _: Self::Context<'_>) {
         log_trace!("Releasing binder TransactionState");
         let mut drop_actions = RefCountActions::default();
         // Release the owned objects unconditionally.
@@ -554,8 +555,8 @@ struct TransientTransactionState<'a> {
 }
 
 impl<'a> Releasable for TransientTransactionState<'a> {
-    type Context<'b> = ();
-    fn release(self, context: ()) {
+    type Context<'b> = &'b CurrentTask;
+    fn release(self, context: Self::Context<'_>) {
         for fd in &self.transient_fds {
             let _: Result<(), Errno> = self.accessor.close_fd(*fd);
         }
@@ -621,7 +622,7 @@ impl<'a> TransientTransactionState<'a> {
         self.transient_fds.push(fd)
     }
 
-    fn into_state(mut self, context: ()) -> ReleaseGuard<TransactionState> {
+    fn into_state(mut self, context: &CurrentTask) -> ReleaseGuard<TransactionState> {
         // Clear the transient FD list, so that these FDs no longer get closed.
         self.transient_fds.clear();
         let result = self.state.take().unwrap();
@@ -754,11 +755,15 @@ impl BinderProcess {
 
     /// A binder thread is done reading a buffer allocated to a transaction. The binder
     /// driver can reclaim this buffer.
-    fn handle_free_buffer(&self, buffer_ptr: UserAddress) -> Result<(), Errno> {
+    fn handle_free_buffer(
+        &self,
+        current_task: &CurrentTask,
+        buffer_ptr: UserAddress,
+    ) -> Result<(), Errno> {
         log_trace!("BinderProcess id={} freeing buffer {:?}", self.identifier, buffer_ptr);
         // Drop the state associated with the now completed transaction.
         let active_transaction = self.lock().active_transactions.remove(&buffer_ptr);
-        release_after!(active_transaction, (), {
+        release_after!(active_transaction, current_task, {
             // Check if this was a oneway transaction and schedule the next oneway if this is the case.
             if let Some(ActiveTransaction {
                 request_type: RequestType::Oneway { object }, ..
@@ -1036,9 +1041,9 @@ impl<'a> BinderProcessGuard<'a> {
 }
 
 impl Releasable for BinderProcess {
-    type Context<'a> = ();
+    type Context<'a> = &'a CurrentTask;
 
-    fn release(self, context: ()) {
+    fn release(self, context: Self::Context<'_>) {
         log_trace!("Releasing BinderProcess id={}", self.identifier);
         let state = self.state.into_inner();
         // Notify any subscribers that the objects this process owned are now dead.
@@ -1346,8 +1351,8 @@ struct HandleTable {
 /// The HandleTable is released at the time the BinderProcess is released. At this moment, any
 /// reference to object owned by another BinderProcess need to be clean.
 impl Releasable for HandleTable {
-    type Context<'a> = ();
-    fn release(self, _: ()) {
+    type Context<'a> = &'a CurrentTask;
+    fn release(self, _: Self::Context<'_>) {
         for (_, r) in self.table.into_iter() {
             let mut actions = RefCountActions::default();
             r.clean_refs(&mut actions);
@@ -3272,7 +3277,7 @@ impl BinderDriver {
             binder_driver_command_protocol_BC_FREE_BUFFER => {
                 profile_duration!("FreeBuffer");
                 let buffer_ptr = UserAddress::from(cursor.read_object::<binder_uintptr_t>()?);
-                binder_proc.handle_free_buffer(buffer_ptr)
+                binder_proc.handle_free_buffer(current_task, buffer_ptr)
             }
             binder_driver_command_protocol_BC_REQUEST_DEATH_NOTIFICATION => {
                 profile_duration!("RequestDeathNotif");
@@ -3442,7 +3447,7 @@ impl BinderDriver {
                             buffers.data.address,
                             ActiveTransaction {
                                 request_type: RequestType::Oneway { object: object.clone() },
-                                state: transaction_state.into_state(()),
+                                state: transaction_state.into_state(current_task),
                             }
                             .into(),
                         );
@@ -3485,7 +3490,7 @@ impl BinderDriver {
                             buffers.data.address,
                             ActiveTransaction {
                                 request_type: RequestType::RequestResponse,
-                                state: transaction_state.into_state(()),
+                                state: transaction_state.into_state(current_task),
                             }
                             .into(),
                         );
@@ -3542,7 +3547,7 @@ impl BinderDriver {
             buffers.data.address,
             ActiveTransaction {
                 request_type: RequestType::RequestResponse,
-                state: transaction_state.into_state(()),
+                state: transaction_state.into_state(current_task),
             }
             .into(),
         );
@@ -3784,7 +3789,7 @@ impl BinderDriver {
         profile_duration!("TranslateObjects");
         let mut transaction_state =
             TransientTransactionState::new(target_resource_accessor, target_proc);
-        release_on_error!(transaction_state, (), {
+        release_on_error!(transaction_state, current_task, {
             let mut sg_remaining_buffer = sg_buffer.user_buffer();
             let mut sg_buffer_offset = 0;
             for (offset_idx, object_offset) in offsets.iter().map(|o| *o as usize).enumerate() {
@@ -4410,7 +4415,7 @@ pub mod tests {
     use crate::{
         mm::{MemoryAccessor, PAGE_SIZE},
         testing::*,
-        vfs::FdFlags,
+        vfs::{anon_fs, Anon, FdFlags},
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
@@ -4421,6 +4426,7 @@ pub mod tests {
     use starnix_uapi::{
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
         errors::{EBADF, EINVAL},
+        file_mode::FileMode,
         BINDER_TYPE_WEAK_HANDLE,
     };
     use std::ops::Deref;
@@ -4482,9 +4488,9 @@ pub mod tests {
     impl Drop for BinderProcessFixture {
         fn drop(&mut self) {
             if let Some(driver) = self.driver.upgrade() {
-                driver.procs.write().remove(&self.proc.identifier).release(());
+                driver.procs.write().remove(&self.proc.identifier).release(&self.task);
             }
-            OwnedRef::take(&mut self.proc).release(());
+            OwnedRef::take(&mut self.proc).release(&self.task);
         }
     }
 
@@ -5550,7 +5556,7 @@ pub mod tests {
         vmo.read(&mut buffer[..], (security_context_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read security_context");
         assert_eq!(&buffer[..], security_context);
-        transaction_state.release(());
+        transaction_state.release(&sender.task);
     }
 
     #[fuchsia::test]
@@ -5628,7 +5634,7 @@ pub mod tests {
             &sender.thread.lock().command_queue.commands.front(),
             Some(Command::AcquireRef(BINDER_OBJECT))
         );
-        transaction_state.release(());
+        transaction_state.release(&sender.task);
     }
 
     #[fuchsia::test]
@@ -5686,7 +5692,7 @@ pub mod tests {
                 &mut allocations.scatter_gather_buffer,
             )
             .expect("failed to translate handles")
-            .release(());
+            .release(&sender.task);
 
         // Verify that the transaction data was mutated.
         let mut expected_transaction_data = vec![];
@@ -5792,7 +5798,7 @@ pub mod tests {
         guard.release(&mut RefCountActions::default_released());
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&owner.proc));
         assert_eq!(object.local, binder_object);
-        transaction_state.release(());
+        transaction_state.release(&sender.task);
     }
 
     #[fuchsia::test]
@@ -5926,7 +5932,7 @@ pub mod tests {
         guard.release(&mut RefCountActions::default_released());
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&other_proc.proc));
         assert_eq!(object.local, binder_object_addr);
-        transaction_state.release(());
+        transaction_state.release(&sender.task);
     }
 
     /// Tests that hwbinder's scatter-gather buffer-fix-up implementation is correct.
@@ -6027,7 +6033,7 @@ pub mod tests {
                 None,
             )
             .expect("copy_transaction_buffers");
-        transaction_state.release(());
+        transaction_state.release(&sender.task);
         let data_buffer = buffers.data;
 
         // Read back the translated objects from the receiver's memory.
@@ -6389,7 +6395,10 @@ pub mod tests {
         assert_eq!(receiver_fd_flags, FdFlags::CLOEXEC);
 
         // Release the buffer in the receiver and verify that the associated FDs have been closed.
-        receiver.proc.handle_free_buffer(data_buffer.address).expect("failed to free buffer");
+        receiver
+            .proc
+            .handle_free_buffer(&receiver.task, data_buffer.address)
+            .expect("failed to free buffer");
         assert!(
             receiver
                 .task
@@ -6659,7 +6668,7 @@ pub mod tests {
         assert!(receiver.task.files.get(fd).is_ok(), "file should be translated");
 
         // Release the result, which should close the fds in the receiver.
-        transient_state.release(());
+        transient_state.release(&sender.task);
         assert!(receiver.task.files.get(fd).expect_err("file should be closed") == EBADF);
     }
 
@@ -6785,74 +6794,58 @@ pub mod tests {
         );
     }
 
-    #[fuchsia::test]
-    async fn process_state_cleaned_up_after_binder_fd_closed() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let binder_driver = BinderDriver::new();
-        let node = FsNode::new_root(PanickingFsNode);
-
-        // Open the binder device, which creates an instance of the binder device associated with
-        // the process.
-        let binder_instance = binder_driver
-            .open(&current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
-            .expect("binder dev open failed");
-
-        // Ensure that the binder driver has created process state.
-        binder_driver.find_process(0).expect("failed to find process").release(());
-
-        // Simulate closing the FD by dropping the binder instance.
-        drop(binder_instance);
-
-        // Verify that the process state no longer exists.
-        binder_driver.find_process(0).expect_err("process was not cleaned up");
+    // Open the binder device, which creates an instance of the binder device associated with
+    // the process.
+    fn open_binder_fd(current_task: &CurrentTask, binder_driver: &Arc<BinderDriver>) -> FileHandle {
+        let fs = anon_fs(current_task.kernel());
+        let node = fs.create_node(
+            &current_task,
+            Anon,
+            FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
+        );
+        FileObject::new_anonymous(
+            binder_driver
+                .open(&current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
+                .expect("binder dev open failed"),
+            Arc::clone(&node),
+            OpenFlags::RDWR,
+        )
     }
 
     #[fuchsia::test]
     async fn close_binder() {
         let (_kernel, current_task) = create_kernel_and_task();
         let binder_driver = BinderDriver::new();
-        let node = FsNode::new_root(PanickingFsNode);
 
-        // Open the binder device, which creates an instance of the binder device associated with
-        // the process.
-        let binder_instance = binder_driver
-            .open(&current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
-            .expect("binder dev open failed");
-        let binder_connection = binder_instance
-            .as_any()
-            .downcast_ref::<BinderConnection>()
-            .expect("must be a BinderConnection");
+        let binder_fd = open_binder_fd(&current_task, &binder_driver);
+        let binder_connection =
+            binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
+        let identifier = binder_connection.identifier;
 
         // Ensure that the binder driver has created process state.
-        binder_driver.find_process(0).expect("failed to find process").release(());
+        binder_driver
+            .find_process(identifier)
+            .expect("failed to find process")
+            .release(&current_task);
 
         // Close the file descriptor.
-        binder_connection.close();
+        std::mem::drop(binder_fd);
+        current_task.trigger_delayed_releaser();
 
         // Verify that the process state no longer exists.
-        binder_driver.find_process(0).expect_err("process was not cleaned up");
-
-        // Verify that binder connection cannot access the process anymore.
-        binder_connection
-            .proc(&current_task)
-            .expect_err("binder_connection still have access to the process.");
+        binder_driver.find_process(identifier).expect_err("process was not cleaned up");
     }
 
     #[fuchsia::test]
     async fn flush_kicks_threads() {
         let (_kernel, current_task) = create_kernel_and_task();
         let binder_driver = BinderDriver::new();
-        let node = FsNode::new_root(PanickingFsNode);
 
         // Open the binder device, which creates an instance of the binder device associated with
         // the process.
-        let binder_instance = binder_driver
-            .open(&current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
-            .expect("binder dev open failed");
-        let binder_connection = binder_instance
-            .as_any()
-            .downcast_ref::<BinderConnection>()
-            .expect("must be a BinderConnection");
+        let binder_fd = open_binder_fd(&current_task, &binder_driver);
+        let binder_connection =
+            binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
         let binder_proc = binder_connection.proc(&current_task).unwrap();
         let binder_thread = binder_proc.lock().find_or_register_thread(binder_proc.pid);
 
@@ -6890,7 +6883,7 @@ pub mod tests {
             .unwrap();
         assert_eq!(bytes_read, 0);
         thread.join().expect("join");
-        binder_proc.release(());
+        binder_proc.release(&current_task);
     }
 
     #[fuchsia::test]
@@ -7156,7 +7149,7 @@ pub mod tests {
             .expect("failed to translate handles");
 
         // Simulate success by converting the transient state.
-        let transaction_state = transient_transaction_state.into_state(());
+        let transaction_state = transient_transaction_state.into_state(&sender.task);
 
         // The receiver should now have a file.
         let receiver_fd =
@@ -7185,7 +7178,7 @@ pub mod tests {
         });
 
         assert_eq!(expected_transaction_data, transaction_data);
-        transaction_state.release(());
+        transaction_state.release(&sender.task);
     }
 
     #[fuchsia::test]
@@ -7230,7 +7223,7 @@ pub mod tests {
         assert!(!receiver.task.files.get_all_fds().is_empty(), "receiver should have a file");
 
         // Simulate an error, which will release the transaction state.
-        transaction_state.release(());
+        transaction_state.release(&sender.task);
 
         assert!(receiver.task.files.get_all_fds().is_empty(), "receiver should not have any files");
     }
@@ -7296,8 +7289,8 @@ pub mod tests {
         sender.thread.lock().command_queue.commands.pop_front().unwrap();
 
         // Simulate a successful transaction by converting the transient state.
-        let transaction_state = transaction_state.into_state(());
-        transaction_state.release(());
+        let transaction_state = transaction_state.into_state(&sender.task);
+        transaction_state.release(&sender.task);
 
         // Verify that a strong release command is sent to the sender process.
         assert_matches!(
@@ -7410,7 +7403,10 @@ pub mod tests {
 
         // Now the receiver issues the `BC_FREE_BUFFER` command, which should queue up the next
         // oneway transaction, guaranteeing sequential execution.
-        receiver.proc.handle_free_buffer(buffer_addr).expect("failed to free buffer");
+        receiver
+            .proc
+            .handle_free_buffer(&receiver.task, buffer_addr)
+            .expect("failed to free buffer");
 
         assert!(object.lock().oneway_transactions.is_empty(), "oneway queue should now be empty");
         assert!(
@@ -7436,7 +7432,10 @@ pub mod tests {
         };
 
         // Now the receiver issues the `BC_FREE_BUFFER` command, which should end oneway handling.
-        receiver.proc.handle_free_buffer(buffer_addr).expect("failed to free buffer");
+        receiver
+            .proc
+            .handle_free_buffer(&receiver.task, buffer_addr)
+            .expect("failed to free buffer");
 
         assert!(object.lock().oneway_transactions.is_empty(), "oneway queue should still be empty");
         assert!(
@@ -7710,15 +7709,10 @@ pub mod tests {
     async fn connect_to_multiple_binder() {
         let (_kernel, task) = create_kernel_and_task();
         let driver = BinderDriver::new();
-        let node = FsNode::new_root(PanickingFsNode);
 
         // Opening the driver twice from the same task must succeed.
-        let _d1 = driver
-            .open(&task, DeviceType::NONE, &node, OpenFlags::RDWR)
-            .expect("binder dev open failed");
-        let _d2 = driver
-            .open(&task, DeviceType::NONE, &node, OpenFlags::RDWR)
-            .expect("binder dev open failed");
+        let _d1 = open_binder_fd(&task, &driver);
+        let _d2 = open_binder_fd(&task, &driver);
     }
 
     pub type TestFdTable = BTreeMap<i32, fbinder::FileHandle>;

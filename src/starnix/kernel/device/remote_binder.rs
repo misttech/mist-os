@@ -5,7 +5,7 @@
 use crate::{
     device::{DeviceOps, RemoteBinderConnection},
     mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
-    task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
+    task::{with_current_task, CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, FsString, NamespaceNode,
@@ -704,7 +704,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         scopeguard::defer! {
             // When leaving the current scope, close the connection, even if some operation are in
             // progress. This should kick the tasks back with an error.
-            remote_binder_connection.close();
+            with_current_task(|current_task| {
+              remote_binder_connection.close(current_task);
+            });
         }
 
         // Register a receiver to be notified of exit
