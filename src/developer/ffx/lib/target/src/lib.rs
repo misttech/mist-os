@@ -17,7 +17,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 use thiserror::Error;
 use timeout::timeout;
-use tracing::info;
+use tracing::{debug, info};
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
@@ -224,7 +224,15 @@ pub async fn knock_target_with_timeout(
 /// variables, e.g. ["$FUCHSIA_TARGET_ADDR", "FUCHSIA_NODENAME"])
 pub async fn get_default_target(context: &EnvironmentContext) -> Result<Option<String>> {
     let target = context.get(TARGET_DEFAULT_KEY).await?;
-    info!("Default target resolved to {target:?}");
+    // TODO: (b/320519654) this resolves the target to use? Is the message wrong, and this is
+    // called to check for a default, and resolution happens somewhere else, for example, handling
+    // the None case? In that case, should both these log messages be moved there?  If this is the
+    // resolution of which target to use and it resolves to None, this should be a warning at
+    // least, if not an error?
+    match target {
+        Some(ref target) => info!("Default target resolved to ['{target:?}']"),
+        None => debug!("No default target configured"),
+    }
     Ok(target)
 }
 
