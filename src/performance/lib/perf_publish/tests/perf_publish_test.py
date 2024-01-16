@@ -93,8 +93,6 @@ _MISMATCH_METRICS_FUCHSIA_PERF = json.dumps(
     indent=4,
 )
 
-_FAKE_CATAPULT = "/path/to/fake_catapult"
-
 
 class CatapultConverterTest(unittest.TestCase):
     """Catapult converter metric publishing tests"""
@@ -143,6 +141,7 @@ class CatapultConverterTest(unittest.TestCase):
                 },
                 current_time=12345,
                 subprocess_check_call=subprocess_check_call,
+                runtime_deps_dir=self._temp_dir.name,
             )
         )
 
@@ -157,15 +156,11 @@ class CatapultConverterTest(unittest.TestCase):
             )
         )
 
-        converter.run(
-            _EMPTY_EXPECTED_METRICS_FILE,
-            converter_path=_FAKE_CATAPULT,
-            expected_metric_names_dir=self._temp_dir.name,
-        )
+        converter.run(_EMPTY_EXPECTED_METRICS_FILE)
 
         subprocess_check_call.assert_called_with(
             [
-                _FAKE_CATAPULT,
+                os.path.join(self._temp_dir.name, "catapult_converter"),
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -194,13 +189,11 @@ class CatapultConverterTest(unittest.TestCase):
                 },
                 current_time=12345,
                 subprocess_check_call=subprocess_check_call,
+                runtime_deps_dir=self._temp_dir.name,
             )
         )
 
-        converter.run(
-            self._expected_metrics_txt,
-            converter_path=_FAKE_CATAPULT,
-        )
+        converter.run(self._expected_metrics_txt)
 
         self.assertTrue(os.path.isfile(self._expected_input_path))
 
@@ -232,7 +225,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                _FAKE_CATAPULT,
+                os.path.join(self._temp_dir.name, "catapult_converter"),
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -267,18 +260,15 @@ class CatapultConverterTest(unittest.TestCase):
                 },
                 current_time=12345,
                 subprocess_check_call=subprocess_check_call,
+                runtime_deps_dir=self._temp_dir.name,
             )
         )
 
-        converter.run(
-            _EMPTY_EXPECTED_METRICS_FILE,
-            converter_path=_FAKE_CATAPULT,
-            expected_metric_names_dir=self._temp_dir.name,
-        )
+        converter.run(_EMPTY_EXPECTED_METRICS_FILE)
 
         subprocess_check_call.assert_called_with(
             [
-                _FAKE_CATAPULT,
+                os.path.join(self._temp_dir.name, "catapult_converter"),
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -314,18 +304,15 @@ class CatapultConverterTest(unittest.TestCase):
                 env,
                 current_time=12345,
                 subprocess_check_call=subprocess_check_call,
+                runtime_deps_dir=self._temp_dir.name,
             )
         )
 
-        converter.run(
-            _EMPTY_EXPECTED_METRICS_FILE,
-            converter_path=_FAKE_CATAPULT,
-            expected_metric_names_dir=self._temp_dir.name,
-        )
+        converter.run(_EMPTY_EXPECTED_METRICS_FILE)
 
         subprocess_check_call.assert_called_with(
             [
-                _FAKE_CATAPULT,
+                os.path.join(self._temp_dir.name, "catapult_converter"),
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -354,14 +341,11 @@ class CatapultConverterTest(unittest.TestCase):
             publish.CatapultConverter.from_env(
                 [self._mismatch_metrics_fuchsia_perf_json],
                 subprocess_check_call=subprocess_check_call,
+                runtime_deps_dir=self._temp_dir.name,
             )
         )
         with self.assertRaises(ValueError) as context:
-            converter.run(
-                _EXPECTED_METRICS_FILE,
-                converter_path=_FAKE_CATAPULT,
-                expected_metric_names_dir=self._temp_dir.name,
-            )
+            converter.run(_EXPECTED_METRICS_FILE)
         self.assertIn(
             (
                 " fuchsia.my.benchmark: metric_1\n"
@@ -384,18 +368,15 @@ class CatapultConverterTest(unittest.TestCase):
             publish.CatapultConverter.from_env(
                 [self._test_fuchsia_perf_json],
                 current_time=12345,
+                runtime_deps_dir=self._temp_dir.name,
                 subprocess_check_call=subprocess_check_call,
             )
         )
-        converter.run(
-            _EXPECTED_METRICS_FILE,
-            converter_path=_FAKE_CATAPULT,
-            expected_metric_names_dir=self._temp_dir.name,
-        )
+        converter.run(_EXPECTED_METRICS_FILE)
 
         subprocess_check_call.assert_called_with(
             [
-                _FAKE_CATAPULT,
+                os.path.join(self._temp_dir.name, "catapult_converter"),
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -426,11 +407,9 @@ class CatapultConverterTest(unittest.TestCase):
                 },
                 current_time=12345,
                 subprocess_check_call=subprocess_check_call,
+                runtime_deps_dir="/fake/path",
             )
-            converter.run(
-                _EXPECTED_METRICS_FILE,
-                converter_path=_FAKE_CATAPULT,
-            )
+            converter.run(_EXPECTED_METRICS_FILE)
             with open(os.path.join(tmpdir, _EXPECTED_METRICS_FILE), "r") as f:
                 contents = f.read()
                 self.assertEqual(
@@ -440,7 +419,7 @@ class CatapultConverterTest(unittest.TestCase):
 
         subprocess_check_call.assert_called_with(
             [
-                _FAKE_CATAPULT,
+                "/fake/path/catapult_converter",
                 "--input",
                 self._expected_input_path,
                 "--output",
@@ -468,10 +447,7 @@ class CatapultConverterTest(unittest.TestCase):
             )
         )
         with self.assertRaises(ValueError) as context:
-            converter.run(
-                _EXPECTED_METRICS_FILE,
-                converter_path=_FAKE_CATAPULT,
-            )
+            converter.run(_EXPECTED_METRICS_FILE)
         self.assertTrue(
             '"invalid_test_suite_name" does not match' in str(context.exception)
         )

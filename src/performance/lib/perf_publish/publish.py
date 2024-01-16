@@ -48,7 +48,7 @@ def publish_fuchsiaperf(
     fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
     expected_metric_names_filename: str,
     env: Union[dict[str, str], type(os.environ)] = os.environ,
-    converter_path: Union[str, os.PathLike] | None = None,
+    runtime_deps_dir: Union[str, os.PathLike] | None = None,
 ) -> None:
     """Publishes the given metrics.
 
@@ -56,12 +56,15 @@ def publish_fuchsiaperf(
         fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics. These
             will be summarized into a single fuchsiaperf.json file.
         env: map holding the environment variables.
-        converter_path: path to the catapult_converter binary.
+        runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
+             metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
         expected_metric_names_filename: allows to optionally validate the metrics in the perf file
             against a set of expected metrics.
     """
-    converter = CatapultConverter.from_env(fuchsia_perf_file_paths, env)
-    converter.run(expected_metric_names_filename, converter_path=converter_path)
+    converter = CatapultConverter.from_env(
+        fuchsia_perf_file_paths, env, runtime_deps_dir=runtime_deps_dir
+    )
+    converter.run(expected_metric_names_filename)
 
 
 class CatapultConverter:
@@ -76,6 +79,7 @@ class CatapultConverter:
         fuchsia_expected_metric_names_dest_dir: str | None = None,
         current_time: int | None = None,
         subprocess_check_call: Any = subprocess.check_call,
+        runtime_deps_dir: Union[str, os.PathLike] | None = None,
     ):
         """Creates a new catapult converter.
 
@@ -86,6 +90,8 @@ class CatapultConverter:
             current_time: the current time, useful for testing. Defaults to time.time.
             subprocess_check_call: allows to execute a process raising an exception on error.
                 Useful for testing. Defaults to subprocess.check_call.
+            runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
+                metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
 
         See //src/testing/catapult_converter/README.md for the rest of args.
         """
@@ -94,7 +100,12 @@ class CatapultConverter:
         self._fuchsia_expected_metric_names_dest_dir = (
             fuchsia_expected_metric_names_dest_dir
         )
-        self._runtime_deps_dir = utils.get_associated_runtime_deps_dir(__file__)
+        if runtime_deps_dir:
+            self._runtime_deps_dir = runtime_deps_dir
+        else:
+            self._runtime_deps_dir = utils.get_associated_runtime_deps_dir(
+                __file__
+            )
 
         self._upload_enabled: bool = True
         if master is None and bot is None:
@@ -184,6 +195,7 @@ class CatapultConverter:
         cls,
         fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
         env: Union[dict[str, str], type(os.environ)] = os.environ,
+        runtime_deps_dir: Union[str, os.PathLike] | None = None,
         current_time: int | None = None,
         subprocess_check_call: Any = subprocess.check_call,
     ) -> Self:
@@ -193,6 +205,8 @@ class CatapultConverter:
             fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
             env: map holding the environment variables.
             current_time: the current time, useful for testing. Defaults to time.time.
+            runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
+                metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
             subprocess_check_call: allows to execute a process raising an exception on error.
                 Useful for testing. Defaults to subprocess.check_call.
         """
@@ -206,6 +220,7 @@ class CatapultConverter:
             fuchsia_expected_metric_names_dest_dir=env.get(
                 ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR
             ),
+            runtime_deps_dir=runtime_deps_dir,
             current_time=current_time,
             subprocess_check_call=subprocess_check_call,
         )
@@ -213,30 +228,19 @@ class CatapultConverter:
     def run(
         self,
         expected_metric_names_filename: str,
-        converter_path: Union[str, os.PathLike] | None = None,
-        expected_metric_names_dir: Union[str, os.PathLike] | None = None,
     ) -> None:
         """Publishes the given metrics.
 
         Args:
             expected_metric_names_filename: file required to validate the metrics in the perf file
                 against a set of expected metrics.
-            converter_path: path to the catapult_converter binary.
-            expected_metric_names_dir: optional dir in which to look for metric name expectation files.
-                Defaults to the test runtime_deps dir.
         """
-        if converter_path is None:
-            converter_path = os.path.join(
-                self._runtime_deps_dir, "catapult_converter"
-            )
-
-        expected_metric_names_dir: str = (
-            self._runtime_deps_dir
-            if expected_metric_names_dir is None
-            else str(expected_metric_names_dir)
+        converter_path = os.path.join(
+            self._runtime_deps_dir, "catapult_converter"
         )
+
         expected_metric_names_file: str = os.path.join(
-            expected_metric_names_dir, expected_metric_names_filename
+            self._runtime_deps_dir, expected_metric_names_filename
         )
 
         _LOGGER.info("Converting the results to the catapult format")
