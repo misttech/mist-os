@@ -60,11 +60,9 @@
     }                                                       \
   } while (0)
 
-#define WLAN_TRACE_DURATION(args...)                                        \
-  {                                                                         \
-    auto function_name = cpp20::source_location::current().function_name(); \
-    TRACE_DURATION("wlan", function_name, args);                            \
-  }
+#define WLAN_TRACE_DURATION(args...)                                      \
+  auto function_name = cpp20::source_location::current().function_name(); \
+  TRACE_DURATION("wlan", function_name, args);
 
 #define FMT_MAC "%02x:%02x:%02x:%02x:%02x:%02x"
 #define FMT_MAC_ARGS(arr) (arr)[0], (arr)[1], (arr)[2], (arr)[3], (arr)[4], (arr)[5]
