@@ -67,8 +67,6 @@ bool RequestedCmsgSet::ipv6_pktinfo() const {
   return static_cast<bool>(requests_ & CmsgRequests::kIpv6Pktinfo);
 }
 
-// TODO(https://fxbug.dev/97260): Implement cache eviction strategy to avoid unbounded cache
-// growth.
 using RequestedCmsgResult = fit::result<ErrOrOutCode, std::optional<RequestedCmsgSet>>;
 RequestedCmsgResult RequestedCmsgCache::Get(zx_wait_item_t err_wait_item,
                                             bool get_requested_cmsg_set,
