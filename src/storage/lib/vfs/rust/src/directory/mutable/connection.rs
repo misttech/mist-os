@@ -31,7 +31,7 @@ use {
     futures::{pin_mut, TryStreamExt as _},
     pin_project::pin_project,
     std::{future::Future, pin::Pin, sync::Arc},
-    storage_trace as trace,
+    storage_trace::{self as trace, TraceFutureExt},
 };
 
 #[pin_project]
@@ -141,37 +141,58 @@ impl MutableConnection {
                             .directory
                             .create_symlink(name, target, connection)
                             .await
-                            .map_err(|s| s.into_raw()),
+                            .map_err(Status::into_raw),
                     )?;
                 }
             }
             fio::DirectoryRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
-                trace::duration!("storage", "Directory::ListExtendedAttributes");
-                this.handle_list_extended_attribute(iterator).await;
+                this.handle_list_extended_attribute(iterator)
+                    .trace(trace::trace_future_args!(
+                        "storage",
+                        "Directory::ListExtendedAttributes"
+                    ))
+                    .await;
             }
             fio::DirectoryRequest::GetExtendedAttribute { name, responder } => {
-                trace::duration!("storage", "Directory::GetExtendedAttribute");
-                let res = this.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
-                responder.send(res)?;
+                async move {
+                    let res =
+                        this.handle_get_extended_attribute(name).await.map_err(Status::into_raw);
+                    responder.send(res)
+                }
+                .trace(trace::trace_future_args!("storage", "Directory::GetExtendedAttribute"))
+                .await?;
             }
             fio::DirectoryRequest::SetExtendedAttribute { name, value, mode, responder } => {
-                trace::duration!("storage", "Directory::SetExtendedAttribute");
-                let res = this
-                    .handle_set_extended_attribute(name, value, mode)
-                    .await
-                    .map_err(|s| s.into_raw());
-                responder.send(res)?;
+                async move {
+                    let res = this
+                        .handle_set_extended_attribute(name, value, mode)
+                        .await
+                        .map_err(Status::into_raw);
+                    responder.send(res)
+                }
+                .trace(trace::trace_future_args!("storage", "Directory::SetExtendedAttribute"))
+                .await?;
             }
             fio::DirectoryRequest::RemoveExtendedAttribute { name, responder } => {
-                trace::duration!("storage", "Directory::RemoveExtendedAttribute");
-                let res =
-                    this.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
-                responder.send(res)?;
+                async move {
+                    let res =
+                        this.handle_remove_extended_attribute(name).await.map_err(Status::into_raw);
+                    responder.send(res)
+                }
+                .trace(trace::trace_future_args!("storage", "Directory::RemoveExtendedAttribute"))
+                .await?;
             }
             fio::DirectoryRequest::UpdateAttributes { payload, responder } => {
-                responder.send(
-                    this.as_mut().handle_update_attributes(payload).await.map_err(Status::into_raw),
-                )?;
+                async move {
+                    responder.send(
+                        this.as_mut()
+                            .handle_update_attributes(payload)
+                            .await
+                            .map_err(Status::into_raw),
+                    )
+                }
+                .trace(trace::trace_future_args!("storage", "Directory::UpdateAttributes"))
+                .await?;
             }
         }
         Ok(ConnectionState::Alive)

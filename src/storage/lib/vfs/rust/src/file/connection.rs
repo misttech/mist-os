@@ -34,7 +34,7 @@ use {
         ops::{Deref, DerefMut},
         sync::Arc,
     },
-    storage_trace as trace,
+    storage_trace::{self as trace, TraceFutureExt},
 };
 
 #[cfg(target_os = "fuchsia")]
@@ -509,17 +509,20 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::FileRequest::Close { responder } => {
-                trace::duration!("storage", "File::Close");
-                responder.send(
-                    if self.options.rights.intersects(
-                        fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES,
-                    ) {
-                        self.file.sync(SyncMode::PreClose).await.map_err(|status| status.into_raw())
-                    } else {
-                        Ok(())
-                    },
-                )?;
-                return Ok(ConnectionState::Closed);
+                return async move {
+                    responder.send(
+                        if self.options.rights.intersects(
+                            fio::Operations::WRITE_BYTES | fio::Operations::UPDATE_ATTRIBUTES,
+                        ) {
+                            self.file.sync(SyncMode::PreClose).await.map_err(Status::into_raw)
+                        } else {
+                            Ok(())
+                        },
+                    )?;
+                    Ok(ConnectionState::Closed)
+                }
+                .trace(trace::trace_future_args!("storage", "File::Close"))
+                .await;
             }
             #[cfg(not(target_os = "fuchsia"))]
             fio::FileRequest::Describe { responder } => {
@@ -540,9 +543,15 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 })?;
             }
             fio::FileRequest::LinkInto { dst_parent_token, dst, responder } => {
-                responder.send(
-                    self.handle_link_into(dst_parent_token, dst).await.map_err(|s| s.into_raw()),
-                )?;
+                async move {
+                    responder.send(
+                        self.handle_link_into(dst_parent_token, dst)
+                            .await
+                            .map_err(Status::into_raw),
+                    )
+                }
+                .trace(trace::trace_future_args!("storage", "File::LinkInto"))
+                .await?;
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
                 trace::duration!("storage", "File::GetConnectionInfo");
@@ -553,109 +562,161 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 })?;
             }
             fio::FileRequest::Sync { responder } => {
-                trace::duration!("storage", "File::Sync");
-                responder.send(
-                    self.file.sync(SyncMode::Normal).await.map_err(|status| status.into_raw()),
-                )?;
+                async move {
+                    responder.send(self.file.sync(SyncMode::Normal).await.map_err(Status::into_raw))
+                }
+                .trace(trace::trace_future_args!("storage", "File::Sync"))
+                .await?;
             }
             fio::FileRequest::GetAttr { responder } => {
-                trace::duration!("storage", "File::GetAttr");
-                let (status, attrs) = self.handle_get_attr().await;
-                responder.send(status.into_raw(), &attrs)?;
+                async move {
+                    let (status, attrs) = self.handle_get_attr().await;
+                    responder.send(status.into_raw(), &attrs)
+                }
+                .trace(trace::trace_future_args!("storage", "File::GetAttr"))
+                .await?;
             }
             fio::FileRequest::SetAttr { flags, attributes, responder } => {
-                trace::duration!("storage", "File::SetAttr");
-                let status = self.handle_set_attr(flags, attributes).await;
-                responder.send(status.into_raw())?;
+                async move {
+                    let status = self.handle_set_attr(flags, attributes).await;
+                    responder.send(status.into_raw())
+                }
+                .trace(trace::trace_future_args!("storage", "File::SetAttr"))
+                .await?;
             }
             fio::FileRequest::GetAttributes { query, responder } => {
-                trace::duration!("storage", "File::GetAttributes");
-                let result = self.handle_get_attributes(query).await;
-                responder.send(
-                    result
-                        .as_ref()
-                        .map(|a| {
-                            let fio::NodeAttributes2 {
-                                mutable_attributes: m,
-                                immutable_attributes: i,
-                            } = a;
-                            (m, i)
-                        })
-                        .map_err(|status| Status::into_raw(*status)),
-                )?;
+                async move {
+                    let result = self.handle_get_attributes(query).await;
+                    responder.send(
+                        result
+                            .as_ref()
+                            .map(|a| {
+                                let fio::NodeAttributes2 {
+                                    mutable_attributes: m,
+                                    immutable_attributes: i,
+                                } = a;
+                                (m, i)
+                            })
+                            .map_err(|status| Status::into_raw(*status)),
+                    )
+                }
+                .trace(trace::trace_future_args!("storage", "File::GetAttributes"))
+                .await?;
             }
             fio::FileRequest::UpdateAttributes { payload, responder } => {
-                trace::duration!("storage", "File::UpdateAttributes");
-                let result = self.handle_update_attributes(payload).await.map_err(|s| s.into_raw());
-                responder.send(result)?;
+                async move {
+                    let result =
+                        self.handle_update_attributes(payload).await.map_err(Status::into_raw);
+                    responder.send(result)
+                }
+                .trace(trace::trace_future_args!("storage", "File::UpdateAttributes"))
+                .await?;
             }
             fio::FileRequest::ListExtendedAttributes { iterator, control_handle: _ } => {
-                trace::duration!("storage", "File::ListExtendedAttributes");
-                self.handle_list_extended_attribute(iterator).await;
+                self.handle_list_extended_attribute(iterator)
+                    .trace(trace::trace_future_args!("storage", "File::ListExtendedAttributes"))
+                    .await;
             }
             fio::FileRequest::GetExtendedAttribute { name, responder } => {
-                trace::duration!("storage", "File::GetExtendedAttribute");
-                let res = self.handle_get_extended_attribute(name).await.map_err(|s| s.into_raw());
-                responder.send(res)?;
+                async move {
+                    let res =
+                        self.handle_get_extended_attribute(name).await.map_err(Status::into_raw);
+                    responder.send(res)
+                }
+                .trace(trace::trace_future_args!("storage", "File::GetExtendedAttribute"))
+                .await?;
             }
             fio::FileRequest::SetExtendedAttribute { name, value, mode, responder } => {
-                trace::duration!("storage", "File::SetExtendedAttribute");
-                let res = self
-                    .handle_set_extended_attribute(name, value, mode)
-                    .await
-                    .map_err(|s| s.into_raw());
-                responder.send(res)?;
+                async move {
+                    let res = self
+                        .handle_set_extended_attribute(name, value, mode)
+                        .await
+                        .map_err(Status::into_raw);
+                    responder.send(res)
+                }
+                .trace(trace::trace_future_args!("storage", "File::SetExtendedAttribute"))
+                .await?;
             }
             fio::FileRequest::RemoveExtendedAttribute { name, responder } => {
-                trace::duration!("storage", "File::RemoveExtendedAttribute");
-                let res =
-                    self.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
-                responder.send(res)?;
+                async move {
+                    let res =
+                        self.handle_remove_extended_attribute(name).await.map_err(Status::into_raw);
+                    responder.send(res)
+                }
+                .trace(trace::trace_future_args!("storage", "File::RemoveExtendedAttribute"))
+                .await?;
             }
             fio::FileRequest::EnableVerity { options, responder } => {
-                trace::duration!("storage", "File::EnableVerity");
-                let res = self.handle_enable_verity(options).await.map_err(|s| s.into_raw());
-                responder.send(res)?;
+                async move {
+                    let res = self.handle_enable_verity(options).await.map_err(Status::into_raw);
+                    responder.send(res)
+                }
+                .trace(trace::trace_future_args!("storage", "File::EnableVerity"))
+                .await?;
             }
             fio::FileRequest::Read { count, responder } => {
-                trace::duration!("storage", "File::Read", "bytes" => count);
-                let result = self.handle_read(count).await;
-                let () = responder.send(result.as_deref().map_err(|s| s.into_raw()))?;
+                let trace_args =
+                    trace::trace_future_args!("storage", "File::Read", "bytes" => count);
+                async move {
+                    let result = self.handle_read(count).await;
+                    responder.send(result.as_deref().map_err(|s| s.into_raw()))
+                }
+                .trace(trace_args)
+                .await?;
             }
             fio::FileRequest::ReadAt { offset, count, responder } => {
-                trace::duration!(
+                let trace_args = trace::trace_future_args!(
                     "storage",
                     "File::ReadAt",
                     "offset" => offset,
                     "bytes" => count
                 );
-                let result = self.handle_read_at(offset, count).await;
-                let () = responder.send(result.as_deref().map_err(|s| s.into_raw()))?;
+                async move {
+                    let result = self.handle_read_at(offset, count).await;
+                    responder.send(result.as_deref().map_err(|s| s.into_raw()))
+                }
+                .trace(trace_args)
+                .await?;
             }
             fio::FileRequest::Write { data, responder } => {
-                trace::duration!("storage", "File::Write", "bytes" => data.len());
-                let result = self.handle_write(data).await;
-                responder.send(result.map_err(Status::into_raw))?;
+                let trace_args =
+                    trace::trace_future_args!("storage", "File::Write", "bytes" => data.len());
+                async move {
+                    let result = self.handle_write(data).await;
+                    responder.send(result.map_err(Status::into_raw))
+                }
+                .trace(trace_args)
+                .await?;
             }
             fio::FileRequest::WriteAt { offset, data, responder } => {
-                trace::duration!(
+                let trace_args = trace::trace_future_args!(
                     "storage",
                     "File::WriteAt",
                     "offset" => offset,
                     "bytes" => data.len()
                 );
-                let result = self.handle_write_at(offset, data).await;
-                responder.send(result.map_err(Status::into_raw))?;
+                async move {
+                    let result = self.handle_write_at(offset, data).await;
+                    responder.send(result.map_err(Status::into_raw))
+                }
+                .trace(trace_args)
+                .await?;
             }
             fio::FileRequest::Seek { origin, offset, responder } => {
-                trace::duration!("storage", "File::Seek");
-                let result = self.handle_seek(offset, origin).await;
-                responder.send(result.map_err(Status::into_raw))?;
+                async move {
+                    let result = self.handle_seek(offset, origin).await;
+                    responder.send(result.map_err(Status::into_raw))
+                }
+                .trace(trace::trace_future_args!("storage", "File::Seek"))
+                .await?;
             }
             fio::FileRequest::Resize { length, responder } => {
-                trace::duration!("storage", "File::Resize", "length" => length);
-                let result = self.handle_truncate(length).await;
-                responder.send(result.map_err(Status::into_raw))?;
+                async move {
+                    let result = self.handle_truncate(length).await;
+                    responder.send(result.map_err(Status::into_raw))
+                }
+                .trace(trace::trace_future_args!("storage", "File::Resize"))
+                .await?;
             }
             fio::FileRequest::GetFlags { responder } => {
                 trace::duration!("storage", "File::GetFlags");
@@ -668,10 +729,14 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             #[cfg(target_os = "fuchsia")]
             fio::FileRequest::GetBackingMemory { flags, responder } => {
-                trace::duration!("storage", "File::GetBackingMemory");
-                let result = self.handle_get_backing_memory(flags).await;
-                responder.send(result.map_err(Status::into_raw))?;
+                async move {
+                    let result = self.handle_get_backing_memory(flags).await;
+                    responder.send(result.map_err(Status::into_raw))
+                }
+                .trace(trace::trace_future_args!("storage", "File::GetBackingMemory"))
+                .await?;
             }
+
             #[cfg(not(target_os = "fuchsia"))]
             fio::FileRequest::GetBackingMemory { flags: _, responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
@@ -681,6 +746,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::FileRequest::Query { responder } => {
+                trace::duration!("storage", "File::Query");
                 responder.send(fio::FILE_PROTOCOL_NAME.as_bytes())?;
             }
             fio::FileRequest::QueryFilesystem { responder } => {
@@ -691,9 +757,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 }
             }
             fio::FileRequest::Allocate { offset, length, mode, responder } => {
-                trace::duration!("storage", "File::Allocate");
-                let result = self.handle_allocate(offset, length, mode).await;
-                responder.send(result.map_err(Status::into_raw))?;
+                async move {
+                    let result = self.handle_allocate(offset, length, mode).await;
+                    responder.send(result.map_err(Status::into_raw))
+                }
+                .trace(trace::trace_future_args!("storage", "File::Allocate"))
+                .await?;
             }
         }
         Ok(ConnectionState::Alive)

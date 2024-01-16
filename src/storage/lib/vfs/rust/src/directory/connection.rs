@@ -28,7 +28,7 @@ use {
     fuchsia_zircon_status::Status,
     futures::future::poll_fn,
     std::{convert::TryInto as _, default::Default, sync::Arc, task::Poll},
-    storage_trace as trace,
+    storage_trace::{self as trace, TraceFutureExt},
 };
 
 /// Return type for `BaseConnection::handle_request` and [`DerivedConnection::handle_request`].
@@ -158,39 +158,45 @@ where
                 })?;
             }
             fio::DirectoryRequest::GetAttr { responder } => {
-                trace::duration!("storage", "Directory::GetAttr");
-                let (attrs, status) = match self.directory.get_attrs().await {
-                    Ok(attrs) => (attrs, Status::OK.into_raw()),
-                    Err(status) => (
-                        fio::NodeAttributes {
-                            mode: 0,
-                            id: fio::INO_UNKNOWN,
-                            content_size: 0,
-                            storage_size: 0,
-                            link_count: 1,
-                            creation_time: 0,
-                            modification_time: 0,
-                        },
-                        status.into_raw(),
-                    ),
-                };
-                responder.send(status, &attrs)?;
+                async move {
+                    let (attrs, status) = match self.directory.get_attrs().await {
+                        Ok(attrs) => (attrs, Status::OK.into_raw()),
+                        Err(status) => (
+                            fio::NodeAttributes {
+                                mode: 0,
+                                id: fio::INO_UNKNOWN,
+                                content_size: 0,
+                                storage_size: 0,
+                                link_count: 1,
+                                creation_time: 0,
+                                modification_time: 0,
+                            },
+                            status.into_raw(),
+                        ),
+                    };
+                    responder.send(status, &attrs)
+                }
+                .trace(trace::trace_future_args!("storage", "Directory::GetAttr"))
+                .await?;
             }
             fio::DirectoryRequest::GetAttributes { query, responder } => {
-                trace::duration!("storage", "Directory::GetAttributes");
-                let result = self.directory.get_attributes(query).await;
-                responder.send(
-                    result
-                        .as_ref()
-                        .map(|a| {
-                            let fio::NodeAttributes2 {
-                                mutable_attributes: m,
-                                immutable_attributes: i,
-                            } = a;
-                            (m, i)
-                        })
-                        .map_err(|status| Status::into_raw(*status)),
-                )?;
+                async move {
+                    let result = self.directory.get_attributes(query).await;
+                    responder.send(
+                        result
+                            .as_ref()
+                            .map(|a| {
+                                let fio::NodeAttributes2 {
+                                    mutable_attributes: m,
+                                    immutable_attributes: i,
+                                } = a;
+                                (m, i)
+                            })
+                            .map_err(|status| Status::into_raw(*status)),
+                    )
+                }
+                .trace(trace::trace_future_args!("storage", "Directory::GetAttributes"))
+                .await?;
             }
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
                 trace::duration!("storage", "Directory::UpdateAttributes");
@@ -222,8 +228,10 @@ where
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
             fio::DirectoryRequest::Open { flags, mode: _, path, object, control_handle: _ } => {
-                trace::duration!("storage", "Directory::Open");
-                self.handle_open(flags, path, object);
+                {
+                    trace::duration!("storage", "Directory::Open");
+                    self.handle_open(flags, path, object);
+                }
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
@@ -234,41 +242,46 @@ where
                 object_request,
                 control_handle: _,
             } => {
-                trace::duration!("storage", "Directory::Open2");
-                // Fill in rights from the parent connection if it's absent.
-                if let fio::ConnectionProtocols::Node(fio::NodeOptions {
-                    rights, protocols, ..
-                }) = &mut protocols
                 {
-                    if rights.is_none() {
-                        if matches!(protocols, Some(fio::NodeProtocols { node: Some(_), .. })) {
-                            // Only inherit the GET_ATTRIBUTES right for node connections.
-                            *rights = Some(self.options.rights & fio::Operations::GET_ATTRIBUTES);
-                        } else {
-                            *rights = Some(self.options.rights);
+                    trace::duration!("storage", "Directory::Open2");
+                    // Fill in rights from the parent connection if it's absent.
+                    if let fio::ConnectionProtocols::Node(fio::NodeOptions {
+                        rights,
+                        protocols,
+                        ..
+                    }) = &mut protocols
+                    {
+                        if rights.is_none() {
+                            if matches!(protocols, Some(fio::NodeProtocols { node: Some(_), .. })) {
+                                // Only inherit the GET_ATTRIBUTES right for node connections.
+                                *rights =
+                                    Some(self.options.rights & fio::Operations::GET_ATTRIBUTES);
+                            } else {
+                                *rights = Some(self.options.rights);
+                            }
                         }
                     }
+                    // If optional_rights is set, remove any rights that are not present on the
+                    // current connection.
+                    if let fio::ConnectionProtocols::Node(fio::NodeOptions {
+                        protocols:
+                            Some(fio::NodeProtocols {
+                                directory:
+                                    Some(fio::DirectoryProtocolOptions {
+                                        optional_rights: Some(rights),
+                                        ..
+                                    }),
+                                ..
+                            }),
+                        ..
+                    }) = &mut protocols
+                    {
+                        *rights &= self.options.rights;
+                    }
+                    protocols
+                        .to_object_request(object_request)
+                        .handle(|req| self.handle_open2(path, protocols, req));
                 }
-                // If optional_rights is set, remove any rights that are not present on the current
-                // connection.
-                if let fio::ConnectionProtocols::Node(fio::NodeOptions {
-                    protocols:
-                        Some(fio::NodeProtocols {
-                            directory:
-                                Some(fio::DirectoryProtocolOptions {
-                                    optional_rights: Some(rights),
-                                    ..
-                                }),
-                            ..
-                        }),
-                    ..
-                }) = &mut protocols
-                {
-                    *rights &= self.options.rights;
-                }
-                protocols
-                    .to_object_request(object_request)
-                    .handle(|req| self.handle_open2(path, protocols, req));
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
@@ -278,9 +291,12 @@ where
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::ReadDirents { max_bytes, responder } => {
-                trace::duration!("storage", "Directory::ReadDirents");
-                let (status, entries) = self.handle_read_dirents(max_bytes).await;
-                responder.send(status.into_raw(), entries.as_slice())?;
+                async move {
+                    let (status, entries) = self.handle_read_dirents(max_bytes).await;
+                    responder.send(status.into_raw(), entries.as_slice())
+                }
+                .trace(trace::trace_future_args!("storage", "Directory::ReadDirents"))
+                .await?;
             }
             fio::DirectoryRequest::Enumerate { options: _, iterator, control_handle: _ } => {
                 trace::duration!("storage", "Directory::Enumerate");
@@ -294,9 +310,12 @@ where
                 responder.send(Status::OK.into_raw())?;
             }
             fio::DirectoryRequest::Link { src, dst_parent_token, dst, responder } => {
-                trace::duration!("storage", "Directory::Link");
-                let status: Status = self.handle_link(&src, dst_parent_token, dst).await.into();
-                responder.send(status.into_raw())?;
+                async move {
+                    let status: Status = self.handle_link(&src, dst_parent_token, dst).await.into();
+                    responder.send(status.into_raw())
+                }
+                .trace(trace::trace_future_args!("storage", "Directory::Link"))
+                .await?;
             }
             fio::DirectoryRequest::Watch { mask, options, watcher, responder } => {
                 trace::duration!("storage", "Directory::Watch");
