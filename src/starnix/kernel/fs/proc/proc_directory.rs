@@ -659,6 +659,8 @@ impl DynamicFileSource for LoadavgFile {
 }
 
 #[derive(Clone)]
+// Tuple member is never used
+#[allow(dead_code)]
 struct SwapsFile(Weak<Kernel>);
 impl SwapsFile {
     pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
