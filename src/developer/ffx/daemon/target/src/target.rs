@@ -762,7 +762,14 @@ impl Target {
                 return;
             }
             None if status.is_some() => {
-                tracing::debug!("status change from None to id: {} {:?}", self.id(), status);
+                // Make compatibility status change more obvious to the user in the info logs.
+                // Leave the detailed status struct in the debug logs in case it is needed.
+                tracing::info!(
+                    "Compatibility status changed to ['{:#?}'] for target: [{}]",
+                    status.as_ref().unwrap().status,
+                    self.id()
+                );
+                tracing::debug!("{:#?}", status);
                 status.clone()
             }
             _ => None,
