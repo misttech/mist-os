@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//src/lib/icu/tzdata/icu_tzdata_resource.gni")
+import("//src/lib/intl/tz/zoneinfo_resource.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
@@ -27,4 +28,26 @@ fuchsia_package("tzdata_provider") {
     ":component",
     ":icu_tzdata_44_le_for_tzdata_provider",
   ]
+}
+
+# The zoneinfo tzif files provider. See the component manifest for details.
+#
+# While it would have been nice to add this information to tzdata_provider,
+# the zoneinfo files are large, so we'll need to have an assembly option to
+# include it into the product where necessary.
+fuchsia_component("zoneinfo_component") {
+  component_name = "zoneinfo-provider"
+  manifest = "meta/zoneinfo_provider.cml"
+}
+
+fuchsia_package("zoneinfo_provider_pkg") {
+  package_name = "zoneinfo-provider"
+  deps = [
+    ":zoneinfo",
+    ":zoneinfo_component",
+  ]
+}
+
+zoneinfo_resource("zoneinfo") {
+  visibility = [ ":*" ]
 }
