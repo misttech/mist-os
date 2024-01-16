@@ -231,7 +231,7 @@ impl NodeCache {
 }
 
 // Wraps a node with an open count.
-pub struct OpenedNode<N: FxNode + ?Sized>(Arc<N>);
+pub struct OpenedNode<N: FxNode + ?Sized>(pub Arc<N>);
 
 impl<N: FxNode + ?Sized> OpenedNode<N> {
     pub fn new(node: Arc<N>) -> Self {

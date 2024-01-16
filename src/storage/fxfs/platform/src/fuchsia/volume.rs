@@ -256,12 +256,12 @@ impl FxVolume {
     pub(super) async fn maybe_purge_file(&self, object_id: u64) -> Result<(), Error> {
         if let Some(node) = self.cache.get(object_id) {
             if let Ok(file) = node.clone().into_any().downcast::<FxFile>() {
-                if !file.mark_purged() {
+                if !file.mark_to_be_purged() {
                     return Ok(());
                 }
             }
             if let Ok(blob) = node.into_any().downcast::<FxBlob>() {
-                if !blob.mark_purged() {
+                if !blob.mark_to_be_purged() {
                     return Ok(());
                 }
             }
@@ -384,13 +384,15 @@ impl FxVolume {
     pub async fn flush_all_files(&self) {
         let mut flushed = 0;
         for file in self.cache.files() {
-            if let Err(e) = file.flush().await {
-                warn!(
-                    store_id = self.store.store_object_id(),
-                    oid = file.object_id(),
-                    error = ?e,
-                    "Failed to flush",
-                )
+            if let Some(node) = file.clone_as_opened_node() {
+                if let Err(e) = FxFile::flush(&node).await {
+                    warn!(
+                        store_id = self.store.store_object_id(),
+                        oid = file.object_id(),
+                        error = ?e,
+                        "Failed to flush",
+                    )
+                }
             }
             flushed += 1;
         }

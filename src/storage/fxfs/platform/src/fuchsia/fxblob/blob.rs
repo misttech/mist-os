@@ -84,7 +84,7 @@ impl FxBlob {
     }
 
     /// Marks the blob as being purged.  Returns true if there are no open references.
-    pub fn mark_purged(&self) -> bool {
+    pub fn mark_to_be_purged(&self) -> bool {
         let mut old = self.open_count.load(Ordering::Relaxed);
         loop {
             assert_eq!(old & PURGED, 0);

@@ -50,10 +50,15 @@ use {
     },
 };
 
-// When the top bit of the open count is set, it means the file has been deleted and when the count
-// drops to zero, it will be tombstoned.  Once it has dropped to zero, it cannot be opened again
-// (assertions will fire).
-const PURGED: usize = 1 << (usize::BITS - 1);
+/// In many operating systems, it is possible to delete a file with open handles. In this case the
+/// file will continue to use space on disk but will not openable and the storage it uses will be
+/// freed when the last handle to the file is closed.
+/// To provide this behaviour, we use this constant to denote files that are marked for deletion.
+///
+/// When the top bit of the open count is set, it means the file has been deleted and when the count
+/// drops to zero, it will be tombstoned.  Once it has dropped to zero, it cannot be opened again
+/// (assertions will fire).
+const TO_BE_PURGED: usize = 1 << (usize::BITS - 1);
 
 /// FxFile represents an open connection to a file.
 pub struct FxFile {
@@ -99,14 +104,15 @@ impl FxFile {
         )
     }
 
-    /// Marks the file as being purged.  Returns true if there are no open references.
-    pub fn mark_purged(&self) -> bool {
+    /// Marks the file to be purged when the open count drops to zero.
+    /// Returns true if there are no open references.
+    pub fn mark_to_be_purged(&self) -> bool {
         let mut old = self.open_count.load(Ordering::Relaxed);
         loop {
-            assert_eq!(old & PURGED, 0);
+            assert_eq!(old & TO_BE_PURGED, 0);
             match self.open_count.compare_exchange_weak(
                 old,
-                old | PURGED,
+                old | TO_BE_PURGED,
                 Ordering::Relaxed,
                 Ordering::Relaxed,
             ) {
@@ -120,9 +126,36 @@ impl FxFile {
         self.handle.uncached_handle().verified_file()
     }
 
+    /// If this instance has not been marked to be purged, returns an OpenedNode instance.
+    /// If marked for purging, returns None.
+    pub fn clone_as_opened_node(self: &Arc<Self>) -> Option<OpenedNode<FxFile>> {
+        let mut count = self.open_count.load(Ordering::Relaxed);
+        loop {
+            if count == TO_BE_PURGED {
+                return None;
+            }
+            match self.open_count.compare_exchange_weak(
+                count,
+                count + 1,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    return Some(OpenedNode(self.clone()));
+                }
+                Err(new_count) => count = new_count,
+            }
+        }
+    }
+
+    /// Persists any unflushed data to disk.
+    ///
+    /// Flush may be triggered as a background task so this requires an OpenedNode to
+    /// ensure that we don't accidentally try to flush a file handle that is in the process of
+    /// being removed. (See use of cache in `FxVolume::flush_all_files`.)
     #[trace]
-    pub async fn flush(&self) -> Result<(), Error> {
-        self.handle.flush().await
+    pub async fn flush(this: &OpenedNode<FxFile>) -> Result<(), Error> {
+        this.handle.flush().await
     }
 
     pub fn get_block_size(&self) -> u64 {
@@ -166,13 +199,21 @@ impl FxFile {
         self.handle.uncached_handle().get_size()
     }
 
+    /// Decrements the open count by one and optionally flushes contents to disk if the count
+    /// drops to zero. This function also takes care of purging files that were
+    /// 'marked_to_be_purged' due to being deleted while still open.
     fn open_count_sub_one_and_maybe_flush(self: Arc<Self>, flush_on_last: bool) {
         let old = if flush_on_last {
             let mut old = self.open_count.load(Ordering::Relaxed);
             loop {
-                assert!(old & !PURGED > 0);
+                // open count should be above zero (ignoring TO_BE_PURGED bit)
+                assert!(old & !TO_BE_PURGED > 0);
+                // Nb: old == 1 here also implies TO_BE_PURGED is NOT set.
+                // There is no point in flushing a file that is about to be purged.
                 if old == 1 && self.handle.needs_flush() {
-                    // Spawn a task to do the flush.
+                    // If the file dereferenced to zero, we spawn a task to do a final flush.
+                    // Due to concurrency, we may have to do this a few times until needs_flush()
+                    // returns false.
                     self.handle.owner().clone().spawn(async move {
                         // Avoid infinite loops for errors.
                         let can_flush_again = self.handle.flush().await.is_ok();
@@ -193,10 +234,13 @@ impl FxFile {
             old
         } else {
             let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
-            assert!(old & !PURGED > 0);
+            assert!(old & !TO_BE_PURGED > 0);
             old
         };
-        if old == PURGED + 1 {
+        // TO_BE_PURGED is the top-most bit of count and used to indicate that an object
+        // should be tombstoned when the open count drops to zero.
+        // Actual purging is queued to be done asynchronously.
+        if old == TO_BE_PURGED + 1 {
             let store = self.handle.store();
             store
                 .filesystem()
@@ -228,7 +272,7 @@ impl FxNode for FxFile {
 
     fn open_count_add_one(&self) {
         let old = self.open_count.fetch_add(1, Ordering::Relaxed);
-        assert!(old != PURGED && old != PURGED - 1);
+        assert!(old != TO_BE_PURGED && old != TO_BE_PURGED - 1);
     }
 
     fn open_count_sub_one(self: Arc<Self>) {
@@ -344,7 +388,7 @@ impl vfs::node::Node for FxFile {
             .await
             .map_err(map_to_status)?;
         // Check that we're not unlinked.
-        if self.open_count.load(Ordering::Relaxed) & PURGED != 0 {
+        if self.open_count.load(Ordering::Relaxed) & TO_BE_PURGED != 0 {
             return Err(zx::Status::NOT_FOUND);
         }
         dir.link_object(transaction, &name, object_id, ObjectDescriptor::File).await
@@ -377,7 +421,7 @@ impl File for FxFile {
     }
 
     async fn enable_verity(&self, options: fio::VerificationOptions) -> Result<(), Status> {
-        self.flush().await.map_err(map_to_status)?;
+        self.handle.flush().await.map_err(map_to_status)?;
         self.handle.uncached_handle().enable_verity(options).await.map_err(map_to_status)
     }
 
