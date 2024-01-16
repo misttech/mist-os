@@ -8,7 +8,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/image-format/image_format.h>
-#include <lib/syslog/cpp/macros.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 #include <zircon/threads.h>
@@ -26,7 +25,6 @@ namespace ge2d {
 namespace {
 
 constexpr uint32_t kGe2d = 0;
-constexpr auto kTag = "ge2d";
 
 }  // namespace
 
@@ -48,7 +46,7 @@ zx_status_t Ge2dDevice::Ge2dInitTaskResize(
       output_image_format_table_list, output_image_format_table_count, output_image_format_index,
       frame_callback, res_callback, task_remove_callback, bti_, canvas_);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Task Creation Failed";
+    zxlogf(ERROR, "Task Creation Failed");
     return status;
   }
 
@@ -82,7 +80,7 @@ zx_status_t Ge2dDevice::Ge2dInitTaskWaterMark(
                           watermark_input_contiguous_vmos_, watermark_blended_contiguous_vmo_,
                           frame_callback, res_callback, task_remove_callback, bti_, canvas_);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Task Creation Failed";
+    zxlogf(ERROR, "Task Creation Failed");
     return status;
   }
 
@@ -114,7 +112,7 @@ zx_status_t Ge2dDevice::Ge2dInitTaskInPlaceWaterMark(
       image_format_index, watermark_input_contiguous_vmos_, watermark_blended_contiguous_vmo_,
       frame_callback, res_callback, task_remove_callback, bti_, canvas_);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Task Creation Failed";
+    zxlogf(ERROR, "Task Creation Failed");
     return status;
   }
 
@@ -157,7 +155,7 @@ void Ge2dDevice::Ge2dReleaseFrame(uint32_t task_index, uint32_t buffer_index) {
     // RemoveTask and FrameReady are asynchronous, so it's possible for a client to receive a frame
     // after it has requested task removal. If the client then returns this frame, the task may
     // already be gone, so just log it as a warning and continue.
-    FX_LOGS(WARNING) << "spurious ReleaseFrame(" << buffer_index << ") for task " << task_index;
+    zxlogf(WARNING, "spurious ReleaseFrame(%u) for task %u", buffer_index, task_index);
     return;
   }
 
@@ -899,7 +897,7 @@ void Ge2dDevice::ProcessRemoveTask(TaskInfo& info) {
 }
 
 int Ge2dDevice::FrameProcessingThread() {
-  FX_LOGST(TRACE, kTag) << "start";
+  zxlogf(TRACE, "start");
   for (;;) {
     fbl::AutoLock al(&lock_);
     while (processing_queue_.empty() && !shutdown_) {
@@ -942,41 +940,41 @@ zx_status_t Ge2dDevice::WaitForInterrupt(zx_port_packet_t* packet) {
 zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* out) {
   auto pdev = ddk::PDevFidl::FromFragment(parent);
   if (!pdev.is_valid()) {
-    FX_LOGST(ERROR, kTag) << "ZX_PROTOCOL_PDEV not available";
+    zxlogf(ERROR, "ZX_PROTOCOL_PDEV not available");
     return ZX_ERR_NO_RESOURCES;
   }
 
   std::optional<fdf::MmioBuffer> ge2d_mmio;
   zx_status_t status = pdev.MapMmio(kGe2d, &ge2d_mmio);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "pdev_.MapMmio failed";
+    zxlogf(ERROR, "pdev_.MapMmio failed");
     return status;
   }
 
   zx::interrupt ge2d_irq;
   status = pdev.GetInterrupt(0, &ge2d_irq);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "pdev_.GetInterrupt failed";
+    zxlogf(ERROR, "pdev_.GetInterrupt failed");
     return status;
   }
 
   zx::port port;
   status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "port create failed";
+    zxlogf(ERROR, "port create failed");
     return status;
   }
 
   status = ge2d_irq.bind(port, kPortKeyIrqMsg, 0 /*options*/);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "interrupt bind failed";
+    zxlogf(ERROR, "interrupt bind failed");
     return status;
   }
 
   zx::bti bti;
   status = pdev.GetBti(0, &bti);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "could not obtain bti";
+    zxlogf(ERROR, "could not obtain bti");
     return status;
   }
 
@@ -984,7 +982,7 @@ zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* 
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_amlogiccanvas::Service::Device>(parent,
                                                                                       "canvas");
   if (canvas_result.is_error()) {
-    FX_LOGST(ERROR, kTag) << "Could not get Amlogic Canvas protocol";
+    zxlogf(ERROR, "Could not get Amlogic Canvas protocol");
     return ZX_ERR_NO_RESOURCES;
   }
 
@@ -998,7 +996,7 @@ zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* 
     zx::vmo vmo;
     status = zx::vmo::create_contiguous(bti, kWatermarkMaxSize, 0, &vmo);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Unable to create contiguous memory for input watermark VMO";
+      zxlogf(ERROR, "Unable to create contiguous memory for input watermark VMO");
       return ZX_ERR_NO_MEMORY;
     }
     watermark_input_contiguous_vmos.push_back(std::move(vmo));
@@ -1007,7 +1005,7 @@ zx_status_t Ge2dDevice::Setup(zx_device_t* parent, std::unique_ptr<Ge2dDevice>* 
   zx::vmo watermark_blended_contiguous_vmo;
   status = zx::vmo::create_contiguous(bti, kWatermarkMaxSize, 0, &watermark_blended_contiguous_vmo);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Unable to create contiguous memory for blended watermark VMO";
+    zxlogf(ERROR, "Unable to create contiguous memory for blended watermark VMO");
     return ZX_ERR_NO_MEMORY;
   }
 

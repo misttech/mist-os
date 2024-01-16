@@ -4,8 +4,8 @@
 
 #include "src/camera/drivers/controller/passthrough_node.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -26,7 +26,7 @@ fpromise::result<std::unique_ptr<PassthroughNode>, zx_status_t> PassthroughNode:
     const InternalConfigNode& internal_passthrough_node, const StreamCreationData& info) {
   TRACE_DURATION("camera", "PassthroughNode::Create");
   if (internal_passthrough_node.output_constraints) {
-    FX_LOGS(INFO) << "Passthrough node does not support copying.";
+    zxlogf(INFO, "Passthrough node does not support copying.");
     return fpromise::error(ZX_ERR_INVALID_ARGS);
   }
   auto node = std::make_unique<camera::PassthroughNode>(
@@ -51,8 +51,8 @@ void PassthroughNode::ShutdownImpl(fit::closure callback) {
   callback();
 }
 
-void PassthroughNode::HwFrameReady(frame_available_info_t info) { FX_NOTREACHED(); }
-void PassthroughNode::HwFrameResolutionChanged(frame_available_info_t info) { FX_NOTREACHED(); }
-void PassthroughNode::HwTaskRemoved(task_remove_status_t status) { FX_NOTREACHED(); }
+void PassthroughNode::HwFrameReady(frame_available_info_t info) { abort(); }
+void PassthroughNode::HwFrameResolutionChanged(frame_available_info_t info) { abort(); }
+void PassthroughNode::HwTaskRemoved(task_remove_status_t status) { abort(); }
 
 }  // namespace camera

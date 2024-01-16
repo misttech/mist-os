@@ -122,7 +122,6 @@ void PipelineManager::SetStreamingEnabled(bool enabled) {
 
 void PipelineManager::Shutdown(fit::closure callback) {
   TRACE_DURATION("camera", "PipelineManager::Shutdown", "this", this);
-  FX_LOGS(INFO) << "PipelineManager::Shutdown() - start";
   zxlogf(INFO, "PipelineManager::Shutdown() - start");
   ZX_ASSERT_MSG(state_ != State::ShuttingDown, "Caller requested shutdown multiple times.");
   shutdown_state_.flow_nonce = TRACE_NONCE();
@@ -247,7 +246,6 @@ void PipelineManager::ShutdownAndRemoveNode(const std::vector<uint8_t>& path) {
     auto parent = path;
     parent.pop_back();
     if (!parent.empty()) {
-      FX_LOGS(INFO) << "Removing " << Format(path) << " from " << Format(parent) << " child set";
       auto path_str = Format(path);
       auto parent_str = Format(parent);
       zxlogf(INFO, "Removing %s from %s child set", path_str.c_str(), parent_str.c_str());

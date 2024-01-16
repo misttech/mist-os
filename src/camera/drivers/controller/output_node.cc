@@ -16,8 +16,7 @@
 namespace camera {
 
 OutputNode::OutputNode(async_dispatcher_t* dispatcher, BufferAttachments attachments)
-    : ProcessNode(dispatcher, NodeType::kOutputStream, attachments,
-                  [](auto, auto) { FX_NOTREACHED(); }),
+    : ProcessNode(dispatcher, NodeType::kOutputStream, attachments, [](auto, auto) { abort(); }),
       dispatcher_(dispatcher),
       binding_(this) {
   binding_.set_error_handler([this](auto status) { callbacks_.disconnect(); });
@@ -52,8 +51,11 @@ void OutputNode::ProcessFrame(FrameToken token, frame_metadata_t metadata) {
     binding_warnings_++;
     if (binding_warnings_ <= kBindingWarningsInitial ||
         binding_warnings_ % kBindingWarningsInterval == 0) {
-      FX_LOGS(WARNING) << this << ": client disconnected? returning frame... (seen "
-                       << binding_warnings_ << " times)";
+      std::stringstream ss;
+      ss << this << ": client disconnected? returning frame... (seen " << binding_warnings_
+         << " times)";
+      ss << "Camera node " << this << " client reconnected? delivering frame...";
+      zxlogf(WARNING, "%s", ss.str().c_str());
     }
     return;  // ~token
   }
@@ -89,9 +91,9 @@ void OutputNode::ShutdownImpl(fit::closure callback) {
   callback();
 }
 
-void OutputNode::HwFrameReady(frame_available_info_t info) { FX_NOTREACHED(); }
-void OutputNode::HwFrameResolutionChanged(frame_available_info_t info) { FX_NOTREACHED(); }
-void OutputNode::HwTaskRemoved(task_remove_status_t status) { FX_NOTREACHED(); }
+void OutputNode::HwFrameReady(frame_available_info_t info) { abort(); }
+void OutputNode::HwFrameResolutionChanged(frame_available_info_t info) { abort(); }
+void OutputNode::HwTaskRemoved(task_remove_status_t status) { abort(); }
 
 void OutputNode::Stop() {
   std::stringstream ss;
