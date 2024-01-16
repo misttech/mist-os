@@ -4,7 +4,7 @@
 
 import("//build/python/python_mobly_test.gni")
 
-python_mobly_test("firmware") {
+python_mobly_test("lacewing") {
   main_source = "fastboot.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
