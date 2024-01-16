@@ -41,7 +41,6 @@ source_set("lib") {
   deps = [
     ":imx227_bind",
     "//sdk/banjo/fuchsia.hardware.camera:fuchsia.hardware.camera_banjo_cpp",
-    "//sdk/lib/syslog/cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk:ddk-metadata-headers",
     "//zircon/system/ulib/fzl",
@@ -71,7 +70,6 @@ fuchsia_driver("fuchsia_driver") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
-    "//sdk/lib/syslog/cpp:backend",
   ]
 }
 

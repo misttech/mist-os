@@ -54,7 +54,7 @@ source_set("button_checker") {
   ]
   deps = [
     "//sdk/lib/component/incoming/cpp:cpp",
-    "//sdk/lib/syslog/cpp",
+    "//src/lib/ddk",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
@@ -93,6 +93,7 @@ executable("button_checker_unittest_bin") {
   sources = [ "button_checker_unittest.cc" ]
   deps = [
     ":button_checker",
+    "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

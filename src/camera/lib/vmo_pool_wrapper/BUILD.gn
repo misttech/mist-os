@@ -17,10 +17,7 @@ source_set("lib") {
   visibility = [ ":*" ]
   sources = [ "vmo_pool_wrapper.cc" ]
   public = [ "vmo_pool_wrapper.h" ]
-  public_deps = [
-    "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/fzl",
-  ]
+  public_deps = [ "//zircon/system/ulib/fzl" ]
 }
 
 executable("vmo_pool_wrapper_unittest_bin") {

@@ -12,7 +12,6 @@ source_set("camera-task") {
     "//sdk/banjo/fuchsia.hardware.camerahwaccel:fuchsia.hardware.camerahwaccel_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/lib/fit-promise",
-    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
   ]

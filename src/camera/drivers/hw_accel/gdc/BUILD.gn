@@ -39,7 +39,6 @@ source_set("lib") {
     "//sdk/banjo/fuchsia.hardware.gdc:fuchsia.hardware.gdc_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/lib/fit",
-    "//sdk/lib/syslog/cpp",
     "//src/camera/drivers/hw_accel/task:camera-task",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
@@ -63,10 +62,7 @@ source_set("lib") {
 
 fuchsia_driver("fuchsia_driver") {
   output_name = "gdc"
-  deps = [
-    ":lib",
-    "//sdk/lib/syslog/cpp:backend",
-  ]
+  deps = [ ":lib" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 }
 

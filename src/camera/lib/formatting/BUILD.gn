@@ -25,7 +25,6 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
     "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
-    "//src/lib/fsl",
   ]
 }
 

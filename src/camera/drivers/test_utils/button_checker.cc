@@ -5,24 +5,22 @@
 #include "button_checker.h"
 
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/syslog/cpp/macros.h>
+#include <lib/ddk/debug.h>
 
 #include <cstring>
 #include <iostream>
 #include <string>
 
-constexpr auto kTag = "button_checker";
-
 std::unique_ptr<ButtonChecker> ButtonChecker::Create() {
   auto checker = std::make_unique<ButtonChecker>();
   auto status = checker->loop_.Run();
   if (status != ZX_ERR_CANCELED) {
-    FX_LOGST(ERROR, kTag) << "Could not run button checker " << status;
+    zxlogf(ERROR, "Could not run button checker %i", status);
     return nullptr;
   }
 
   if (checker->devices_.empty()) {
-    FX_LOGST(WARNING, kTag) << "Zero devices were bound from " << kDevicePath;
+    zxlogf(WARNING, "Zero devices were bound from %s", kDevicePath);
     return nullptr;
   }
 
@@ -35,18 +33,19 @@ ButtonChecker::ButtonState ButtonChecker::GetMuteState() {
     // Get the report for the mute field.
     auto result = device->GetInputReport(fuchsia_input_report::DeviceType::kConsumerControl);
     if (result.is_error()) {
-      FX_LOGST(ERROR, kTag) << "GetInputReport failed " << result.error_value().FormatDescription();
+      auto error_str = result.error_value().FormatDescription();
+      zxlogf(ERROR, "GetInputReport failed %s", error_str.c_str());
       return ButtonState::UNKNOWN;
     }
 
     const auto& consumer_control = result->report().consumer_control();
     if (!consumer_control) {
-      FX_LOGST(ERROR, kTag) << "Invalid input report. Must have consumer_control.";
+      zxlogf(ERROR, "Invalid input report. Must have consumer_control.");
       return ButtonState::UNKNOWN;
     }
     const auto& pressed_buttons = consumer_control->pressed_buttons();
     if (!pressed_buttons) {
-      FX_LOGST(ERROR, kTag) << "Invalid input report. Must have pressed_buttons.";
+      zxlogf(ERROR, "Invalid input report. Must have pressed_buttons.");
       return ButtonState::UNKNOWN;
     }
     auto state_for_device =
@@ -57,7 +56,7 @@ ButtonChecker::ButtonState ButtonChecker::GetMuteState() {
 
     // Make sure that devices don't have conflicting states.
     if (state != ButtonState::UNKNOWN && state != state_for_device) {
-      FX_LOGST(ERROR, kTag) << "Conflicting states reported by different devices";
+      zxlogf(ERROR, "Conflicting states reported by different devices");
       return ButtonState::UNKNOWN;
     }
     state = state_for_device;
@@ -68,20 +67,19 @@ ButtonChecker::ButtonState ButtonChecker::GetMuteState() {
 
 void ButtonChecker::ExistsCallback(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
                                    const std::string& filename) {
-  FX_LOGST(DEBUG, kTag) << "Reading reports from " << filename.c_str();
+  zxlogf(DEBUG, "Reading reports from %s", filename.c_str());
 
   zx::result connection = component::ConnectAt<fuchsia_input_report::InputDevice>(dir, filename);
   if (connection.is_error()) {
-    FX_LOGST(ERROR, kTag) << "Could not open " << filename.c_str() << ": "
-                          << connection.status_string();
+    zxlogf(ERROR, "Could not open %s: %s", filename.c_str(), connection.status_string());
     return;
   }
 
   auto device = fidl::SyncClient(std::move(connection.value()));
   const auto descriptor = device->GetDescriptor();
   if (descriptor.is_error()) {
-    FX_LOGST(ERROR, kTag) << "GetDescriptor failed for " << filename.c_str() << ": "
-                          << descriptor.error_value().FormatDescription();
+    auto error_str = descriptor.error_value().FormatDescription();
+    zxlogf(ERROR, "GetDescriptor failed for %s: %s", filename.c_str(), error_str.c_str());
     return;
   }
 
@@ -126,7 +124,7 @@ bool VerifyDeviceUnmuted(bool consider_unknown_as_unmuted) {
     std::cerr.flush();
     return consider_unknown_as_unmuted;
   }
-  FX_DCHECK(state == ButtonChecker::ButtonState::DOWN);
+  ZX_DEBUG_ASSERT(state == ButtonChecker::ButtonState::DOWN);
   std::cerr << "**********************************************\n"
                "* WARNING: DEVICE IS MUTED. CAMERA WILL NOT  *\n"
                "*          OPERATE AND TESTS MAY BE SKIPPED! *\n"

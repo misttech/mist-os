@@ -18,7 +18,6 @@ source_set("lib") {
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//sdk/lib/syslog/cpp:backend",
     "//src/lib/fxl",
   ]
   public_deps = [ "//src/camera/bin/camera-gym/fidl:controller_hlcpp" ]
