@@ -34,7 +34,14 @@
         {
             from: "#config",
             to: "#bootstrap",
-            config: [ "fuchsia.driver.DriverLoadFuzzerMaxDelayMs" ],
+            config: [
+                "fuchsia.driver.BindEager",
+                "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+                "fuchsia.driver.DisabledDrivers",
+                "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+                "fuchsia.driver.EnableDriverLoadFuzzer",
+                "fuchsia.driver.EnableEphemeralDrivers",
+            ],
         },
         {
             protocol: "fuchsia.component.Binder",

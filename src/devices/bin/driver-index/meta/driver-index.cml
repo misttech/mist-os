@@ -20,8 +20,28 @@
     ],
     use: [
         {
+            config: "fuchsia.driver.EnableEphemeralDrivers",
+            config_key: "enable_ephemeral_drivers",
+        },
+        {
+            config: "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+            config_key: "delay_fallback_until_base_drivers_indexed",
+        },
+        {
+            config: "fuchsia.driver.BindEager",
+            config_key: "bind_eager",
+        },
+        {
+            config: "fuchsia.driver.EnableDriverLoadFuzzer",
+            config_key: "enable_driver_load_fuzzer",
+        },
+        {
             config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
             config_key: "driver_load_fuzzer_max_delay_ms",
+        },
+        {
+            config: "fuchsia.driver.DisabledDrivers",
+            config_key: "disabled_drivers",
         },
         {
             directory: "boot",

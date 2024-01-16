@@ -27,12 +27,11 @@ fuchsia_structured_config_rust_lib("driver_index_config") {
   cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("test_config") {
-  testonly = true
+fuchsia_structured_config_values("default_config") {
   cm_label = ":manifest"
   values = {
-    enable_ephemeral_drivers = true
-    delay_fallback_until_base_drivers_indexed = true
+    enable_ephemeral_drivers = false
+    delay_fallback_until_base_drivers_indexed = false
     bind_eager = []
     enable_driver_load_fuzzer = false
     driver_load_fuzzer_max_delay_ms = 0
@@ -102,8 +101,10 @@ fuchsia_component("component") {
 
 fuchsia_package("package") {
   package_name = "driver-index"
-  validate_structured_config = false
-  deps = [ ":component" ]
+  deps = [
+    ":component",
+    ":default_config",
+  ]
 }
 
 fuchsia_driver("fake-driver") {

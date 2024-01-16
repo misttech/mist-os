@@ -14,6 +14,9 @@ use std::num::NonZeroU32;
 
 /// The type of a configuration capability.
 pub use cm_rust::ConfigValueType;
+/// The inner type of a vector configuration capability.
+pub use cm_rust::ConfigNestedValueType;
+
 /// A collection of configuration capabilities.
 /// The name is the capability name, and the Config struct contains the configuration type and value.
 pub type CapabilityNamedMap = NamedMap<String, Config>;

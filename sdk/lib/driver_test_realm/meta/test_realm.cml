@@ -57,6 +57,21 @@
     ],
     capabilities: [
         {
+            config: "fuchsia.driver.EnableEphemeralDrivers",
+            type: "bool",
+            value: true,
+        },
+        {
+            config: "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+            type: "bool",
+            value: true,
+        },
+        {
+            config: "fuchsia.driver.EnableDriverLoadFuzzer",
+            type: "bool",
+            value: false,
+        },
+        {
             config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
             type: "int64",
             value: 0,
@@ -66,7 +81,12 @@
         {
             from: "self",
             to: "#driver-index",
-            config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+            config: [
+                "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+                "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+                "fuchsia.driver.EnableDriverLoadFuzzer",
+                "fuchsia.driver.EnableEphemeralDrivers",
+            ],
         },
         {
             protocol: [ "fuchsia.device.fs.lifecycle.Lifecycle" ],

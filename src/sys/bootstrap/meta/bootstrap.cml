@@ -164,7 +164,14 @@
         {
             from: "parent",
             to: "#driver_index",
-            config: [ "fuchsia.driver.DriverLoadFuzzerMaxDelayMs" ],
+            config: [
+                "fuchsia.driver.BindEager",
+                "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+                "fuchsia.driver.DisabledDrivers",
+                "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+                "fuchsia.driver.EnableDriverLoadFuzzer",
+                "fuchsia.driver.EnableEphemeralDrivers",
+            ],
         },
 
         // Disable the required offer for Archivist

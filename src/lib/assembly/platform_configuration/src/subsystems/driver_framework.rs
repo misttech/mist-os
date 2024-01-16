@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_capabilities::{Config, ConfigValueType};
+use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::driver_framework_config::{
     DriverFrameworkConfig, DriverHostCrashPolicy, TestFuzzingConfig,
 };
@@ -30,19 +30,41 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
                 enable_test_shutdown_delays: false,
             });
 
-        builder
-            .package("driver-index")
-            .component("meta/driver-index.cm")?
-            .field("enable_ephemeral_drivers", matches!(context.build_type, BuildType::Eng))?
-            .field("delay_fallback_until_base_drivers_indexed", delay_fallback)?
-            .field("bind_eager", driver_framework_config.eager_drivers.clone())?
-            .field("enable_driver_load_fuzzer", test_fuzzing_config.enable_load_fuzzer)?
-            .field("driver_load_fuzzer_max_delay_ms", test_fuzzing_config.max_load_delay_ms)?
-            .field("disabled_drivers", disabled_drivers)?;
-
+        builder.set_config_capability(
+            "fuchsia.driver.EnableEphemeralDrivers",
+            Config::new(ConfigValueType::Bool, matches!(context.build_type, BuildType::Eng).into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+            Config::new(ConfigValueType::Bool, delay_fallback.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.driver.BindEager",
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 100 },
+                    max_count: 20,
+                },
+                driver_framework_config.eager_drivers.clone().into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.driver.EnableDriverLoadFuzzer",
+            Config::new(ConfigValueType::Bool, test_fuzzing_config.enable_load_fuzzer.into()),
+        )?;
         builder.set_config_capability(
             "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
             Config::new(ConfigValueType::Int64, test_fuzzing_config.max_load_delay_ms.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.driver.DisabledDrivers",
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 100 },
+                    max_count: 20,
+                },
+                disabled_drivers.into(),
+            ),
         )?;
 
         let driver_host_crash_policy = driver_framework_config

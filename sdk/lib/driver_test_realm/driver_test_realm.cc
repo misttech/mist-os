@@ -411,16 +411,26 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     }
 
     // Set driver-index config based on request.
-    realm_builder_.InitMutableConfigFromPackage("driver-index");
-    realm_builder_.SetConfigValue("driver-index", "enable_ephemeral_drivers",
-                                  ConfigValue::Bool(true));
-    realm_builder_.SetConfigValue("driver-index", "delay_fallback_until_base_drivers_indexed",
-                                  ConfigValue::Bool(true));
     const std::vector<std::string> kEmptyVec;
-    realm_builder_.SetConfigValue("driver-index", "bind_eager",
-                                  request.args().driver_bind_eager().value_or(kEmptyVec));
-    realm_builder_.SetConfigValue("driver-index", "disabled_drivers",
-                                  request.args().driver_disable().value_or(kEmptyVec));
+    std::vector<component_testing::ConfigCapability> configurations;
+    configurations.push_back({
+        .name = "fuchsia.driver.BindEager",
+        .value = request.args().driver_bind_eager().value_or(kEmptyVec),
+    });
+    configurations.push_back({
+        .name = "fuchsia.driver.DisabledDrivers",
+        .value = request.args().driver_disable().value_or(kEmptyVec),
+    });
+    realm_builder_.AddConfiguration(std::move(configurations));
+    realm_builder_.AddRoute({
+        .capabilities =
+            {
+                component_testing::Config{.name = "fuchsia.driver.BindEager"},
+                component_testing::Config{.name = "fuchsia.driver.DisabledDrivers"},
+            },
+        .source = component_testing::SelfRef{},
+        .targets = {component_testing::ChildRef{"driver-index"}},
+    });
 
     // Set driver_manager config based on request.
     realm_builder_.InitMutableConfigFromPackage("driver_manager");
