@@ -63,7 +63,7 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
         fuchsia_system_metrics::kCpuPercentageMigratedIntBucketsStepSize);
   }
 
-  inspect::Inspector Inspector() { return *(daemon_->inspector_.inspector()); }
+  inspect::Inspector Inspector() { return daemon_->inspector_.inspector(); }
 
   // Run a promise to completion on the default async executor.
   void RunPromiseToCompletion(fpromise::promise<> promise) {

@@ -8,7 +8,7 @@
 
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <lib/zx/resource.h>
@@ -83,7 +83,7 @@ SystemMetricsDaemon::SystemMetricsDaemon(
       cpu_stats_fetcher_(std::move(cpu_stats_fetcher)),
       activity_listener_(std::move(activity_listener)),
       activation_file_prefix_(std::move(activation_file_prefix)),
-      inspector_(context),
+      inspector_(dispatcher_, {}),
       platform_metric_node_(inspector_.root().CreateChild(kInspecPlatformtNodeName)),
       // Diagram of hierarchy can be seen below:
       // root

@@ -12,7 +12,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/zbi-format/zbi.h>
@@ -283,7 +283,7 @@ int main(int argc, const char** argv) {
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
-  sys::ComponentInspector inspector(context.get());
+  inspect::ComponentInspector inspector(loop.dispatcher(), {});
   inspector.Health().StartingUp();
 
   // Lower the priority of the main thread.

@@ -10,9 +10,9 @@
 
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/sys/inspect/cpp/component.h>
 
 #include <chrono>
 #include <memory>
@@ -195,7 +195,7 @@ class SystemMetricsDaemon {
   fidl::InterfacePtr<fuchsia::ui::activity::Provider> activity_provider_;
   std::string activation_file_prefix_;
 
-  sys::ComponentInspector inspector_;
+  inspect::ComponentInspector inspector_;
   inspect::Node platform_metric_node_;
 
   inspect::Node metric_cpu_node_;
