@@ -98,11 +98,16 @@ func NewFFXInstance(
 	if ffxPath == "" {
 		return nil, nil
 	}
-	if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
+	absOutputDir, err := filepath.Abs(outputDir)
+	if err != nil {
 		return nil, err
 	}
+	if err := os.MkdirAll(absOutputDir, os.ModePerm); err != nil {
+		return nil, err
+	}
+
 	env = append(os.Environ(), env...)
-	env = append(env, fmt.Sprintf("%s=%s", FFXIsolateDirEnvKey, outputDir))
+	env = append(env, fmt.Sprintf("%s=%s", FFXIsolateDirEnvKey, absOutputDir))
 	absFFXPath, err := filepath.Abs(ffxPath)
 	if err != nil {
 		return nil, err
@@ -115,10 +120,10 @@ func NewFFXInstance(
 		stderr:     os.Stderr,
 		target:     target,
 		env:        env,
-		isolateDir: outputDir,
+		isolateDir: absOutputDir,
 	}
 	ffxCmds := [][]string{
-		{"config", "set", "log.dir", filepath.Join(outputDir, "ffx_logs")},
+		{"config", "set", "log.dir", filepath.Join(absOutputDir, "ffx_logs")},
 		{"config", "set", "ffx.subtool-search-paths", filepath.Dir(absFFXPath)},
 		{"config", "set", "target.default", target},
 		{"config", "set", "test.experimental_json_input", "true"},
@@ -167,6 +172,14 @@ func (f *FFXInstance) Env() []string {
 
 func (f *FFXInstance) SetTarget(target string) {
 	f.target = target
+}
+
+func (f *FFXInstance) Stdout() io.Writer {
+	return f.stdout
+}
+
+func (f *FFXInstance) Stderr() io.Writer {
+	return f.stderr
 }
 
 // SetStdoutStderr sets the stdout and stderr for the ffx commands to write to.

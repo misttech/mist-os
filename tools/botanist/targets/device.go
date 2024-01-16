@@ -229,6 +229,8 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 	if err != nil {
 		return fmt.Errorf("cannot listen: %w", err)
 	}
+	stdout, _, flush := botanist.NewStdioWriters(ctx)
+	defer flush()
 	go func() {
 		defer l.Close()
 		for atomic.LoadUint32(&t.stopping) == 0 {
@@ -236,7 +238,9 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			if err != nil {
 				continue
 			}
-			fmt.Print(data)
+			if _, err := stdout.Write([]byte(data)); err != nil {
+				logger.Warningf(ctx, "failed to write log to stdout: %s, data: %s", err, data)
+			}
 		}
 	}()
 

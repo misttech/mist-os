@@ -9,6 +9,7 @@ import (
 	"context"
 	"io"
 	"math"
+	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/streams"
@@ -87,7 +88,7 @@ func (w *LineWriter) Write(data []byte) (int, error) {
 	for _, line := range lines {
 		if bytes.HasSuffix(line, []byte("\n")) {
 			n, err := w.writer.Write(append(w.line, line...))
-			written += int(math.Max(0, float64(n-len(line))))
+			written += int(math.Max(0, float64(n-len(w.line))))
 			if err != nil {
 				return written, err
 			}
@@ -97,6 +98,25 @@ func (w *LineWriter) Write(data []byte) (int, error) {
 		}
 	}
 	return len(data), nil
+}
+
+// TimestampWriter is a wrapper around a writer that prepends its writes
+// with the current host timestamp. This will allow all botanist logs
+// (kernel/serial/syslog/test) to be reliably lined up when reading them.
+type TimestampWriter struct {
+	writer io.Writer
+	format string
+}
+
+func NewTimestampWriter(writer io.Writer) *TimestampWriter {
+	return &TimestampWriter{writer, "15:04:05.000000 "}
+}
+
+func (w *TimestampWriter) Write(data []byte) (int, error) {
+	if n, err := w.writer.Write([]byte(time.Now().Format(w.format))); err != nil {
+		return n, err
+	}
+	return w.writer.Write(data)
 }
 
 // NewStiodWriters returns a new LineWriter for the stdout and stderr associated

@@ -497,7 +497,46 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		if err := os.MkdirAll(filepath.Dir(logfile), os.ModePerm); err != nil {
 			return fmt.Errorf("failed to make parent dirs of %q: %w", logfile, err)
 		}
-		chardev.Logfile = logfile
+		// Have the emulator write the serial output to a temp file, which we will
+		// read through a TimestampWriter into the actual designated log file.
+		tempLogfile := filepath.Join(os.TempDir(), "temp_logfile.txt")
+		chardev.Logfile = tempLogfile
+		f, err := os.Create(tempLogfile)
+		if err != nil {
+			return fmt.Errorf("failed to create %s", tempLogfile)
+		}
+		cleanupTempLogfile := func() {
+			if err := f.Close(); err != nil {
+				logger.Warningf(t.targetCtx, "failed to close %s", tempLogfile)
+			}
+			if err := os.Remove(tempLogfile); err != nil {
+				logger.Warningf(t.targetCtx, "failed to remove %s", tempLogfile)
+			}
+		}
+		g, err := os.Create(logfile)
+		if err != nil {
+			cleanupTempLogfile()
+			return fmt.Errorf("failed to create %s", logfile)
+		}
+		serialWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(g))
+		go func() {
+			for {
+				if t.targetCtx.Err() != nil {
+					logger.Debugf(t.targetCtx, "target context finished: %s", t.targetCtx.Err())
+					break
+				}
+
+				if _, err := io.Copy(serialWriter, f); err != nil {
+					logger.Errorf(t.targetCtx, "failed to copy serial: %s", err)
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+			if err := g.Close(); err != nil {
+				logger.Warningf(t.targetCtx, "failed to close %s", logfile)
+			}
+			cleanupTempLogfile()
+		}()
 	}
 	qemuCmd.AddSerial(chardev)
 
@@ -548,7 +587,11 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 			return err
 		}
 		configFile := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_emu_config.json")
-		if err := jsonutil.WriteToFile(configFile, config); err != nil {
+		absConfigFile, err := filepath.Abs(configFile)
+		if err != nil {
+			return err
+		}
+		if err := jsonutil.WriteToFile(absConfigFile, config); err != nil {
 			return err
 		}
 		cwd, err := os.Getwd()
@@ -560,7 +603,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 			FVM:      t.config.FVMTool,
 			ZBI:      t.config.ZBITool,
 		}
-		cmd, err = t.ffx.EmuStartConsole(ctx, cwd, DefaultQEMUNodename, t.isQEMU, configFile, tools)
+		cmd, err = t.ffx.EmuStartConsole(ctx, cwd, DefaultQEMUNodename, t.isQEMU, absConfigFile, tools)
 		if err != nil {
 			return err
 		}

@@ -40,9 +40,9 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
-	lockedStdout := botanist.NewLockedWriter(ctx, os.Stdout)
+	lockedStdout := botanist.NewLockedWriter(ctx, botanist.NewTimestampWriter(os.Stdout))
 	defer lockedStdout.Close()
-	lockedStderr := botanist.NewLockedWriter(ctx, os.Stderr)
+	lockedStderr := botanist.NewLockedWriter(ctx, botanist.NewTimestampWriter(os.Stderr))
 	defer lockedStderr.Close()
 
 	// set up temp file for copying stdout content to a temp file
@@ -57,7 +57,9 @@ func main() {
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 	defer flush()
 	l := logger.NewLogger(level, color.NewColor(colors), stdout, stderr, "botanist ")
-	l.SetFlags(logger.Ltime | logger.Lmicroseconds | logger.Lshortfile)
+	// The stdout and stderr writers already add a timestamp to each write so no need
+	// to add the time in the logger flags.
+	l.SetFlags(logger.Lshortfile)
 	ctx = logger.WithLogger(ctx, l)
 
 	os.Exit(int(subcommands.Execute(ctx)))
