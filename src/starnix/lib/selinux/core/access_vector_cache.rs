@@ -387,7 +387,7 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
 /// owns a shared cache of size `SHARED_SIZE`, and can produce thread-local caches of size
 /// `THREAD_LOCAL_SIZE`.
 pub struct Manager<SS, const SHARED_SIZE: usize = 1000, const THREAD_LOCAL_SIZE: usize = 10> {
-    shared_cache: Locked<Fixed<Weak<SS>, THREAD_LOCAL_SIZE>>,
+    shared_cache: Locked<Fixed<Weak<SS>, SHARED_SIZE>>,
     thread_local_version: Arc<AtomicVersion>,
 }
 
@@ -411,12 +411,17 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize>
         self.shared_cache.set_stateful_cache_delegate(security_server)
     }
 
+    /// Returns a shared reference to the shared cache managed by this manager. This operation does
+    /// not copy the cache, but it does perform an atomic operation to update a reference count.
+    pub fn get_shared_cache(&self) -> Locked<Fixed<Weak<SS>, SHARED_SIZE>> {
+        self.shared_cache.clone()
+    }
+
     /// Constructs a new thread-local cache that will delegate to the shared cache managed by this
     /// manager (which, in turn, delegates to its security server).
     pub fn new_thread_local_cache(
         &self,
-    ) -> ThreadLocalQuery<Fixed<Locked<Fixed<Weak<SS>, THREAD_LOCAL_SIZE>>, THREAD_LOCAL_SIZE>>
-    {
+    ) -> ThreadLocalQuery<Fixed<Locked<Fixed<Weak<SS>, SHARED_SIZE>>, THREAD_LOCAL_SIZE>> {
         ThreadLocalQuery::new(
             self.thread_local_version.clone(),
             Fixed::new(self.shared_cache.clone()),
@@ -1109,8 +1114,15 @@ mod tests {
             }
         }
 
-        for item in security_server.manager().shared_cache.delegate.lock().cache.iter() {
-            assert_eq!(AccessVector::WRITE, item.access_vector);
+        let shared_cache = security_server.manager().shared_cache.delegate.lock();
+        if shared_cache.is_full {
+            for item in shared_cache.cache.iter() {
+                assert_eq!(AccessVector::WRITE, item.access_vector);
+            }
+        } else {
+            for i in 0..shared_cache.next_index {
+                assert_eq!(AccessVector::WRITE, shared_cache.cache[i].access_vector);
+            }
         }
     }
 }

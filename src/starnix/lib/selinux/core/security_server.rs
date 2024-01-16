@@ -162,6 +162,11 @@ impl SecurityServer {
         }
     }
 
+    /// Returns a reference to the shared access vector cache that delebates cache misses to `self`.
+    pub fn get_shared_avc(&self) -> impl Query {
+        self.avc_manager.get_shared_cache()
+    }
+
     /// Returns a newly constructed thread-local access vector cache that delegates cache misses to
     /// any shared caches owned by `self.avc_manager`, which ultimately delegate to `self`. The
     /// returned cache will be reset when this security server's policy is reset.
