@@ -122,7 +122,9 @@ void I2cDevice::Transact(const uint16_t address, TransferRequestView request,
     return;
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Failed to perform transfer: %s", zx_status_get_string(result->error_value()));
+    // Don't log at ERROR severity here, as some I2C devices intentionally NACK to indicate that
+    // they are busy.
+    zxlogf(DEBUG, "Failed to perform transfer: %s", zx_status_get_string(result->error_value()));
     completer.ReplyError(result->error_value());
     return;
   }
