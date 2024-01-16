@@ -4,8 +4,8 @@
 
 #include "src/camera/drivers/controller/pipeline_manager.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -13,6 +13,7 @@
 #include <csignal>
 #include <list>
 #include <numeric>
+#include <sstream>
 #include <stack>
 #include <type_traits>
 
@@ -91,8 +92,11 @@ void PipelineManager::ConfigureStreamPipeline(
     }
     if (matches.empty() || matches.size() > 1) {
       const auto reason = matches.empty() ? "no matches" : "multiple matches";
-      FX_LOGS(FATAL) << "invalid product config - " << reason << " for stream type "
-                     << formatting::ToString(info.stream_type()) << " at path " << Format(path);
+      const auto config_str = formatting::ToString(info.stream_type());
+      auto path_str = Format(path);
+      fprintf(stderr, "invalid product config - %s for stream type %s at path %s", reason,
+              config_str.c_str(), path_str.c_str());
+      abort();
     }
     path.push_back(matches[0]);
     auto& current = candidates.get()[path.back()];
@@ -106,7 +110,9 @@ void PipelineManager::ConfigureStreamPipeline(
     }
     candidates = current.child_nodes;
   }
-  FX_LOGS(FATAL) << "invalid product config - no outputs below path " << Format(path);
+  auto path_str = Format(path);
+  fprintf(stderr, "invalid product config - no outputs below path %s", path_str.c_str());
+  abort();
 }
 
 void PipelineManager::SetStreamingEnabled(bool enabled) {
@@ -117,6 +123,7 @@ void PipelineManager::SetStreamingEnabled(bool enabled) {
 void PipelineManager::Shutdown(fit::closure callback) {
   TRACE_DURATION("camera", "PipelineManager::Shutdown", "this", this);
   FX_LOGS(INFO) << "PipelineManager::Shutdown() - start";
+  zxlogf(INFO, "PipelineManager::Shutdown() - start");
   ZX_ASSERT_MSG(state_ != State::ShuttingDown, "Caller requested shutdown multiple times.");
   shutdown_state_.flow_nonce = TRACE_NONCE();
   TRACE_FLOW_BEGIN("camera", "PipelineManager::ShutdownFlow", shutdown_state_.flow_nonce);
@@ -219,8 +226,10 @@ void PipelineManager::UpdateInputNodeStreamingState() {
     if (input != graph_.nodes.end()) {
       auto node = static_cast<InputNode*>(input->second.process_node.get());
       // The input node is robust to idempotent start/stop requests.
-      FX_LOGS(INFO) << this << ": camera pipeline streaming "
-                    << (streaming_enabled_ ? "enabled" : "disabled");
+      std::stringstream ss;
+      ss << this << ": camera pipeline streaming " << (streaming_enabled_ ? "enabled" : "disabled");
+      zxlogf(INFO, "%s", ss.str().c_str());
+
       if (streaming_enabled_) {
         node->StartStreaming();
       } else {
@@ -239,6 +248,9 @@ void PipelineManager::ShutdownAndRemoveNode(const std::vector<uint8_t>& path) {
     parent.pop_back();
     if (!parent.empty()) {
       FX_LOGS(INFO) << "Removing " << Format(path) << " from " << Format(parent) << " child set";
+      auto path_str = Format(path);
+      auto parent_str = Format(parent);
+      zxlogf(INFO, "Removing %s from %s child set", path_str.c_str(), parent_str.c_str());
       graph_.nodes.at(parent).children.erase(path);
     }
     Prune();
@@ -254,7 +266,7 @@ void PipelineManager::Prune() {
       return;
     }
   }
-  FX_LOGS(INFO) << "Prune() - no prune targets found";
+  zxlogf(INFO, "Prune() - no prune targets found");
   SetPipelineChanging(false);
 }
 
@@ -298,13 +310,7 @@ std::string PipelineManager::Dump(bool log, cpp20::source_location location) con
   }
   auto str = ss.str();
   if (log) {
-    // Derivation of FX_LOGS(severity) that accepts custom FILE and LINE parameters.
-    FX_LAZY_STREAM(::fuchsia_logging::LogMessage(::fuchsia_logging::LOG_INFO, location.file_name(),
-                                                 location.line(), nullptr, nullptr)
-                       .stream(),
-                   FX_LOG_IS_ON(INFO))
-        << "PipelineManager::Dump()\n"
-        << str;
+    zxlogf(INFO, "%s: %s", location.function_name(), str.c_str());
   }
   return str;
 }
@@ -361,7 +367,8 @@ bool PipelineManager::CreateFGNode(const StreamCreationData& info, const std::ve
     zx_status_t status =
         memory_allocator_.AllocateSharedMemory(constraints, buffers, NodeTypeName(icself));
     if (status != ZX_OK) {
-      FX_PLOGS(FATAL, status) << "unable to allocate memory";
+      fprintf(stderr, "unable to allocate memory");
+      abort();
     }
     fgself.output_buffers = std::move(buffers);
     attachments.output_collection = *fgself.output_buffers;
@@ -463,7 +470,8 @@ bool PipelineManager::CreateFGNode(const StreamCreationData& info, const std::ve
 
 void PipelineManager::ClientDisconnect(const std::vector<uint8_t>& origin) {
   TRACE_DURATION("camera", "PipelineManager::ClientDisconnect", "origin", &origin);
-  FX_LOGS(INFO) << "ClientDisconnect(" << Format(origin) << ")";
+  auto origin_str = Format(origin);
+  zxlogf(INFO, "ClientDisconnect(%s)", origin_str.c_str());
   if (pipeline_changing_) {
     pending_requests_.disconnects.push(origin);
     return;
@@ -532,7 +540,9 @@ void PipelineManager::GetBuffers(const std::vector<uint8_t>& origin,
     local_path.pop_back();
   }
   if (local_path.empty()) {
-    FX_LOGS(FATAL) << "no output buffers found in ancestors of " << Format(origin);
+    auto origin_str = Format(origin);
+    fprintf(stderr, "no output buffers found in ancestors of %s", origin_str.c_str());
+    abort();
   }
   auto& fgnode = graph_.nodes.at(local_path);
   auto& input_buffer_collection = fgnode.output_buffers->ptr;

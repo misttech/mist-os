@@ -7,13 +7,9 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/syslog/cpp/log_settings.h>
-#include <lib/syslog/cpp/macros.h>
 #include <zircon/types.h>
 
 #include <ddktl/fidl.h>
-
-#include "src/lib/fsl/handles/object_info.h"
 
 namespace camera {
 
@@ -32,8 +28,7 @@ fpromise::result<std::unique_ptr<ControllerDevice>, zx_status_t> ControllerDevic
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(parent,
                                                                                     "sysmem");
   if (sysmem_result.is_error()) {
-    FX_PLOGS(ERROR, sysmem_result.status_value())
-        << "Failed to get fuchsia.sysmem.Allocator protocol";
+    zxlogf(ERROR, "Failed to get fuchsia.sysmem.Allocator protocol");
     return fpromise::error(sysmem_result.status_value());
   }
   fuchsia::sysmem::AllocatorSyncPtr sysmem;
@@ -64,7 +59,7 @@ fpromise::result<std::pair<zx::vmo, size_t>, zx_status_t> ControllerDevice::Load
   size_t size = 0;
   zx_status_t status = ::load_firmware(parent(), path.c_str(), vmo.reset_and_get_address(), &size);
   if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "failed to laod firmware: " << path;
+    zxlogf(ERROR, "failed to laod firmware: %s", path.c_str());
     return fpromise::error(status);
   }
   return fpromise::ok(std::make_pair(std::move(vmo), size));
@@ -89,21 +84,19 @@ void ControllerDevice::GetDebugChannel(GetDebugChannelRequestView request,
 }
 
 static zx_status_t ControllerDeviceBind(void* /*ctx*/, zx_device_t* parent) {
-  fuchsia_logging::SetTags({"camera-controller"});
-
   auto result = camera::ControllerDevice::Create(parent);
   if (result.is_error()) {
-    FX_PLOGS(ERROR, result.error()) << "Could not setup camera_controller_device";
+    zxlogf(ERROR, "Could not setup camera_controller_device");
     return result.error();
   }
 
   zx_status_t status = result.value()->DdkAdd("camera-controller-device");
   if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Could not add camera_controller_device device";
+    zxlogf(ERROR, "Could not add camera_controller_device device");
     return status;
   }
 
-  FX_LOGS(INFO) << "camera_controller_device driver added";
+  zxlogf(INFO, "camera_controller_device driver added");
 
   // controller device intentionally leaked as it is now held by DevMgr.
   [[maybe_unused]] auto* dev = result.take_value().release();

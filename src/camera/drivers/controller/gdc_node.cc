@@ -4,8 +4,8 @@
 
 #include "src/camera/drivers/controller/gdc_node.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -18,18 +18,16 @@
 
 namespace camera {
 
-constexpr auto kTag = "camera_controller_gdc_node";
-
 static fpromise::result<gdc_config_info, zx_status_t> LoadGdcConfiguration(
     const LoadFirmwareCallback& load_firmware, ProductConfig& product_config,
     const camera::GdcConfig& config_type) {
   if (config_type == GdcConfig::INVALID) {
-    FX_LOGST(DEBUG, kTag) << "Invalid GDC configuration type";
+    zxlogf(ERROR, "Invalid GDC configuration type");
     return fpromise::error(ZX_ERR_INVALID_ARGS);
   }
   auto result = load_firmware(product_config.GetGdcConfigFile(config_type));
   if (result.is_error() || result.value().second == 0) {
-    FX_PLOGST(ERROR, kTag, result.error()) << "Failed to load the GDC firmware";
+    zxlogf(ERROR, "Failed to load the GDC firmware");
     return fpromise::error(result.error());
   }
   auto [vmo, size] = result.take_value();
@@ -91,7 +89,7 @@ fpromise::result<std::unique_ptr<ProcessNode>, zx_status_t> GdcNode::Create(
   for (const auto& config : internal_gdc_node.gdc_info.config_type) {
     auto gdc_config = LoadGdcConfiguration(load_firmware, *product_config, config);
     if (gdc_config.is_error()) {
-      FX_LOGST(ERROR, kTag) << "Failed to load GDC configuration";
+      zxlogf(ERROR, "Failed to load GDC configuration");
       return fpromise::error(gdc_config.error());
     }
     config_vmos_info.push_back(gdc_config.value());
@@ -114,7 +112,7 @@ fpromise::result<std::unique_ptr<ProcessNode>, zx_status_t> GdcNode::Create(
                    node->GetHwFrameReadyCallback(), node->GetHwFrameResolutionChangeCallback(),
                    node->GetHwTaskRemovedCallback(), &node->task_index_);
   if (status != ZX_OK) {
-    FX_PLOGST(ERROR, kTag, status) << "Failed to initialize GDC";
+    zxlogf(ERROR, "Failed to initialize GDC");
     return fpromise::error(status);
   }
 
@@ -155,7 +153,7 @@ void GdcNode::HwFrameReady(frame_available_info_t info) {
 
   // Don't do anything further with error frames.
   if (info.frame_status != FRAME_STATUS_OK) {
-    FX_LOGST(ERROR, kTag) << "failed gdc frame: " << static_cast<uint32_t>(info.frame_status);
+    zxlogf(ERROR, "failed gdc frame: %u", static_cast<uint32_t>(info.frame_status));
     return;
   }
 
@@ -176,8 +174,9 @@ void GdcNode::HwTaskRemoved(task_remove_status_t status) {
   ZX_ASSERT(status == TASK_REMOVE_STATUS_OK);
   ZX_ASSERT(shutdown_callback_);
   if (!input_frame_queue_.empty()) {
-    FX_LOGS(WARNING) << "GDC driver completed task removal but did not complete processing for all "
-                        "frames it was sent. These will be manually released.";
+    zxlogf(WARNING,
+           "GDC driver completed task removal but did not complete processing for all "
+           "frames it was sent. These will be manually released.");
     while (!input_frame_queue_.empty()) {
       input_frame_queue_.pop();
     }

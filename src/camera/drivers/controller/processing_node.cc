@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #include "processing_node.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/assert.h>
@@ -33,7 +34,7 @@ ProcessNode::ProcessNode(async_dispatcher_t* dispatcher, NodeType type,
           .remove_task{.task_removed = &ProcessNode::StaticHwTaskRemoved, .ctx = this}} {}
 
 ProcessNode::~ProcessNode() {
-  FX_LOGS(INFO) << "~ProcessNode(" << label_ << ")";
+  zxlogf(INFO, "~ProcessNode(%s)", label_.c_str());
   ZX_ASSERT_MSG(shutdown_state_.requested, "Caller destroying node without requesting shutdown.");
   ZX_ASSERT_MSG(shutdown_state_.completed,
                 "Caller destroying node without awaiting shutdown completion.");
@@ -43,7 +44,7 @@ NodeType ProcessNode::Type() const { return type_; }
 
 void ProcessNode::Shutdown(fit::closure callback) {
   TRACE_DURATION("camera", "ProcessNode::Shutdown", "this", this);
-  FX_LOGS(INFO) << "ProcessNode::Shutdown(" << label_ << ") - start";
+  zxlogf(INFO, "ProcessNode::Shutdown(%s) - start", label_.c_str());
   ZX_ASSERT_MSG(!shutdown_state_.requested, "Caller requested shutdown multiple times.");
   auto nonce = TRACE_NONCE();
   TRACE_FLOW_BEGIN("camera", "ProcessNode::Shutdown.shutdown", nonce);
@@ -51,7 +52,7 @@ void ProcessNode::Shutdown(fit::closure callback) {
   ShutdownImpl([this, nonce, callback = std::move(callback)] {
     TRACE_DURATION("camera", "ProcessNode::Shutdown.callback", "this", this);
     TRACE_FLOW_END("camera", "ProcessNode::Shutdown.shutdown", nonce);
-    FX_LOGS(INFO) << "ProcessNode::Shutdown(" << label_ << ") - finish";
+    zxlogf(INFO, "ProcessNode::Shutdown(%s) - finish", label_.c_str());
     ZX_ASSERT_MSG(shutdown_state_.requested, "Node sent unsolicited shutdown callback.");
     ZX_ASSERT_MSG(!shutdown_state_.completed, "Node sent multiple shutdown callbacks.");
     shutdown_state_.completed = true;
@@ -60,7 +61,7 @@ void ProcessNode::Shutdown(fit::closure callback) {
 }
 
 void ProcessNode::SetLabel(std::string label) {
-  FX_LOGS(INFO) << this << " now known as '" << label << "'";
+  zxlogf(INFO, "ProcessNode::SetLabel(%s) - start", label_.c_str());
   label_ = std::move(label);
 }
 

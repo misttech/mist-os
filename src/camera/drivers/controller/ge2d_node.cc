@@ -4,8 +4,8 @@
 
 #include "src/camera/drivers/controller/ge2d_node.h"
 
+#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -18,8 +18,6 @@
 #include "src/devices/lib/sysmem/sysmem.h"
 
 namespace camera {
-
-constexpr auto kTag = "camera_controller_ge2d_node";
 
 Ge2dNode::Ge2dNode(async_dispatcher_t* dispatcher, BufferAttachments attachments,
                    FrameCallback frame_callback, const ddk::Ge2dProtocolClient& ge2d,
@@ -75,7 +73,7 @@ fpromise::result<std::unique_ptr<Ge2dNode>, zx_status_t> Ge2dNode::Create(
           node->GetHwFrameReadyCallback(), node->GetHwFrameResolutionChangeCallback(),
           node->GetHwTaskRemovedCallback(), &node->task_index_);
       if (status != ZX_OK) {
-        FX_PLOGST(ERROR, kTag, status) << "Failed to initialize GE2D resize task";
+        zxlogf(ERROR, "Failed to initialize GE2D resize task");
         return fpromise::error(status);
       }
       break;
@@ -85,7 +83,7 @@ fpromise::result<std::unique_ptr<Ge2dNode>, zx_status_t> Ge2dNode::Create(
       for (auto watermark : internal_ge2d_node.ge2d_info.watermark) {
         auto result = load_firmware(watermark.filename);
         if (result.is_error()) {
-          FX_PLOGST(ERROR, kTag, result.error()) << "Failed to load the watermark image";
+          zxlogf(ERROR, "Failed to load the watermark image");
           return fpromise::error(result.error());
         }
         auto [vmo, size] = result.take_value();
@@ -130,13 +128,13 @@ fpromise::result<std::unique_ptr<Ge2dNode>, zx_status_t> Ge2dNode::Create(
             node->GetHwTaskRemovedCallback(), &node->task_index_);
       }
       if (status != ZX_OK) {
-        FX_PLOGST(ERROR, kTag, status) << "Failed to initialize GE2D watermark task";
+        zxlogf(ERROR, "Failed to initialize GE2D watermark task");
         return fpromise::error(status);
       }
       break;
     }
     default: {
-      FX_LOGST(ERROR, kTag) << "Unkwon config type";
+      zxlogf(ERROR, "Unkwon config type");
       return fpromise::error(ZX_ERR_INVALID_ARGS);
     }
   }
@@ -181,7 +179,7 @@ void Ge2dNode::HwFrameReady(frame_available_info_t info) {
 
   // Don't do anything further with error frames.
   if (info.frame_status != FRAME_STATUS_OK) {
-    FX_LOGST(ERROR, kTag) << "failed ge2d frame: " << static_cast<uint32_t>(info.frame_status);
+    zxlogf(ERROR, "failed ge2d frame: %u", static_cast<uint32_t>(info.frame_status));
     return;
   }
 
@@ -209,9 +207,9 @@ void Ge2dNode::HwTaskRemoved(task_remove_status_t status) {
   ZX_ASSERT(status == TASK_REMOVE_STATUS_OK);
   ZX_ASSERT(shutdown_callback_);
   if (!input_frame_queue_.empty()) {
-    FX_LOGS(WARNING)
-        << "GE2D driver completed task removal but did not complete processing for all "
-           "frames it was sent. These will be manually released.";
+    zxlogf(WARNING,
+           "GE2D driver completed task removal but did not complete processing for all "
+           "frames it was sent. These will be manually released.");
     while (!input_frame_queue_.empty()) {
       input_frame_queue_.pop();
     }
@@ -226,14 +224,12 @@ zx_status_t Ge2dNode::SetCropRect(float x_min, float y_min, float x_max, float y
   }
 
   if (x_max < x_min) {
-    FX_LOGST(DEBUG, kTag) << "Invalid crop parameters: x_max(" << x_min << ") < x_min(" << x_min
-                          << ")";
+    zxlogf(DEBUG, "Invalid crop parameters: x_max(%f) < x_min(%f)", x_min, x_max);
     return ZX_ERR_INVALID_ARGS;
   }
 
   if (y_max < y_min) {
-    FX_LOGST(DEBUG, kTag) << "Invalid crop parameters: y_max(" << y_min << ") < y_min(" << y_min
-                          << ")";
+    zxlogf(DEBUG, "Invalid crop parameters: y_max(%f) < y_min(%f)", y_min, y_max);
     return ZX_ERR_INVALID_ARGS;
   }
 

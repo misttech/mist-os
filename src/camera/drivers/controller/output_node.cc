@@ -4,16 +4,16 @@
 
 #include "src/camera/drivers/controller/output_node.h"
 
-#include <lib/syslog/cpp/macros.h>
+#include <lib/ddk/debug.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <sstream>
+
 #include <safemath/safe_conversions.h>
 
 namespace camera {
-
-constexpr auto kTag = "camera_controller_output_node";
 
 OutputNode::OutputNode(async_dispatcher_t* dispatcher, BufferAttachments attachments)
     : ProcessNode(dispatcher, NodeType::kOutputStream, attachments,
@@ -42,7 +42,7 @@ void OutputNode::ProcessFrame(FrameToken token, frame_metadata_t metadata) {
 
   frame_count_++;
   if (frame_count_ % kFrameCountHeartbeatInterval == 0) {
-    FX_LOGS(INFO) << "Camera node " << GetLabel() << " has produced " << frame_count_ << " frames";
+    zxlogf(INFO, "Camera node %s has produced %u frames", GetLabel().c_str(), frame_count_);
   }
 
   // Throttle the rate of binding warning messages.
@@ -59,7 +59,9 @@ void OutputNode::ProcessFrame(FrameToken token, frame_metadata_t metadata) {
   }
 
   if (binding_warnings_ > 0) {
-    FX_LOGS(WARNING) << this << ": client reconnected? delivering frame...";
+    std::stringstream ss;
+    ss << "Camera node " << this << " client reconnected? delivering frame...";
+    zxlogf(INFO, "%s", ss.str().c_str());
     binding_warnings_ = 0;
   }
 
@@ -92,24 +94,28 @@ void OutputNode::HwFrameResolutionChanged(frame_available_info_t info) { FX_NOTR
 void OutputNode::HwTaskRemoved(task_remove_status_t status) { FX_NOTREACHED(); }
 
 void OutputNode::Stop() {
-  FX_LOGS(INFO) << this << ": Stop()";
+  std::stringstream ss;
+  ss << "Camera node " << this << " Stop()";
+  zxlogf(INFO, "%s", ss.str().c_str());
   started_ = false;
 }
 
 void OutputNode::Start() {
-  FX_LOGS(INFO) << this << ": Start()";
+  std::stringstream ss;
+  ss << "Camera node " << this << " Start()";
+  zxlogf(INFO, "%s", ss.str().c_str());
   started_ = true;
 }
 
 void OutputNode::ReleaseFrame(uint32_t buffer_id) {
   auto element = client_tokens_.extract(buffer_id);
   if (element.empty()) {
-    FX_LOGS(INFO) << "Client called ReleaseFrame on non-held buffer " << buffer_id;
+    zxlogf(INFO, "Client called ReleaseFrame on non-held buffer %u", buffer_id);
   }
 }
 
 void OutputNode::AcknowledgeFrameError() {
-  FX_LOGST(ERROR, kTag) << __PRETTY_FUNCTION__ << " not implemented";
+  zxlogf(ERROR, "Camera node %s not implemented", __PRETTY_FUNCTION__);
 }
 
 void OutputNode::SetRegionOfInterest(float x_min, float y_min, float x_max, float y_max,

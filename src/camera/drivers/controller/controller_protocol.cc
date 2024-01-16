@@ -5,12 +5,11 @@
 #include "src/camera/drivers/controller/controller_protocol.h"
 
 #include <fuchsia/camera2/cpp/fidl.h>
+#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
 #include "src/camera/drivers/controller/configs/product_config.h"
-#include "src/lib/fsl/handles/object_info.h"
 
 namespace camera {
 
@@ -25,20 +24,20 @@ ControllerImpl::ControllerImpl(async_dispatcher_t* dispatcher,
                         std::move(load_firmware)),
       product_config_(ProductConfig::Create()) {
   binding_.set_error_handler(
-      [](zx_status_t status) { FX_PLOGS(INFO, status) << "controller client disconnected"; });
+      [](zx_status_t status) { zxlogf(INFO, "controller client disconnected"); });
   configs_ = product_config_->ExternalConfigs();
   internal_configs_ = product_config_->InternalConfigs();
 }
 
 void ControllerImpl::Connect(fidl::InterfaceRequest<fuchsia::camera2::hal::Controller> request) {
   if (binding_.is_bound()) {
-    FX_LOGS(WARNING) << "ControllerImpl::Connect(): Camera controller is already bound";
+    zxlogf(WARNING, "ControllerImpl::Connect(): Camera controller is already bound");
     request.Close(ZX_ERR_ALREADY_BOUND);
     return;
   }
 
   zx_status_t status = binding_.Bind(std::move(request), dispatcher_);
-  FX_LOGS(INFO) << "ControllerImpl::Connect(): Bind() -> " << status;
+  zxlogf(INFO, "ControllerImpl::Connect(): Bind() -> %d", status);
 }
 
 void ControllerImpl::GetNextConfig(GetNextConfigCallback callback) {
@@ -53,14 +52,20 @@ void ControllerImpl::GetNextConfig(GetNextConfigCallback callback) {
   config_count_++;
 }
 
+zx_koid_t GetRelatedKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.related_koid : ZX_KOID_INVALID;
+}
+
 void ControllerImpl::CreateStream(uint32_t config_index, uint32_t stream_index,
                                   uint32_t image_format_index,
                                   fidl::InterfaceRequest<fuchsia::camera2::Stream> stream) {
   TRACE_DURATION("camera", "ControllerImpl::CreateStream");
 
-  FX_LOGS(INFO) << "new request from remote channel koid "
-                << fsl::GetRelatedKoid(stream.channel().get()) << " for c" << config_index << "s"
-                << stream_index << "f" << image_format_index;
+  zxlogf(INFO, "new request from remote channel koid %lu for c%us%uf%u",
+         GetRelatedKoid(stream.channel().get()), config_index, stream_index, image_format_index);
 
   if (config_index >= configs_.size()) {
     stream.Close(ZX_ERR_INVALID_ARGS);
@@ -91,8 +96,8 @@ void ControllerImpl::CreateStream(uint32_t config_index, uint32_t stream_index,
     return;
   }
 
-  // TODO(https://fxbug.dev/100525): Move config index management into the pipeline manager, then delete
-  // shutdown/queueing in this component.
+  // TODO(https://fxbug.dev/100525): Move config index management into the pipeline manager, then
+  // delete shutdown/queueing in this component.
   //
   // If the requested config is different from the current
   // config, handling it requires shutting down the current pipeline first.

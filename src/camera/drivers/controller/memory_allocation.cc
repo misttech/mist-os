@@ -4,17 +4,13 @@
 
 #include "src/camera/drivers/controller/memory_allocation.h"
 
-#include <lib/syslog/cpp/macros.h>
+#include <lib/ddk/debug.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 
 #include <sstream>
 
-#include "src/lib/fsl/handles/object_info.h"
-
 namespace camera {
-
-constexpr auto kTag = "camera_controller";
 
 ControllerMemoryAllocator::ControllerMemoryAllocator(
     fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator)
@@ -63,9 +59,8 @@ zx_status_t ControllerMemoryAllocator::AllocateSharedMemory(
     BufferCollection& out_buffer_collection, const std::string& name) const {
   TRACE_DURATION("camera", "ControllerMemoryAllocator::AllocateSharedMemory");
 
-  FX_LOGST(INFO, kTag) << "AllocateSharedMemory (name = " << name
-                       << ") with the following constraints:\n"
-                       << FormatConstraints(constraints);
+  zxlogf(INFO, "AllocateSharedMemory (name = %s) with the following constraints:\n%s", name.c_str(),
+         FormatConstraints(constraints).c_str());
 
   auto num_constraints = constraints.size();
 
@@ -79,7 +74,7 @@ zx_status_t ControllerMemoryAllocator::AllocateSharedMemory(
   // Start the allocation process.
   auto status = sysmem_allocator_->AllocateSharedCollection(tokens[0].NewRequest());
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Failed to create token";
+    zxlogf(ERROR, "Failed to create token");
     return status;
   }
 
@@ -87,7 +82,7 @@ zx_status_t ControllerMemoryAllocator::AllocateSharedMemory(
   for (uint32_t i = 1; i < num_constraints; i++) {
     status = tokens[0]->Duplicate(std::numeric_limits<uint32_t>::max(), tokens[i].NewRequest());
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Failed to duplicate token";
+      zxlogf(ERROR, "Failed to duplicate token");
       return status;
     }
   }
@@ -98,13 +93,13 @@ zx_status_t ControllerMemoryAllocator::AllocateSharedMemory(
   status = sysmem_allocator_->BindSharedCollection(std::move(tokens[0]),
                                                    buffer_collections[0].NewRequest());
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Failed to create logical buffer collection";
+    zxlogf(ERROR, "Failed to create logical buffer collection");
     return status;
   }
 
   status = buffer_collections[0]->Sync();
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Failed to sync";
+    zxlogf(ERROR, "Failed to sync");
     return status;
   }
 
@@ -116,7 +111,7 @@ zx_status_t ControllerMemoryAllocator::AllocateSharedMemory(
     status = sysmem_allocator_->BindSharedCollection(std::move(tokens[i]),
                                                      buffer_collections[i].NewRequest());
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Failed to create logical buffer collection";
+      zxlogf(ERROR, "Failed to create logical buffer collection");
       return status;
     }
   }
@@ -125,7 +120,7 @@ zx_status_t ControllerMemoryAllocator::AllocateSharedMemory(
   for (uint32_t i = 0; i < num_constraints; i++) {
     status = buffer_collections[i]->SetConstraints(true, constraints[i]);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Failed to set buffer collection constraints";
+      zxlogf(ERROR, "Failed to set buffer collection constraints");
       return status;
     }
   }
@@ -134,11 +129,11 @@ zx_status_t ControllerMemoryAllocator::AllocateSharedMemory(
   status = buffer_collections[0]->WaitForBuffersAllocated(&allocation_status,
                                                           &out_buffer_collection.buffers);
   if (status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Failed to wait for buffer collection info.";
+    zxlogf(ERROR, "Failed to wait for buffer collection info.");
     return status;
   }
   if (allocation_status != ZX_OK) {
-    FX_LOGST(ERROR, kTag) << "Failed to allocate buffer collection.";
+    zxlogf(ERROR, "Failed to allocate buffer collection.");
     return allocation_status;
   }
 
@@ -148,7 +143,7 @@ zx_status_t ControllerMemoryAllocator::AllocateSharedMemory(
   for (uint32_t i = 1; i < num_constraints; i++) {
     status = buffer_collections[i]->Close();
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Failed to close producer buffer collection";
+      zxlogf(ERROR, "Failed to close producer buffer collection");
       return status;
     }
   }
