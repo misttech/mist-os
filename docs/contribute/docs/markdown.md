@@ -384,6 +384,9 @@ reference links:
 In the main text, include a label[^1] that starts with a caret.
 
 {% verbatim %}[^1]: The footnote content goes here.{% endverbatim %}
+
+{% verbatim %}[^2]: Longer footnote content can be span multiple lines
+    by indenting the continuation 4 spaces.
 ```
 
 The footnote label can be any arbitrary string as long as it starts with a
@@ -873,12 +876,12 @@ Regardless of the way you create a markdown link in your content, you can link t
 types of content from Fuchsia.dev:
 
 * Content that is created by contributors that exists in the [`//docs` directory][cs-docs] of the Fuchsia source tree.
- 
+
   Example: This is a link to
   [`//docs/get-started/learn-fuchsia.md`](https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/get-started/learn-fuchsia.md):
 
   Note: You should always use a full filename including the file extension.
-  
+
   ```
   [Learn Fuchsia](/docs/get-started/learn-fuchsia.md)
   ```
@@ -891,11 +894,11 @@ types of content from Fuchsia.dev:
 
   Note: Notice how the URL path does not include `docs/` or `fuchsia-src/`. This indicates
   that this content is generated.
-  
+
   ```
   [`fuchsia.bluetooth`](https://fuchsia.dev/reference/fidl/fuchsia.bluetooth)
   ```
-  
+
   Fuchsia also has non-generated reference content that exists in the
   [`//docs/reference/` directory][cs-ref-docs].
   This type of content can be linked using the Fuchsia source tree content syntax.
@@ -905,7 +908,7 @@ types of content from Fuchsia.dev:
   Example: This is a link to [`google.com`](https://google.com):
 
   Note: You should always use a full filename including the file extension.
-  
+
   ```
   [`google.com`](https://google.com){: .external}
   ```
