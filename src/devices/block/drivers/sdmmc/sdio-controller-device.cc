@@ -193,25 +193,26 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
   return ZX_OK;
 }
 
-zx_status_t SdioControllerDevice::StartSdioIrqThreadIfNeeded() {
-  fbl::AutoLock lock(&irq_thread_lock_);
+zx_status_t SdioControllerDevice::StartSdioIrqDispatcherIfNeeded() {
+  fbl::AutoLock lock(&irq_dispatcher_lock_);
 
-  if (dead_) {
+  if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
-  if (irq_thread_) {
+  if (irq_dispatcher_.get()) {
     return ZX_OK;
   }
 
-  auto thread_func = [](void* ctx) -> int {
-    return reinterpret_cast<SdioControllerDevice*>(ctx)->SdioIrqThread();
-  };
-
-  int rc = thrd_create_with_name(&irq_thread_, thread_func, this, "sdio-irq-thread");
-  if (rc != thrd_success) {
-    irq_thread_ = 0;
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "sdio-irq-thread",
+      [&](fdf_dispatcher_t*) { irq_shutdown_completion_.Signal(); });
+  if (dispatcher.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to create dispatcher: %s",
+             zx_status_get_string(dispatcher.status_value()));
+    return dispatcher.status_value();
   }
-  return thrd_status_to_zx_status(rc);
+  irq_dispatcher_ = *std::move(dispatcher);
+  return ZX_OK;
 }
 
 zx_status_t SdioControllerDevice::AddDevice() {
@@ -283,15 +284,15 @@ zx_status_t SdioControllerDevice::AddDevice() {
   return ZX_OK;
 }
 
-void SdioControllerDevice::StopSdioIrqThread() {
-  dead_ = true;
+void SdioControllerDevice::StopSdioIrqDispatcher(
+    std::optional<fdf::PrepareStopCompleter> completer) {
+  shutdown_ = true;
 
   {
-    fbl::AutoLock lock(&irq_thread_lock_);
-    if (irq_thread_) {
-      sync_completion_signal(&irq_signal_);
-      thrd_join(irq_thread_, nullptr);
-      irq_thread_ = 0;
+    fbl::AutoLock lock(&irq_dispatcher_lock_);
+    if (irq_dispatcher_.get()) {
+      irq_dispatcher_.ShutdownAsync();
+      irq_shutdown_completion_.Wait();
     }
   }
 
@@ -300,6 +301,10 @@ void SdioControllerDevice::StopSdioIrqThread() {
       // Return an error to any waiters.
       irq.destroy();
     }
+  }
+
+  if (completer.has_value()) {
+    completer.value()(zx::ok());
   }
 }
 
@@ -536,7 +541,7 @@ zx_status_t SdioControllerDevice::SdioDoRwByteLocked(bool write, uint8_t fn_idx,
   if (!SdioFnIdxValid(fn_idx)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (dead_) {
+  if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
 
@@ -553,7 +558,7 @@ zx_status_t SdioControllerDevice::SdioGetInBandIntr(uint8_t fn_idx, zx::interrup
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (const zx_status_t st = StartSdioIrqThreadIfNeeded(); st != ZX_OK) {
+  if (const zx_status_t st = StartSdioIrqDispatcherIfNeeded(); st != ZX_OK) {
     return st;
   }
 
@@ -570,44 +575,38 @@ void SdioControllerDevice::SdioAckInBandIntr(uint8_t fn_idx) {
   }
 }
 
-void SdioControllerDevice::InBandInterruptCallback() { sync_completion_signal(&irq_signal_); }
+void SdioControllerDevice::InBandInterruptCallback() {
+  async::PostTask(irq_dispatcher_.async_dispatcher(), [this] { SdioIrqHandler(); });
+}
 
-int SdioControllerDevice::SdioIrqThread() {
-  for (;;) {
-    sync_completion_wait(&irq_signal_, ZX_TIME_INFINITE);
-    sync_completion_reset(&irq_signal_);
+void SdioControllerDevice::SdioIrqHandler() {
+  const zx::time irq_time = zx::clock::get_monotonic();
 
-    const zx::time irq_time = zx::clock::get_monotonic();
-
-    if (dead_) {
-      return thrd_success;
-    }
-
-    uint8_t intr_byte;
-    {
-      fbl::AutoLock lock(&lock_);
-
-      zx_status_t st =
-          SdioDoRwByteLocked(false, 0, SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, 0, &intr_byte);
-      if (st != ZX_OK) {
-        FDF_LOGL(ERROR, logger(), "Failed reading intr pending reg. status: %d", st);
-        return thrd_error;
-      }
-
-      // Only trigger interrupts for functions that have ack'd the previous interrupt. Clear the
-      // enabled bits for these functions.
-      intr_byte &= interrupt_enabled_mask_;
-      interrupt_enabled_mask_ &= ~intr_byte;
-    }
-
-    for (uint8_t i = 1; SdioFnIdxValid(i); i++) {
-      if (intr_byte & (1 << i)) {
-        sdio_irqs_[i].trigger(0, irq_time);
-      }
-    }
+  if (shutdown_) {
+    return;
   }
 
-  return thrd_success;
+  uint8_t intr_byte;
+  {
+    fbl::AutoLock lock(&lock_);
+
+    zx_status_t st = SdioDoRwByteLocked(false, 0, SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, 0, &intr_byte);
+    if (st != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed reading intr pending reg. status: %d", st);
+      return;
+    }
+
+    // Only trigger interrupts for functions that have ack'd the previous interrupt. Clear the
+    // enabled bits for these functions.
+    intr_byte &= interrupt_enabled_mask_;
+    interrupt_enabled_mask_ &= ~intr_byte;
+  }
+
+  for (uint8_t i = 1; SdioFnIdxValid(i); i++) {
+    if (intr_byte & (1 << i)) {
+      sdio_irqs_[i].trigger(0, irq_time);
+    }
+  }
 }
 
 zx_status_t SdioControllerDevice::SdioIoAbort(uint8_t fn_idx) {
@@ -651,7 +650,7 @@ zx_status_t SdioControllerDevice::SdioRegisterVmo(uint8_t fn_idx, uint32_t vmo_i
   if (!SdioFnIdxValid(fn_idx) || fn_idx == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (dead_) {
+  if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
 
@@ -664,7 +663,7 @@ zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo
   if (!SdioFnIdxValid(fn_idx) || fn_idx == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (dead_) {
+  if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
 
@@ -673,7 +672,7 @@ zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo
 }
 
 zx_status_t SdioControllerDevice::SdioRequestCardReset() {
-  if (dead_) {
+  if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
 
@@ -696,7 +695,7 @@ zx_status_t SdioControllerDevice::SdioRequestCardReset() {
 }
 
 zx_status_t SdioControllerDevice::SdioPerformTuning() {
-  if (dead_) {
+  if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
 
@@ -846,7 +845,7 @@ zx_status_t SdioControllerDevice::SdioDoRwTxn(uint8_t fn_idx, const SdioRwTxn<T>
   if (!SdioFnIdxValid(fn_idx)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (dead_) {
+  if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
 

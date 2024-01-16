@@ -295,7 +295,7 @@ TEST_F(SdioControllerDeviceTest, MultiplexInterrupts) {
 
   ASSERT_OK(StartDriver());
 
-  auto stop_thread = fit::defer([&]() { sdio_controller_device_->StopSdioIrqThread(); });
+  auto stop_thread = fit::defer([&]() { sdio_controller_device_->StopSdioIrqDispatcher(); });
 
   zx::port port;
   ASSERT_OK(zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port));

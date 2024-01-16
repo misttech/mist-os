@@ -74,6 +74,12 @@ void SdmmcRootDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
     return;
   }
 
+  const auto* sdio_device = std::get_if<std::unique_ptr<SdioControllerDevice>>(&child_device_);
+  if (sdio_device) {
+    sdio_device->get()->StopSdioIrqDispatcher(std::move(completer));
+    return;
+  }
+
   completer(zx::ok());
 }
 

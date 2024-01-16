@@ -11,6 +11,7 @@
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/completion.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
 
@@ -48,7 +49,6 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
       funcs_[i] = {};
     }
   }
-  ~SdioControllerDevice() { StopSdioIrqThread(); }
 
   static zx_status_t Create(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc,
                             std::unique_ptr<SdioControllerDevice>* out_dev);
@@ -101,8 +101,9 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   }
   SdmmcRootDevice* parent() { return parent_; }
 
-  zx_status_t StartSdioIrqThreadIfNeeded() TA_EXCL(irq_thread_lock_);
-  void StopSdioIrqThread() TA_EXCL(irq_thread_lock_);
+  zx_status_t StartSdioIrqDispatcherIfNeeded() TA_EXCL(irq_dispatcher_lock_);
+  void StopSdioIrqDispatcher(std::optional<fdf::PrepareStopCompleter> completer = std::nullopt)
+      TA_EXCL(irq_dispatcher_lock_);
 
   fdf::Logger& logger();
 
@@ -171,17 +172,17 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
                                                    SdioTxnPosition<T> current_position)
       TA_REQ(lock_);
 
-  int SdioIrqThread();
+  void SdioIrqHandler();
   uint8_t interrupt_enabled_mask_ TA_GUARDED(lock_) = UINT8_MAX;
 
-  fbl::Mutex irq_thread_lock_;  // Used to make thread start and stop atomic.
-  thrd_t irq_thread_ TA_GUARDED(irq_thread_lock_) = 0;
-  sync_completion_t irq_signal_;
+  fbl::Mutex irq_dispatcher_lock_;  // Used to make dispatcher creation and shutdown atomic.
+  fdf::Dispatcher irq_dispatcher_;
+  libsync::Completion irq_shutdown_completion_;
 
   fbl::Mutex lock_;
   SdmmcRootDevice* const parent_;
   std::unique_ptr<SdmmcDevice> sdmmc_;
-  std::atomic<bool> dead_ = false;
+  std::atomic<bool> shutdown_ = false;
   std::array<zx::interrupt, SDIO_MAX_FUNCS> sdio_irqs_;
   std::array<SdioFunction, SDIO_MAX_FUNCS> funcs_ TA_GUARDED(lock_);
   sdio_device_hw_info_t hw_info_ TA_GUARDED(lock_);
