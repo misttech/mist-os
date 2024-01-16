@@ -54,7 +54,7 @@ class SSH:
 
         ffx_transport: ffx.FFX object.
 
-        device_ip: Fuchsia device IP Address.
+        ip_port: Fuchsia device's SSH IP Address and Port.
 
         username: Username to be used to SSH into fuchsia device.
             Default is "fuchsia".
@@ -65,13 +65,11 @@ class SSH:
         device_name: str,
         private_key: str,
         ffx_transport: ffx.FFX,
-        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
+        ip_port: custom_types.IpPort | None = None,
         username: str | None = None,
     ) -> None:
         self._name: str = device_name
-        self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
-            device_ip
-        )
+        self._ip_port: custom_types.IpPort | None = ip_port
         self._private_key: str = private_key
         self._username: str = username or _DEFAULTS["USERNAME"]
 
@@ -122,27 +120,38 @@ class SSH:
             errors.SSHCommandError: On failure.
             errors.FfxCommandError: If failed to get the target SSH address.
         """
-        if self._ip_address:
-            ssh_command: str = _SSH_COMMAND_WITHOUT_PORT.format(
-                options=_OPTIONS,
-                private_key=self._private_key,
-                username=self._username,
-                ip_address=self._ip_address,
-                command=command,
-            )
+        ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
+        port: int | None = None
+        ssh_command: str
+
+        if self._ip_port:
+            ip = self._ip_port.ip
+            port = self._ip_port.port
         else:
             target_ssh_address: custom_types.TargetSshAddress = (
                 self._ffx_transport.get_target_ssh_address()
             )
+            ip = target_ssh_address.ip
+            port = target_ssh_address.port
 
+        if port:
             ssh_command = _SSH_COMMAND_WITH_PORT.format(
                 options=_OPTIONS,
                 private_key=self._private_key,
-                port=target_ssh_address.port,
+                port=port,
                 username=self._username,
-                ip_address=target_ssh_address.ip,
+                ip_address=ip,
                 command=command,
             )
+        else:
+            ssh_command = _SSH_COMMAND_WITHOUT_PORT.format(
+                options=_OPTIONS,
+                private_key=self._private_key,
+                username=self._username,
+                ip_address=ip,
+                command=command,
+            )
+
         try:
             _LOGGER.debug("Running the SSH command: '%s'...", ssh_command)
             output: str = subprocess.check_output(

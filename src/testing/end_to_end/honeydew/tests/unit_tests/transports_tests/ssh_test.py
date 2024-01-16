@@ -19,13 +19,18 @@ _IPV4: str = "11.22.33.44"
 _IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
 
 _SSH_PORT: int = 22
+
+_IPV4_NO_PORT: custom_types.IpPort = custom_types.IpPort(
+    ip=_IPV4_OBJ, port=None
+)
+
 _SSH_USER: str = "root"
 _SSH_PRIVATE_KEY: str = "/tmp/.ssh/pkey"
 _DEVICE_NAME: str = "fuchsia-emulator"
 
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": _DEVICE_NAME,
-    "device_ip_v4": _IPV4_OBJ,
+    "device_ssh_ipv4_no_port": _IPV4_NO_PORT,
     "ssh_private_key": _SSH_PRIVATE_KEY,
     "ssh_user": _SSH_USER,
 }
@@ -64,7 +69,7 @@ class SshTests(unittest.TestCase):
         self.ssh_obj_with_ip = ssh.SSH(
             device_name=_INPUT_ARGS["device_name"],
             private_key=_INPUT_ARGS["ssh_private_key"],
-            device_ip=_INPUT_ARGS["device_ip_v4"],
+            ip_port=_INPUT_ARGS["device_ssh_ipv4_no_port"],
             ffx_transport=self.ffx_obj,
         )
 

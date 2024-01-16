@@ -196,7 +196,7 @@ class BaseFuchsiaDevice(
             )
         ssh_obj: ssh_transport.SSH = ssh_transport.SSH(
             device_name=self.device_name,
-            device_ip=self._ip_address,
+            ip_port=self._ip_address_port,
             username=self._ssh_user,
             private_key=self._ssh_private_key,
             ffx_transport=self.ffx,
