@@ -23,6 +23,7 @@ use {
     },
     fidl_fuchsia_diagnostics_host as fhost,
     fidl_fuchsia_mem::Buffer,
+    flyweights::FlyStr,
     fuchsia_async::{self as fasync, Task},
     fuchsia_inspect::NumericProperty,
     fuchsia_sync::Mutex,
@@ -539,7 +540,7 @@ fn maybe_update_budget(
     bytes: usize,
     byte_limit: usize,
 ) -> bool {
-    if let Some(remaining_budget) = budget_map.get_mut(moniker) {
+    if let Some(remaining_budget) = budget_map.get_mut(&FlyStr::new(moniker)) {
         if *remaining_budget + bytes > byte_limit {
             false
         } else {
@@ -547,10 +548,10 @@ fn maybe_update_budget(
             true
         }
     } else if bytes > byte_limit {
-        budget_map.insert(moniker.to_string().into_boxed_str(), 0);
+        budget_map.insert(FlyStr::new(moniker), 0);
         false
     } else {
-        budget_map.insert(moniker.to_string().into_boxed_str(), bytes);
+        budget_map.insert(FlyStr::new(moniker), bytes);
         true
     }
 }

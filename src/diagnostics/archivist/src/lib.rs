@@ -26,4 +26,4 @@ mod utils;
 #[cfg(test)]
 mod testing;
 
-pub type ImmutableString = Box<str>;
+pub(crate) type ImmutableString = flyweights::FlyStr;
