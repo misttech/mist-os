@@ -78,6 +78,14 @@ do
   esac
 done
 
+# Propagate some build metadata from the environment.
+# Some of these values are set by infra.
+build_metadata_opts=()
+[[ "${{BUILDBUCKET_ID-NOT_SET}}" == "NOT_SET" ]] ||
+  build_metadata_opts+=( "--build_metadata=BUILDBUCKET_ID=go/bbid/$BUILDBUCKET_ID" )
+[[ "${{BUILDBUCKET_BUILDER-NOT_SET}}" == "NOT_SET" ]] ||
+  build_metadata_opts+=( "--build_metadata=BUILDBUCKET_BUILDER=$BUILDBUCKET_BUILDER" )
+
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
 # the USER is not actually used. See https://fxbug.dev/112206#c9.
 # In developer environments, use the real username so that authentication
@@ -93,4 +101,5 @@ cd "${{_WORKSPACE_DIR}}" && USER="$_user" "${{_BAZEL_BIN}}"\
       --output_base="${{_OUTPUT_BASE}}" \
       --output_user_root="${{_OUTPUT_USER_ROOT}}" \
       "$@" \
+      "${{build_metadata_opts[@]}}" \
       "${{proxy_overrides[@]}}"

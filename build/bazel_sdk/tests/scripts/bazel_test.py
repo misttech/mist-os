@@ -534,6 +534,18 @@ def main():
         for name, path in repo_override_map.items()
     ]
 
+    # Propagate some build metadata from the environment.
+    # Some of these values are set by infra.
+    def forward_build_metadata_from_env(var: str, value_format: str = "%s"):
+        env_value = os.environ.get(var)  # set by infra
+        if env_value is not None:
+            bazel_common_args.append(
+                f"--build_metadata={var}=" + (value_format % env_value)
+            )
+
+    forward_build_metadata_from_env("BUILDBUCKET_ID", "go/bbid/%s")
+    forward_build_metadata_from_env("BUILDBUCKET_BUILDER", "%s")
+
     # These argument remove verbose output from Bazel, used in queries.
     bazel_quiet_args = [
         "--noshow_loading_progress",
