@@ -214,9 +214,6 @@ use crate::bindings::{interfaces_watcher::AddressPropertiesUpdate, util::TaskWai
 trait DeviceIdExt {
     /// Returns the state associated with devices.
     fn external_state(&self) -> DeviceSpecificInfo<'_>;
-
-    /// Gets the contained ethernet ID if this is an ethernet device.
-    fn into_ethernet(self) -> Option<EthernetDeviceId<BindingsCtx>>;
 }
 
 impl DeviceIdExt for DeviceId<BindingsCtx> {
@@ -224,13 +221,6 @@ impl DeviceIdExt for DeviceId<BindingsCtx> {
         match self {
             DeviceId::Ethernet(d) => DeviceSpecificInfo::Netdevice(d.external_state()),
             DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
-        }
-    }
-
-    fn into_ethernet(self) -> Option<EthernetDeviceId<BindingsCtx>> {
-        match self {
-            DeviceId::Ethernet(d) => Some(d),
-            DeviceId::Loopback(_) => None,
         }
     }
 }
@@ -1209,7 +1199,7 @@ impl NetstackSeed {
             });
             let neighbors_ctx = netstack.ctx.clone();
             let neighbors = inspector.root().create_lazy_child("Neighbors", move || {
-                futures::future::ok(inspect::neighbors(&neighbors_ctx)).boxed()
+                futures::future::ok(inspect::neighbors(neighbors_ctx.clone())).boxed()
             });
             let counters_ctx = netstack.ctx.clone();
             let counters = inspector.root().create_lazy_child("Counters", move || {

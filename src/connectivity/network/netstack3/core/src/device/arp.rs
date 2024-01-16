@@ -217,6 +217,13 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
+
+    /// Calls the function with an immutable reference to ARP state.
+    fn with_arp_state<O, F: FnOnce(&ArpState<D, BC::Instant, BC::Notifier>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
 }
 
 /// An execution context for the ARP protocol that allows accessing
@@ -262,6 +269,14 @@ impl<
         cb: F,
     ) -> O {
         self.with_arp_state_mut(device_id, |ArpState { nud }, core_ctx| cb(nud, core_ctx))
+    }
+
+    fn with_nud_state<O, F: FnOnce(&NudState<Ipv4, D, BC::Instant, BC::Notifier>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.with_arp_state(device_id, |ArpState { nud }| cb(nud))
     }
 
     fn send_neighbor_solicitation(
@@ -772,6 +787,24 @@ mod tests {
         ) -> O {
             let state = self.get_mut();
             cb(&mut state.arp_state, &mut state.inner)
+        }
+
+        fn with_arp_state<
+            O,
+            F: FnOnce(
+                &ArpState<
+                    EthernetLinkDevice,
+                    FakeInstant,
+                    FakeLinkResolutionNotifier<EthernetLinkDevice>,
+                >,
+            ) -> O,
+        >(
+            &mut self,
+            FakeLinkDeviceId: &FakeLinkDeviceId,
+            cb: F,
+        ) -> O {
+            let state = self.get_ref();
+            cb(&state.arp_state)
         }
 
         fn get_protocol_addr(

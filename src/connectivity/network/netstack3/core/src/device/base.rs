@@ -21,7 +21,7 @@ use smallvec::SmallVec;
 use tracing::{debug, trace};
 
 use crate::{
-    context::{CounterContext, InstantBindingsTypes, InstantContext},
+    context::{CounterContext, InstantContext},
     counters::Counter,
     device::{
         arp::ArpCounters,
@@ -33,7 +33,6 @@ use crate::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
             StrongId, WeakId,
         },
-        integration,
         loopback::{
             self, LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackPrimaryDeviceId,
         },
@@ -47,7 +46,7 @@ use crate::{
     error::{self, ExistsError, NotSupportedError, SetIpAddressPropertiesError},
     ip::{
         device::{
-            nud::{LinkResolutionContext, NeighborStateInspect},
+            nud::LinkResolutionContext,
             state::{
                 AddrSubnetAndManualConfigEither, AssignedAddress as _, IpDeviceFlags,
                 Ipv4DeviceConfigurationAndFlags, Ipv6DeviceConfigurationAndFlags, Lifetime,
@@ -62,7 +61,7 @@ use crate::{
     sync::{PrimaryRc, RwLock},
     trace_duration,
     work_queue::WorkQueueReport,
-    BindingsContext, CoreCtx, Instant, StackState, SyncCtx,
+    BindingsContext, CoreCtx, StackState, SyncCtx,
 };
 
 /// A device.
@@ -162,20 +161,6 @@ pub fn get_routing_metric<BC: BindingsContext>(
     }
 }
 
-/// Visitor for NUD state.
-pub trait NeighborVisitor<BC: BindingsContext, T: Instant> {
-    /// Performs a user-defined operation over an iterator of neighbor state
-    /// describing the neighbors associated with a given `device`.
-    ///
-    /// This function will be called N times, where N is the number of devices
-    /// in the stack.
-    fn visit_neighbors<LinkAddress: Debug>(
-        &self,
-        device: DeviceId<BC>,
-        neighbors: impl Iterator<Item = NeighborStateInspect<LinkAddress, T>>,
-    );
-}
-
 /// Creates a snapshot of the devices in the stack at the time of invocation.
 ///
 /// Devices are copied into the return value.
@@ -192,32 +177,6 @@ pub(crate) fn snapshot_device_ids<T, BC: BindingsContext, F: FnMut(DeviceId<BC>)
     DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }
         .filter_map(filter_map)
         .collect::<SmallVec<[T; 32]>>()
-}
-
-/// Provides access to NUD state via a `visitor`.
-pub fn inspect_neighbors<BC, V>(core_ctx: &SyncCtx<BC>, visitor: &V)
-where
-    BC: BindingsContext,
-    V: NeighborVisitor<BC, <BC as InstantBindingsTypes>::Instant>,
-{
-    let device_ids = snapshot_device_ids(core_ctx, |device| match device {
-        DeviceId::Ethernet(d) => Some(d),
-        // Loopback devices do not have neighbors.
-        DeviceId::Loopback(_) => None,
-    });
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    for device in device_ids {
-        let id = device.clone();
-        integration::with_device_state(&mut core_ctx, &id, |mut device_state| {
-            let (arp, mut device_state) =
-                device_state.lock_and::<crate::lock_ordering::EthernetIpv4Arp>();
-            let nud = device_state.lock::<crate::lock_ordering::EthernetIpv6Nud>();
-            visitor.visit_neighbors(
-                DeviceId::from(device),
-                arp.nud.state_iter().chain(nud.state_iter()),
-            );
-        })
-    }
 }
 
 /// Visitor for Device state.

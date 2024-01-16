@@ -28,10 +28,10 @@ use tracing::{error, info, warn};
 
 use crate::bindings::{
     devices::{BindingId, DeviceIdAndName},
-    BindingsCtx, Ctx, DeviceIdExt as _, StackTime,
+    BindingsCtx, Ctx, StackTime,
 };
 use netstack3_core::{
-    device::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
+    device::{DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId},
     error::NotFoundError,
     neighbor,
     neighbor::{NeighborRemovalError, StaticNeighborInsertionError},
@@ -427,11 +427,13 @@ pub(super) async fn serve_view(
 }
 
 fn get_ethernet_id(ctx: &Ctx, interface: u64) -> Result<EthernetDeviceId<BindingsCtx>, zx::Status> {
-    BindingId::new(interface)
+    match BindingId::new(interface)
         .and_then(|id| ctx.bindings_ctx().devices.get_core_id(id))
         .ok_or(zx::Status::NOT_FOUND)?
-        .into_ethernet()
-        .ok_or(zx::Status::NOT_SUPPORTED)
+    {
+        DeviceId::Ethernet(e) => Ok(e),
+        DeviceId::Loopback(_) => Err(zx::Status::NOT_SUPPORTED),
+    }
 }
 
 #[netstack3_core::context_ip_bounds(A::Version, BindingsCtx)]

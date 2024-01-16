@@ -43,7 +43,7 @@ use crate::bindings::{
     devices::{BindingId, Devices},
     routes,
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
-    Ctx, DeviceIdExt as _, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
+    Ctx, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
 struct LogFormatter;
@@ -1020,7 +1020,10 @@ async fn test_neighbor_table_inspect() {
         let devices: &Devices<_> = ctx.bindings_ctx().as_ref();
         let device = devices
             .get_core_id(bindings_id)
-            .and_then(|d| d.into_ethernet())
+            .and_then(|d| match d {
+                DeviceId::Ethernet(e) => Some(e),
+                DeviceId::Loopback(_) => None,
+            })
             .expect("get_core_id failed");
         let v4_neigh_addr = net_ip_v4!("192.168.0.1");
         let v4_neigh_mac = net_mac!("AA:BB:CC:DD:EE:FF");

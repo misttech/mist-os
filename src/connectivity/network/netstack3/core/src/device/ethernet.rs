@@ -246,6 +246,25 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         )
     }
 
+    fn with_nud_state<
+        O,
+        F: FnOnce(&NudState<Ipv6, EthernetLinkDevice, BC::Instant, BC::Notifier>) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<BC>,
+        cb: F,
+    ) -> O {
+        device::integration::with_device_state_and_core_ctx(
+            self,
+            device_id,
+            |mut core_ctx_and_resource| {
+                let nud = core_ctx_and_resource
+                    .lock_with::<crate::lock_ordering::EthernetIpv6Nud, _>(|c| c.right());
+                cb(&nud)
+            },
+        )
+    }
+
     fn send_neighbor_solicitation(
         &mut self,
         bindings_ctx: &mut BC,
@@ -1271,6 +1290,25 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
             },
         )
     }
+
+    fn with_arp_state<
+        O,
+        F: FnOnce(&ArpState<EthernetLinkDevice, BC::Instant, BC::Notifier>) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<BC>,
+        cb: F,
+    ) -> O {
+        device::integration::with_device_state_and_core_ctx(
+            self,
+            device_id,
+            |mut core_ctx_and_resource| {
+                let arp = core_ctx_and_resource
+                    .lock_with::<crate::lock_ordering::EthernetIpv4Arp, _>(|c| c.right());
+                cb(&arp)
+            },
+        )
+    }
 }
 
 impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::NudConfig<Ipv4>>> ArpConfigContext
@@ -1710,6 +1748,24 @@ mod tests {
         ) -> O {
             let Self { outer, inner } = self;
             cb(outer, &mut CoreCtxWithDeviceId { core_ctx: inner, device_id })
+        }
+
+        fn with_arp_state<
+            O,
+            F: FnOnce(
+                &ArpState<
+                    EthernetLinkDevice,
+                    FakeInstant,
+                    FakeLinkResolutionNotifier<EthernetLinkDevice>,
+                >,
+            ) -> O,
+        >(
+            &mut self,
+            FakeDeviceId: &Self::DeviceId,
+            cb: F,
+        ) -> O {
+            let Self { outer, inner: _ } = self;
+            cb(outer)
         }
     }
 

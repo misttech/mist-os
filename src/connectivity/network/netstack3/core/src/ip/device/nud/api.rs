@@ -13,12 +13,12 @@ use net_types::{
 use thiserror::Error;
 
 use crate::{
-    context::ContextPair,
+    context::{ContextPair, InstantBindingsTypes},
     device::{link::LinkDevice, DeviceIdContext},
     error::NotFoundError,
     ip::device::nud::{
-        LinkResolutionContext, LinkResolutionNotifier, LinkResolutionResult, NudBindingsContext,
-        NudContext, NudHandler,
+        LinkResolutionContext, LinkResolutionNotifier, LinkResolutionResult, NeighborStateInspect,
+        NudBindingsContext, NudContext, NudHandler,
     },
 };
 
@@ -75,6 +75,15 @@ impl<I: Ip, D, C> NeighborApi<I, D, C> {
     }
 }
 
+/// Visitor for NUD state.
+pub trait NeighborVisitor<A: IpAddress, LinkAddress, T> {
+    /// Performs a user-defined operation over an iterator of neighbor state.
+    fn visit_neighbors(
+        &mut self,
+        neighbors: impl Iterator<Item = NeighborStateInspect<A, LinkAddress, T>>,
+    );
+}
+
 impl<I, D, C> NeighborApi<I, D, C>
 where
     I: Ip,
@@ -83,6 +92,11 @@ where
     C::CoreContext: NudContext<I, D, C::BindingsContext>,
     C::BindingsContext: NudBindingsContext<I, D, <C::CoreContext as DeviceIdContext<D>>::DeviceId>,
 {
+    fn core_ctx(&mut self) -> &mut C::CoreContext {
+        let Self(pair, IpVersionMarker { .. }, PhantomData) = self;
+        pair.core_ctx()
+    }
+
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
         let Self(pair, IpVersionMarker { .. }, PhantomData) = self;
         pair.contexts()
@@ -145,5 +159,20 @@ where
         let addr = validate_neighbor_addr(addr).ok_or(NeighborRemovalError::IpAddressInvalid)?;
         NudHandler::<I, D, _>::delete_neighbor(core_ctx, bindings_ctx, device, addr)
             .map_err(Into::into)
+    }
+
+    /// Provides access to NUD state via a `visitor`.
+    pub fn inspect_neighbors<V>(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
+        visitor: &mut V,
+    ) where
+        V: NeighborVisitor<
+            I::Addr,
+            D::Address,
+            <C::BindingsContext as InstantBindingsTypes>::Instant,
+        >,
+    {
+        self.core_ctx().with_nud_state(device, |nud| visitor.visit_neighbors(nud.state_iter()))
     }
 }

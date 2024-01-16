@@ -22,7 +22,7 @@ use core::{
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddr, Ipv4Addr, Ipv6Addr},
+    ip::{GenericOverIp, Ip},
     SpecifiedAddr,
 };
 use packet::{Buf, BufferMut, Serializer};
@@ -1493,7 +1493,7 @@ pub struct NudState<I: Ip, D: LinkDevice, Time: Instant, N: LinkResolutionNotifi
 impl<I: Ip, D: LinkDevice, T: Instant, N: LinkResolutionNotifier<D>> NudState<I, D, T, N> {
     pub(crate) fn state_iter(
         &self,
-    ) -> impl Iterator<Item = NeighborStateInspect<D::Address, T>> + '_ {
+    ) -> impl Iterator<Item = NeighborStateInspect<I::Addr, D::Address, T>> + '_ {
         self.neighbors.iter().map(|(ip_address, state)| {
             let (state, link_address, last_confirmed_at) = match state {
                 NeighborState::Static(addr) => ("Static", Some(*addr), None),
@@ -1524,7 +1524,7 @@ impl<I: Ip, D: LinkDevice, T: Instant, N: LinkResolutionNotifier<D>> NudState<I,
             };
             NeighborStateInspect {
                 state: state,
-                ip_address: IpAddr::from(*ip_address),
+                ip_address: *ip_address,
                 link_address,
                 last_confirmed_at,
             }
@@ -1533,11 +1533,11 @@ impl<I: Ip, D: LinkDevice, T: Instant, N: LinkResolutionNotifier<D>> NudState<I,
 }
 
 /// A snapshot of the state of a neighbor, for exporting to Inspect.
-pub struct NeighborStateInspect<LinkAddress: Debug, T: Instant> {
+pub struct NeighborStateInspect<A, LinkAddress, T> {
     /// The NUD state of the neighbor.
     pub state: &'static str,
     /// The neighbor's IP address.
-    pub ip_address: IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>,
+    pub ip_address: SpecifiedAddr<A>,
     /// The neighbor's link address.
     pub link_address: Option<LinkAddress>,
     /// The last instant at which the neighbor's reachability was confirmed.
@@ -1610,6 +1610,13 @@ pub trait NudContext<I: Ip, D: LinkDevice, BC: NudBindingsContext<I, D, Self::De
         O,
         F: FnOnce(&mut NudState<I, D, BC::Instant, BC::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
     >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with an immutable reference to the NUD state.
+    fn with_nud_state<O, F: FnOnce(&NudState<I, D, BC::Instant, BC::Notifier>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
@@ -2767,6 +2774,24 @@ mod tests {
             cb: F,
         ) -> O {
             cb(&mut self.outer.nud, self.inner.get_mut())
+        }
+
+        fn with_nud_state<
+            O,
+            F: FnOnce(
+                &NudState<
+                    I,
+                    FakeLinkDevice,
+                    FakeInstant,
+                    FakeLinkResolutionNotifier<FakeLinkDevice>,
+                >,
+            ) -> O,
+        >(
+            &mut self,
+            &FakeLinkDeviceId: &FakeLinkDeviceId,
+            cb: F,
+        ) -> O {
+            cb(&self.outer.nud)
         }
 
         fn send_neighbor_solicitation(

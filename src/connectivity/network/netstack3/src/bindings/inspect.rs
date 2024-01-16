@@ -7,7 +7,7 @@
 //! This module provides utilities for publishing netstack3 diagnostics data to
 //! Inspect.
 
-use super::{
+use crate::bindings::{
     devices::{
         DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo,
     },
@@ -15,53 +15,44 @@ use super::{
 };
 use fuchsia_inspect::ArrayProperty as _;
 use net_types::{
-    ip::{Ip, IpVersion, Ipv4, Ipv6},
+    ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
     Witness as _,
 };
 use netstack3_core::{
-    device::{self, DeviceId, WeakDeviceId},
-    tcp,
+    device::{self, DeviceId, EthernetLinkDevice, WeakDeviceId},
+    neighbor, tcp,
 };
-use std::{fmt, string::ToString as _};
+use std::{fmt::Debug, string::ToString as _};
 
 /// A visitor for diagnostics data that has distinct Ipv4 and Ipv6 variants.
-struct DualIpVisitor {
-    inspector: fuchsia_inspect::Inspector,
+struct DualIpVisitor<'a> {
+    node: &'a fuchsia_inspect::Node,
     count: usize,
 }
 
-impl DualIpVisitor {
-    fn new() -> Self {
-        Self {
-            inspector: fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()),
-            count: 0,
-        }
+impl<'a> DualIpVisitor<'a> {
+    fn new(node: &'a fuchsia_inspect::Node) -> Self {
+        Self { node, count: 0 }
     }
 
     /// Records a child Inspect node with an incrementing id that is unique
     /// across IP versions.
     fn record_unique_child<F>(&mut self, f: F)
     where
-        F: FnOnce(&fuchsia_inspect::types::Node),
+        F: FnOnce(&fuchsia_inspect::Node),
     {
-        let Self { inspector, count } = self;
+        let Self { node, count } = self;
         let id = core::mem::replace(count, *count + 1);
-        inspector.root().record_child(format!("{id}"), f)
+        node.record_child(format!("{id}"), f)
     }
 }
 
 /// A visitor for diagnostics data.
-struct Visitor(fuchsia_inspect::Inspector);
-
-impl Visitor {
-    fn new() -> Self {
-        Self(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()))
-    }
-}
+struct Visitor<'a>(&'a fuchsia_inspect::Node);
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    impl<I: Ip> tcp::InfoVisitor<I, WeakDeviceId<BindingsCtx>> for DualIpVisitor {
+    impl<'a, I: Ip> tcp::InfoVisitor<I, WeakDeviceId<BindingsCtx>> for DualIpVisitor<'a> {
         fn visit(&mut self, socket: tcp::SocketStats<I, WeakDeviceId<BindingsCtx>>) {
             let tcp::SocketStats { local, remote } = socket;
             self.record_unique_child(|node| {
@@ -88,17 +79,17 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             })
         }
     }
-    let mut visitor = DualIpVisitor::new();
+    let inspector = fuchsia_inspect::Inspector::new(Default::default());
+    let mut visitor = DualIpVisitor::new(inspector.root());
     ctx.api().tcp::<Ipv4>().with_info(&mut visitor);
     ctx.api().tcp::<Ipv6>().with_info(&mut visitor);
-
-    visitor.inspector
+    inspector
 }
 
 /// Publishes netstack3 routing table diagnostics data to Inspect.
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     impl<'a, I: Ip> netstack3_core::routes::RoutesVisitor<'a, I, DeviceId<BindingsCtx>>
-        for DualIpVisitor
+        for DualIpVisitor<'a>
     {
         fn visit<'b>(
             &mut self,
@@ -134,24 +125,25 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
-    let mut visitor = DualIpVisitor::new();
+    let inspector = fuchsia_inspect::Inspector::new(Default::default());
+    let mut visitor = DualIpVisitor::new(inspector.root());
     ctx.api().routes::<Ipv4>().with_routes(&mut visitor);
     ctx.api().routes::<Ipv6>().with_routes(&mut visitor);
-    visitor.inspector
+    inspector
 }
 
 pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    impl device::DevicesVisitor<BindingsCtx> for Visitor {
+    impl<'a> device::DevicesVisitor<BindingsCtx> for Visitor<'a> {
         fn visit_devices(
             &self,
             devices: impl Iterator<Item = device::InspectDeviceState<BindingsCtx>>,
         ) {
             use crate::bindings::DeviceIdExt as _;
-            let Self(inspector) = self;
+            let Self(node) = self;
             for device::InspectDeviceState { device_id, addresses } in devices {
                 let external_state = device_id.external_state();
                 let DeviceIdAndName { id: binding_id, name } = device_id.bindings_id();
-                inspector.root().record_child(format!("{binding_id}"), |node| {
+                node.record_child(format!("{binding_id}"), |node| {
                     node.record_string("Name", &name);
                     node.record_uint("InterfaceId", (*binding_id).into());
                     let ip_addresses = node.create_string_array("IpAddresses", addresses.len());
@@ -202,58 +194,71 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             }
         }
     }
+    let inspector = fuchsia_inspect::Inspector::new(Default::default());
     let core_ctx = ctx.core_ctx();
-    let visitor = Visitor::new();
-    device::inspect_devices::<BindingsCtx, _>(core_ctx, &visitor);
-    let Visitor(inspector) = visitor;
+    device::inspect_devices::<BindingsCtx, _>(core_ctx, &Visitor(inspector.root()));
     inspector
 }
 
-pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    impl device::NeighborVisitor<BindingsCtx, StackTime> for Visitor {
-        fn visit_neighbors<LinkAddress: fmt::Debug>(
-            &self,
-            device: DeviceId<BindingsCtx>,
-            neighbors: impl Iterator<
-                Item = netstack3_core::neighbor::NeighborStateInspect<LinkAddress, StackTime>,
-            >,
+pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
+    impl<'a, A: IpAddress, LinkAddress: Debug> neighbor::NeighborVisitor<A, LinkAddress, StackTime>
+        for DualIpVisitor<'a>
+    {
+        fn visit_neighbors(
+            &mut self,
+            neighbors: impl Iterator<Item = neighbor::NeighborStateInspect<A, LinkAddress, StackTime>>,
         ) {
-            let Self(inspector) = self;
-            let name = &device.bindings_id().name;
-            inspector.root().record_child(name, |node| {
-                for (i, neighbor) in neighbors.enumerate() {
-                    let netstack3_core::neighbor::NeighborStateInspect {
-                        state,
-                        ip_address,
-                        link_address,
-                        last_confirmed_at,
-                    } = neighbor;
-                    node.record_child(format!("{i}"), |node| {
-                        node.record_string("State", state);
-                        node.record_string("IpAddress", format!("{}", ip_address));
-                        if let Some(link_address) = link_address {
-                            node.record_string("LinkAddress", format!("{:?}", link_address));
-                        };
-                        if let Some(StackTime(last_confirmed_at)) = last_confirmed_at {
-                            node.record_int("LastConfirmedAt", last_confirmed_at.into_nanos());
-                        }
-                    })
-                }
-            });
+            for neighbor in neighbors {
+                let netstack3_core::neighbor::NeighborStateInspect {
+                    state,
+                    ip_address,
+                    link_address,
+                    last_confirmed_at,
+                } = neighbor;
+                self.record_unique_child(|node| {
+                    node.record_string("State", state);
+                    node.record_string("IpAddress", format!("{}", ip_address));
+                    if let Some(link_address) = link_address {
+                        node.record_string("LinkAddress", format!("{:?}", link_address));
+                    };
+                    if let Some(StackTime(last_confirmed_at)) = last_confirmed_at {
+                        node.record_int("LastConfirmedAt", last_confirmed_at.into_nanos());
+                    }
+                })
+            }
         }
     }
-    let core_ctx = ctx.core_ctx();
-    let visitor = Visitor::new();
-    device::inspect_neighbors::<BindingsCtx, _>(core_ctx, &visitor);
-    let Visitor(inspector) = visitor;
+    let inspector = fuchsia_inspect::Inspector::new(Default::default());
+
+    // Get a snapshot of all supported devices. Ethernet is the only device type
+    // that supports neighbors.
+    let ethernet_devices = ctx.bindings_ctx().devices.with_devices(|devices| {
+        devices
+            .filter_map(|d| match d {
+                DeviceId::Ethernet(d) => Some(d.clone()),
+                DeviceId::Loopback(_) => None,
+            })
+            .collect::<Vec<_>>()
+    });
+    for device in ethernet_devices {
+        inspector.root().record_child(&device.bindings_id().name, |node| {
+            let mut visitor = DualIpVisitor::new(node);
+            ctx.api()
+                .neighbor::<Ipv4, EthernetLinkDevice>()
+                .inspect_neighbors(&device, &mut visitor);
+            ctx.api()
+                .neighbor::<Ipv6, EthernetLinkDevice>()
+                .inspect_neighbors(&device, &mut visitor);
+        });
+    }
     inspector
 }
 
 pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    impl netstack3_core::inspect::CounterVisitor for Visitor {
+    impl<'a> netstack3_core::inspect::CounterVisitor for Visitor<'a> {
         fn visit_counters(&self, counters: netstack3_core::inspect::StackCounters<'_>) {
-            let Self(inspector) = self;
-            inspector.root().record_child("Devices", |node| {
+            let Self(node) = self;
+            node.record_child("Devices", |node| {
                 node.record_child("Ethernet", |node| {
                     node.record_child("Rx", |node| {
                         node.record_uint(
@@ -338,7 +343,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                     });
                 });
             });
-            inspector.root().record_child("Arp", |node| {
+            node.record_child("Arp", |node| {
                 node.record_child("Rx", |node| {
                     node.record_uint("TotalPackets", counters.arp.rx_packets.get());
                     node.record_uint("Requests", counters.arp.rx_requests.get());
@@ -358,7 +363,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                     node.record_uint("Responses", counters.arp.tx_responses.get());
                 });
             });
-            inspector.root().record_child("ICMP", |node| {
+            node.record_child("ICMP", |node| {
                 node.record_child("V4", |node| {
                     node.record_child("Rx", |node| {
                         node.record_uint("EchoRequest", counters.icmpv4_rx.echo_request.get());
@@ -482,7 +487,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                     });
                 });
             });
-            inspector.root().record_child("IPv4", |node| {
+            node.record_child("IPv4", |node| {
                 node.record_uint("PacketTx", counters.ipv4_common.send_ip_packet.get());
                 node.record_child("PacketRx", |node| {
                     node.record_uint("Received", counters.ipv4_common.receive_ip_packet.get());
@@ -532,7 +537,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                     node.record_uint("CacheFull", counters.ipv4_common.fragment_cache_full.get());
                 });
             });
-            inspector.root().record_child("IPv6", |node| {
+            node.record_child("IPv6", |node| {
                 node.record_uint("PacketTx", counters.ipv6_common.send_ip_packet.get());
                 node.record_child("PacketRx", |node| {
                     node.record_uint("Received", counters.ipv6_common.receive_ip_packet.get());
@@ -592,7 +597,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                     node.record_uint("CacheFull", counters.ipv6_common.fragment_cache_full.get());
                 });
             });
-            inspector.root().record_child("UDP", |node| {
+            node.record_child("UDP", |node| {
                 node.record_child("V4", |node| {
                     node.record_child("Rx", |node| {
                         node.record_uint("Received", counters.udpv4.rx.get());
@@ -632,9 +637,8 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             });
         }
     }
+    let inspector = fuchsia_inspect::Inspector::new(Default::default());
     let core_ctx = ctx.core_ctx();
-    let visitor = Visitor::new();
-    netstack3_core::inspect::inspect_counters::<_, _>(core_ctx, &visitor);
-    let Visitor(inspector) = visitor;
+    netstack3_core::inspect::inspect_counters::<_, _>(core_ctx, &Visitor(inspector.root()));
     inspector
 }

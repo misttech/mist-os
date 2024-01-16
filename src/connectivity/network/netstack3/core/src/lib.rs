@@ -71,18 +71,17 @@ pub mod device {
         add_ethernet_device_with_state, add_ip_addr_subnet, add_loopback_device_with_state,
         del_ip_addr, get_all_ip_addr_subnets, get_ipv4_configuration_and_flags,
         get_ipv6_configuration_and_flags, get_routing_metric, handle_queued_rx_packets,
-        inspect_devices, inspect_neighbors, new_ipv4_configuration_update,
-        new_ipv6_configuration_update, receive_frame, remove_ethernet_device,
-        remove_loopback_device, set_ip_addr_properties, set_tx_queue_configuration,
-        transmit_queued_tx_frames,
+        inspect_devices, new_ipv4_configuration_update, new_ipv6_configuration_update,
+        receive_frame, remove_ethernet_device, remove_loopback_device, set_ip_addr_properties,
+        set_tx_queue_configuration, transmit_queued_tx_frames,
     };
     pub use config::{get_device_configuration, new_device_configuration_update};
 
     // Re-exported types.
     pub use base::{
         AddIpAddrSubnetError, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
-        DeviceSendFrameError, DevicesVisitor, InspectDeviceState, NeighborVisitor,
-        RemoveDeviceResult, RemoveDeviceResultWithContext,
+        DeviceSendFrameError, DevicesVisitor, InspectDeviceState, RemoveDeviceResult,
+        RemoveDeviceResultWithContext,
     };
     pub use config::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
@@ -167,7 +166,7 @@ pub mod ip {
 pub mod neighbor {
     // Re-exported types.
     pub use crate::ip::device::nud::{
-        api::{NeighborRemovalError, StaticNeighborInsertionError},
+        api::{NeighborRemovalError, NeighborVisitor, StaticNeighborInsertionError},
         Event, EventDynamicState, EventKind, EventState, LinkResolutionContext,
         LinkResolutionNotifier, LinkResolutionResult, NeighborStateInspect, NudUserConfig,
         NudUserConfigUpdate, MAX_ENTRIES,
