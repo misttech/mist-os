@@ -5,25 +5,24 @@
 """A cc_library backed by a FIDL library."""
 
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load("@bazel_skylib//lib:paths.bzl", "paths")
 
 _CodegenInfo = provider("Carries generated information across FIDL bindings code generation ", fields = ["files"])
 
 # ALL CODE BELOW IS DEPRECATED - TODO: REMOVE IT when soft transition is over
-def _codegen_impl(context):
-    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    fidlgen = sdk.fidlgen_cpp if context.attr.binding_level == "llcpp" else sdk.fidlgen_hlcpp
+def _codegen_impl(ctx):
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+    fidlgen = sdk.fidlgen_cpp if ctx.attr.binding_level == "llcpp" else sdk.fidlgen_hlcpp
 
-    ir = context.attr.library[FuchsiaFidlLibraryInfo].ir
-    name = context.attr.library[FuchsiaFidlLibraryInfo].name
+    ir = ctx.attr.library[FuchsiaFidlLibraryInfo].ir
+    name = ctx.attr.library[FuchsiaFidlLibraryInfo].name
 
-    base_path = context.attr.name + "." + context.attr.binding_level
+    base_path = ctx.attr.name + "." + ctx.attr.binding_level
 
-    # This declaration is needed in order to get access to the full path.
-    root = context.actions.declare_directory(base_path)
     headers = []
     sources = []
-    if context.attr.binding_level == "llcpp":
-        dir = base_path + "/fidl/" + name + "/cpp"
+    if ctx.attr.binding_level == "llcpp":
+        dir = paths.join(base_path, "fidl", name, "cpp")
         header_files = []
         source_files = []
 
@@ -59,30 +58,27 @@ def _codegen_impl(context):
             source_files = ["markers.h"]
 
         for header in header_files:
-            headers.append(context.actions.declare_file(dir + "/" + header))
+            headers.append(ctx.actions.declare_file(dir + "/" + header))
         for source in source_files:
-            sources.append(context.actions.declare_file(dir + "/" + source))
+            sources.append(ctx.actions.declare_file(dir + "/" + source))
 
-    else:  # context.attr.binding_level == "hlcpp"
-        dir = base_path + "/" + name.replace(".", "/") + "/cpp"
-        headers.append(context.actions.declare_file(dir + "/fidl.h"))
-        headers.append(context.actions.declare_file(dir + "/fidl_test_base.h"))
-        sources.append(context.actions.declare_file(dir + "/fidl.cc"))
-        sources.append(context.actions.declare_file(dir + "/tables.c"))
+    else:  # ctx.attr.binding_level == "hlcpp"
+        dir = paths.join(base_path, name.replace(".", "/"), "cpp")
+        headers.append(ctx.actions.declare_file(dir + "/fidl.h"))
+        headers.append(ctx.actions.declare_file(dir + "/fidl_test_base.h"))
+        sources.append(ctx.actions.declare_file(dir + "/fidl.cc"))
+        sources.append(ctx.actions.declare_file(dir + "/tables.c"))
 
-    outputs = [root] + headers + sources
-    context.actions.run(
+    ctx.actions.run(
         executable = fidlgen,
         arguments = [
             "--json",
             ir.path,
             "--root",
-            root.path,
+            paths.join(ctx.bin_dir.path, ctx.label.workspace_root, ctx.label.package, base_path),
         ],
-        inputs = [
-            ir,
-        ],
-        outputs = outputs,
+        inputs = [ir],
+        outputs = headers + sources,
         mnemonic = "FidlGenCc",
     )
 
@@ -91,8 +87,8 @@ def _codegen_impl(context):
         DefaultInfo(files = depset(headers)),
     ]
 
-def _impl_wrapper_impl(context):
-    files = context.attr.codegen[_CodegenInfo].files
+def _impl_wrapper_impl(ctx):
+    files = ctx.attr.codegen[_CodegenInfo].files
     return [DefaultInfo(files = files)]
 
 # Runs fidlgen to produce both the header file and the implementation file.

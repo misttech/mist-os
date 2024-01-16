@@ -6,41 +6,35 @@
 
 load(":fuchsia_bind_library.bzl", "fuchsia_bind_library")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load("@bazel_skylib//lib:paths.bzl", "paths")
 
-def _bindlibgen_impl(context):
-    sdk = context.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+def _bindlibgen_impl(ctx):
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     bindc = sdk.bindc
 
-    ir = context.attr.library[FuchsiaFidlLibraryInfo].ir
-    fidl_lib_name = context.attr.library[FuchsiaFidlLibraryInfo].name
+    ir = ctx.attr.library[FuchsiaFidlLibraryInfo].ir
+    fidl_lib_name = ctx.attr.library[FuchsiaFidlLibraryInfo].name
 
-    base_path = context.attr.name
-
-    # This declaration is needed in order to get access to the full path.
-    root = context.actions.declare_directory(base_path)
+    base_path = ctx.attr.name
 
     # The generated bind library file
-    bindlib_relative = "/fidl_bindlibs/" + fidl_lib_name + ".bind"
-    bindlib = [context.actions.declare_file(base_path + bindlib_relative)]
+    bindlib = ctx.actions.declare_file(paths.join(base_path, "fidl_bindlibs", fidl_lib_name + ".bind"))
 
-    outputs = [root] + bindlib
-    context.actions.run(
+    ctx.actions.run(
         executable = bindc,
         arguments = [
             "generate-bind",
             "--output",
-            root.path + bindlib_relative,
+            bindlib.path,
             ir.path,
         ],
-        inputs = [
-            ir,
-        ],
-        outputs = outputs,
+        inputs = [ir],
+        outputs = [bindlib],
         mnemonic = "FidlGenBindlib",
     )
 
     return [
-        DefaultInfo(files = depset(bindlib)),
+        DefaultInfo(files = depset([bindlib])),
     ]
 
 # Runs bindc to produce the bind library file.
