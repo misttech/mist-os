@@ -15,9 +15,7 @@
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl {
-
-using utils::identity_t;
+namespace fidlc {
 
 class Reporter {
  public:
@@ -88,6 +86,6 @@ class Reporter {
   std::vector<std::unique_ptr<Diagnostic>> warnings_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_REPORTER_H_

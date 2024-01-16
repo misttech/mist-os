@@ -19,7 +19,7 @@
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
-namespace fidl {
+namespace fidlc {
 
 using ErrorId = uint32_t;
 
@@ -31,17 +31,17 @@ std::string Display(std::string_view s);
 std::string Display(const std::set<std::string_view>& s);
 std::string Display(SourceSpan s);
 std::string Display(Token::KindAndSubkind t);
-std::string Display(types::Openness o);
+std::string Display(Openness o);
 std::string Display(const std::vector<std::string_view>& library_name);
-std::string Display(const flat::Attribute* a);
-std::string Display(const flat::AttributeArg* a);
-std::string Display(const flat::Constant* c);
-std::string Display(flat::Element::Kind k);
-std::string Display(flat::Decl::Kind k);
-std::string Display(const flat::Element* e);
-std::string Display(const std::vector<const flat::Decl*>& d);
-std::string Display(const flat::Type* t);
-std::string Display(const flat::Name& n);
+std::string Display(const Attribute* a);
+std::string Display(const AttributeArg* a);
+std::string Display(const Constant* c);
+std::string Display(Element::Kind k);
+std::string Display(Decl::Kind k);
+std::string Display(const Element* e);
+std::string Display(const std::vector<const Decl*>& d);
+std::string Display(const Type* t);
+std::string Display(const Name& n);
 std::string Display(const Platform& p);
 std::string Display(Version v);
 std::string Display(VersionRange r);
@@ -102,8 +102,6 @@ constexpr void CheckFormatArgs(std::string_view msg) {
 }
 
 }  // namespace internal
-
-using utils::identity_t;
 
 // A tag that indicates whether a diagnostic definition is an error or warning.
 // In the future this could be extended to include hints, suggestions, etc.
@@ -195,6 +193,6 @@ struct Diagnostic {
   const std::string msg;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_DIAGNOSTIC_TYPES_H_

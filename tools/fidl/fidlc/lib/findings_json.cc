@@ -4,7 +4,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/findings_json.h"
 
-namespace fidl {
+namespace fidlc {
 
 void FindingsJson::Generate(const Finding& finding) {
   GenerateObject([&]() {
@@ -78,4 +78,4 @@ std::ostringstream FindingsJson::Produce() {
   return std::move(json_file_);
 }
 
-}  // namespace fidl
+}  // namespace fidlc

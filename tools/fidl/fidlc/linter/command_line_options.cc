@@ -6,7 +6,7 @@
 
 #include <lib/cmdline/args_parser.h>
 
-namespace fidl::linter {
+namespace fidlc {
 
 namespace help {
 
@@ -116,4 +116,4 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
   return cmdline::Status::Ok();
 }
 
-}  // namespace fidl::linter
+}  // namespace fidlc

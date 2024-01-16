@@ -54,7 +54,7 @@ const (
 	syscallTransport Transport = "syscall"
 )
 
-// Kind corresponds to fidl::flat::Element::Kind in fidlc, e.g. const, enum,
+// Kind corresponds to fidl::Element::Kind in fidlc, e.g. const, enum,
 // enum member, struct, struct member, protocol, method, etc.
 type Kind string
 

@@ -10,7 +10,7 @@
 
 #include "src/lib/fxl/strings/utf_codecs.h"
 
-namespace fidl {
+namespace fidlc {
 
 bool SourceManager::CreateSource(std::string_view filename, const char** failure_reason) {
   struct stat s;
@@ -63,4 +63,4 @@ void SourceManager::AddSourceFile(std::unique_ptr<SourceFile> file) {
   sources_.push_back(std::move(file));
 }
 
-}  // namespace fidl
+}  // namespace fidlc

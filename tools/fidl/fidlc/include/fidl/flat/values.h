@@ -15,7 +15,7 @@
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/types.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 struct Type;
 
@@ -146,9 +146,9 @@ struct NumericConstantValue final : ConstantValue {
   }
 };
 
-using Size = NumericConstantValue<uint32_t>;
-using HandleSubtype = NumericConstantValue<uint32_t>;
-using HandleRights = NumericConstantValue<types::RightsWrappedType>;
+using SizeValue = NumericConstantValue<uint32_t>;
+using HandleSubtypeValue = NumericConstantValue<uint32_t>;
+using HandleRightsValue = NumericConstantValue<RightsWrappedType>;
 
 struct BoolConstantValue final : ConstantValue {
   explicit BoolConstantValue(bool value)
@@ -248,7 +248,7 @@ struct Constant : HasClone<Constant> {
 };
 
 struct IdentifierConstant final : Constant {
-  explicit IdentifierConstant(const raw::CompoundIdentifier& name, SourceSpan span)
+  explicit IdentifierConstant(const RawCompoundIdentifier& name, SourceSpan span)
       : Constant(Kind::kIdentifier, span), reference(name) {}
   // This constructor is needed for IdentifierLayoutParameter::Disambiguate().
   explicit IdentifierConstant(Reference reference, SourceSpan span)
@@ -263,7 +263,7 @@ struct IdentifierConstant final : Constant {
 };
 
 struct LiteralConstant final : Constant {
-  explicit LiteralConstant(const raw::Literal* literal)
+  explicit LiteralConstant(const RawLiteral* literal)
       : Constant(Kind::kLiteral, literal->span()), literal(literal) {}
 
   std::unique_ptr<LiteralConstant> CloneLiteralConstant() const {
@@ -271,7 +271,7 @@ struct LiteralConstant final : Constant {
   }
 
   // Owned by Library::raw_literals.
-  const raw::Literal* literal;
+  const RawLiteral* literal;
 
  private:
   std::unique_ptr<Constant> CloneImpl() const override { return CloneLiteralConstant(); }
@@ -299,6 +299,6 @@ struct BinaryOperatorConstant final : Constant {
   }
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_VALUES_H_

@@ -12,7 +12,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl {
+namespace fidlc {
 
 // A suggested change to address a linter |Finding|, with a human language
 // description of the suggestion, and one or more potential |Replacement|
@@ -96,6 +96,6 @@ class Finding {
 // references.
 using Findings = std::list<Finding>;
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FINDINGS_H_

@@ -9,7 +9,7 @@
 #include <string>
 #include <utility>
 
-namespace fidl {
+namespace fidlc {
 
 using Substitutions = std::map<std::string, std::string>;
 
@@ -56,6 +56,6 @@ class TemplateString {
   std::string str_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_TEMPLATE_STRING_H_

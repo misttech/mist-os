@@ -10,11 +10,11 @@
 
 #include "tools/fidl/fidlc/include/fidl/flat/values.h"
 
-namespace fidl {
+namespace fidlc {
 class Reporter;
 }
 
-namespace fidl::flat {
+namespace fidlc {
 
 class TypeResolver;
 struct Resource;
@@ -100,10 +100,10 @@ class Constraint : public ConstraintStorage<K> {
 template <>
 struct ConstraintStorage<ConstraintKind::kHandleSubtype> : public ConstraintStorageBase {
   // The type of handle subtype constraints.
-  using ValueType = types::HandleSubtype;
+  using ValueType = HandleSubtype;
 
   // The default handle subtype.
-  static constexpr ValueType kDefault = types::HandleSubtype::kHandle;
+  static constexpr ValueType kDefault = HandleSubtype::kHandle;
 
   // The handle subtype is available as |subtype| on types that have this constraint, such as
   // |HandleType|.
@@ -123,7 +123,7 @@ struct ConstraintStorage<ConstraintKind::kHandleSubtype> : public ConstraintStor
 
 template <>
 struct ConstraintStorage<ConstraintKind::kHandleRights> : public ConstraintStorageBase {
-  using ValueType = const HandleRights*;
+  using ValueType = const HandleRightsValue*;
   static const ValueType kDefault;
 
   ValueType rights = kDefault;
@@ -136,7 +136,7 @@ struct ConstraintStorage<ConstraintKind::kHandleRights> : public ConstraintStora
 
 template <>
 struct ConstraintStorage<ConstraintKind::kSize> : public ConstraintStorageBase {
-  using ValueType = const Size*;
+  using ValueType = const SizeValue*;
   static const ValueType kDefault;
 
   ValueType size = kDefault;
@@ -152,7 +152,7 @@ struct ConstraintStorage<ConstraintKind::kSize> : public ConstraintStorageBase {
 
 template <>
 struct ConstraintStorage<ConstraintKind::kNullability> : public ConstraintStorageBase {
-  using ValueType = types::Nullability;
+  using ValueType = Nullability;
   static constexpr ValueType kDefault = ValueType::kNonnullable;
 
   ValueType nullability = kDefault;
@@ -414,6 +414,6 @@ struct Constraints<> : ConstraintsBase {
   }
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_CONSTRAINTS_H_

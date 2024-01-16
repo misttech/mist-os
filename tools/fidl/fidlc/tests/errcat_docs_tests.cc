@@ -33,7 +33,7 @@ std::optional<std::string> ReadFile(const std::string& path) {
 }
 
 // Returns all the good/fi-NNNN*.test.fidl paths found in _fi-NNNN.md.
-std::optional<std::vector<std::string>> GoodFidlPaths(const fidl::DiagnosticDef& def) {
+std::optional<std::vector<std::string>> GoodFidlPaths(const fidlc::DiagnosticDef& def) {
   auto id = def.FormatId();
   auto path = TestLibrary::TestFilePath("error-catalog/_" + id + ".md");
   auto content = ReadFile(path);
@@ -45,7 +45,7 @@ std::optional<std::vector<std::string>> GoodFidlPaths(const fidl::DiagnosticDef&
       R"RE(gerrit_path="tools/fidl/fidlc/tests/fidl/(good/fi-(\d+)(?:-[a-z])?\.test.fidl)")RE";
   std::vector<std::string> result;
   std::string group1;
-  fidl::ErrorId group2;
+  fidlc::ErrorId group2;
   while (RE2::FindAndConsume(&text, pattern, &group1, &group2)) {
     EXPECT_EQ(group2, def.id) << path << " references " << group1
                               << " which is for the wrong error ID";
@@ -59,8 +59,8 @@ TEST(ErrcatDocsTests, IndexIsComplete) {
   auto path = TestLibrary::TestFilePath("errcat.md");
   std::ifstream input(path);
   ASSERT_TRUE(input);
-  auto it = std::begin(fidl::kAllDiagnosticDefs);
-  const auto end = std::end(fidl::kAllDiagnosticDefs);
+  auto it = std::begin(fidlc::kAllDiagnosticDefs);
+  const auto end = std::end(fidlc::kAllDiagnosticDefs);
   std::string line;
   std::string prefix = "<<error-catalog/";
   while (it != end && std::getline(input, line)) {
@@ -71,7 +71,7 @@ TEST(ErrcatDocsTests, IndexIsComplete) {
           << " was not next in sequence, or it is marked documented=false "
              "in diagnostics.h and should not appear";
       it = std::find_if(std::next(it), end,
-                        [](const fidl::DiagnosticDef* def) { return def->opts.documented; });
+                        [](const fidlc::DiagnosticDef* def) { return def->opts.documented; });
     }
   }
   EXPECT_EQ(it, end) << path << " did not contain all diagnostics; missing " << (*it)->FormatId()
@@ -81,7 +81,7 @@ TEST(ErrcatDocsTests, IndexIsComplete) {
 TEST(ErrcatDocsTests, RedirectsAreComplete) {
   auto path = TestLibrary::TestFilePath("_redirects.yaml");
   auto redirects = ReadFile(path).value();
-  for (auto def : fidl::kAllDiagnosticDefs) {
+  for (auto def : fidlc::kAllDiagnosticDefs) {
     auto id = def->FormatId();
     auto entry = "- from: /fuchsia-src/error/" + id +
                  "\n  to: /fuchsia-src/reference/fidl/language/errcat.md#" + id;
@@ -96,7 +96,7 @@ TEST(ErrcatDocsTests, RedirectsAreComplete) {
 }
 
 TEST(ErrcatDocsTests, MarkdownFilesExist) {
-  for (auto def : fidl::kAllDiagnosticDefs) {
+  for (auto def : fidlc::kAllDiagnosticDefs) {
     auto id = def->FormatId();
     auto path = TestLibrary::TestFilePath("error-catalog/_" + id + ".md");
     bool exists = std::filesystem::exists(path);
@@ -111,7 +111,7 @@ TEST(ErrcatDocsTests, MarkdownFilesExist) {
 }
 
 TEST(ErrcatDocsTests, DocsAreAccurate) {
-  for (auto def : fidl::kAllDiagnosticDefs) {
+  for (auto def : fidlc::kAllDiagnosticDefs) {
     if (!def->opts.documented) {
       continue;
     }
@@ -122,7 +122,7 @@ TEST(ErrcatDocsTests, DocsAreAccurate) {
       // Will be caught by ErrcatDocsTests.MarkdownFilesExist.
       continue;
     }
-    if (def->kind == fidl::DiagnosticKind::kRetired) {
+    if (def->kind == fidlc::DiagnosticKind::kRetired) {
       auto prefix = "## " + id + " {:#" + id + " .hide-from-toc}";
       EXPECT_EQ(content.value().substr(0, prefix.size()), prefix)
           << "first line of " << path << " is incorrect";
@@ -142,12 +142,12 @@ TEST(ErrcatDocsTests, DocsAreAccurate) {
 TEST(ErrcatDocsTests, AllGoodFilesAreTested) {
   auto path = TestLibrary::TestFilePath("errcat_good_tests.cc");
   auto source_file = ReadFile(path).value();
-  for (auto def : fidl::kAllDiagnosticDefs) {
-    if (!def->opts.documented || def->kind == fidl::DiagnosticKind::kRetired) {
+  for (auto def : fidlc::kAllDiagnosticDefs) {
+    if (!def->opts.documented || def->kind == fidlc::DiagnosticKind::kRetired) {
       // Will be caught by ErrorsAreTestedIffDocumentedAndNotRetired.
       continue;
     }
-    if (def->id == fidl::ErrGeneratedZeroValueOrdinal.id) {
+    if (def->id == fidlc::ErrGeneratedZeroValueOrdinal.id) {
       // This error has no examples because it is impossible to test.
       continue;
     }
@@ -166,8 +166,8 @@ TEST(ErrcatDocsTests, AllGoodFilesAreTested) {
 TEST(ErrcatDocsTests, ErrorsAreTestedIffDocumentedAndNotRetired) {
   auto path = TestLibrary::TestFilePath("errcat_good_tests.cc");
   auto source_file = ReadFile(path).value();
-  for (auto def : fidl::kAllDiagnosticDefs) {
-    if (def->id == fidl::ErrGeneratedZeroValueOrdinal.id) {
+  for (auto def : fidlc::kAllDiagnosticDefs) {
+    if (def->id == fidlc::ErrGeneratedZeroValueOrdinal.id) {
       // This error has no examples because it is impossible to test.
       continue;
     }
@@ -179,7 +179,7 @@ TEST(ErrcatDocsTests, ErrorsAreTestedIffDocumentedAndNotRetired) {
       location << path << ":"
                << 1 + std::count(source_file.data(), source_file.data() + index, '\n');
     }
-    if (def->opts.documented && def->kind != fidl::DiagnosticKind::kRetired) {
+    if (def->opts.documented && def->kind != fidlc::DiagnosticKind::kRetired) {
       EXPECT_TRUE(tested) << id << " (documented=true, retired=false) is missing a test in "
                           << path;
     } else if (!def->opts.documented) {

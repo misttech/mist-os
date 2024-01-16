@@ -24,7 +24,7 @@ TEST(LibraryTests, BadFilesDisagreeOnLibraryName) {
   library.AddFile("bad/fi-0040-a.test.fidl");
   library.AddFile("bad/fi-0040-b.test.fidl");
 
-  library.ExpectFail(fidl::ErrFilesDisagreeOnLibraryName);
+  library.ExpectFail(fidlc::ErrFilesDisagreeOnLibraryName);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

@@ -12,7 +12,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/typespace.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 AttributeSchema& AttributeSchema::RestrictTo(std::set<Element::Kind> placements) {
   ZX_ASSERT_MSG(!placements.empty(), "must allow some placements");
@@ -270,7 +270,7 @@ void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, Att
       if (TryResolveAsHead(step, static_cast<IdentifierConstant*>(constant)->reference)) {
         constant->ResolveTo(
             std::make_unique<NumericConstantValue<uint64_t>>(Version::Head().ordinal()),
-            step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kUint64));
+            step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint64));
         return;
       }
     }
@@ -292,46 +292,46 @@ void AttributeArgSchema::ResolveArg(CompileStep* step, Attribute* attribute, Att
       target_type = step->typespace()->GetUnboundedStringType();
       break;
     case ConstantValue::Kind::kBool:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kBool);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kBool);
       break;
     case ConstantValue::Kind::kInt8:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kInt8);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kInt8);
       break;
     case ConstantValue::Kind::kInt16:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kInt16);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kInt16);
       break;
     case ConstantValue::Kind::kInt32:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kInt32);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kInt32);
       break;
     case ConstantValue::Kind::kInt64:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kInt64);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kInt64);
       break;
     case ConstantValue::Kind::kUint8:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kUint8);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint8);
       break;
     case ConstantValue::Kind::kZxUchar:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kZxUchar);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kZxUchar);
       break;
     case ConstantValue::Kind::kUint16:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kUint16);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint16);
       break;
     case ConstantValue::Kind::kUint32:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kUint32);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint32);
       break;
     case ConstantValue::Kind::kUint64:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kUint64);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kUint64);
       break;
     case ConstantValue::Kind::kZxUsize64:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kZxUsize64);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kZxUsize64);
       break;
     case ConstantValue::Kind::kZxUintptr64:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kZxUintptr64);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kZxUintptr64);
       break;
     case ConstantValue::Kind::kFloat32:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kFloat32);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kFloat32);
       break;
     case ConstantValue::Kind::kFloat64:
-      target_type = step->typespace()->GetPrimitiveType(types::PrimitiveSubtype::kFloat64);
+      target_type = step->typespace()->GetPrimitiveType(PrimitiveSubtype::kFloat64);
       break;
   }
   if (!step->ResolveConstant(constant, target_type)) {
@@ -365,8 +365,7 @@ void AttributeSchema::ResolveArgsWithoutSchema(CompileStep* step, Attribute* att
       case Type::Kind::kString:
         break;
       case Type::Kind::kPrimitive:
-        if (static_cast<const PrimitiveType*>(inferred_type)->subtype ==
-            types::PrimitiveSubtype::kBool) {
+        if (static_cast<const PrimitiveType*>(inferred_type)->subtype == PrimitiveSubtype::kBool) {
           break;
         }
         [[fallthrough]];
@@ -393,9 +392,9 @@ static bool DiscoverableConstraint(Reporter* reporter, const ExperimentalFlags f
   if (!arg) {
     return true;
   }
-  ZX_ASSERT(arg->value->Value().kind == flat::ConstantValue::Kind::kString);
-  auto name = static_cast<const flat::StringConstantValue&>(arg->value->Value()).MakeContents();
-  if (!utils::IsValidDiscoverableName(name)) {
+  ZX_ASSERT(arg->value->Value().kind == ConstantValue::Kind::kString);
+  auto name = static_cast<const StringConstantValue&>(arg->value->Value()).MakeContents();
+  if (!IsValidDiscoverableName(name)) {
     return reporter->Fail(ErrInvalidDiscoverableName, arg->span, name);
   }
   return true;
@@ -407,7 +406,7 @@ static bool TransportConstraint(Reporter* reporter, const ExperimentalFlags flag
   ZX_ASSERT(element->kind == Element::Kind::kProtocol);
 
   auto arg = attribute->GetArg(AttributeArg::kDefaultAnonymousName);
-  auto& arg_value = static_cast<const flat::StringConstantValue&>(arg->value->Value());
+  auto& arg_value = static_cast<const StringConstantValue&>(arg->value->Value());
 
   const std::string& value = arg_value.MakeContents();
   std::optional<Transport> transport = Transport::FromTransportName(value);
@@ -476,4 +475,4 @@ AttributeSchemaMap AttributeSchema::OfficialAttributes() {
   return map;
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

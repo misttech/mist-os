@@ -10,10 +10,10 @@
 #include "tools/fidl/fidlc/include/fidl/types.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
-static std::optional<types::PrimitiveSubtype> ConstPrimitiveSubtype(TestLibrary& library,
-                                                                    const char* const_name) {
+static std::optional<PrimitiveSubtype> ConstPrimitiveSubtype(TestLibrary& library,
+                                                             const char* const_name) {
   auto type = library.LookupConstant(const_name)->value->type;
   if (type->kind == Type::Kind::kPrimitive) {
     return static_cast<const PrimitiveType*>(type)->subtype;
@@ -42,24 +42,24 @@ const f64 float64 = 0;
 )FIDL");
 
   // For the use of usize64, uintptr64, and uchar.
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "b"), types::PrimitiveSubtype::kBool);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "i8"), types::PrimitiveSubtype::kInt8);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "i16"), types::PrimitiveSubtype::kInt16);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "i32"), types::PrimitiveSubtype::kInt32);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "i64"), types::PrimitiveSubtype::kInt64);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "u8"), types::PrimitiveSubtype::kUint8);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "u16"), types::PrimitiveSubtype::kUint16);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "u32"), types::PrimitiveSubtype::kUint32);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "u64"), types::PrimitiveSubtype::kUint64);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "us"), types::PrimitiveSubtype::kZxUsize64);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "up"), types::PrimitiveSubtype::kZxUintptr64);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "uc"), types::PrimitiveSubtype::kZxUchar);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "f32"), types::PrimitiveSubtype::kFloat32);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "f64"), types::PrimitiveSubtype::kFloat64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "b"), PrimitiveSubtype::kBool);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "i8"), PrimitiveSubtype::kInt8);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "i16"), PrimitiveSubtype::kInt16);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "i32"), PrimitiveSubtype::kInt32);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "i64"), PrimitiveSubtype::kInt64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "u8"), PrimitiveSubtype::kUint8);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "u16"), PrimitiveSubtype::kUint16);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "u32"), PrimitiveSubtype::kUint32);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "u64"), PrimitiveSubtype::kUint64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "us"), PrimitiveSubtype::kZxUsize64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "up"), PrimitiveSubtype::kZxUintptr64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "uc"), PrimitiveSubtype::kZxUchar);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "f32"), PrimitiveSubtype::kFloat32);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "f64"), PrimitiveSubtype::kFloat64);
 }
 
 TEST(TypesTests, GoodRootTypesQualified) {
@@ -83,87 +83,66 @@ const float64 fidl.float64 = 0;
 )FIDL");
 
   // For the use of usize64, uintptr64, and uchar.
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "bool"), types::PrimitiveSubtype::kBool);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "int8"), types::PrimitiveSubtype::kInt8);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "int16"), types::PrimitiveSubtype::kInt16);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "int32"), types::PrimitiveSubtype::kInt32);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "int64"), types::PrimitiveSubtype::kInt64);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "uint8"), types::PrimitiveSubtype::kUint8);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "uint16"), types::PrimitiveSubtype::kUint16);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "uint32"), types::PrimitiveSubtype::kUint32);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "uint64"), types::PrimitiveSubtype::kUint64);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "usize64"), types::PrimitiveSubtype::kZxUsize64);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "uintptr64"), types::PrimitiveSubtype::kZxUintptr64);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "uchar"), types::PrimitiveSubtype::kZxUchar);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "float32"), types::PrimitiveSubtype::kFloat32);
-  EXPECT_EQ(ConstPrimitiveSubtype(library, "float64"), types::PrimitiveSubtype::kFloat64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "bool"), PrimitiveSubtype::kBool);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "int8"), PrimitiveSubtype::kInt8);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "int16"), PrimitiveSubtype::kInt16);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "int32"), PrimitiveSubtype::kInt32);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "int64"), PrimitiveSubtype::kInt64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "uint8"), PrimitiveSubtype::kUint8);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "uint16"), PrimitiveSubtype::kUint16);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "uint32"), PrimitiveSubtype::kUint32);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "uint64"), PrimitiveSubtype::kUint64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "usize64"), PrimitiveSubtype::kZxUsize64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "uintptr64"), PrimitiveSubtype::kZxUintptr64);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "uchar"), PrimitiveSubtype::kZxUchar);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "float32"), PrimitiveSubtype::kFloat32);
+  EXPECT_EQ(ConstPrimitiveSubtype(library, "float64"), PrimitiveSubtype::kFloat64);
 }
 
 // Check that fidl's types.h and zircon/types.h's handle subtype
 // values stay in sync, until the latter is generated.
 TEST(TypesTests, GoodHandleSubtype) {
-  static_assert(sizeof(types::HandleSubtype) == sizeof(zx_obj_type_t));
+  static_assert(sizeof(HandleSubtype) == sizeof(zx_obj_type_t));
 
-  static_assert(types::HandleSubtype::kHandle ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_NONE));
+  static_assert(HandleSubtype::kHandle == static_cast<HandleSubtype>(ZX_OBJ_TYPE_NONE));
 
-  static_assert(types::HandleSubtype::kBti == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_BTI));
-  static_assert(types::HandleSubtype::kChannel ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_CHANNEL));
-  static_assert(types::HandleSubtype::kClock ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_CLOCK));
-  static_assert(types::HandleSubtype::kEvent ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_EVENT));
-  static_assert(types::HandleSubtype::kEventpair ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_EVENTPAIR));
-  static_assert(types::HandleSubtype::kException ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_EXCEPTION));
-  static_assert(types::HandleSubtype::kFifo == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_FIFO));
-  static_assert(types::HandleSubtype::kGuest ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_GUEST));
-  static_assert(types::HandleSubtype::kInterrupt ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_INTERRUPT));
-  static_assert(types::HandleSubtype::kIommu ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_IOMMU));
-  static_assert(types::HandleSubtype::kJob == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_JOB));
-  static_assert(types::HandleSubtype::kDebugLog ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_DEBUGLOG));
-  static_assert(types::HandleSubtype::kPager ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_PAGER));
-  static_assert(types::HandleSubtype::kPciDevice ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_PCI_DEVICE));
-  static_assert(types::HandleSubtype::kPmt == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_PMT));
-  static_assert(types::HandleSubtype::kPort == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_PORT));
-  static_assert(types::HandleSubtype::kProcess ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_PROCESS));
-  static_assert(types::HandleSubtype::kProfile ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_PROFILE));
-  static_assert(types::HandleSubtype::kResource ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_RESOURCE));
-  static_assert(types::HandleSubtype::kSocket ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_SOCKET));
-  static_assert(types::HandleSubtype::kStream ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_STREAM));
-  static_assert(types::HandleSubtype::kSuspendToken ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_SUSPEND_TOKEN));
-  static_assert(types::HandleSubtype::kThread ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_THREAD));
-  static_assert(types::HandleSubtype::kTimer ==
-                static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_TIMER));
-  static_assert(types::HandleSubtype::kVcpu == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_VCPU));
-  static_assert(types::HandleSubtype::kVmar == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_VMAR));
-  static_assert(types::HandleSubtype::kVmo == static_cast<types::HandleSubtype>(ZX_OBJ_TYPE_VMO));
+  static_assert(HandleSubtype::kBti == static_cast<HandleSubtype>(ZX_OBJ_TYPE_BTI));
+  static_assert(HandleSubtype::kChannel == static_cast<HandleSubtype>(ZX_OBJ_TYPE_CHANNEL));
+  static_assert(HandleSubtype::kClock == static_cast<HandleSubtype>(ZX_OBJ_TYPE_CLOCK));
+  static_assert(HandleSubtype::kEvent == static_cast<HandleSubtype>(ZX_OBJ_TYPE_EVENT));
+  static_assert(HandleSubtype::kEventpair == static_cast<HandleSubtype>(ZX_OBJ_TYPE_EVENTPAIR));
+  static_assert(HandleSubtype::kException == static_cast<HandleSubtype>(ZX_OBJ_TYPE_EXCEPTION));
+  static_assert(HandleSubtype::kFifo == static_cast<HandleSubtype>(ZX_OBJ_TYPE_FIFO));
+  static_assert(HandleSubtype::kGuest == static_cast<HandleSubtype>(ZX_OBJ_TYPE_GUEST));
+  static_assert(HandleSubtype::kInterrupt == static_cast<HandleSubtype>(ZX_OBJ_TYPE_INTERRUPT));
+  static_assert(HandleSubtype::kIommu == static_cast<HandleSubtype>(ZX_OBJ_TYPE_IOMMU));
+  static_assert(HandleSubtype::kJob == static_cast<HandleSubtype>(ZX_OBJ_TYPE_JOB));
+  static_assert(HandleSubtype::kDebugLog == static_cast<HandleSubtype>(ZX_OBJ_TYPE_DEBUGLOG));
+  static_assert(HandleSubtype::kPager == static_cast<HandleSubtype>(ZX_OBJ_TYPE_PAGER));
+  static_assert(HandleSubtype::kPciDevice == static_cast<HandleSubtype>(ZX_OBJ_TYPE_PCI_DEVICE));
+  static_assert(HandleSubtype::kPmt == static_cast<HandleSubtype>(ZX_OBJ_TYPE_PMT));
+  static_assert(HandleSubtype::kPort == static_cast<HandleSubtype>(ZX_OBJ_TYPE_PORT));
+  static_assert(HandleSubtype::kProcess == static_cast<HandleSubtype>(ZX_OBJ_TYPE_PROCESS));
+  static_assert(HandleSubtype::kProfile == static_cast<HandleSubtype>(ZX_OBJ_TYPE_PROFILE));
+  static_assert(HandleSubtype::kResource == static_cast<HandleSubtype>(ZX_OBJ_TYPE_RESOURCE));
+  static_assert(HandleSubtype::kSocket == static_cast<HandleSubtype>(ZX_OBJ_TYPE_SOCKET));
+  static_assert(HandleSubtype::kStream == static_cast<HandleSubtype>(ZX_OBJ_TYPE_STREAM));
+  static_assert(HandleSubtype::kSuspendToken ==
+                static_cast<HandleSubtype>(ZX_OBJ_TYPE_SUSPEND_TOKEN));
+  static_assert(HandleSubtype::kThread == static_cast<HandleSubtype>(ZX_OBJ_TYPE_THREAD));
+  static_assert(HandleSubtype::kTimer == static_cast<HandleSubtype>(ZX_OBJ_TYPE_TIMER));
+  static_assert(HandleSubtype::kVcpu == static_cast<HandleSubtype>(ZX_OBJ_TYPE_VCPU));
+  static_assert(HandleSubtype::kVmar == static_cast<HandleSubtype>(ZX_OBJ_TYPE_VMAR));
+  static_assert(HandleSubtype::kVmo == static_cast<HandleSubtype>(ZX_OBJ_TYPE_VMO));
 }
 
 // Check that fidl's types.h and zircon/types.h's rights types stay in
 // sync, until the latter is generated.
-TEST(TypesTests, GoodRights) {
-  static_assert(sizeof(types::RightsWrappedType) == sizeof(zx_rights_t));
-}
+TEST(TypesTests, GoodRights) { static_assert(sizeof(RightsWrappedType) == sizeof(zx_rights_t)); }
 
 TEST(NewSyntaxTests, GoodTypeDeclOfAnonymousLayouts) {
   TestLibrary library(R"FIDL(
@@ -212,7 +191,7 @@ type TypeDecl = struct {
 TEST(NewSyntaxTests, BadTypeDeclOfNewTypeErrors) {
   TestLibrary library;
   library.AddFile("bad/fi-0062.test.fidl");
-  library.ExpectFail(fidl::ErrNewTypesNotAllowed, "Matrix", "array");
+  library.ExpectFail(fidlc::ErrNewTypesNotAllowed, "Matrix", "array");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -283,16 +262,16 @@ type t1 = resource struct {
   size_t i = 0;
 
   auto u0_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(u0_type_base->kind, fidl::flat::Type::Kind::kIdentifier);
-  auto u0_type = static_cast<const fidl::flat::IdentifierType*>(u0_type_base);
-  EXPECT_EQ(u0_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(u0_type->type_decl->kind, fidl::flat::Decl::Kind::kUnion);
+  ASSERT_EQ(u0_type_base->kind, fidlc::Type::Kind::kIdentifier);
+  auto u0_type = static_cast<const fidlc::IdentifierType*>(u0_type_base);
+  EXPECT_EQ(u0_type->nullability, fidlc::Nullability::kNonnullable);
+  EXPECT_EQ(u0_type->type_decl->kind, fidlc::Decl::Kind::kUnion);
 
   auto u1_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(u1_type_base->kind, fidl::flat::Type::Kind::kIdentifier);
-  auto u1_type = static_cast<const fidl::flat::IdentifierType*>(u1_type_base);
-  EXPECT_EQ(u1_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(u1_type->type_decl->kind, fidl::flat::Decl::Kind::kUnion);
+  ASSERT_EQ(u1_type_base->kind, fidlc::Type::Kind::kIdentifier);
+  auto u1_type = static_cast<const fidlc::IdentifierType*>(u1_type_base);
+  EXPECT_EQ(u1_type->nullability, fidlc::Nullability::kNullable);
+  EXPECT_EQ(u1_type->type_decl->kind, fidlc::Decl::Kind::kUnion);
 }
 
 TEST(NewSyntaxTests, GoodConstraintsOnVectors) {
@@ -328,121 +307,121 @@ type TypeDecl= struct {
   size_t i = 0;
 
   auto v0_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(v0_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto v0_type = static_cast<const fidl::flat::VectorType*>(v0_type_base);
-  EXPECT_EQ(v0_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(v0_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(v0_type->ElementCount(), fidl::flat::Size::Max().value);
+  ASSERT_EQ(v0_type_base->kind, fidlc::Type::Kind::kVector);
+  auto v0_type = static_cast<const fidlc::VectorType*>(v0_type_base);
+  EXPECT_EQ(v0_type->nullability, fidlc::Nullability::kNonnullable);
+  EXPECT_EQ(v0_type->element_type->kind, fidlc::Type::Kind::kPrimitive);
+  EXPECT_EQ(v0_type->ElementCount(), fidlc::SizeValue::Max().value);
 
   auto v1_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(v1_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto v1_type = static_cast<const fidl::flat::VectorType*>(v1_type_base);
-  EXPECT_EQ(v1_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(v1_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
+  ASSERT_EQ(v1_type_base->kind, fidlc::Type::Kind::kVector);
+  auto v1_type = static_cast<const fidlc::VectorType*>(v1_type_base);
+  EXPECT_EQ(v1_type->nullability, fidlc::Nullability::kNonnullable);
+  EXPECT_EQ(v1_type->element_type->kind, fidlc::Type::Kind::kPrimitive);
   EXPECT_EQ(v1_type->ElementCount(), 16u);
 
   auto v2_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(v2_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto v2_type = static_cast<const fidl::flat::VectorType*>(v2_type_base);
-  EXPECT_EQ(v2_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(v2_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(v2_type->ElementCount(), fidl::flat::Size::Max().value);
+  ASSERT_EQ(v2_type_base->kind, fidlc::Type::Kind::kVector);
+  auto v2_type = static_cast<const fidlc::VectorType*>(v2_type_base);
+  EXPECT_EQ(v2_type->nullability, fidlc::Nullability::kNullable);
+  EXPECT_EQ(v2_type->element_type->kind, fidlc::Type::Kind::kPrimitive);
+  EXPECT_EQ(v2_type->ElementCount(), fidlc::SizeValue::Max().value);
 
   auto v3_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(v3_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto v3_type = static_cast<const fidl::flat::VectorType*>(v3_type_base);
-  EXPECT_EQ(v3_type->nullability, fidl::types::Nullability::kNullable);
+  ASSERT_EQ(v3_type_base->kind, fidlc::Type::Kind::kVector);
+  auto v3_type = static_cast<const fidlc::VectorType*>(v3_type_base);
+  EXPECT_EQ(v3_type->nullability, fidlc::Nullability::kNullable);
   EXPECT_EQ(v3_type->ElementCount(), 16u);
 
   auto b4_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(b4_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto b4_type = static_cast<const fidl::flat::VectorType*>(b4_type_base);
-  EXPECT_EQ(b4_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(b4_type->ElementCount(), fidl::flat::Size::Max().value);
+  ASSERT_EQ(b4_type_base->kind, fidlc::Type::Kind::kVector);
+  auto b4_type = static_cast<const fidlc::VectorType*>(b4_type_base);
+  EXPECT_EQ(b4_type->nullability, fidlc::Nullability::kNonnullable);
+  EXPECT_EQ(b4_type->ElementCount(), fidlc::SizeValue::Max().value);
 
   auto b5_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(b5_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto b5_type = static_cast<const fidl::flat::VectorType*>(b5_type_base);
-  EXPECT_EQ(b5_type->nullability, fidl::types::Nullability::kNonnullable);
+  ASSERT_EQ(b5_type_base->kind, fidlc::Type::Kind::kVector);
+  auto b5_type = static_cast<const fidlc::VectorType*>(b5_type_base);
+  EXPECT_EQ(b5_type->nullability, fidlc::Nullability::kNonnullable);
   EXPECT_EQ(b5_type->ElementCount(), 16u);
 
   auto b6_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(b6_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto b6_type = static_cast<const fidl::flat::VectorType*>(b6_type_base);
-  EXPECT_EQ(b6_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(b6_type->ElementCount(), fidl::flat::Size::Max().value);
+  ASSERT_EQ(b6_type_base->kind, fidlc::Type::Kind::kVector);
+  auto b6_type = static_cast<const fidlc::VectorType*>(b6_type_base);
+  EXPECT_EQ(b6_type->nullability, fidlc::Nullability::kNullable);
+  EXPECT_EQ(b6_type->ElementCount(), fidlc::SizeValue::Max().value);
 
   auto b7_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(b7_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto b7_type = static_cast<const fidl::flat::VectorType*>(b7_type_base);
-  EXPECT_EQ(b7_type->nullability, fidl::types::Nullability::kNullable);
+  ASSERT_EQ(b7_type_base->kind, fidlc::Type::Kind::kVector);
+  auto b7_type = static_cast<const fidlc::VectorType*>(b7_type_base);
+  EXPECT_EQ(b7_type->nullability, fidlc::Nullability::kNullable);
   EXPECT_EQ(b7_type->ElementCount(), 16u);
 
   auto s8_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(s8_type_base->kind, fidl::flat::Type::Kind::kString);
-  auto s8_type = static_cast<const fidl::flat::StringType*>(s8_type_base);
-  EXPECT_EQ(s8_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(s8_type->MaxSize(), fidl::flat::Size::Max().value);
+  ASSERT_EQ(s8_type_base->kind, fidlc::Type::Kind::kString);
+  auto s8_type = static_cast<const fidlc::StringType*>(s8_type_base);
+  EXPECT_EQ(s8_type->nullability, fidlc::Nullability::kNonnullable);
+  EXPECT_EQ(s8_type->MaxSize(), fidlc::SizeValue::Max().value);
 
   auto s9_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(s9_type_base->kind, fidl::flat::Type::Kind::kString);
-  auto s9_type = static_cast<const fidl::flat::StringType*>(s9_type_base);
-  EXPECT_EQ(s9_type->nullability, fidl::types::Nullability::kNonnullable);
+  ASSERT_EQ(s9_type_base->kind, fidlc::Type::Kind::kString);
+  auto s9_type = static_cast<const fidlc::StringType*>(s9_type_base);
+  EXPECT_EQ(s9_type->nullability, fidlc::Nullability::kNonnullable);
   EXPECT_EQ(s9_type->MaxSize(), 16u);
 
   auto s10_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(s10_type_base->kind, fidl::flat::Type::Kind::kString);
-  auto s10_type = static_cast<const fidl::flat::StringType*>(s10_type_base);
-  EXPECT_EQ(s10_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(s10_type->MaxSize(), fidl::flat::Size::Max().value);
+  ASSERT_EQ(s10_type_base->kind, fidlc::Type::Kind::kString);
+  auto s10_type = static_cast<const fidlc::StringType*>(s10_type_base);
+  EXPECT_EQ(s10_type->nullability, fidlc::Nullability::kNullable);
+  EXPECT_EQ(s10_type->MaxSize(), fidlc::SizeValue::Max().value);
 
   auto s11_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(s11_type_base->kind, fidl::flat::Type::Kind::kString);
-  auto s11_type = static_cast<const fidl::flat::StringType*>(s11_type_base);
-  EXPECT_EQ(s11_type->nullability, fidl::types::Nullability::kNullable);
+  ASSERT_EQ(s11_type_base->kind, fidlc::Type::Kind::kString);
+  auto s11_type = static_cast<const fidlc::StringType*>(s11_type_base);
+  EXPECT_EQ(s11_type->nullability, fidlc::Nullability::kNullable);
   EXPECT_EQ(s11_type->MaxSize(), 16u);
 
   auto a12_invocation = type_decl->members[i].type_ctor->resolved_params;
   EXPECT_EQ(a12_invocation.element_type_resolved, nullptr);
-  EXPECT_EQ(a12_invocation.nullability, fidl::types::Nullability::kNonnullable);
+  EXPECT_EQ(a12_invocation.nullability, fidlc::Nullability::kNonnullable);
   auto a12_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(a12_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto a12_type = static_cast<const fidl::flat::VectorType*>(a12_type_base);
-  EXPECT_EQ(a12_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(a12_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(a12_type->ElementCount(), fidl::flat::Size::Max().value);
+  ASSERT_EQ(a12_type_base->kind, fidlc::Type::Kind::kVector);
+  auto a12_type = static_cast<const fidlc::VectorType*>(a12_type_base);
+  EXPECT_EQ(a12_type->nullability, fidlc::Nullability::kNonnullable);
+  EXPECT_EQ(a12_type->element_type->kind, fidlc::Type::Kind::kPrimitive);
+  EXPECT_EQ(a12_type->ElementCount(), fidlc::SizeValue::Max().value);
   EXPECT_EQ(a12_invocation.size_resolved, nullptr);
 
   auto a13_invocation = type_decl->members[i].type_ctor->resolved_params;
   EXPECT_EQ(a13_invocation.element_type_resolved, nullptr);
-  EXPECT_EQ(a13_invocation.nullability, fidl::types::Nullability::kNonnullable);
+  EXPECT_EQ(a13_invocation.nullability, fidlc::Nullability::kNonnullable);
   auto a13_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(a13_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto a13_type = static_cast<const fidl::flat::VectorType*>(a13_type_base);
-  EXPECT_EQ(a13_type->nullability, fidl::types::Nullability::kNonnullable);
-  EXPECT_EQ(a13_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
+  ASSERT_EQ(a13_type_base->kind, fidlc::Type::Kind::kVector);
+  auto a13_type = static_cast<const fidlc::VectorType*>(a13_type_base);
+  EXPECT_EQ(a13_type->nullability, fidlc::Nullability::kNonnullable);
+  EXPECT_EQ(a13_type->element_type->kind, fidlc::Type::Kind::kPrimitive);
   EXPECT_EQ(a13_type->ElementCount(), 16u);
   EXPECT_EQ(a13_type->ElementCount(), a13_invocation.size_resolved->value);
 
   auto a14_invocation = type_decl->members[i].type_ctor->resolved_params;
   EXPECT_EQ(a14_invocation.element_type_resolved, nullptr);
-  EXPECT_EQ(a14_invocation.nullability, fidl::types::Nullability::kNullable);
+  EXPECT_EQ(a14_invocation.nullability, fidlc::Nullability::kNullable);
   auto a14_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(a14_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto a14_type = static_cast<const fidl::flat::VectorType*>(a14_type_base);
-  EXPECT_EQ(a14_type->nullability, fidl::types::Nullability::kNullable);
-  EXPECT_EQ(a14_type->element_type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(a14_type->ElementCount(), fidl::flat::Size::Max().value);
+  ASSERT_EQ(a14_type_base->kind, fidlc::Type::Kind::kVector);
+  auto a14_type = static_cast<const fidlc::VectorType*>(a14_type_base);
+  EXPECT_EQ(a14_type->nullability, fidlc::Nullability::kNullable);
+  EXPECT_EQ(a14_type->element_type->kind, fidlc::Type::Kind::kPrimitive);
+  EXPECT_EQ(a14_type->ElementCount(), fidlc::SizeValue::Max().value);
   // EXPECT_EQ(a14_type->ElementCount(), a14_invocation->maybe_size);
   EXPECT_EQ(a14_invocation.size_resolved, nullptr);
 
   auto a15_invocation = type_decl->members[i].type_ctor->resolved_params;
   EXPECT_EQ(a15_invocation.element_type_resolved, nullptr);
-  EXPECT_EQ(a15_invocation.nullability, fidl::types::Nullability::kNullable);
+  EXPECT_EQ(a15_invocation.nullability, fidlc::Nullability::kNullable);
   auto a15_type_base = type_decl->members[i++].type_ctor->type;
-  ASSERT_EQ(a15_type_base->kind, fidl::flat::Type::Kind::kVector);
-  auto a15_type = static_cast<const fidl::flat::VectorType*>(a15_type_base);
-  EXPECT_EQ(a15_type->nullability, fidl::types::Nullability::kNullable);
+  ASSERT_EQ(a15_type_base->kind, fidlc::Type::Kind::kVector);
+  auto a15_type = static_cast<const fidlc::VectorType*>(a15_type_base);
+  EXPECT_EQ(a15_type->nullability, fidlc::Nullability::kNullable);
   EXPECT_EQ(a15_type->ElementCount(), 16u);
   EXPECT_EQ(a15_type->ElementCount(), a15_invocation.size_resolved->value);
 }
@@ -470,28 +449,28 @@ type TypeDecl= struct {
   size_t i = 0;
 
   auto& u0 = type_decl->members[i++];
-  auto u0_type = static_cast<const fidl::flat::IdentifierType*>(u0.type_ctor->type);
-  EXPECT_EQ(u0_type->nullability, fidl::types::Nullability::kNonnullable);
+  auto u0_type = static_cast<const fidlc::IdentifierType*>(u0.type_ctor->type);
+  EXPECT_EQ(u0_type->nullability, fidlc::Nullability::kNonnullable);
 
   auto& u1 = type_decl->members[i++];
-  auto u1_type = static_cast<const fidl::flat::IdentifierType*>(u1.type_ctor->type);
-  EXPECT_EQ(u1_type->nullability, fidl::types::Nullability::kNullable);
+  auto u1_type = static_cast<const fidlc::IdentifierType*>(u1.type_ctor->type);
+  EXPECT_EQ(u1_type->nullability, fidlc::Nullability::kNullable);
 
   auto& u2 = type_decl->members[i++];
-  auto u2_type = static_cast<const fidl::flat::IdentifierType*>(u2.type_ctor->type);
-  EXPECT_EQ(u2_type->nullability, fidl::types::Nullability::kNonnullable);
+  auto u2_type = static_cast<const fidlc::IdentifierType*>(u2.type_ctor->type);
+  EXPECT_EQ(u2_type->nullability, fidlc::Nullability::kNonnullable);
 
   auto& u3 = type_decl->members[i++];
-  auto u3_type = static_cast<const fidl::flat::IdentifierType*>(u3.type_ctor->type);
-  EXPECT_EQ(u3_type->nullability, fidl::types::Nullability::kNullable);
+  auto u3_type = static_cast<const fidlc::IdentifierType*>(u3.type_ctor->type);
+  EXPECT_EQ(u3_type->nullability, fidlc::Nullability::kNullable);
 
   auto& u4 = type_decl->members[i++];
-  auto u4_type = static_cast<const fidl::flat::IdentifierType*>(u4.type_ctor->type);
-  EXPECT_EQ(u4_type->nullability, fidl::types::Nullability::kNonnullable);
+  auto u4_type = static_cast<const fidlc::IdentifierType*>(u4.type_ctor->type);
+  EXPECT_EQ(u4_type->nullability, fidlc::Nullability::kNonnullable);
 
   auto& u5 = type_decl->members[i++];
-  auto u5_type = static_cast<const fidl::flat::IdentifierType*>(u5.type_ctor->type);
-  EXPECT_EQ(u5_type->nullability, fidl::types::Nullability::kNullable);
+  auto u5_type = static_cast<const fidlc::IdentifierType*>(u5.type_ctor->type);
+  EXPECT_EQ(u5_type->nullability, fidlc::Nullability::kNullable);
 }
 
 TEST(NewSyntaxTests, GoodConstraintsOnHandles) {
@@ -515,49 +494,47 @@ type TypeDecl = resource struct {
   ASSERT_NE(type_decl, nullptr);
   ASSERT_EQ(type_decl->members.size(), 6u);
 
-  using types::HandleSubtype;
-
   auto& h0 = type_decl->members[0];
-  auto h0_type = static_cast<const fidl::flat::HandleType*>(h0.type_ctor->type);
+  auto h0_type = static_cast<const fidlc::HandleType*>(h0.type_ctor->type);
   EXPECT_EQ(h0_type->subtype, HandleSubtype::kHandle);
-  EXPECT_EQ(h0_type->rights, &fidl::flat::HandleType::kSameRights);
-  EXPECT_EQ(h0_type->nullability, fidl::types::Nullability::kNonnullable);
+  EXPECT_EQ(h0_type->rights, &fidlc::HandleType::kSameRights);
+  EXPECT_EQ(h0_type->nullability, fidlc::Nullability::kNonnullable);
 
   auto& h1 = type_decl->members[1];
-  auto h1_type = static_cast<const fidl::flat::HandleType*>(h1.type_ctor->type);
+  auto h1_type = static_cast<const fidlc::HandleType*>(h1.type_ctor->type);
   EXPECT_NE(h1_type->subtype, HandleSubtype::kHandle);
-  EXPECT_EQ(h1_type->rights, &fidl::flat::HandleType::kSameRights);
-  EXPECT_EQ(h1_type->nullability, fidl::types::Nullability::kNonnullable);
+  EXPECT_EQ(h1_type->rights, &fidlc::HandleType::kSameRights);
+  EXPECT_EQ(h1_type->nullability, fidlc::Nullability::kNonnullable);
 
   auto& h2 = type_decl->members[2];
-  auto h2_type = static_cast<const fidl::flat::HandleType*>(h2.type_ctor->type);
+  auto h2_type = static_cast<const fidlc::HandleType*>(h2.type_ctor->type);
   EXPECT_EQ(h2_type->subtype, HandleSubtype::kHandle);
-  EXPECT_EQ(h2_type->rights, &fidl::flat::HandleType::kSameRights);
-  EXPECT_EQ(h2_type->nullability, fidl::types::Nullability::kNullable);
+  EXPECT_EQ(h2_type->rights, &fidlc::HandleType::kSameRights);
+  EXPECT_EQ(h2_type->nullability, fidlc::Nullability::kNullable);
 
   auto& h3 = type_decl->members[3];
-  auto h3_type = static_cast<const fidl::flat::HandleType*>(h3.type_ctor->type);
+  auto h3_type = static_cast<const fidlc::HandleType*>(h3.type_ctor->type);
   EXPECT_EQ(h3_type->subtype, HandleSubtype::kVmo);  // VMO
-  EXPECT_EQ(h3_type->rights, &fidl::flat::HandleType::kSameRights);
-  EXPECT_EQ(h3_type->nullability, fidl::types::Nullability::kNullable);
+  EXPECT_EQ(h3_type->rights, &fidlc::HandleType::kSameRights);
+  EXPECT_EQ(h3_type->nullability, fidlc::Nullability::kNullable);
 
   auto& h4 = type_decl->members[4];
-  auto h4_type = static_cast<const fidl::flat::HandleType*>(h4.type_ctor->type);
+  auto h4_type = static_cast<const fidlc::HandleType*>(h4.type_ctor->type);
   EXPECT_EQ(h4_type->subtype, HandleSubtype::kVmo);  // VMO
   EXPECT_EQ(h4_type->rights->value, 0x02u);          // TRANSFER
-  EXPECT_EQ(h4_type->nullability, fidl::types::Nullability::kNonnullable);
+  EXPECT_EQ(h4_type->nullability, fidlc::Nullability::kNonnullable);
 
   auto& h5 = type_decl->members[5];
-  auto h5_type = static_cast<const fidl::flat::HandleType*>(h5.type_ctor->type);
+  auto h5_type = static_cast<const fidlc::HandleType*>(h5.type_ctor->type);
   EXPECT_EQ(h5_type->subtype, HandleSubtype::kVmo);  // VMO
   EXPECT_EQ(h5_type->rights->value, 0x02u);          // TRANSFER
-  EXPECT_EQ(h5_type->nullability, fidl::types::Nullability::kNullable);
+  EXPECT_EQ(h5_type->nullability, fidlc::Nullability::kNullable);
 }
 
 TEST(NewSyntaxTests, BadTooManyLayoutParameters) {
   TestLibrary library;
   library.AddFile("bad/fi-0162-b.test.fidl");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "uint8", 0, 1);
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "uint8", 0, 1);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -570,7 +547,7 @@ type Foo = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "array", 2, 0);
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "array", 2, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "array");
 }
@@ -578,7 +555,7 @@ type Foo = struct {
 TEST(NewSyntaxTests, BadNotEnoughParameters) {
   TestLibrary library;
   library.AddFile("bad/fi-0162-a.test.fidl");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "array", 2, 1);
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "array", 2, 1);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "<8>");
 }
@@ -586,7 +563,7 @@ TEST(NewSyntaxTests, BadNotEnoughParameters) {
 TEST(NewSyntaxTests, BadTooManyConstraints) {
   TestLibrary library;
   library.AddFile("bad/fi-0164.test.fidl");
-  library.ExpectFail(fidl::ErrTooManyConstraints, "string", 2, 3);
+  library.ExpectFail(fidlc::ErrTooManyConstraints, "string", 2, 3);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "<0, optional, 20>");
 }
@@ -600,7 +577,7 @@ type Foo = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "Bar", 0, 1);
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "Bar", 0, 1);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -622,7 +599,7 @@ type Foo = struct {
   // TODO(https://fxbug.dev/74193): We plan to disallow constraints on aliases, so this
   // error message should change to that. For now, to test this we have to use
   // `zx.ObjType` above because contextual lookup is not done through aliases.
-  library.ExpectFail(fidl::ErrCannotConstrainTwice, "MyVmo");
+  library.ExpectFail(fidlc::ErrCannotConstrainTwice, "MyVmo");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -647,7 +624,7 @@ type Foo = resource struct {
 TEST(NewSyntaxTests, BadWantTypeLayoutParameter) {
   TestLibrary library;
   library.AddFile("bad/fi-0165.test.fidl");
-  library.ExpectFail(fidl::ErrExpectedType);
+  library.ExpectFail(fidlc::ErrExpectedType);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -660,14 +637,14 @@ type Foo = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrExpectedValueButGotType, "uint8");
+  library.ExpectFail(fidlc::ErrExpectedValueButGotType, "uint8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(NewSyntaxTests, BadUnresolvableConstraint) {
   TestLibrary library;
   library.AddFile("bad/fi-0166.test.fidl");
-  library.ExpectFail(fidl::ErrUnexpectedConstraint, "vector");
+  library.ExpectFail(fidlc::ErrUnexpectedConstraint, "vector");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -682,7 +659,7 @@ type Foo = resource struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrUnexpectedConstraint, "vector");
+  library.ExpectFail(fidlc::ErrUnexpectedConstraint, "vector");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -695,8 +672,8 @@ type Foo = resource struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"hello\"", "string:5", "uint32");
-  library.ExpectFail(fidl::ErrCouldNotResolveSizeBound);
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"hello\"", "string:5", "uint32");
+  library.ExpectFail(fidlc::ErrCouldNotResolveSizeBound);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -709,7 +686,7 @@ type Foo = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrNameNotFound, "FrameworkErr", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "FrameworkErr", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -722,57 +699,57 @@ type Foo = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrNameNotFound, "FrameworkErr", "fidl");
+  library.ExpectFail(fidlc::ErrNameNotFound, "FrameworkErr", "fidl");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, BadUsize64WithoutFlag) {
   TestLibrary library;
   library.AddFile("bad/fi-0180.test.fidl");
-  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "usize64");
+  library.ExpectFail(fidlc::ErrExperimentalZxCTypesDisallowed, "usize64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, BadUintptr64WithoutFlag) {
   TestLibrary library("library example; alias T = uintptr64;");
-  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "uintptr64");
+  library.ExpectFail(fidlc::ErrExperimentalZxCTypesDisallowed, "uintptr64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, BadUcharWithoutFlag) {
   TestLibrary library("library example; alias T = uchar;");
-  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "uchar");
+  library.ExpectFail(fidlc::ErrExperimentalZxCTypesDisallowed, "uchar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, BadExperimentalPointerWithoutFlag) {
   TestLibrary library("library example; alias T = experimental_pointer<uint32>;");
-  library.ExpectFail(fidl::ErrExperimentalZxCTypesDisallowed, "experimental_pointer");
+  library.ExpectFail(fidlc::ErrExperimentalZxCTypesDisallowed, "experimental_pointer");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TypesTests, GoodUsize64WithFlag) {
   TestLibrary library("library example; alias T = usize64;");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 
 TEST(TypesTests, GoodUintptr64WithFlag) {
   TestLibrary library("library example; alias T = uintptr64;");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 
 TEST(TypesTests, GoodUcharWithFlag) {
   TestLibrary library("library example; alias T = uchar;");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 
 TEST(TypesTests, GoodExperimentalPointerWithFlag) {
   TestLibrary library("library example; alias T = experimental_pointer<uint32>;");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

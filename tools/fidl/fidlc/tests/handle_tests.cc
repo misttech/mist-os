@@ -30,13 +30,12 @@ type MyStruct = resource struct {
 
   auto h_type = h_type_ctor->type;
   ASSERT_NE(h_type, nullptr);
-  ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
-  auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
+  ASSERT_EQ(h_type->kind, fidlc::Type::Kind::kHandle);
+  auto handle_type = static_cast<const fidlc::HandleType*>(h_type);
 
-  EXPECT_EQ(fidl::types::HandleSubtype::kThread, handle_type->subtype);
-  EXPECT_EQ(
-      static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
-      3u);
+  EXPECT_EQ(fidlc::HandleSubtype::kThread, handle_type->subtype);
+  EXPECT_EQ(static_cast<const fidlc::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
+            3u);
 }
 
 TEST(HandleTests, GoodNoHandleRightsTest) {
@@ -56,15 +55,14 @@ type MyStruct = resource struct {
   const auto& h_type_ctor = library.LookupStruct("MyStruct")->members[0].type_ctor;
   auto h_type = h_type_ctor->type;
   ASSERT_NE(h_type, nullptr);
-  ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
-  auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
+  ASSERT_EQ(h_type->kind, fidlc::Type::Kind::kHandle);
+  auto handle_type = static_cast<const fidlc::HandleType*>(h_type);
 
   ASSERT_TRUE(h_type_ctor->resolved_params.subtype_raw != nullptr);
   EXPECT_EQ("VMO", h_type_ctor->resolved_params.subtype_raw->span.data());
-  EXPECT_EQ(fidl::types::HandleSubtype::kVmo, handle_type->subtype);
-  EXPECT_EQ(
-      static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
-      fidl::flat::kHandleSameRights);
+  EXPECT_EQ(fidlc::HandleSubtype::kVmo, handle_type->subtype);
+  EXPECT_EQ(static_cast<const fidlc::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
+            fidlc::kHandleSameRights);
 }
 
 TEST(HandleTests, BadInvalidHandleRightsTest) {
@@ -81,8 +79,8 @@ protocol P {
 
   // NOTE(https://fxbug.dev/72924): we provide a more general error because there are multiple
   // possible interpretations.
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "zx/Rights");
-  library.ExpectFail(fidl::ErrUnexpectedConstraint, "Handle");
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "zx/Rights");
+  library.ExpectFail(fidlc::ErrUnexpectedConstraint, "Handle");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -103,13 +101,12 @@ type MyStruct = resource struct {
 
   auto h_type = h_type_ctor->type;
   ASSERT_NE(h_type, nullptr);
-  ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
-  auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
+  ASSERT_EQ(h_type->kind, fidlc::Type::Kind::kHandle);
+  auto handle_type = static_cast<const fidlc::HandleType*>(h_type);
 
-  EXPECT_EQ(fidl::types::HandleSubtype::kHandle, handle_type->subtype);
-  EXPECT_EQ(
-      static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
-      fidl::flat::kHandleSameRights);
+  EXPECT_EQ(fidlc::HandleSubtype::kHandle, handle_type->subtype);
+  EXPECT_EQ(static_cast<const fidlc::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
+            fidlc::kHandleSameRights);
 }
 
 TEST(HandleTests, GoodHandleFidlDefinedTest) {
@@ -130,29 +127,29 @@ type MyStruct = resource struct {
   const auto& a = library.LookupStruct("MyStruct")->members[0].type_ctor;
   auto a_type = a->type;
   ASSERT_NE(a_type, nullptr);
-  ASSERT_EQ(a_type->kind, fidl::flat::Type::Kind::kHandle);
-  auto a_handle_type = static_cast<const fidl::flat::HandleType*>(a_type);
-  EXPECT_EQ(fidl::types::HandleSubtype::kThread, a_handle_type->subtype);
-  EXPECT_EQ(static_cast<const fidl::flat::HandleRights*>(a_handle_type->rights)->value,
-            fidl::flat::kHandleSameRights);
+  ASSERT_EQ(a_type->kind, fidlc::Type::Kind::kHandle);
+  auto a_handle_type = static_cast<const fidlc::HandleType*>(a_type);
+  EXPECT_EQ(fidlc::HandleSubtype::kThread, a_handle_type->subtype);
+  EXPECT_EQ(static_cast<const fidlc::HandleRightsValue*>(a_handle_type->rights)->value,
+            fidlc::kHandleSameRights);
 
   const auto& b = library.LookupStruct("MyStruct")->members[1].type_ctor;
   auto b_type = b->type;
   ASSERT_NE(b_type, nullptr);
-  ASSERT_EQ(b_type->kind, fidl::flat::Type::Kind::kHandle);
-  auto b_handle_type = static_cast<const fidl::flat::HandleType*>(b_type);
-  EXPECT_EQ(fidl::types::HandleSubtype::kProcess, b_handle_type->subtype);
-  EXPECT_EQ(static_cast<const fidl::flat::HandleRights*>(b_handle_type->rights)->value,
-            fidl::flat::kHandleSameRights);
+  ASSERT_EQ(b_type->kind, fidlc::Type::Kind::kHandle);
+  auto b_handle_type = static_cast<const fidlc::HandleType*>(b_type);
+  EXPECT_EQ(fidlc::HandleSubtype::kProcess, b_handle_type->subtype);
+  EXPECT_EQ(static_cast<const fidlc::HandleRightsValue*>(b_handle_type->rights)->value,
+            fidlc::kHandleSameRights);
 
   const auto& c = library.LookupStruct("MyStruct")->members[2].type_ctor;
   auto c_type = c->type;
   ASSERT_NE(c_type, nullptr);
-  ASSERT_EQ(c_type->kind, fidl::flat::Type::Kind::kHandle);
-  auto c_handle_type = static_cast<const fidl::flat::HandleType*>(c_type);
-  EXPECT_EQ(fidl::types::HandleSubtype::kVmo, c_handle_type->subtype);
+  ASSERT_EQ(c_type->kind, fidlc::Type::Kind::kHandle);
+  auto c_handle_type = static_cast<const fidlc::HandleType*>(c_type);
+  EXPECT_EQ(fidlc::HandleSubtype::kVmo, c_handle_type->subtype);
   ASSERT_NE(c_handle_type->rights, nullptr);
-  EXPECT_EQ(static_cast<const fidl::flat::HandleRights*>(c_handle_type->rights)->value, 2u);
+  EXPECT_EQ(static_cast<const fidlc::HandleRightsValue*>(c_handle_type->rights)->value, 2u);
 }
 
 TEST(HandleTests, BadInvalidFidlDefinedHandleSubtype) {
@@ -167,7 +164,7 @@ type MyStruct = struct {
 )FIDL");
   library.UseLibraryZx();
 
-  library.ExpectFail(fidl::ErrNameNotFound, "ZIPPY", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "ZIPPY", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -183,8 +180,8 @@ type MyStruct = struct {
 )FIDL");
   library.UseLibraryZx();
 
-  library.ExpectFail(fidl::ErrNameNotFound, "handle", "example");
-  library.ExpectFail(fidl::ErrNameNotFound, "vmo", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "handle", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "vmo", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -212,15 +209,14 @@ type MyStruct = resource struct {
   const auto& h_type_ctor = library.LookupStruct("MyStruct")->members[0].type_ctor;
   auto h_type = h_type_ctor->type;
   ASSERT_NE(h_type, nullptr);
-  ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
-  auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
+  ASSERT_EQ(h_type->kind, fidlc::Type::Kind::kHandle);
+  auto handle_type = static_cast<const fidlc::HandleType*>(h_type);
 
   ASSERT_TRUE(h_type_ctor->resolved_params.subtype_raw != nullptr);
   EXPECT_TRUE(h_type_ctor->resolved_params.subtype_raw->span.data() == "VMO");
-  EXPECT_EQ(fidl::types::HandleSubtype::kVmo, handle_type->subtype);
-  EXPECT_EQ(
-      static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
-      fidl::flat::kHandleSameRights);
+  EXPECT_EQ(fidlc::HandleSubtype::kVmo, handle_type->subtype);
+  EXPECT_EQ(static_cast<const fidlc::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
+            fidlc::kHandleSameRights);
 }
 
 TEST(HandleTests, BadInvalidSubtypeAtUseSite) {
@@ -243,9 +239,9 @@ type MyStruct = resource struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
                      "example/ObjType");
-  library.ExpectFail(fidl::ErrUnexpectedConstraint, "handle");
+  library.ExpectFail(fidlc::ErrUnexpectedConstraint, "handle");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -270,9 +266,9 @@ type MyStruct = resource struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"my_improperly_typed_rights\"",
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"my_improperly_typed_rights\"",
                      "string:26", "uint32");
-  library.ExpectFail(fidl::ErrUnexpectedConstraint, "handle");
+  library.ExpectFail(fidlc::ErrUnexpectedConstraint, "handle");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -284,7 +280,7 @@ type MyStruct = resource struct {
     h handle;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameNotFound, "handle", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "handle", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -296,8 +292,8 @@ type MyStruct = resource struct {
     h handle:VMO;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameNotFound, "handle", "example");
-  library.ExpectFail(fidl::ErrNameNotFound, "VMO", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "handle", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "VMO", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -311,8 +307,8 @@ type MyStruct = resource struct {
     h my_handle:VMO;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameNotFound, "handle", "example");
-  library.ExpectFail(fidl::ErrNameNotFound, "VMO", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "handle", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "VMO", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

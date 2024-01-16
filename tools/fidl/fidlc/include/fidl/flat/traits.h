@@ -7,7 +7,7 @@
 
 #include <memory>
 
-namespace fidl::flat {
+namespace fidlc {
 
 // This file defines abstract base classes for common traits/behaviors in the
 // flat AST. These exist mostly for the sake of documentation. They use CRTP
@@ -41,6 +41,6 @@ struct HasCopy : private NoCopy {
   virtual T Copy() const = 0;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_TRAITS_H_

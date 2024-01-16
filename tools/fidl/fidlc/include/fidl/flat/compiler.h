@@ -18,19 +18,19 @@
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 class Libraries;
 
-// Compiler consumes raw::File ASTs and produces a compiled flat::Library.
+// Compiler consumes File ASTs and produces a compiled Library.
 class Compiler final {
  public:
   Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
-           ordinals::MethodHasher method_hasher, ExperimentalFlags experimental_flags);
+           MethodHasher method_hasher, ExperimentalFlags experimental_flags);
   Compiler(const Compiler&) = delete;
 
   // Consumes a parsed file. Must be called once for each file in the library.
-  bool ConsumeFile(std::unique_ptr<raw::File> file);
+  bool ConsumeFile(std::unique_ptr<File> file);
   // Compiles the library. Must be called once after consuming all files. On
   // success, inserts the new library into all_libraries and returns true.
   bool Compile();
@@ -56,7 +56,7 @@ class Compiler final {
     Typespace* typespace();
     VirtualSourceFile* generated_source_file();
     const VersionSelection* version_selection() { return compiler_->version_selection; }
-    const ordinals::MethodHasher& method_hasher() { return compiler_->method_hasher_; }
+    const MethodHasher& method_hasher() { return compiler_->method_hasher_; }
     const ExperimentalFlags& experimental_flags() { return compiler_->experimental_flags_; }
 
    private:
@@ -72,7 +72,7 @@ class Compiler final {
   std::unique_ptr<Library> library_;
   Libraries* all_libraries_;
   const VersionSelection* version_selection;
-  ordinals::MethodHasher method_hasher_;
+  MethodHasher method_hasher_;
   const ExperimentalFlags experimental_flags_;
 };
 
@@ -209,6 +209,6 @@ struct Compilation {
   const VersionSelection* version_selection_;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_COMPILER_H_

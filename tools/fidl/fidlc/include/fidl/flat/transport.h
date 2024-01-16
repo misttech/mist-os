@@ -9,7 +9,7 @@
 #include <set>
 #include <vector>
 
-namespace fidl::flat {
+namespace fidlc {
 
 // The class / namespace of the handle, used for compatibility checking with
 // transports.
@@ -48,6 +48,6 @@ struct Transport {
   static std::vector<Transport> transports;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_TRANSPORT_H_

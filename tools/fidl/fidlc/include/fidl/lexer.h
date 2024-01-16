@@ -13,7 +13,7 @@
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/token.h"
 
-namespace fidl {
+namespace fidlc {
 
 // The lexer does not own the data it operates on. It merely takes a
 // std::string_view and produces a stream of tokens and possibly a failure
@@ -73,6 +73,6 @@ class Lexer {
   uint16_t leading_newlines_ = 0;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_LEXER_H_

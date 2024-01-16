@@ -10,7 +10,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 constexpr uint32_t kHandleSameRights = 0x80000000;  // ZX_HANDLE_SAME_RIGHTS
 
@@ -39,8 +39,8 @@ class Typespace final {
                      const LayoutParameterList& parameters, const TypeConstraints& constraints,
                      LayoutInvocation* out_params);
 
-  const PrimitiveType* GetPrimitiveType(types::PrimitiveSubtype subtype);
-  const InternalType* GetInternalType(types::InternalSubtype subtype);
+  const PrimitiveType* GetPrimitiveType(PrimitiveSubtype subtype);
+  const InternalType* GetInternalType(InternalSubtype subtype);
   const Type* GetUnboundedStringType();
   const Type* GetStringType(size_t max_size);
   const Type* GetUntypedNumericType();
@@ -53,15 +53,15 @@ class Typespace final {
   Reporter* reporter_;
 
   std::vector<std::unique_ptr<Type>> types_;
-  std::map<types::PrimitiveSubtype, std::unique_ptr<PrimitiveType>> primitive_types_;
-  std::map<types::InternalSubtype, std::unique_ptr<InternalType>> internal_types_;
+  std::map<PrimitiveSubtype, std::unique_ptr<PrimitiveType>> primitive_types_;
+  std::map<InternalSubtype, std::unique_ptr<InternalType>> internal_types_;
   std::unique_ptr<StringType> unbounded_string_type_;
   std::unique_ptr<UntypedNumericType> untyped_numeric_type_;
-  std::vector<std::unique_ptr<Size>> sizes_;
+  std::vector<std::unique_ptr<SizeValue>> sizes_;
   std::optional<Name> vector_layout_name_;
   std::optional<Name> pointer_type_name_;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_TYPESPACE_H_

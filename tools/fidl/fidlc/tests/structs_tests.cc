@@ -33,7 +33,7 @@ type MyStruct = struct {
 TEST(StructsTests, BadPrimitiveDefaultValueNoAnnotation) {
   TestLibrary library;
   library.AddFile("bad/fi-0050.test.fidl");
-  library.ExpectFail(fidl::ErrDeprecatedStructDefaults);
+  library.ExpectFail(fidlc::ErrDeprecatedStructDefaults);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -59,7 +59,7 @@ type MyStruct = struct {
     field int64 = A;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameNotFound, "A", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "A", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -105,16 +105,16 @@ type MyStruct = struct {
     field MyEnum = OtherEnum.A;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "field");
-  library.ExpectFail(fidl::ErrMismatchedNameTypeAssignment, "MyEnum", "OtherEnum");
+  library.ExpectFail(fidlc::ErrCouldNotResolveMemberDefault, "field");
+  library.ExpectFail(fidlc::ErrMismatchedNameTypeAssignment, "MyEnum", "OtherEnum");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadDefaultValuePrimitiveInEnum) {
   TestLibrary library;
   library.AddFile("bad/fi-0103.test.fidl");
-  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "field");
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
+  library.ExpectFail(fidlc::ErrCouldNotResolveMemberDefault, "field");
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
                      "test.bad.fi0103/MyEnum");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -161,8 +161,8 @@ type MyStruct = struct {
     field MyBits = OtherBits.A;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "field");
-  library.ExpectFail(fidl::ErrMismatchedNameTypeAssignment, "MyBits", "OtherBits");
+  library.ExpectFail(fidlc::ErrCouldNotResolveMemberDefault, "field");
+  library.ExpectFail(fidlc::ErrMismatchedNameTypeAssignment, "MyBits", "OtherBits");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -177,8 +177,8 @@ type MyStruct = struct {
     field MyBits = 1;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "field");
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
+  library.ExpectFail(fidlc::ErrCouldNotResolveMemberDefault, "field");
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "1", "untyped numeric",
                      "example/MyBits");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -195,14 +195,14 @@ type MyStruct = struct {
     field MyEnum = A;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameNotFound, "A", "example");
+  library.ExpectFail(fidlc::ErrNameNotFound, "A", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadDefaultValueNullableString) {
   TestLibrary library;
   library.AddFile("bad/fi-0091.test.fidl");
-  library.ExpectFail(fidl::ErrInvalidStructMemberType, "name", "string?");
+  library.ExpectFail(fidlc::ErrInvalidStructMemberType, "name", "string?");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -215,9 +215,8 @@ type MyStruct = struct {
     my_struct_member uint8;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kStructMember,
-                     "my_struct_member", fidl::flat::Element::Kind::kStructMember,
-                     "example.fidl:5:5");
+  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kStructMember,
+                     "my_struct_member", fidlc::Element::Kind::kStructMember, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -234,7 +233,7 @@ type MyStruct = struct {
 TEST(StructsTests, BadInlineSizeExceeds64k) {
   TestLibrary library;
   library.AddFile("bad/fi-0111.test.fidl");
-  library.ExpectFail(fidl::ErrInlineSizeExceedsLimit, "MyStruct", 65536, 65535);
+  library.ExpectFail(fidlc::ErrInlineSizeExceedsLimit, "MyStruct", 65536, 65535);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -242,7 +241,7 @@ TEST(StructsTests, BadMutuallyRecursive) {
   TestLibrary library;
   library.AddFile("bad/fi-0057-a.test.fidl");
 
-  library.ExpectFail(fidl::ErrIncludeCycle, "struct 'Yang' -> struct 'Yin' -> struct 'Yang'");
+  library.ExpectFail(fidlc::ErrIncludeCycle, "struct 'Yang' -> struct 'Yin' -> struct 'Yang'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -250,7 +249,7 @@ TEST(StructsTests, BadSelfRecursive) {
   TestLibrary library;
   library.AddFile("bad/fi-0057-c.test.fidl");
 
-  library.ExpectFail(fidl::ErrIncludeCycle, "struct 'MySelf' -> struct 'MySelf'");
+  library.ExpectFail(fidlc::ErrIncludeCycle, "struct 'MySelf' -> struct 'MySelf'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -279,7 +278,7 @@ type Leaf = struct {
 )FIDL");
   // Leaf sorts before either Yin or Yang, so the cycle finder in sort_step.cc
   // starts there, which leads it to yin before yang.
-  library.ExpectFail(fidl::ErrIncludeCycle, "struct 'Yin' -> struct 'Yang' -> struct 'Yin'");
+  library.ExpectFail(fidlc::ErrIncludeCycle, "struct 'Yin' -> struct 'Yang' -> struct 'Yin'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -300,7 +299,7 @@ type Leaf = struct {
   x int32;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrIncludeCycle, "struct 'Yang' -> struct 'Yin' -> struct 'Yang'");
+  library.ExpectFail(fidlc::ErrIncludeCycle, "struct 'Yang' -> struct 'Yin' -> struct 'Yang'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -321,7 +320,7 @@ type Intersection = struct {
   yang Yang;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrIncludeCycle,
+  library.ExpectFail(fidlc::ErrIncludeCycle,
                      "struct 'Intersection' -> struct 'Yang' -> struct 'Intersection'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -329,14 +328,14 @@ type Intersection = struct {
 TEST(StructsTests, BadBoxCannotBeOptional) {
   TestLibrary library;
   library.AddFile("bad/fi-0169.test.fidl");
-  library.ExpectFail(fidl::ErrBoxCannotBeOptional);
+  library.ExpectFail(fidlc::ErrBoxCannotBeOptional);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadStructCannotBeOptional) {
   TestLibrary library;
   library.AddFile("bad/fi-0159.test.fidl");
-  library.ExpectFail(fidl::ErrStructCannotBeOptional, "Date");
+  library.ExpectFail(fidlc::ErrStructCannotBeOptional, "Date");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -344,7 +343,7 @@ TEST(StructsTests, BadHandleCannotBeBoxedShouldBeOptional) {
   TestLibrary library;
   library.AddFile("bad/fi-0171.test.fidl");
   library.UseLibraryZx();
-  library.ExpectFail(fidl::ErrCannotBeBoxedShouldBeOptional, "Handle");
+  library.ExpectFail(fidlc::ErrCannotBeBoxedShouldBeOptional, "Handle");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -366,7 +365,7 @@ TEST(StructsTests, BadTypeCannotBeBoxedShouldBeOptional) {
     SCOPED_TRACE(fidl);
     TestLibrary library(fidl);
     library.UseLibraryZx();
-    library.ExpectFail(fidl::ErrCannotBeBoxedShouldBeOptional, boxed_name);
+    library.ExpectFail(fidlc::ErrCannotBeBoxedShouldBeOptional, boxed_name);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -374,7 +373,7 @@ TEST(StructsTests, BadTypeCannotBeBoxedShouldBeOptional) {
 TEST(StructsTests, BadCannotBoxPrimitive) {
   TestLibrary library;
   library.AddFile("bad/fi-0193.test.fidl");
-  library.ExpectFail(fidl::ErrCannotBeBoxedNorOptional, "bool");
+  library.ExpectFail(fidlc::ErrCannotBeBoxedNorOptional, "bool");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -404,7 +403,7 @@ TEST(StructsTests, BadTypeCannotBeBoxedNorOptional) {
     SCOPED_TRACE(fidl);
     TestLibrary library(fidl);
     library.UseLibraryZx();
-    library.ExpectFail(fidl::ErrCannotBeBoxedNorOptional, boxed_name);
+    library.ExpectFail(fidlc::ErrCannotBeBoxedNorOptional, boxed_name);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -420,9 +419,9 @@ type Foo = struct {
 
 const BAR bool = "not a bool";
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "flag");
-  library.ExpectFail(fidl::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not a bool\"", "string:10", "bool");
+  library.ExpectFail(fidlc::ErrCouldNotResolveMemberDefault, "flag");
+  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"not a bool\"", "string:10", "bool");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -430,7 +429,7 @@ TEST(StructsTests, CannotReferToIntMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0053-a.test.fidl");
 
-  library.ExpectFail(fidl::ErrCannotReferToMember, "struct 'Person'");
+  library.ExpectFail(fidlc::ErrCannotReferToMember, "struct 'Person'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -438,7 +437,7 @@ TEST(StructsTests, CannotReferToStructMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0053-b.test.fidl");
 
-  library.ExpectFail(fidl::ErrCannotReferToMember, "struct 'Person'");
+  library.ExpectFail(fidlc::ErrCannotReferToMember, "struct 'Person'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

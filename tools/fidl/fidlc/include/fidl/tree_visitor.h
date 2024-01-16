@@ -7,7 +7,7 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_TREE_VISITOR_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_TREE_VISITOR_H_
 
-namespace fidl::raw {
+namespace fidlc {
 
 // A TreeVisitor is an API that walks a FIDL AST.  The default implementation
 // does nothing but walk the AST.  To make it interesting, subclass TreeVisitor
@@ -18,221 +18,223 @@ class TreeVisitor {
 
   virtual void OnSourceElementStart(const SourceElement& element) {}
   virtual void OnSourceElementEnd(const SourceElement& element) {}
-  virtual void OnIdentifier(const std::unique_ptr<Identifier>& element) { element->Accept(this); }
-  virtual void OnCompoundIdentifier(const std::unique_ptr<CompoundIdentifier>& element) {
+  virtual void OnIdentifier(const std::unique_ptr<RawIdentifier>& element) {
+    element->Accept(this);
+  }
+  virtual void OnCompoundIdentifier(const std::unique_ptr<RawCompoundIdentifier>& element) {
     element->Accept(this);
   }
 
-  virtual void OnLiteral(const std::unique_ptr<fidl::raw::Literal>& element) {
+  virtual void OnLiteral(const std::unique_ptr<RawLiteral>& element) {
     switch (element->kind) {
-      case Literal::Kind::kDocComment:
-        OnDocCommentLiteral(*static_cast<DocCommentLiteral*>(element.get()));
+      case RawLiteral::Kind::kDocComment:
+        OnDocCommentLiteral(*static_cast<RawDocCommentLiteral*>(element.get()));
         break;
-      case Literal::Kind::kString:
-        OnStringLiteral(*static_cast<StringLiteral*>(element.get()));
+      case RawLiteral::Kind::kString:
+        OnStringLiteral(*static_cast<RawStringLiteral*>(element.get()));
         break;
-      case Literal::Kind::kNumeric:
-        OnNumericLiteral(*static_cast<NumericLiteral*>(element.get()));
+      case RawLiteral::Kind::kNumeric:
+        OnNumericLiteral(*static_cast<RawNumericLiteral*>(element.get()));
         break;
-      case Literal::Kind::kBool:
-        OnBoolLiteral(*static_cast<BoolLiteral*>(element.get()));
+      case RawLiteral::Kind::kBool:
+        OnBoolLiteral(*static_cast<RawBoolLiteral*>(element.get()));
         break;
     }
   }
-  virtual void OnDocCommentLiteral(DocCommentLiteral& element) { element.Accept(this); }
+  virtual void OnDocCommentLiteral(RawDocCommentLiteral& element) { element.Accept(this); }
 
-  virtual void OnStringLiteral(StringLiteral& element) { element.Accept(this); }
+  virtual void OnStringLiteral(RawStringLiteral& element) { element.Accept(this); }
 
-  virtual void OnNumericLiteral(NumericLiteral& element) { element.Accept(this); }
+  virtual void OnNumericLiteral(RawNumericLiteral& element) { element.Accept(this); }
 
-  virtual void OnBoolLiteral(BoolLiteral& element) { element.Accept(this); }
+  virtual void OnBoolLiteral(RawBoolLiteral& element) { element.Accept(this); }
 
-  virtual void OnOrdinal64(Ordinal64& element) { element.Accept(this); }
+  virtual void OnOrdinal64(RawOrdinal64& element) { element.Accept(this); }
 
 #ifdef DISPATCH_TO
 #error "Cannot define macro DISPATCH_TO: already defined"
 #endif
-#define DISPATCH_TO(TYPE, SUPERTYPE, ELEMENT)              \
-  do {                                                     \
-    std::unique_ptr<SUPERTYPE>& unconst_element =          \
-        const_cast<std::unique_ptr<SUPERTYPE>&>(element);  \
-    TYPE* ptr = static_cast<TYPE*>(unconst_element.get()); \
-    std::unique_ptr<TYPE> uptr(ptr);                       \
-    On##TYPE(uptr);                                        \
-    static_cast<void>(uptr.release());                     \
+#define DISPATCH_TO(TYPE, SUPERTYPE, ELEMENT)                        \
+  do {                                                               \
+    std::unique_ptr<SUPERTYPE>& unconst_element =                    \
+        const_cast<std::unique_ptr<SUPERTYPE>&>(element);            \
+    Raw##TYPE* ptr = static_cast<Raw##TYPE*>(unconst_element.get()); \
+    std::unique_ptr<Raw##TYPE> uptr(ptr);                            \
+    On##TYPE(uptr);                                                  \
+    static_cast<void>(uptr.release());                               \
   } while (0)
 
-  virtual void OnConstant(const std::unique_ptr<Constant>& element) {
-    Constant::Kind kind = element->kind;
+  virtual void OnConstant(const std::unique_ptr<RawConstant>& element) {
+    RawConstant::Kind kind = element->kind;
     switch (kind) {
-      case Constant::Kind::kIdentifier: {
-        DISPATCH_TO(IdentifierConstant, Constant, element);
+      case RawConstant::Kind::kIdentifier: {
+        DISPATCH_TO(IdentifierConstant, RawConstant, element);
         break;
       }
-      case Constant::Kind::kLiteral: {
-        DISPATCH_TO(LiteralConstant, Constant, element);
+      case RawConstant::Kind::kLiteral: {
+        DISPATCH_TO(LiteralConstant, RawConstant, element);
         break;
       }
-      case Constant::Kind::kBinaryOperator: {
-        DISPATCH_TO(BinaryOperatorConstant, Constant, element);
+      case RawConstant::Kind::kBinaryOperator: {
+        DISPATCH_TO(BinaryOperatorConstant, RawConstant, element);
         break;
       }
     }
   }
 
-  virtual void OnIdentifierConstant(const std::unique_ptr<IdentifierConstant>& element) {
+  virtual void OnIdentifierConstant(const std::unique_ptr<RawIdentifierConstant>& element) {
     element->Accept(this);
   }
-  virtual void OnLiteralConstant(const std::unique_ptr<LiteralConstant>& element) {
+  virtual void OnLiteralConstant(const std::unique_ptr<RawLiteralConstant>& element) {
     element->Accept(this);
   }
-  virtual void OnBinaryOperatorConstant(const std::unique_ptr<BinaryOperatorConstant>& element) {
-    element->Accept(this);
-  }
-
-  virtual void OnAttributeArg(const std::unique_ptr<AttributeArg>& element) {
+  virtual void OnBinaryOperatorConstant(const std::unique_ptr<RawBinaryOperatorConstant>& element) {
     element->Accept(this);
   }
 
-  virtual void OnAttribute(const std::unique_ptr<Attribute>& element) { element->Accept(this); }
-
-  virtual void OnAttributeList(const std::unique_ptr<AttributeList>& element) {
+  virtual void OnAttributeArg(const std::unique_ptr<RawAttributeArg>& element) {
     element->Accept(this);
   }
 
-  virtual void OnAliasDeclaration(const std::unique_ptr<AliasDeclaration>& element) {
+  virtual void OnAttribute(const std::unique_ptr<RawAttribute>& element) { element->Accept(this); }
+
+  virtual void OnAttributeList(const std::unique_ptr<RawAttributeList>& element) {
     element->Accept(this);
   }
 
-  virtual void OnLibraryDeclaration(const std::unique_ptr<LibraryDeclaration>& element) {
+  virtual void OnAliasDeclaration(const std::unique_ptr<RawAliasDeclaration>& element) {
     element->Accept(this);
   }
 
-  virtual void OnUsing(const std::unique_ptr<Using>& element) { element->Accept(this); }
-
-  virtual void OnConstDeclaration(const std::unique_ptr<ConstDeclaration>& element) {
+  virtual void OnLibraryDeclaration(const std::unique_ptr<RawLibraryDeclaration>& element) {
     element->Accept(this);
   }
 
-  virtual void OnParameterList(const std::unique_ptr<ParameterList>& element) {
-    element->Accept(this);
-  }
-  virtual void OnProtocolMethod(const std::unique_ptr<ProtocolMethod>& element) {
-    element->Accept(this);
-  }
-  virtual void OnProtocolCompose(const std::unique_ptr<ProtocolCompose>& element) {
-    element->Accept(this);
-  }
-  virtual void OnProtocolDeclaration(const std::unique_ptr<ProtocolDeclaration>& element) {
-    element->Accept(this);
-  }
-  virtual void OnResourceProperty(const std::unique_ptr<ResourceProperty>& element) {
-    element->Accept(this);
-  }
-  virtual void OnResourceDeclaration(const std::unique_ptr<ResourceDeclaration>& element) {
-    element->Accept(this);
-  }
-  virtual void OnServiceMember(const std::unique_ptr<ServiceMember>& element) {
-    element->Accept(this);
-  }
-  virtual void OnServiceDeclaration(const std::unique_ptr<ServiceDeclaration>& element) {
-    element->Accept(this);
-  }
-  virtual void OnModifiers(const std::unique_ptr<Modifiers>& element) { element->Accept(this); }
+  virtual void OnUsing(const std::unique_ptr<RawUsing>& element) { element->Accept(this); }
 
-  virtual void OnLayoutParameter(const std::unique_ptr<LayoutParameter>& element) {
-    LayoutParameter::Kind kind = element->kind;
+  virtual void OnConstDeclaration(const std::unique_ptr<RawConstDeclaration>& element) {
+    element->Accept(this);
+  }
+
+  virtual void OnParameterList(const std::unique_ptr<RawParameterList>& element) {
+    element->Accept(this);
+  }
+  virtual void OnProtocolMethod(const std::unique_ptr<RawProtocolMethod>& element) {
+    element->Accept(this);
+  }
+  virtual void OnProtocolCompose(const std::unique_ptr<RawProtocolCompose>& element) {
+    element->Accept(this);
+  }
+  virtual void OnProtocolDeclaration(const std::unique_ptr<RawProtocolDeclaration>& element) {
+    element->Accept(this);
+  }
+  virtual void OnResourceProperty(const std::unique_ptr<RawResourceProperty>& element) {
+    element->Accept(this);
+  }
+  virtual void OnResourceDeclaration(const std::unique_ptr<RawResourceDeclaration>& element) {
+    element->Accept(this);
+  }
+  virtual void OnServiceMember(const std::unique_ptr<RawServiceMember>& element) {
+    element->Accept(this);
+  }
+  virtual void OnServiceDeclaration(const std::unique_ptr<RawServiceDeclaration>& element) {
+    element->Accept(this);
+  }
+  virtual void OnModifiers(const std::unique_ptr<RawModifiers>& element) { element->Accept(this); }
+
+  virtual void OnLayoutParameter(const std::unique_ptr<RawLayoutParameter>& element) {
+    RawLayoutParameter::Kind kind = element->kind;
     switch (kind) {
-      case LayoutParameter::Kind::kIdentifier: {
-        DISPATCH_TO(IdentifierLayoutParameter, LayoutParameter, element);
+      case RawLayoutParameter::Kind::kIdentifier: {
+        DISPATCH_TO(IdentifierLayoutParameter, RawLayoutParameter, element);
         break;
       }
-      case LayoutParameter::Kind::kLiteral: {
-        DISPATCH_TO(LiteralLayoutParameter, LayoutParameter, element);
+      case RawLayoutParameter::Kind::kLiteral: {
+        DISPATCH_TO(LiteralLayoutParameter, RawLayoutParameter, element);
         break;
       }
-      case LayoutParameter::Kind::kType: {
-        DISPATCH_TO(TypeLayoutParameter, LayoutParameter, element);
+      case RawLayoutParameter::Kind::kType: {
+        DISPATCH_TO(TypeLayoutParameter, RawLayoutParameter, element);
         break;
       }
     }
   }
 
-  virtual void OnLayoutParameterList(const std::unique_ptr<LayoutParameterList>& element) {
+  virtual void OnLayoutParameterList(const std::unique_ptr<RawLayoutParameterList>& element) {
     element->Accept(this);
   }
 
   virtual void OnIdentifierLayoutParameter(
-      const std::unique_ptr<IdentifierLayoutParameter>& element) {
+      const std::unique_ptr<RawIdentifierLayoutParameter>& element) {
     element->Accept(this);
   }
-  virtual void OnLiteralLayoutParameter(const std::unique_ptr<LiteralLayoutParameter>& element) {
+  virtual void OnLiteralLayoutParameter(const std::unique_ptr<RawLiteralLayoutParameter>& element) {
     element->Accept(this);
   }
-  virtual void OnTypeLayoutParameter(const std::unique_ptr<TypeLayoutParameter>& element) {
+  virtual void OnTypeLayoutParameter(const std::unique_ptr<RawTypeLayoutParameter>& element) {
     element->Accept(this);
   }
 
-  virtual void OnLayoutMember(const std::unique_ptr<LayoutMember>& element) {
-    LayoutMember::Kind kind = element->kind;
+  virtual void OnLayoutMember(const std::unique_ptr<RawLayoutMember>& element) {
+    RawLayoutMember::Kind kind = element->kind;
     switch (kind) {
-      case LayoutMember::Kind::kOrdinaled: {
-        DISPATCH_TO(OrdinaledLayoutMember, LayoutMember, element);
+      case RawLayoutMember::Kind::kOrdinaled: {
+        DISPATCH_TO(OrdinaledLayoutMember, RawLayoutMember, element);
         break;
       }
-      case LayoutMember::Kind::kStruct: {
-        DISPATCH_TO(StructLayoutMember, LayoutMember, element);
+      case RawLayoutMember::Kind::kStruct: {
+        DISPATCH_TO(StructLayoutMember, RawLayoutMember, element);
         break;
       }
-      case LayoutMember::Kind::kValue: {
-        DISPATCH_TO(ValueLayoutMember, LayoutMember, element);
+      case RawLayoutMember::Kind::kValue: {
+        DISPATCH_TO(ValueLayoutMember, RawLayoutMember, element);
         break;
       }
     }
   }
 
-  virtual void OnOrdinaledLayoutMember(const std::unique_ptr<OrdinaledLayoutMember>& element) {
+  virtual void OnOrdinaledLayoutMember(const std::unique_ptr<RawOrdinaledLayoutMember>& element) {
     element->Accept(this);
   }
-  virtual void OnStructLayoutMember(const std::unique_ptr<StructLayoutMember>& element) {
+  virtual void OnStructLayoutMember(const std::unique_ptr<RawStructLayoutMember>& element) {
     element->Accept(this);
   }
-  virtual void OnValueLayoutMember(const std::unique_ptr<ValueLayoutMember>& element) {
+  virtual void OnValueLayoutMember(const std::unique_ptr<RawValueLayoutMember>& element) {
     element->Accept(this);
   }
 
-  virtual void OnLayout(const std::unique_ptr<Layout>& element) { element->Accept(this); }
+  virtual void OnLayout(const std::unique_ptr<RawLayout>& element) { element->Accept(this); }
 
-  virtual void OnLayoutReference(const std::unique_ptr<LayoutReference>& element) {
-    LayoutReference::Kind kind = element->kind;
+  virtual void OnLayoutReference(const std::unique_ptr<RawLayoutReference>& element) {
+    RawLayoutReference::Kind kind = element->kind;
     switch (kind) {
-      case LayoutReference::Kind::kInline: {
-        DISPATCH_TO(InlineLayoutReference, LayoutReference, element);
+      case RawLayoutReference::Kind::kInline: {
+        DISPATCH_TO(InlineLayoutReference, RawLayoutReference, element);
         break;
       }
-      case LayoutReference::Kind::kNamed: {
-        DISPATCH_TO(NamedLayoutReference, LayoutReference, element);
+      case RawLayoutReference::Kind::kNamed: {
+        DISPATCH_TO(NamedLayoutReference, RawLayoutReference, element);
         break;
       }
     }
   }
 
-  virtual void OnInlineLayoutReference(const std::unique_ptr<InlineLayoutReference>& element) {
+  virtual void OnInlineLayoutReference(const std::unique_ptr<RawInlineLayoutReference>& element) {
     element->Accept(this);
   }
-  virtual void OnNamedLayoutReference(const std::unique_ptr<NamedLayoutReference>& element) {
-    element->Accept(this);
-  }
-
-  virtual void OnTypeConstraints(const std::unique_ptr<TypeConstraints>& element) {
+  virtual void OnNamedLayoutReference(const std::unique_ptr<RawNamedLayoutReference>& element) {
     element->Accept(this);
   }
 
-  virtual void OnTypeConstructor(const std::unique_ptr<TypeConstructor>& element) {
+  virtual void OnTypeConstraints(const std::unique_ptr<RawTypeConstraints>& element) {
     element->Accept(this);
   }
 
-  virtual void OnTypeDeclaration(const std::unique_ptr<TypeDeclaration>& element) {
+  virtual void OnTypeConstructor(const std::unique_ptr<RawTypeConstructor>& element) {
+    element->Accept(this);
+  }
+
+  virtual void OnTypeDeclaration(const std::unique_ptr<RawTypeDeclaration>& element) {
     element->Accept(this);
   }
 
@@ -246,9 +248,9 @@ class TreeVisitor {
 class DeclarationOrderTreeVisitor : public TreeVisitor {
  public:
   void OnFile(const std::unique_ptr<File>& element) override;
-  void OnProtocolDeclaration(const std::unique_ptr<ProtocolDeclaration>& element) override;
+  void OnProtocolDeclaration(const std::unique_ptr<RawProtocolDeclaration>& element) override;
 };
 
-}  // namespace fidl::raw
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_TREE_VISITOR_H_

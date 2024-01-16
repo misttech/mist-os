@@ -44,16 +44,16 @@ service SomeService {
   EXPECT_EQ(service->members.size(), 3u);
   const auto& member0 = service->members[0];
   EXPECT_EQ(member0.name.data(), "some_protocol_first_first");
-  const auto* type0 = static_cast<const fidl::flat::TransportSideType*>(member0.type_ctor->type);
-  EXPECT_EQ(fidl::NameFlatName(type0->protocol_decl->name), "example/SomeProtocol1");
+  const auto* type0 = static_cast<const fidlc::TransportSideType*>(member0.type_ctor->type);
+  EXPECT_EQ(fidlc::NameFlatName(type0->protocol_decl->name), "example/SomeProtocol1");
   const auto& member1 = service->members[1];
   EXPECT_EQ(member1.name.data(), "some_protocol_first_second");
-  const auto* type1 = static_cast<const fidl::flat::TransportSideType*>(member1.type_ctor->type);
-  EXPECT_EQ(fidl::NameFlatName(type1->protocol_decl->name), "example/SomeProtocol1");
+  const auto* type1 = static_cast<const fidlc::TransportSideType*>(member1.type_ctor->type);
+  EXPECT_EQ(fidlc::NameFlatName(type1->protocol_decl->name), "example/SomeProtocol1");
   const auto& member2 = service->members[2];
   EXPECT_EQ(member2.name.data(), "some_protocol_second");
-  const auto* type2 = static_cast<const fidl::flat::TransportSideType*>(member2.type_ctor->type);
-  EXPECT_EQ(fidl::NameFlatName(type2->protocol_decl->name), "example/SomeProtocol2");
+  const auto* type2 = static_cast<const fidlc::TransportSideType*>(member2.type_ctor->type);
+  EXPECT_EQ(fidlc::NameFlatName(type2->protocol_decl->name), "example/SomeProtocol2");
 }
 
 TEST(ServiceTests, BadCannotHaveConflictingMembers) {
@@ -67,17 +67,16 @@ service MyService {
     my_service_member client_end:MyProtocol;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kServiceMember,
-                     "my_service_member", fidl::flat::Element::Kind::kServiceMember,
-                     "example.fidl:7:5");
+  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kServiceMember,
+                     "my_service_member", fidlc::Element::Kind::kServiceMember, "example.fidl:7:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ServiceTests, BadNoNullableProtocolMembers) {
   TestLibrary library;
   library.AddFile("bad/fi-0088.test.fidl");
-  library.ExpectFail(fidl::ErrOptionalServiceMember);
-  library.ExpectFail(fidl::ErrOptionalServiceMember);
+  library.ExpectFail(fidlc::ErrOptionalServiceMember);
+  library.ExpectFail(fidlc::ErrOptionalServiceMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -92,14 +91,14 @@ service SomeService {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrOnlyClientEndsInServices);
+  library.ExpectFail(fidlc::ErrOnlyClientEndsInServices);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ServiceTests, BadNoServerEnds) {
   TestLibrary library;
   library.AddFile("bad/fi-0112.test.fidl");
-  library.ExpectFail(fidl::ErrOnlyClientEndsInServices);
+  library.ExpectFail(fidlc::ErrOnlyClientEndsInServices);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -114,14 +113,14 @@ type CannotUseService = struct {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrExpectedType);
+  library.ExpectFail(fidlc::ErrExpectedType);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ServiceTests, BadCannotUseMoreThanOneProtocolTransportKind) {
   TestLibrary library;
   library.AddFile("bad/fi-0113.test.fidl");
-  library.ExpectFail(fidl::ErrMismatchedTransportInServices, "b", "Driver", "a", "Channel");
+  library.ExpectFail(fidlc::ErrMismatchedTransportInServices, "b", "Driver", "a", "Channel");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

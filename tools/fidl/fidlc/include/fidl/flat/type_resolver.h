@@ -8,7 +8,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/compile_step.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 class CompileStep;
 
@@ -27,17 +27,16 @@ class TypeResolver {
   bool ResolveParamAsType(const Reference& layout, const std::unique_ptr<LayoutParameter>& param,
                           const Type** out_type);
   bool ResolveParamAsSize(const Reference& layout, const std::unique_ptr<LayoutParameter>& param,
-                          const Size** out_size);
+                          const SizeValue** out_size);
 
   // These methods forward their implementation to the library_. They are used
   // by the top level methods above
   bool ResolveType(TypeConstructor* type);
-  bool ResolveSizeBound(Constant* size_constant, const Size** out_size);
+  bool ResolveSizeBound(Constant* size_constant, const SizeValue** out_size);
   bool ResolveAsOptional(Constant* constant);
-  bool ResolveAsHandleSubtype(Resource* resource, Constant* constant,
-                              types::HandleSubtype* out_obj_type);
+  bool ResolveAsHandleSubtype(Resource* resource, Constant* constant, HandleSubtype* out_obj_type);
   bool ResolveAsHandleRights(Resource* resource, Constant* constant,
-                             const HandleRights** out_rights);
+                             const HandleRightsValue** out_rights);
   bool ResolveAsProtocol(const Constant* size_constant, const Protocol** out_decl);
 
   // Used in Typespace::Creator::Create{Identifier,Alias}Type to recursively
@@ -51,6 +50,6 @@ class TypeResolver {
   CompileStep* compile_step_;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_TYPE_RESOLVER_H_

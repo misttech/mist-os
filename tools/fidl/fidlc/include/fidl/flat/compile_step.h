@@ -7,7 +7,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // We run one main CompileStep for the whole library. Some attributes are
 // compiled before that via the CompileAttributeEarly method. To avoid kicking
@@ -47,10 +47,10 @@ class CompileStep : public Compiler::Step {
 
   // Resolve methods
   bool ResolveHandleRightsConstant(Resource* resource, Constant* constant,
-                                   const HandleRights** out_rights);
+                                   const HandleRightsValue** out_rights);
   bool ResolveHandleSubtypeIdentifier(Resource* resource, Constant* constant,
-                                      types::HandleSubtype* out_obj_type);
-  bool ResolveSizeBound(Constant* size_constant, const Size** out_size);
+                                      HandleSubtype* out_obj_type);
+  bool ResolveSizeBound(Constant* size_constant, const SizeValue** out_size);
   bool ResolveOrOperatorConstant(Constant* constant, std::optional<const Type*> opt_type,
                                  const ConstantValue& left_operand,
                                  const ConstantValue& right_operand);
@@ -69,7 +69,7 @@ class CompileStep : public Compiler::Step {
   bool TypeIsConvertibleTo(const Type* from_type, const Type* to_type);
   const Type* UnderlyingType(const Type* type);
   const Type* InferType(Constant* constant);
-  ConstantValue::Kind ConstantValuePrimitiveKind(types::PrimitiveSubtype primitive_subtype);
+  ConstantValue::Kind ConstantValuePrimitiveKind(PrimitiveSubtype primitive_subtype);
 
   // Validates a single member of a bits or enum. On success, returns nullptr,
   // and on failure returns an error. The caller will set the diagnostic span.
@@ -99,6 +99,6 @@ class CompileStep : public Compiler::Step {
   std::vector<const Decl*> decl_stack_;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_COMPILE_STEP_H_

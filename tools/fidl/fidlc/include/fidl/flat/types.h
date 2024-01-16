@@ -16,7 +16,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/values.h"
 #include "tools/fidl/fidlc/include/fidl/types.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 class TypeResolver;
 
@@ -51,7 +51,7 @@ struct Type : public Object {
 
   // Returns the nominal resourceness of the type per the FTP-057 definition.
   // For IdentifierType, can only be called after the Decl has been compiled.
-  types::Resourceness Resourceness() const;
+  Resourceness Resourceness() const;
 
   // Comparison helper object.
   class Comparison {
@@ -121,9 +121,9 @@ struct ArrayConstraints : public Constraints<ConstraintKind::kUtf8> {
 struct ArrayType final : public Type, public ArrayConstraints {
   using Constraints = ArrayConstraints;
 
-  ArrayType(const Name& name, const Type* element_type, const Size* element_count)
+  ArrayType(const Name& name, const Type* element_type, const SizeValue* element_count)
       : Type(name, Kind::kArray), element_type(element_type), element_count(element_count) {}
-  ArrayType(const Name& name, const Type* element_type, const Size* element_count,
+  ArrayType(const Name& name, const Type* element_type, const SizeValue* element_count,
             Constraints constraints)
       : Type(name, Kind::kArray),
         Constraints(std::move(constraints)),
@@ -131,7 +131,7 @@ struct ArrayType final : public Type, public ArrayConstraints {
         element_count(element_count) {}
 
   const Type* element_type;
-  const Size* element_count;
+  const SizeValue* element_count;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -171,9 +171,9 @@ struct VectorType final : public Type, public VectorConstraints {
 
   const Type* element_type;
 
-  uint32_t ElementCount() const { return size ? size->value : Size::Max().value; }
+  uint32_t ElementCount() const { return size ? size->value : SizeValue::Max().value; }
 
-  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
+  bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -197,9 +197,9 @@ struct StringType final : public Type, public VectorConstraints {
   StringType(const Name& name, Constraints constraints)
       : Type(name, Kind::kString), Constraints(std::move(constraints)) {}
 
-  uint32_t MaxSize() const { return size ? size->value : Size::Max().value; }
+  uint32_t MaxSize() const { return size ? size->value : SizeValue::Max().value; }
 
-  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
+  bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -231,15 +231,15 @@ struct HandleType final : public Type, HandleConstraints {
 
   Resource* resource_decl;
 
-  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
+  bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   Comparison Compare(const Type& other) const override {
     const auto& other_handle_type = *static_cast<const HandleType*>(&other);
-    auto rights_val = static_cast<const NumericConstantValue<types::RightsWrappedType>*>(rights);
-    auto other_rights_val = static_cast<const NumericConstantValue<types::RightsWrappedType>*>(
-        other_handle_type.rights);
+    auto rights_val = static_cast<const NumericConstantValue<RightsWrappedType>*>(rights);
+    auto other_rights_val =
+        static_cast<const NumericConstantValue<RightsWrappedType>*>(other_handle_type.rights);
     // TODO: move Compare into constraints.
     ZX_ASSERT(kind == other.kind);
     return Comparison()
@@ -253,16 +253,16 @@ struct HandleType final : public Type, HandleConstraints {
                         std::unique_ptr<Type>* out_type,
                         LayoutInvocation* out_params) const override;
 
-  const static HandleRights kSameRights;
+  const static HandleRightsValue kSameRights;
 };
 
 struct PrimitiveType final : public Type, public RejectOptionalConstraints {
   using Constraints = RejectOptionalConstraints;
 
-  explicit PrimitiveType(const Name& name, types::PrimitiveSubtype subtype)
+  explicit PrimitiveType(const Name& name, PrimitiveSubtype subtype)
       : Type(name, Kind::kPrimitive), subtype(subtype) {}
 
-  types::PrimitiveSubtype subtype;
+  PrimitiveSubtype subtype;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -277,7 +277,7 @@ struct PrimitiveType final : public Type, public RejectOptionalConstraints {
                         LayoutInvocation* out_params) const override;
 
  private:
-  static uint32_t SubtypeSize(types::PrimitiveSubtype subtype);
+  static uint32_t SubtypeSize(PrimitiveSubtype subtype);
 };
 
 // Internal types are types which are used internally by the bindings but not
@@ -285,10 +285,10 @@ struct PrimitiveType final : public Type, public RejectOptionalConstraints {
 struct InternalType final : public Type, public Constraints<> {
   using Constraints = Constraints<>;
 
-  explicit InternalType(const Name& name, types::InternalSubtype subtype)
+  explicit InternalType(const Name& name, InternalSubtype subtype)
       : Type(name, Kind::kInternal), subtype(subtype) {}
 
-  types::InternalSubtype subtype;
+  InternalSubtype subtype;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -303,7 +303,7 @@ struct InternalType final : public Type, public Constraints<> {
                         LayoutInvocation* out_params) const override;
 
  private:
-  static uint32_t SubtypeSize(types::InternalSubtype subtype);
+  static uint32_t SubtypeSize(InternalSubtype subtype);
 };
 
 struct IdentifierType final : public Type, public Constraints<ConstraintKind::kNullability> {
@@ -314,7 +314,7 @@ struct IdentifierType final : public Type, public Constraints<ConstraintKind::kN
 
   TypeDecl* type_decl;
 
-  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
+  bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -356,7 +356,7 @@ struct TransportSideType final : public Type, public TransportSideConstraints {
         end(end),
         protocol_transport(protocol_transport) {}
 
-  bool IsNullable() const override { return nullability == types::Nullability::kNullable; }
+  bool IsNullable() const override { return nullability == Nullability::kNullable; }
 
   const TransportSide end;
   // TODO(https://fxbug.dev/56727): Eventually, this will need to point to a transport declaration.
@@ -443,6 +443,6 @@ struct ZxExperimentalPointerType final : public Type, public Constraints<> {
                         LayoutInvocation* out_params) const override;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_TYPES_H_

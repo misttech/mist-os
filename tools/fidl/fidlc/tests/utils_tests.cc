@@ -10,7 +10,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl::utils {
+namespace fidlc {
 
 namespace {
 
@@ -760,4 +760,4 @@ TEST(UtilsTests, StringLiteralLength) {
 
 }  // namespace
 
-}  // namespace fidl::utils
+}  // namespace fidlc

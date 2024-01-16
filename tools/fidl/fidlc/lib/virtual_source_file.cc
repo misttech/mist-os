@@ -6,7 +6,7 @@
 
 #include <zircon/assert.h>
 
-namespace fidl {
+namespace fidlc {
 
 SourceSpan VirtualSourceFile::AddLine(std::string_view line) {
   ZX_ASSERT_MSG(line.find('\n') == std::string::npos,
@@ -32,4 +32,4 @@ std::string_view VirtualSourceFile::LineContaining(std::string_view view,
   return std::string_view();
 }
 
-}  // namespace fidl
+}  // namespace fidlc

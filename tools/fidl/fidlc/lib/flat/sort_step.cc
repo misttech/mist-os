@@ -11,7 +11,7 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 namespace {
 
@@ -59,7 +59,7 @@ void CalcDependencies::AddDependency(const Decl* decl) {
 void CalcDependencies::VisitConstant(const Constant* constant) {
   switch (constant->kind) {
     case Constant::Kind::kIdentifier: {
-      auto identifier = static_cast<const flat::IdentifierConstant*>(constant);
+      auto identifier = static_cast<const IdentifierConstant*>(constant);
       AddDependency(identifier->reference.resolved().element_or_parent_decl());
       break;
     }
@@ -68,7 +68,7 @@ void CalcDependencies::VisitConstant(const Constant* constant) {
       break;
     }
     case Constant::Kind::kBinaryOperator: {
-      auto op = static_cast<const flat::BinaryOperatorConstant*>(constant);
+      auto op = static_cast<const BinaryOperatorConstant*>(constant);
       VisitConstant(op->left_operand.get());
       VisitConstant(op->right_operand.get());
       break;
@@ -341,4 +341,4 @@ void SortStep::RunImpl() {
   }
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

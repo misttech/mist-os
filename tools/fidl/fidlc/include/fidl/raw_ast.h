@@ -36,10 +36,10 @@
 // method to help visitors visit the node.  When you add a new node, or add a
 // field to an existing node, you must ensure the Accept method works.
 
-// A raw::File is produced by parsing a token stream. All of the
+// A File is produced by parsing a token stream. All of the
 // Files in a library are then flattened out into a Library.
 
-namespace fidl::raw {
+namespace fidlc {
 
 class TreeVisitor;
 
@@ -81,23 +81,23 @@ class SourceElementMark {
   const SourceElement& element_;
 };
 
-struct Identifier final : public SourceElement {
-  explicit Identifier(const SourceElement& element) : SourceElement(element) {}
+struct RawIdentifier final : public SourceElement {
+  explicit RawIdentifier(const SourceElement& element) : SourceElement(element) {}
 
   void Accept(TreeVisitor* visitor) const;
 };
 
-struct CompoundIdentifier final : public SourceElement {
-  CompoundIdentifier(const SourceElement& element,
-                     std::vector<std::unique_ptr<Identifier>> components)
+struct RawCompoundIdentifier final : public SourceElement {
+  RawCompoundIdentifier(const SourceElement& element,
+                        std::vector<std::unique_ptr<RawIdentifier>> components)
       : SourceElement(element), components(std::move(components)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::vector<std::unique_ptr<Identifier>> components;
+  std::vector<std::unique_ptr<RawIdentifier>> components;
 };
 
-struct Literal : public SourceElement {
+struct RawLiteral : public SourceElement {
   enum class Kind : uint8_t {
     kBool,
     kDocComment,
@@ -105,13 +105,15 @@ struct Literal : public SourceElement {
     kString,
   };
 
-  explicit Literal(const SourceElement& element, Kind kind) : SourceElement(element), kind(kind) {}
+  explicit RawLiteral(const SourceElement& element, Kind kind)
+      : SourceElement(element), kind(kind) {}
 
   const Kind kind;
 };
 
-struct DocCommentLiteral final : public Literal {
-  explicit DocCommentLiteral(const SourceElement& element) : Literal(element, Kind::kDocComment) {}
+struct RawDocCommentLiteral final : public RawLiteral {
+  explicit RawDocCommentLiteral(const SourceElement& element)
+      : RawLiteral(element, Kind::kDocComment) {}
 
   void Accept(TreeVisitor* visitor) const;
 
@@ -119,12 +121,12 @@ struct DocCommentLiteral final : public Literal {
     if (!has_span() || span().data().empty()) {
       return "";
     }
-    return fidl::utils::strip_doc_comment_slashes(span().data());
+    return strip_doc_comment_slashes(span().data());
   }
 };
 
-struct StringLiteral final : public Literal {
-  explicit StringLiteral(const SourceElement& element) : Literal(element, Kind::kString) {}
+struct RawStringLiteral final : public RawLiteral {
+  explicit RawStringLiteral(const SourceElement& element) : RawLiteral(element, Kind::kString) {}
 
   void Accept(TreeVisitor* visitor) const;
 
@@ -132,110 +134,113 @@ struct StringLiteral final : public Literal {
     if (!has_span() || span().data().empty()) {
       return "";
     }
-    return fidl::utils::strip_string_literal_quotes(span().data());
+    return strip_string_literal_quotes(span().data());
   }
 };
 
-struct NumericLiteral final : public Literal {
-  explicit NumericLiteral(const SourceElement& element) : Literal(element, Kind::kNumeric) {}
+struct RawNumericLiteral final : public RawLiteral {
+  explicit RawNumericLiteral(const SourceElement& element) : RawLiteral(element, Kind::kNumeric) {}
 
   void Accept(TreeVisitor* visitor) const;
 };
 
-struct BoolLiteral final : public Literal {
-  BoolLiteral(const SourceElement& element, bool value)
-      : Literal(element, Kind::kBool), value(value) {}
+struct RawBoolLiteral final : public RawLiteral {
+  RawBoolLiteral(const SourceElement& element, bool value)
+      : RawLiteral(element, Kind::kBool), value(value) {}
 
   void Accept(TreeVisitor* visitor) const;
 
   const bool value;
 };
 
-struct Ordinal64 final : public SourceElement {
-  Ordinal64(const SourceElement& element, uint64_t value) : SourceElement(element), value(value) {}
+struct RawOrdinal64 final : public SourceElement {
+  RawOrdinal64(const SourceElement& element, uint64_t value)
+      : SourceElement(element), value(value) {}
 
   void Accept(TreeVisitor* visitor) const;
 
   const uint64_t value;
 };
 
-struct Constant : public SourceElement {
+struct RawConstant : public SourceElement {
   enum class Kind : uint8_t { kIdentifier, kLiteral, kBinaryOperator };
 
-  explicit Constant(Token start, Token end, Kind kind) : SourceElement(start, end), kind(kind) {}
-  explicit Constant(const SourceElement& element, Kind kind) : SourceElement(element), kind(kind) {}
+  explicit RawConstant(Token start, Token end, Kind kind) : SourceElement(start, end), kind(kind) {}
+  explicit RawConstant(const SourceElement& element, Kind kind)
+      : SourceElement(element), kind(kind) {}
 
   const Kind kind;
 };
 
-struct IdentifierConstant final : public Constant {
-  explicit IdentifierConstant(std::unique_ptr<CompoundIdentifier> identifier)
-      : Constant(SourceElement(identifier->start_token, identifier->end_token), Kind::kIdentifier),
+struct RawIdentifierConstant final : public RawConstant {
+  explicit RawIdentifierConstant(std::unique_ptr<RawCompoundIdentifier> identifier)
+      : RawConstant(SourceElement(identifier->start_token, identifier->end_token),
+                    Kind::kIdentifier),
         identifier(std::move(identifier)) {}
 
-  std::unique_ptr<CompoundIdentifier> identifier;
+  std::unique_ptr<RawCompoundIdentifier> identifier;
 
   void Accept(TreeVisitor* visitor) const;
 };
 
-struct LiteralConstant final : public Constant {
-  explicit LiteralConstant(std::unique_ptr<Literal> literal)
-      : Constant(literal->start_token, literal->end_token, Kind::kLiteral),
+struct RawLiteralConstant final : public RawConstant {
+  explicit RawLiteralConstant(std::unique_ptr<RawLiteral> literal)
+      : RawConstant(literal->start_token, literal->end_token, Kind::kLiteral),
         literal(std::move(literal)) {}
 
-  std::unique_ptr<Literal> literal;
+  std::unique_ptr<RawLiteral> literal;
 
   void Accept(TreeVisitor* visitor) const;
 };
 
-struct BinaryOperatorConstant final : public Constant {
+struct RawBinaryOperatorConstant final : public RawConstant {
   enum class Operator : uint8_t { kOr };
-  explicit BinaryOperatorConstant(std::unique_ptr<Constant> left_operand,
-                                  std::unique_ptr<Constant> right_operand, Operator op)
-      : Constant(SourceElement(left_operand->start_token, right_operand->end_token),
-                 Kind::kBinaryOperator),
+  explicit RawBinaryOperatorConstant(std::unique_ptr<RawConstant> left_operand,
+                                     std::unique_ptr<RawConstant> right_operand, Operator op)
+      : RawConstant(SourceElement(left_operand->start_token, right_operand->end_token),
+                    Kind::kBinaryOperator),
         left_operand(std::move(left_operand)),
         right_operand(std::move(right_operand)),
         op(op) {}
 
-  std::unique_ptr<Constant> left_operand;
-  std::unique_ptr<Constant> right_operand;
+  std::unique_ptr<RawConstant> left_operand;
+  std::unique_ptr<RawConstant> right_operand;
   Operator op;
 
   void Accept(TreeVisitor* visitor) const;
 };
 
-struct AttributeArg final : public SourceElement {
+struct RawAttributeArg final : public SourceElement {
   // Constructor for cases where the arg name has been explicitly defined in the text.
-  AttributeArg(const SourceElement& element, std::unique_ptr<Identifier> name,
-               std::unique_ptr<Constant> value)
+  RawAttributeArg(const SourceElement& element, std::unique_ptr<RawIdentifier> name,
+                  std::unique_ptr<RawConstant> value)
       : SourceElement(element), maybe_name(std::move(name)), value(std::move(value)) {}
 
   // Constructor for cases where the arg name is inferred.
-  AttributeArg(const SourceElement& element, std::unique_ptr<Constant> value)
+  RawAttributeArg(const SourceElement& element, std::unique_ptr<RawConstant> value)
       : SourceElement(element), maybe_name(nullptr), value(std::move(value)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<Identifier> maybe_name;
-  std::unique_ptr<Constant> value;
+  std::unique_ptr<RawIdentifier> maybe_name;
+  std::unique_ptr<RawConstant> value;
 };
 
-struct Attribute final : public SourceElement {
+struct RawAttribute final : public SourceElement {
   enum class Provenance : uint8_t {
     kDefault,
     kDocComment,
   };
 
   // Constructor for cases where the name of the attribute is explicitly defined in the text.
-  Attribute(const SourceElement& element, std::unique_ptr<Identifier> maybe_name,
-            std::vector<std::unique_ptr<AttributeArg>> args)
+  RawAttribute(const SourceElement& element, std::unique_ptr<RawIdentifier> maybe_name,
+               std::vector<std::unique_ptr<RawAttributeArg>> args)
       : SourceElement(element), maybe_name(std::move(maybe_name)), args(std::move(args)) {}
 
   // Factory for "///"-style doc comments, which have no attribute name.
-  static Attribute CreateDocComment(const SourceElement& element,
-                                    std::vector<std::unique_ptr<AttributeArg>> args) {
-    auto attr = Attribute(element, nullptr, std::move(args));
+  static RawAttribute CreateDocComment(const SourceElement& element,
+                                       std::vector<std::unique_ptr<RawAttributeArg>> args) {
+    auto attr = RawAttribute(element, nullptr, std::move(args));
     attr.provenance = Provenance::kDocComment;
     return attr;
   }
@@ -243,36 +248,37 @@ struct Attribute final : public SourceElement {
   void Accept(TreeVisitor* visitor) const;
 
   Provenance provenance = Provenance::kDefault;
-  std::unique_ptr<Identifier> maybe_name;
-  std::vector<std::unique_ptr<AttributeArg>> args;
+  std::unique_ptr<RawIdentifier> maybe_name;
+  std::vector<std::unique_ptr<RawAttributeArg>> args;
 };
 
 // In the raw AST, "no attributes" is represented by a null AttributeList*,
 // because every SourceElement must have a valid span. (In the flat AST, it is
 // the opposite: never null, but the vector can be empty.)
-struct AttributeList final : public SourceElement {
-  AttributeList(const SourceElement& element, std::vector<std::unique_ptr<Attribute>> attributes)
+struct RawAttributeList final : public SourceElement {
+  RawAttributeList(const SourceElement& element,
+                   std::vector<std::unique_ptr<RawAttribute>> attributes)
       : SourceElement(element), attributes(std::move(attributes)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::vector<std::unique_ptr<Attribute>> attributes;
+  std::vector<std::unique_ptr<RawAttribute>> attributes;
 };
 
-struct TypeConstructor;
+struct RawTypeConstructor;
 
-struct LayoutReference;
-struct LayoutParameterList;
-struct TypeConstraints;
+struct RawLayoutReference;
+struct RawLayoutParameterList;
+struct RawTypeConstraints;
 
 // The monostate variant is used to represent a parse failure.
-using ConstraintOrSubtype = std::variant<std::unique_ptr<TypeConstraints>,
-                                         std::unique_ptr<TypeConstructor>, std::monostate>;
+using ConstraintOrSubtype = std::variant<std::unique_ptr<RawTypeConstraints>,
+                                         std::unique_ptr<RawTypeConstructor>, std::monostate>;
 
-struct TypeConstructor final : public SourceElement {
-  TypeConstructor(const SourceElement& element, std::unique_ptr<LayoutReference> layout_ref,
-                  std::unique_ptr<LayoutParameterList> parameters,
-                  std::unique_ptr<TypeConstraints> constraints)
+struct RawTypeConstructor final : public SourceElement {
+  RawTypeConstructor(const SourceElement& element, std::unique_ptr<RawLayoutReference> layout_ref,
+                     std::unique_ptr<RawLayoutParameterList> parameters,
+                     std::unique_ptr<RawTypeConstraints> constraints)
       : SourceElement(element),
         layout_ref(std::move(layout_ref)),
         parameters(std::move(parameters)),
@@ -280,14 +286,15 @@ struct TypeConstructor final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<LayoutReference> layout_ref;
-  std::unique_ptr<LayoutParameterList> parameters;
-  std::unique_ptr<TypeConstraints> constraints;
+  std::unique_ptr<RawLayoutReference> layout_ref;
+  std::unique_ptr<RawLayoutParameterList> parameters;
+  std::unique_ptr<RawTypeConstraints> constraints;
 };
 
-struct AliasDeclaration final : public SourceElement {
-  AliasDeclaration(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                   std::unique_ptr<Identifier> alias, std::unique_ptr<TypeConstructor> type_ctor)
+struct RawAliasDeclaration final : public SourceElement {
+  RawAliasDeclaration(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                      std::unique_ptr<RawIdentifier> alias,
+                      std::unique_ptr<RawTypeConstructor> type_ctor)
       : SourceElement(element),
         attributes(std::move(attributes)),
         alias(std::move(alias)),
@@ -295,25 +302,26 @@ struct AliasDeclaration final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<Identifier> alias;
-  std::unique_ptr<TypeConstructor> type_ctor;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawIdentifier> alias;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
 };
 
-struct LibraryDeclaration final : public SourceElement {
-  LibraryDeclaration(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                     std::unique_ptr<CompoundIdentifier> path)
+struct RawLibraryDeclaration final : public SourceElement {
+  RawLibraryDeclaration(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                        std::unique_ptr<RawCompoundIdentifier> path)
       : SourceElement(element), attributes(std::move(attributes)), path(std::move(path)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<CompoundIdentifier> path;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawCompoundIdentifier> path;
 };
 
-struct Using final : public SourceElement {
-  Using(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-        std::unique_ptr<CompoundIdentifier> using_path, std::unique_ptr<Identifier> maybe_alias)
+struct RawUsing final : public SourceElement {
+  RawUsing(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+           std::unique_ptr<RawCompoundIdentifier> using_path,
+           std::unique_ptr<RawIdentifier> maybe_alias)
       : SourceElement(element),
         attributes(std::move(attributes)),
         using_path(std::move(using_path)),
@@ -321,15 +329,16 @@ struct Using final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<CompoundIdentifier> using_path;
-  std::unique_ptr<Identifier> maybe_alias;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawCompoundIdentifier> using_path;
+  std::unique_ptr<RawIdentifier> maybe_alias;
 };
 
-struct ConstDeclaration final : public SourceElement {
-  ConstDeclaration(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                   std::unique_ptr<TypeConstructor> type_ctor,
-                   std::unique_ptr<Identifier> identifier, std::unique_ptr<Constant> constant)
+struct RawConstDeclaration final : public SourceElement {
+  RawConstDeclaration(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                      std::unique_ptr<RawTypeConstructor> type_ctor,
+                      std::unique_ptr<RawIdentifier> identifier,
+                      std::unique_ptr<RawConstant> constant)
       : SourceElement(element),
         attributes(std::move(attributes)),
         type_ctor(std::move(type_ctor)),
@@ -338,16 +347,16 @@ struct ConstDeclaration final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<TypeConstructor> type_ctor;
-  std::unique_ptr<Identifier> identifier;
-  std::unique_ptr<Constant> constant;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
+  std::unique_ptr<RawIdentifier> identifier;
+  std::unique_ptr<RawConstant> constant;
 };
 
 // A single modifier applied to a layout, protocol, or method.
 template <typename T>
-struct Modifier final {
-  Modifier(T value, Token token) : value(value), token(token) {}
+struct RawModifier final {
+  RawModifier(T value, Token token) : value(value), token(token) {}
 
   // Value of the modifier
   T value;
@@ -355,12 +364,12 @@ struct Modifier final {
   Token token;
 };
 
-struct Modifiers final : public SourceElement {
+struct RawModifiers final : public SourceElement {
   // Constructor for Layouts (has resourceness and strictness, but not openness).
-  Modifiers(const SourceElement& element,
-            std::optional<Modifier<types::Resourceness>> maybe_resourceness,
-            std::optional<Modifier<types::Strictness>> maybe_strictness,
-            bool resourceness_comes_first)
+  RawModifiers(const SourceElement& element,
+               std::optional<RawModifier<Resourceness>> maybe_resourceness,
+               std::optional<RawModifier<Strictness>> maybe_strictness,
+               bool resourceness_comes_first)
       : SourceElement(element),
         maybe_resourceness(maybe_resourceness),
         maybe_strictness(maybe_strictness),
@@ -368,7 +377,7 @@ struct Modifiers final : public SourceElement {
         resourceness_comes_first(resourceness_comes_first) {}
 
   // Constructor for Protocols (only has openness).
-  Modifiers(const SourceElement& element, std::optional<Modifier<types::Openness>> maybe_openness)
+  RawModifiers(const SourceElement& element, std::optional<RawModifier<Openness>> maybe_openness)
       : SourceElement(element),
         maybe_resourceness(std::nullopt),
         maybe_strictness(std::nullopt),
@@ -376,8 +385,8 @@ struct Modifiers final : public SourceElement {
         resourceness_comes_first(false) {}
 
   // Constructor for Protocol methods (only has strictness).
-  Modifiers(const SourceElement& element,
-            std::optional<Modifier<types::Strictness>> maybe_strictness)
+  RawModifiers(const SourceElement& element,
+               std::optional<RawModifier<Strictness>> maybe_strictness)
       : SourceElement(element),
         maybe_resourceness(std::nullopt),
         maybe_strictness(maybe_strictness),
@@ -386,29 +395,30 @@ struct Modifiers final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::optional<Modifier<types::Resourceness>> maybe_resourceness;
-  std::optional<Modifier<types::Strictness>> maybe_strictness;
-  std::optional<Modifier<types::Openness>> maybe_openness;
+  std::optional<RawModifier<Resourceness>> maybe_resourceness;
+  std::optional<RawModifier<Strictness>> maybe_strictness;
+  std::optional<RawModifier<Openness>> maybe_openness;
   // Whether the resourceness modifier for a layout was before the strictness
   // modifier, used for linting.
   bool resourceness_comes_first;
 };
 
-struct ParameterList final : public SourceElement {
-  ParameterList(const SourceElement& element, std::unique_ptr<TypeConstructor> type_ctor)
+struct RawParameterList final : public SourceElement {
+  RawParameterList(const SourceElement& element, std::unique_ptr<RawTypeConstructor> type_ctor)
       : SourceElement(element), type_ctor(std::move(type_ctor)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<TypeConstructor> type_ctor;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
 };
 
-struct ProtocolMethod : public SourceElement {
-  ProtocolMethod(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                 std::unique_ptr<Modifiers> modifiers, std::unique_ptr<Identifier> identifier,
-                 std::unique_ptr<ParameterList> maybe_request,
-                 std::unique_ptr<ParameterList> maybe_response,
-                 std::unique_ptr<TypeConstructor> maybe_error_ctor)
+struct RawProtocolMethod : public SourceElement {
+  RawProtocolMethod(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                    std::unique_ptr<RawModifiers> modifiers,
+                    std::unique_ptr<RawIdentifier> identifier,
+                    std::unique_ptr<RawParameterList> maybe_request,
+                    std::unique_ptr<RawParameterList> maybe_response,
+                    std::unique_ptr<RawTypeConstructor> maybe_error_ctor)
       : SourceElement(element),
         attributes(std::move(attributes)),
         modifiers(std::move(modifiers)),
@@ -419,32 +429,33 @@ struct ProtocolMethod : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<Modifiers> modifiers;
-  std::unique_ptr<Identifier> identifier;
-  std::unique_ptr<ParameterList> maybe_request;
-  std::unique_ptr<ParameterList> maybe_response;
-  std::unique_ptr<TypeConstructor> maybe_error_ctor;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawModifiers> modifiers;
+  std::unique_ptr<RawIdentifier> identifier;
+  std::unique_ptr<RawParameterList> maybe_request;
+  std::unique_ptr<RawParameterList> maybe_response;
+  std::unique_ptr<RawTypeConstructor> maybe_error_ctor;
 };
 
-struct ProtocolCompose final : public SourceElement {
-  ProtocolCompose(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                  std::unique_ptr<CompoundIdentifier> protocol_name)
+struct RawProtocolCompose final : public SourceElement {
+  RawProtocolCompose(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                     std::unique_ptr<RawCompoundIdentifier> protocol_name)
       : SourceElement(element),
         attributes(std::move(attributes)),
         protocol_name(std::move(protocol_name)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<CompoundIdentifier> protocol_name;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawCompoundIdentifier> protocol_name;
 };
 
-struct ProtocolDeclaration final : public SourceElement {
-  ProtocolDeclaration(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                      std::unique_ptr<Modifiers> modifiers, std::unique_ptr<Identifier> identifier,
-                      std::vector<std::unique_ptr<ProtocolCompose>> composed_protocols,
-                      std::vector<std::unique_ptr<ProtocolMethod>> methods)
+struct RawProtocolDeclaration final : public SourceElement {
+  RawProtocolDeclaration(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                         std::unique_ptr<RawModifiers> modifiers,
+                         std::unique_ptr<RawIdentifier> identifier,
+                         std::vector<std::unique_ptr<RawProtocolCompose>> composed_protocols,
+                         std::vector<std::unique_ptr<RawProtocolMethod>> methods)
       : SourceElement(element),
         attributes(std::move(attributes)),
         modifiers(std::move(modifiers)),
@@ -454,17 +465,17 @@ struct ProtocolDeclaration final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<Modifiers> modifiers;
-  std::unique_ptr<Identifier> identifier;
-  std::vector<std::unique_ptr<ProtocolCompose>> composed_protocols;
-  std::vector<std::unique_ptr<ProtocolMethod>> methods;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawModifiers> modifiers;
+  std::unique_ptr<RawIdentifier> identifier;
+  std::vector<std::unique_ptr<RawProtocolCompose>> composed_protocols;
+  std::vector<std::unique_ptr<RawProtocolMethod>> methods;
 };
 
-struct ResourceProperty final : public SourceElement {
-  ResourceProperty(const SourceElement& element, std::unique_ptr<TypeConstructor> type_ctor,
-                   std::unique_ptr<Identifier> identifier,
-                   std::unique_ptr<AttributeList> attributes)
+struct RawResourceProperty final : public SourceElement {
+  RawResourceProperty(const SourceElement& element, std::unique_ptr<RawTypeConstructor> type_ctor,
+                      std::unique_ptr<RawIdentifier> identifier,
+                      std::unique_ptr<RawAttributeList> attributes)
       : SourceElement(element),
         type_ctor(std::move(type_ctor)),
         identifier(std::move(identifier)),
@@ -472,16 +483,16 @@ struct ResourceProperty final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<TypeConstructor> type_ctor;
-  std::unique_ptr<Identifier> identifier;
-  std::unique_ptr<AttributeList> attributes;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
+  std::unique_ptr<RawIdentifier> identifier;
+  std::unique_ptr<RawAttributeList> attributes;
 };
 
-struct ResourceDeclaration final : public SourceElement {
-  ResourceDeclaration(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                      std::unique_ptr<Identifier> identifier,
-                      std::unique_ptr<TypeConstructor> maybe_type_ctor,
-                      std::vector<std::unique_ptr<ResourceProperty>> properties)
+struct RawResourceDeclaration final : public SourceElement {
+  RawResourceDeclaration(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                         std::unique_ptr<RawIdentifier> identifier,
+                         std::unique_ptr<RawTypeConstructor> maybe_type_ctor,
+                         std::vector<std::unique_ptr<RawResourceProperty>> properties)
       : SourceElement(element),
         attributes(std::move(attributes)),
         identifier(std::move(identifier)),
@@ -490,15 +501,16 @@ struct ResourceDeclaration final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<Identifier> identifier;
-  std::unique_ptr<TypeConstructor> maybe_type_ctor;
-  std::vector<std::unique_ptr<ResourceProperty>> properties;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawIdentifier> identifier;
+  std::unique_ptr<RawTypeConstructor> maybe_type_ctor;
+  std::vector<std::unique_ptr<RawResourceProperty>> properties;
 };
 
-struct ServiceMember final : public SourceElement {
-  ServiceMember(const SourceElement& element, std::unique_ptr<TypeConstructor> type_ctor,
-                std::unique_ptr<Identifier> identifier, std::unique_ptr<AttributeList> attributes)
+struct RawServiceMember final : public SourceElement {
+  RawServiceMember(const SourceElement& element, std::unique_ptr<RawTypeConstructor> type_ctor,
+                   std::unique_ptr<RawIdentifier> identifier,
+                   std::unique_ptr<RawAttributeList> attributes)
       : SourceElement(element),
         type_ctor(std::move(type_ctor)),
         identifier(std::move(identifier)),
@@ -506,15 +518,15 @@ struct ServiceMember final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<TypeConstructor> type_ctor;
-  std::unique_ptr<Identifier> identifier;
-  std::unique_ptr<AttributeList> attributes;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
+  std::unique_ptr<RawIdentifier> identifier;
+  std::unique_ptr<RawAttributeList> attributes;
 };
 
-struct ServiceDeclaration final : public SourceElement {
-  ServiceDeclaration(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                     std::unique_ptr<Identifier> identifier,
-                     std::vector<std::unique_ptr<ServiceMember>> members)
+struct RawServiceDeclaration final : public SourceElement {
+  RawServiceDeclaration(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                        std::unique_ptr<RawIdentifier> identifier,
+                        std::vector<std::unique_ptr<RawServiceMember>> members)
       : SourceElement(element),
         attributes(std::move(attributes)),
         identifier(std::move(identifier)),
@@ -522,21 +534,21 @@ struct ServiceDeclaration final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<Identifier> identifier;
-  std::vector<std::unique_ptr<ServiceMember>> members;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawIdentifier> identifier;
+  std::vector<std::unique_ptr<RawServiceMember>> members;
 };
 
-struct LayoutMember : public SourceElement {
+struct RawLayoutMember : public SourceElement {
   enum class Kind : uint8_t {
     kOrdinaled,
     kStruct,
     kValue,
   };
 
-  explicit LayoutMember(const SourceElement& element, Kind kind,
-                        std::unique_ptr<AttributeList> attributes,
-                        std::unique_ptr<Identifier> identifier)
+  explicit RawLayoutMember(const SourceElement& element, Kind kind,
+                           std::unique_ptr<RawAttributeList> attributes,
+                           std::unique_ptr<RawIdentifier> identifier)
       : SourceElement(element),
         kind(kind),
         attributes(std::move(attributes)),
@@ -545,11 +557,11 @@ struct LayoutMember : public SourceElement {
   void Accept(TreeVisitor* visitor) const;
 
   const Kind kind;
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<Identifier> identifier;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawIdentifier> identifier;
 };
 
-struct Layout final : public SourceElement {
+struct RawLayout final : public SourceElement {
   enum class Kind : uint8_t {
     kBits,
     kEnum,
@@ -559,9 +571,10 @@ struct Layout final : public SourceElement {
     kOverlay,
   };
 
-  Layout(const SourceElement& element, Kind kind,
-         std::vector<std::unique_ptr<LayoutMember>> members, std::unique_ptr<Modifiers> modifiers,
-         std::unique_ptr<TypeConstructor> subtype_ctor)
+  RawLayout(const SourceElement& element, Kind kind,
+            std::vector<std::unique_ptr<RawLayoutMember>> members,
+            std::unique_ptr<RawModifiers> modifiers,
+            std::unique_ptr<RawTypeConstructor> subtype_ctor)
       : SourceElement(element),
         kind(kind),
         members(std::move(members)),
@@ -571,168 +584,170 @@ struct Layout final : public SourceElement {
   void Accept(TreeVisitor* visitor) const;
 
   Kind kind;
-  std::vector<std::unique_ptr<raw::LayoutMember>> members;
-  std::unique_ptr<Modifiers> modifiers;
+  std::vector<std::unique_ptr<RawLayoutMember>> members;
+  std::unique_ptr<RawModifiers> modifiers;
   // Only used for Kind::kBits and Kind::kEnum.
-  std::unique_ptr<TypeConstructor> subtype_ctor;
+  std::unique_ptr<RawTypeConstructor> subtype_ctor;
 };
 
-struct OrdinaledLayoutMember final : public LayoutMember {
-  explicit OrdinaledLayoutMember(const SourceElement& element,
-                                 std::unique_ptr<AttributeList> attributes,
-                                 std::unique_ptr<Ordinal64> ordinal,
-                                 std::unique_ptr<Identifier> identifier,
-                                 std::unique_ptr<TypeConstructor> type_ctor)
-      : LayoutMember(element, Kind::kOrdinaled, std::move(attributes), std::move(identifier)),
+struct RawOrdinaledLayoutMember final : public RawLayoutMember {
+  explicit RawOrdinaledLayoutMember(const SourceElement& element,
+                                    std::unique_ptr<RawAttributeList> attributes,
+                                    std::unique_ptr<RawOrdinal64> ordinal,
+                                    std::unique_ptr<RawIdentifier> identifier,
+                                    std::unique_ptr<RawTypeConstructor> type_ctor)
+      : RawLayoutMember(element, Kind::kOrdinaled, std::move(attributes), std::move(identifier)),
         ordinal(std::move(ordinal)),
         type_ctor(std::move(type_ctor)) {}
-  explicit OrdinaledLayoutMember(const SourceElement& element,
-                                 std::unique_ptr<AttributeList> attributes,
-                                 std::unique_ptr<Ordinal64> ordinal)
-      : LayoutMember(element, Kind::kOrdinaled, std::move(attributes), nullptr),
+  explicit RawOrdinaledLayoutMember(const SourceElement& element,
+                                    std::unique_ptr<RawAttributeList> attributes,
+                                    std::unique_ptr<RawOrdinal64> ordinal)
+      : RawLayoutMember(element, Kind::kOrdinaled, std::move(attributes), nullptr),
         ordinal(std::move(ordinal)),
         type_ctor(nullptr),
         reserved(true) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<Ordinal64> ordinal;
-  std::unique_ptr<TypeConstructor> type_ctor;
+  std::unique_ptr<RawOrdinal64> ordinal;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
   const bool reserved = false;
 };
 
-struct ValueLayoutMember final : public LayoutMember {
-  explicit ValueLayoutMember(const SourceElement& element,
-                             std::unique_ptr<AttributeList> attributes,
-                             std::unique_ptr<Identifier> identifier,
-                             std::unique_ptr<Constant> value)
-      : LayoutMember(element, Kind::kValue, std::move(attributes), std::move(identifier)),
+struct RawValueLayoutMember final : public RawLayoutMember {
+  explicit RawValueLayoutMember(const SourceElement& element,
+                                std::unique_ptr<RawAttributeList> attributes,
+                                std::unique_ptr<RawIdentifier> identifier,
+                                std::unique_ptr<RawConstant> value)
+      : RawLayoutMember(element, Kind::kValue, std::move(attributes), std::move(identifier)),
         value(std::move(value)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<Constant> value;
+  std::unique_ptr<RawConstant> value;
 };
 
-struct StructLayoutMember final : public LayoutMember {
-  explicit StructLayoutMember(const SourceElement& element,
-                              std::unique_ptr<AttributeList> attributes,
-                              std::unique_ptr<Identifier> identifier,
-                              std::unique_ptr<TypeConstructor> type_ctor,
-                              std::unique_ptr<Constant> default_value)
-      : LayoutMember(element, Kind::kStruct, std::move(attributes), std::move(identifier)),
+struct RawStructLayoutMember final : public RawLayoutMember {
+  explicit RawStructLayoutMember(const SourceElement& element,
+                                 std::unique_ptr<RawAttributeList> attributes,
+                                 std::unique_ptr<RawIdentifier> identifier,
+                                 std::unique_ptr<RawTypeConstructor> type_ctor,
+                                 std::unique_ptr<RawConstant> default_value)
+      : RawLayoutMember(element, Kind::kStruct, std::move(attributes), std::move(identifier)),
         type_ctor(std::move(type_ctor)),
         default_value(std::move(default_value)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<TypeConstructor> type_ctor;
-  std::unique_ptr<Constant> default_value;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
+  std::unique_ptr<RawConstant> default_value;
 };
 
-struct LayoutReference : public SourceElement {
+struct RawLayoutReference : public SourceElement {
   enum class Kind : uint8_t {
     kInline,
     kNamed,
   };
 
-  LayoutReference(const SourceElement& element, Kind kind) : SourceElement(element), kind(kind) {}
+  RawLayoutReference(const SourceElement& element, Kind kind)
+      : SourceElement(element), kind(kind) {}
 
   void Accept(TreeVisitor* visitor) const;
   const Kind kind;
 };
 
-struct InlineLayoutReference final : public LayoutReference {
-  explicit InlineLayoutReference(const SourceElement& element,
-                                 std::unique_ptr<AttributeList> attributes,
-                                 std::unique_ptr<Layout> layout)
-      : LayoutReference(element, Kind::kInline),
+struct RawInlineLayoutReference final : public RawLayoutReference {
+  explicit RawInlineLayoutReference(const SourceElement& element,
+                                    std::unique_ptr<RawAttributeList> attributes,
+                                    std::unique_ptr<RawLayout> layout)
+      : RawLayoutReference(element, Kind::kInline),
         attributes(std::move(attributes)),
         layout(std::move(layout)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<Layout> layout;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawLayout> layout;
 };
 
-struct NamedLayoutReference final : public LayoutReference {
-  explicit NamedLayoutReference(const SourceElement& element,
-                                std::unique_ptr<CompoundIdentifier> identifier)
-      : LayoutReference(element, Kind::kNamed), identifier(std::move(identifier)) {}
+struct RawNamedLayoutReference final : public RawLayoutReference {
+  explicit RawNamedLayoutReference(const SourceElement& element,
+                                   std::unique_ptr<RawCompoundIdentifier> identifier)
+      : RawLayoutReference(element, Kind::kNamed), identifier(std::move(identifier)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<CompoundIdentifier> identifier;
+  std::unique_ptr<RawCompoundIdentifier> identifier;
 };
 
-struct LayoutParameter : public SourceElement {
+struct RawLayoutParameter : public SourceElement {
   enum class Kind : uint8_t {
     kIdentifier,
     kLiteral,
     kType,
   };
 
-  LayoutParameter(const SourceElement& element, Kind kind) : SourceElement(element), kind(kind) {}
+  RawLayoutParameter(const SourceElement& element, Kind kind)
+      : SourceElement(element), kind(kind) {}
 
   void Accept(TreeVisitor* visitor) const;
 
   const Kind kind;
 };
 
-struct LiteralLayoutParameter final : public LayoutParameter {
-  explicit LiteralLayoutParameter(const SourceElement& element,
-                                  std::unique_ptr<LiteralConstant> literal)
-      : LayoutParameter(element, Kind::kLiteral), literal(std::move(literal)) {}
+struct RawLiteralLayoutParameter final : public RawLayoutParameter {
+  explicit RawLiteralLayoutParameter(const SourceElement& element,
+                                     std::unique_ptr<RawLiteralConstant> literal)
+      : RawLayoutParameter(element, Kind::kLiteral), literal(std::move(literal)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<LiteralConstant> literal;
+  std::unique_ptr<RawLiteralConstant> literal;
 };
 
-struct TypeLayoutParameter final : public LayoutParameter {
-  explicit TypeLayoutParameter(const SourceElement& element,
-                               std::unique_ptr<TypeConstructor> type_ctor)
-      : LayoutParameter(element, Kind::kType), type_ctor(std::move(type_ctor)) {}
+struct RawTypeLayoutParameter final : public RawLayoutParameter {
+  explicit RawTypeLayoutParameter(const SourceElement& element,
+                                  std::unique_ptr<RawTypeConstructor> type_ctor)
+      : RawLayoutParameter(element, Kind::kType), type_ctor(std::move(type_ctor)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<TypeConstructor> type_ctor;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
 };
 
-struct IdentifierLayoutParameter final : public LayoutParameter {
-  explicit IdentifierLayoutParameter(const SourceElement& element,
-                                     std::unique_ptr<CompoundIdentifier> identifier)
-      : LayoutParameter(element, Kind::kIdentifier), identifier(std::move(identifier)) {}
+struct RawIdentifierLayoutParameter final : public RawLayoutParameter {
+  explicit RawIdentifierLayoutParameter(const SourceElement& element,
+                                        std::unique_ptr<RawCompoundIdentifier> identifier)
+      : RawLayoutParameter(element, Kind::kIdentifier), identifier(std::move(identifier)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<CompoundIdentifier> identifier;
+  std::unique_ptr<RawCompoundIdentifier> identifier;
 };
 
-struct LayoutParameterList final : public SourceElement {
-  LayoutParameterList(const SourceElement& element,
-                      std::vector<std::unique_ptr<raw::LayoutParameter>> items)
+struct RawLayoutParameterList final : public SourceElement {
+  RawLayoutParameterList(const SourceElement& element,
+                         std::vector<std::unique_ptr<RawLayoutParameter>> items)
       : SourceElement(element), items(std::move(items)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::vector<std::unique_ptr<raw::LayoutParameter>> items;
+  std::vector<std::unique_ptr<RawLayoutParameter>> items;
 };
 
-struct TypeConstraints final : public SourceElement {
-  TypeConstraints(const SourceElement& element, std::vector<std::unique_ptr<raw::Constant>> items)
+struct RawTypeConstraints final : public SourceElement {
+  RawTypeConstraints(const SourceElement& element, std::vector<std::unique_ptr<RawConstant>> items)
       : SourceElement(element), items(std::move(items)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::vector<std::unique_ptr<raw::Constant>> items;
+  std::vector<std::unique_ptr<RawConstant>> items;
 };
 
-struct TypeDeclaration final : public SourceElement {
-  TypeDeclaration(const SourceElement& element, std::unique_ptr<AttributeList> attributes,
-                  std::unique_ptr<Identifier> identifier,
-                  std::unique_ptr<TypeConstructor> type_ctor)
+struct RawTypeDeclaration final : public SourceElement {
+  RawTypeDeclaration(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                     std::unique_ptr<RawIdentifier> identifier,
+                     std::unique_ptr<RawTypeConstructor> type_ctor)
       : SourceElement(element),
         attributes(std::move(attributes)),
         identifier(std::move(identifier)),
@@ -740,20 +755,20 @@ struct TypeDeclaration final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<AttributeList> attributes;
-  std::unique_ptr<Identifier> identifier;
-  std::unique_ptr<TypeConstructor> type_ctor;
+  std::unique_ptr<RawAttributeList> attributes;
+  std::unique_ptr<RawIdentifier> identifier;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
 };
 
 struct File final : public SourceElement {
-  File(const SourceElement& element, std::unique_ptr<LibraryDeclaration> library_decl,
-       std::vector<std::unique_ptr<AliasDeclaration>> alias_list,
-       std::vector<std::unique_ptr<Using>> using_list,
-       std::vector<std::unique_ptr<ConstDeclaration>> const_declaration_list,
-       std::vector<std::unique_ptr<ProtocolDeclaration>> protocol_declaration_list,
-       std::vector<std::unique_ptr<ResourceDeclaration>> resource_declaration_list,
-       std::vector<std::unique_ptr<ServiceDeclaration>> service_declaration_list,
-       std::vector<std::unique_ptr<TypeDeclaration>> type_decls, std::vector<Token> tokens)
+  File(const SourceElement& element, std::unique_ptr<RawLibraryDeclaration> library_decl,
+       std::vector<std::unique_ptr<RawAliasDeclaration>> alias_list,
+       std::vector<std::unique_ptr<RawUsing>> using_list,
+       std::vector<std::unique_ptr<RawConstDeclaration>> const_declaration_list,
+       std::vector<std::unique_ptr<RawProtocolDeclaration>> protocol_declaration_list,
+       std::vector<std::unique_ptr<RawResourceDeclaration>> resource_declaration_list,
+       std::vector<std::unique_ptr<RawServiceDeclaration>> service_declaration_list,
+       std::vector<std::unique_ptr<RawTypeDeclaration>> type_decls, std::vector<Token> tokens)
       : SourceElement(element),
         library_decl(std::move(library_decl)),
         alias_list(std::move(alias_list)),
@@ -767,19 +782,19 @@ struct File final : public SourceElement {
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::unique_ptr<LibraryDeclaration> library_decl;
-  std::vector<std::unique_ptr<AliasDeclaration>> alias_list;
-  std::vector<std::unique_ptr<Using>> using_list;
-  std::vector<std::unique_ptr<ConstDeclaration>> const_declaration_list;
-  std::vector<std::unique_ptr<ProtocolDeclaration>> protocol_declaration_list;
-  std::vector<std::unique_ptr<ResourceDeclaration>> resource_declaration_list;
-  std::vector<std::unique_ptr<ServiceDeclaration>> service_declaration_list;
-  std::vector<std::unique_ptr<TypeDeclaration>> type_decls;
+  std::unique_ptr<RawLibraryDeclaration> library_decl;
+  std::vector<std::unique_ptr<RawAliasDeclaration>> alias_list;
+  std::vector<std::unique_ptr<RawUsing>> using_list;
+  std::vector<std::unique_ptr<RawConstDeclaration>> const_declaration_list;
+  std::vector<std::unique_ptr<RawProtocolDeclaration>> protocol_declaration_list;
+  std::vector<std::unique_ptr<RawResourceDeclaration>> resource_declaration_list;
+  std::vector<std::unique_ptr<RawServiceDeclaration>> service_declaration_list;
+  std::vector<std::unique_ptr<RawTypeDeclaration>> type_decls;
 
   // An ordered list of all tokens (including comments) in the source file.
   std::vector<Token> tokens;
 };
 
-}  // namespace fidl::raw
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_RAW_AST_H_

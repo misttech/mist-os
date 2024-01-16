@@ -4,7 +4,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/flat/transport.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 std::string_view HandleClassName(HandleClass handle_class) {
   switch (handle_class) {
@@ -74,4 +74,4 @@ std::vector<Transport> Transport::transports = {
     },
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc

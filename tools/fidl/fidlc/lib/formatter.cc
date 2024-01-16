@@ -9,20 +9,20 @@
 #include "tools/fidl/fidlc/include/fidl/span_sequence.h"
 #include "tools/fidl/fidlc/include/fidl/span_sequence_tree_visitor.h"
 
-namespace fidl::fmt {
+namespace fidlc {
 
-std::optional<std::string> Formatter::Format(
-    const fidl::SourceFile& source_file, const fidl::ExperimentalFlags& experimental_flags) const {
-  fidl::Lexer lexer(source_file, reporter_);
-  fidl::Parser parser(&lexer, reporter_, experimental_flags);
-  std::unique_ptr<raw::File> ast = parser.Parse();
+std::optional<std::string> Formatter::Format(const SourceFile& source_file,
+                                             const ExperimentalFlags& experimental_flags) const {
+  Lexer lexer(source_file, reporter_);
+  Parser parser(&lexer, reporter_, experimental_flags);
+  std::unique_ptr<File> ast = parser.Parse();
   if (parser.Success()) {
     return Print(std::move(ast), source_file.data().size());
   }
   return std::nullopt;
 }
 
-std::string Formatter::Print(std::unique_ptr<raw::File> ast, size_t original_file_size) const {
+std::string Formatter::Print(std::unique_ptr<File> ast, size_t original_file_size) const {
   std::string out;
   auto visitor = SpanSequenceTreeVisitor(ast->tokens);
   visitor.OnFile(ast);
@@ -39,4 +39,4 @@ std::string Formatter::Print(std::unique_ptr<raw::File> ast, size_t original_fil
     return out + '\n';
   return out;
 }
-}  // namespace fidl::fmt
+}  // namespace fidlc

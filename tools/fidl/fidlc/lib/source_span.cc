@@ -4,7 +4,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl {
+namespace fidlc {
 
 std::string_view SourceSpan::SourceLine(SourceFile::Position* position_out) const {
   return source_file_->LineContaining(data(), position_out);
@@ -27,4 +27,4 @@ std::string SourceSpan::position_str() const {
   return position;
 }
 
-}  // namespace fidl
+}  // namespace fidlc

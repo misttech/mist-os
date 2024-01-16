@@ -13,7 +13,7 @@ namespace {
 TEST(FlexibleTests, BadEnumMultipleUnknown) {
   TestLibrary library;
   library.AddFile("bad/fi-0072.test.fidl");
-  library.ExpectFail(fidl::ErrUnknownAttributeOnMultipleEnumMembers);
+  library.ExpectFail(fidlc::ErrUnknownAttributeOnMultipleEnumMembers);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -21,7 +21,7 @@ TEST(FlexibleTests, BadEnumMaxValueWithoutUnknownUnsigned) {
   {
     TestLibrary library;
     library.AddFile("bad/fi-0068.test.fidl");
-    library.ExpectFail(fidl::ErrFlexibleEnumMemberWithMaxValue, "255");
+    library.ExpectFail(fidlc::ErrFlexibleEnumMemberWithMaxValue, "255");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
   {
@@ -46,7 +46,7 @@ type Foo = flexible enum : int8 {
   MAX = 127;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrFlexibleEnumMemberWithMaxValue, "127");
+  library.ExpectFail(fidlc::ErrFlexibleEnumMemberWithMaxValue, "127");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

@@ -31,26 +31,17 @@
 #include "tools/fidl/fidlc/include/fidl/types.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
-namespace fidl {
+namespace fidlc {
 
+class AttributeSchema;
 class Reporter;
+class Typespace;
 class VirtualSourceFile;
-
-}  // namespace fidl
-
-namespace fidl::raw {
-
-struct Identifier;
-struct Ordinal64;
-
-}  // namespace fidl::raw
-
-namespace fidl::flat {
 
 struct Decl;
 struct Library;
-class AttributeSchema;
-class Typespace;
+struct RawIdentifier;
+struct RawOrdinal64;
 
 // This is needed (for now) to work around declaration order issues.
 std::string LibraryName(const std::vector<std::string_view>& components,
@@ -266,13 +257,13 @@ struct LayoutInvocation {
 
   // resolved form of this type constructor's arguments
   const Type* element_type_resolved = nullptr;
-  const Size* size_resolved = nullptr;
+  const SizeValue* size_resolved = nullptr;
   // This has no users, probably because it's missing in the JSON IR (it is not
   // yet generated for experimental_maybe_from_alias)
-  types::HandleSubtype subtype_resolved = types::HandleSubtype::kHandle;
+  HandleSubtype subtype_resolved = HandleSubtype::kHandle;
   // This has no users, probably because it's missing in the JSON IR (it is not
   // yet generated for experimental_maybe_from_alias).
-  const HandleRights* rights_resolved = nullptr;
+  const HandleRightsValue* rights_resolved = nullptr;
   // This has no users, probably because it's missing in the JSON IR (it is not
   // yet generated for experimental_maybe_from_alias).
   const Protocol* protocol_decl = nullptr;
@@ -292,7 +283,7 @@ struct LayoutInvocation {
 
   // Nullability is represented differently because there's only one degree of
   // freedom: if it was specified, this value is equal to kNullable
-  types::Nullability nullability = types::Nullability::kNonnullable;
+  Nullability nullability = Nullability::kNonnullable;
 
   // Utf8 is similarly just a boolean.
   bool utf8 = false;
@@ -301,7 +292,7 @@ struct LayoutInvocation {
 struct LayoutParameterList;
 struct TypeConstraints;
 
-// Unlike raw::TypeConstructor which will either store a name referencing a
+// Unlike RawTypeConstructor which will either store a name referencing a
 // layout or an anonymous layout directly, in the flat AST all type constructors
 // store a Reference. In the case where the type constructor represents an
 // anonymous layout, the data of the anonymous layout is consumed and stored in
@@ -446,7 +437,7 @@ struct Enum final : public TypeDecl {
 
   Enum(std::unique_ptr<AttributeList> attributes, Name name,
        std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members,
-       types::Strictness strictness)
+       Strictness strictness)
       : TypeDecl(Kind::kEnum, std::move(attributes), std::move(name)),
         subtype_ctor(std::move(subtype_ctor)),
         members(std::move(members)),
@@ -455,7 +446,7 @@ struct Enum final : public TypeDecl {
   // Set during construction.
   std::unique_ptr<TypeConstructor> subtype_ctor;
   std::vector<Member> members;
-  const types::Strictness strictness;
+  const Strictness strictness;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -485,7 +476,7 @@ struct Bits final : public TypeDecl {
 
   Bits(std::unique_ptr<AttributeList> attributes, Name name,
        std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members,
-       types::Strictness strictness)
+       Strictness strictness)
       : TypeDecl(Kind::kBits, std::move(attributes), std::move(name)),
         subtype_ctor(std::move(subtype_ctor)),
         members(std::move(members)),
@@ -494,7 +485,7 @@ struct Bits final : public TypeDecl {
   // Set during construction.
   std::unique_ptr<TypeConstructor> subtype_ctor;
   std::vector<Member> members;
-  const types::Strictness strictness;
+  const Strictness strictness;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -559,7 +550,7 @@ struct Struct final : public TypeDecl {
   using Member = StructMember;
 
   Struct(std::unique_ptr<AttributeList> attributes, Name name,
-         std::vector<Member> unparented_members, std::optional<types::Resourceness> resourceness)
+         std::vector<Member> unparented_members, std::optional<Resourceness> resourceness)
       : TypeDecl(Kind::kStruct, std::move(attributes), std::move(name)),
         members(std::move(unparented_members)),
         resourceness(resourceness) {
@@ -573,7 +564,7 @@ struct Struct final : public TypeDecl {
   // For user-defined structs, this is set during construction. For synthesized
   // structs (requests/responses, error result success payload) it is set during
   // compilation based on the struct's members.
-  std::optional<types::Resourceness> resourceness;
+  std::optional<Resourceness> resourceness;
   std::any AcceptAny(VisitorAny* visitor) const override;
 
  private:
@@ -604,13 +595,13 @@ struct TableMemberUsed : public Object, public HasClone<TableMemberUsed> {
 struct TableMember : public Element, public Object, public HasCopy<TableMember> {
   using Used = TableMemberUsed;
 
-  TableMember(const raw::Ordinal64* ordinal, std::unique_ptr<TypeConstructor> type, SourceSpan name,
+  TableMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type, SourceSpan name,
               std::unique_ptr<AttributeList> attributes)
       : Element(Element::Kind::kTableMember, std::move(attributes)),
         ordinal(ordinal),
         maybe_used(std::make_unique<Used>(std::move(type), name)) {}
 
-  static TableMember Reserved(const raw::Ordinal64* ordinal, SourceSpan span,
+  static TableMember Reserved(const RawOrdinal64* ordinal, SourceSpan span,
                               std::unique_ptr<AttributeList> attributes) {
     return TableMember(ordinal, span, nullptr, std::move(attributes));
   }
@@ -619,13 +610,13 @@ struct TableMember : public Element, public Object, public HasCopy<TableMember> 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
-  const raw::Ordinal64* ordinal;
+  const RawOrdinal64* ordinal;
   // The span for reserved table members.
   std::optional<SourceSpan> span;
   std::unique_ptr<Used> maybe_used;
 
  private:
-  TableMember(const raw::Ordinal64* ordinal, std::optional<SourceSpan> span,
+  TableMember(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
               std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
       : Element(Element::Kind::kTableMember, std::move(attributes)),
         ordinal(ordinal),
@@ -637,15 +628,15 @@ struct Table final : public TypeDecl {
   using Member = TableMember;
 
   Table(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
-        types::Strictness strictness, types::Resourceness resourceness)
+        Strictness strictness, Resourceness resourceness)
       : TypeDecl(Kind::kTable, std::move(attributes), std::move(name)),
         members(std::move(members)),
         strictness(strictness),
         resourceness(resourceness) {}
 
   std::vector<Member> members;
-  const types::Strictness strictness;
-  const types::Resourceness resourceness;
+  const Strictness strictness;
+  const Resourceness resourceness;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -679,13 +670,13 @@ struct UnionMemberUsed : public Object, public HasClone<UnionMemberUsed> {
 struct UnionMember : public Element, public Object, public HasCopy<UnionMember> {
   using Used = UnionMemberUsed;
 
-  UnionMember(const raw::Ordinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
+  UnionMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
               SourceSpan name, std::unique_ptr<AttributeList> attributes)
       : Element(Element::Kind::kUnionMember, std::move(attributes)),
         ordinal(ordinal),
         maybe_used(std::make_unique<Used>(std::move(type_ctor), name)) {}
 
-  static UnionMember Reserved(const raw::Ordinal64* ordinal, SourceSpan span,
+  static UnionMember Reserved(const RawOrdinal64* ordinal, SourceSpan span,
                               std::unique_ptr<AttributeList> attributes) {
     return UnionMember(ordinal, span, nullptr, std::move(attributes));
   }
@@ -694,13 +685,13 @@ struct UnionMember : public Element, public Object, public HasCopy<UnionMember> 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
-  const raw::Ordinal64* ordinal;
+  const RawOrdinal64* ordinal;
   // The span for reserved members.
   std::optional<SourceSpan> span;
   std::unique_ptr<Used> maybe_used;
 
  private:
-  UnionMember(const raw::Ordinal64* ordinal, std::optional<SourceSpan> span,
+  UnionMember(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
               std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
       : Element(Element::Kind::kUnionMember, std::move(attributes)),
         ordinal(ordinal),
@@ -712,8 +703,8 @@ struct Union final : public TypeDecl {
   using Member = UnionMember;
 
   Union(std::unique_ptr<AttributeList> attributes, Name name,
-        std::vector<Member> unparented_members, types::Strictness strictness,
-        std::optional<types::Resourceness> resourceness)
+        std::vector<Member> unparented_members, Strictness strictness,
+        std::optional<Resourceness> resourceness)
       : TypeDecl(Kind::kUnion, std::move(attributes), std::move(name)),
         members(std::move(unparented_members)),
         strictness(strictness),
@@ -726,12 +717,12 @@ struct Union final : public TypeDecl {
   }
 
   std::vector<Member> members;
-  const types::Strictness strictness;
+  const Strictness strictness;
 
   // For user-defined unions, this is set on construction. For synthesized
   // unions (in error result responses) it is set during compilation based on
   // the unions's members.
-  std::optional<types::Resourceness> resourceness;
+  std::optional<Resourceness> resourceness;
 
   std::vector<std::reference_wrapper<const Member>> MembersSortedByUnionOrdinal() const;
 
@@ -762,13 +753,13 @@ struct OverlayMemberUsed : public Object, public HasClone<OverlayMemberUsed> {
 
 struct OverlayMember final : public Element, public Object, public HasCopy<OverlayMember> {
   using Used = OverlayMemberUsed;
-  OverlayMember(const raw::Ordinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
+  OverlayMember(const RawOrdinal64* ordinal, std::unique_ptr<TypeConstructor> type_ctor,
                 SourceSpan name, std::unique_ptr<AttributeList> attributes)
       : Element(Element::Kind::kOverlayMember, std::move(attributes)),
         ordinal(ordinal),
         maybe_used(std::make_unique<Used>(std::move(type_ctor), name)) {}
 
-  static OverlayMember Reserved(const raw::Ordinal64* ordinal, SourceSpan span,
+  static OverlayMember Reserved(const RawOrdinal64* ordinal, SourceSpan span,
                                 std::unique_ptr<AttributeList> attributes) {
     return OverlayMember(ordinal, span, nullptr, std::move(attributes));
   }
@@ -777,14 +768,14 @@ struct OverlayMember final : public Element, public Object, public HasCopy<Overl
   std::any AcceptAny(VisitorAny* visitor) const override;
 
   // Owned by Library::raw_ordinals.
-  const raw::Ordinal64* ordinal;
+  const RawOrdinal64* ordinal;
 
   // The span for reserved members.
   std::optional<SourceSpan> span;
   std::unique_ptr<Used> maybe_used;
 
  private:
-  OverlayMember(const raw::Ordinal64* ordinal, std::optional<SourceSpan> span,
+  OverlayMember(const RawOrdinal64* ordinal, std::optional<SourceSpan> span,
                 std::unique_ptr<Used> maybe_used, std::unique_ptr<AttributeList> attributes)
       : Element(Element::Kind::kOverlayMember, std::move(attributes)),
         ordinal(ordinal),
@@ -796,8 +787,7 @@ struct Overlay final : public TypeDecl {
   using Member = OverlayMember;
 
   Overlay(std::unique_ptr<AttributeList> attributes, Name name,
-          std::vector<Member> unparented_members, types::Strictness strictness,
-          types::Resourceness resourceness)
+          std::vector<Member> unparented_members, Strictness strictness, Resourceness resourceness)
       : TypeDecl(Kind::kOverlay, std::move(attributes), std::move(name)),
         members(std::move(unparented_members)),
         strictness(strictness),
@@ -810,8 +800,8 @@ struct Overlay final : public TypeDecl {
   }
 
   std::vector<Member> members;
-  const types::Strictness strictness;
-  types::Resourceness resourceness;
+  const Strictness strictness;
+  Resourceness resourceness;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
 
@@ -821,8 +811,8 @@ struct Overlay final : public TypeDecl {
 
 struct Protocol final : public TypeDecl {
   struct Method : public Element, public HasCopy<Method> {
-    Method(std::unique_ptr<AttributeList> attributes, types::Strictness strictness,
-           const raw::Identifier* identifier, SourceSpan name, bool has_request,
+    Method(std::unique_ptr<AttributeList> attributes, Strictness strictness,
+           const RawIdentifier* identifier, SourceSpan name, bool has_request,
            std::unique_ptr<TypeConstructor> maybe_request, bool has_response,
            std::unique_ptr<TypeConstructor> maybe_response, bool has_error)
         : Element(Element::Kind::kProtocolMethod, std::move(attributes)),
@@ -839,9 +829,9 @@ struct Protocol final : public TypeDecl {
     }
     Method Copy() const override;
 
-    types::Strictness strictness;
+    Strictness strictness;
     // Owned by Library::raw_identifiers.
-    const raw::Identifier* identifier;
+    const RawIdentifier* identifier;
     SourceSpan name;
     bool has_request;
     std::unique_ptr<TypeConstructor> maybe_request;
@@ -852,8 +842,7 @@ struct Protocol final : public TypeDecl {
     // Returns true if this method should use a result union. Result union is used if the
     // method uses error syntax or if it is a flexible two-way method.
     bool HasResultUnion() const {
-      return has_error ||
-             (has_request && has_response && strictness == types::Strictness::kFlexible);
+      return has_error || (has_request && has_response && strictness == Strictness::kFlexible);
     }
 
     // This is set to the |Protocol| instance that owns this |Method|,
@@ -861,7 +850,7 @@ struct Protocol final : public TypeDecl {
     Protocol* owning_protocol = nullptr;
 
     // Set during compilation
-    std::unique_ptr<raw::Ordinal64> generated_ordinal64;
+    std::unique_ptr<RawOrdinal64> generated_ordinal64;
   };
 
   // Used to keep track of a all methods (i.e. including composed methods).
@@ -883,7 +872,7 @@ struct Protocol final : public TypeDecl {
     Reference reference;
   };
 
-  Protocol(std::unique_ptr<AttributeList> attributes, types::Openness openness, Name name,
+  Protocol(std::unique_ptr<AttributeList> attributes, Openness openness, Name name,
            std::vector<ComposedProtocol> composed_protocols, std::vector<Method> methods)
       : TypeDecl(Kind::kProtocol, std::move(attributes), std::move(name)),
         openness(openness),
@@ -894,7 +883,7 @@ struct Protocol final : public TypeDecl {
     }
   }
 
-  types::Openness openness;
+  Openness openness;
   std::vector<ComposedProtocol> composed_protocols;
   std::vector<Method> methods;
 
@@ -989,7 +978,7 @@ class Dependencies {
   // if provided, otherwise the library's name. Afterwards, Dependencies::Lookup
   // will return |dep_library| given the registration name.
   RegisterResult Register(const SourceSpan& span, std::string_view filename, Library* dep_library,
-                          const std::unique_ptr<raw::Identifier>& maybe_alias);
+                          const std::unique_ptr<RawIdentifier>& maybe_alias);
 
   // Returns true if this dependency set contains a library with the given name and filename.
   bool Contains(std::string_view filename, const std::vector<std::string_view>& name);
@@ -1094,20 +1083,20 @@ struct Library final : public Element {
   std::vector<const Decl*> declaration_order;
   // Raw AST objects pointed to by certain flat AST nodes. We store them on the
   // Library because there is no unique ownership (e.g. multiple Table::Member
-  // instances can point to the same raw::Ordinal64 after decomposition).
-  std::vector<std::unique_ptr<raw::Literal>> raw_literals;
-  std::vector<std::unique_ptr<raw::Identifier>> raw_identifiers;
-  std::vector<std::unique_ptr<raw::Ordinal64>> raw_ordinals;
+  // instances can point to the same RawOrdinal64 after decomposition).
+  std::vector<std::unique_ptr<RawLiteral>> raw_literals;
+  std::vector<std::unique_ptr<RawIdentifier>> raw_identifiers;
+  std::vector<std::unique_ptr<RawOrdinal64>> raw_ordinals;
 };
 
 struct LibraryComparator {
-  bool operator()(const flat::Library* lhs, const flat::Library* rhs) const {
+  bool operator()(const Library* lhs, const Library* rhs) const {
     ZX_ASSERT(!lhs->name.empty());
     ZX_ASSERT(!rhs->name.empty());
     return lhs->name < rhs->name;
   }
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_AST_H_

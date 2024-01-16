@@ -11,15 +11,15 @@
 
 namespace {
 
-using fidl::Availability;
+using fidlc::Availability;
 using Legacy = Availability::Legacy;
 using InheritResult = Availability::InheritResult;
 using Status = InheritResult::Status;
 using LegacyStatus = InheritResult::LegacyStatus;
-using fidl::Platform;
-using fidl::Version;
-using fidl::VersionRange;
-using fidl::VersionSet;
+using fidlc::Platform;
+using fidlc::Version;
+using fidlc::VersionRange;
+using fidlc::VersionSet;
 
 Version v(uint64_t x) { return Version::From(x).value(); }
 VersionRange range(uint64_t x, uint64_t y) { return VersionRange(v(x), v(y)); }

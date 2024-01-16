@@ -11,7 +11,7 @@
 #include <map>
 #include <string_view>
 
-namespace fidl {
+namespace fidlc {
 
 class ExperimentalFlags {
  public:
@@ -77,6 +77,6 @@ class ExperimentalFlags {
   FlagSet flags_ = 0;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_EXPERIMENTAL_FLAGS_H_

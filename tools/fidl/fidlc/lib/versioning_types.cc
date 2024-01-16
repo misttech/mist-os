@@ -10,10 +10,10 @@
 
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl {
+namespace fidlc {
 
 std::optional<Platform> Platform::Parse(std::string str) {
-  if (utils::IsValidLibraryComponent(str)) {
+  if (IsValidLibraryComponent(str)) {
     return Platform(std::move(str));
   }
   return std::nullopt;
@@ -44,7 +44,7 @@ std::optional<Version> Version::Parse(std::string_view str) {
     return Legacy();
   }
   uint64_t value;
-  if (utils::ParseNumeric(str, &value) != utils::ParseNumericResult::kSuccess) {
+  if (ParseNumeric(str, &value) != ParseNumericResult::kSuccess) {
     return std::nullopt;
   }
   return From(value);
@@ -371,4 +371,4 @@ void VersionSelection::ForEach(const fit::function<void(const Platform&, Version
   }
 }
 
-}  // namespace fidl
+}  // namespace fidlc

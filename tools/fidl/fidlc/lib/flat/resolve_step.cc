@@ -12,7 +12,7 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 void ResolveStep::RunImpl() {
   // In a single pass:
@@ -713,4 +713,4 @@ void ResolveStep::ValidateReference(const Reference& ref, Context context) {
   }
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

@@ -7,18 +7,13 @@
 
 #include <cstdint>
 
-// TODO(https://fxbug.dev/8032): We should revisit this namespace choice as part of improving code
-// organization.
-namespace fidl {
-namespace flat {
+namespace fidlc {
 
 struct Object;
 struct StructMember;
 struct TableMemberUsed;
 struct UnionMemberUsed;
 struct OverlayMemberUsed;
-
-}  // namespace flat
 
 enum class WireFormat : uint8_t {
   kV2,  // The v2 wire format, using efficient envelopes. Request and response structs do not
@@ -27,8 +22,8 @@ enum class WireFormat : uint8_t {
 };
 
 struct TypeShape {
-  explicit TypeShape(const flat::Object& object, WireFormat wire_format);
-  explicit TypeShape(const flat::Object* object, WireFormat wire_format);
+  explicit TypeShape(const Object& object, WireFormat wire_format);
+  explicit TypeShape(const Object* object, WireFormat wire_format);
 
   // The inline size of this type, including padding for the type's minimum alignment. For example,
   // "struct S { uint32 a; uint16 b; };" will have an inline_size of 8, not 6: the "packed" size of
@@ -74,10 +69,10 @@ struct TypeShape {
 // |FieldShape| describes the offset and padding information for members that are contained within
 // an aggregate type (e.g. struct/union).
 struct FieldShape {
-  explicit FieldShape(const flat::StructMember&, WireFormat wire_format);
-  explicit FieldShape(const flat::TableMemberUsed&, WireFormat wire_format);
-  explicit FieldShape(const flat::UnionMemberUsed&, WireFormat wire_format);
-  explicit FieldShape(const flat::OverlayMemberUsed&, WireFormat wire_format);
+  explicit FieldShape(const StructMember&, WireFormat wire_format);
+  explicit FieldShape(const TableMemberUsed&, WireFormat wire_format);
+  explicit FieldShape(const UnionMemberUsed&, WireFormat wire_format);
+  explicit FieldShape(const OverlayMemberUsed&, WireFormat wire_format);
 
   uint32_t offset = 0;
   uint32_t padding = 0;
@@ -85,6 +80,6 @@ struct FieldShape {
 
 constexpr uint32_t kMessageAlign = 8u;
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_TYPE_SHAPE_H_

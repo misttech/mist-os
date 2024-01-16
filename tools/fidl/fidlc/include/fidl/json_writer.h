@@ -14,7 +14,7 @@
 
 #include "utils.h"
 
-namespace fidl::utils {
+namespace fidlc {
 
 // Methods or functions named "Emit..." are the actual protocol to
 // the JSON output.
@@ -230,7 +230,7 @@ class JsonWriter {
       }
       std::string_view codepoint_hex(hex_begin, it - hex_begin);
       // Next, decode the code point X as an integer.
-      auto codepoint = utils::decode_unicode_hex(codepoint_hex);
+      auto codepoint = decode_unicode_hex(codepoint_hex);
       if (codepoint <= 0xffff) {
         // This code point can be represented by a single \uNNNN in JSON.
         char buf[7];
@@ -305,6 +305,6 @@ class JsonWriter {
   int indent_level_;
 };
 
-}  // namespace fidl::utils
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_JSON_WRITER_H_

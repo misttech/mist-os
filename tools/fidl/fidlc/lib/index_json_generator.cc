@@ -11,13 +11,12 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
 
-namespace fidl {
+namespace fidlc {
 
 std::ostringstream IndexJSONGenerator::Produce() {
   ResetIndentLevel();
   GenerateObject([&]() {
-    GenerateObjectMember("name", flat::LibraryName(compilation_->library_name, "."),
-                         Position::kFirst);
+    GenerateObjectMember("name", LibraryName(compilation_->library_name, "."), Position::kFirst);
     GenerateObjectMember("lib_declarations", compilation_->library_declarations);
     GenerateObjectMember("using_declarations", compilation_->using_references);
     GenerateObjectMember("dependencies", compilation_->direct_and_composed_dependencies);
@@ -46,7 +45,7 @@ IndexJSONGenerator::GetDependencyIdentifiers() {
       auto identifier = IndexJSONGenerator::ReferencedIdentifier(enumdecl->name);
       identifiers.emplace_back(identifier);
       for (auto& member : enumdecl->members) {
-        flat::Name full_name = enumdecl->name.WithMemberName(std::string(member.name.data()));
+        Name full_name = enumdecl->name.WithMemberName(std::string(member.name.data()));
         auto member_identifier =
             IndexJSONGenerator::ReferencedIdentifier(NameFlatName(full_name), member.name);
         identifiers.emplace_back(member_identifier);
@@ -93,39 +92,38 @@ void IndexJSONGenerator::Generate(IndexJSONGenerator::ReferencedIdentifier value
   });
 }
 
-void IndexJSONGenerator::Generate(std::pair<flat::Library*, SourceSpan> reference) {
+void IndexJSONGenerator::Generate(std::pair<Library*, SourceSpan> reference) {
   GenerateObject([&]() {
     // for debugging purpose, include the span data
-    GenerateObjectMember("library_name", flat::LibraryName(reference.first->name, "."),
-                         Position::kFirst);
+    GenerateObjectMember("library_name", LibraryName(reference.first->name, "."), Position::kFirst);
     GenerateObjectMember("referenced_at", reference.second);
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Compilation::Dependency& dependency) {
+void IndexJSONGenerator::Generate(const Compilation::Dependency& dependency) {
   GenerateObject([&]() {
-    GenerateObjectMember("library_name", flat::LibraryName(dependency.library->name, "."),
+    GenerateObjectMember("library_name", LibraryName(dependency.library->name, "."),
                          Position::kFirst);
     GenerateObjectMember("library_location", dependency.library->arbitrary_name_span);
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Constant& value) {
+void IndexJSONGenerator::Generate(const Constant& value) {
   GenerateObject([&]() {
     GenerateObjectMember("type", NameFlatConstantKind(value.kind), Position::kFirst);
     switch (value.kind) {
-      case flat::Constant::Kind::kIdentifier: {
-        auto identifier = static_cast<const flat::IdentifierConstant*>(&value);
+      case Constant::Kind::kIdentifier: {
+        auto identifier = static_cast<const IdentifierConstant*>(&value);
         GenerateObjectMember("identifier", NameFlatName((identifier->reference.resolved().name())));
         GenerateObjectMember("referenced_at", identifier->reference.span());
         break;
       }
-      case flat::Constant::Kind::kLiteral: {
+      case Constant::Kind::kLiteral: {
         // No need to record literal values
         break;
       }
-      case flat::Constant::Kind::kBinaryOperator: {
-        auto binary_operator_constant = static_cast<const flat::BinaryOperatorConstant*>(&value);
+      case Constant::Kind::kBinaryOperator: {
+        auto binary_operator_constant = static_cast<const BinaryOperatorConstant*>(&value);
         GenerateObjectMember("lhs", binary_operator_constant->left_operand);
         GenerateObjectMember("rhs", binary_operator_constant->right_operand);
         break;
@@ -134,7 +132,7 @@ void IndexJSONGenerator::Generate(const flat::Constant& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Const& value) {
+void IndexJSONGenerator::Generate(const Const& value) {
   GenerateObject([&]() {
     GenerateObjectMember("identifier", NameFlatName(value.name), Position::kFirst);
     GenerateObjectMember("location", value.name.span().value());
@@ -142,9 +140,9 @@ void IndexJSONGenerator::Generate(const flat::Const& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Name& name) { Generate(NameFlatName(name)); }
+void IndexJSONGenerator::Generate(const Name& name) { Generate(NameFlatName(name)); }
 
-void IndexJSONGenerator::Generate(const flat::Enum& value) {
+void IndexJSONGenerator::Generate(const Enum& value) {
   GenerateObject([&]() {
     GenerateObjectMember("is_anonymous", value.IsAnonymousLayout(), Position::kFirst);
     GenerateObjectMember("identifier", value.name);
@@ -156,7 +154,7 @@ void IndexJSONGenerator::Generate(const flat::Enum& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Enum::Member& value) {
+void IndexJSONGenerator::Generate(const Enum::Member& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name.data(), Position::kFirst);
     GenerateObjectMember("location", value.name);
@@ -164,7 +162,7 @@ void IndexJSONGenerator::Generate(const flat::Enum::Member& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Union& value) {
+void IndexJSONGenerator::Generate(const Union& value) {
   GenerateObject([&]() {
     GenerateObjectMember("is_anonymous", value.IsAnonymousLayout(), Position::kFirst);
     if (!value.IsAnonymousLayout()) {
@@ -175,7 +173,7 @@ void IndexJSONGenerator::Generate(const flat::Union& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Union::Member& value) {
+void IndexJSONGenerator::Generate(const Union::Member& value) {
   GenerateObject([&]() {
     GenerateObjectMember("is_reserved", !value.maybe_used, Position::kFirst);
     if (value.maybe_used) {
@@ -186,7 +184,7 @@ void IndexJSONGenerator::Generate(const flat::Union::Member& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Table& value) {
+void IndexJSONGenerator::Generate(const Table& value) {
   GenerateObject([&]() {
     GenerateObjectMember("is_anonymous", value.IsAnonymousLayout(), Position::kFirst);
     if (!value.IsAnonymousLayout()) {
@@ -197,7 +195,7 @@ void IndexJSONGenerator::Generate(const flat::Table& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Table::Member& value) {
+void IndexJSONGenerator::Generate(const Table::Member& value) {
   GenerateObject([&]() {
     GenerateObjectMember("is_reserved", !value.maybe_used, Position::kFirst);
     if (value.maybe_used) {
@@ -208,7 +206,7 @@ void IndexJSONGenerator::Generate(const flat::Table::Member& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Struct& value) {
+void IndexJSONGenerator::Generate(const Struct& value) {
   GenerateObject([&]() {
     GenerateObjectMember("is_anonymous", value.IsAnonymousLayout(), Position::kFirst);
     GenerateObjectMember("identifier", value.name);
@@ -219,7 +217,7 @@ void IndexJSONGenerator::Generate(const flat::Struct& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Struct::Member& value) {
+void IndexJSONGenerator::Generate(const Struct::Member& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.name.data(), Position::kFirst);
     GenerateObjectMember("location", value.name);
@@ -227,15 +225,15 @@ void IndexJSONGenerator::Generate(const flat::Struct::Member& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::TypeConstructor* value) {
+void IndexJSONGenerator::Generate(const TypeConstructor* value) {
   auto type = value->type;
   GenerateObject([&]() {
     GenerateObjectMember("kind", NameFlatTypeKind(type), Position::kFirst);
     // handle the non anonymous type identifier case only for now
     // parameterized types (arrays, vectors) are not handled yet
-    if (type->kind == flat::Type::Kind::kIdentifier) {
+    if (type->kind == Type::Kind::kIdentifier) {
       GenerateObjectMember("is_anonymous", type->name.as_anonymous() != nullptr);
-      const auto* identifier = static_cast<const flat::IdentifierType*>(type);
+      const auto* identifier = static_cast<const IdentifierType*>(type);
       if (!type->name.as_anonymous()) {
         GenerateObjectMember("type_identifier", identifier->name);
         GenerateObjectMember("type_referenced_at", value->layout.span());
@@ -244,7 +242,7 @@ void IndexJSONGenerator::Generate(const flat::TypeConstructor* value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Protocol& value) {
+void IndexJSONGenerator::Generate(const Protocol& value) {
   GenerateObject([&]() {
     GenerateObjectMember("identifier", value.name, Position::kFirst);
     GenerateObjectMember("location", value.name.span().value());
@@ -253,14 +251,14 @@ void IndexJSONGenerator::Generate(const flat::Protocol& value) {
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Protocol::ComposedProtocol& value) {
+void IndexJSONGenerator::Generate(const Protocol::ComposedProtocol& value) {
   GenerateObject([&]() {
     GenerateObjectMember("identifier", value.reference.resolved().name(), Position::kFirst);
     GenerateObjectMember("referenced_at", value.reference.span());
   });
 }
 
-void IndexJSONGenerator::Generate(const flat::Protocol::MethodWithInfo& method_with_info) {
+void IndexJSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
   const auto& value = *method_with_info.method;
   GenerateObject([&]() {
     GenerateObjectMember("identifier", value.name.data(), Position::kFirst);
@@ -274,4 +272,4 @@ void IndexJSONGenerator::Generate(const flat::Protocol::MethodWithInfo& method_w
   });
 }
 
-}  // namespace fidl
+}  // namespace fidlc

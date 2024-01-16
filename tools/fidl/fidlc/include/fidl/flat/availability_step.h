@@ -7,7 +7,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // The AvailabilityStep sets library->platform and element->availability for
 // every element based on @available attributes. If there are none, the platform
@@ -88,6 +88,6 @@ class AvailabilityStep : public Compiler::Step {
   std::map<const Element*, Element*> lexical_parents_;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_AVAILABILITY_STEP_H_

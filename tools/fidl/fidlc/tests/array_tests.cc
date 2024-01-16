@@ -21,7 +21,7 @@ type S = struct {
 TEST(ArrayTests, BadZeroSizeArray) {
   TestLibrary library;
   library.AddFile("bad/fi-0161.test.fidl");
-  library.ExpectFail(fidl::ErrMustHaveNonZeroSize, "array");
+  library.ExpectFail(fidlc::ErrMustHaveNonZeroSize, "array");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -33,7 +33,7 @@ type S = struct {
     arr array<uint8>;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "array", 2, 1);
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "array", 2, 1);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -45,7 +45,7 @@ type S = struct {
     arr array;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "array", 2, 0);
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "array", 2, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -57,7 +57,7 @@ type S = struct {
     arr array<uint8, 10>:optional;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCannotBeOptional, "array");
+  library.ExpectFail(fidlc::ErrCannotBeOptional, "array");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -69,7 +69,7 @@ type S = struct {
     arr array<uint8, 10>:<1, 2, 3>;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrTooManyConstraints, "array", 1, 3);
+  library.ExpectFail(fidlc::ErrTooManyConstraints, "array", 1, 3);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

@@ -74,8 +74,8 @@ TEST(UnionTests, GoodStrictUnion) {
 TEST(UnionTests, BadMustHaveExplicitOrdinals) {
   TestLibrary library;
   library.AddFile("bad/fi-0016-b.test.fidl");
-  library.ExpectFail(fidl::ErrMissingOrdinalBeforeMember);
-  library.ExpectFail(fidl::ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(fidlc::ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(fidlc::ErrMissingOrdinalBeforeMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -172,7 +172,7 @@ type Foo = strict union {
 TEST(UnionTests, BadOrdinalOutOfBoundsNegative) {
   TestLibrary library;
   library.AddFile("bad/fi-0017-b.test.fidl");
-  library.ExpectFail(fidl::ErrOrdinalOutOfBound);
+  library.ExpectFail(fidlc::ErrOrdinalOutOfBound);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -184,14 +184,14 @@ type Foo = union {
   4294967296: foo string;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrOrdinalOutOfBound);
+  library.ExpectFail(fidlc::ErrOrdinalOutOfBound);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UnionTests, BadOrdinalsMustBeUnique) {
   TestLibrary library;
   library.AddFile("bad/fi-0097.test.fidl");
-  library.ExpectFail(fidl::ErrDuplicateUnionMemberOrdinal, "bad/fi-0097.test.fidl:7:5");
+  library.ExpectFail(fidlc::ErrDuplicateUnionMemberOrdinal, "bad/fi-0097.test.fidl:7:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -204,15 +204,15 @@ type MyUnion = strict union {
     2: my_variant int32;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kUnionMember, "my_variant",
-                     fidl::flat::Element::Kind::kUnionMember, "example.fidl:5:8");
+  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kUnionMember, "my_variant",
+                     fidlc::Element::Kind::kUnionMember, "example.fidl:5:8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UnionTests, BadCannotStartAtZero) {
   TestLibrary library;
   library.AddFile("bad/fi-0018.test.fidl");
-  library.ExpectFail(fidl::ErrOrdinalsMustStartAtOne);
+  library.ExpectFail(fidlc::ErrOrdinalsMustStartAtOne);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -225,10 +225,10 @@ type Foo = strict union {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
-                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual),
-                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
-  library.ExpectFail(fidl::ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
+                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual),
+                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
+  library.ExpectFail(fidlc::ErrMissingOrdinalBeforeMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -242,14 +242,14 @@ type Example = strict union {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrNonDenseOrdinal, 2);
+  library.ExpectFail(fidlc::ErrNonDenseOrdinal, 2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UnionTests, BadNoNullableMembers) {
   TestLibrary library;
   library.AddFile("bad/fi-0049.test.fidl");
-  library.ExpectFail(fidl::ErrOptionalUnionMember);
+  library.ExpectFail(fidlc::ErrOptionalUnionMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -262,7 +262,7 @@ type Value = strict union {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrIncludeCycle, "union 'Value' -> union 'Value'");
+  library.ExpectFail(fidlc::ErrIncludeCycle, "union 'Value' -> union 'Value'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -303,14 +303,14 @@ type Foo = flexible union {
 TEST(UnionTests, BadEmptyStrictUnion) {
   TestLibrary library;
   library.AddFile("bad/fi-0086-a.test.fidl");
-  library.ExpectFail(fidl::ErrStrictUnionMustHaveNonReservedMember);
+  library.ExpectFail(fidlc::ErrStrictUnionMustHaveNonReservedMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UnionTests, BadOnlyReservedStrictUnion) {
   TestLibrary library;
   library.AddFile("bad/fi-0086-b.test.fidl");
-  library.ExpectFail(fidl::ErrStrictUnionMustHaveNonReservedMember);
+  library.ExpectFail(fidlc::ErrStrictUnionMustHaveNonReservedMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -321,7 +321,7 @@ open protocol Example {
 };
 )FIDL");
   ASSERT_COMPILED(library);
-  const fidl::flat::Union* error_union = library.LookupUnion("Example_Method_Result");
+  const fidlc::Union* error_union = library.LookupUnion("Example_Method_Result");
   ASSERT_NE(error_union, nullptr);
   ASSERT_EQ(3u, error_union->members.size());
   ASSERT_EQ(1u, error_union->members[0].ordinal->value);
@@ -338,7 +338,7 @@ type Foo = strict union {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "selector");
+  library.ExpectFail(fidlc::ErrInvalidAttributePlacement, "selector");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

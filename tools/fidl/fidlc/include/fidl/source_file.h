@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-namespace fidl {
+namespace fidlc {
 
 class SourceFile {
  public:
@@ -53,6 +53,6 @@ class SourceFile {
   std::vector<std::string_view> lines_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SOURCE_FILE_H_

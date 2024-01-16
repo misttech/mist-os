@@ -9,7 +9,7 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics_json.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
-namespace fidl {
+namespace fidlc {
 
 namespace {
 
@@ -147,4 +147,4 @@ type Table = table {
 
 }  // namespace
 
-}  // namespace fidl
+}  // namespace fidlc

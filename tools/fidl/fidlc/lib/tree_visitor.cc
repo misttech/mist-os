@@ -8,7 +8,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 
-namespace fidl::raw {
+namespace fidlc {
 
 void DeclarationOrderTreeVisitor::OnFile(const std::unique_ptr<File>& element) {
   OnSourceElementStart(*element);
@@ -102,7 +102,7 @@ void DeclarationOrderTreeVisitor::OnFile(const std::unique_ptr<File>& element) {
 }
 
 void DeclarationOrderTreeVisitor::OnProtocolDeclaration(
-    const std::unique_ptr<ProtocolDeclaration>& element) {
+    const std::unique_ptr<RawProtocolDeclaration>& element) {
   SourceElementMark sem(this, *element);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -144,4 +144,4 @@ void DeclarationOrderTreeVisitor::OnProtocolDeclaration(
   }
 }
 
-}  // namespace fidl::raw
+}  // namespace fidlc

@@ -8,14 +8,14 @@
 
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 std::unique_ptr<AttributeArg> AttributeArg::Clone() const {
   return std::make_unique<AttributeArg>(name, value->Clone(), span);
 }
 
 const AttributeArg* Attribute::GetArg(std::string_view arg_name) const {
-  std::string name = utils::canonicalize(arg_name);
+  std::string name = canonicalize(arg_name);
   for (const auto& arg : args) {
     if (arg->name && arg->name.value().data() == name) {
       return arg.get();
@@ -35,7 +35,7 @@ AttributeArg* Attribute::GetStandaloneAnonymousArg() const {
 }
 
 std::unique_ptr<Attribute> Attribute::Clone() const {
-  auto attribute = std::make_unique<Attribute>(name, utils::MapClone(args), span);
+  auto attribute = std::make_unique<Attribute>(name, MapClone(args), span);
   attribute->compiled = compiled;
   return attribute;
 }
@@ -57,7 +57,7 @@ Attribute* AttributeList::Get(std::string_view attribute_name) {
 }
 
 std::unique_ptr<AttributeList> AttributeList::Clone() const {
-  return std::make_unique<AttributeList>(utils::MapClone(attributes));
+  return std::make_unique<AttributeList>(MapClone(attributes));
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

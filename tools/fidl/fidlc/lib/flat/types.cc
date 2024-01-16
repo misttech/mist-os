@@ -11,10 +11,10 @@
 #include "tools/fidl/fidlc/include/fidl/flat/visitor.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // ZX_HANDLE_SAME_RIGHTS
-const HandleRights HandleType::kSameRights = HandleRights(0x80000000);
+const HandleRightsValue HandleType::kSameRights = HandleRightsValue(0x80000000);
 
 bool RejectOptionalConstraints::OnUnexpectedConstraint(
     TypeResolver* resolver, Reporter* reporter, std::optional<SourceSpan> params_span,
@@ -260,28 +260,28 @@ bool UntypedNumericType::ApplyConstraints(TypeResolver* resolver, Reporter* repo
   ZX_PANIC("should not have untyped numeric here");
 }
 
-uint32_t PrimitiveType::SubtypeSize(types::PrimitiveSubtype subtype) {
+uint32_t PrimitiveType::SubtypeSize(PrimitiveSubtype subtype) {
   switch (subtype) {
-    case types::PrimitiveSubtype::kBool:
-    case types::PrimitiveSubtype::kInt8:
-    case types::PrimitiveSubtype::kUint8:
-    case types::PrimitiveSubtype::kZxUchar:
+    case PrimitiveSubtype::kBool:
+    case PrimitiveSubtype::kInt8:
+    case PrimitiveSubtype::kUint8:
+    case PrimitiveSubtype::kZxUchar:
       return 1u;
 
-    case types::PrimitiveSubtype::kInt16:
-    case types::PrimitiveSubtype::kUint16:
+    case PrimitiveSubtype::kInt16:
+    case PrimitiveSubtype::kUint16:
       return 2u;
 
-    case types::PrimitiveSubtype::kFloat32:
-    case types::PrimitiveSubtype::kInt32:
-    case types::PrimitiveSubtype::kUint32:
+    case PrimitiveSubtype::kFloat32:
+    case PrimitiveSubtype::kInt32:
+    case PrimitiveSubtype::kUint32:
       return 4u;
 
-    case types::PrimitiveSubtype::kFloat64:
-    case types::PrimitiveSubtype::kInt64:
-    case types::PrimitiveSubtype::kUint64:
-    case types::PrimitiveSubtype::kZxUsize64:
-    case types::PrimitiveSubtype::kZxUintptr64:
+    case PrimitiveSubtype::kFloat64:
+    case PrimitiveSubtype::kInt64:
+    case PrimitiveSubtype::kUint64:
+    case PrimitiveSubtype::kZxUsize64:
+    case PrimitiveSubtype::kZxUintptr64:
       return 8u;
   }
 }
@@ -295,9 +295,8 @@ bool PrimitiveType::ApplyConstraints(TypeResolver* resolver, Reporter* reporter,
     return false;
   }
 
-  if ((subtype == types::PrimitiveSubtype::kZxUsize64 ||
-       subtype == types::PrimitiveSubtype::kZxUintptr64 ||
-       subtype == types::PrimitiveSubtype::kZxUchar) &&
+  if ((subtype == PrimitiveSubtype::kZxUsize64 || subtype == PrimitiveSubtype::kZxUintptr64 ||
+       subtype == PrimitiveSubtype::kZxUchar) &&
       !resolver->experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
     return reporter->Fail(ErrExperimentalZxCTypesDisallowed, layout.span(),
                           layout.resolved().name());
@@ -335,15 +334,15 @@ bool ZxExperimentalPointerType::ApplyConstraints(TypeResolver* resolver, Reporte
   return true;
 }
 
-types::Resourceness Type::Resourceness() const {
+Resourceness Type::Resourceness() const {
   switch (this->kind) {
     case Type::Kind::kPrimitive:
     case Type::Kind::kInternal:
     case Type::Kind::kString:
-      return types::Resourceness::kValue;
+      return Resourceness::kValue;
     case Type::Kind::kHandle:
     case Type::Kind::kTransportSide:
-      return types::Resourceness::kResource;
+      return Resourceness::kResource;
     case Type::Kind::kArray:
       return static_cast<const ArrayType*>(this)->element_type->Resourceness();
     case Type::Kind::kVector:
@@ -363,9 +362,9 @@ types::Resourceness Type::Resourceness() const {
   switch (decl->kind) {
     case Decl::Kind::kBits:
     case Decl::Kind::kEnum:
-      return types::Resourceness::kValue;
+      return Resourceness::kValue;
     case Decl::Kind::kProtocol:
-      return types::Resourceness::kResource;
+      return Resourceness::kResource;
     case Decl::Kind::kStruct:
       ZX_ASSERT_MSG(decl->compiled, "accessing resourceness of not-yet-compiled struct");
       return static_cast<const Struct*>(decl)->resourceness.value();
@@ -409,4 +408,4 @@ std::any UntypedNumericType::AcceptAny(VisitorAny* visitor) const {
   ZX_PANIC("should not have untyped numeric here");
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

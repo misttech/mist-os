@@ -9,7 +9,7 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat/compile_step.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 bool TypeResolver::ResolveParamAsType(const Reference& layout,
                                       const std::unique_ptr<LayoutParameter>& param,
@@ -32,7 +32,7 @@ bool TypeResolver::ResolveParamAsType(const Reference& layout,
 
 bool TypeResolver::ResolveParamAsSize(const Reference& layout,
                                       const std::unique_ptr<LayoutParameter>& param,
-                                      const Size** out_size) {
+                                      const SizeValue** out_size) {
   // We could use param->AsConstant() here, leading to code similar to ResolveParamAsType.
   // However, unlike ErrExpectedType, ErrExpectedValueButGotType requires a name to be
   // reported, which would require doing a switch on the parameter kind anyway to find
@@ -73,7 +73,7 @@ bool TypeResolver::ResolveType(TypeConstructor* type) {
   return type->type != nullptr;
 }
 
-bool TypeResolver::ResolveSizeBound(Constant* size_constant, const Size** out_size) {
+bool TypeResolver::ResolveSizeBound(Constant* size_constant, const SizeValue** out_size) {
   return compile_step_->ResolveSizeBound(size_constant, out_size);
 }
 
@@ -82,12 +82,12 @@ bool TypeResolver::ResolveAsOptional(Constant* constant) {
 }
 
 bool TypeResolver::ResolveAsHandleSubtype(Resource* resource, Constant* constant,
-                                          types::HandleSubtype* out_obj_type) {
+                                          HandleSubtype* out_obj_type) {
   return compile_step_->ResolveHandleSubtypeIdentifier(resource, constant, out_obj_type);
 }
 
 bool TypeResolver::ResolveAsHandleRights(Resource* resource, Constant* constant,
-                                         const HandleRights** out_rights) {
+                                         const HandleRightsValue** out_rights) {
   return compile_step_->ResolveHandleRightsConstant(resource, constant, out_rights);
 }
 
@@ -112,4 +112,4 @@ std::optional<std::vector<const Decl*>> TypeResolver::GetDeclCycle(const Decl* d
   return compile_step_->GetDeclCycle(decl);
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

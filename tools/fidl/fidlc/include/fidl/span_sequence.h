@@ -13,7 +13,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/token.h"
 
-namespace fidl::fmt {
+namespace fidlc {
 
 // Tracks whether the line a particular token finds itself on is indented relative to either its
 // immediate predecessor (in which case the `prev` property is true) or follower (in which case the
@@ -449,6 +449,6 @@ class StandaloneCommentSpanSequence final : public CommentSpanSequence {
   std::vector<std::string_view> lines_;
 };
 
-}  // namespace fidl::fmt
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SPAN_SEQUENCE_H_

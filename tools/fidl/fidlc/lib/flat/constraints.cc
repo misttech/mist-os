@@ -8,7 +8,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/type_resolver.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 ////////// ConstraintBase
 bool ConstraintStorageBase::ReportMergeFailure(Reporter* reporter, const Name& layout_name,
@@ -155,4 +155,4 @@ bool ConstraintsBase::OnUnexpectedConstraint(TypeResolver* resolver, Reporter* r
   return reporter->Fail(ErrUnexpectedConstraint, params[param_index]->span, layout_name);
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

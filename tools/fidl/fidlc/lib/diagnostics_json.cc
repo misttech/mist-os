@@ -6,7 +6,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 
-namespace fidl {
+namespace fidlc {
 
 void DiagnosticsJson::Generate(const Diagnostic* diagnostic) {
   GenerateObject([&]() {
@@ -56,4 +56,4 @@ std::ostringstream DiagnosticsJson::Produce() {
   return std::move(json_file_);
 }
 
-}  // namespace fidl
+}  // namespace fidlc

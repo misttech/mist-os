@@ -10,7 +10,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // Explicit instantations.
 template struct NumericConstantValue<int8_t>;
@@ -148,7 +148,7 @@ std::string DocCommentConstantValue::MakeContents() const {
   if (value.empty()) {
     return "";
   }
-  return fidl::utils::strip_doc_comment_slashes(value);
+  return strip_doc_comment_slashes(value);
 }
 
 bool StringConstantValue::Convert(Kind kind, std::unique_ptr<ConstantValue>* out_value) const {
@@ -166,7 +166,7 @@ std::string StringConstantValue::MakeContents() const {
   if (value.empty()) {
     return "";
   }
-  return fidl::utils::strip_string_literal_quotes(value);
+  return strip_string_literal_quotes(value);
 }
 
 void Constant::ResolveTo(std::unique_ptr<ConstantValue> value, const Type* type) {
@@ -190,4 +190,4 @@ std::unique_ptr<Constant> Constant::Clone() const {
   return cloned;
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

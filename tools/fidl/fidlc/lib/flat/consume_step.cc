@@ -13,9 +13,9 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
-ConsumeStep::ConsumeStep(Compiler* compiler, std::unique_ptr<raw::File> file)
+ConsumeStep::ConsumeStep(Compiler* compiler, std::unique_ptr<File> file)
     : Step(compiler),
       file_(std::move(file)),
       default_underlying_type_(
@@ -79,7 +79,7 @@ Decl* ConsumeStep::RegisterDecl(std::unique_ptr<Decl> decl) {
     if (library()->dependencies.Contains(name.span()->source_file().filename(),
                                          {name.span()->data()})) {
       reporter()->Fail(ErrDeclNameConflictsWithLibraryImport, name.span().value(), name);
-    } else if (auto canonical_decl_name = utils::canonicalize(name.decl_name());
+    } else if (auto canonical_decl_name = canonicalize(name.decl_name());
                library()->dependencies.Contains(name.span()->source_file().filename(),
                                                 {canonical_decl_name})) {
       reporter()->Fail(ErrDeclNameConflictsWithLibraryImportCanonical, name.span().value(), name,
@@ -89,7 +89,7 @@ Decl* ConsumeStep::RegisterDecl(std::unique_ptr<Decl> decl) {
   return decl_ptr;
 }
 
-void ConsumeStep::ConsumeAttributeList(std::unique_ptr<raw::AttributeList> raw_attribute_list,
+void ConsumeStep::ConsumeAttributeList(std::unique_ptr<RawAttributeList> raw_attribute_list,
                                        std::unique_ptr<AttributeList>* out_attribute_list) {
   ZX_ASSERT_MSG(out_attribute_list, "must provide out parameter");
   // Usually *out_attribute_list is null and we create the AttributeList here.
@@ -109,7 +109,7 @@ void ConsumeStep::ConsumeAttributeList(std::unique_ptr<raw::AttributeList> raw_a
   }
 }
 
-void ConsumeStep::ConsumeAttribute(std::unique_ptr<raw::Attribute> raw_attribute,
+void ConsumeStep::ConsumeAttribute(std::unique_ptr<RawAttribute> raw_attribute,
                                    std::unique_ptr<Attribute>* out_attribute) {
   bool all_named = true;
   std::vector<std::unique_ptr<AttributeArg>> args;
@@ -129,10 +129,10 @@ void ConsumeStep::ConsumeAttribute(std::unique_ptr<raw::Attribute> raw_attribute
                 "parser should not allow an anonymous arg with other args");
   SourceSpan name;
   switch (raw_attribute->provenance) {
-    case raw::Attribute::Provenance::kDefault:
+    case RawAttribute::Provenance::kDefault:
       name = raw_attribute->maybe_name->span();
       break;
-    case raw::Attribute::Provenance::kDocComment:
+    case RawAttribute::Provenance::kDocComment:
       name = generated_source_file()->AddLine(Attribute::kDocCommentName);
       break;
   }
@@ -140,27 +140,27 @@ void ConsumeStep::ConsumeAttribute(std::unique_ptr<raw::Attribute> raw_attribute
   all_libraries()->WarnOnAttributeTypo(out_attribute->get());
 }
 
-bool ConsumeStep::ConsumeConstant(std::unique_ptr<raw::Constant> raw_constant,
+bool ConsumeStep::ConsumeConstant(std::unique_ptr<RawConstant> raw_constant,
                                   std::unique_ptr<Constant>* out_constant) {
   switch (raw_constant->kind) {
-    case raw::Constant::Kind::kIdentifier: {
-      auto identifier = static_cast<raw::IdentifierConstant*>(raw_constant.get());
+    case RawConstant::Kind::kIdentifier: {
+      auto identifier = static_cast<RawIdentifierConstant*>(raw_constant.get());
       *out_constant =
           std::make_unique<IdentifierConstant>(*identifier->identifier, identifier->span());
       break;
     }
-    case raw::Constant::Kind::kLiteral: {
-      auto literal = static_cast<raw::LiteralConstant*>(raw_constant.get());
+    case RawConstant::Kind::kLiteral: {
+      auto literal = static_cast<RawLiteralConstant*>(raw_constant.get());
       std::unique_ptr<LiteralConstant> out;
       ConsumeLiteralConstant(literal, &out);
       *out_constant = std::unique_ptr<Constant>(out.release());
       break;
     }
-    case raw::Constant::Kind::kBinaryOperator: {
-      auto binary_operator_constant = static_cast<raw::BinaryOperatorConstant*>(raw_constant.get());
+    case RawConstant::Kind::kBinaryOperator: {
+      auto binary_operator_constant = static_cast<RawBinaryOperatorConstant*>(raw_constant.get());
       BinaryOperatorConstant::Operator op;
       switch (binary_operator_constant->op) {
-        case raw::BinaryOperatorConstant::Operator::kOr:
+        case RawBinaryOperatorConstant::Operator::kOr:
           op = BinaryOperatorConstant::Operator::kOr;
           break;
       }
@@ -180,13 +180,13 @@ bool ConsumeStep::ConsumeConstant(std::unique_ptr<raw::Constant> raw_constant,
   return true;
 }
 
-void ConsumeStep::ConsumeLiteralConstant(raw::LiteralConstant* raw_constant,
+void ConsumeStep::ConsumeLiteralConstant(RawLiteralConstant* raw_constant,
                                          std::unique_ptr<LiteralConstant>* out_constant) {
   *out_constant =
       std::make_unique<LiteralConstant>(ConsumeLiteral(std::move(raw_constant->literal)));
 }
 
-void ConsumeStep::ConsumeUsing(std::unique_ptr<raw::Using> using_directive) {
+void ConsumeStep::ConsumeUsing(std::unique_ptr<RawUsing> using_directive) {
   if (using_directive->attributes != nullptr) {
     reporter()->Fail(ErrAttributesNotAllowedOnLibraryImport, using_directive->span());
     return;
@@ -224,8 +224,7 @@ void ConsumeStep::ConsumeUsing(std::unique_ptr<raw::Using> using_directive) {
   }
 }
 
-void ConsumeStep::ConsumeAliasDeclaration(
-    std::unique_ptr<raw::AliasDeclaration> alias_declaration) {
+void ConsumeStep::ConsumeAliasDeclaration(std::unique_ptr<RawAliasDeclaration> alias_declaration) {
   ZX_ASSERT(alias_declaration->alias && alias_declaration->type_ctor != nullptr);
 
   std::unique_ptr<AttributeList> attributes;
@@ -242,8 +241,7 @@ void ConsumeStep::ConsumeAliasDeclaration(
       std::make_unique<Alias>(std::move(attributes), std::move(alias_name), std::move(type_ctor_)));
 }
 
-void ConsumeStep::ConsumeConstDeclaration(
-    std::unique_ptr<raw::ConstDeclaration> const_declaration) {
+void ConsumeStep::ConsumeConstDeclaration(std::unique_ptr<RawConstDeclaration> const_declaration) {
   auto span = const_declaration->identifier->span();
   auto name = Name::CreateSourced(library(), span);
   std::unique_ptr<AttributeList> attributes;
@@ -273,7 +271,7 @@ bool ConsumeStep::CreateMethodResult(
     const std::shared_ptr<NamingContext>& success_variant_context,
     const std::shared_ptr<NamingContext>& err_variant_context,
     const std::shared_ptr<NamingContext>& framework_err_variant_context, bool has_err,
-    bool has_framework_err, SourceSpan response_span, raw::ProtocolMethod* method,
+    bool has_framework_err, SourceSpan response_span, RawProtocolMethod* method,
     std::unique_ptr<TypeConstructor> success_variant,
     std::unique_ptr<TypeConstructor>* out_payload) {
   ZX_ASSERT_MSG(
@@ -282,7 +280,7 @@ bool ConsumeStep::CreateMethodResult(
   ZX_ASSERT(err_variant_context != nullptr);
   ZX_ASSERT(framework_err_variant_context != nullptr);
 
-  auto ordinal_source = raw::SourceElement(fidl::Token(), fidl::Token());
+  auto ordinal_source = SourceElement(Token(), Token());
   std::vector<Union::Member> result_members;
 
   enum {
@@ -292,7 +290,7 @@ bool ConsumeStep::CreateMethodResult(
   };
 
   result_members.emplace_back(
-      ConsumeOrdinal(std::make_unique<raw::Ordinal64>(ordinal_source, kSuccessOrdinal)),
+      ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kSuccessOrdinal)),
       std::move(success_variant), success_variant_context->name(),
       std::make_unique<AttributeList>());
 
@@ -306,12 +304,12 @@ bool ConsumeStep::CreateMethodResult(
     ZX_ASSERT_MSG(error_type_ctor != nullptr, "missing err type ctor");
 
     result_members.emplace_back(
-        ConsumeOrdinal(std::make_unique<raw::Ordinal64>(ordinal_source, kErrorOrdinal)),
+        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kErrorOrdinal)),
         std::move(error_type_ctor), err_variant_context->name(), std::make_unique<AttributeList>());
   } else {
     // If there's no error, the error variant is reserved.
     result_members.emplace_back(Union::Member::Reserved(
-        ConsumeOrdinal(std::make_unique<raw::Ordinal64>(ordinal_source, kErrorOrdinal)),
+        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kErrorOrdinal)),
         err_variant_context->name(), std::make_unique<AttributeList>()));
   }
 
@@ -319,7 +317,7 @@ bool ConsumeStep::CreateMethodResult(
     std::unique_ptr<TypeConstructor> error_type_ctor = IdentifierTypeForDecl(framework_err_type_);
     ZX_ASSERT_MSG(error_type_ctor != nullptr, "missing framework_err type ctor");
     result_members.emplace_back(
-        ConsumeOrdinal(std::make_unique<raw::Ordinal64>(ordinal_source, kFrameworkErrorOrdinal)),
+        ConsumeOrdinal(std::make_unique<RawOrdinal64>(ordinal_source, kFrameworkErrorOrdinal)),
         std::move(error_type_ctor), framework_err_variant_context->name(),
         std::make_unique<AttributeList>());
   }
@@ -328,9 +326,9 @@ bool ConsumeStep::CreateMethodResult(
   auto result_context = err_variant_context->parent();
   auto result_name = Name::CreateAnonymous(library(), response_span, result_context,
                                            Name::Provenance::kGeneratedResultUnion);
-  auto union_decl = std::make_unique<Union>(
-      std::make_unique<AttributeList>(), std::move(result_name), std::move(result_members),
-      types::Strictness::kStrict, std::nullopt /* resourceness */);
+  auto union_decl = std::make_unique<Union>(std::make_unique<AttributeList>(),
+                                            std::move(result_name), std::move(result_members),
+                                            Strictness::kStrict, std::nullopt /* resourceness */);
   auto result_decl = union_decl.get();
   if (!RegisterDecl(std::move(union_decl)))
     return false;
@@ -340,7 +338,7 @@ bool ConsumeStep::CreateMethodResult(
 }
 
 void ConsumeStep::ConsumeProtocolDeclaration(
-    std::unique_ptr<raw::ProtocolDeclaration> protocol_declaration) {
+    std::unique_ptr<RawProtocolDeclaration> protocol_declaration) {
   auto protocol_name = Name::CreateSourced(library(), protocol_declaration->identifier->span());
   auto protocol_context = NamingContext::Create(protocol_name.span().value());
 
@@ -358,7 +356,7 @@ void ConsumeStep::ConsumeProtocolDeclaration(
 
     SourceSpan method_name = method->identifier->span();
 
-    auto strictness = types::Strictness::kFlexible;
+    auto strictness = Strictness::kFlexible;
     if (method->modifiers != nullptr && method->modifiers->maybe_strictness.has_value()) {
       strictness = method->modifiers->maybe_strictness->value;
     }
@@ -381,7 +379,7 @@ void ConsumeStep::ConsumeProtocolDeclaration(
       // has_framework_error is true for flexible two-way methods. We already
       // checked has_response in the outer if block, so to see whether this is a
       // two-way method or an event, we check has_request here.
-      bool has_framework_error = has_request && strictness == types::Strictness::kFlexible;
+      bool has_framework_error = has_request && strictness == Strictness::kFlexible;
 
       const auto response_context = has_request ? protocol_context->EnterResponse(method_name)
                                                 : protocol_context->EnterEvent(method_name);
@@ -411,15 +409,15 @@ void ConsumeStep::ConsumeProtocolDeclaration(
         // fidlc codebase we use the word "response" to refer to the outermost
         // type, which in this case is P_M_Result.
         response_context->set_name_override(
-            utils::StringJoin({protocol_name.decl_name(), method_name.data(), "Result"}, "_"));
+            StringJoin({protocol_name.decl_name(), method_name.data(), "Result"}, "_"));
         success_variant_context =
             response_context->EnterMember(generated_source_file()->AddLine("response"));
         success_variant_context->set_name_override(
-            utils::StringJoin({protocol_name.decl_name(), method_name.data(), "Response"}, "_"));
+            StringJoin({protocol_name.decl_name(), method_name.data(), "Response"}, "_"));
         err_variant_context =
             response_context->EnterMember(generated_source_file()->AddLine("err"));
         err_variant_context->set_name_override(
-            utils::StringJoin({protocol_name.decl_name(), method_name.data(), "Error"}, "_"));
+            StringJoin({protocol_name.decl_name(), method_name.data(), "Error"}, "_"));
         framework_err_variant_context =
             response_context->EnterMember(generated_source_file()->AddLine("framework_err"));
 
@@ -458,7 +456,7 @@ void ConsumeStep::ConsumeProtocolDeclaration(
   std::unique_ptr<AttributeList> attributes;
   ConsumeAttributeList(std::move(protocol_declaration->attributes), &attributes);
 
-  auto openness = types::Openness::kOpen;
+  auto openness = Openness::kOpen;
   if (protocol_declaration->modifiers != nullptr &&
       protocol_declaration->modifiers->maybe_openness.has_value()) {
     openness = protocol_declaration->modifiers->maybe_openness->value;
@@ -470,7 +468,7 @@ void ConsumeStep::ConsumeProtocolDeclaration(
 
 bool ConsumeStep::ConsumeParameterList(const SourceSpan method_name,
                                        const std::shared_ptr<NamingContext>& context,
-                                       std::unique_ptr<raw::ParameterList> parameter_layout,
+                                       std::unique_ptr<RawParameterList> parameter_layout,
                                        bool is_request_or_response,
                                        std::unique_ptr<TypeConstructor>* out_payload) {
   if (!parameter_layout->type_ctor) {
@@ -485,7 +483,7 @@ bool ConsumeStep::ConsumeParameterList(const SourceSpan method_name,
         std::make_unique<AttributeList>(),
         Name::CreateAnonymous(library(), parameter_layout->span(), context,
                               Name::Provenance::kGeneratedEmptySuccessStruct),
-        std::vector<Struct::Member>(), types::Resourceness::kValue);
+        std::vector<Struct::Member>(), Resourceness::kValue);
     auto empty_struct_decl = empty_struct.get();
     ZX_ASSERT(RegisterDecl(std::move(empty_struct)));
     *out_payload = IdentifierTypeForDecl(empty_struct_decl);
@@ -503,7 +501,7 @@ bool ConsumeStep::ConsumeParameterList(const SourceSpan method_name,
 }
 
 void ConsumeStep::ConsumeResourceDeclaration(
-    std::unique_ptr<raw::ResourceDeclaration> resource_declaration) {
+    std::unique_ptr<RawResourceDeclaration> resource_declaration) {
   auto name = Name::CreateSourced(library(), resource_declaration->identifier->span());
   auto context = NamingContext::Create(name);
   std::vector<Resource::Property> properties;
@@ -535,7 +533,7 @@ void ConsumeStep::ConsumeResourceDeclaration(
                                           std::move(type_ctor), std::move(properties)));
 }
 
-void ConsumeStep::ConsumeServiceDeclaration(std::unique_ptr<raw::ServiceDeclaration> service_decl) {
+void ConsumeStep::ConsumeServiceDeclaration(std::unique_ptr<RawServiceDeclaration> service_decl) {
   auto name = Name::CreateSourced(library(), service_decl->identifier->span());
   auto context = NamingContext::Create(name);
   std::vector<Service::Member> members;
@@ -570,7 +568,7 @@ void ConsumeStep::MaybeOverrideName(AttributeList& attributes, NamingContext* co
   const ConstantValue& value = arg->value->Value();
   ZX_ASSERT(value.kind == ConstantValue::Kind::kString);
   std::string str = static_cast<const StringConstantValue&>(value).MakeContents();
-  if (utils::IsValidIdentifierComponent(str)) {
+  if (IsValidIdentifierComponent(str)) {
     context->set_name_override(std::move(str));
   } else {
     reporter()->Fail(ErrInvalidGeneratedName, arg->span);
@@ -578,13 +576,13 @@ void ConsumeStep::MaybeOverrideName(AttributeList& attributes, NamingContext* co
 }
 
 template <typename T>
-bool ConsumeStep::ConsumeValueLayout(std::unique_ptr<raw::Layout> layout,
+bool ConsumeStep::ConsumeValueLayout(std::unique_ptr<RawLayout> layout,
                                      const std::shared_ptr<NamingContext>& context,
-                                     std::unique_ptr<raw::AttributeList> raw_attribute_list,
+                                     std::unique_ptr<RawAttributeList> raw_attribute_list,
                                      Decl** out_decl) {
   std::vector<typename T::Member> members;
   for (auto& mem : layout->members) {
-    auto member = static_cast<raw::ValueLayoutMember*>(mem.get());
+    auto member = static_cast<RawValueLayoutMember*>(mem.get());
     auto span = member->identifier->span();
 
     std::unique_ptr<AttributeList> attributes;
@@ -609,12 +607,12 @@ bool ConsumeStep::ConsumeValueLayout(std::unique_ptr<raw::Layout> layout,
   ConsumeAttributeList(std::move(raw_attribute_list), &attributes);
   MaybeOverrideName(*attributes, context.get());
 
-  auto strictness = types::Strictness::kFlexible;
+  auto strictness = Strictness::kFlexible;
   if (layout->modifiers != nullptr && layout->modifiers->maybe_strictness.has_value())
     strictness = layout->modifiers->maybe_strictness->value;
 
   if (layout->members.empty()) {
-    if (strictness != types::Strictness::kFlexible)
+    if (strictness != Strictness::kFlexible)
       return reporter()->Fail(ErrMustHaveOneMember, layout->span());
   }
 
@@ -628,13 +626,13 @@ bool ConsumeStep::ConsumeValueLayout(std::unique_ptr<raw::Layout> layout,
 }
 
 template <typename T>
-bool ConsumeStep::ConsumeOrdinaledLayout(std::unique_ptr<raw::Layout> layout,
+bool ConsumeStep::ConsumeOrdinaledLayout(std::unique_ptr<RawLayout> layout,
                                          const std::shared_ptr<NamingContext>& context,
-                                         std::unique_ptr<raw::AttributeList> raw_attribute_list,
+                                         std::unique_ptr<RawAttributeList> raw_attribute_list,
                                          Decl** out_decl) {
   std::vector<typename T::Member> members;
   for (auto& mem : layout->members) {
-    auto member = static_cast<raw::OrdinaledLayoutMember*>(mem.get());
+    auto member = static_cast<RawOrdinaledLayoutMember*>(mem.get());
     std::unique_ptr<AttributeList> attributes;
     ConsumeAttributeList(std::move(member->attributes), &attributes);
     if (member->reserved) {
@@ -656,11 +654,11 @@ bool ConsumeStep::ConsumeOrdinaledLayout(std::unique_ptr<raw::Layout> layout,
   ConsumeAttributeList(std::move(raw_attribute_list), &attributes);
   MaybeOverrideName(*attributes, context.get());
 
-  auto strictness = types::Strictness::kFlexible;
+  auto strictness = Strictness::kFlexible;
   if (layout->modifiers != nullptr && layout->modifiers->maybe_strictness.has_value())
     strictness = layout->modifiers->maybe_strictness->value;
 
-  auto resourceness = types::Resourceness::kValue;
+  auto resourceness = Resourceness::kValue;
   if (layout->modifiers != nullptr && layout->modifiers->maybe_resourceness.has_value())
     resourceness = layout->modifiers->maybe_resourceness->value;
 
@@ -673,13 +671,13 @@ bool ConsumeStep::ConsumeOrdinaledLayout(std::unique_ptr<raw::Layout> layout,
   return decl != nullptr;
 }
 
-bool ConsumeStep::ConsumeStructLayout(std::unique_ptr<raw::Layout> layout,
+bool ConsumeStep::ConsumeStructLayout(std::unique_ptr<RawLayout> layout,
                                       const std::shared_ptr<NamingContext>& context,
-                                      std::unique_ptr<raw::AttributeList> raw_attribute_list,
+                                      std::unique_ptr<RawAttributeList> raw_attribute_list,
                                       Decl** out_decl) {
   std::vector<Struct::Member> members;
   for (auto& mem : layout->members) {
-    auto member = static_cast<raw::StructLayoutMember*>(mem.get());
+    auto member = static_cast<RawStructLayoutMember*>(mem.get());
 
     std::unique_ptr<AttributeList> attributes;
     ConsumeAttributeList(std::move(member->attributes), &attributes);
@@ -707,7 +705,7 @@ bool ConsumeStep::ConsumeStructLayout(std::unique_ptr<raw::Layout> layout,
   ConsumeAttributeList(std::move(raw_attribute_list), &attributes);
   MaybeOverrideName(*attributes, context.get());
 
-  auto resourceness = types::Resourceness::kValue;
+  auto resourceness = Resourceness::kValue;
   if (layout->modifiers != nullptr && layout->modifiers->maybe_resourceness.has_value())
     resourceness = layout->modifiers->maybe_resourceness->value;
 
@@ -720,41 +718,41 @@ bool ConsumeStep::ConsumeStructLayout(std::unique_ptr<raw::Layout> layout,
   return decl != nullptr;
 }
 
-bool ConsumeStep::ConsumeLayout(std::unique_ptr<raw::Layout> layout,
+bool ConsumeStep::ConsumeLayout(std::unique_ptr<RawLayout> layout,
                                 const std::shared_ptr<NamingContext>& context,
-                                std::unique_ptr<raw::AttributeList> raw_attribute_list,
+                                std::unique_ptr<RawAttributeList> raw_attribute_list,
                                 Decl** out_decl) {
   switch (layout->kind) {
-    case raw::Layout::Kind::kBits: {
+    case RawLayout::Kind::kBits: {
       return ConsumeValueLayout<Bits>(std::move(layout), context, std::move(raw_attribute_list),
                                       out_decl);
     }
-    case raw::Layout::Kind::kEnum: {
+    case RawLayout::Kind::kEnum: {
       return ConsumeValueLayout<Enum>(std::move(layout), context, std::move(raw_attribute_list),
                                       out_decl);
     }
-    case raw::Layout::Kind::kStruct: {
+    case RawLayout::Kind::kStruct: {
       return ConsumeStructLayout(std::move(layout), context, std::move(raw_attribute_list),
                                  out_decl);
     }
-    case raw::Layout::Kind::kTable: {
+    case RawLayout::Kind::kTable: {
       return ConsumeOrdinaledLayout<Table>(std::move(layout), context,
                                            std::move(raw_attribute_list), out_decl);
     }
-    case raw::Layout::Kind::kUnion: {
+    case RawLayout::Kind::kUnion: {
       return ConsumeOrdinaledLayout<Union>(std::move(layout), context,
                                            std::move(raw_attribute_list), out_decl);
     }
-    case raw::Layout::Kind::kOverlay: {
+    case RawLayout::Kind::kOverlay: {
       return ConsumeOrdinaledLayout<Overlay>(std::move(layout), context,
                                              std::move(raw_attribute_list), out_decl);
     }
   }
 }
 
-bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<raw::TypeConstructor> raw_type_ctor,
+bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<RawTypeConstructor> raw_type_ctor,
                                          const std::shared_ptr<NamingContext>& context,
-                                         std::unique_ptr<raw::AttributeList> raw_attribute_list,
+                                         std::unique_ptr<RawAttributeList> raw_attribute_list,
                                          std::unique_ptr<TypeConstructor>* out_type_ctor,
                                          Decl** out_inline_decl) {
   std::vector<std::unique_ptr<LayoutParameter>> params;
@@ -765,8 +763,8 @@ bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<raw::TypeConstructor> r
       auto param = std::move(p);
       auto span = param->span();
       switch (param->kind) {
-        case raw::LayoutParameter::Kind::kLiteral: {
-          auto literal_param = static_cast<raw::LiteralLayoutParameter*>(param.get());
+        case RawLayoutParameter::Kind::kLiteral: {
+          auto literal_param = static_cast<RawLiteralLayoutParameter*>(param.get());
           std::unique_ptr<LiteralConstant> constant;
           ConsumeLiteralConstant(literal_param->literal.get(), &constant);
 
@@ -775,8 +773,8 @@ bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<raw::TypeConstructor> r
           params.push_back(std::move(consumed));
           break;
         }
-        case raw::LayoutParameter::Kind::kType: {
-          auto type_param = static_cast<raw::TypeLayoutParameter*>(param.get());
+        case RawLayoutParameter::Kind::kType: {
+          auto type_param = static_cast<RawTypeLayoutParameter*>(param.get());
           std::unique_ptr<TypeConstructor> type_ctor;
           if (!ConsumeTypeConstructor(std::move(type_param->type_ctor), context,
                                       /*raw_attribute_list=*/nullptr, &type_ctor,
@@ -788,8 +786,8 @@ bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<raw::TypeConstructor> r
           params.push_back(std::move(consumed));
           break;
         }
-        case raw::LayoutParameter::Kind::kIdentifier: {
-          auto id_param = static_cast<raw::IdentifierLayoutParameter*>(param.get());
+        case RawLayoutParameter::Kind::kIdentifier: {
+          auto id_param = static_cast<RawIdentifierLayoutParameter*>(param.get());
           std::unique_ptr<LayoutParameter> consumed =
               std::make_unique<IdentifierLayoutParameter>(Reference(*id_param->identifier), span);
           params.push_back(std::move(consumed));
@@ -811,8 +809,8 @@ bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<raw::TypeConstructor> r
     }
   }
 
-  if (raw_type_ctor->layout_ref->kind == raw::LayoutReference::Kind::kInline) {
-    auto inline_ref = static_cast<raw::InlineLayoutReference*>(raw_type_ctor->layout_ref.get());
+  if (raw_type_ctor->layout_ref->kind == RawLayoutReference::Kind::kInline) {
+    auto inline_ref = static_cast<RawInlineLayoutReference*>(raw_type_ctor->layout_ref.get());
     auto attributes = std::move(raw_attribute_list);
     if (inline_ref->attributes != nullptr)
       attributes = std::move(inline_ref->attributes);
@@ -832,7 +830,7 @@ bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<raw::TypeConstructor> r
     return true;
   }
 
-  auto named_ref = static_cast<raw::NamedLayoutReference*>(raw_type_ctor->layout_ref.get());
+  auto named_ref = static_cast<RawNamedLayoutReference*>(raw_type_ctor->layout_ref.get());
   ZX_ASSERT_MSG(out_type_ctor, "out type ctors should always be provided for a named type ctor");
   *out_type_ctor = std::make_unique<TypeConstructor>(
       Reference(*named_ref->identifier),
@@ -841,23 +839,23 @@ bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<raw::TypeConstructor> r
   return true;
 }
 
-bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<raw::TypeConstructor> raw_type_ctor,
+bool ConsumeStep::ConsumeTypeConstructor(std::unique_ptr<RawTypeConstructor> raw_type_ctor,
                                          const std::shared_ptr<NamingContext>& context,
                                          std::unique_ptr<TypeConstructor>* out_type) {
   return ConsumeTypeConstructor(std::move(raw_type_ctor), context, /*raw_attribute_list=*/nullptr,
                                 out_type, /*out_inline_decl=*/nullptr);
 }
 
-void ConsumeStep::ConsumeTypeDeclaration(std::unique_ptr<raw::TypeDeclaration> type_decl) {
+void ConsumeStep::ConsumeTypeDeclaration(std::unique_ptr<RawTypeDeclaration> type_decl) {
   auto name = Name::CreateSourced(library(), type_decl->identifier->span());
   auto& layout_ref = type_decl->type_ctor->layout_ref;
 
-  if (layout_ref->kind == raw::LayoutReference::Kind::kNamed) {
+  if (layout_ref->kind == RawLayoutReference::Kind::kNamed) {
     if (experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kAllowNewTypes)) {
       ConsumeNewType(std::move(type_decl));
       return;
     }
-    auto named_ref = static_cast<raw::NamedLayoutReference*>(layout_ref.get());
+    auto named_ref = static_cast<RawNamedLayoutReference*>(layout_ref.get());
     reporter()->Fail(ErrNewTypesNotAllowed, type_decl->span(), name, named_ref->span().data());
     return;
   }
@@ -867,8 +865,8 @@ void ConsumeStep::ConsumeTypeDeclaration(std::unique_ptr<raw::TypeDeclaration> t
                          /*out_type=*/nullptr, /*out_inline_decl=*/nullptr);
 }
 
-void ConsumeStep::ConsumeNewType(std::unique_ptr<raw::TypeDeclaration> type_decl) {
-  ZX_ASSERT(type_decl->type_ctor->layout_ref->kind == raw::LayoutReference::Kind::kNamed);
+void ConsumeStep::ConsumeNewType(std::unique_ptr<RawTypeDeclaration> type_decl) {
+  ZX_ASSERT(type_decl->type_ctor->layout_ref->kind == RawLayoutReference::Kind::kNamed);
   ZX_ASSERT(experimental_flags().IsFlagEnabled(ExperimentalFlags::Flag::kAllowNewTypes));
 
   std::unique_ptr<AttributeList> attributes;
@@ -885,23 +883,22 @@ void ConsumeStep::ConsumeNewType(std::unique_ptr<raw::TypeDeclaration> type_decl
                                          std::move(new_type_ctor)));
 }
 
-const raw::Literal* ConsumeStep::ConsumeLiteral(std::unique_ptr<raw::Literal> raw_literal) {
+const RawLiteral* ConsumeStep::ConsumeLiteral(std::unique_ptr<RawLiteral> raw_literal) {
   auto ptr = raw_literal.get();
   library()->raw_literals.push_back(std::move(raw_literal));
   return ptr;
 }
 
-const raw::Identifier* ConsumeStep::ConsumeIdentifier(
-    std::unique_ptr<raw::Identifier> raw_identifier) {
+const RawIdentifier* ConsumeStep::ConsumeIdentifier(std::unique_ptr<RawIdentifier> raw_identifier) {
   auto ptr = raw_identifier.get();
   library()->raw_identifiers.push_back(std::move(raw_identifier));
   return ptr;
 }
 
-const raw::Ordinal64* ConsumeStep::ConsumeOrdinal(std::unique_ptr<raw::Ordinal64> raw_ordinal) {
+const RawOrdinal64* ConsumeStep::ConsumeOrdinal(std::unique_ptr<RawOrdinal64> raw_ordinal) {
   auto ptr = raw_ordinal.get();
   library()->raw_ordinals.push_back(std::move(raw_ordinal));
   return ptr;
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

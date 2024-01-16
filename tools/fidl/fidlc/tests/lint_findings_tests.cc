@@ -12,7 +12,7 @@
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
-namespace fidl {
+namespace fidlc {
 
 namespace {
 
@@ -291,7 +291,7 @@ class LintTest {
                                              bool assert_positions_match) {
     std::ostringstream ss;
     ss << finding.span().position_str() << ": ";
-    utils::PrintFinding(ss, finding);
+    PrintFinding(ss, finding);
     auto context = (test_context + ss.str());
     SCOPED_TRACE(context);
     ASSERT_EQ(expectf.subcategory(), finding.subcategory());
@@ -318,7 +318,7 @@ class LintTest {
     os << "============================\n";
     for (; finding != end; finding++) {
       os << finding->span().position_str() << ": ";
-      utils::PrintFinding(os, *finding);
+      PrintFinding(os, *finding);
       os << '\n';
     }
     os << "============================\n";
@@ -1963,4 +1963,4 @@ type ${STRUCT_NAME} = struct {
 
 }  // namespace
 
-}  // namespace fidl
+}  // namespace fidlc

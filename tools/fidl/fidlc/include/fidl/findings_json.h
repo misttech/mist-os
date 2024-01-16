@@ -12,17 +12,17 @@
 #include "tools/fidl/fidlc/include/fidl/json_writer.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl {
+namespace fidlc {
 
 // |JsonWriter| requires the derived type as a template parameter so it can
 // match methods declared with parameter overrides in the derived class.
-class FindingsJson : public utils::JsonWriter<FindingsJson> {
+class FindingsJson : public JsonWriter<FindingsJson> {
  public:
   // "using" is required for overridden methods, so the implementations in
   // both the base class and in this derived class are visible when matching
   // parameter types
-  using utils::JsonWriter<FindingsJson>::Generate;
-  using utils::JsonWriter<FindingsJson>::GenerateArray;
+  using JsonWriter<FindingsJson>::Generate;
+  using JsonWriter<FindingsJson>::GenerateArray;
 
   // Suggested replacement string and span, per the JSON schema used by
   // Tricium for a findings/diagnostics
@@ -52,6 +52,6 @@ class FindingsJson : public utils::JsonWriter<FindingsJson> {
   std::ostringstream json_file_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FINDINGS_JSON_H_

@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <functional>
 
-namespace fidl {
+namespace fidlc {
 
 SourceFile::SourceFile(std::string filename, std::string data)
     : filename_(std::move(filename)), data_(std::move(data)) {
@@ -89,4 +89,4 @@ std::string_view SourceFile::LineContaining(std::string_view view, Position* pos
   return std::string_view(*line);
 }
 
-}  // namespace fidl
+}  // namespace fidlc

@@ -10,12 +10,12 @@
 #include "tools/fidl/fidlc/include/fidl/findings_json.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
-namespace fidl {
+namespace fidlc {
 
 namespace {
 
 void FindingsEmitThisJson(const Findings& findings, std::string_view expected_json) {
-  std::string actual_json = fidl::FindingsJson(findings).Produce().str();
+  std::string actual_json = fidlc::FindingsJson(findings).Produce().str();
 
   if (expected_json != actual_json) {
     std::ofstream output_actual("json_findings_tests_actual.txt");
@@ -77,7 +77,7 @@ class JsonFindingsTest {
 
     source_data.remove_prefix(start);
     source_data.remove_suffix(source_data.size() - size);
-    auto span = fidl::SourceSpan(source_data, source_file);
+    auto span = fidlc::SourceSpan(source_data, source_file);
 
     return &findings_.emplace_back(span, args.check_id, args.message);
   }
@@ -543,4 +543,4 @@ protocol TestProtocol {
 
 }  // namespace
 
-}  // namespace fidl
+}  // namespace fidlc

@@ -28,7 +28,7 @@ namespace {
   va_start(args, message);
   vfprintf(stderr, message, args);
   va_end(args);
-  std::cerr << fidl::linter::Usage(argv0) << '\n';
+  std::cerr << fidlc::Usage(argv0) << '\n';
   exit(2);  // Exit code 1 is reserved to indicate lint findings
 }
 
@@ -40,30 +40,30 @@ namespace {
   exit(2);  // Exit code 1 is reserved to indicate lint findings
 }
 
-fidl::Finding DiagnosticToFinding(const fidl::Diagnostic& diag) {
+fidlc::Finding DiagnosticToFinding(const fidlc::Diagnostic& diag) {
   const char* check_id = nullptr;
   switch (diag.def.kind) {
-    case fidl::DiagnosticKind::kError:
+    case fidlc::DiagnosticKind::kError:
       check_id = "parse-error";
       break;
-    case fidl::DiagnosticKind::kWarning:
+    case fidlc::DiagnosticKind::kWarning:
       check_id = "parse-warning";
       break;
-    case fidl::DiagnosticKind::kRetired:
+    case fidlc::DiagnosticKind::kRetired:
       ZX_PANIC("should never emit a retired diagnostic");
   }
-  return fidl::Finding(diag.span, check_id, diag.Format());
+  return fidlc::Finding(diag.span, check_id, diag.Format());
 }
 
-void Lint(const fidl::SourceFile& source_file, fidl::Findings* findings,
+void Lint(const fidlc::SourceFile& source_file, fidlc::Findings* findings,
           const std::set<std::string>& included_checks,
           const std::set<std::string>& excluded_checks, bool exclude_by_default,
           std::set<std::string>* excluded_checks_not_found) {
-  fidl::Reporter reporter;
-  fidl::Lexer lexer(source_file, &reporter);
-  fidl::ExperimentalFlags experimental_flags;
-  fidl::Parser parser(&lexer, &reporter, experimental_flags);
-  std::unique_ptr<fidl::raw::File> ast = parser.Parse();
+  fidlc::Reporter reporter;
+  fidlc::Lexer lexer(source_file, &reporter);
+  fidlc::ExperimentalFlags experimental_flags;
+  fidlc::Parser parser(&lexer, &reporter, experimental_flags);
+  std::unique_ptr<fidlc::File> ast = parser.Parse();
   for (auto* diag : reporter.Diagnostics()) {
     findings->push_back(DiagnosticToFinding(*diag));
   }
@@ -71,7 +71,7 @@ void Lint(const fidl::SourceFile& source_file, fidl::Findings* findings,
     return;
   }
 
-  fidl::linter::Linter linter;
+  fidlc::Linter linter;
 
   linter.set_included_checks(included_checks);
   linter.set_excluded_checks(excluded_checks);
@@ -83,10 +83,10 @@ void Lint(const fidl::SourceFile& source_file, fidl::Findings* findings,
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  fidl::linter::CommandLineOptions options;
+  fidlc::CommandLineOptions options;
   std::vector<std::string> filepaths;
   cmdline::Status status =
-      fidl::linter::ParseCommandLine(argc, const_cast<const char**>(argv), &options, &filepaths);
+      fidlc::ParseCommandLine(argc, const_cast<const char**>(argv), &options, &filepaths);
   if (status.has_error()) {
     Fail("%s\n", status.error_message().c_str());
   }
@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
     FailWithUsage(argv[0], "No files provided\n");
   }
 
-  fidl::SourceManager source_manager;
+  fidlc::SourceManager source_manager;
 
   // Process filenames.
   for (const auto& filepath : filepaths) {
@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
   // officially released an so no-longer experimental.
   included_checks.insert(options.experimental_checks.begin(), options.experimental_checks.end());
 
-  fidl::Findings findings;
+  fidlc::Findings findings;
   bool enable_color = !std::getenv("NO_COLOR") && isatty(fileno(stderr));
   for (const auto& source_file : source_manager.sources()) {
     Lint(*source_file, &findings, included_checks, excluded_checks, exclude_by_default,
@@ -147,13 +147,13 @@ int main(int argc, char* argv[]) {
   }
 
   if (options.format == "text") {
-    auto lints = fidl::utils::FormatFindings(findings, enable_color);
+    auto lints = fidlc::FormatFindings(findings, enable_color);
     for (const auto& lint : lints) {
       fprintf(stderr, "%s\n", lint.c_str());
     }
   } else {
     ZX_ASSERT(options.format == "json");  // should never be false
-    std::cout << fidl::FindingsJson(findings).Produce().str();
+    std::cout << fidlc::FindingsJson(findings).Produce().str();
   }
 
   if (!excluded_checks_not_found.empty()) {

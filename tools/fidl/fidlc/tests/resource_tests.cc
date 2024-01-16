@@ -30,9 +30,9 @@ resource_definition SomeResource : uint32 {
 
   ASSERT_NE(resource->subtype_ctor, nullptr);
   auto underlying = resource->subtype_ctor->type;
-  ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
-  auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
-  EXPECT_EQ(underlying_primitive->subtype, fidl::types::PrimitiveSubtype::kUint32);
+  ASSERT_EQ(underlying->kind, fidlc::Type::Kind::kPrimitive);
+  auto underlying_primitive = static_cast<const fidlc::PrimitiveType*>(underlying);
+  EXPECT_EQ(underlying_primitive->subtype, fidlc::PrimitiveSubtype::kUint32);
 
   auto& subtype = resource->properties[0];
   EXPECT_EQ(subtype.name.data(), "subtype");
@@ -62,9 +62,9 @@ resource_definition SomeResource : uint32 {
 
   ASSERT_NE(resource->subtype_ctor, nullptr);
   auto underlying = resource->subtype_ctor->type;
-  ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
-  auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
-  EXPECT_EQ(underlying_primitive->subtype, fidl::types::PrimitiveSubtype::kUint32);
+  ASSERT_EQ(underlying->kind, fidlc::Type::Kind::kPrimitive);
+  auto underlying_primitive = static_cast<const fidlc::PrimitiveType*>(underlying);
+  EXPECT_EQ(underlying_primitive->subtype, fidlc::PrimitiveSubtype::kUint32);
 
   auto& subtype = resource->properties[0];
   EXPECT_EQ(subtype.name.data(), "subtype");
@@ -73,9 +73,9 @@ resource_definition SomeResource : uint32 {
 
   auto& rights = resource->properties[1];
   EXPECT_EQ(rights.name.data(), "rights");
-  EXPECT_EQ(rights.type_ctor->type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(static_cast<const fidl::flat::PrimitiveType*>(rights.type_ctor->type)->subtype,
-            fidl::types::PrimitiveSubtype::kUint32);
+  EXPECT_EQ(rights.type_ctor->type->kind, fidlc::Type::Kind::kPrimitive);
+  EXPECT_EQ(static_cast<const fidlc::PrimitiveType*>(rights.type_ctor->type)->subtype,
+            fidlc::PrimitiveSubtype::kUint32);
 }
 
 TEST(ResourceTests, GoodAliasedBaseTypeWithoutRights) {
@@ -101,9 +101,9 @@ resource_definition SomeResource : via {
 
   ASSERT_NE(resource->subtype_ctor, nullptr);
   auto underlying = resource->subtype_ctor->type;
-  ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
-  auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
-  EXPECT_EQ(underlying_primitive->subtype, fidl::types::PrimitiveSubtype::kUint32);
+  ASSERT_EQ(underlying->kind, fidlc::Type::Kind::kPrimitive);
+  auto underlying_primitive = static_cast<const fidlc::PrimitiveType*>(underlying);
+  EXPECT_EQ(underlying_primitive->subtype, fidlc::PrimitiveSubtype::kUint32);
 
   auto& subtype = resource->properties[0];
   EXPECT_EQ(subtype.name.data(), "subtype");
@@ -135,9 +135,9 @@ resource_definition SomeResource : via {
 
   ASSERT_NE(resource->subtype_ctor, nullptr);
   auto underlying = resource->subtype_ctor->type;
-  ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
-  auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
-  EXPECT_EQ(underlying_primitive->subtype, fidl::types::PrimitiveSubtype::kUint32);
+  ASSERT_EQ(underlying->kind, fidlc::Type::Kind::kPrimitive);
+  auto underlying_primitive = static_cast<const fidlc::PrimitiveType*>(underlying);
+  EXPECT_EQ(underlying_primitive->subtype, fidlc::PrimitiveSubtype::kUint32);
 
   auto& subtype = resource->properties[0];
   EXPECT_EQ(subtype.name.data(), "subtype");
@@ -146,9 +146,9 @@ resource_definition SomeResource : via {
 
   auto& rights = resource->properties[1];
   EXPECT_EQ(rights.name.data(), "rights");
-  EXPECT_EQ(rights.type_ctor->type->kind, fidl::flat::Type::Kind::kPrimitive);
-  EXPECT_EQ(static_cast<const fidl::flat::PrimitiveType*>(rights.type_ctor->type)->subtype,
-            fidl::types::PrimitiveSubtype::kUint32);
+  EXPECT_EQ(rights.type_ctor->type->kind, fidlc::Type::Kind::kPrimitive);
+  EXPECT_EQ(static_cast<const fidlc::PrimitiveType*>(rights.type_ctor->type)->subtype,
+            fidlc::PrimitiveSubtype::kUint32);
 }
 
 TEST(ResourceTests, BadEmpty) {
@@ -159,16 +159,16 @@ resource_definition SomeResource : uint32 {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrUnexpectedIdentifier,
-                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightCurly),
-                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kProperties));
+  library.ExpectFail(fidlc::ErrUnexpectedIdentifier,
+                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightCurly),
+                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kProperties));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourceTests, BadNoProperties) {
   TestLibrary library;
   library.AddFile("bad/fi-0029.test.fidl");
-  library.ExpectFail(fidl::ErrMustHaveOneProperty);
+  library.ExpectFail(fidlc::ErrMustHaveOneProperty);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -184,29 +184,29 @@ resource_definition MyResource : uint32 {
     };
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kResourceProperty, "rights",
-                     fidl::flat::Element::Kind::kResourceProperty, "example.fidl:7:9");
+  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kResourceProperty, "rights",
+                     fidlc::Element::Kind::kResourceProperty, "example.fidl:7:9");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourceTests, BadNotUint32) {
   TestLibrary library;
   library.AddFile("bad/fi-0172.test.fidl");
-  library.ExpectFail(fidl::ErrResourceMustBeUint32Derived, "MyResource");
+  library.ExpectFail(fidlc::ErrResourceMustBeUint32Derived, "MyResource");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourceTests, BadMissingSubtypePropertyTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0173.test.fidl");
-  library.ExpectFail(fidl::ErrResourceMissingSubtypeProperty, "MyResource");
+  library.ExpectFail(fidlc::ErrResourceMissingSubtypeProperty, "MyResource");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourceTests, BadSubtypeNotEnum) {
   TestLibrary library;
   library.AddFile("bad/fi-0175.test.fidl");
-  library.ExpectFail(fidl::ErrResourceSubtypePropertyMustReferToEnum, "MyResource");
+  library.ExpectFail(fidlc::ErrResourceSubtypePropertyMustReferToEnum, "MyResource");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -220,14 +220,14 @@ resource_definition handle : uint32 {
     };
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrResourceSubtypePropertyMustReferToEnum, "handle");
+  library.ExpectFail(fidlc::ErrResourceSubtypePropertyMustReferToEnum, "handle");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourceTests, BadNonBitsRights) {
   TestLibrary library;
   library.AddFile("bad/fi-0177.test.fidl");
-  library.ExpectFail(fidl::ErrResourceRightsPropertyMustReferToBits, "MyResource");
+  library.ExpectFail(fidlc::ErrResourceRightsPropertyMustReferToBits, "MyResource");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -241,8 +241,8 @@ resource_definition handle : uint32 {
     };
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrIncludeCycle, "resource 'handle' -> resource 'handle'");
-  library.ExpectFail(fidl::ErrResourceSubtypePropertyMustReferToEnum, "handle");
+  library.ExpectFail(fidlc::ErrIncludeCycle, "resource 'handle' -> resource 'handle'");
+  library.ExpectFail(fidlc::ErrResourceSubtypePropertyMustReferToEnum, "handle");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

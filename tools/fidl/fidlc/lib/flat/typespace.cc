@@ -8,49 +8,49 @@
 #include "tools/fidl/fidlc/include/fidl/flat/type_resolver.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
-static const Size kMaxSize = Size::Max();
+static const SizeValue kMaxSize = SizeValue::Max();
 
-static std::optional<types::PrimitiveSubtype> BuiltinToPrimitiveSubtype(Builtin::Identity id) {
+static std::optional<PrimitiveSubtype> BuiltinToPrimitiveSubtype(Builtin::Identity id) {
   switch (id) {
     case Builtin::Identity::kBool:
-      return types::PrimitiveSubtype::kBool;
+      return PrimitiveSubtype::kBool;
     case Builtin::Identity::kInt8:
-      return types::PrimitiveSubtype::kInt8;
+      return PrimitiveSubtype::kInt8;
     case Builtin::Identity::kInt16:
-      return types::PrimitiveSubtype::kInt16;
+      return PrimitiveSubtype::kInt16;
     case Builtin::Identity::kInt32:
-      return types::PrimitiveSubtype::kInt32;
+      return PrimitiveSubtype::kInt32;
     case Builtin::Identity::kInt64:
-      return types::PrimitiveSubtype::kInt64;
+      return PrimitiveSubtype::kInt64;
     case Builtin::Identity::kUint8:
-      return types::PrimitiveSubtype::kUint8;
+      return PrimitiveSubtype::kUint8;
     case Builtin::Identity::kZxUchar:
-      return types::PrimitiveSubtype::kZxUchar;
+      return PrimitiveSubtype::kZxUchar;
     case Builtin::Identity::kUint16:
-      return types::PrimitiveSubtype::kUint16;
+      return PrimitiveSubtype::kUint16;
     case Builtin::Identity::kUint32:
-      return types::PrimitiveSubtype::kUint32;
+      return PrimitiveSubtype::kUint32;
     case Builtin::Identity::kUint64:
-      return types::PrimitiveSubtype::kUint64;
+      return PrimitiveSubtype::kUint64;
     case Builtin::Identity::kZxUsize64:
-      return types::PrimitiveSubtype::kZxUsize64;
+      return PrimitiveSubtype::kZxUsize64;
     case Builtin::Identity::kZxUintptr64:
-      return types::PrimitiveSubtype::kZxUintptr64;
+      return PrimitiveSubtype::kZxUintptr64;
     case Builtin::Identity::kFloat32:
-      return types::PrimitiveSubtype::kFloat32;
+      return PrimitiveSubtype::kFloat32;
     case Builtin::Identity::kFloat64:
-      return types::PrimitiveSubtype::kFloat64;
+      return PrimitiveSubtype::kFloat64;
     default:
       return std::nullopt;
   }
 }
 
-static std::optional<types::InternalSubtype> BuiltinToInternalSubtype(Builtin::Identity id) {
+static std::optional<InternalSubtype> BuiltinToInternalSubtype(Builtin::Identity id) {
   switch (id) {
     case Builtin::Identity::kFrameworkErr:
-      return types::InternalSubtype::kFrameworkErr;
+      return InternalSubtype::kFrameworkErr;
     default:
       return std::nullopt;
   }
@@ -77,11 +77,11 @@ Typespace::Typespace(const Library* root_library, Reporter* reporter) : reporter
       std::make_unique<UntypedNumericType>(Name::CreateIntrinsic(nullptr, "untyped numeric"));
 }
 
-const PrimitiveType* Typespace::GetPrimitiveType(types::PrimitiveSubtype subtype) {
+const PrimitiveType* Typespace::GetPrimitiveType(PrimitiveSubtype subtype) {
   return primitive_types_.at(subtype).get();
 }
 
-const InternalType* Typespace::GetInternalType(types::InternalSubtype subtype) {
+const InternalType* Typespace::GetInternalType(InternalSubtype subtype) {
   return internal_types_.at(subtype).get();
 }
 
@@ -89,10 +89,10 @@ const Type* Typespace::GetUnboundedStringType() { return unbounded_string_type_.
 
 const Type* Typespace::GetStringType(size_t max_size) {
   auto name = unbounded_string_type_->name;
-  sizes_.push_back(std::make_unique<Size>(max_size));
+  sizes_.push_back(std::make_unique<SizeValue>(max_size));
   auto size = sizes_.back().get();
-  types_.push_back(std::make_unique<StringType>(
-      name, StringType::Constraints(size, types::Nullability::kNonnullable)));
+  types_.push_back(
+      std::make_unique<StringType>(name, StringType::Constraints(size, Nullability::kNonnullable)));
   return types_.back().get();
 }
 
@@ -122,8 +122,8 @@ class Typespace::Creator {
 
   bool EnsureNumberOfLayoutParams(size_t expected_params);
 
-  const Type* CreatePrimitiveType(types::PrimitiveSubtype subtype);
-  const Type* CreateInternalType(types::InternalSubtype subtype);
+  const Type* CreatePrimitiveType(PrimitiveSubtype subtype);
+  const Type* CreateInternalType(InternalSubtype subtype);
   const Type* CreateStringType();
   const Type* CreateArrayType();
   const Type* CreateStringArrayType();
@@ -214,7 +214,7 @@ const Type* Typespace::Creator::Create() {
     case Builtin::Identity::kServerEnd:
       return CreateTransportSideType(TransportSide::kServer);
     case Builtin::Identity::kByte:
-      return CreatePrimitiveType(types::PrimitiveSubtype::kUint8);
+      return CreatePrimitiveType(PrimitiveSubtype::kUint8);
     case Builtin::Identity::kFrameworkErr:
       return CreateInternalType(BuiltinToInternalSubtype(builtin->id).value());
     case Builtin::Identity::kOptional:
@@ -235,7 +235,7 @@ bool Typespace::Creator::EnsureNumberOfLayoutParams(size_t expected_params) {
                           expected_params, num_params);
 }
 
-const Type* Typespace::Creator::CreatePrimitiveType(types::PrimitiveSubtype subtype) {
+const Type* Typespace::Creator::CreatePrimitiveType(PrimitiveSubtype subtype) {
   if (!EnsureNumberOfLayoutParams(0)) {
     return nullptr;
   }
@@ -245,7 +245,7 @@ const Type* Typespace::Creator::CreatePrimitiveType(types::PrimitiveSubtype subt
   return typespace_->Intern(std::move(constrained_type));
 }
 
-const Type* Typespace::Creator::CreateInternalType(types::InternalSubtype subtype) {
+const Type* Typespace::Creator::CreateInternalType(InternalSubtype subtype) {
   if (!EnsureNumberOfLayoutParams(0)) {
     return nullptr;
   }
@@ -265,7 +265,7 @@ const Type* Typespace::Creator::CreateArrayType() {
   out_params_->element_type_resolved = element_type;
   out_params_->element_type_raw = parameters_.items[0]->AsTypeCtor();
 
-  const Size* size = nullptr;
+  const SizeValue* size = nullptr;
   if (!resolver_->ResolveParamAsSize(layout_, parameters_.items[1], &size))
     return nullptr;
   out_params_->size_resolved = size;
@@ -283,9 +283,9 @@ const Type* Typespace::Creator::CreateStringArrayType() {
     return nullptr;
   }
 
-  const Type* uint8_type = typespace_->GetPrimitiveType(types::PrimitiveSubtype::kUint8);
+  const Type* uint8_type = typespace_->GetPrimitiveType(PrimitiveSubtype::kUint8);
 
-  const Size* size = nullptr;
+  const SizeValue* size = nullptr;
   if (!resolver_->ResolveParamAsSize(layout_, parameters_.items[0], &size))
     return nullptr;
   out_params_->size_resolved = size;
@@ -456,7 +456,7 @@ const Type* Typespace::Creator::CreateBoxType() {
     return nullptr;
   }
   const auto* inner = static_cast<const IdentifierType*>(boxed_type);
-  ZX_ASSERT_MSG(inner->nullability == types::Nullability::kNonnullable,
+  ZX_ASSERT_MSG(inner->nullability == Nullability::kNonnullable,
                 "the inner type must be non-nullable because it is a struct");
   // We disallow specifying the boxed type as nullable in FIDL source but
   // then mark the boxed type as nullable, so that internally it shares the
@@ -467,7 +467,7 @@ const Type* Typespace::Creator::CreateBoxType() {
   // box types own their own boxed types, we cast away the const to be able
   // to change the boxed type to be mutable.
   auto* mutable_inner = const_cast<IdentifierType*>(inner);
-  mutable_inner->nullability = types::Nullability::kNullable;
+  mutable_inner->nullability = Nullability::kNullable;
 
   out_params_->boxed_type_resolved = boxed_type;
   out_params_->boxed_type_raw = parameters_.items[0]->AsTypeCtor();
@@ -479,4 +479,4 @@ const Type* Typespace::Creator::CreateBoxType() {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

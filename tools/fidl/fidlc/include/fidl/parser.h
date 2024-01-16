@@ -19,9 +19,7 @@
 #include "tools/fidl/fidlc/include/fidl/types.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl {
-
-using utils::identity_t;
+namespace fidlc {
 
 // See https://fuchsia.dev/fuchsia-src/development/languages/fidl/reference/compiler#_parsing
 // for additional context
@@ -30,7 +28,7 @@ class Parser {
   Parser(Lexer* lexer, Reporter* reporter, ExperimentalFlags experimental_flags);
 
   // Returns the parsed raw AST, or null if there were unrecoverable errors.
-  std::unique_ptr<raw::File> Parse() { return ParseFile(); }
+  std::unique_ptr<File> Parse() { return ParseFile(); }
 
   // Returns true if there were no errors, not even recovered ones.
   bool Success() const { return checkpoint_.NoNewErrors(); }
@@ -89,9 +87,9 @@ class Parser {
     explicit ASTScope(Parser* parser) : parser_(parser) {
       parser_->active_ast_scopes_.emplace_back(Token(), Token());
     }
-    raw::SourceElement GetSourceElement() {
+    SourceElement GetSourceElement() {
       parser_->active_ast_scopes_.back().end_token = parser_->previous_token_;
-      return raw::SourceElement(parser_->active_ast_scopes_.back());
+      return SourceElement(parser_->active_ast_scopes_.back());
     }
     ~ASTScope() { parser_->active_ast_scopes_.pop_back(); }
 
@@ -218,93 +216,92 @@ class Parser {
   // included in |Allowlist|. The |decl_token| should be "struct", "enum", etc.
   // Marks the error as recovered so that parsing will continue.
   template <typename... Allowlist>
-  void ValidateModifiers(const std::unique_ptr<raw::Modifiers>& modifiers, Token decl_token) {
+  void ValidateModifiers(const std::unique_ptr<RawModifiers>& modifiers, Token decl_token) {
     const auto fail = [&](std::optional<Token> token) {
       Fail(ErrCannotSpecifyModifier, token.value(), token.value().kind_and_subkind(),
            decl_token.kind_and_subkind());
       RecoverOneError();
     };
-    if (!(std::is_same_v<types::Strictness, Allowlist> || ...) &&
+    if (!(std::is_same_v<Strictness, Allowlist> || ...) &&
         modifiers->maybe_strictness != std::nullopt) {
       fail(modifiers->maybe_strictness->token);
     }
-    if (!(std::is_same_v<types::Resourceness, Allowlist> || ...) &&
+    if (!(std::is_same_v<Resourceness, Allowlist> || ...) &&
         modifiers->maybe_resourceness != std::nullopt) {
       fail(modifiers->maybe_resourceness->token);
     }
-    if (!(std::is_same_v<types::Openness, Allowlist> || ...) &&
+    if (!(std::is_same_v<Openness, Allowlist> || ...) &&
         modifiers->maybe_openness != std::nullopt) {
       fail(modifiers->maybe_openness->token);
     }
   }
 
-  std::unique_ptr<raw::Identifier> ParseIdentifier();
-  std::unique_ptr<raw::CompoundIdentifier> ParseCompoundIdentifier();
-  std::unique_ptr<raw::CompoundIdentifier> ParseCompoundIdentifier(
-      ASTScope& scope, std::unique_ptr<raw::Identifier> first_identifier);
-  std::unique_ptr<raw::LibraryDeclaration> ParseLibraryDeclaration();
+  std::unique_ptr<RawIdentifier> ParseIdentifier();
+  std::unique_ptr<RawCompoundIdentifier> ParseCompoundIdentifier();
+  std::unique_ptr<RawCompoundIdentifier> ParseCompoundIdentifier(
+      ASTScope& scope, std::unique_ptr<RawIdentifier> first_identifier);
+  std::unique_ptr<RawLibraryDeclaration> ParseLibraryDeclaration();
 
-  std::unique_ptr<raw::StringLiteral> ParseStringLiteral();
-  std::unique_ptr<raw::NumericLiteral> ParseNumericLiteral();
-  std::unique_ptr<raw::BoolLiteral> ParseBoolLiteral(Token::Subkind subkind);
-  std::unique_ptr<raw::Literal> ParseLiteral();
-  std::unique_ptr<raw::Ordinal64> ParseOrdinal64();
+  std::unique_ptr<RawStringLiteral> ParseStringLiteral();
+  std::unique_ptr<RawNumericLiteral> ParseNumericLiteral();
+  std::unique_ptr<RawBoolLiteral> ParseBoolLiteral(Token::Subkind subkind);
+  std::unique_ptr<RawLiteral> ParseLiteral();
+  std::unique_ptr<RawOrdinal64> ParseOrdinal64();
 
-  std::unique_ptr<raw::Constant> ParseConstant();
-  std::unique_ptr<raw::ConstDeclaration> ParseConstDeclaration(
-      std::unique_ptr<raw::AttributeList> attributes, ASTScope&);
+  std::unique_ptr<RawConstant> ParseConstant();
+  std::unique_ptr<RawConstDeclaration> ParseConstDeclaration(
+      std::unique_ptr<RawAttributeList> attributes, ASTScope&);
 
-  std::unique_ptr<raw::AliasDeclaration> ParseAliasDeclaration(
-      std::unique_ptr<raw::AttributeList> attributes, ASTScope&);
-  std::unique_ptr<raw::Using> ParseUsing(std::unique_ptr<raw::AttributeList> attributes, ASTScope&);
+  std::unique_ptr<RawAliasDeclaration> ParseAliasDeclaration(
+      std::unique_ptr<RawAttributeList> attributes, ASTScope&);
+  std::unique_ptr<RawUsing> ParseUsing(std::unique_ptr<RawAttributeList> attributes, ASTScope&);
 
-  std::unique_ptr<raw::ParameterList> ParseParameterList();
-  std::unique_ptr<raw::ProtocolMethod> ParseProtocolEvent(
-      std::unique_ptr<raw::AttributeList> attributes, std::unique_ptr<raw::Modifiers> modifiers,
+  std::unique_ptr<RawParameterList> ParseParameterList();
+  std::unique_ptr<RawProtocolMethod> ParseProtocolEvent(
+      std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifiers> modifiers,
       ASTScope& scope);
-  std::unique_ptr<raw::ProtocolMethod> ParseProtocolMethod(
-      std::unique_ptr<raw::AttributeList> attributes, std::unique_ptr<raw::Modifiers> modifiers,
-      std::unique_ptr<raw::Identifier> method_name, ASTScope& scope);
-  std::unique_ptr<raw::ProtocolCompose> ParseProtocolCompose(
-      std::unique_ptr<raw::AttributeList> attributes, ASTScope& scope);
+  std::unique_ptr<RawProtocolMethod> ParseProtocolMethod(
+      std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifiers> modifiers,
+      std::unique_ptr<RawIdentifier> method_name, ASTScope& scope);
+  std::unique_ptr<RawProtocolCompose> ParseProtocolCompose(
+      std::unique_ptr<RawAttributeList> attributes, ASTScope& scope);
   // ParseProtocolMember parses any one protocol member, i.e. an event,
   // a method, or a compose stanza.
-  void ParseProtocolMember(std::vector<std::unique_ptr<raw::ProtocolCompose>>* composed_protocols,
-                           std::vector<std::unique_ptr<raw::ProtocolMethod>>* methods);
-  std::unique_ptr<raw::ProtocolDeclaration> ParseProtocolDeclaration(
-      std::unique_ptr<raw::AttributeList>, ASTScope&);
-  std::unique_ptr<raw::ResourceProperty> ParseResourcePropertyDeclaration();
+  void ParseProtocolMember(std::vector<std::unique_ptr<RawProtocolCompose>>* composed_protocols,
+                           std::vector<std::unique_ptr<RawProtocolMethod>>* methods);
+  std::unique_ptr<RawProtocolDeclaration> ParseProtocolDeclaration(
+      std::unique_ptr<RawAttributeList>, ASTScope&);
+  std::unique_ptr<RawResourceProperty> ParseResourcePropertyDeclaration();
   // TODO(https://fxbug.dev/64629): When we properly generalize handles, we will most
   // likely alter the name of a resource declaration, and how it looks
   // syntactically. While we rely on this feature in `library zx;`, it should
   // be considered experimental for all other intents and purposes.
-  std::unique_ptr<raw::ResourceDeclaration> ParseResourceDeclaration(
-      std::unique_ptr<raw::AttributeList>, ASTScope&);
-  std::unique_ptr<raw::ServiceMember> ParseServiceMember();
+  std::unique_ptr<RawResourceDeclaration> ParseResourceDeclaration(
+      std::unique_ptr<RawAttributeList>, ASTScope&);
+  std::unique_ptr<RawServiceMember> ParseServiceMember();
   // This method may be used to parse the second attribute argument onward - the first argument in
   // the list is handled separately in ParseAttributeNew().
-  std::unique_ptr<raw::AttributeArg> ParseSubsequentAttributeArg();
-  std::unique_ptr<raw::ServiceDeclaration> ParseServiceDeclaration(
-      std::unique_ptr<raw::AttributeList>, ASTScope&);
-  std::unique_ptr<raw::Attribute> ParseAttribute();
-  std::unique_ptr<raw::Attribute> ParseDocComment();
-  std::unique_ptr<raw::AttributeList> ParseAttributeList(
-      std::unique_ptr<raw::Attribute> doc_comment, ASTScope& scope);
-  std::unique_ptr<raw::AttributeList> MaybeParseAttributeList();
-  std::unique_ptr<raw::LayoutParameter> ParseLayoutParameter();
-  std::unique_ptr<raw::LayoutParameterList> MaybeParseLayoutParameterList();
-  std::unique_ptr<raw::LayoutMember> ParseLayoutMember(raw::LayoutMember::Kind);
-  std::unique_ptr<raw::Layout> ParseLayout(
-      ASTScope& scope, std::unique_ptr<raw::Modifiers> modifiers,
-      std::unique_ptr<raw::CompoundIdentifier> compound_identifier,
-      std::unique_ptr<raw::TypeConstructor> subtype_ctor);
-  std::unique_ptr<raw::TypeConstraints> ParseTypeConstraints();
-  raw::ConstraintOrSubtype ParseTokenAfterColon();
+  std::unique_ptr<RawAttributeArg> ParseSubsequentAttributeArg();
+  std::unique_ptr<RawServiceDeclaration> ParseServiceDeclaration(std::unique_ptr<RawAttributeList>,
+                                                                 ASTScope&);
+  std::unique_ptr<RawAttribute> ParseAttribute();
+  std::unique_ptr<RawAttribute> ParseDocComment();
+  std::unique_ptr<RawAttributeList> ParseAttributeList(std::unique_ptr<RawAttribute> doc_comment,
+                                                       ASTScope& scope);
+  std::unique_ptr<RawAttributeList> MaybeParseAttributeList();
+  std::unique_ptr<RawLayoutParameter> ParseLayoutParameter();
+  std::unique_ptr<RawLayoutParameterList> MaybeParseLayoutParameterList();
+  std::unique_ptr<RawLayoutMember> ParseLayoutMember(RawLayoutMember::Kind);
+  std::unique_ptr<RawLayout> ParseLayout(ASTScope& scope, std::unique_ptr<RawModifiers> modifiers,
+                                         std::unique_ptr<RawCompoundIdentifier> compound_identifier,
+                                         std::unique_ptr<RawTypeConstructor> subtype_ctor);
+  std::unique_ptr<RawTypeConstraints> ParseTypeConstraints();
+  ConstraintOrSubtype ParseTokenAfterColon();
 
-  std::unique_ptr<raw::TypeConstructor> ParseTypeConstructor();
-  std::unique_ptr<raw::TypeDeclaration> ParseTypeDeclaration(
-      std::unique_ptr<raw::AttributeList> attributes, ASTScope&);
-  std::unique_ptr<raw::File> ParseFile();
+  std::unique_ptr<RawTypeConstructor> ParseTypeConstructor();
+  std::unique_ptr<RawTypeDeclaration> ParseTypeDeclaration(
+      std::unique_ptr<RawAttributeList> attributes, ASTScope&);
+  std::unique_ptr<File> ParseFile();
 
   enum class RecoverResult : uint8_t {
     Failure,
@@ -356,7 +353,7 @@ class Parser {
   const ExperimentalFlags experimental_flags_;
 
   // The stack of information interesting to the currently active ASTScope objects.
-  std::vector<raw::SourceElement> active_ast_scopes_;
+  std::vector<SourceElement> active_ast_scopes_;
 
   // The token before last_token_ (below).
   Token previous_token_;
@@ -368,6 +365,6 @@ class Parser {
   std::vector<Token> tokens_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_PARSER_H_

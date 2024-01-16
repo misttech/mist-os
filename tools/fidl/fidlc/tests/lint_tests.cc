@@ -278,7 +278,7 @@ closed protocol Example {
   Foo();
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrFlexibleOneWayMethodInClosedProtocol, "one-way method");
+  library.ExpectFail(fidlc::ErrFlexibleOneWayMethodInClosedProtocol, "one-way method");
   ASSERT_COMPILER_DIAGNOSTICS(library);
   ASSERT_FALSE(library.Lint({.included_check_ids = {"explicit-flexible-method-modifier"}}));
   ASSERT_WARNINGS(1, library, "Foo must have an explicit 'flexible' modifier");
@@ -294,7 +294,7 @@ closed protocol Example {
   -> OnFoo();
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrFlexibleOneWayMethodInClosedProtocol, "event");
+  library.ExpectFail(fidlc::ErrFlexibleOneWayMethodInClosedProtocol, "event");
   ASSERT_COMPILER_DIAGNOSTICS(library);
   ASSERT_FALSE(library.Lint({.included_check_ids = {"explicit-flexible-method-modifier"}}));
   ASSERT_WARNINGS(1, library, "OnFoo must have an explicit 'flexible' modifier");

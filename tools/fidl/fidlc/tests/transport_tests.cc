@@ -130,7 +130,7 @@ protocol P {
 };
 )FIDL");
   library.UseLibraryFdf();
-  library.ExpectFail(fidl::ErrHandleUsedInIncompatibleTransport, "fdf.handle", "Channel",
+  library.ExpectFail(fidlc::ErrHandleUsedInIncompatibleTransport, "fdf.handle", "Channel",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -148,7 +148,7 @@ protocol P {
   });
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrTransportEndUsedInIncompatibleTransport, "Driver", "Channel",
+  library.ExpectFail(fidlc::ErrTransportEndUsedInIncompatibleTransport, "Driver", "Channel",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -168,7 +168,7 @@ protocol P {
   });
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrTransportEndUsedInIncompatibleTransport, "Driver", "Channel",
+  library.ExpectFail(fidlc::ErrTransportEndUsedInIncompatibleTransport, "Driver", "Channel",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -187,7 +187,7 @@ protocol P {
   });
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrTransportEndUsedInIncompatibleTransport, "Driver", "Banjo",
+  library.ExpectFail(fidlc::ErrTransportEndUsedInIncompatibleTransport, "Driver", "Banjo",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -206,7 +206,7 @@ protocol P {
   });
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrTransportEndUsedInIncompatibleTransport, "Banjo", "Driver",
+  library.ExpectFail(fidlc::ErrTransportEndUsedInIncompatibleTransport, "Banjo", "Driver",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -214,7 +214,7 @@ protocol P {
 TEST(TransportTests, BadSyscallTransportWithDriverClientEndRequest) {
   TestLibrary library;
   library.AddFile("bad/fi-0118.test.fidl");
-  library.ExpectFail(fidl::ErrTransportEndUsedInIncompatibleTransport, "Driver", "Syscall",
+  library.ExpectFail(fidlc::ErrTransportEndUsedInIncompatibleTransport, "Driver", "Syscall",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -233,7 +233,7 @@ protocol P {
   });
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrTransportEndUsedInIncompatibleTransport, "Syscall", "Syscall",
+  library.ExpectFail(fidlc::ErrTransportEndUsedInIncompatibleTransport, "Syscall", "Syscall",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -262,7 +262,7 @@ protocol P {
   });
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrHandleUsedInIncompatibleTransport, "example.handle", "Channel",
+  library.ExpectFail(fidlc::ErrHandleUsedInIncompatibleTransport, "example.handle", "Channel",
                      "protocol 'P'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -271,7 +271,7 @@ TEST(TransportTests, BadDriverHandleInZirconChannel) {
   TestLibrary library;
   library.AddFile("bad/fi-0117.test.fidl");
   library.UseLibraryFdf();
-  library.ExpectFail(fidl::ErrHandleUsedInIncompatibleTransport, "fdf.handle", "Channel",
+  library.ExpectFail(fidlc::ErrHandleUsedInIncompatibleTransport, "fdf.handle", "Channel",
                      "protocol 'Protocol'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -280,8 +280,8 @@ TEST(TransportTests, BadCannotReassignTransport) {
   TestLibrary library;
   library.AddFile("bad/fi-0167.test.fidl");
 
-  library.ExpectFail(fidl::ErrCannotConstrainTwice, "ClientEnd");
-  library.ExpectFail(fidl::ErrCannotConstrainTwice, "ServerEnd");
+  library.ExpectFail(fidlc::ErrCannotConstrainTwice, "ClientEnd");
+  library.ExpectFail(fidlc::ErrCannotConstrainTwice, "ServerEnd");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

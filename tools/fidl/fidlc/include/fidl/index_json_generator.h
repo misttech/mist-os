@@ -16,24 +16,24 @@
 #include "tools/fidl/fidlc/include/fidl/json_writer.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
 
-namespace fidl {
+namespace fidlc {
 
-class IndexJSONGenerator : public utils::JsonWriter<IndexJSONGenerator> {
+class IndexJSONGenerator : public JsonWriter<IndexJSONGenerator> {
  public:
   // "using" is required for overridden methods, so the implementations in
   // both the base class and in this derived class are visible when matching
   // parameter types
-  using utils::JsonWriter<IndexJSONGenerator>::Generate;
-  using utils::JsonWriter<IndexJSONGenerator>::GenerateArray;
+  using JsonWriter<IndexJSONGenerator>::Generate;
+  using JsonWriter<IndexJSONGenerator>::GenerateArray;
 
-  explicit IndexJSONGenerator(const flat::Compilation* compilation)
+  explicit IndexJSONGenerator(const Compilation* compilation)
       : JsonWriter(json_file_), compilation_(compilation) {}
 
   ~IndexJSONGenerator() = default;
 
   // struct representing an identifier from dependency library referenced in target library
   struct ReferencedIdentifier {
-    explicit ReferencedIdentifier(const flat::Name& name) : identifier(NameFlatName(name)) {
+    explicit ReferencedIdentifier(const Name& name) : identifier(NameFlatName(name)) {
       ZX_ASSERT_MSG(name.span().has_value(), "anonymous name used as an identifier");
       span = name.span().value();
     }
@@ -45,31 +45,31 @@ class IndexJSONGenerator : public utils::JsonWriter<IndexJSONGenerator> {
 
   void Generate(SourceSpan value);
   void Generate(ReferencedIdentifier value);
-  void Generate(const flat::Compilation::Dependency& dependency);
-  void Generate(std::pair<flat::Library*, SourceSpan> reference);
-  void Generate(const flat::Const& value);
-  void Generate(const flat::Constant& value);
-  void Generate(const flat::Enum& value);
-  void Generate(const flat::Enum::Member& value);
-  void Generate(const flat::Name& name);
-  void Generate(const flat::Struct& value);
-  void Generate(const flat::Struct::Member& value);
-  void Generate(const flat::TypeConstructor* value);
-  void Generate(const flat::Protocol& value);
-  void Generate(const flat::Protocol::ComposedProtocol& value);
-  void Generate(const flat::Protocol::MethodWithInfo& method_with_info);
-  void Generate(const flat::Union& value);
-  void Generate(const flat::Union::Member& value);
-  void Generate(const flat::Table& value);
-  void Generate(const flat::Table::Member& value);
+  void Generate(const Compilation::Dependency& dependency);
+  void Generate(std::pair<Library*, SourceSpan> reference);
+  void Generate(const Const& value);
+  void Generate(const Constant& value);
+  void Generate(const Enum& value);
+  void Generate(const Enum::Member& value);
+  void Generate(const Name& name);
+  void Generate(const Struct& value);
+  void Generate(const Struct::Member& value);
+  void Generate(const TypeConstructor* value);
+  void Generate(const Protocol& value);
+  void Generate(const Protocol::ComposedProtocol& value);
+  void Generate(const Protocol::MethodWithInfo& method_with_info);
+  void Generate(const Union& value);
+  void Generate(const Union::Member& value);
+  void Generate(const Table& value);
+  void Generate(const Table::Member& value);
 
   std::ostringstream Produce();
 
  private:
   std::vector<ReferencedIdentifier> GetDependencyIdentifiers();
-  const flat::Compilation* compilation_;
+  const Compilation* compilation_;
   std::ostringstream json_file_;
 };
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_INDEX_JSON_GENERATOR_H_

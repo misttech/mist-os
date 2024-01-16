@@ -8,7 +8,7 @@
 
 #include <string>
 
-namespace fidl::fmt {
+namespace fidlc {
 
 namespace {
 
@@ -550,4 +550,4 @@ std::optional<SpanSequence::Kind> StandaloneCommentSpanSequence::Print(
   return SpanSequence::Kind::kStandaloneComment;
 }
 
-}  // namespace fidl::fmt
+}  // namespace fidlc

@@ -11,7 +11,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
 
-namespace fidl {
+namespace fidlc {
 
 // A SourceSpan represents a span of a source file. It consists of a std::string_view, and a
 // reference to the SourceFile that is backing the std::string_view.
@@ -54,6 +54,6 @@ class SourceSpan {
   const SourceFile* source_file_ = nullptr;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SOURCE_SPAN_H_

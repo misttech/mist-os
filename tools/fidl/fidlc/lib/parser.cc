@@ -15,7 +15,7 @@
 #include "tools/fidl/fidlc/include/fidl/types.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl {
+namespace fidlc {
 
 // The "case" keyword is not folded into CASE_TOKEN and CASE_IDENTIFIER because
 // doing so confuses clang-format.
@@ -77,19 +77,19 @@ std::nullptr_t Parser::Fail(const ErrorDef<Id, Args...>& err, SourceSpan span,
   return nullptr;
 }
 
-std::unique_ptr<raw::Identifier> Parser::ParseIdentifier() {
+std::unique_ptr<RawIdentifier> Parser::ParseIdentifier() {
   ASTScope scope(this);
   std::optional<Token> token = ConsumeToken(OfKind(Token::Kind::kIdentifier));
   if (!Ok() || !token)
     return Fail();
   std::string identifier(token->data());
-  if (!utils::IsValidIdentifierComponent(identifier))
+  if (!IsValidIdentifierComponent(identifier))
     return Fail(ErrInvalidIdentifier, identifier);
 
-  return std::make_unique<raw::Identifier>(scope.GetSourceElement());
+  return std::make_unique<RawIdentifier>(scope.GetSourceElement());
 }
 
-std::unique_ptr<raw::CompoundIdentifier> Parser::ParseCompoundIdentifier() {
+std::unique_ptr<RawCompoundIdentifier> Parser::ParseCompoundIdentifier() {
   ASTScope scope(this);
   auto first_identifier = ParseIdentifier();
   if (!Ok())
@@ -98,9 +98,9 @@ std::unique_ptr<raw::CompoundIdentifier> Parser::ParseCompoundIdentifier() {
   return ParseCompoundIdentifier(scope, std::move(first_identifier));
 }
 
-std::unique_ptr<raw::CompoundIdentifier> Parser::ParseCompoundIdentifier(
-    ASTScope& scope, std::unique_ptr<raw::Identifier> first_identifier) {
-  std::vector<std::unique_ptr<raw::Identifier>> components;
+std::unique_ptr<RawCompoundIdentifier> Parser::ParseCompoundIdentifier(
+    ASTScope& scope, std::unique_ptr<RawIdentifier> first_identifier) {
+  std::vector<std::unique_ptr<RawIdentifier>> components;
   components.push_back(std::move(first_identifier));
 
   auto parse_component = [&components, this]() {
@@ -122,10 +122,10 @@ std::unique_ptr<raw::CompoundIdentifier> Parser::ParseCompoundIdentifier(
       return Fail();
   }
 
-  return std::make_unique<raw::CompoundIdentifier>(scope.GetSourceElement(), std::move(components));
+  return std::make_unique<RawCompoundIdentifier>(scope.GetSourceElement(), std::move(components));
 }
 
-std::unique_ptr<raw::LibraryDeclaration> Parser::ParseLibraryDeclaration() {
+std::unique_ptr<RawLibraryDeclaration> Parser::ParseLibraryDeclaration() {
   ASTScope scope(this);
   auto attributes = MaybeParseAttributeList();
   if (!Ok())
@@ -141,34 +141,34 @@ std::unique_ptr<raw::LibraryDeclaration> Parser::ParseLibraryDeclaration() {
 
   for (const auto& component : library_name->components) {
     std::string component_data(component->start_token.data());
-    if (!utils::IsValidLibraryComponent(component_data)) {
+    if (!IsValidLibraryComponent(component_data)) {
       return Fail(ErrInvalidLibraryNameComponent, component->start_token, component_data);
     }
   }
 
-  return std::make_unique<raw::LibraryDeclaration>(scope.GetSourceElement(), std::move(attributes),
-                                                   std::move(library_name));
+  return std::make_unique<RawLibraryDeclaration>(scope.GetSourceElement(), std::move(attributes),
+                                                 std::move(library_name));
 }
 
-std::unique_ptr<raw::StringLiteral> Parser::ParseStringLiteral() {
+std::unique_ptr<RawStringLiteral> Parser::ParseStringLiteral() {
   ASTScope scope(this);
   ConsumeToken(OfKind(Token::Kind::kStringLiteral));
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::StringLiteral>(scope.GetSourceElement());
+  return std::make_unique<RawStringLiteral>(scope.GetSourceElement());
 }
 
-std::unique_ptr<raw::NumericLiteral> Parser::ParseNumericLiteral() {
+std::unique_ptr<RawNumericLiteral> Parser::ParseNumericLiteral() {
   ASTScope scope(this);
   ConsumeToken(OfKind(Token::Kind::kNumericLiteral));
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::NumericLiteral>(scope.GetSourceElement());
+  return std::make_unique<RawNumericLiteral>(scope.GetSourceElement());
 }
 
-std::unique_ptr<raw::Ordinal64> Parser::ParseOrdinal64() {
+std::unique_ptr<RawOrdinal64> Parser::ParseOrdinal64() {
   ASTScope scope(this);
 
   if (!MaybeConsumeToken(OfKind(Token::Kind::kNumericLiteral)))
@@ -190,20 +190,20 @@ std::unique_ptr<raw::Ordinal64> Parser::ParseOrdinal64() {
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::Ordinal64>(scope.GetSourceElement(), ordinal);
+  return std::make_unique<RawOrdinal64>(scope.GetSourceElement(), ordinal);
 }
 
-std::unique_ptr<raw::BoolLiteral> Parser::ParseBoolLiteral(Token::Subkind subkind) {
+std::unique_ptr<RawBoolLiteral> Parser::ParseBoolLiteral(Token::Subkind subkind) {
   ASTScope scope(this);
   ConsumeToken(IdentifierOfSubkind(subkind));
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::BoolLiteral>(scope.GetSourceElement(),
-                                            Token::Subkind::kTrue == subkind);
+  return std::make_unique<RawBoolLiteral>(scope.GetSourceElement(),
+                                          Token::Subkind::kTrue == subkind);
 }
 
-std::unique_ptr<raw::Literal> Parser::ParseLiteral() {
+std::unique_ptr<RawLiteral> Parser::ParseLiteral() {
   switch (Peek().combined()) {
     case CASE_TOKEN(Token::Kind::kStringLiteral):
       return ParseStringLiteral();
@@ -222,7 +222,7 @@ std::unique_ptr<raw::Literal> Parser::ParseLiteral() {
   }
 }
 
-std::unique_ptr<raw::AttributeArg> Parser::ParseSubsequentAttributeArg() {
+std::unique_ptr<RawAttributeArg> Parser::ParseSubsequentAttributeArg() {
   ASTScope scope(this);
   auto name = ParseIdentifier();
   if (!Ok())
@@ -236,11 +236,11 @@ std::unique_ptr<raw::AttributeArg> Parser::ParseSubsequentAttributeArg() {
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::AttributeArg>(scope.GetSourceElement(), std::move(name),
-                                             std::move(value));
+  return std::make_unique<RawAttributeArg>(scope.GetSourceElement(), std::move(name),
+                                           std::move(value));
 }
 
-std::unique_ptr<raw::Attribute> Parser::ParseAttribute() {
+std::unique_ptr<RawAttribute> Parser::ParseAttribute() {
   ASTScope scope(this);
   ConsumeToken(OfKind(Token::Kind::kAt));
   if (!Ok())
@@ -250,7 +250,7 @@ std::unique_ptr<raw::Attribute> Parser::ParseAttribute() {
   if (!Ok())
     return Fail();
 
-  std::vector<std::unique_ptr<raw::AttributeArg>> args;
+  std::vector<std::unique_ptr<RawAttributeArg>> args;
   if (MaybeConsumeToken(OfKind(Token::Kind::kLeftParen))) {
     if (Peek().kind() == Token::Kind::kRightParen) {
       return Fail(ErrAttributeWithEmptyParens);
@@ -279,8 +279,8 @@ std::unique_ptr<raw::Attribute> Parser::ParseAttribute() {
     switch (Peek().kind()) {
       case Token::Kind::kRightParen: {
         // This attribute has a single, unnamed argument.
-        args.emplace_back(std::make_unique<raw::AttributeArg>(arg_scope.GetSourceElement(),
-                                                              std::move(maybe_constant)));
+        args.emplace_back(std::make_unique<RawAttributeArg>(arg_scope.GetSourceElement(),
+                                                            std::move(maybe_constant)));
         ConsumeToken(OfKind(Token::Kind::kRightParen));
         if (!Ok())
           return Fail();
@@ -292,10 +292,10 @@ std::unique_ptr<raw::Attribute> Parser::ParseAttribute() {
       }
       case Token::Kind::kEqual: {
         // This attribute has multiple arguments.
-        if (maybe_constant->kind != raw::Constant::Kind::kIdentifier) {
+        if (maybe_constant->kind != RawConstant::Kind::kIdentifier) {
           return Fail(ErrInvalidIdentifier, maybe_constant->span().data());
         }
-        auto constant = static_cast<raw::IdentifierConstant*>(maybe_constant.get());
+        auto constant = static_cast<RawIdentifierConstant*>(maybe_constant.get());
         if (constant->identifier->components.size() > 1) {
           return Fail(ErrInvalidIdentifier, maybe_constant->span().data());
         }
@@ -309,8 +309,8 @@ std::unique_ptr<raw::Attribute> Parser::ParseAttribute() {
         if (!Ok())
           return Fail();
 
-        args.emplace_back(std::make_unique<raw::AttributeArg>(
-            arg_scope.GetSourceElement(), std::move(arg_name), std::move(value)));
+        args.emplace_back(std::make_unique<RawAttributeArg>(arg_scope.GetSourceElement(),
+                                                            std::move(arg_name), std::move(value)));
         while (Peek().kind() == Token::Kind::kComma) {
           ConsumeToken(OfKind(Token::Kind::kComma));
           if (!Ok())
@@ -338,13 +338,12 @@ std::unique_ptr<raw::Attribute> Parser::ParseAttribute() {
     }
   }
 
-  return std::make_unique<raw::Attribute>(scope.GetSourceElement(), std::move(name),
-                                          std::move(args));
+  return std::make_unique<RawAttribute>(scope.GetSourceElement(), std::move(name), std::move(args));
 }
 
-std::unique_ptr<raw::AttributeList> Parser::ParseAttributeList(
-    std::unique_ptr<raw::Attribute> doc_comment, ASTScope& scope) {
-  std::vector<std::unique_ptr<raw::Attribute>> attributes;
+std::unique_ptr<RawAttributeList> Parser::ParseAttributeList(
+    std::unique_ptr<RawAttribute> doc_comment, ASTScope& scope) {
+  std::vector<std::unique_ptr<RawAttribute>> attributes;
   if (doc_comment)
     attributes.emplace_back(std::move(doc_comment));
 
@@ -367,10 +366,10 @@ std::unique_ptr<raw::AttributeList> Parser::ParseAttributeList(
     }
   }
 
-  return std::make_unique<raw::AttributeList>(scope.GetSourceElement(), std::move(attributes));
+  return std::make_unique<RawAttributeList>(scope.GetSourceElement(), std::move(attributes));
 }
 
-std::unique_ptr<raw::Attribute> Parser::ParseDocComment() {
+std::unique_ptr<RawAttribute> Parser::ParseDocComment() {
   ASTScope scope(this);
   std::optional<Token> doc_line;
   std::optional<Token> first_doc_line;
@@ -389,23 +388,22 @@ std::unique_ptr<raw::Attribute> Parser::ParseDocComment() {
     }
   }
 
-  auto literal = std::make_unique<raw::DocCommentLiteral>(scope.GetSourceElement());
-  auto constant = std::make_unique<raw::LiteralConstant>(std::move(literal));
+  auto literal = std::make_unique<RawDocCommentLiteral>(scope.GetSourceElement());
+  auto constant = std::make_unique<RawLiteralConstant>(std::move(literal));
   if (Peek().kind() == Token::Kind::kEndOfFile)
     reporter_->Warn(WarnDocCommentMustBeFollowedByDeclaration, previous_token_.span());
 
-  std::vector<std::unique_ptr<raw::AttributeArg>> args;
+  std::vector<std::unique_ptr<RawAttributeArg>> args;
   args.emplace_back(
-      std::make_unique<raw::AttributeArg>(scope.GetSourceElement(), std::move(constant)));
+      std::make_unique<RawAttributeArg>(scope.GetSourceElement(), std::move(constant)));
 
-  auto doc_comment_attr =
-      raw::Attribute::CreateDocComment(scope.GetSourceElement(), std::move(args));
-  return std::make_unique<raw::Attribute>(std::move(doc_comment_attr));
+  auto doc_comment_attr = RawAttribute::CreateDocComment(scope.GetSourceElement(), std::move(args));
+  return std::make_unique<RawAttribute>(std::move(doc_comment_attr));
 }
 
-std::unique_ptr<raw::AttributeList> Parser::MaybeParseAttributeList() {
+std::unique_ptr<RawAttributeList> Parser::MaybeParseAttributeList() {
   ASTScope scope(this);
-  std::unique_ptr<raw::Attribute> doc_comment;
+  std::unique_ptr<RawAttribute> doc_comment;
   // Doc comments must appear above attributes
   if (Peek().kind() == Token::Kind::kDocComment) {
     doc_comment = ParseDocComment();
@@ -415,15 +413,15 @@ std::unique_ptr<raw::AttributeList> Parser::MaybeParseAttributeList() {
   }
   // no generic attributes, start the attribute list
   if (doc_comment) {
-    std::vector<std::unique_ptr<raw::Attribute>> attributes;
+    std::vector<std::unique_ptr<RawAttribute>> attributes;
     attributes.emplace_back(std::move(doc_comment));
-    return std::make_unique<raw::AttributeList>(scope.GetSourceElement(), std::move(attributes));
+    return std::make_unique<RawAttributeList>(scope.GetSourceElement(), std::move(attributes));
   }
   return nullptr;
 }
 
-std::unique_ptr<raw::Constant> Parser::ParseConstant() {
-  std::unique_ptr<raw::Constant> constant;
+std::unique_ptr<RawConstant> Parser::ParseConstant() {
+  std::unique_ptr<RawConstant> constant;
 
   switch (Peek().combined()) {
   // TODO(https://fxbug.dev/77561): by placing this before the kIdentifier check below, we are
@@ -443,7 +441,7 @@ std::unique_ptr<raw::Constant> Parser::ParseConstant() {
     auto literal = ParseLiteral();
     if (!Ok())
       return Fail();
-    constant = std::make_unique<raw::LiteralConstant>(std::move(literal));
+    constant = std::make_unique<RawLiteralConstant>(std::move(literal));
     break;
   }
 
@@ -462,7 +460,7 @@ std::unique_ptr<raw::Constant> Parser::ParseConstant() {
       auto identifier = ParseCompoundIdentifier();
       if (!Ok())
         return Fail();
-      constant = std::make_unique<raw::IdentifierConstant>(std::move(identifier));
+      constant = std::make_unique<RawIdentifierConstant>(std::move(identifier));
     } else {
       return Fail();
     }
@@ -474,14 +472,14 @@ std::unique_ptr<raw::Constant> Parser::ParseConstant() {
     std::unique_ptr right_operand = ParseConstant();
     if (!Ok())
       return Fail();
-    return std::make_unique<raw::BinaryOperatorConstant>(
-        std::move(constant), std::move(right_operand), raw::BinaryOperatorConstant::Operator::kOr);
+    return std::make_unique<RawBinaryOperatorConstant>(
+        std::move(constant), std::move(right_operand), RawBinaryOperatorConstant::Operator::kOr);
   }
   return constant;
 }
 
-std::unique_ptr<raw::AliasDeclaration> Parser::ParseAliasDeclaration(
-    std::unique_ptr<raw::AttributeList> attributes, ASTScope& scope) {
+std::unique_ptr<RawAliasDeclaration> Parser::ParseAliasDeclaration(
+    std::unique_ptr<RawAttributeList> attributes, ASTScope& scope) {
   ConsumeToken(IdentifierOfSubkind(Token::Subkind::kAlias));
   if (!Ok())
     return Fail();
@@ -498,12 +496,12 @@ std::unique_ptr<raw::AliasDeclaration> Parser::ParseAliasDeclaration(
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::AliasDeclaration>(scope.GetSourceElement(), std::move(attributes),
-                                                 std::move(alias), std::move(type_ctor));
+  return std::make_unique<RawAliasDeclaration>(scope.GetSourceElement(), std::move(attributes),
+                                               std::move(alias), std::move(type_ctor));
 }
 
-std::unique_ptr<raw::Using> Parser::ParseUsing(std::unique_ptr<raw::AttributeList> attributes,
-                                               ASTScope& scope) {
+std::unique_ptr<RawUsing> Parser::ParseUsing(std::unique_ptr<RawAttributeList> attributes,
+                                             ASTScope& scope) {
   ConsumeToken(IdentifierOfSubkind(Token::Subkind::kUsing));
   if (!Ok())
     return Fail();
@@ -512,7 +510,7 @@ std::unique_ptr<raw::Using> Parser::ParseUsing(std::unique_ptr<raw::AttributeLis
   if (!Ok())
     return Fail();
 
-  std::unique_ptr<raw::Identifier> maybe_alias;
+  std::unique_ptr<RawIdentifier> maybe_alias;
   if (MaybeConsumeToken(IdentifierOfSubkind(Token::Subkind::kAs))) {
     if (!Ok())
       return Fail();
@@ -521,12 +519,12 @@ std::unique_ptr<raw::Using> Parser::ParseUsing(std::unique_ptr<raw::AttributeLis
       return Fail();
   }
 
-  return std::make_unique<raw::Using>(scope.GetSourceElement(), std::move(attributes),
-                                      std::move(using_path), std::move(maybe_alias));
+  return std::make_unique<RawUsing>(scope.GetSourceElement(), std::move(attributes),
+                                    std::move(using_path), std::move(maybe_alias));
 }
 
-std::unique_ptr<raw::ConstDeclaration> Parser::ParseConstDeclaration(
-    std::unique_ptr<raw::AttributeList> attributes, ASTScope& scope) {
+std::unique_ptr<RawConstDeclaration> Parser::ParseConstDeclaration(
+    std::unique_ptr<RawAttributeList> attributes, ASTScope& scope) {
   ConsumeToken(IdentifierOfSubkind(Token::Subkind::kConst));
   if (!Ok())
     return Fail();
@@ -545,14 +543,14 @@ std::unique_ptr<raw::ConstDeclaration> Parser::ParseConstDeclaration(
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::ConstDeclaration>(scope.GetSourceElement(), std::move(attributes),
-                                                 std::move(type_ctor), std::move(identifier),
-                                                 std::move(constant));
+  return std::make_unique<RawConstDeclaration>(scope.GetSourceElement(), std::move(attributes),
+                                               std::move(type_ctor), std::move(identifier),
+                                               std::move(constant));
 }
 
-std::unique_ptr<raw::ParameterList> Parser::ParseParameterList() {
+std::unique_ptr<RawParameterList> Parser::ParseParameterList() {
   ASTScope scope(this);
-  std::unique_ptr<raw::TypeConstructor> type_ctor;
+  std::unique_ptr<RawTypeConstructor> type_ctor;
 
   ConsumeToken(OfKind(Token::Kind::kLeftParen));
   if (!Ok())
@@ -567,16 +565,16 @@ std::unique_ptr<raw::ParameterList> Parser::ParseParameterList() {
       }
     }
 
-    if (type_ctor && type_ctor->layout_ref->kind == raw::LayoutReference::Kind::kInline) {
+    if (type_ctor && type_ctor->layout_ref->kind == RawLayoutReference::Kind::kInline) {
       const auto* layout =
-          static_cast<const raw::InlineLayoutReference*>(type_ctor->layout_ref.get());
+          static_cast<const RawInlineLayoutReference*>(type_ctor->layout_ref.get());
       if (layout->attributes != nullptr) {
         auto& attrs = layout->attributes->attributes;
-        if (!attrs.empty() && attrs[0]->provenance == raw::Attribute::Provenance::kDocComment) {
+        if (!attrs.empty() && attrs[0]->provenance == RawAttribute::Provenance::kDocComment) {
           auto& args = attrs[0]->args;
-          if (!args.empty() && args[0]->value->kind == raw::Constant::Kind::kLiteral) {
-            auto literal_constant = static_cast<raw::LiteralConstant*>(args[0]->value.get());
-            if (literal_constant->literal->kind == raw::Literal::Kind::kDocComment) {
+          if (!args.empty() && args[0]->value->kind == RawConstant::Kind::kLiteral) {
+            auto literal_constant = static_cast<RawLiteralConstant*>(args[0]->value.get());
+            if (literal_constant->literal->kind == RawLiteral::Kind::kDocComment) {
               Fail(ErrDocCommentOnParameters, attrs[0]->span());
               const auto result = RecoverToEndOfParamList();
               if (result == RecoverResult::Failure) {
@@ -593,11 +591,11 @@ std::unique_ptr<raw::ParameterList> Parser::ParseParameterList() {
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::ParameterList>(scope.GetSourceElement(), std::move(type_ctor));
+  return std::make_unique<RawParameterList>(scope.GetSourceElement(), std::move(type_ctor));
 }
 
-std::unique_ptr<raw::ProtocolMethod> Parser::ParseProtocolEvent(
-    std::unique_ptr<raw::AttributeList> attributes, std::unique_ptr<raw::Modifiers> modifiers,
+std::unique_ptr<RawProtocolMethod> Parser::ParseProtocolEvent(
+    std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifiers> modifiers,
     ASTScope& scope) {
   ConsumeToken(OfKind(Token::Kind::kArrow));
   if (!Ok())
@@ -607,19 +605,19 @@ std::unique_ptr<raw::ProtocolMethod> Parser::ParseProtocolEvent(
   if (!Ok())
     return Fail();
 
-  auto parse_params = [this](std::unique_ptr<raw::ParameterList>* params_out) {
+  auto parse_params = [this](std::unique_ptr<RawParameterList>* params_out) {
     if (!Ok())
       return false;
     *params_out = ParseParameterList();
     return Ok();
   };
 
-  std::unique_ptr<raw::ParameterList> request;
-  std::unique_ptr<raw::ParameterList> response;
+  std::unique_ptr<RawParameterList> request;
+  std::unique_ptr<RawParameterList> response;
   if (!parse_params(&response))
     return Fail();
 
-  std::unique_ptr<raw::TypeConstructor> maybe_error;
+  std::unique_ptr<RawTypeConstructor> maybe_error;
   if (MaybeConsumeToken(IdentifierOfSubkind(Token::Subkind::kError))) {
     maybe_error = ParseTypeConstructor();
     if (!Ok())
@@ -629,25 +627,25 @@ std::unique_ptr<raw::ProtocolMethod> Parser::ParseProtocolEvent(
   ZX_ASSERT(method_name);
   ZX_ASSERT(response != nullptr);
 
-  return std::make_unique<raw::ProtocolMethod>(
+  return std::make_unique<RawProtocolMethod>(
       scope.GetSourceElement(), std::move(attributes), std::move(modifiers), std::move(method_name),
       std::move(request), std::move(response), std::move(maybe_error));
 }
 
-std::unique_ptr<raw::ProtocolMethod> Parser::ParseProtocolMethod(
-    std::unique_ptr<raw::AttributeList> attributes, std::unique_ptr<raw::Modifiers> modifiers,
-    std::unique_ptr<raw::Identifier> method_name, ASTScope& scope) {
-  auto parse_params = [this](std::unique_ptr<raw::ParameterList>* params_out) {
+std::unique_ptr<RawProtocolMethod> Parser::ParseProtocolMethod(
+    std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifiers> modifiers,
+    std::unique_ptr<RawIdentifier> method_name, ASTScope& scope) {
+  auto parse_params = [this](std::unique_ptr<RawParameterList>* params_out) {
     *params_out = ParseParameterList();
     return Ok();
   };
 
-  std::unique_ptr<raw::ParameterList> request;
+  std::unique_ptr<RawParameterList> request;
   if (!parse_params(&request))
     return Fail();
 
-  std::unique_ptr<raw::ParameterList> maybe_response;
-  std::unique_ptr<raw::TypeConstructor> maybe_error;
+  std::unique_ptr<RawParameterList> maybe_response;
+  std::unique_ptr<RawTypeConstructor> maybe_error;
   if (MaybeConsumeToken(OfKind(Token::Kind::kArrow))) {
     if (!Ok())
       return Fail();
@@ -663,26 +661,26 @@ std::unique_ptr<raw::ProtocolMethod> Parser::ParseProtocolMethod(
   ZX_ASSERT(method_name);
   ZX_ASSERT(request != nullptr);
 
-  return std::make_unique<raw::ProtocolMethod>(
+  return std::make_unique<RawProtocolMethod>(
       scope.GetSourceElement(), std::move(attributes), std::move(modifiers), std::move(method_name),
       std::move(request), std::move(maybe_response), std::move(maybe_error));
 }
 
-std::unique_ptr<raw::ProtocolCompose> Parser::ParseProtocolCompose(
-    std::unique_ptr<raw::AttributeList> attributes, ASTScope& scope) {
+std::unique_ptr<RawProtocolCompose> Parser::ParseProtocolCompose(
+    std::unique_ptr<RawAttributeList> attributes, ASTScope& scope) {
   auto identifier = ParseCompoundIdentifier();
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::ProtocolCompose>(scope.GetSourceElement(), std::move(attributes),
-                                                std::move(identifier));
+  return std::make_unique<RawProtocolCompose>(scope.GetSourceElement(), std::move(attributes),
+                                              std::move(identifier));
 }
 
 void Parser::ParseProtocolMember(
-    std::vector<std::unique_ptr<raw::ProtocolCompose>>* composed_protocols,
-    std::vector<std::unique_ptr<raw::ProtocolMethod>>* methods) {
+    std::vector<std::unique_ptr<RawProtocolCompose>>* composed_protocols,
+    std::vector<std::unique_ptr<RawProtocolMethod>>* methods) {
   ASTScope scope(this);
-  std::unique_ptr<raw::AttributeList> attributes = MaybeParseAttributeList();
+  std::unique_ptr<RawAttributeList> attributes = MaybeParseAttributeList();
   if (!Ok()) {
     Fail();
     return;
@@ -696,8 +694,8 @@ void Parser::ParseProtocolMember(
       return;
     }
     case Token::Kind::kIdentifier: {
-      std::unique_ptr<raw::Modifiers> modifiers;
-      std::unique_ptr<raw::Identifier> method_name;
+      std::unique_ptr<RawModifiers> modifiers;
+      std::unique_ptr<RawIdentifier> method_name;
       if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kCompose)) {
         // There are two possibilities here: we are looking at the first token in a compose
         // statement like `compose a.b;`, or we are looking at the identifier of a method that has
@@ -719,8 +717,8 @@ void Parser::ParseProtocolMember(
 
         // Looks like this is a `compose(...);` method after all, so coerce the composed token into
         // an Identifier source element.
-        method_name = std::make_unique<raw::Identifier>(
-            raw::SourceElement(compose_token.value(), compose_token.value()));
+        method_name = std::make_unique<RawIdentifier>(
+            SourceElement(compose_token.value(), compose_token.value()));
       } else if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kStrict) ||
                  Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kFlexible)) {
         // There are two possibilities here: we are looking at a method or event with strictness
@@ -739,12 +737,11 @@ void Parser::ParseProtocolMember(
           method_name = std::move(maybe_modifier);
         } else {
           // This is a modifier on either an event or a method.
-          auto as_strictness = modifier_subkind == Token::Subkind::kFlexible
-                                   ? types::Strictness::kFlexible
-                                   : types::Strictness::kStrict;
-          modifiers = std::make_unique<raw::Modifiers>(
-              raw::SourceElement(maybe_modifier->start_token, maybe_modifier->end_token),
-              raw::Modifier<types::Strictness>(as_strictness, maybe_modifier->start_token));
+          auto as_strictness = modifier_subkind == Token::Subkind::kFlexible ? Strictness::kFlexible
+                                                                             : Strictness::kStrict;
+          modifiers = std::make_unique<RawModifiers>(
+              SourceElement(maybe_modifier->start_token, maybe_modifier->end_token),
+              RawModifier<Strictness>(as_strictness, maybe_modifier->start_token));
           switch (Peek().kind()) {
             case Token::Kind::kArrow: {
               add(methods, [&] {
@@ -793,11 +790,11 @@ void Parser::ParseProtocolMember(
   }
 }
 
-std::unique_ptr<raw::ProtocolDeclaration> Parser::ParseProtocolDeclaration(
-    std::unique_ptr<raw::AttributeList> attributes, ASTScope& scope) {
-  std::unique_ptr<raw::Modifiers> modifiers;
-  std::vector<std::unique_ptr<raw::ProtocolCompose>> composed_protocols;
-  std::vector<std::unique_ptr<raw::ProtocolMethod>> methods;
+std::unique_ptr<RawProtocolDeclaration> Parser::ParseProtocolDeclaration(
+    std::unique_ptr<RawAttributeList> attributes, ASTScope& scope) {
+  std::unique_ptr<RawModifiers> modifiers;
+  std::vector<std::unique_ptr<RawProtocolCompose>> composed_protocols;
+  std::vector<std::unique_ptr<RawProtocolMethod>> methods;
 
   if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kOpen) ||
       Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kAjar) ||
@@ -807,23 +804,23 @@ std::unique_ptr<raw::ProtocolDeclaration> Parser::ParseProtocolDeclaration(
     if (!Ok())
       return Fail();
 
-    types::Openness as_openness;
+    Openness as_openness;
     switch (modifier_subkind) {
       case Token::Subkind::kOpen:
-        as_openness = types::Openness::kOpen;
+        as_openness = Openness::kOpen;
         break;
       case Token::Subkind::kAjar:
-        as_openness = types::Openness::kAjar;
+        as_openness = Openness::kAjar;
         break;
       case Token::Subkind::kClosed:
-        as_openness = types::Openness::kClosed;
+        as_openness = Openness::kClosed;
         break;
       default:
         ZX_PANIC("expected openness token");
     }
-    modifiers = std::make_unique<raw::Modifiers>(
-        raw::SourceElement(modifier->start_token, modifier->end_token),
-        raw::Modifier<types::Openness>(as_openness, modifier->start_token));
+    modifiers =
+        std::make_unique<RawModifiers>(SourceElement(modifier->start_token, modifier->end_token),
+                                       RawModifier<Openness>(as_openness, modifier->start_token));
   }
 
   ConsumeToken(IdentifierOfSubkind(Token::Subkind::kProtocol));
@@ -862,12 +859,12 @@ std::unique_ptr<raw::ProtocolDeclaration> Parser::ParseProtocolDeclaration(
   if (!Ok())
     Fail();
 
-  return std::make_unique<raw::ProtocolDeclaration>(
+  return std::make_unique<RawProtocolDeclaration>(
       scope.GetSourceElement(), std::move(attributes), std::move(modifiers), std::move(identifier),
       std::move(composed_protocols), std::move(methods));
 }
 
-std::unique_ptr<raw::ResourceProperty> Parser::ParseResourcePropertyDeclaration() {
+std::unique_ptr<RawResourceProperty> Parser::ParseResourcePropertyDeclaration() {
   ASTScope scope(this);
   auto attributes = MaybeParseAttributeList();
   if (!Ok())
@@ -880,13 +877,13 @@ std::unique_ptr<raw::ResourceProperty> Parser::ParseResourcePropertyDeclaration(
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::ResourceProperty>(scope.GetSourceElement(), std::move(type_ctor),
-                                                 std::move(identifier), std::move(attributes));
+  return std::make_unique<RawResourceProperty>(scope.GetSourceElement(), std::move(type_ctor),
+                                               std::move(identifier), std::move(attributes));
 }
 
-std::unique_ptr<raw::ResourceDeclaration> Parser::ParseResourceDeclaration(
-    std::unique_ptr<raw::AttributeList> attributes, ASTScope& scope) {
-  std::vector<std::unique_ptr<raw::ResourceProperty>> properties;
+std::unique_ptr<RawResourceDeclaration> Parser::ParseResourceDeclaration(
+    std::unique_ptr<RawAttributeList> attributes, ASTScope& scope) {
+  std::vector<std::unique_ptr<RawResourceProperty>> properties;
 
   ConsumeToken(IdentifierOfSubkind(Token::Subkind::kResourceDefinition));
   if (!Ok())
@@ -896,17 +893,17 @@ std::unique_ptr<raw::ResourceDeclaration> Parser::ParseResourceDeclaration(
   if (!Ok())
     return Fail();
 
-  std::unique_ptr<raw::TypeConstructor> maybe_type_ctor;
+  std::unique_ptr<RawTypeConstructor> maybe_type_ctor;
   if (MaybeConsumeToken(OfKind(Token::Kind::kColon))) {
     ASTScope type_identifier_scope(this);
     auto resource_type_identifier = ParseCompoundIdentifier();
     if (!Ok())
       return Fail();
 
-    maybe_type_ctor = std::make_unique<raw::TypeConstructor>(
+    maybe_type_ctor = std::make_unique<RawTypeConstructor>(
         scope.GetSourceElement(),
-        std::make_unique<raw::NamedLayoutReference>(type_identifier_scope.GetSourceElement(),
-                                                    std::move(resource_type_identifier)),
+        std::make_unique<RawNamedLayoutReference>(type_identifier_scope.GetSourceElement(),
+                                                  std::move(resource_type_identifier)),
         /*parameters=*/nullptr,
         /*constraints=*/nullptr);
   }
@@ -965,12 +962,12 @@ std::unique_ptr<raw::ResourceDeclaration> Parser::ParseResourceDeclaration(
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::ResourceDeclaration>(
-      scope.GetSourceElement(), std::move(attributes), std::move(identifier),
-      std::move(maybe_type_ctor), std::move(properties));
+  return std::make_unique<RawResourceDeclaration>(scope.GetSourceElement(), std::move(attributes),
+                                                  std::move(identifier), std::move(maybe_type_ctor),
+                                                  std::move(properties));
 }
 
-std::unique_ptr<raw::ServiceMember> Parser::ParseServiceMember() {
+std::unique_ptr<RawServiceMember> Parser::ParseServiceMember() {
   ASTScope scope(this);
   auto attributes = MaybeParseAttributeList();
   if (!Ok())
@@ -983,13 +980,13 @@ std::unique_ptr<raw::ServiceMember> Parser::ParseServiceMember() {
   if (!Ok())
     return Fail();
 
-  return std::make_unique<raw::ServiceMember>(scope.GetSourceElement(), std::move(type_ctor),
-                                              std::move(identifier), std::move(attributes));
+  return std::make_unique<RawServiceMember>(scope.GetSourceElement(), std::move(type_ctor),
+                                            std::move(identifier), std::move(attributes));
 }
 
-std::unique_ptr<raw::ServiceDeclaration> Parser::ParseServiceDeclaration(
-    std::unique_ptr<raw::AttributeList> attributes, ASTScope& scope) {
-  std::vector<std::unique_ptr<raw::ServiceMember>> members;
+std::unique_ptr<RawServiceDeclaration> Parser::ParseServiceDeclaration(
+    std::unique_ptr<RawAttributeList> attributes, ASTScope& scope) {
+  std::vector<std::unique_ptr<RawServiceMember>> members;
 
   ConsumeToken(IdentifierOfSubkind(Token::Subkind::kService));
   if (!Ok())
@@ -1026,11 +1023,11 @@ std::unique_ptr<raw::ServiceDeclaration> Parser::ParseServiceDeclaration(
   if (!Ok())
     Fail();
 
-  return std::make_unique<raw::ServiceDeclaration>(scope.GetSourceElement(), std::move(attributes),
-                                                   std::move(identifier), std::move(members));
+  return std::make_unique<RawServiceDeclaration>(scope.GetSourceElement(), std::move(attributes),
+                                                 std::move(identifier), std::move(members));
 }
 
-std::unique_ptr<raw::LayoutParameter> Parser::ParseLayoutParameter() {
+std::unique_ptr<RawLayoutParameter> Parser::ParseLayoutParameter() {
   ASTScope scope(this);
 
   switch (Peek().combined()) {
@@ -1038,9 +1035,9 @@ std::unique_ptr<raw::LayoutParameter> Parser::ParseLayoutParameter() {
     auto literal = ParseLiteral();
     if (!Ok())
       return Fail();
-    auto constant = std::make_unique<raw::LiteralConstant>(std::move(literal));
-    return std::make_unique<raw::LiteralLayoutParameter>(scope.GetSourceElement(),
-                                                         std::move(constant));
+    auto constant = std::make_unique<RawLiteralConstant>(std::move(literal));
+    return std::make_unique<RawLiteralLayoutParameter>(scope.GetSourceElement(),
+                                                       std::move(constant));
   }
   default: {
     auto type_ctor = ParseTypeConstructor();
@@ -1052,25 +1049,24 @@ std::unique_ptr<raw::LayoutParameter> Parser::ParseLayoutParameter() {
     // In cases with no type parameters or constraints present (ie, just "foo"), it is impossible
     // to deduce whether "foo" refers to a type or a value.  In such cases, we must discard the
     // recently built type constructor, and convert it to a compound identifier instead.
-    if (type_ctor->layout_ref->kind == raw::LayoutReference::Kind::kNamed &&
+    if (type_ctor->layout_ref->kind == RawLayoutReference::Kind::kNamed &&
         type_ctor->parameters == nullptr && type_ctor->constraints == nullptr) {
-      auto named_ref = static_cast<raw::NamedLayoutReference*>(type_ctor->layout_ref.get());
-      return std::make_unique<raw::IdentifierLayoutParameter>(scope.GetSourceElement(),
-                                                              std::move(named_ref->identifier));
+      auto named_ref = static_cast<RawNamedLayoutReference*>(type_ctor->layout_ref.get());
+      return std::make_unique<RawIdentifierLayoutParameter>(scope.GetSourceElement(),
+                                                            std::move(named_ref->identifier));
     }
-    return std::make_unique<raw::TypeLayoutParameter>(scope.GetSourceElement(),
-                                                      std::move(type_ctor));
+    return std::make_unique<RawTypeLayoutParameter>(scope.GetSourceElement(), std::move(type_ctor));
   }
   }
 }
 
-std::unique_ptr<raw::LayoutParameterList> Parser::MaybeParseLayoutParameterList() {
+std::unique_ptr<RawLayoutParameterList> Parser::MaybeParseLayoutParameterList() {
   ASTScope scope(this);
   if (!MaybeConsumeToken(OfKind(Token::Kind::kLeftAngle))) {
     return nullptr;
   }
 
-  std::vector<std::unique_ptr<raw::LayoutParameter>> params;
+  std::vector<std::unique_ptr<RawLayoutParameter>> params;
   for (;;) {
     params.emplace_back(ParseLayoutParameter());
     if (!Ok())
@@ -1082,13 +1078,13 @@ std::unique_ptr<raw::LayoutParameterList> Parser::MaybeParseLayoutParameterList(
   if (!ConsumeToken(OfKind(Token::Kind::kRightAngle)))
     return Fail();
 
-  return std::make_unique<raw::LayoutParameterList>(scope.GetSourceElement(), std::move(params));
+  return std::make_unique<RawLayoutParameterList>(scope.GetSourceElement(), std::move(params));
 }
 
-std::unique_ptr<raw::TypeConstraints> Parser::ParseTypeConstraints() {
+std::unique_ptr<RawTypeConstraints> Parser::ParseTypeConstraints() {
   ASTScope scope(this);
   bool bracketed = false;
-  std::vector<std::unique_ptr<raw::Constant>> constraints;
+  std::vector<std::unique_ptr<RawConstant>> constraints;
   if (MaybeConsumeToken(OfKind(Token::Kind::kLeftAngle))) {
     bracketed = true;
   }
@@ -1108,19 +1104,19 @@ std::unique_ptr<raw::TypeConstraints> Parser::ParseTypeConstraints() {
   } else {
     ZX_ASSERT_MSG(constraints.size() == 1, "only parse one constraint when no brackets present");
   }
-  return std::make_unique<raw::TypeConstraints>(scope.GetSourceElement(), std::move(constraints));
+  return std::make_unique<RawTypeConstraints>(scope.GetSourceElement(), std::move(constraints));
 }
 
-std::unique_ptr<raw::LayoutMember> Parser::ParseLayoutMember(raw::LayoutMember::Kind kind) {
+std::unique_ptr<RawLayoutMember> Parser::ParseLayoutMember(RawLayoutMember::Kind kind) {
   ASTScope scope(this);
 
   auto attributes = MaybeParseAttributeList();
   if (!Ok())
     return Fail();
 
-  std::unique_ptr<raw::Ordinal64> ordinal = nullptr;
-  std::unique_ptr<raw::Identifier> identifier = nullptr;
-  if (kind == raw::LayoutMember::Kind::kOrdinaled) {
+  std::unique_ptr<RawOrdinal64> ordinal = nullptr;
+  std::unique_ptr<RawIdentifier> identifier = nullptr;
+  if (kind == RawLayoutMember::Kind::kOrdinaled) {
     ordinal = ParseOrdinal64();
     if (!Ok())
       return Fail();
@@ -1131,8 +1127,8 @@ std::unique_ptr<raw::LayoutMember> Parser::ParseLayoutMember(raw::LayoutMember::
       return Fail();
 
     if (identifier_is_reserved && Peek().kind() == Token::Kind::kSemicolon) {
-      return std::make_unique<raw::OrdinaledLayoutMember>(
-          scope.GetSourceElement(), std::move(attributes), std::move(ordinal));
+      return std::make_unique<RawOrdinaledLayoutMember>(scope.GetSourceElement(),
+                                                        std::move(attributes), std::move(ordinal));
     }
   }
 
@@ -1142,8 +1138,8 @@ std::unique_ptr<raw::LayoutMember> Parser::ParseLayoutMember(raw::LayoutMember::
       return Fail();
   }
 
-  std::unique_ptr<raw::TypeConstructor> layout = nullptr;
-  if (kind != raw::LayoutMember::Kind::kValue) {
+  std::unique_ptr<RawTypeConstructor> layout = nullptr;
+  if (kind != RawLayoutMember::Kind::kValue) {
     layout = ParseTypeConstructor();
     if (!Ok())
       return Fail();
@@ -1151,14 +1147,14 @@ std::unique_ptr<raw::LayoutMember> Parser::ParseLayoutMember(raw::LayoutMember::
 
   // An equal sign followed by a constant (aka, a default value) is optional for
   // a struct member, but required for a value member.
-  std::unique_ptr<raw::Constant> value = nullptr;
-  if (kind == raw::LayoutMember::Kind::kStruct && MaybeConsumeToken(OfKind(Token::Kind::kEqual))) {
+  std::unique_ptr<RawConstant> value = nullptr;
+  if (kind == RawLayoutMember::Kind::kStruct && MaybeConsumeToken(OfKind(Token::Kind::kEqual))) {
     if (!Ok())
       return Fail();
     value = ParseConstant();
     if (!Ok())
       return Fail();
-  } else if (kind == raw::LayoutMember::Kind::kValue) {
+  } else if (kind == RawLayoutMember::Kind::kValue) {
     ConsumeToken(OfKind(Token::Kind::kEqual));
     if (!Ok())
       return Fail();
@@ -1169,71 +1165,71 @@ std::unique_ptr<raw::LayoutMember> Parser::ParseLayoutMember(raw::LayoutMember::
   }
 
   switch (kind) {
-    case raw::LayoutMember::Kind::kOrdinaled: {
-      return std::make_unique<raw::OrdinaledLayoutMember>(scope.GetSourceElement(),
-                                                          std::move(attributes), std::move(ordinal),
-                                                          std::move(identifier), std::move(layout));
+    case RawLayoutMember::Kind::kOrdinaled: {
+      return std::make_unique<RawOrdinaledLayoutMember>(scope.GetSourceElement(),
+                                                        std::move(attributes), std::move(ordinal),
+                                                        std::move(identifier), std::move(layout));
     }
-    case raw::LayoutMember::Kind::kStruct: {
-      return std::make_unique<raw::StructLayoutMember>(scope.GetSourceElement(),
-                                                       std::move(attributes), std::move(identifier),
-                                                       std::move(layout), std::move(value));
+    case RawLayoutMember::Kind::kStruct: {
+      return std::make_unique<RawStructLayoutMember>(scope.GetSourceElement(),
+                                                     std::move(attributes), std::move(identifier),
+                                                     std::move(layout), std::move(value));
     }
-    case raw::LayoutMember::Kind::kValue: {
-      return std::make_unique<raw::ValueLayoutMember>(
-          scope.GetSourceElement(), std::move(attributes), std::move(identifier), std::move(value));
+    case RawLayoutMember::Kind::kValue: {
+      return std::make_unique<RawValueLayoutMember>(scope.GetSourceElement(), std::move(attributes),
+                                                    std::move(identifier), std::move(value));
     }
   }
 }
 
-std::unique_ptr<raw::Layout> Parser::ParseLayout(
-    ASTScope& scope, std::unique_ptr<raw::Modifiers> modifiers,
-    std::unique_ptr<raw::CompoundIdentifier> compound_identifier,
-    std::unique_ptr<raw::TypeConstructor> subtype_ctor) {
-  raw::Layout::Kind layout_kind;
-  raw::LayoutMember::Kind member_kind;
+std::unique_ptr<RawLayout> Parser::ParseLayout(
+    ASTScope& scope, std::unique_ptr<RawModifiers> modifiers,
+    std::unique_ptr<RawCompoundIdentifier> compound_identifier,
+    std::unique_ptr<RawTypeConstructor> subtype_ctor) {
+  RawLayout::Kind layout_kind;
+  RawLayoutMember::Kind member_kind;
 
   if (compound_identifier->components.size() != 1) {
     return Fail(ErrInvalidLayoutClass);
   }
-  std::unique_ptr<raw::Identifier> identifier = std::move(compound_identifier->components[0]);
+  std::unique_ptr<RawIdentifier> identifier = std::move(compound_identifier->components[0]);
 
   if (identifier->span().data() == "bits") {
     if (modifiers != nullptr)
-      ValidateModifiers<types::Strictness>(modifiers, identifier->start_token);
-    layout_kind = raw::Layout::Kind::kBits;
-    member_kind = raw::LayoutMember::Kind::kValue;
+      ValidateModifiers<Strictness>(modifiers, identifier->start_token);
+    layout_kind = RawLayout::Kind::kBits;
+    member_kind = RawLayoutMember::Kind::kValue;
   } else if (identifier->span().data() == "enum") {
     if (modifiers != nullptr)
-      ValidateModifiers<types::Strictness>(modifiers, identifier->start_token);
-    layout_kind = raw::Layout::Kind::kEnum;
-    member_kind = raw::LayoutMember::Kind::kValue;
+      ValidateModifiers<Strictness>(modifiers, identifier->start_token);
+    layout_kind = RawLayout::Kind::kEnum;
+    member_kind = RawLayoutMember::Kind::kValue;
   } else if (identifier->span().data() == "struct") {
     if (modifiers != nullptr)
-      ValidateModifiers<types::Resourceness>(modifiers, identifier->start_token);
-    layout_kind = raw::Layout::Kind::kStruct;
-    member_kind = raw::LayoutMember::Kind::kStruct;
+      ValidateModifiers<Resourceness>(modifiers, identifier->start_token);
+    layout_kind = RawLayout::Kind::kStruct;
+    member_kind = RawLayoutMember::Kind::kStruct;
   } else if (identifier->span().data() == "table") {
     if (modifiers != nullptr)
-      ValidateModifiers<types::Resourceness>(modifiers, identifier->start_token);
-    layout_kind = raw::Layout::Kind::kTable;
-    member_kind = raw::LayoutMember::Kind::kOrdinaled;
+      ValidateModifiers<Resourceness>(modifiers, identifier->start_token);
+    layout_kind = RawLayout::Kind::kTable;
+    member_kind = RawLayoutMember::Kind::kOrdinaled;
   } else if (identifier->span().data() == "union") {
     if (modifiers != nullptr)
-      ValidateModifiers<types::Strictness, types::Resourceness>(modifiers, identifier->start_token);
-    layout_kind = raw::Layout::Kind::kUnion;
-    member_kind = raw::LayoutMember::Kind::kOrdinaled;
+      ValidateModifiers<Strictness, Resourceness>(modifiers, identifier->start_token);
+    layout_kind = RawLayout::Kind::kUnion;
+    member_kind = RawLayoutMember::Kind::kOrdinaled;
   } else if (experimental_flags_.IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes) &&
              identifier->span().data() == "overlay") {
     if (modifiers != nullptr)
-      ValidateModifiers<types::Strictness>(modifiers, identifier->start_token);
-    layout_kind = raw::Layout::Kind::kOverlay;
-    member_kind = raw::LayoutMember::Kind::kOrdinaled;
+      ValidateModifiers<Strictness>(modifiers, identifier->start_token);
+    layout_kind = RawLayout::Kind::kOverlay;
+    member_kind = RawLayoutMember::Kind::kOrdinaled;
   } else {
     return Fail(ErrInvalidLayoutClass);
   }
 
-  if (member_kind != raw::LayoutMember::Kind::kValue && subtype_ctor != nullptr) {
+  if (member_kind != RawLayoutMember::Kind::kValue && subtype_ctor != nullptr) {
     return Fail(ErrCannotSpecifySubtype, identifier->start_token.kind_and_subkind());
   }
 
@@ -1241,7 +1237,7 @@ std::unique_ptr<raw::Layout> Parser::ParseLayout(
   if (!Ok())
     return Fail();
 
-  std::vector<std::unique_ptr<raw::LayoutMember>> members;
+  std::vector<std::unique_ptr<RawLayoutMember>> members;
   auto parse_member = [&]() {
     if (Peek().kind() == Token::Kind::kRightCurly) {
       ConsumeToken(OfKind(Token::Kind::kRightCurly));
@@ -1272,8 +1268,8 @@ std::unique_ptr<raw::Layout> Parser::ParseLayout(
   if (!checkpoint.NoNewErrors())
     return nullptr;
 
-  return std::make_unique<raw::Layout>(scope.GetSourceElement(), layout_kind, std::move(members),
-                                       std::move(modifiers), std::move(subtype_ctor));
+  return std::make_unique<RawLayout>(scope.GetSourceElement(), layout_kind, std::move(members),
+                                     std::move(modifiers), std::move(subtype_ctor));
 }
 
 // The colon character is ambiguous. Consider the following two examples:
@@ -1291,9 +1287,9 @@ std::unique_ptr<raw::Layout> Parser::ParseLayout(
 // assume that this is in fact the inline layout case ("type A"). If it is not,
 // we assume that it is a named layout with constraints ("type B"). If a parse
 // failure occurs, std::monostate is returned.
-raw::ConstraintOrSubtype Parser::ParseTokenAfterColon() {
-  std::unique_ptr<raw::TypeConstructor> type_ctor;
-  std::unique_ptr<raw::TypeConstraints> constraints;
+ConstraintOrSubtype Parser::ParseTokenAfterColon() {
+  std::unique_ptr<RawTypeConstructor> type_ctor;
+  std::unique_ptr<RawTypeConstraints> constraints;
   ConsumeToken(OfKind(Token::Kind::kColon));
   if (!Ok()) {
     Fail();
@@ -1309,7 +1305,7 @@ raw::ConstraintOrSubtype Parser::ParseTokenAfterColon() {
     return constraints;
   }
 
-  std::unique_ptr<raw::Constant> constraint_or_subtype = ParseConstant();
+  std::unique_ptr<RawConstant> constraint_or_subtype = ParseConstant();
   if (!Ok()) {
     Fail();
     return std::monostate();
@@ -1318,36 +1314,36 @@ raw::ConstraintOrSubtype Parser::ParseTokenAfterColon() {
   // If the token after the constant is not an open brace, this was actually a
   // one-entry constraints block the whole time, so it should be parsed as such.
   if (Peek().kind() != Token::Kind::kLeftCurly) {
-    std::vector<std::unique_ptr<raw::Constant>> components;
+    std::vector<std::unique_ptr<RawConstant>> components;
     components.emplace_back(std::move(constraint_or_subtype));
-    return std::make_unique<raw::TypeConstraints>(scope.GetSourceElement(), std::move(components));
+    return std::make_unique<RawTypeConstraints>(scope.GetSourceElement(), std::move(components));
   }
 
   // The token we just parsed as a constant is in fact a layout subtype. Coerce
   // it into that class.
-  if (constraint_or_subtype->kind != raw::Constant::Kind::kIdentifier) {
+  if (constraint_or_subtype->kind != RawConstant::Kind::kIdentifier) {
     Fail(ErrInvalidWrappedType);
     return std::monostate();
   }
 
   auto subtype_element =
-      raw::SourceElement(constraint_or_subtype->start_token, constraint_or_subtype->end_token);
-  auto subtype_constant = static_cast<raw::IdentifierConstant*>(constraint_or_subtype.get());
-  auto subtype_ref = std::make_unique<raw::NamedLayoutReference>(
+      SourceElement(constraint_or_subtype->start_token, constraint_or_subtype->end_token);
+  auto subtype_constant = static_cast<RawIdentifierConstant*>(constraint_or_subtype.get());
+  auto subtype_ref = std::make_unique<RawNamedLayoutReference>(
       subtype_element, std::move(subtype_constant->identifier));
-  return std::make_unique<raw::TypeConstructor>(subtype_element, std::move(subtype_ref),
-                                                /*parameters=*/nullptr, /*constraints=*/nullptr);
+  return std::make_unique<RawTypeConstructor>(subtype_element, std::move(subtype_ref),
+                                              /*parameters=*/nullptr, /*constraints=*/nullptr);
 }
 
 using NamedOrInline =
-    std::variant<std::unique_ptr<raw::CompoundIdentifier>, std::unique_ptr<raw::Layout>>;
+    std::variant<std::unique_ptr<RawCompoundIdentifier>, std::unique_ptr<RawLayout>>;
 
 // [ name | { ... } ][ < ... > ][ : ... ]
-std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
+std::unique_ptr<RawTypeConstructor> Parser::ParseTypeConstructor() {
   ASTScope scope(this);
-  std::unique_ptr<raw::LayoutReference> layout_ref;
-  std::unique_ptr<raw::LayoutParameterList> parameters;
-  std::unique_ptr<raw::TypeConstraints> constraints;
+  std::unique_ptr<RawLayoutReference> layout_ref;
+  std::unique_ptr<RawLayoutParameterList> parameters;
+  std::unique_ptr<RawTypeConstraints> constraints;
   NamedOrInline layout;
   auto attributes = MaybeParseAttributeList();
 
@@ -1362,10 +1358,10 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
   {
     ASTScope layout_scope(this);
     bool resourceness_comes_first = false;
-    std::unique_ptr<raw::Modifiers> modifiers;
-    std::unique_ptr<raw::CompoundIdentifier> identifier;
-    std::optional<raw::Modifier<types::Strictness>> maybe_strictness = std::nullopt;
-    std::optional<raw::Modifier<types::Resourceness>> maybe_resourceness = std::nullopt;
+    std::unique_ptr<RawModifiers> modifiers;
+    std::unique_ptr<RawCompoundIdentifier> identifier;
+    std::optional<RawModifier<Strictness>> maybe_strictness = std::nullopt;
+    std::optional<RawModifier<Resourceness>> maybe_resourceness = std::nullopt;
 
     // Consume tokens until we get one that isn't a modifier, treating duplicates
     // and conflicts as immediately recovered errors. For conflicts (e.g. "strict
@@ -1405,8 +1401,8 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
           case Token::Subkind::kFlexible:
           case Token::Subkind::kStrict: {
             auto as_strictness = modifier_subkind == Token::Subkind::kFlexible
-                                     ? types::Strictness::kFlexible
-                                     : types::Strictness::kStrict;
+                                     ? Strictness::kFlexible
+                                     : Strictness::kStrict;
             if (maybe_strictness.has_value() && maybe_strictness->value == as_strictness) {
               Fail(ErrDuplicateModifier, modifier_token, modifier_token.kind_and_subkind());
               RecoverOneError();
@@ -1425,7 +1421,7 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
           }
           case Token::Subkind::kResource: {
             if (maybe_resourceness.has_value() &&
-                maybe_resourceness->value == types::Resourceness::kResource) {
+                maybe_resourceness->value == Resourceness::kResource) {
               Fail(ErrDuplicateModifier, modifier_token, modifier_token.kind_and_subkind());
               RecoverOneError();
               break;
@@ -1433,7 +1429,7 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
             if (maybe_strictness == std::nullopt) {
               resourceness_comes_first = true;
             }
-            maybe_resourceness.emplace(types::Resourceness::kResource, maybe_modifier->start_token);
+            maybe_resourceness.emplace(Resourceness::kResource, maybe_modifier->start_token);
             break;
           }
           default: {
@@ -1443,8 +1439,8 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
       } else {
         if (maybe_strictness.has_value() || maybe_resourceness.has_value()) {
           modifiers =
-              std::make_unique<raw::Modifiers>(layout_scope.GetSourceElement(), maybe_resourceness,
-                                               maybe_strictness, resourceness_comes_first);
+              std::make_unique<RawModifiers>(layout_scope.GetSourceElement(), maybe_resourceness,
+                                             maybe_strictness, resourceness_comes_first);
         }
         break;
       }
@@ -1467,9 +1463,9 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
         break;
       }
       case Token::Kind::kColon: {
-        raw::ConstraintOrSubtype after_colon = ParseTokenAfterColon();
-        std::visit(fidl::utils::matchers{
-                       [&](std::unique_ptr<raw::TypeConstraints>& constraint) -> void {
+        ConstraintOrSubtype after_colon = ParseTokenAfterColon();
+        std::visit(matchers{
+                       [&](std::unique_ptr<RawTypeConstraints>& constraint) -> void {
                          if (constraints != nullptr) {
                            Fail(ErrMultipleConstraintDefinitions, previous_token_.span());
                          }
@@ -1480,7 +1476,7 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
                          constraints = std::move(constraint);
                          layout = std::move(identifier);
                        },
-                       [&](std::unique_ptr<raw::TypeConstructor>& type_ctor) -> void {
+                       [&](std::unique_ptr<RawTypeConstructor>& type_ctor) -> void {
                          layout = ParseLayout(layout_scope, std::move(modifiers),
                                               std::move(identifier), std::move(type_ctor));
                          if (!Ok()) {
@@ -1507,17 +1503,17 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
   }
 
   // Build a LayoutReference of the right type based on the underlying type of the layout.
-  ZX_ASSERT_MSG(std::holds_alternative<std::unique_ptr<raw::CompoundIdentifier>>(layout) ||
-                    std::holds_alternative<std::unique_ptr<raw::Layout>>(layout),
+  ZX_ASSERT_MSG(std::holds_alternative<std::unique_ptr<RawCompoundIdentifier>>(layout) ||
+                    std::holds_alternative<std::unique_ptr<RawLayout>>(layout),
                 "must have set layout by this point");
-  std::visit(fidl::utils::matchers{
-                 [&](std::unique_ptr<raw::CompoundIdentifier>& named_layout) -> void {
-                   layout_ref = std::make_unique<raw::NamedLayoutReference>(
-                       raw::SourceElement(named_layout->start_token, named_layout->end_token),
+  std::visit(matchers{
+                 [&](std::unique_ptr<RawCompoundIdentifier>& named_layout) -> void {
+                   layout_ref = std::make_unique<RawNamedLayoutReference>(
+                       SourceElement(named_layout->start_token, named_layout->end_token),
                        std::move(named_layout));
                  },
-                 [&](std::unique_ptr<raw::Layout>& inline_layout) -> void {
-                   layout_ref = std::make_unique<raw::InlineLayoutReference>(
+                 [&](std::unique_ptr<RawLayout>& inline_layout) -> void {
+                   layout_ref = std::make_unique<RawInlineLayoutReference>(
                        scope.GetSourceElement(), std::move(attributes), std::move(inline_layout));
                  },
              },
@@ -1541,12 +1537,12 @@ std::unique_ptr<raw::TypeConstructor> Parser::ParseTypeConstructor() {
 
   ZX_ASSERT_MSG(layout_ref != nullptr,
                 "ParseTypeConstructor must always produce a non-null layout_ref");
-  return std::make_unique<raw::TypeConstructor>(scope.GetSourceElement(), std::move(layout_ref),
-                                                std::move(parameters), std::move(constraints));
+  return std::make_unique<RawTypeConstructor>(scope.GetSourceElement(), std::move(layout_ref),
+                                              std::move(parameters), std::move(constraints));
 }
 
-std::unique_ptr<raw::TypeDeclaration> Parser::ParseTypeDeclaration(
-    std::unique_ptr<raw::AttributeList> attributes, ASTScope& scope) {
+std::unique_ptr<RawTypeDeclaration> Parser::ParseTypeDeclaration(
+    std::unique_ptr<RawAttributeList> attributes, ASTScope& scope) {
   ConsumeToken(IdentifierOfSubkind(Token::Subkind::kType));
   if (!Ok())
     return Fail();
@@ -1564,15 +1560,15 @@ std::unique_ptr<raw::TypeDeclaration> Parser::ParseTypeDeclaration(
     return Fail();
 
   bool layout_has_attributes =
-      layout->layout_ref->kind == raw::LayoutReference::Kind::kInline &&
-      static_cast<raw::InlineLayoutReference*>(layout->layout_ref.get())->attributes != nullptr;
+      layout->layout_ref->kind == RawLayoutReference::Kind::kInline &&
+      static_cast<RawInlineLayoutReference*>(layout->layout_ref.get())->attributes != nullptr;
   if (attributes != nullptr && layout_has_attributes)
     return Fail(ErrRedundantAttributePlacement, scope.GetSourceElement().span());
-  return std::make_unique<raw::TypeDeclaration>(scope.GetSourceElement(), std::move(attributes),
-                                                std::move(identifier), std::move(layout));
+  return std::make_unique<RawTypeDeclaration>(scope.GetSourceElement(), std::move(attributes),
+                                              std::move(identifier), std::move(layout));
 }
 
-std::unique_ptr<raw::File> Parser::ParseFile() {
+std::unique_ptr<File> Parser::ParseFile() {
   ASTScope scope(this);
 
   ConsumeToken(OfKind(Token::Kind::kStartOfFile));
@@ -1584,16 +1580,16 @@ std::unique_ptr<raw::File> Parser::ParseFile() {
     return Fail();
 
   bool done_with_library_imports = false;
-  std::vector<std::unique_ptr<raw::AliasDeclaration>> alias_list;
-  std::vector<std::unique_ptr<raw::Using>> using_list;
-  std::vector<std::unique_ptr<raw::ConstDeclaration>> const_declaration_list;
-  std::vector<std::unique_ptr<raw::ProtocolDeclaration>> protocol_declaration_list;
-  std::vector<std::unique_ptr<raw::ResourceDeclaration>> resource_declaration_list;
-  std::vector<std::unique_ptr<raw::ServiceDeclaration>> service_declaration_list;
-  std::vector<std::unique_ptr<raw::TypeDeclaration>> type_decls;
+  std::vector<std::unique_ptr<RawAliasDeclaration>> alias_list;
+  std::vector<std::unique_ptr<RawUsing>> using_list;
+  std::vector<std::unique_ptr<RawConstDeclaration>> const_declaration_list;
+  std::vector<std::unique_ptr<RawProtocolDeclaration>> protocol_declaration_list;
+  std::vector<std::unique_ptr<RawResourceDeclaration>> resource_declaration_list;
+  std::vector<std::unique_ptr<RawServiceDeclaration>> service_declaration_list;
+  std::vector<std::unique_ptr<RawTypeDeclaration>> type_decls;
   auto parse_declaration = [&]() {
     ASTScope scope(this);
-    std::unique_ptr<raw::AttributeList> attributes = MaybeParseAttributeList();
+    std::unique_ptr<RawAttributeList> attributes = MaybeParseAttributeList();
     if (!Ok())
       return More;
 
@@ -1677,7 +1673,7 @@ std::unique_ptr<raw::File> Parser::ParseFile() {
   if (!Ok() || !end)
     return Fail();
 
-  return std::make_unique<raw::File>(
+  return std::make_unique<File>(
       scope.GetSourceElement(), std::move(library_decl), std::move(alias_list),
       std::move(using_list), std::move(const_declaration_list),
       std::move(protocol_declaration_list), std::move(resource_declaration_list),
@@ -1844,4 +1840,4 @@ Parser::RecoverResult Parser::RecoverToEndOfParamList() {
   }
 }
 
-}  // namespace fidl
+}  // namespace fidlc

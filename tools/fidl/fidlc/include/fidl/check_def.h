@@ -5,22 +5,12 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_CHECK_DEF_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_CHECK_DEF_H_
 
-///////////////////////////////////////////////////////////////
-// Even though this file is namespaced to "fidl::lint", it
-// could be promoted to the "fidl" namespace in the future.
-//
-// check and finding classes should not have any
-// dependencies on the "Lint" process. They should be
-// generic enough to be useful for capturing and reporting
-// findings from other developer tools, such as fidlc.
-///////////////////////////////////////////////////////////////
-
 #include <string>
 #include <utility>
 
 #include "tools/fidl/fidlc/include/fidl/template_string.h"
 
-namespace fidl::linter {
+namespace fidlc {
 
 // Each CheckDef corresponds to some associated linting logic that verifies code
 // meets or fails to meet a FIDL Readability requirement.
@@ -48,6 +38,6 @@ class CheckDef {
   TemplateString message_template_;
 };
 
-}  // namespace fidl::linter
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_CHECK_DEF_H_

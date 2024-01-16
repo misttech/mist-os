@@ -14,7 +14,7 @@
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl {
+namespace fidlc {
 
 // TODO(https://fxbug.dev/8027): Remove this class.
 class VirtualSourceFile : public SourceFile {
@@ -31,6 +31,6 @@ class VirtualSourceFile : public SourceFile {
   std::vector<std::unique_ptr<std::string>> virtual_lines_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_VIRTUAL_SOURCE_FILE_H_

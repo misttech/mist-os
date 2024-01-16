@@ -252,10 +252,10 @@ enum class Behavior {
   kIndex,
 };
 
-bool Parse(const fidl::SourceFile& source_file, fidl::Reporter* reporter,
-           fidl::flat::Compiler* compiler, const fidl::ExperimentalFlags& experimental_flags) {
-  fidl::Lexer lexer(source_file, reporter);
-  fidl::Parser parser(&lexer, reporter, experimental_flags);
+bool Parse(const fidlc::SourceFile& source_file, fidlc::Reporter* reporter,
+           fidlc::Compiler* compiler, const fidlc::ExperimentalFlags& experimental_flags) {
+  fidlc::Lexer lexer(source_file, reporter);
+  fidlc::Parser parser(&lexer, reporter, experimental_flags);
   auto ast = parser.Parse();
   if (!parser.Success()) {
     return false;
@@ -293,19 +293,20 @@ void Write(const std::ostringstream& output_stream, const std::string& file_path
 
 }  // namespace
 
-int compile(fidl::Reporter* reporter, const std::string& library_name,
+int compile(fidlc::Reporter* reporter, const std::string& library_name,
             const std::string& dep_file_path, const std::vector<std::string>& source_list,
             const std::vector<std::pair<Behavior, std::string>>& outputs,
-            const std::vector<fidl::SourceManager>& source_managers,
-            fidl::VirtualSourceFile* virtual_file, const fidl::VersionSelection* version_selection,
-            fidl::ExperimentalFlags experimental_flags) {
-  fidl::flat::Libraries all_libraries(reporter, virtual_file);
+            const std::vector<fidlc::SourceManager>& source_managers,
+            fidlc::VirtualSourceFile* virtual_file,
+            const fidlc::VersionSelection* version_selection,
+            fidlc::ExperimentalFlags experimental_flags) {
+  fidlc::Libraries all_libraries(reporter, virtual_file);
   for (const auto& source_manager : source_managers) {
     if (source_manager.sources().empty()) {
       continue;
     }
-    fidl::flat::Compiler compiler(&all_libraries, version_selection,
-                                  fidl::ordinals::GetGeneratedOrdinal64, experimental_flags);
+    fidlc::Compiler compiler(&all_libraries, version_selection, fidlc::GetGeneratedOrdinal64,
+                             experimental_flags);
     for (const auto& source_file : source_manager.sources()) {
       if (!Parse(*source_file, reporter, &compiler, experimental_flags)) {
         return 1;
@@ -340,7 +341,7 @@ int compile(fidl::Reporter* reporter, const std::string& library_name,
       } else {
         library_names.append(", ");
       }
-      library_names.append(fidl::NameLibrary(library->name));
+      library_names.append(fidlc::NameLibrary(library->name));
     }
     library_names.append("\n");
     Fail("Unused libraries provided via --files: %s", library_names.c_str());
@@ -349,7 +350,7 @@ int compile(fidl::Reporter* reporter, const std::string& library_name,
   auto compilation = all_libraries.Filter(version_selection);
 
   // Verify that the produced library's name matches the expected name.
-  std::string produced_name = fidl::NameLibrary(compilation->library_name);
+  std::string produced_name = fidlc::NameLibrary(compilation->library_name);
   if (!library_name.empty() && produced_name != library_name) {
     Fail("Generated library '%s' did not match --name argument: %s\n", produced_name.c_str(),
          library_name.c_str());
@@ -390,12 +391,12 @@ int compile(fidl::Reporter* reporter, const std::string& library_name,
         break;
       }
       case Behavior::kJSON: {
-        fidl::JSONGenerator generator(compilation.get(), experimental_flags);
+        fidlc::JSONGenerator generator(compilation.get(), experimental_flags);
         Write(generator.Produce(), file_path);
         break;
       }
       case Behavior::kIndex: {
-        fidl::IndexJSONGenerator generator(compilation.get());
+        fidlc::IndexJSONGenerator generator(compilation.get());
         Write(generator.Produce(), file_path);
         break;
       }
@@ -421,8 +422,8 @@ int main(int argc, char* argv[]) {
   bool warnings_as_errors = false;
   std::string format = "text";
   std::vector<std::pair<Behavior, std::string>> outputs;
-  fidl::VersionSelection version_selection;
-  fidl::ExperimentalFlags experimental_flags;
+  fidlc::VersionSelection version_selection;
+  fidlc::ExperimentalFlags experimental_flags;
   while (args->Remaining()) {
     // Try to parse an output type.
     std::string behavior_argument = args->Claim();
@@ -461,8 +462,8 @@ int main(int argc, char* argv[]) {
       }
       const auto platform_str = selection.substr(0, colon_idx);
       const auto version_str = selection.substr(colon_idx + 1);
-      const auto platform = fidl::Platform::Parse(platform_str);
-      const auto version = fidl::Version::Parse(version_str);
+      const auto platform = fidlc::Platform::Parse(platform_str);
+      const auto version = fidlc::Version::Parse(version_str);
       if (!platform.has_value()) {
         FailWithUsage("Invalid platform name `%s`\n", platform_str.c_str());
       }
@@ -488,7 +489,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Prepare source files.
-  std::vector<fidl::SourceManager> source_managers;
+  std::vector<fidlc::SourceManager> source_managers;
   std::vector<std::string> source_list;
   source_managers.emplace_back();
   while (args->Remaining()) {
@@ -505,12 +506,12 @@ int main(int argc, char* argv[]) {
   }
 
   // Ready. Set. Go.
-  if (experimental_flags.IsFlagEnabled(fidl::ExperimentalFlags::Flag::kOutputIndexJson)) {
+  if (experimental_flags.IsFlagEnabled(fidlc::ExperimentalFlags::Flag::kOutputIndexJson)) {
     auto path = std::filesystem::path(json_path).replace_extension("index.json");
     outputs.emplace_back(Behavior::kIndex, path);
   }
-  fidl::Reporter reporter;
-  fidl::VirtualSourceFile virtual_file("generated");
+  fidlc::Reporter reporter;
+  fidlc::VirtualSourceFile virtual_file("generated");
   reporter.set_warnings_as_errors(warnings_as_errors);
   auto status = compile(&reporter, library_name, dep_file_path, source_list, outputs,
                         source_managers, &virtual_file, &version_selection, experimental_flags);

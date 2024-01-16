@@ -11,7 +11,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl {
+namespace fidlc {
 
 // A Token represents a typed view into a source buffer. That is, it
 // has a TokenKind, and it has a buffer representing the data
@@ -96,6 +96,6 @@ class Token {
   KindAndSubkind kind_and_subkind_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_TOKEN_H_

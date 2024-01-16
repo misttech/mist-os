@@ -19,10 +19,10 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 Compiler::Compiler(Libraries* all_libraries, const VersionSelection* version_selection,
-                   ordinals::MethodHasher method_hasher, ExperimentalFlags experimental_flags)
+                   MethodHasher method_hasher, ExperimentalFlags experimental_flags)
     : reporter_(all_libraries->reporter()),
       library_(std::make_unique<Library>()),
       all_libraries_(all_libraries),
@@ -30,7 +30,7 @@ Compiler::Compiler(Libraries* all_libraries, const VersionSelection* version_sel
       method_hasher_(std::move(method_hasher)),
       experimental_flags_(experimental_flags) {}
 
-bool Compiler::ConsumeFile(std::unique_ptr<raw::File> file) {
+bool Compiler::ConsumeFile(std::unique_ptr<File> file) {
   return ConsumeStep(this, std::move(file)).Run();
 }
 
@@ -174,49 +174,47 @@ void Libraries::WarnOnAttributeTypo(const Attribute* attribute) const {
 }
 
 // Helper function to calculate Compilation::external_structs.
-static std::vector<const flat::Struct*> ExternalStructs(
-    const Library* target_library, const std::vector<const Protocol*>& protocols) {
+static std::vector<const Struct*> ExternalStructs(const Library* target_library,
+                                                  const std::vector<const Protocol*>& protocols) {
   // Use the comparator below to ensure deterministic output when this set is
   // converted into a vector at the end of this function.
-  auto ordering = [](const flat::Struct* a, const flat::Struct* b) {
+  auto ordering = [](const Struct* a, const Struct* b) {
     return NameFlatName(a->name) < NameFlatName(b->name);
   };
-  std::set<const flat::Struct*, decltype(ordering)> external_structs(ordering);
+  std::set<const Struct*, decltype(ordering)> external_structs(ordering);
 
   for (const auto& protocol : protocols) {
     for (const auto method_with_info : protocol->all_methods) {
       const auto& method = method_with_info.method;
       if (method->maybe_request) {
-        auto id = static_cast<const flat::IdentifierType*>(method->maybe_request->type);
+        auto id = static_cast<const IdentifierType*>(method->maybe_request->type);
 
         // Make sure this is actually an externally defined struct before proceeding.
-        if (id->name.library() != target_library &&
-            id->type_decl->kind == flat::Decl::Kind::kStruct) {
-          auto as_struct = static_cast<const flat::Struct*>(id->type_decl);
+        if (id->name.library() != target_library && id->type_decl->kind == Decl::Kind::kStruct) {
+          auto as_struct = static_cast<const Struct*>(id->type_decl);
           external_structs.insert(as_struct);
         }
       }
       if (method->maybe_response) {
-        auto id = static_cast<const flat::IdentifierType*>(method->maybe_response->type);
+        auto id = static_cast<const IdentifierType*>(method->maybe_response->type);
 
         // Make sure this is actually an externally defined struct before proceeding.
-        if (id->name.library() != target_library &&
-            id->type_decl->kind == flat::Decl::Kind::kStruct) {
-          auto as_struct = static_cast<const flat::Struct*>(id->type_decl);
+        if (id->name.library() != target_library && id->type_decl->kind == Decl::Kind::kStruct) {
+          auto as_struct = static_cast<const Struct*>(id->type_decl);
           external_structs.insert(as_struct);
         }
 
         // Include the success variant of a result union, if it's an external struct.
         if (method->HasResultUnion()) {
           ZX_ASSERT(id->type_decl->kind == Decl::Kind::kUnion);
-          const auto* result_union = static_cast<const flat::Union*>(id->type_decl);
-          const auto* success_variant_type = static_cast<const flat::IdentifierType*>(
+          const auto* result_union = static_cast<const Union*>(id->type_decl);
+          const auto* success_variant_type = static_cast<const IdentifierType*>(
               result_union->members[0].maybe_used->type_ctor->type);
-          if (success_variant_type->type_decl->kind != flat::Decl::Kind::kStruct) {
+          if (success_variant_type->type_decl->kind != Decl::Kind::kStruct) {
             continue;
           }
           const auto* success_variant_struct =
-              static_cast<const flat::Struct*>(success_variant_type->type_decl);
+              static_cast<const Struct*>(success_variant_type->type_decl);
 
           // Make sure this is actually an externally defined struct before proceeding.
           if (success_variant_type->name.library() != target_library) {
@@ -227,7 +225,7 @@ static std::vector<const flat::Struct*> ExternalStructs(
     }
   }
 
-  return std::vector<const flat::Struct*>(external_structs.begin(), external_structs.end());
+  return std::vector<const Struct*>(external_structs.begin(), external_structs.end());
 }
 
 namespace {
@@ -288,10 +286,9 @@ class CalcDependencies {
             VisitTypeConstructorAndStructFields(request);
           }
           if (method->HasResultUnion()) {
-            auto response_id =
-                static_cast<const flat::IdentifierType*>(method->maybe_response->type);
+            auto response_id = static_cast<const IdentifierType*>(method->maybe_response->type);
             ZX_ASSERT(response_id->type_decl->kind == Decl::Kind::kUnion);
-            auto result_union = static_cast<const flat::Union*>(response_id->type_decl);
+            auto result_union = static_cast<const Union*>(response_id->type_decl);
             for (const auto& member : result_union->members) {
               if (auto used = member.maybe_used.get()) {
                 VisitTypeConstructorAndStructFields(used->type_ctor.get());
@@ -373,7 +370,7 @@ class CalcDependencies {
   void VisitTypeConstructorAndStructFields(const TypeConstructor* type_ctor) {
     VisitTypeConstructor(type_ctor);
     if (type_ctor->type->kind == Type::Kind::kIdentifier) {
-      auto type_decl = static_cast<const flat::IdentifierType*>(type_ctor->type)->type_decl;
+      auto type_decl = static_cast<const IdentifierType*>(type_ctor->type)->type_decl;
       if (type_decl->kind == Decl::Kind::kStruct) {
         VisitDecl(static_cast<const Struct*>(type_decl));
       }
@@ -480,4 +477,4 @@ std::unique_ptr<Compilation> Libraries::Filter(const VersionSelection* version_s
   return compilation;
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

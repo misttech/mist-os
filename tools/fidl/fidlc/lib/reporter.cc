@@ -11,7 +11,7 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/diagnostics_json.h"
 
-namespace fidl {
+namespace fidlc {
 
 static std::string MakeSquiggle(std::string_view surrounding_line, int column) {
   std::string squiggle;
@@ -170,7 +170,7 @@ void Reporter::PrintReports(bool enable_color) const {
 }
 
 void Reporter::PrintReportsJson() const {
-  fprintf(stderr, "%s", fidl::DiagnosticsJson(Diagnostics()).Produce().str().c_str());
+  fprintf(stderr, "%s", DiagnosticsJson(Diagnostics()).Produce().str().c_str());
 }
 
-}  // namespace fidl
+}  // namespace fidlc

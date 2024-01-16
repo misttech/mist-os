@@ -8,7 +8,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
 #include "tools/fidl/fidlc/include/fidl/flat/transport.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 struct Element;
 
@@ -24,12 +24,12 @@ class VerifyResourcenessStep : public Compiler::Step {
   // types includes (1) nominal resource types per the FTP-057 definition, and
   // (2) declarations that have an effective resource member (or equivalently,
   // transitively contain a nominal resource).
-  types::Resourceness EffectiveResourceness(const Type* type);
+  Resourceness EffectiveResourceness(const Type* type);
 
   // Map from struct/table/union declarations to their effective resourceness. A
   // value of std::nullopt indicates that the declaration has been visited, used
   // to prevent infinite recursion.
-  std::map<const Decl*, std::optional<types::Resourceness>> effective_resourceness_;
+  std::map<const Decl*, std::optional<Resourceness>> effective_resourceness_;
 };
 
 class VerifyHandleTransportCompatibilityStep : public Compiler::Step {
@@ -77,9 +77,9 @@ class VerifyOpenInteractionsStep : public Compiler::Step {
  private:
   void RunImpl() override;
   void VerifyProtocolOpenness(const Protocol& protocol);
-  static bool IsAllowedComposition(types::Openness composing, types::Openness composed);
+  static bool IsAllowedComposition(Openness composing, Openness composed);
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_VERIFY_STEPS_H_

@@ -10,7 +10,7 @@
 #include "tools/fidl/fidlc/include/fidl/span_sequence.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 
-namespace fidl::fmt {
+namespace fidlc {
 
 namespace {
 
@@ -95,7 +95,7 @@ void ClearLeadingBlankLines(std::unique_ptr<SpanSequence>& span_sequence) {
 // checks to see if an attribute block exists for the raw AST node currently being processed.  If it
 // does, the first element in the currently open SpanSequence list has its leading_blank_lines
 // overwritten to 0.
-void ClearBlankLinesAfterAttributeList(const std::unique_ptr<raw::AttributeList>& attrs,
+void ClearBlankLinesAfterAttributeList(const std::unique_ptr<RawAttributeList>& attrs,
                                        SpanSequenceList& list) {
   if (attrs != nullptr && !list.empty()) {
     ClearLeadingBlankLines(list[0]);
@@ -354,7 +354,7 @@ SpanSequenceTreeVisitor::StatementBuilder<T>::~StatementBuilder<T>() {
 }
 
 void SpanSequenceTreeVisitor::OnAliasDeclaration(
-    const std::unique_ptr<raw::AliasDeclaration>& element) {
+    const std::unique_ptr<RawAliasDeclaration>& element) {
   const auto visiting = Visiting(this, VisitorKind::kAliasDeclaration);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -367,7 +367,7 @@ void SpanSequenceTreeVisitor::OnAliasDeclaration(
   ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
 }
 
-void SpanSequenceTreeVisitor::OnAttributeArg(const std::unique_ptr<raw::AttributeArg>& element) {
+void SpanSequenceTreeVisitor::OnAttributeArg(const std::unique_ptr<RawAttributeArg>& element) {
   const auto visiting = Visiting(this, VisitorKind::kAttributeArg);
   const auto builder = SpanBuilder<AtomicSpanSequence>(this, *element);
 
@@ -385,12 +385,12 @@ void SpanSequenceTreeVisitor::OnAttributeArg(const std::unique_ptr<raw::Attribut
   OnConstant(element->value);
 }
 
-void SpanSequenceTreeVisitor::OnAttribute(const std::unique_ptr<raw::Attribute>& element) {
+void SpanSequenceTreeVisitor::OnAttribute(const std::unique_ptr<RawAttribute>& element) {
   const auto visiting = Visiting(this, VisitorKind::kAttribute);
 
   // Special case: this attribute is actually a doc comment.  Treat it like any other comment type,
   // and ingest until the last newline in the doc comment.
-  if (element->provenance == raw::Attribute::Provenance::kDocComment) {
+  if (element->provenance == RawAttribute::Provenance::kDocComment) {
     auto doc_comment = IngestUpToAndIncluding(element->end_token);
     if (doc_comment.has_value())
       building_.top().push_back(std::move(doc_comment.value()));
@@ -456,7 +456,7 @@ void SpanSequenceTreeVisitor::OnAttribute(const std::unique_ptr<raw::Attribute>&
   building_.top()[0]->SetTrailingSpace(false);
 }
 
-void SpanSequenceTreeVisitor::OnAttributeList(const std::unique_ptr<raw::AttributeList>& element) {
+void SpanSequenceTreeVisitor::OnAttributeList(const std::unique_ptr<RawAttributeList>& element) {
   if (already_seen_.insert(element.get()).second) {
     // Special case: attributes on anonymous layouts do not go on newlines.  Instead, they are put
     // into a DivisibleSpanSequence and kept on the same line if possible.
@@ -490,7 +490,7 @@ void SpanSequenceTreeVisitor::OnAttributeList(const std::unique_ptr<raw::Attribu
 }
 
 void SpanSequenceTreeVisitor::OnBinaryOperatorConstant(
-    const std::unique_ptr<raw::BinaryOperatorConstant>& element) {
+    const std::unique_ptr<RawBinaryOperatorConstant>& element) {
   // We need a separate scope, so that each operand receives a different visitor kind.  This is
   // important because OnLiteral visitor behaves different for the last constant in the chain: it
   // requires trailing spaces on all constants except the last.
@@ -509,20 +509,20 @@ void SpanSequenceTreeVisitor::OnBinaryOperatorConstant(
 }
 
 void SpanSequenceTreeVisitor::OnCompoundIdentifier(
-    const std::unique_ptr<raw::CompoundIdentifier>& element) {
+    const std::unique_ptr<RawCompoundIdentifier>& element) {
   const auto visiting = Visiting(this, VisitorKind::kCompoundIdentifier);
   const auto builder = SpanBuilder<AtomicSpanSequence>(this, *element);
   TreeVisitor::OnCompoundIdentifier(element);
 }
 
-void SpanSequenceTreeVisitor::OnConstant(const std::unique_ptr<raw::Constant>& element) {
+void SpanSequenceTreeVisitor::OnConstant(const std::unique_ptr<RawConstant>& element) {
   const auto visiting = Visiting(this, VisitorKind::kConstant);
   const auto span_builder = SpanBuilder<AtomicSpanSequence>(this, *element);
   TreeVisitor::OnConstant(element);
 }
 
 void SpanSequenceTreeVisitor::OnConstDeclaration(
-    const std::unique_ptr<raw::ConstDeclaration>& element) {
+    const std::unique_ptr<RawConstDeclaration>& element) {
   const auto visiting = Visiting(this, VisitorKind::kConstDeclaration);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -555,7 +555,7 @@ void SpanSequenceTreeVisitor::OnConstDeclaration(
   ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
 }
 
-void SpanSequenceTreeVisitor::OnFile(const std::unique_ptr<raw::File>& element) {
+void SpanSequenceTreeVisitor::OnFile(const std::unique_ptr<File>& element) {
   const auto visiting = Visiting(this, VisitorKind::kFile);
   building_.emplace();
 
@@ -570,7 +570,7 @@ void SpanSequenceTreeVisitor::OnFile(const std::unique_ptr<raw::File>& element) 
     building_.top().push_back(std::move(footer.value()));
 }
 
-void SpanSequenceTreeVisitor::OnIdentifier(const std::unique_ptr<raw::Identifier>& element,
+void SpanSequenceTreeVisitor::OnIdentifier(const std::unique_ptr<RawIdentifier>& element,
                                            bool ignore) {
   if (already_seen_.insert(element.get()).second && !ignore) {
     const auto visiting = Visiting(this, VisitorKind::kIdentifier);
@@ -585,7 +585,7 @@ void SpanSequenceTreeVisitor::OnIdentifier(const std::unique_ptr<raw::Identifier
   }
 }
 
-void SpanSequenceTreeVisitor::OnLiteral(const std::unique_ptr<raw::Literal>& element) {
+void SpanSequenceTreeVisitor::OnLiteral(const std::unique_ptr<RawLiteral>& element) {
   const auto visiting = Visiting(this, VisitorKind::kLiteral);
   const auto trailing_space = IsInsideOf(VisitorKind::kBinaryOperatorFirstConstant);
   const auto builder = TokenBuilder(this, element->start_token, trailing_space);
@@ -593,13 +593,13 @@ void SpanSequenceTreeVisitor::OnLiteral(const std::unique_ptr<raw::Literal>& ele
 }
 
 void SpanSequenceTreeVisitor::OnIdentifierConstant(
-    const std::unique_ptr<raw::IdentifierConstant>& element) {
+    const std::unique_ptr<RawIdentifierConstant>& element) {
   const auto visiting = Visiting(this, VisitorKind::kIdentifierConstant);
   TreeVisitor::OnIdentifierConstant(element);
 }
 
 void SpanSequenceTreeVisitor::OnInlineLayoutReference(
-    const std::unique_ptr<raw::InlineLayoutReference>& element) {
+    const std::unique_ptr<RawInlineLayoutReference>& element) {
   const auto visiting = Visiting(this, VisitorKind::kInlineLayoutReference);
 
   // We deliberately ignore the AttributeList, as it has been handled by the OnTypeConstructor call
@@ -608,23 +608,23 @@ void SpanSequenceTreeVisitor::OnInlineLayoutReference(
   ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
 }
 
-void SpanSequenceTreeVisitor::OnLayout(const std::unique_ptr<raw::Layout>& element) {
+void SpanSequenceTreeVisitor::OnLayout(const std::unique_ptr<RawLayout>& element) {
   const auto visiting = Visiting(this, VisitorKind::kLayout);
 
   VisitorKind inner_kind;
   switch (element->kind) {
-    case raw::Layout::Kind::kBits:
-    case raw::Layout::Kind::kEnum: {
+    case RawLayout::Kind::kBits:
+    case RawLayout::Kind::kEnum: {
       inner_kind = VisitorKind::kValueLayout;
       break;
     }
-    case raw::Layout::Kind::kStruct: {
+    case RawLayout::Kind::kStruct: {
       inner_kind = VisitorKind::kStructLayout;
       break;
     }
-    case raw::Layout::Kind::kTable:
-    case raw::Layout::Kind::kOverlay:
-    case raw::Layout::Kind::kUnion: {
+    case RawLayout::Kind::kTable:
+    case RawLayout::Kind::kOverlay:
+    case RawLayout::Kind::kUnion: {
       inner_kind = VisitorKind::kOrdinaledLayout;
       break;
     }
@@ -664,13 +664,13 @@ void SpanSequenceTreeVisitor::OnLayout(const std::unique_ptr<raw::Layout>& eleme
   TreeVisitor::OnLayout(element);
 }
 
-void SpanSequenceTreeVisitor::OnLayoutMember(const std::unique_ptr<raw::LayoutMember>& element) {
+void SpanSequenceTreeVisitor::OnLayoutMember(const std::unique_ptr<RawLayoutMember>& element) {
   const auto visiting = Visiting(this, VisitorKind::kLayoutMember);
   TreeVisitor::OnLayoutMember(element);
 }
 
 void SpanSequenceTreeVisitor::OnLibraryDeclaration(
-    const std::unique_ptr<raw::LibraryDeclaration>& element) {
+    const std::unique_ptr<RawLibraryDeclaration>& element) {
   const auto visiting = Visiting(this, VisitorKind::kLibraryDeclaration);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -683,26 +683,26 @@ void SpanSequenceTreeVisitor::OnLibraryDeclaration(
 }
 
 void SpanSequenceTreeVisitor::OnLiteralConstant(
-    const std::unique_ptr<raw::LiteralConstant>& element) {
+    const std::unique_ptr<RawLiteralConstant>& element) {
   const auto visiting = Visiting(this, VisitorKind::kLiteralConstant);
   TreeVisitor::OnLiteralConstant(element);
 }
 
 void SpanSequenceTreeVisitor::OnNamedLayoutReference(
-    const std::unique_ptr<raw::NamedLayoutReference>& element) {
+    const std::unique_ptr<RawNamedLayoutReference>& element) {
   const auto visiting = Visiting(this, VisitorKind::kNamedLayoutReference);
   const auto builder = SpanBuilder<AtomicSpanSequence>(this, *element);
   TreeVisitor::OnNamedLayoutReference(element);
 }
 
-void SpanSequenceTreeVisitor::OnOrdinal64(raw::Ordinal64& element) {
+void SpanSequenceTreeVisitor::OnOrdinal64(RawOrdinal64& element) {
   const auto visiting = Visiting(this, VisitorKind::kOrdinal64);
   const auto span_builder = SpanBuilder<AtomicSpanSequence>(this, element);
   const auto token_builder = TokenBuilder(this, element.start_token, false);
 }
 
 void SpanSequenceTreeVisitor::OnOrdinaledLayoutMember(
-    const std::unique_ptr<raw::OrdinaledLayoutMember>& element) {
+    const std::unique_ptr<RawOrdinaledLayoutMember>& element) {
   const auto visiting = Visiting(this, VisitorKind::kOrdinaledLayoutMember);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -738,7 +738,7 @@ void SpanSequenceTreeVisitor::OnOrdinaledLayoutMember(
     OutdentFirstChildToken(building_.top().back(), ordinal_digits - 1);
 }
 
-void SpanSequenceTreeVisitor::OnParameterList(const std::unique_ptr<raw::ParameterList>& element) {
+void SpanSequenceTreeVisitor::OnParameterList(const std::unique_ptr<RawParameterList>& element) {
   const auto visiting = Visiting(this, VisitorKind::kParameterList);
 
   const auto builder = SpanBuilder<AtomicSpanSequence>(this, *element);
@@ -752,7 +752,7 @@ void SpanSequenceTreeVisitor::OnParameterList(const std::unique_ptr<raw::Paramet
 }
 
 void SpanSequenceTreeVisitor::OnProtocolCompose(
-    const std::unique_ptr<raw::ProtocolCompose>& element) {
+    const std::unique_ptr<RawProtocolCompose>& element) {
   const auto visiting = Visiting(this, VisitorKind::kProtocolCompose);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -765,7 +765,7 @@ void SpanSequenceTreeVisitor::OnProtocolCompose(
 }
 
 void SpanSequenceTreeVisitor::OnProtocolDeclaration(
-    const std::unique_ptr<raw::ProtocolDeclaration>& element) {
+    const std::unique_ptr<RawProtocolDeclaration>& element) {
   const auto visiting = Visiting(this, VisitorKind::kProtocolDeclaration);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -813,8 +813,7 @@ void SpanSequenceTreeVisitor::OnProtocolDeclaration(
   ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
 }
 
-void SpanSequenceTreeVisitor::OnProtocolMethod(
-    const std::unique_ptr<raw::ProtocolMethod>& element) {
+void SpanSequenceTreeVisitor::OnProtocolMethod(const std::unique_ptr<RawProtocolMethod>& element) {
   const auto visiting = Visiting(this, VisitorKind::kProtocolMethod);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -860,7 +859,7 @@ void SpanSequenceTreeVisitor::OnProtocolMethod(
 }
 
 void SpanSequenceTreeVisitor::OnResourceDeclaration(
-    const std::unique_ptr<raw::ResourceDeclaration>& element) {
+    const std::unique_ptr<RawResourceDeclaration>& element) {
   const auto visiting = Visiting(this, VisitorKind::kResourceDeclaration);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -913,7 +912,7 @@ void SpanSequenceTreeVisitor::OnResourceDeclaration(
 }
 
 void SpanSequenceTreeVisitor::OnResourceProperty(
-    const std::unique_ptr<raw::ResourceProperty>& element) {
+    const std::unique_ptr<RawResourceProperty>& element) {
   const auto visiting = Visiting(this, VisitorKind::kResourceProperty);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -928,7 +927,7 @@ void SpanSequenceTreeVisitor::OnResourceProperty(
 }
 
 void SpanSequenceTreeVisitor::OnServiceDeclaration(
-    const std::unique_ptr<raw::ServiceDeclaration>& element) {
+    const std::unique_ptr<RawServiceDeclaration>& element) {
   const auto visiting = Visiting(this, VisitorKind::kServiceDeclaration);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -958,7 +957,7 @@ void SpanSequenceTreeVisitor::OnServiceDeclaration(
   ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
 }
 
-void SpanSequenceTreeVisitor::OnServiceMember(const std::unique_ptr<raw::ServiceMember>& element) {
+void SpanSequenceTreeVisitor::OnServiceMember(const std::unique_ptr<RawServiceMember>& element) {
   const auto visiting = Visiting(this, VisitorKind::kServiceMember);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -973,7 +972,7 @@ void SpanSequenceTreeVisitor::OnServiceMember(const std::unique_ptr<raw::Service
 }
 
 void SpanSequenceTreeVisitor::OnStructLayoutMember(
-    const std::unique_ptr<raw::StructLayoutMember>& element) {
+    const std::unique_ptr<RawStructLayoutMember>& element) {
   const auto visiting = Visiting(this, VisitorKind::kStructLayoutMember);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -987,7 +986,7 @@ void SpanSequenceTreeVisitor::OnStructLayoutMember(
 }
 
 void SpanSequenceTreeVisitor::OnTypeConstructor(
-    const std::unique_ptr<raw::TypeConstructor>& element) {
+    const std::unique_ptr<RawTypeConstructor>& element) {
   // Special case: make sure not to visit the subtype on a bits/enum declaration twice, since it is
   // already being processed as part of the prelude to the layout.
   if (IsInsideOf(VisitorKind::kValueLayout) || (IsInsideOf(VisitorKind::kResourceDeclaration) &&
@@ -996,11 +995,11 @@ void SpanSequenceTreeVisitor::OnTypeConstructor(
   }
 
   const auto visiting = Visiting(this, VisitorKind::kTypeConstructor);
-  if (element->layout_ref->kind == raw::LayoutReference::Kind::kInline) {
+  if (element->layout_ref->kind == RawLayoutReference::Kind::kInline) {
     // Check if we have attributes - if we do, we'll need to process them before creating the
     // TypeConstructor-containing AtomicSpanSequence, because inline layout attributes should be
     // stacked when wrapped.
-    auto as_inline_layout_ref = static_cast<raw::InlineLayoutReference*>(element->layout_ref.get());
+    auto as_inline_layout_ref = static_cast<RawInlineLayoutReference*>(element->layout_ref.get());
     if (as_inline_layout_ref->attributes != nullptr) {
       OnAttributeList(as_inline_layout_ref->attributes);
       const auto builder = SpanBuilder<AtomicSpanSequence>(this, *element);
@@ -1014,7 +1013,7 @@ void SpanSequenceTreeVisitor::OnTypeConstructor(
 }
 
 void SpanSequenceTreeVisitor::OnTypeDeclaration(
-    const std::unique_ptr<raw::TypeDeclaration>& element) {
+    const std::unique_ptr<RawTypeDeclaration>& element) {
   const auto visiting = Visiting(this, VisitorKind::kTypeDeclaration);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -1027,7 +1026,7 @@ void SpanSequenceTreeVisitor::OnTypeDeclaration(
   ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
 }
 
-void SpanSequenceTreeVisitor::OnUsing(const std::unique_ptr<raw::Using>& element) {
+void SpanSequenceTreeVisitor::OnUsing(const std::unique_ptr<RawUsing>& element) {
   const auto visiting = Visiting(this, VisitorKind::kUsing);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -1041,7 +1040,7 @@ void SpanSequenceTreeVisitor::OnUsing(const std::unique_ptr<raw::Using>& element
 }
 
 void SpanSequenceTreeVisitor::OnValueLayoutMember(
-    const std::unique_ptr<raw::ValueLayoutMember>& element) {
+    const std::unique_ptr<RawValueLayoutMember>& element) {
   const auto visiting = Visiting(this, VisitorKind::kValueLayoutMember);
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
@@ -1062,4 +1061,4 @@ MultilineSpanSequence SpanSequenceTreeVisitor::Result() {
   return result;
 }
 
-}  // namespace fidl::fmt
+}  // namespace fidlc

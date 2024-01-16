@@ -8,7 +8,7 @@
 
 #include <re2/re2.h>
 
-namespace fidl {
+namespace fidlc {
 
 std::string TemplateString::Substitute(Substitutions substitutions, bool remove_unmatched) const {
   std::ostringstream os;
@@ -52,4 +52,4 @@ std::string TemplateString::Substitute(Substitutions substitutions, bool remove_
   return os.str();
 }
 
-}  // namespace fidl
+}  // namespace fidlc

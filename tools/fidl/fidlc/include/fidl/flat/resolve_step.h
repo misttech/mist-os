@@ -7,7 +7,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // This step resolves all references in the library. It does so in three steps:
 //
@@ -100,6 +100,6 @@ class ResolveStep : public Compiler::Step {
   std::map<const Element*, NodeInfo> graph_;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_RESOLVE_STEP_H_

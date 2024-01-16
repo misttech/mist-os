@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace fidl::linter {
+namespace fidlc {
 
 struct CommandLineOptions {
   std::vector<std::string> included_checks;
@@ -30,6 +30,6 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
 // Returns the fidl-lint usage string.
 std::string Usage(const std::string& argv0);
 
-}  // namespace fidl::linter
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_LINTER_COMMAND_LINE_OPTIONS_H_

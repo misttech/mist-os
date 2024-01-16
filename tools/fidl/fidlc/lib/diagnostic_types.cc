@@ -13,7 +13,7 @@
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl {
+namespace fidlc {
 
 namespace internal {
 
@@ -38,13 +38,13 @@ std::string Display(SourceSpan s) { return s.position_str(); }
 
 std::string Display(Token::KindAndSubkind t) { return std::string(Token::Name(t)); }
 
-std::string Display(types::Openness o) {
+std::string Display(Openness o) {
   switch (o) {
-    case types::Openness::kOpen:
+    case Openness::kOpen:
       return "open";
-    case types::Openness::kAjar:
+    case Openness::kAjar:
       return "ajar";
-    case types::Openness::kClosed:
+    case Openness::kClosed:
       return "closed";
   }
 }
@@ -53,83 +53,83 @@ std::string Display(const std::vector<std::string_view>& library_name) {
   return NameLibrary(library_name);
 }
 
-std::string Display(const flat::Attribute* a) { return std::string(a->name.data()); }
+std::string Display(const Attribute* a) { return std::string(a->name.data()); }
 
-std::string Display(const flat::AttributeArg* a) {
+std::string Display(const AttributeArg* a) {
   return a->name.has_value() ? std::string(a->name.value().data()) : "";
 }
 
-std::string Display(const flat::Constant* c) { return NameFlatConstant(c); }
+std::string Display(const Constant* c) { return NameFlatConstant(c); }
 
-std::string Display(flat::Element::Kind k) {
+std::string Display(Element::Kind k) {
   switch (k) {
-    case flat::Element::Kind::kBits:
+    case Element::Kind::kBits:
       return "bits";
-    case flat::Element::Kind::kBitsMember:
+    case Element::Kind::kBitsMember:
       return "bits member";
-    case flat::Element::Kind::kBuiltin:
+    case Element::Kind::kBuiltin:
       return "builtin";
-    case flat::Element::Kind::kConst:
+    case Element::Kind::kConst:
       return "const";
-    case flat::Element::Kind::kEnum:
+    case Element::Kind::kEnum:
       return "enum";
-    case flat::Element::Kind::kEnumMember:
+    case Element::Kind::kEnumMember:
       return "enum member";
-    case flat::Element::Kind::kLibrary:
+    case Element::Kind::kLibrary:
       return "library";
-    case flat::Element::Kind::kNewType:
+    case Element::Kind::kNewType:
       return "new-type";
-    case flat::Element::Kind::kProtocol:
+    case Element::Kind::kProtocol:
       return "protocol";
-    case flat::Element::Kind::kProtocolCompose:
+    case Element::Kind::kProtocolCompose:
       return "protocol composition";
-    case flat::Element::Kind::kProtocolMethod:
+    case Element::Kind::kProtocolMethod:
       return "protocol method";
-    case flat::Element::Kind::kResource:
+    case Element::Kind::kResource:
       return "resource";
-    case flat::Element::Kind::kResourceProperty:
+    case Element::Kind::kResourceProperty:
       return "resource property";
-    case flat::Element::Kind::kService:
+    case Element::Kind::kService:
       return "service";
-    case flat::Element::Kind::kServiceMember:
+    case Element::Kind::kServiceMember:
       return "service member";
-    case flat::Element::Kind::kStruct:
+    case Element::Kind::kStruct:
       return "struct";
-    case flat::Element::Kind::kStructMember:
+    case Element::Kind::kStructMember:
       return "struct member";
-    case flat::Element::Kind::kTable:
+    case Element::Kind::kTable:
       return "table";
-    case flat::Element::Kind::kTableMember:
+    case Element::Kind::kTableMember:
       return "table member";
-    case flat::Element::Kind::kAlias:
+    case Element::Kind::kAlias:
       return "alias";
-    case flat::Element::Kind::kUnion:
+    case Element::Kind::kUnion:
       return "union";
-    case flat::Element::Kind::kUnionMember:
+    case Element::Kind::kUnionMember:
       return "union member";
-    case flat::Element::Kind::kOverlay:
+    case Element::Kind::kOverlay:
       return "overlay";
-    case flat::Element::Kind::kOverlayMember:
+    case Element::Kind::kOverlayMember:
       return "overlay member";
   }
 }
 
-std::string Display(flat::Decl::Kind k) { return Display(flat::Decl::ElementKind(k)); }
+std::string Display(Decl::Kind k) { return Display(Decl::ElementKind(k)); }
 
-std::string Display(const flat::Element* e) {
+std::string Display(const Element* e) {
   std::stringstream ss;
 
   switch (e->kind) {
-    case flat::Element::Kind::kTableMember: {
-      auto table_member = static_cast<const flat::Table::Member*>(e);
+    case Element::Kind::kTableMember: {
+      auto table_member = static_cast<const Table::Member*>(e);
       if (!table_member->maybe_used) {
         ss << "reserved " << Display(e->kind);
         return ss.str();
       }
       break;
     }
-    case flat::Element::Kind::kUnionMember: {
-      auto table_member = static_cast<const flat::Union::Member*>(e);
+    case Element::Kind::kUnionMember: {
+      auto table_member = static_cast<const Union::Member*>(e);
       if (!table_member->maybe_used) {
         ss << "reserved " << Display(e->kind);
         return ss.str();
@@ -143,62 +143,61 @@ std::string Display(const flat::Element* e) {
   ss << Display(e->kind) << " '";
 
   switch (e->kind) {
-    case flat::Element::Kind::kBits:
-    case flat::Element::Kind::kBuiltin:
-    case flat::Element::Kind::kConst:
-    case flat::Element::Kind::kEnum:
-    case flat::Element::Kind::kNewType:
-    case flat::Element::Kind::kProtocol:
-    case flat::Element::Kind::kResource:
-    case flat::Element::Kind::kService:
-    case flat::Element::Kind::kStruct:
-    case flat::Element::Kind::kTable:
-    case flat::Element::Kind::kAlias:
-    case flat::Element::Kind::kUnion:
-    case flat::Element::Kind::kOverlay:
-      ss << static_cast<const flat::Decl*>(e)->name.decl_name();
+    case Element::Kind::kBits:
+    case Element::Kind::kBuiltin:
+    case Element::Kind::kConst:
+    case Element::Kind::kEnum:
+    case Element::Kind::kNewType:
+    case Element::Kind::kProtocol:
+    case Element::Kind::kResource:
+    case Element::Kind::kService:
+    case Element::Kind::kStruct:
+    case Element::Kind::kTable:
+    case Element::Kind::kAlias:
+    case Element::Kind::kUnion:
+    case Element::Kind::kOverlay:
+      ss << static_cast<const Decl*>(e)->name.decl_name();
       break;
-    case flat::Element::Kind::kBitsMember:
-      ss << static_cast<const flat::Bits::Member*>(e)->name.data();
+    case Element::Kind::kBitsMember:
+      ss << static_cast<const Bits::Member*>(e)->name.data();
       break;
-    case flat::Element::Kind::kEnumMember:
-      ss << static_cast<const flat::Enum::Member*>(e)->name.data();
+    case Element::Kind::kEnumMember:
+      ss << static_cast<const Enum::Member*>(e)->name.data();
       break;
-    case flat::Element::Kind::kLibrary:
-      ss << Display(static_cast<const flat::Library*>(e)->name);
+    case Element::Kind::kLibrary:
+      ss << Display(static_cast<const Library*>(e)->name);
       break;
-    case flat::Element::Kind::kProtocolCompose:
-      ss << Display(
-          static_cast<const flat::Protocol::ComposedProtocol*>(e)->reference.span().data());
+    case Element::Kind::kProtocolCompose:
+      ss << Display(static_cast<const Protocol::ComposedProtocol*>(e)->reference.span().data());
       break;
-    case flat::Element::Kind::kProtocolMethod:
-      ss << static_cast<const flat::Protocol::Method*>(e)->name.data();
+    case Element::Kind::kProtocolMethod:
+      ss << static_cast<const Protocol::Method*>(e)->name.data();
       break;
-    case flat::Element::Kind::kResourceProperty:
-      ss << static_cast<const flat::Resource::Property*>(e)->name.data();
+    case Element::Kind::kResourceProperty:
+      ss << static_cast<const Resource::Property*>(e)->name.data();
       break;
-    case flat::Element::Kind::kServiceMember:
-      ss << static_cast<const flat::Service::Member*>(e)->name.data();
+    case Element::Kind::kServiceMember:
+      ss << static_cast<const Service::Member*>(e)->name.data();
       break;
-    case flat::Element::Kind::kStructMember:
-      ss << static_cast<const flat::Struct::Member*>(e)->name.data();
+    case Element::Kind::kStructMember:
+      ss << static_cast<const Struct::Member*>(e)->name.data();
       break;
-    case flat::Element::Kind::kTableMember: {
-      auto table_member = static_cast<const flat::Table::Member*>(e);
+    case Element::Kind::kTableMember: {
+      auto table_member = static_cast<const Table::Member*>(e);
       if (auto& used = table_member->maybe_used) {
         ss << used->name.data();
       }
       break;
     }
-    case flat::Element::Kind::kUnionMember: {
-      auto union_member = static_cast<const flat::Union::Member*>(e);
+    case Element::Kind::kUnionMember: {
+      auto union_member = static_cast<const Union::Member*>(e);
       if (auto& used = union_member->maybe_used) {
         ss << used->name.data();
       }
       break;
     }
-    case flat::Element::Kind::kOverlayMember: {
-      auto overlay_member = static_cast<const flat::Overlay::Member*>(e);
+    case Element::Kind::kOverlayMember: {
+      auto overlay_member = static_cast<const Overlay::Member*>(e);
       if (auto& used = overlay_member->maybe_used) {
         ss << used->name.data();
       }
@@ -212,7 +211,7 @@ std::string Display(const flat::Element* e) {
 
 // Display a list of nested types with arrows indicating what includes what:
 // ['A', 'B', 'C'] -> "A -> B -> C"
-std::string Display(const std::vector<const flat::Decl*>& d) {
+std::string Display(const std::vector<const Decl*>& d) {
   std::stringstream ss;
   for (auto it = d.cbegin(); it != d.cend(); it++) {
     if (it != d.cbegin()) {
@@ -223,9 +222,9 @@ std::string Display(const std::vector<const flat::Decl*>& d) {
   return ss.str();
 }
 
-std::string Display(const flat::Type* t) { return NameFlatType(t); }
+std::string Display(const Type* t) { return NameFlatType(t); }
 
-std::string Display(const flat::Name& n) { return n.full_name(); }
+std::string Display(const Name& n) { return n.full_name(); }
 
 std::string Display(const Platform& p) {
   ZX_ASSERT_MSG(!p.is_anonymous(), "diagnostics should not refer to anonymous platforms");
@@ -295,4 +294,4 @@ std::string Diagnostic::Format() const {
   return out.str();
 }
 
-}  // namespace fidl
+}  // namespace fidlc

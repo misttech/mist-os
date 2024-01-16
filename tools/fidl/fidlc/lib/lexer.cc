@@ -11,7 +11,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 
-namespace fidl {
+namespace fidlc {
 
 namespace {
 
@@ -282,7 +282,7 @@ Token Lexer::LexStringLiteral() {
           } else {
             SourceSpan span(std::string_view(current_ - 1 - unicode_hex_digits, unicode_hex_digits),
                             source_file_);
-            auto codepoint = utils::decode_unicode_hex(span.data());
+            auto codepoint = decode_unicode_hex(span.data());
             if (codepoint > 0x10ffff) {
               reporter_->Fail(ErrUnicodeEscapeTooLarge, span, span.data());
             }
@@ -500,4 +500,4 @@ Token Lexer::Lex() {
   } while (true);
 }
 
-}  // namespace fidl
+}  // namespace fidlc

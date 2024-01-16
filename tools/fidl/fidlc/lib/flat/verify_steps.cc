@@ -10,7 +10,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/attribute_schema.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 void VerifyResourcenessStep::RunImpl() {
   for (const auto& [name, decl] : library()->declarations.all) {
@@ -23,9 +23,9 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
   switch (decl->kind) {
     case Decl::Kind::kStruct: {
       const auto* struct_decl = static_cast<const Struct*>(decl);
-      if (struct_decl->resourceness == types::Resourceness::kValue) {
+      if (struct_decl->resourceness == Resourceness::kValue) {
         for (const auto& member : struct_decl->members) {
-          if (EffectiveResourceness(member.type_ctor->type) == types::Resourceness::kResource) {
+          if (EffectiveResourceness(member.type_ctor->type) == Resourceness::kResource) {
             reporter()->Fail(ErrTypeMustBeResource, struct_decl->name.span().value(),
                              struct_decl->name, member.name.data(), "struct");
           }
@@ -35,11 +35,11 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
     }
     case Decl::Kind::kTable: {
       const auto* table_decl = static_cast<const Table*>(decl);
-      if (table_decl->resourceness == types::Resourceness::kValue) {
+      if (table_decl->resourceness == Resourceness::kValue) {
         for (const auto& member : table_decl->members) {
           if (member.maybe_used) {
             const auto& used = *member.maybe_used;
-            if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
+            if (EffectiveResourceness(used.type_ctor->type) == Resourceness::kResource) {
               reporter()->Fail(ErrTypeMustBeResource, table_decl->name.span().value(),
                                table_decl->name, used.name.data(), "table");
             }
@@ -50,11 +50,11 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
     }
     case Decl::Kind::kUnion: {
       const auto* union_decl = static_cast<const Union*>(decl);
-      if (union_decl->resourceness == types::Resourceness::kValue) {
+      if (union_decl->resourceness == Resourceness::kValue) {
         for (const auto& member : union_decl->members) {
           if (member.maybe_used) {
             const auto& used = *member.maybe_used;
-            if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
+            if (EffectiveResourceness(used.type_ctor->type) == Resourceness::kResource) {
               reporter()->Fail(ErrTypeMustBeResource, union_decl->name.span().value(),
                                union_decl->name, used.name.data(), "union");
             }
@@ -65,11 +65,11 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
     }
     case Decl::Kind::kOverlay: {
       const auto* overlay_decl = static_cast<const Overlay*>(decl);
-      if (overlay_decl->resourceness == types::Resourceness::kValue) {
+      if (overlay_decl->resourceness == Resourceness::kValue) {
         for (const auto& member : overlay_decl->members) {
           if (member.maybe_used) {
             const auto& used = *member.maybe_used;
-            if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
+            if (EffectiveResourceness(used.type_ctor->type) == Resourceness::kResource) {
               reporter()->Fail(ErrOverlayMemberMustBeValue, overlay_decl->name.span().value());
             }
           }
@@ -82,20 +82,20 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
   }
 }
 
-types::Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* type) {
+Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* type) {
   switch (type->kind) {
     case Type::Kind::kPrimitive:
     case Type::Kind::kString:
-      return types::Resourceness::kValue;
+      return Resourceness::kValue;
     case Type::Kind::kInternal: {
       switch (static_cast<const InternalType*>(type)->subtype) {
-        case fidl::types::InternalSubtype::kFrameworkErr:
-          return types::Resourceness::kValue;
+        case InternalSubtype::kFrameworkErr:
+          return Resourceness::kValue;
       }
     }
     case Type::Kind::kHandle:
     case Type::Kind::kTransportSide:
-      return types::Resourceness::kResource;
+      return Resourceness::kResource;
     case Type::Kind::kArray:
       return EffectiveResourceness(static_cast<const ArrayType*>(type)->element_type);
     case Type::Kind::kVector:
@@ -116,35 +116,34 @@ types::Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* ty
   switch (decl->kind) {
     case Decl::Kind::kBits:
     case Decl::Kind::kEnum:
-      return types::Resourceness::kValue;
+      return Resourceness::kValue;
     case Decl::Kind::kNewType: {
       const auto* new_type = static_cast<const NewType*>(decl);
       return EffectiveResourceness(new_type->type_ctor->type);
     }
     case Decl::Kind::kProtocol:
-      return types::Resourceness::kResource;
+      return Resourceness::kResource;
     case Decl::Kind::kStruct:
-      if (static_cast<const Struct*>(decl)->resourceness.value() ==
-          types::Resourceness::kResource) {
-        return types::Resourceness::kResource;
+      if (static_cast<const Struct*>(decl)->resourceness.value() == Resourceness::kResource) {
+        return Resourceness::kResource;
       }
       break;
     case Decl::Kind::kTable:
-      if (static_cast<const Table*>(decl)->resourceness == types::Resourceness::kResource) {
-        return types::Resourceness::kResource;
+      if (static_cast<const Table*>(decl)->resourceness == Resourceness::kResource) {
+        return Resourceness::kResource;
       }
       break;
     case Decl::Kind::kUnion:
-      if (static_cast<const Union*>(decl)->resourceness.value() == types::Resourceness::kResource) {
-        return types::Resourceness::kResource;
+      if (static_cast<const Union*>(decl)->resourceness.value() == Resourceness::kResource) {
+        return Resourceness::kResource;
       }
       break;
     case Decl::Kind::kOverlay:
       // Overlays are always value types.
-      ZX_ASSERT(static_cast<const Overlay*>(decl)->resourceness == types::Resourceness::kValue);
-      return types::Resourceness::kValue;
+      ZX_ASSERT(static_cast<const Overlay*>(decl)->resourceness == Resourceness::kValue);
+      return Resourceness::kValue;
     case Decl::Kind::kService:
-      return types::Resourceness::kValue;
+      return Resourceness::kValue;
     case Decl::Kind::kBuiltin:
     case Decl::Kind::kConst:
     case Decl::Kind::kResource:
@@ -158,35 +157,33 @@ types::Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* ty
     // If we already computed effective resourceness, return it. If we started
     // computing it but did not complete (nullopt), we're in a cycle, so return
     // kValue as the default assumption.
-    return maybe_value.value_or(types::Resourceness::kValue);
+    return maybe_value.value_or(Resourceness::kValue);
   }
 
   switch (decl->kind) {
     case Decl::Kind::kStruct:
       for (const auto& member : static_cast<const Struct*>(decl)->members) {
-        if (EffectiveResourceness(member.type_ctor->type) == types::Resourceness::kResource) {
-          effective_resourceness_[decl] = types::Resourceness::kResource;
-          return types::Resourceness::kResource;
+        if (EffectiveResourceness(member.type_ctor->type) == Resourceness::kResource) {
+          effective_resourceness_[decl] = Resourceness::kResource;
+          return Resourceness::kResource;
         }
       }
       break;
     case Decl::Kind::kTable:
       for (const auto& member : static_cast<const Table*>(decl)->members) {
         const auto& used = member.maybe_used;
-        if (used &&
-            EffectiveResourceness(used->type_ctor->type) == types::Resourceness::kResource) {
-          effective_resourceness_[decl] = types::Resourceness::kResource;
-          return types::Resourceness::kResource;
+        if (used && EffectiveResourceness(used->type_ctor->type) == Resourceness::kResource) {
+          effective_resourceness_[decl] = Resourceness::kResource;
+          return Resourceness::kResource;
         }
       }
       break;
     case Decl::Kind::kUnion:
       for (const auto& member : static_cast<const Union*>(decl)->members) {
         const auto& used = member.maybe_used;
-        if (used &&
-            EffectiveResourceness(used->type_ctor->type) == types::Resourceness::kResource) {
-          effective_resourceness_[decl] = types::Resourceness::kResource;
-          return types::Resourceness::kResource;
+        if (used && EffectiveResourceness(used->type_ctor->type) == Resourceness::kResource) {
+          effective_resourceness_[decl] = Resourceness::kResource;
+          return Resourceness::kResource;
         }
       }
       break;
@@ -194,8 +191,8 @@ types::Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* ty
       ZX_PANIC("unexpected kind");
   }
 
-  effective_resourceness_[decl] = types::Resourceness::kValue;
-  return types::Resourceness::kValue;
+  effective_resourceness_[decl] = Resourceness::kValue;
+  return Resourceness::kValue;
 }
 
 void VerifyHandleTransportCompatibilityStep::RunImpl() {
@@ -243,7 +240,7 @@ void VerifyHandleTransportCompatibilityStep::CheckHandleTransportUsages(
       return;
     case Type::Kind::kInternal: {
       switch (static_cast<const InternalType*>(type)->subtype) {
-        case fidl::types::InternalSubtype::kFrameworkErr:
+        case InternalSubtype::kFrameworkErr:
           return;
       }
     }
@@ -398,17 +395,17 @@ void VerifyOpenInteractionsStep::VerifyProtocolOpenness(const Protocol& protocol
   }
 
   for (const auto& method : protocol.methods) {
-    if (method.strictness == types::Strictness::kFlexible) {
+    if (method.strictness == Strictness::kFlexible) {
       if (method.has_request && method.has_response) {
         // This is a two-way method, so it must be in an open protocol.
-        if (protocol.openness != types::Openness::kOpen) {
+        if (protocol.openness != Openness::kOpen) {
           reporter()->Fail(ErrFlexibleTwoWayMethodRequiresOpenProtocol, method.name,
                            protocol.openness);
         }
       } else {
         // This is an event or one-way method, so it can be in either an open
         // protocol or an ajar protocol.
-        if (protocol.openness == types::Openness::kClosed) {
+        if (protocol.openness == Openness::kClosed) {
           reporter()->Fail(ErrFlexibleOneWayMethodInClosedProtocol, method.name,
                            method.has_request ? "one-way method" : "event");
         }
@@ -417,19 +414,18 @@ void VerifyOpenInteractionsStep::VerifyProtocolOpenness(const Protocol& protocol
   }
 }
 
-bool VerifyOpenInteractionsStep::IsAllowedComposition(types::Openness composing,
-                                                      types::Openness composed) {
+bool VerifyOpenInteractionsStep::IsAllowedComposition(Openness composing, Openness composed) {
   switch (composing) {
-    case types::Openness::kOpen:
+    case Openness::kOpen:
       // Open protocol can compose any other protocol.
       return true;
-    case types::Openness::kAjar:
+    case Openness::kAjar:
       // Ajar protocols can compose anything that isn't open.
-      return composed != types::Openness::kOpen;
-    case types::Openness::kClosed:
+      return composed != Openness::kOpen;
+    case Openness::kClosed:
       // Closed protocol can only compose another closed protocol.
-      return composed == types::Openness::kClosed;
+      return composed == Openness::kClosed;
   }
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

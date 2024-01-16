@@ -16,7 +16,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/json_writer.h"
 
-namespace fidl {
+namespace fidlc {
 
 struct NameSpan {
   explicit NameSpan(const SourceSpan& span)
@@ -24,7 +24,7 @@ struct NameSpan {
     span.SourceLine(&position);
   }
 
-  explicit NameSpan(const flat::Name& name) : NameSpan(name.span().value()) {
+  explicit NameSpan(const Name& name) : NameSpan(name.span().value()) {
     ZX_ASSERT_MSG(!name.is_intrinsic(), "must not use NameSpan on intrinsic names");
   }
 
@@ -45,15 +45,15 @@ struct NameSpan {
 
 // |JsonWriter| requires the derived type as a template parameter so it can
 // match methods declared with parameter overrides in the derived class.
-class JSONGenerator : public utils::JsonWriter<JSONGenerator> {
+class JSONGenerator : public JsonWriter<JSONGenerator> {
  public:
   // "using" is required for overridden methods, so the implementations in
   // both the base class and in this derived class are visible when matching
   // parameter types
-  using utils::JsonWriter<JSONGenerator>::Generate;
-  using utils::JsonWriter<JSONGenerator>::GenerateArray;
+  using JsonWriter<JSONGenerator>::Generate;
+  using JsonWriter<JSONGenerator>::GenerateArray;
 
-  explicit JSONGenerator(const flat::Compilation* compilation, ExperimentalFlags experimental_flags)
+  explicit JSONGenerator(const Compilation* compilation, ExperimentalFlags experimental_flags)
       : JsonWriter(json_file_),
         compilation_(compilation),
         experimental_flags_(experimental_flags) {}
@@ -65,51 +65,51 @@ class JSONGenerator : public utils::JsonWriter<JSONGenerator> {
   void Generate(SourceSpan value);
   void Generate(NameSpan value);
 
-  void Generate(types::HandleSubtype value);
-  void Generate(types::Nullability value);
-  void Generate(types::Strictness value);
-  void Generate(types::Openness value);
+  void Generate(HandleSubtype value);
+  void Generate(Nullability value);
+  void Generate(Strictness value);
+  void Generate(Openness value);
 
-  void Generate(const raw::Identifier& value);
-  void Generate(const flat::AttributeArg& value);
-  void Generate(const flat::Attribute& value);
-  void Generate(const flat::AttributeList& value);
-  void Generate(const raw::Ordinal64& value);
+  void Generate(const RawIdentifier& value);
+  void Generate(const AttributeArg& value);
+  void Generate(const Attribute& value);
+  void Generate(const AttributeList& value);
+  void Generate(const RawOrdinal64& value);
 
   void Generate(const TypeShape& type_shape);
   void Generate(const FieldShape& field_shape);
 
-  void GenerateDeclName(const flat::Name& name);
-  void Generate(const flat::Name& name);
-  void Generate(const flat::Type* value);
-  void Generate(const flat::Constant& value);
-  void Generate(const flat::ConstantValue& value);
-  void Generate(const flat::Bits& value);
-  void Generate(const flat::Bits::Member& value);
-  void Generate(const flat::Const& value);
-  void Generate(const flat::Enum& value);
-  void Generate(const flat::Enum::Member& value);
-  void Generate(const flat::NewType& value);
-  void Generate(const flat::Protocol& value);
-  void Generate(const flat::Protocol::ComposedProtocol& value);
-  void Generate(const flat::Protocol::MethodWithInfo& method_with_info);
-  void Generate(const flat::LiteralConstant& value);
-  void Generate(const flat::Resource& value);
-  void Generate(const flat::Resource::Property& value);
-  void Generate(const flat::Service& value);
-  void Generate(const flat::Service::Member& value);
-  void Generate(const flat::Struct& value);
-  void Generate(const flat::Struct::Member& value);
-  void Generate(const flat::Table& value);
-  void Generate(const flat::Table::Member& value);
-  void Generate(const flat::Union& value);
-  void Generate(const flat::Union::Member& value);
-  void Generate(const flat::Overlay& value);
-  void Generate(const flat::Overlay::Member& value);
-  void Generate(const flat::LayoutInvocation& value);
-  void Generate(const flat::TypeConstructor& value);
-  void Generate(const flat::Alias& value);
-  void Generate(const flat::Compilation::Dependency& dependency);
+  void GenerateDeclName(const Name& name);
+  void Generate(const Name& name);
+  void Generate(const Type* value);
+  void Generate(const Constant& value);
+  void Generate(const ConstantValue& value);
+  void Generate(const Bits& value);
+  void Generate(const Bits::Member& value);
+  void Generate(const Const& value);
+  void Generate(const Enum& value);
+  void Generate(const Enum::Member& value);
+  void Generate(const NewType& value);
+  void Generate(const Protocol& value);
+  void Generate(const Protocol::ComposedProtocol& value);
+  void Generate(const Protocol::MethodWithInfo& method_with_info);
+  void Generate(const LiteralConstant& value);
+  void Generate(const Resource& value);
+  void Generate(const Resource::Property& value);
+  void Generate(const Service& value);
+  void Generate(const Service::Member& value);
+  void Generate(const Struct& value);
+  void Generate(const Struct::Member& value);
+  void Generate(const Table& value);
+  void Generate(const Table::Member& value);
+  void Generate(const Union& value);
+  void Generate(const Union::Member& value);
+  void Generate(const Overlay& value);
+  void Generate(const Overlay::Member& value);
+  void Generate(const LayoutInvocation& value);
+  void Generate(const TypeConstructor& value);
+  void Generate(const Alias& value);
+  void Generate(const Compilation::Dependency& dependency);
 
  private:
   enum TypeKind : uint8_t {
@@ -118,9 +118,9 @@ class JSONGenerator : public utils::JsonWriter<JSONGenerator> {
     kRequestPayload,
     kResponsePayload,
   };
-  void GenerateTypeAndFromAlias(TypeKind parent_type_kind, const flat::TypeConstructor* value,
+  void GenerateTypeAndFromAlias(TypeKind parent_type_kind, const TypeConstructor* value,
                                 Position position = Position::kSubsequent);
-  void GenerateTypeAndFromAlias(const flat::TypeConstructor* value,
+  void GenerateTypeAndFromAlias(const TypeConstructor* value,
                                 Position position = Position::kSubsequent);
 
   // This is a generator for the builtin generics: array, vector, and request.
@@ -137,26 +137,25 @@ class JSONGenerator : public utils::JsonWriter<JSONGenerator> {
   // When GenerateParameterizedType is called for Example.bar, the "type" will
   // be a nullable vector of size 5, but the de-aliased constructor passed in
   // will be the underlying type for just Foo, in this is case "vector<bool:5>."
-  void GenerateParameterizedType(TypeKind parent_type_kind, const flat::Type* type,
-                                 const flat::TypeConstructor* type_ctor,
+  void GenerateParameterizedType(TypeKind parent_type_kind, const Type* type,
+                                 const TypeConstructor* type_ctor,
                                  Position position = Position::kSubsequent);
-  void GenerateExperimentalMaybeFromAlias(const flat::LayoutInvocation& invocation);
-  void GenerateDeclarationsEntry(int count, const flat::Name& name, std::string_view decl_kind);
-  void GenerateDeclarationsMember(const flat::Compilation::Declarations& declarations,
+  void GenerateExperimentalMaybeFromAlias(const LayoutInvocation& invocation);
+  void GenerateDeclarationsEntry(int count, const Name& name, std::string_view decl_kind);
+  void GenerateDeclarationsMember(const Compilation::Declarations& declarations,
                                   Position position = Position::kSubsequent);
-  void GenerateExternalDeclarationsEntry(int count, const flat::Name& name,
-                                         std::string_view decl_kind,
-                                         std::optional<types::Resourceness> maybe_resourceness);
-  void GenerateExternalDeclarationsMember(const flat::Compilation::Declarations& declarations,
+  void GenerateExternalDeclarationsEntry(int count, const Name& name, std::string_view decl_kind,
+                                         std::optional<Resourceness> maybe_resourceness);
+  void GenerateExternalDeclarationsMember(const Compilation::Declarations& declarations,
                                           Position position = Position::kSubsequent);
-  void GenerateTypeShapes(const flat::Object& object);
-  void GenerateFieldShapes(const flat::Struct::Member& struct_member);
+  void GenerateTypeShapes(const Object& object);
+  void GenerateFieldShapes(const Struct::Member& struct_member);
 
-  const flat::Compilation* compilation_;
+  const Compilation* compilation_;
   const ExperimentalFlags experimental_flags_;
   std::ostringstream json_file_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_JSON_GENERATOR_H_

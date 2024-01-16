@@ -10,7 +10,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 
-namespace fidl::raw {
+namespace fidlc {
 
 SourceElementMark::SourceElementMark(TreeVisitor* tv, const SourceElement& element)
     : tv_(tv), element_(element) {
@@ -19,45 +19,47 @@ SourceElementMark::SourceElementMark(TreeVisitor* tv, const SourceElement& eleme
 
 SourceElementMark::~SourceElementMark() { tv_->OnSourceElementEnd(element_); }
 
-void Identifier::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
+void RawIdentifier::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
 
-void CompoundIdentifier::Accept(TreeVisitor* visitor) const {
+void RawCompoundIdentifier::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   for (auto& i : components) {
     visitor->OnIdentifier(i);
   }
 }
 
-void DocCommentLiteral::Accept(TreeVisitor* visitor) const {
+void RawDocCommentLiteral::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
 }
 
-void StringLiteral::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
+void RawStringLiteral::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
 
-void NumericLiteral::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
+void RawNumericLiteral::Accept(TreeVisitor* visitor) const {
+  SourceElementMark sem(visitor, *this);
+}
 
-void BoolLiteral::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
+void RawBoolLiteral::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
 
-void IdentifierConstant::Accept(TreeVisitor* visitor) const {
+void RawIdentifierConstant::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   visitor->OnCompoundIdentifier(identifier);
 }
 
-void LiteralConstant::Accept(TreeVisitor* visitor) const {
+void RawLiteralConstant::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   visitor->OnLiteral(literal);
 }
 
-void BinaryOperatorConstant::Accept(TreeVisitor* visitor) const {
+void RawBinaryOperatorConstant::Accept(TreeVisitor* visitor) const {
   // TODO(https://fxbug.dev/43758): Visit the operator as well.
   SourceElementMark sem(visitor, *this);
   visitor->OnConstant(left_operand);
   visitor->OnConstant(right_operand);
 }
 
-void Ordinal64::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
+void RawOrdinal64::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
 
-void AttributeArg::Accept(TreeVisitor* visitor) const {
+void RawAttributeArg::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (maybe_name != nullptr) {
     visitor->OnIdentifier(maybe_name);
@@ -65,21 +67,21 @@ void AttributeArg::Accept(TreeVisitor* visitor) const {
   visitor->OnConstant(value);
 }
 
-void Attribute::Accept(TreeVisitor* visitor) const {
+void RawAttribute::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   for (auto& i : args) {
     visitor->OnAttributeArg(i);
   }
 }
 
-void AttributeList::Accept(TreeVisitor* visitor) const {
+void RawAttributeList::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   for (auto& i : attributes) {
     visitor->OnAttribute(i);
   }
 }
 
-void LibraryDeclaration::Accept(TreeVisitor* visitor) const {
+void RawLibraryDeclaration::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -87,7 +89,7 @@ void LibraryDeclaration::Accept(TreeVisitor* visitor) const {
   visitor->OnCompoundIdentifier(path);
 }
 
-void Using::Accept(TreeVisitor* visitor) const {
+void RawUsing::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -98,7 +100,7 @@ void Using::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void AliasDeclaration::Accept(TreeVisitor* visitor) const {
+void RawAliasDeclaration::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -107,7 +109,7 @@ void AliasDeclaration::Accept(TreeVisitor* visitor) const {
   visitor->OnTypeConstructor(type_ctor);
 }
 
-void ConstDeclaration::Accept(TreeVisitor* visitor) const {
+void RawConstDeclaration::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -117,14 +119,14 @@ void ConstDeclaration::Accept(TreeVisitor* visitor) const {
   visitor->OnConstant(constant);
 }
 
-void ParameterList::Accept(TreeVisitor* visitor) const {
+void RawParameterList::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (type_ctor) {
     visitor->OnTypeConstructor(type_ctor);
   }
 }
 
-void ProtocolMethod::Accept(TreeVisitor* visitor) const {
+void RawProtocolMethod::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -144,7 +146,7 @@ void ProtocolMethod::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void ProtocolCompose::Accept(TreeVisitor* visitor) const {
+void RawProtocolCompose::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -152,7 +154,7 @@ void ProtocolCompose::Accept(TreeVisitor* visitor) const {
   visitor->OnCompoundIdentifier(protocol_name);
 }
 
-void ProtocolDeclaration::Accept(TreeVisitor* visitor) const {
+void RawProtocolDeclaration::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -169,7 +171,7 @@ void ProtocolDeclaration::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void ResourceProperty::Accept(TreeVisitor* visitor) const {
+void RawResourceProperty::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -178,7 +180,7 @@ void ResourceProperty::Accept(TreeVisitor* visitor) const {
   visitor->OnTypeConstructor(type_ctor);
 }
 
-void ResourceDeclaration::Accept(TreeVisitor* visitor) const {
+void RawResourceDeclaration::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -192,7 +194,7 @@ void ResourceDeclaration::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void ServiceMember::Accept(TreeVisitor* visitor) const {
+void RawServiceMember::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -201,7 +203,7 @@ void ServiceMember::Accept(TreeVisitor* visitor) const {
   visitor->OnTypeConstructor(type_ctor);
 }
 
-void ServiceDeclaration::Accept(TreeVisitor* visitor) const {
+void RawServiceDeclaration::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -212,31 +214,31 @@ void ServiceDeclaration::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void Modifiers::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
+void RawModifiers::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
 
-void IdentifierLayoutParameter::Accept(TreeVisitor* visitor) const {
+void RawIdentifierLayoutParameter::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   visitor->OnCompoundIdentifier(identifier);
 }
 
-void LiteralLayoutParameter::Accept(TreeVisitor* visitor) const {
+void RawLiteralLayoutParameter::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   visitor->OnLiteralConstant(literal);
 }
 
-void TypeLayoutParameter::Accept(TreeVisitor* visitor) const {
+void RawTypeLayoutParameter::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   visitor->OnTypeConstructor(type_ctor);
 }
 
-void LayoutParameterList::Accept(TreeVisitor* visitor) const {
+void RawLayoutParameterList::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   for (auto& item : items) {
     visitor->OnLayoutParameter(item);
   }
 }
 
-void OrdinaledLayoutMember::Accept(TreeVisitor* visitor) const {
+void RawOrdinaledLayoutMember::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -251,7 +253,7 @@ void OrdinaledLayoutMember::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void StructLayoutMember::Accept(TreeVisitor* visitor) const {
+void RawStructLayoutMember::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -264,7 +266,7 @@ void StructLayoutMember::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void ValueLayoutMember::Accept(TreeVisitor* visitor) const {
+void RawValueLayoutMember::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -274,7 +276,7 @@ void ValueLayoutMember::Accept(TreeVisitor* visitor) const {
   visitor->OnConstant(value);
 }
 
-void Layout::Accept(TreeVisitor* visitor) const {
+void RawLayout::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (modifiers != nullptr) {
     visitor->OnModifiers(modifiers);
@@ -287,7 +289,7 @@ void Layout::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void InlineLayoutReference::Accept(TreeVisitor* visitor) const {
+void RawInlineLayoutReference::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -295,19 +297,19 @@ void InlineLayoutReference::Accept(TreeVisitor* visitor) const {
   visitor->OnLayout(layout);
 }
 
-void NamedLayoutReference::Accept(TreeVisitor* visitor) const {
+void RawNamedLayoutReference::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   visitor->OnCompoundIdentifier(identifier);
 }
 
-void TypeConstraints::Accept(TreeVisitor* visitor) const {
+void RawTypeConstraints::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   for (auto& item : items) {
     visitor->OnConstant(item);
   }
 }
 
-void TypeConstructor::Accept(TreeVisitor* visitor) const {
+void RawTypeConstructor::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   visitor->OnLayoutReference(layout_ref);
   if (parameters != nullptr) {
@@ -318,7 +320,7 @@ void TypeConstructor::Accept(TreeVisitor* visitor) const {
   }
 }
 
-void TypeDeclaration::Accept(TreeVisitor* visitor) const {
+void RawTypeDeclaration::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
     visitor->OnAttributeList(attributes);
@@ -354,4 +356,4 @@ void File::Accept(TreeVisitor* visitor) const {
   }
 }
 
-}  // namespace fidl::raw
+}  // namespace fidlc

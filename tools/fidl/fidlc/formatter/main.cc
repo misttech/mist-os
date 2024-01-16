@@ -49,15 +49,15 @@ void Usage(std::string_view argv0) {
   exit(1);
 }
 
-bool Format(const fidl::SourceFile& source_file, fidl::Reporter* reporter, std::string& output) {
-  fidl::Lexer lexer(source_file, reporter);
-  fidl::ExperimentalFlags experimental_flags;
+bool Format(const fidlc::SourceFile& source_file, fidlc::Reporter* reporter, std::string& output) {
+  fidlc::Lexer lexer(source_file, reporter);
+  fidlc::ExperimentalFlags experimental_flags;
   // The formatter is run directly by fx format-code, not as part of the build,
   // so we can't rely on having accurate experimental flags. Instead, we just
   // set all the flags which could block parsing if disabled.
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  experimental_flags.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  auto formatter = fidl::fmt::Formatter(100, reporter);
+  auto formatter = fidlc::Formatter(100, reporter);
   auto result = formatter.Format(source_file, experimental_flags);
   if (!result.has_value()) {
     return false;
@@ -65,7 +65,7 @@ bool Format(const fidl::SourceFile& source_file, fidl::Reporter* reporter, std::
   output = result.value();
 
   std::string source_file_str(source_file.data());
-  if (!fidl::utils::OnlyWhitespaceChanged(source_file_str, output)) {
+  if (!fidlc::OnlyWhitespaceChanged(source_file_str, output)) {
     // Note that this is only useful as long as we do not have the formatter do
     // things that affect non-whitespace characters, like sort using statements
     // or coalesce consts into const blocks.  If / when this happens, this check
@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
     pos++;
   }
 
-  fidl::SourceManager source_manager;
+  fidlc::SourceManager source_manager;
 
   // Is this formatting stdin to stdout?
   bool pipe = (pos == args.size());
@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
   if (pipe) {
     std::string input(std::istreambuf_iterator<char>(std::cin >> std::noskipws),
                       std::istreambuf_iterator<char>());
-    source_manager.AddSourceFile(std::make_unique<fidl::SourceFile>("stdin", std::move(input)));
+    source_manager.AddSourceFile(std::make_unique<fidlc::SourceFile>("stdin", std::move(input)));
   } else {
     for (size_t i = pos; i < args.size(); i++) {
       const char* reason;
@@ -123,7 +123,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  fidl::Reporter reporter;
+  fidlc::Reporter reporter;
   for (const auto& source_file : source_manager.sources()) {
     std::string output;
     if (!Format(*source_file, &reporter, output)) {

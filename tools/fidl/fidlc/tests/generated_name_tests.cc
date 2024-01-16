@@ -70,8 +70,8 @@ protocol Foo {
   auto foo = library.LookupProtocol("Foo");
   ASSERT_NE(foo, nullptr);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_request->type);
-  auto request_type = static_cast<const fidl::flat::Struct*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(foo->methods[0].maybe_request->type);
+  auto request_type = static_cast<const fidlc::Struct*>(id->type_decl);
   EXPECT_EQ(request_type->name.decl_name(), "Good");
 }
 
@@ -88,8 +88,8 @@ protocol Foo {
   auto foo = library.LookupProtocol("Foo");
   ASSERT_NE(foo, nullptr);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_response->type);
-  auto response_type = static_cast<const fidl::flat::Struct*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(foo->methods[0].maybe_response->type);
+  auto response_type = static_cast<const fidlc::Struct*>(id->type_decl);
   EXPECT_EQ(response_type->name.decl_name(), "Good");
 }
 
@@ -106,8 +106,8 @@ protocol Foo {
   auto foo = library.LookupProtocol("Foo");
   ASSERT_NE(foo, nullptr);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_response->type);
-  auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(foo->methods[0].maybe_response->type);
+  auto result_union = static_cast<const fidlc::Union*>(id->type_decl);
   auto success_type = result_union->members[0].maybe_used->type_ctor->type;
   EXPECT_EQ(success_type->name.decl_name(), "Good");
 }
@@ -125,8 +125,8 @@ protocol Foo {
   auto foo = library.LookupProtocol("Foo");
   ASSERT_NE(foo, nullptr);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_response->type);
-  auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(foo->methods[0].maybe_response->type);
+  auto result_union = static_cast<const fidlc::Union*>(id->type_decl);
   auto error_type = result_union->members[1].maybe_used->type_ctor->type;
   EXPECT_EQ(error_type->name.decl_name(), "Good");
 }
@@ -241,7 +241,7 @@ library fidl.test;
 type Bad = struct {};
 
 )FIDL");
-  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  library.ExpectFail(fidlc::ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -252,7 +252,7 @@ library fidl.test;
 type Foo = @generated_name("Bad") struct {};
 
 )FIDL");
-  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  library.ExpectFail(fidlc::ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -267,14 +267,14 @@ type Foo = struct {
 type Bar = struct {};
 
 )FIDL");
-  library.ExpectFail(fidl::ErrCannotAttachAttributeToIdentifier);
+  library.ExpectFail(fidlc::ErrCannotAttachAttributeToIdentifier);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadOnStructMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0120-b.test.fidl");
-  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  library.ExpectFail(fidlc::ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -289,7 +289,7 @@ type MetaVars = enum {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  library.ExpectFail(fidlc::ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -305,7 +305,7 @@ service Bar {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "generated_name");
+  library.ExpectFail(fidlc::ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -318,14 +318,14 @@ type Foo = struct {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrMissingRequiredAnonymousAttributeArg, "generated_name");
+  library.ExpectFail(fidlc::ErrMissingRequiredAnonymousAttributeArg, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadInvalidIdentifier) {
   TestLibrary library;
   library.AddFile("bad/fi-0146.test.fidl");
-  library.ExpectFail(fidl::ErrInvalidGeneratedName);
+  library.ExpectFail(fidlc::ErrInvalidGeneratedName);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -340,23 +340,23 @@ type Foo = struct {
 type Baz = struct {};
 
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kStruct, "Baz",
-                     fidl::flat::Element::Kind::kStruct, "example.fidl:5:30");
+  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kStruct, "Baz",
+                     fidlc::Element::Kind::kStruct, "example.fidl:5:30");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadNotString) {
   TestLibrary library;
   library.AddFile("bad/fi-0104.test.fidl");
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "true", "bool", "string");
-  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "true", "bool", "string");
+  library.ExpectFail(fidlc::ErrCouldNotResolveAttributeArg);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(GeneratedNameTests, BadNonLiteralArgument) {
   TestLibrary library;
   library.AddFile("bad/fi-0133.test.fidl");
-  library.ExpectFail(fidl::ErrAttributeArgRequiresLiteral, "value", "generated_name");
+  library.ExpectFail(fidlc::ErrAttributeArgRequiresLiteral, "value", "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

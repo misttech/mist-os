@@ -12,19 +12,19 @@
 
 namespace {
 
-using fidl::Diagnostic;
-using fidl::ErrorDef;
-using fidl::Reporter;
-using fidl::SourceSpan;
-using fidl::VirtualSourceFile;
-using fidl::WarningDef;
+using fidlc::Diagnostic;
+using fidlc::ErrorDef;
+using fidlc::Reporter;
+using fidlc::SourceSpan;
+using fidlc::VirtualSourceFile;
+using fidlc::WarningDef;
 
 using ::testing::HasSubstr;
 using ::testing::Not;
 
-const fidl::ErrorId kTestErrorId = 123;
+const fidlc::ErrorId kTestErrorId = 123;
 const std::string kTestErrorIdStr = "fi-0123";
-const fidl::ErrorId kTestWarningId = 124;
+const fidlc::ErrorId kTestWarningId = 124;
 const std::string kTestWarningIdStr = "fi-0124";
 
 constexpr ErrorDef<kTestErrorId, std::string_view, std::string_view> ErrTest(

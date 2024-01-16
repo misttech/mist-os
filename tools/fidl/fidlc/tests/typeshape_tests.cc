@@ -46,8 +46,8 @@ struct Expected {
     ExpectTypeShape((object), (expected));    \
   }
 
-void ExpectTypeShape(const fidl::flat::Object* object, Expected expected) {
-  auto actual = fidl::TypeShape(object, fidl::WireFormat::kV2);
+void ExpectTypeShape(const fidlc::Object* object, Expected expected) {
+  auto actual = fidlc::TypeShape(object, fidlc::WireFormat::kV2);
   EXPECT_EQ(expected.inline_size, actual.inline_size);
   EXPECT_EQ(expected.alignment, actual.alignment);
   EXPECT_EQ(expected.max_out_of_line, actual.max_out_of_line);
@@ -70,7 +70,7 @@ struct ExpectedField {
 
 template <typename T>
 void ExpectFieldShape(const T& field, ExpectedField expected) {
-  auto actual = fidl::FieldShape(field, fidl::WireFormat::kV2);
+  auto actual = fidlc::FieldShape(field, fidlc::WireFormat::kV2);
   EXPECT_EQ(expected.offset, actual.offset);
   EXPECT_EQ(expected.padding, actual.padding);
 }
@@ -199,7 +199,7 @@ type UnionOfThings = strict union {
 };
 type NewUnionOfThings = UnionOfThings;
 )FIDL");
-  test_library.EnableFlag(fidl::ExperimentalFlags::Flag::kAllowNewTypes);
+  test_library.EnableFlag(fidlc::ExperimentalFlags::Flag::kAllowNewTypes);
   ASSERT_COMPILED(test_library);
 
   auto new_bool_and_u32_struct = test_library.LookupNewType("NewBoolAndU32");
@@ -1019,7 +1019,7 @@ type BoolOverlayStruct = struct {
 };
 
 )FIDL");
-  test_library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  test_library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(test_library);
   auto bool_or_string_or_u64 = test_library.LookupOverlay("BoolOrStringOrU64");
@@ -1378,7 +1378,7 @@ type StringArray = struct {
 };
 
 )FIDL");
-  test_library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  test_library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(test_library);
 
@@ -1910,8 +1910,8 @@ protocol Test {
   EXPECT_EQ(method.has_request, true);
   ASSERT_NE(method_request, nullptr);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(method_request->type);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(method_request->type);
+  auto as_struct = static_cast<const fidlc::Struct*>(id->type_decl);
   ASSERT_NE(as_struct, nullptr);
 
   EXPECT_TYPE_SHAPE(as_struct, (Expected{
@@ -1943,8 +1943,8 @@ protocol Test {
   EXPECT_EQ(method.has_response, true);
   ASSERT_NE(method_response, nullptr);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(method_response->type);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(method_response->type);
+  auto as_struct = static_cast<const fidlc::Struct*>(id->type_decl);
   ASSERT_NE(as_struct, nullptr);
 
   EXPECT_TYPE_SHAPE(as_struct, (Expected{
@@ -1994,8 +1994,8 @@ protocol MessagePort {
   EXPECT_EQ(post_message.has_request, true);
   ASSERT_NE(post_message_request, nullptr);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(post_message_request->type);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(post_message_request->type);
+  auto as_struct = static_cast<const fidlc::Struct*>(id->type_decl);
   ASSERT_NE(as_struct, nullptr);
 
   EXPECT_TYPE_SHAPE(as_struct, (Expected{
@@ -2040,8 +2040,8 @@ protocol MessagePort {
   auto post_message_request = post_message.maybe_request.get();
   EXPECT_EQ(post_message.has_request, true);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(post_message_request->type);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(post_message_request->type);
+  auto as_struct = static_cast<const fidlc::Struct*>(id->type_decl);
   ASSERT_NE(as_struct, nullptr);
 
   EXPECT_TYPE_SHAPE(as_struct, (Expected{
@@ -2086,8 +2086,8 @@ protocol MessagePort {
   auto post_message_request = post_message.maybe_request.get();
   EXPECT_EQ(post_message.has_request, true);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(post_message_request->type);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(post_message_request->type);
+  auto as_struct = static_cast<const fidlc::Struct*>(id->type_decl);
   ASSERT_NE(as_struct, nullptr);
 
   EXPECT_TYPE_SHAPE(as_struct, (Expected{
@@ -2132,8 +2132,8 @@ protocol MessagePort {
   auto post_message_request = post_message.maybe_request.get();
   EXPECT_EQ(post_message.has_request, true);
 
-  auto id = static_cast<const fidl::flat::IdentifierType*>(post_message_request->type);
-  auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
+  auto id = static_cast<const fidlc::IdentifierType*>(post_message_request->type);
+  auto as_struct = static_cast<const fidlc::Struct*>(id->type_decl);
   ASSERT_NE(as_struct, nullptr);
 
   EXPECT_TYPE_SHAPE(as_struct, (Expected{

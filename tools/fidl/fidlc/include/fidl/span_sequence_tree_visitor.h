@@ -14,53 +14,52 @@
 #include "tools/fidl/fidlc/include/fidl/span_sequence.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 
-namespace fidl::fmt {
+namespace fidlc {
 
 using SpanSequenceList = std::vector<std::unique_ptr<SpanSequence>>;
 
 // This class is a pretty printer for a parse-able FIDL file.  It takes two representations of the
 // file as input: the raw AST (via the OnFile method), and a view into the source text of the file
 // from which that raw AST was generated.
-class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
+class SpanSequenceTreeVisitor : public DeclarationOrderTreeVisitor {
  public:
   explicit SpanSequenceTreeVisitor(cpp20::span<Token> tokens) : tokens_(tokens) {}
-  void OnAliasDeclaration(const std::unique_ptr<raw::AliasDeclaration>& element) override;
-  void OnAttributeArg(const std::unique_ptr<raw::AttributeArg>& element) override;
-  void OnAttribute(const std::unique_ptr<raw::Attribute>& element) override;
-  void OnAttributeList(const std::unique_ptr<raw::AttributeList>& element) override;
-  void OnBinaryOperatorConstant(
-      const std::unique_ptr<raw::BinaryOperatorConstant>& element) override;
-  void OnCompoundIdentifier(const std::unique_ptr<raw::CompoundIdentifier>& element) override;
-  void OnConstant(const std::unique_ptr<raw::Constant>& element) override;
-  void OnConstDeclaration(const std::unique_ptr<raw::ConstDeclaration>& element) override;
-  void OnFile(const std::unique_ptr<raw::File>& element) override;
-  void OnIdentifier(const std::unique_ptr<raw::Identifier>& element, bool ignore);
-  void OnIdentifier(const std::unique_ptr<raw::Identifier>& element) override {
+  void OnAliasDeclaration(const std::unique_ptr<RawAliasDeclaration>& element) override;
+  void OnAttributeArg(const std::unique_ptr<RawAttributeArg>& element) override;
+  void OnAttribute(const std::unique_ptr<RawAttribute>& element) override;
+  void OnAttributeList(const std::unique_ptr<RawAttributeList>& element) override;
+  void OnBinaryOperatorConstant(const std::unique_ptr<RawBinaryOperatorConstant>& element) override;
+  void OnCompoundIdentifier(const std::unique_ptr<RawCompoundIdentifier>& element) override;
+  void OnConstant(const std::unique_ptr<RawConstant>& element) override;
+  void OnConstDeclaration(const std::unique_ptr<RawConstDeclaration>& element) override;
+  void OnFile(const std::unique_ptr<File>& element) override;
+  void OnIdentifier(const std::unique_ptr<RawIdentifier>& element, bool ignore);
+  void OnIdentifier(const std::unique_ptr<RawIdentifier>& element) override {
     OnIdentifier(element, false);
   }
-  void OnIdentifierConstant(const std::unique_ptr<raw::IdentifierConstant>& element) override;
-  void OnLayout(const std::unique_ptr<raw::Layout>& element) override;
-  void OnInlineLayoutReference(const std::unique_ptr<raw::InlineLayoutReference>& element) override;
-  void OnLayoutMember(const std::unique_ptr<raw::LayoutMember>& element) override;
-  void OnLibraryDeclaration(const std::unique_ptr<raw::LibraryDeclaration>& element) override;
-  void OnLiteral(const std::unique_ptr<raw::Literal>& element) override;
-  void OnLiteralConstant(const std::unique_ptr<raw::LiteralConstant>& element) override;
-  void OnNamedLayoutReference(const std::unique_ptr<raw::NamedLayoutReference>& element) override;
-  void OnOrdinal64(raw::Ordinal64& element) override;
-  void OnOrdinaledLayoutMember(const std::unique_ptr<raw::OrdinaledLayoutMember>& element) override;
-  void OnParameterList(const std::unique_ptr<raw::ParameterList>& element) override;
-  void OnProtocolCompose(const std::unique_ptr<raw::ProtocolCompose>& element) override;
-  void OnProtocolDeclaration(const std::unique_ptr<raw::ProtocolDeclaration>& element) override;
-  void OnProtocolMethod(const std::unique_ptr<raw::ProtocolMethod>& element) override;
-  void OnResourceDeclaration(const std::unique_ptr<raw::ResourceDeclaration>& element) override;
-  void OnResourceProperty(const std::unique_ptr<raw::ResourceProperty>& element) override;
-  void OnServiceDeclaration(const std::unique_ptr<raw::ServiceDeclaration>& element) override;
-  void OnServiceMember(const std::unique_ptr<raw::ServiceMember>& element) override;
-  void OnStructLayoutMember(const std::unique_ptr<raw::StructLayoutMember>& element) override;
-  void OnTypeConstructor(const std::unique_ptr<raw::TypeConstructor>& element) override;
-  void OnTypeDeclaration(const std::unique_ptr<raw::TypeDeclaration>& element) override;
-  void OnUsing(const std::unique_ptr<raw::Using>& element) override;
-  void OnValueLayoutMember(const std::unique_ptr<raw::ValueLayoutMember>& element) override;
+  void OnIdentifierConstant(const std::unique_ptr<RawIdentifierConstant>& element) override;
+  void OnLayout(const std::unique_ptr<RawLayout>& element) override;
+  void OnInlineLayoutReference(const std::unique_ptr<RawInlineLayoutReference>& element) override;
+  void OnLayoutMember(const std::unique_ptr<RawLayoutMember>& element) override;
+  void OnLibraryDeclaration(const std::unique_ptr<RawLibraryDeclaration>& element) override;
+  void OnLiteral(const std::unique_ptr<RawLiteral>& element) override;
+  void OnLiteralConstant(const std::unique_ptr<RawLiteralConstant>& element) override;
+  void OnNamedLayoutReference(const std::unique_ptr<RawNamedLayoutReference>& element) override;
+  void OnOrdinal64(RawOrdinal64& element) override;
+  void OnOrdinaledLayoutMember(const std::unique_ptr<RawOrdinaledLayoutMember>& element) override;
+  void OnParameterList(const std::unique_ptr<RawParameterList>& element) override;
+  void OnProtocolCompose(const std::unique_ptr<RawProtocolCompose>& element) override;
+  void OnProtocolDeclaration(const std::unique_ptr<RawProtocolDeclaration>& element) override;
+  void OnProtocolMethod(const std::unique_ptr<RawProtocolMethod>& element) override;
+  void OnResourceDeclaration(const std::unique_ptr<RawResourceDeclaration>& element) override;
+  void OnResourceProperty(const std::unique_ptr<RawResourceProperty>& element) override;
+  void OnServiceDeclaration(const std::unique_ptr<RawServiceDeclaration>& element) override;
+  void OnServiceMember(const std::unique_ptr<RawServiceMember>& element) override;
+  void OnStructLayoutMember(const std::unique_ptr<RawStructLayoutMember>& element) override;
+  void OnTypeConstructor(const std::unique_ptr<RawTypeConstructor>& element) override;
+  void OnTypeDeclaration(const std::unique_ptr<RawTypeDeclaration>& element) override;
+  void OnUsing(const std::unique_ptr<RawUsing>& element) override;
+  void OnValueLayoutMember(const std::unique_ptr<RawValueLayoutMember>& element) override;
 
   // Must be called after OnFile() has been called.  Returns the result of the file fragmentation
   // work done by this class.
@@ -111,9 +110,9 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
 
   // As we descend down a particular branch of the raw AST, we record the VisitorKind of each node
   // we visit in the ast_path_ member set.  Later, we can use this function to check if we are
-  // "inside" of some raw AST node.  For example, we handle raw::Identifiers differently if they are
-  // inside of a raw::CompoundIdentifier.  Running `IsInsideOf(VisitorKind::kCompoundIdentifier)`
-  // allows us to deduce if this special handling is necessary for any raw::Identifier we visit.
+  // "inside" of some raw AST node.  For example, we handle RawIdentifiers differently if they are
+  // inside of a RawCompoundIdentifier.  Running `IsInsideOf(VisitorKind::kCompoundIdentifier)`
+  // allows us to deduce if this special handling is necessary for any RawIdentifier we visit.
   bool IsInsideOf(VisitorKind visitor_kind);
 
   // This function is like `IsInsideOf`, except it only checks the immediate parent node.
@@ -183,7 +182,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   //   // My standalone comment.
   //   using foo.bar as qux; // My inline comment.
   //
-  // The span `foo.bar` is a raw::CompoundIdentifier consisting of multiple tokens (`foo`, `.`, and
+  // The span `foo.bar` is a RawCompoundIdentifier consisting of multiple tokens (`foo`, `.`, and
   // `bar`).  Since this span is not meant to be divisible, it should be constructed by a
   // SpanBuilder<AtomicSpanSequence>.  In contrast, a sub-statement length span that IS meant to be
   // divisible, like `@attr(foo="bar)`, should be constructed by SpanBuilder<DivisibleSpanSequence>
@@ -195,7 +194,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
 
    public:
     // Use these constructors when the entire SourceElement will be ingested by the SpanBuilder.
-    SpanBuilder(SpanSequenceTreeVisitor* ftv, const raw::SourceElement& element,
+    SpanBuilder(SpanSequenceTreeVisitor* ftv, const SourceElement& element,
                 SpanSequence::Position position = SpanSequence::Position::kDefault)
         : Builder<T>(ftv, element.start_token, element.end_token, true), position_(position) {}
     SpanBuilder(SpanSequenceTreeVisitor* ftv, const Token& start, const Token& end,
@@ -241,7 +240,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   class StatementBuilder : public Builder<T> {
    public:
     // Use this constructor when the entire SourceElement will be ingested by the StatementBuilder.
-    StatementBuilder(SpanSequenceTreeVisitor* ftv, const raw::SourceElement& element,
+    StatementBuilder(SpanSequenceTreeVisitor* ftv, const SourceElement& element,
                      SpanSequence::Position position = SpanSequence::Position::kDefault)
         : Builder<T>(ftv, element.start_token, element.end_token, true), position_(position) {}
     StatementBuilder(SpanSequenceTreeVisitor* ftv, const Token& start, const Token& end,
@@ -320,7 +319,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   //
   // To avoid this "double visit" problem, we maintain a set of pointers to SourceElements we've
   // already visited.
-  std::set<raw::SourceElement*> already_seen_;
+  std::set<SourceElement*> already_seen_;
 
   // A stack that keeps track of the CompositeSpanSequence we are currently building.  It is a list
   // of that CompositeSpanSequence's children.  When the child list has been filled out, it is
@@ -339,6 +338,6 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   size_t next_token_index_ = 0;
 };
 
-}  // namespace fidl::fmt
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SPAN_SEQUENCE_TREE_VISITOR_H_

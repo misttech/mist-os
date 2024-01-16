@@ -23,9 +23,9 @@ type Fruit = enum : uint64 {
   ASSERT_NE(type_decl, nullptr);
   EXPECT_EQ(type_decl->members.size(), 3u);
   auto underlying = type_decl->subtype_ctor->type;
-  ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
-  auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
-  EXPECT_EQ(underlying_primitive->subtype, fidl::types::PrimitiveSubtype::kUint64);
+  ASSERT_EQ(underlying->kind, fidlc::Type::Kind::kPrimitive);
+  auto underlying_primitive = static_cast<const fidlc::PrimitiveType*>(underlying);
+  EXPECT_EQ(underlying_primitive->subtype, fidlc::PrimitiveSubtype::kUint64);
 }
 
 TEST(BitsTests, GoodEnumDefaultUint32) {
@@ -39,16 +39,16 @@ type Fruit = enum {
   auto type_decl = library.LookupEnum("Fruit");
   ASSERT_NE(type_decl, nullptr);
   auto underlying = type_decl->subtype_ctor->type;
-  ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
-  auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
-  EXPECT_EQ(underlying_primitive->subtype, fidl::types::PrimitiveSubtype::kUint32);
+  ASSERT_EQ(underlying->kind, fidlc::Type::Kind::kPrimitive);
+  auto underlying_primitive = static_cast<const fidlc::PrimitiveType*>(underlying);
+  EXPECT_EQ(underlying_primitive->subtype, fidlc::PrimitiveSubtype::kUint32);
 }
 
 TEST(EnumsTests, BadEnumTestWithNonUniqueValues) {
   TestLibrary library;
   library.AddFile("bad/fi-0107.test.fidl");
-  library.ExpectFail(fidl::ErrDuplicateMemberValue, fidl::flat::Decl::Kind::kEnum, "APPLE",
-                     "ORANGE", "bad/fi-0107.test.fidl:7:5");
+  library.ExpectFail(fidlc::ErrDuplicateMemberValue, fidlc::Decl::Kind::kEnum, "APPLE", "ORANGE",
+                     "bad/fi-0107.test.fidl:7:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -64,8 +64,8 @@ type Fruit = enum {
 const FOUR uint32 = 4;
 const TWO_SQUARED uint32 = 4;
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateMemberValue, fidl::flat::Decl::Kind::kEnum, "APPLE",
-                     "ORANGE", "example.fidl:5:5");
+  library.ExpectFail(fidlc::ErrDuplicateMemberValue, fidlc::Decl::Kind::kEnum, "APPLE", "ORANGE",
+                     "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -78,8 +78,8 @@ type Fruit = enum : uint64 {
     APPLE = -2;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
-  library.ExpectFail(fidl::ErrConstantOverflowsType, "-2", "uint64");
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kEnum);
+  library.ExpectFail(fidlc::ErrConstantOverflowsType, "-2", "uint64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -92,8 +92,8 @@ type Fruit = enum {
     APPLE = -2;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
-  library.ExpectFail(fidl::ErrConstantOverflowsType, "-2", "uint32");
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kEnum);
+  library.ExpectFail(fidlc::ErrConstantOverflowsType, "-2", "uint32");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -106,15 +106,15 @@ type Fruit = enum : uint8 {
     APPLE = 256;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
-  library.ExpectFail(fidl::ErrConstantOverflowsType, "256", "uint8");
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kEnum);
+  library.ExpectFail(fidlc::ErrConstantOverflowsType, "256", "uint8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(EnumsTests, BadEnumTestFloatType) {
   TestLibrary library;
   library.AddFile("bad/fi-0070.test.fidl");
-  library.ExpectFail(fidl::ErrEnumTypeMustBeIntegralPrimitive, "float64");
+  library.ExpectFail(fidlc::ErrEnumTypeMustBeIntegralPrimitive, "float64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -128,8 +128,8 @@ type Fruit = flexible enum {
     ORANGE = 3;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kEnumMember, "ORANGE",
-                     fidl::flat::Element::Kind::kEnumMember, "example.fidl:5:5");
+  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kEnumMember, "ORANGE",
+                     fidlc::Element::Kind::kEnumMember, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -157,7 +157,7 @@ TEST(EnumsTests, GoodEnumTestStrictWithMembers) {
 TEST(EnumsTests, BadEnumTestNoMembersWhenStrict) {
   TestLibrary library;
   library.AddFile("bad/fi-0019.test.fidl");
-  library.ExpectFail(fidl::ErrMustHaveOneMember);
+  library.ExpectFail(fidlc::ErrMustHaveOneMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -185,7 +185,7 @@ type Struct = struct {
     not_nullable NotNullable:optional;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCannotBeOptional, "NotNullable");
+  library.ExpectFail(fidlc::ErrCannotBeOptional, "NotNullable");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -201,7 +201,7 @@ type Struct = struct {
     not_nullable NotNullable:<1, 2, 3>;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrTooManyConstraints, "NotNullable", 1, 3);
+  library.ExpectFail(fidlc::ErrTooManyConstraints, "NotNullable", 1, 3);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

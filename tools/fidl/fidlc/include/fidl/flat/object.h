@@ -9,17 +9,17 @@
 
 #include "tools/fidl/fidlc/include/fidl/type_shape.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // An |Object| is anything that can be encoded in the FIDL wire format. Thus, all objects have
 // information such as as their size, alignment, and depth (how many levels of sub-objects are
 // contained within an object). See the FIDL wire format's definition of "object" for more details.
-// TODO(https://fxbug.dev/37535): Remove this Object class, since it forms a third type hierarchy along with
-// Type & Decl.
+// TODO(https://fxbug.dev/37535): Remove this Object class, since it forms a third type hierarchy
+// along with Type & Decl.
 struct Object {
   virtual ~Object() = default;
 
-  TypeShape typeshape(fidl::WireFormat wire_format) const { return TypeShape(*this, wire_format); }
+  TypeShape typeshape(WireFormat wire_format) const { return TypeShape(*this, wire_format); }
 
   // |Visitor|, and the corresponding |Accept()| method below, enable the visitor pattern to be used
   // for derived classes of Object. See <https://en.wikipedia.org/wiki/Visitor_pattern> for
@@ -44,8 +44,8 @@ struct Object {
   // <https://eli.thegreenplace.net/2018/type-erasure-and-reification/> for a good introduction to
   // type erasure in C++.
   //
-  // TODO(https://fxbug.dev/37535): Refactor the visitor pattern here to be the simpler kind-enum + switch()
-  // dispatch.
+  // TODO(https://fxbug.dev/37535): Refactor the visitor pattern here to be the simpler kind-enum +
+  // switch() dispatch.
   template <typename T>
   struct Visitor;
 
@@ -57,6 +57,6 @@ struct Object {
   virtual std::any AcceptAny(VisitorAny* visitor) const = 0;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_OBJECT_H_

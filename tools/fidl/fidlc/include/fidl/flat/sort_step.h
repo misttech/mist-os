@@ -7,7 +7,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // SortStep topologically sorts the library's decls, or fails if it detects a
 // cycle. It stores the result in library_->declaration_order_. See also
@@ -26,6 +26,6 @@ class SortStep : public Compiler::Step {
   void RunImpl() override;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_SORT_STEP_H_

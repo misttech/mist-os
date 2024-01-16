@@ -10,16 +10,14 @@
 
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl::raw {
-struct CompoundIdentifier;
-}
+namespace fidlc {
 
-namespace fidl::flat {
+class Name;
 
 struct Decl;
 struct Element;
 struct Library;
-class Name;
+struct RawCompoundIdentifier;
 
 // A reference refers to an element by name, and is either sourced or synthetic.
 // The difference between a name and a reference is that names are definitional,
@@ -62,7 +60,7 @@ class Reference final {
   };
 
   // Creates a sourced reference.
-  explicit Reference(const raw::CompoundIdentifier& name);
+  explicit Reference(const RawCompoundIdentifier& name);
   // Creates a synthetic reference.
   explicit Reference(Target target);
 
@@ -159,6 +157,6 @@ class Reference final {
   std::variant<RawSourced, RawSynthetic, Key, Contextual, Target, Failed> state_;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_REFERENCE_H_

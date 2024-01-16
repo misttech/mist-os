@@ -12,7 +12,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 
-namespace fidl::utils {
+namespace fidlc {
 
 const std::string kLibraryComponentPattern = "[a-z][a-z0-9]*";
 const std::string kIdentifierComponentPattern = "[A-Za-z]([A-Za-z0-9_]*[A-Za-z0-9])?";
@@ -365,4 +365,4 @@ std::uint32_t string_literal_length(std::string_view str) {
   return count;
 }
 
-}  // namespace fidl::utils
+}  // namespace fidlc

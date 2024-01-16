@@ -19,10 +19,10 @@ protocol P {};              // Error: name collision
 type foo = struct {};
 type Foo = struct {};       // Error: canonical name collision
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kProtocol, "P",
-                     fidl::flat::Element::Kind::kProtocol, "example.fidl:4:10");
-  library.ExpectFail(fidl::ErrNameCollisionCanonical, fidl::flat::Element::Kind::kStruct, "foo",
-                     fidl::flat::Element::Kind::kStruct, "Foo", "example.fidl:8:6", "foo");
+  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kProtocol, "P",
+                     fidlc::Element::Kind::kProtocol, "example.fidl:4:10");
+  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kStruct, "foo",
+                     fidlc::Element::Kind::kStruct, "Foo", "example.fidl:8:6", "foo");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -53,12 +53,12 @@ type NonDenseTable = table {
     3: b uint8;                   // Error: non-dense ordinals
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
-  library.ExpectFail(fidl::ErrDuplicateMemberValue, fidl::flat::Decl::Kind::kEnum, "TWO", "ONE",
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  library.ExpectFail(fidlc::ErrDuplicateMemberValue, fidlc::Decl::Kind::kEnum, "TWO", "ONE",
                      "example.fidl:11:5");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"2\"", "string:1", "uint32");
-  library.ExpectFail(fidl::ErrNonDenseOrdinal, 2);
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kEnum);
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"2\"", "string:1", "uint32");
+  library.ExpectFail(fidlc::ErrNonDenseOrdinal, 2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -75,7 +75,7 @@ type Struct = struct {
     foo uint16;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "transitional");
+  library.ExpectFail(fidlc::ErrInvalidAttributePlacement, "transitional");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -91,12 +91,12 @@ type Enum = enum {
         = "not a number";    // Error: cannot be interpreted as uint32
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateAttributeArg, "foo", "first", "example.fidl:4:6");
-  library.ExpectFail(fidl::ErrCanOnlyUseStringOrBool, "first", "bar");
-  library.ExpectFail(fidl::ErrCanOnlyUseStringOrBool, "second", "bar");
-  library.ExpectFail(fidl::ErrDuplicateAttribute, "foo", "example.fidl:4:2");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not a number\"", "string:12",
+  library.ExpectFail(fidlc::ErrDuplicateAttributeArg, "foo", "first", "example.fidl:4:6");
+  library.ExpectFail(fidlc::ErrCanOnlyUseStringOrBool, "first", "bar");
+  library.ExpectFail(fidlc::ErrCanOnlyUseStringOrBool, "second", "bar");
+  library.ExpectFail(fidlc::ErrDuplicateAttribute, "foo", "example.fidl:4:2");
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kEnum);
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"not a number\"", "string:12",
                      "uint32");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -108,9 +108,9 @@ library example;
 @attr(1)
 const FOO string = 2;
 )FIDL");
-  library.ExpectFail(fidl::ErrCanOnlyUseStringOrBool, "value", "attr");
-  library.ExpectFail(fidl::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "2", "untyped numeric", "string");
+  library.ExpectFail(fidlc::ErrCanOnlyUseStringOrBool, "value", "attr");
+  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "2", "untyped numeric", "string");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -127,13 +127,13 @@ type Foo = bits {
     XYZ = 3;               // Error: not a power of two
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kBits);
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not a number\"", "string:12",
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kBits);
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"not a number\"", "string:12",
                      "uint32");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kBits);
-  library.ExpectFail(fidl::ErrDuplicateMemberValue, fidl::flat::Decl::Kind::kBits, "BAZ", "TWO",
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kBits);
+  library.ExpectFail(fidlc::ErrDuplicateMemberValue, fidlc::Decl::Kind::kBits, "BAZ", "TWO",
                      "example.fidl:8:5");
-  library.ExpectFail(fidl::ErrBitsMemberMustBePowerOfTwo);
+  library.ExpectFail(fidlc::ErrBitsMemberMustBePowerOfTwo);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -150,13 +150,13 @@ type Foo = flexible enum : uint8 {
     XYZ = 255;             // Error: max value on flexible enum
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not a number\"", "string:12",
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kEnum);
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"not a number\"", "string:12",
                      "uint8");
-  library.ExpectFail(fidl::ErrCouldNotResolveMember, fidl::flat::Decl::Kind::kEnum);
-  library.ExpectFail(fidl::ErrDuplicateMemberValue, fidl::flat::Decl::Kind::kEnum, "BAZ", "TWO",
+  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kEnum);
+  library.ExpectFail(fidlc::ErrDuplicateMemberValue, fidlc::Decl::Kind::kEnum, "BAZ", "TWO",
                      "example.fidl:8:5");
-  library.ExpectFail(fidl::ErrFlexibleEnumMemberWithMaxValue, "255");
+  library.ExpectFail(fidlc::ErrFlexibleEnumMemberWithMaxValue, "255");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -172,10 +172,10 @@ type Foo = struct {
         = "not bool";  // Error: cannot interpret as bool
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "string", 0, 1);
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
-  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "baz");
-  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not bool\"", "string:8", "bool");
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "string", 0, 1);
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  library.ExpectFail(fidlc::ErrCouldNotResolveMemberDefault, "baz");
+  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"not bool\"", "string:8", "bool");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -190,10 +190,10 @@ type Foo = table {
        vector;               // Error: expected 1 layout parameter
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNonDenseOrdinal, 1);
-  library.ExpectFail(fidl::ErrOptionalTableMember);
-  library.ExpectFail(fidl::ErrDuplicateTableFieldOrdinal, "example.fidl:6:5");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  library.ExpectFail(fidlc::ErrNonDenseOrdinal, 1);
+  library.ExpectFail(fidlc::ErrOptionalTableMember);
+  library.ExpectFail(fidlc::ErrDuplicateTableFieldOrdinal, "example.fidl:6:5");
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -208,10 +208,10 @@ type Foo = union {
         vector;              // Error: expected 1 layout parameter
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrNonDenseOrdinal, 1);
-  library.ExpectFail(fidl::ErrOptionalUnionMember);
-  library.ExpectFail(fidl::ErrDuplicateUnionMemberOrdinal, "example.fidl:6:5");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  library.ExpectFail(fidlc::ErrNonDenseOrdinal, 1);
+  library.ExpectFail(fidlc::ErrOptionalUnionMember);
+  library.ExpectFail(fidlc::ErrDuplicateUnionMemberOrdinal, "example.fidl:6:5");
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -227,11 +227,11 @@ protocol Foo {
     }) error vector;             // Error: expected 1 layout parameter
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrComposingNonProtocol);
-  library.ExpectFail(fidl::ErrInvalidSelectorValue);
-  library.ExpectFail(fidl::ErrEmptyPayloadStructs, "Bar");
-  library.ExpectFail(fidl::ErrCannotBeOptional, "bool");
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  library.ExpectFail(fidlc::ErrComposingNonProtocol);
+  library.ExpectFail(fidlc::ErrInvalidSelectorValue);
+  library.ExpectFail(fidlc::ErrEmptyPayloadStructs, "Bar");
+  library.ExpectFail(fidlc::ErrCannotBeOptional, "bool");
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -247,10 +247,10 @@ service Foo {
     opt client_end:<P,optional>;  // Error: cannot be optional
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrOnlyClientEndsInServices);
-  library.ExpectFail(fidl::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
-  library.ExpectFail(fidl::ErrOnlyClientEndsInServices);
-  library.ExpectFail(fidl::ErrOptionalServiceMember);
+  library.ExpectFail(fidlc::ErrOnlyClientEndsInServices);
+  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "vector", 1, 0);
+  library.ExpectFail(fidlc::ErrOnlyClientEndsInServices);
+  library.ExpectFail(fidlc::ErrOptionalServiceMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

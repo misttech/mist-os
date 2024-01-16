@@ -14,7 +14,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/values.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 struct AttributeArg final : public HasClone<AttributeArg> {
   AttributeArg(std::optional<SourceSpan> name, std::unique_ptr<Constant> value, SourceSpan span)
@@ -54,9 +54,9 @@ struct Attribute final : public HasClone<Attribute> {
   // Set to true by Library::CompileAttribute.
   bool compiled = false;
 
-  // We parse `///` doc comments as nameless raw::Attribute with `provenance`
-  // set to raw::Attribute::Provenance::kDocComment. When consuming into a
-  // flat::Attribute, we set the name to kDocCommentName.
+  // We parse `///` doc comments as nameless RawAttribute with `provenance`
+  // set to RawAttribute::Provenance::kDocComment. When consuming into a
+  // Attribute, we set the name to kDocCommentName.
   static constexpr std::string_view kDocCommentName = "doc";
 };
 
@@ -75,6 +75,6 @@ struct AttributeList final : public HasClone<AttributeList> {
   std::vector<std::unique_ptr<Attribute>> attributes;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_ATTRIBUTES_H_

@@ -7,20 +7,20 @@
 #include "tools/fidl/fidlc/include/fidl/formatter.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-#define ASSERT_FORMATTED(source, expected)                         \
-  std::string actual = Format(source);                             \
-  ASSERT_TRUE(fidl::utils::OnlyWhitespaceChanged(source, actual)); \
+#define ASSERT_FORMATTED(source, expected)                   \
+  std::string actual = Format(source);                       \
+  ASSERT_TRUE(fidlc::OnlyWhitespaceChanged(source, actual)); \
   ASSERT_EQ(expected, actual);
 
 namespace {
 std::string Format(const std::string& source, bool reformat_and_compare = true) {
-  fidl::SourceFile source_file("example.fidl", source);
+  fidlc::SourceFile source_file("example.fidl", source);
 
   // We use a column width of 40, rather than the "real world" 100, to make tests easier to read
   // and write.
-  fidl::Reporter reporter;
-  auto formatter = fidl::fmt::Formatter(40, &reporter);
-  fidl::ExperimentalFlags experimental_flags;
+  fidlc::Reporter reporter;
+  auto formatter = fidlc::Formatter(40, &reporter);
+  fidlc::ExperimentalFlags experimental_flags;
   auto result = formatter.Format(source_file, experimental_flags);
 
   // If we're still going to reformat, then this is the first pass.  Otherwise, we're on the second

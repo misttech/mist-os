@@ -12,7 +12,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 class CompileStep;
 
@@ -149,6 +149,6 @@ class AttributeSchema {
   Constraint constraint_ = nullptr;
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_ATTRIBUTE_SCHEMA_H_

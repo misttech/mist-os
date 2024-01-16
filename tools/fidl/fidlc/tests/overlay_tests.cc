@@ -26,7 +26,7 @@ type Union = strict union {
     1: o Overlay;
 };
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 }
@@ -55,7 +55,7 @@ type Overlay = strict overlay {
 
 
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 }
@@ -78,7 +78,7 @@ type Outer = strict overlay {
 
 
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 }
@@ -98,7 +98,7 @@ type Foo = strict overlay {
     5: reserved bool;
 };
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(library);
   auto type_decl = library.LookupOverlay("Foo");
@@ -115,9 +115,9 @@ type Foo = flexible overlay {
 };
 
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  library.ExpectFail(fidl::ErrOverlayMustBeStrict);
+  library.ExpectFail(fidlc::ErrOverlayMustBeStrict);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -130,11 +130,11 @@ type Foo = strict resource overlay {
 };
 
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  library.ExpectFail(fidl::ErrCannotSpecifyModifier,
-                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kResource),
-                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kOverlay));
+  library.ExpectFail(fidlc::ErrCannotSpecifyModifier,
+                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kResource),
+                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kOverlay));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -148,9 +148,9 @@ type Foo = strict overlay {
 };
 
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  library.ExpectFail(fidl::ErrOverlayMemberMustBeValue);
+  library.ExpectFail(fidlc::ErrOverlayMemberMustBeValue);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -164,9 +164,9 @@ type Foo = strict overlay {
 };
 
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  library.ExpectFail(fidl::ErrOverlayMustNotContainReserved);
+  library.ExpectFail(fidlc::ErrOverlayMustNotContainReserved);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -179,7 +179,7 @@ type Foo = strict overlay {
 };
 
 )FIDL");
-  library.ExpectFail(fidl::ErrInvalidLayoutClass);
+  library.ExpectFail(fidlc::ErrInvalidLayoutClass);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -195,9 +195,9 @@ type Baff = struct {
     baz Biff:optional;
 };
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  library.ExpectFail(fidl::ErrCannotBeOptional, "Biff");
+  library.ExpectFail(fidlc::ErrCannotBeOptional, "Biff");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -217,7 +217,7 @@ type Bar = strict overlay {
 };
 
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
   ASSERT_COMPILED(library);
 }
@@ -230,9 +230,9 @@ type Value = strict overlay {
     2: recurse Value;
 };
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  library.ExpectFail(fidl::ErrIncludeCycle, "overlay 'Value' -> overlay 'Value'");
+  library.ExpectFail(fidlc::ErrIncludeCycle, "overlay 'Value' -> overlay 'Value'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -253,9 +253,9 @@ type Sum = strict overlay {
     4: product Product;
 };
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  library.ExpectFail(fidl::ErrIncludeCycle,
+  library.ExpectFail(fidlc::ErrIncludeCycle,
                      "struct 'Product' -> overlay 'Sum' -> struct 'Product'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -269,8 +269,8 @@ type Foo = strict overlay {
 };
 
 )FIDL");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
 
-  library.ExpectFail(fidl::ErrInvalidAttributePlacement, "selector");
+  library.ExpectFail(fidlc::ErrInvalidAttributePlacement, "selector");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }

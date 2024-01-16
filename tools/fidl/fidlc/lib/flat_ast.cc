@@ -10,7 +10,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/visitor.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 bool Element::IsDecl() const {
   switch (kind) {
@@ -234,7 +234,7 @@ Resource::Property* Resource::LookupProperty(std::string_view name) {
 
 Dependencies::RegisterResult Dependencies::Register(
     const SourceSpan& span, std::string_view filename, Library* dep_library,
-    const std::unique_ptr<raw::Identifier>& maybe_alias) {
+    const std::unique_ptr<RawIdentifier>& maybe_alias) {
   refs_.push_back(std::make_unique<LibraryRef>(span, dep_library));
   LibraryRef* ref = refs_.back().get();
 
@@ -293,7 +293,7 @@ void Dependencies::VerifyAllDependenciesWereUsed(const Library& for_library, Rep
 
 std::string LibraryName(const std::vector<std::string_view>& components,
                         std::string_view separator) {
-  return utils::StringJoin(components, separator);
+  return StringJoin(components, separator);
 }
 
 // static
@@ -474,11 +474,11 @@ std::unique_ptr<TypeConstructor> TypeConstructor::Clone() const {
 }
 
 std::unique_ptr<LayoutParameterList> LayoutParameterList::Clone() const {
-  return std::make_unique<LayoutParameterList>(utils::MapClone(items), span);
+  return std::make_unique<LayoutParameterList>(MapClone(items), span);
 }
 
 std::unique_ptr<TypeConstraints> TypeConstraints::Clone() const {
-  return std::make_unique<TypeConstraints>(utils::MapClone(items), span);
+  return std::make_unique<TypeConstraints>(MapClone(items), span);
 }
 
 TypeConstructor* LiteralLayoutParameter::AsTypeCtor() const { return nullptr; }
@@ -709,4 +709,4 @@ std::any Overlay::Member::Used::AcceptAny(VisitorAny* visitor) const {
   return visitor->Visit(*this);
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

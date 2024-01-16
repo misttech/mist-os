@@ -11,7 +11,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
 
-namespace fidl {
+namespace fidlc {
 
 class SourceManager {
  public:
@@ -25,6 +25,6 @@ class SourceManager {
   std::vector<std::unique_ptr<SourceFile>> sources_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_SOURCE_MANAGER_H_

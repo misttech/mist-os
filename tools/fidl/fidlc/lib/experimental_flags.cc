@@ -4,7 +4,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 
-namespace fidl {
+namespace fidlc {
 
 bool ExperimentalFlags::EnableFlagByName(std::string_view flag) {
   auto it = kFlagStrings.find(flag);
@@ -41,4 +41,4 @@ std::map<const std::string_view, const ExperimentalFlags::Flag> ExperimentalFlag
     {"transitional_allow_list", Flag::kTransitionalAllowList},
 };
 
-}  // namespace fidl
+}  // namespace fidlc

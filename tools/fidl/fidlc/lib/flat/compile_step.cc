@@ -18,7 +18,7 @@
 #include "tools/fidl/fidlc/include/fidl/names.h"
 #include "tools/fidl/fidlc/include/fidl/ordinals.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // See RFC-0132 for the origin of this table limit.
 constexpr size_t kMaxTableOrdinals = 64;
@@ -95,14 +95,14 @@ struct MethodScope {
 };
 
 // A helper class to derive the resourceness of synthesized decls based on their
-// members. If the given std::optional<types::Resourceness> is already set
+// members. If the given std::optional<Resourceness> is already set
 // (meaning the decl is user-defined, not synthesized), this does nothing.
 //
 // Types added via AddType must already be compiled. In other words, there must
 // not be cycles among the synthesized decls.
 class DeriveResourceness {
  public:
-  explicit DeriveResourceness(std::optional<types::Resourceness>* target)
+  explicit DeriveResourceness(std::optional<Resourceness>* target)
       : target_(target), derive_(!target->has_value()) {}
 
   ~DeriveResourceness() {
@@ -112,16 +112,16 @@ class DeriveResourceness {
   }
 
   void AddType(const Type* type) {
-    if (derive_ && result_ == types::Resourceness::kValue &&
-        type->Resourceness() == types::Resourceness::kResource) {
-      result_ = types::Resourceness::kResource;
+    if (derive_ && result_ == Resourceness::kValue &&
+        type->Resourceness() == Resourceness::kResource) {
+      result_ = Resourceness::kResource;
     }
   }
 
  private:
-  std::optional<types::Resourceness>* const target_;
+  std::optional<Resourceness>* const target_;
   const bool derive_;
-  types::Resourceness result_ = types::Resourceness::kValue;
+  Resourceness result_ = Resourceness::kValue;
 };
 
 // A helper class to track when a Decl is compiling and compiled.
@@ -279,35 +279,35 @@ bool CompileStep::ResolveConstant(Constant* constant, std::optional<const Type*>
 }
 
 ConstantValue::Kind CompileStep::ConstantValuePrimitiveKind(
-    const types::PrimitiveSubtype primitive_subtype) {
+    const PrimitiveSubtype primitive_subtype) {
   switch (primitive_subtype) {
-    case types::PrimitiveSubtype::kBool:
+    case PrimitiveSubtype::kBool:
       return ConstantValue::Kind::kBool;
-    case types::PrimitiveSubtype::kInt8:
+    case PrimitiveSubtype::kInt8:
       return ConstantValue::Kind::kInt8;
-    case types::PrimitiveSubtype::kInt16:
+    case PrimitiveSubtype::kInt16:
       return ConstantValue::Kind::kInt16;
-    case types::PrimitiveSubtype::kInt32:
+    case PrimitiveSubtype::kInt32:
       return ConstantValue::Kind::kInt32;
-    case types::PrimitiveSubtype::kInt64:
+    case PrimitiveSubtype::kInt64:
       return ConstantValue::Kind::kInt64;
-    case types::PrimitiveSubtype::kUint8:
+    case PrimitiveSubtype::kUint8:
       return ConstantValue::Kind::kUint8;
-    case types::PrimitiveSubtype::kZxUchar:
+    case PrimitiveSubtype::kZxUchar:
       return ConstantValue::Kind::kZxUchar;
-    case types::PrimitiveSubtype::kUint16:
+    case PrimitiveSubtype::kUint16:
       return ConstantValue::Kind::kUint16;
-    case types::PrimitiveSubtype::kUint32:
+    case PrimitiveSubtype::kUint32:
       return ConstantValue::Kind::kUint32;
-    case types::PrimitiveSubtype::kUint64:
+    case PrimitiveSubtype::kUint64:
       return ConstantValue::Kind::kUint64;
-    case types::PrimitiveSubtype::kZxUsize64:
+    case PrimitiveSubtype::kZxUsize64:
       return ConstantValue::Kind::kZxUsize64;
-    case types::PrimitiveSubtype::kZxUintptr64:
+    case PrimitiveSubtype::kZxUintptr64:
       return ConstantValue::Kind::kZxUintptr64;
-    case types::PrimitiveSubtype::kFloat32:
+    case PrimitiveSubtype::kFloat32:
       return ConstantValue::Kind::kFloat32;
-    case types::PrimitiveSubtype::kFloat64:
+    case PrimitiveSubtype::kFloat64:
       return ConstantValue::Kind::kFloat64;
   }
 }
@@ -458,60 +458,60 @@ fail_cannot_convert:
 
 bool CompileStep::ResolveLiteralConstant(LiteralConstant* literal_constant,
                                          std::optional<const Type*> opt_type) {
-  auto inferred_type = InferType(static_cast<flat::Constant*>(literal_constant));
+  auto inferred_type = InferType(static_cast<Constant*>(literal_constant));
   const Type* type = opt_type ? opt_type.value() : inferred_type;
   if (!TypeIsConvertibleTo(inferred_type, type)) {
     return reporter()->Fail(ErrTypeCannotBeConvertedToType, literal_constant->literal->span(),
                             literal_constant, inferred_type, type);
   }
   switch (literal_constant->literal->kind) {
-    case raw::Literal::Kind::kDocComment: {
+    case RawLiteral::Kind::kDocComment: {
       auto doc_comment_literal =
-          static_cast<const raw::DocCommentLiteral*>(literal_constant->literal);
+          static_cast<const RawDocCommentLiteral*>(literal_constant->literal);
       literal_constant->ResolveTo(
           std::make_unique<DocCommentConstantValue>(doc_comment_literal->span().data()),
           typespace()->GetUnboundedStringType());
       return true;
     }
-    case raw::Literal::Kind::kString: {
+    case RawLiteral::Kind::kString: {
       literal_constant->ResolveTo(
           std::make_unique<StringConstantValue>(literal_constant->literal->span().data()),
           typespace()->GetUnboundedStringType());
       return true;
     }
-    case raw::Literal::Kind::kBool: {
-      auto bool_literal = static_cast<const raw::BoolLiteral*>(literal_constant->literal);
+    case RawLiteral::Kind::kBool: {
+      auto bool_literal = static_cast<const RawBoolLiteral*>(literal_constant->literal);
       literal_constant->ResolveTo(std::make_unique<BoolConstantValue>(bool_literal->value),
-                                  typespace()->GetPrimitiveType(types::PrimitiveSubtype::kBool));
+                                  typespace()->GetPrimitiveType(PrimitiveSubtype::kBool));
       return true;
     }
-    case raw::Literal::Kind::kNumeric: {
+    case RawLiteral::Kind::kNumeric: {
       // Even though `untyped numeric` is convertible to any numeric type, we
       // still need to check for overflows which is done in
       // ResolveLiteralConstantKindNumericLiteral.
       switch (static_cast<const PrimitiveType*>(type)->subtype) {
-        case types::PrimitiveSubtype::kInt8:
+        case PrimitiveSubtype::kInt8:
           return ResolveLiteralConstantKindNumericLiteral<int8_t>(literal_constant, type);
-        case types::PrimitiveSubtype::kInt16:
+        case PrimitiveSubtype::kInt16:
           return ResolveLiteralConstantKindNumericLiteral<int16_t>(literal_constant, type);
-        case types::PrimitiveSubtype::kInt32:
+        case PrimitiveSubtype::kInt32:
           return ResolveLiteralConstantKindNumericLiteral<int32_t>(literal_constant, type);
-        case types::PrimitiveSubtype::kInt64:
+        case PrimitiveSubtype::kInt64:
           return ResolveLiteralConstantKindNumericLiteral<int64_t>(literal_constant, type);
-        case types::PrimitiveSubtype::kUint8:
-        case types::PrimitiveSubtype::kZxUchar:
+        case PrimitiveSubtype::kUint8:
+        case PrimitiveSubtype::kZxUchar:
           return ResolveLiteralConstantKindNumericLiteral<uint8_t>(literal_constant, type);
-        case types::PrimitiveSubtype::kUint16:
+        case PrimitiveSubtype::kUint16:
           return ResolveLiteralConstantKindNumericLiteral<uint16_t>(literal_constant, type);
-        case types::PrimitiveSubtype::kUint32:
+        case PrimitiveSubtype::kUint32:
           return ResolveLiteralConstantKindNumericLiteral<uint32_t>(literal_constant, type);
-        case types::PrimitiveSubtype::kUint64:
-        case types::PrimitiveSubtype::kZxUsize64:
-        case types::PrimitiveSubtype::kZxUintptr64:
+        case PrimitiveSubtype::kUint64:
+        case PrimitiveSubtype::kZxUsize64:
+        case PrimitiveSubtype::kZxUintptr64:
           return ResolveLiteralConstantKindNumericLiteral<uint64_t>(literal_constant, type);
-        case types::PrimitiveSubtype::kFloat32:
+        case PrimitiveSubtype::kFloat32:
           return ResolveLiteralConstantKindNumericLiteral<float>(literal_constant, type);
-        case types::PrimitiveSubtype::kFloat64:
+        case PrimitiveSubtype::kFloat64:
           return ResolveLiteralConstantKindNumericLiteral<double>(literal_constant, type);
         default:
           ZX_PANIC("should not have any other primitive type reachable");
@@ -526,17 +526,17 @@ bool CompileStep::ResolveLiteralConstantKindNumericLiteral(LiteralConstant* lite
   NumericType value;
   const auto span = literal_constant->literal->span();
   std::string string_data(span.data().data(), span.data().data() + span.data().size());
-  switch (utils::ParseNumeric(string_data, &value)) {
-    case utils::ParseNumericResult::kSuccess:
+  switch (ParseNumeric(string_data, &value)) {
+    case ParseNumericResult::kSuccess:
       literal_constant->ResolveTo(std::make_unique<NumericConstantValue<NumericType>>(value), type);
       return true;
-    case utils::ParseNumericResult::kMalformed:
+    case ParseNumericResult::kMalformed:
       // The caller (ResolveLiteralConstant) ensures that the constant kind is
       // a numeric literal, which means that it follows the grammar for
       // numerical types. As a result, an error to parse the data here is due
       // to the data being too large, rather than bad input.
       [[fallthrough]];
-    case utils::ParseNumericResult::kOutOfBounds:
+    case ParseNumericResult::kOutOfBounds:
       return reporter()->Fail(ErrConstantOverflowsType, span, literal_constant, type);
   }
 }
@@ -545,18 +545,18 @@ const Type* CompileStep::InferType(Constant* constant) {
   switch (constant->kind) {
     case Constant::Kind::kLiteral: {
       auto literal =
-          static_cast<const raw::Literal*>(static_cast<const LiteralConstant*>(constant)->literal);
+          static_cast<const RawLiteral*>(static_cast<const LiteralConstant*>(constant)->literal);
       switch (literal->kind) {
-        case raw::Literal::Kind::kString: {
-          auto string_literal = static_cast<const raw::StringLiteral*>(literal);
-          auto inferred_size = utils::string_literal_length(string_literal->span().data());
+        case RawLiteral::Kind::kString: {
+          auto string_literal = static_cast<const RawStringLiteral*>(literal);
+          auto inferred_size = string_literal_length(string_literal->span().data());
           return typespace()->GetStringType(inferred_size);
         }
-        case raw::Literal::Kind::kNumeric:
+        case RawLiteral::Kind::kNumeric:
           return typespace()->GetUntypedNumericType();
-        case raw::Literal::Kind::kBool:
-          return typespace()->GetPrimitiveType(types::PrimitiveSubtype::kBool);
-        case raw::Literal::Kind::kDocComment:
+        case RawLiteral::Kind::kBool:
+          return typespace()->GetPrimitiveType(PrimitiveSubtype::kBool);
+        case RawLiteral::Kind::kDocComment:
           return typespace()->GetUnboundedStringType();
       }
       return nullptr;
@@ -589,7 +589,7 @@ void CompileStep::CompileAttributeList(AttributeList* attributes) {
   Scope<std::string> scope;
   for (auto& attribute : attributes->attributes) {
     const auto original_name = attribute->name.data();
-    const auto canonical_name = utils::canonicalize(original_name);
+    const auto canonical_name = canonicalize(original_name);
     const auto result = scope.Insert(canonical_name, attribute->name);
     if (!result.ok()) {
       const auto previous_span = result.previous_occurrence();
@@ -615,7 +615,7 @@ void CompileStep::CompileAttribute(Attribute* attribute, bool early) {
       continue;
     }
     const auto original_name = arg->name.value().data();
-    const auto canonical_name = utils::canonicalize(original_name);
+    const auto canonical_name = canonicalize(original_name);
     const auto result = scope.Insert(canonical_name, arg->name.value());
     if (!result.ok()) {
       const auto previous_span = result.previous_occurrence();
@@ -661,11 +661,11 @@ const Type* CompileStep::UnderlyingType(const Type* type) {
 
 bool CompileStep::TypeCanBeConst(const Type* type) {
   switch (type->kind) {
-    case flat::Type::Kind::kString:
+    case Type::Kind::kString:
       return !type->IsNullable();
-    case flat::Type::Kind::kPrimitive:
+    case Type::Kind::kPrimitive:
       return true;
-    case flat::Type::Kind::kIdentifier: {
+    case Type::Kind::kIdentifier: {
       auto identifier_type = static_cast<const IdentifierType*>(type);
       switch (identifier_type->type_decl->kind) {
         case Decl::Kind::kEnum:
@@ -682,12 +682,12 @@ bool CompileStep::TypeCanBeConst(const Type* type) {
 
 bool CompileStep::TypeIsConvertibleTo(const Type* from_type, const Type* to_type) {
   switch (to_type->kind) {
-    case flat::Type::Kind::kString: {
-      if (from_type->kind != flat::Type::Kind::kString)
+    case Type::Kind::kString: {
+      if (from_type->kind != Type::Kind::kString)
         return false;
 
-      auto from_string_type = static_cast<const flat::StringType*>(from_type);
-      auto to_string_type = static_cast<const flat::StringType*>(to_type);
+      auto from_string_type = static_cast<const StringType*>(from_type);
+      auto to_string_type = static_cast<const StringType*>(to_type);
 
       if (!to_string_type->IsNullable() && from_string_type->IsNullable())
         return false;
@@ -697,24 +697,24 @@ bool CompileStep::TypeIsConvertibleTo(const Type* from_type, const Type* to_type
 
       return true;
     }
-    case flat::Type::Kind::kPrimitive: {
-      auto to_primitive_type = static_cast<const flat::PrimitiveType*>(to_type);
+    case Type::Kind::kPrimitive: {
+      auto to_primitive_type = static_cast<const PrimitiveType*>(to_type);
       switch (from_type->kind) {
-        case flat::Type::Kind::kUntypedNumeric:
-          return to_primitive_type->subtype != types::PrimitiveSubtype::kBool;
-        case flat::Type::Kind::kPrimitive:
+        case Type::Kind::kUntypedNumeric:
+          return to_primitive_type->subtype != PrimitiveSubtype::kBool;
+        case Type::Kind::kPrimitive:
           break;  // handled below
         default:
           return false;
       }
-      auto from_primitive_type = static_cast<const flat::PrimitiveType*>(from_type);
+      auto from_primitive_type = static_cast<const PrimitiveType*>(from_type);
       switch (to_primitive_type->subtype) {
-        case types::PrimitiveSubtype::kBool:
-          return from_primitive_type->subtype == types::PrimitiveSubtype::kBool;
+        case PrimitiveSubtype::kBool:
+          return from_primitive_type->subtype == PrimitiveSubtype::kBool;
         default:
           // TODO(https://fxbug.dev/118282): be more precise about convertibility, e.g. it should
           // not be allowed to convert a float to an int.
-          return from_primitive_type->subtype != types::PrimitiveSubtype::kBool;
+          return from_primitive_type->subtype != PrimitiveSubtype::kBool;
       }
     }
     default:
@@ -742,44 +742,44 @@ void CompileStep::CompileBits(Bits* bits_declaration) {
   // Validate constants.
   auto primitive_type = static_cast<const PrimitiveType*>(bits_declaration->subtype_ctor->type);
   switch (primitive_type->subtype) {
-    case types::PrimitiveSubtype::kUint8: {
+    case PrimitiveSubtype::kUint8: {
       uint8_t mask;
       if (!ValidateBitsMembersAndCalcMask<uint8_t>(bits_declaration, &mask))
         return;
       bits_declaration->mask = mask;
       break;
     }
-    case types::PrimitiveSubtype::kUint16: {
+    case PrimitiveSubtype::kUint16: {
       uint16_t mask;
       if (!ValidateBitsMembersAndCalcMask<uint16_t>(bits_declaration, &mask))
         return;
       bits_declaration->mask = mask;
       break;
     }
-    case types::PrimitiveSubtype::kUint32: {
+    case PrimitiveSubtype::kUint32: {
       uint32_t mask;
       if (!ValidateBitsMembersAndCalcMask<uint32_t>(bits_declaration, &mask))
         return;
       bits_declaration->mask = mask;
       break;
     }
-    case types::PrimitiveSubtype::kUint64: {
+    case PrimitiveSubtype::kUint64: {
       uint64_t mask;
       if (!ValidateBitsMembersAndCalcMask<uint64_t>(bits_declaration, &mask))
         return;
       bits_declaration->mask = mask;
       break;
     }
-    case types::PrimitiveSubtype::kBool:
-    case types::PrimitiveSubtype::kInt8:
-    case types::PrimitiveSubtype::kInt16:
-    case types::PrimitiveSubtype::kInt32:
-    case types::PrimitiveSubtype::kInt64:
-    case types::PrimitiveSubtype::kZxUchar:
-    case types::PrimitiveSubtype::kZxUsize64:
-    case types::PrimitiveSubtype::kZxUintptr64:
-    case types::PrimitiveSubtype::kFloat32:
-    case types::PrimitiveSubtype::kFloat64:
+    case PrimitiveSubtype::kBool:
+    case PrimitiveSubtype::kInt8:
+    case PrimitiveSubtype::kInt16:
+    case PrimitiveSubtype::kInt32:
+    case PrimitiveSubtype::kInt64:
+    case PrimitiveSubtype::kZxUchar:
+    case PrimitiveSubtype::kZxUsize64:
+    case PrimitiveSubtype::kZxUintptr64:
+    case PrimitiveSubtype::kFloat32:
+    case PrimitiveSubtype::kFloat64:
       reporter()->Fail(ErrBitsTypeMustBeUnsignedIntegralPrimitive,
                        bits_declaration->name.span().value(), bits_declaration->subtype_ctor->type);
       return;
@@ -821,68 +821,68 @@ void CompileStep::CompileEnum(Enum* enum_declaration) {
   auto primitive_type = static_cast<const PrimitiveType*>(enum_declaration->subtype_ctor->type);
   enum_declaration->type = primitive_type;
   switch (primitive_type->subtype) {
-    case types::PrimitiveSubtype::kInt8: {
+    case PrimitiveSubtype::kInt8: {
       int8_t unknown_value;
       if (ValidateEnumMembersAndCalcUnknownValue<int8_t>(enum_declaration, &unknown_value)) {
         enum_declaration->unknown_value_signed = unknown_value;
       }
       break;
     }
-    case types::PrimitiveSubtype::kInt16: {
+    case PrimitiveSubtype::kInt16: {
       int16_t unknown_value;
       if (ValidateEnumMembersAndCalcUnknownValue<int16_t>(enum_declaration, &unknown_value)) {
         enum_declaration->unknown_value_signed = unknown_value;
       }
       break;
     }
-    case types::PrimitiveSubtype::kInt32: {
+    case PrimitiveSubtype::kInt32: {
       int32_t unknown_value;
       if (ValidateEnumMembersAndCalcUnknownValue<int32_t>(enum_declaration, &unknown_value)) {
         enum_declaration->unknown_value_signed = unknown_value;
       }
       break;
     }
-    case types::PrimitiveSubtype::kInt64: {
+    case PrimitiveSubtype::kInt64: {
       int64_t unknown_value;
       if (ValidateEnumMembersAndCalcUnknownValue<int64_t>(enum_declaration, &unknown_value)) {
         enum_declaration->unknown_value_signed = unknown_value;
       }
       break;
     }
-    case types::PrimitiveSubtype::kUint8: {
+    case PrimitiveSubtype::kUint8: {
       uint8_t unknown_value;
       if (ValidateEnumMembersAndCalcUnknownValue<uint8_t>(enum_declaration, &unknown_value)) {
         enum_declaration->unknown_value_unsigned = unknown_value;
       }
       break;
     }
-    case types::PrimitiveSubtype::kUint16: {
+    case PrimitiveSubtype::kUint16: {
       uint16_t unknown_value;
       if (ValidateEnumMembersAndCalcUnknownValue<uint16_t>(enum_declaration, &unknown_value)) {
         enum_declaration->unknown_value_unsigned = unknown_value;
       }
       break;
     }
-    case types::PrimitiveSubtype::kUint32: {
+    case PrimitiveSubtype::kUint32: {
       uint32_t unknown_value;
       if (ValidateEnumMembersAndCalcUnknownValue<uint32_t>(enum_declaration, &unknown_value)) {
         enum_declaration->unknown_value_unsigned = unknown_value;
       }
       break;
     }
-    case types::PrimitiveSubtype::kUint64: {
+    case PrimitiveSubtype::kUint64: {
       uint64_t unknown_value;
       if (ValidateEnumMembersAndCalcUnknownValue<uint64_t>(enum_declaration, &unknown_value)) {
         enum_declaration->unknown_value_unsigned = unknown_value;
       }
       break;
     }
-    case types::PrimitiveSubtype::kBool:
-    case types::PrimitiveSubtype::kFloat32:
-    case types::PrimitiveSubtype::kFloat64:
-    case types::PrimitiveSubtype::kZxUsize64:
-    case types::PrimitiveSubtype::kZxUintptr64:
-    case types::PrimitiveSubtype::kZxUchar:
+    case PrimitiveSubtype::kBool:
+    case PrimitiveSubtype::kFloat32:
+    case PrimitiveSubtype::kFloat64:
+    case PrimitiveSubtype::kZxUsize64:
+    case PrimitiveSubtype::kZxUintptr64:
+    case PrimitiveSubtype::kZxUchar:
       reporter()->Fail(ErrEnumTypeMustBeIntegralPrimitive, enum_declaration->name.span().value(),
                        enum_declaration->subtype_ctor->type);
       break;
@@ -898,7 +898,7 @@ void CompileStep::CompileResource(Resource* resource_declaration) {
 
   if (resource_declaration->subtype_ctor->type->kind != Type::Kind::kPrimitive ||
       static_cast<const PrimitiveType*>(resource_declaration->subtype_ctor->type)->subtype !=
-          types::PrimitiveSubtype::kUint32) {
+          PrimitiveSubtype::kUint32) {
     reporter()->Fail(ErrResourceMustBeUint32Derived, resource_declaration->name.span().value(),
                      resource_declaration->name);
   }
@@ -931,7 +931,7 @@ void CompileStep::CompileResource(Resource* resource_declaration) {
     const Type* rights_underlying_type = UnderlyingType(rights_type);
     if (!(rights_underlying_type->kind == Type::Kind::kPrimitive &&
           static_cast<const PrimitiveType*>(rights_underlying_type)->subtype ==
-              types::PrimitiveSubtype::kUint32)) {
+              PrimitiveSubtype::kUint32)) {
       reporter()->Fail(ErrResourceRightsPropertyMustReferToBits, rights_property->name,
                        resource_declaration->name);
     }
@@ -963,7 +963,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
     }
     for (const auto& method : protocol->methods) {
       const auto original_name = method.name.data();
-      const auto canonical_name = utils::canonicalize(original_name);
+      const auto canonical_name = canonicalize(original_name);
       const auto name_result = method_scope.canonical_names.Insert(canonical_name, method.name);
       if (!name_result.ok()) {
         const auto previous_span = name_result.previous_occurrence();
@@ -1022,9 +1022,8 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
   }
   for (auto& method : protocol_declaration->methods) {
     CompileAttributeList(method.attributes.get());
-    auto selector = fidl::ordinals::GetSelector(method.attributes.get(), method.name);
-    if (!utils::IsValidIdentifierComponent(selector) &&
-        !utils::IsValidFullyQualifiedMethodIdentifier(selector)) {
+    auto selector = GetSelector(method.attributes.get(), method.name);
+    if (!IsValidIdentifierComponent(selector) && !IsValidFullyQualifiedMethodIdentifier(selector)) {
       reporter()->Fail(
           ErrInvalidSelectorValue,
           method.attributes->Get("selector")->GetArg(AttributeArg::kDefaultAnonymousName)->span);
@@ -1037,7 +1036,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       reporter()->Fail(ErrFuchsiaIoExplicitOrdinals, method.name);
       continue;
     }
-    method.generated_ordinal64 = std::make_unique<raw::Ordinal64>(method_hasher()(
+    method.generated_ordinal64 = std::make_unique<RawOrdinal64>(method_hasher()(
         library_name, protocol_declaration->name.decl_name(), selector, *method.identifier));
   }
 
@@ -1113,7 +1112,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
           reporter()->Fail(ErrInvalidMethodPayloadType, method.name, type);
         } else {
           ZX_ASSERT(type->kind == Type::Kind::kIdentifier);
-          auto decl = static_cast<const flat::IdentifierType*>(type)->type_decl;
+          auto decl = static_cast<const IdentifierType*>(type)->type_decl;
           CompileDecl(decl);
           CheckNoDefaultMembers(decl);
           CheckPayloadDeclKind(method.name, decl);
@@ -1127,11 +1126,11 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
           reporter()->Fail(ErrInvalidMethodPayloadType, method.name, type);
         } else {
           ZX_ASSERT(type->kind == Type::Kind::kIdentifier);
-          auto decl = static_cast<const flat::IdentifierType*>(type)->type_decl;
+          auto decl = static_cast<const IdentifierType*>(type)->type_decl;
           CompileDecl(decl);
           if (method.HasResultUnion()) {
             ZX_ASSERT(decl->kind == Decl::Kind::kUnion);
-            const auto* result_union = static_cast<const flat::Union*>(decl);
+            const auto* result_union = static_cast<const Union*>(decl);
             ZX_ASSERT(!result_union->members.empty());
             ZX_ASSERT(result_union->members[0].maybe_used);
             const auto* success_variant_type = result_union->members[0].maybe_used->type_ctor->type;
@@ -1313,8 +1312,8 @@ void CompileStep::ValidateDomainErrorType(const Union* result_union) {
       error_primitive = static_cast<const PrimitiveType*>(error_enum->subtype_ctor->type);
     }
   }
-  if (!error_primitive || (error_primitive->subtype != types::PrimitiveSubtype::kInt32 &&
-                           error_primitive->subtype != types::PrimitiveSubtype::kUint32)) {
+  if (!error_primitive || (error_primitive->subtype != PrimitiveSubtype::kInt32 &&
+                           error_primitive->subtype != PrimitiveSubtype::kUint32)) {
     reporter()->Fail(ErrInvalidErrorType, result_union->name.span().value());
   }
 }
@@ -1454,8 +1453,7 @@ void CompileStep::CompileUnion(Union* union_declaration) {
     derive_resourceness.AddType(member_used.type_ctor->type);
   }
 
-  if (union_declaration->strictness == types::Strictness::kStrict &&
-      !contains_non_reserved_member) {
+  if (union_declaration->strictness == Strictness::kStrict && !contains_non_reserved_member) {
     reporter()->Fail(ErrStrictUnionMustHaveNonReservedMember,
                      union_declaration->name.span().value());
   }
@@ -1467,10 +1465,10 @@ void CompileStep::CompileUnion(Union* union_declaration) {
 }
 
 void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
-  if (overlay_declaration->strictness != types::Strictness::kStrict) {
+  if (overlay_declaration->strictness != Strictness::kStrict) {
     reporter()->Fail(ErrOverlayMustBeStrict, overlay_declaration->name.span().value());
   }
-  if (overlay_declaration->resourceness == types::Resourceness::kResource) {
+  if (overlay_declaration->resourceness == Resourceness::kResource) {
     reporter()->Fail(ErrOverlayMustBeValue, overlay_declaration->name.span().value());
   }
   Ordinal64Scope ordinal_scope;
@@ -1521,7 +1519,7 @@ void CompileStep::CompileTypeConstructor(TypeConstructor* type_ctor) {
 }
 
 bool CompileStep::ResolveHandleRightsConstant(Resource* resource, Constant* constant,
-                                              const HandleRights** out_rights) {
+                                              const HandleRightsValue** out_rights) {
   auto rights_property = resource->LookupProperty("rights");
   if (!rights_property) {
     return false;
@@ -1532,13 +1530,13 @@ bool CompileStep::ResolveHandleRightsConstant(Resource* resource, Constant* cons
   }
 
   if (out_rights) {
-    *out_rights = static_cast<const HandleRights*>(&constant->Value());
+    *out_rights = static_cast<const HandleRightsValue*>(&constant->Value());
   }
   return true;
 }
 
 bool CompileStep::ResolveHandleSubtypeIdentifier(Resource* resource, Constant* constant,
-                                                 types::HandleSubtype* out_obj_type) {
+                                                 HandleSubtype* out_obj_type) {
   ZX_ASSERT_MSG(resource != nullptr, "must pass resource");
 
   auto subtype_property = resource->LookupProperty("subtype");
@@ -1551,30 +1549,29 @@ bool CompileStep::ResolveHandleSubtypeIdentifier(Resource* resource, Constant* c
   }
 
   if (out_obj_type) {
-    auto constant_value = static_cast<const HandleSubtype*>(&constant->Value());
-    *out_obj_type = static_cast<types::HandleSubtype>(constant_value->value);
+    auto constant_value = static_cast<const HandleSubtypeValue*>(&constant->Value());
+    *out_obj_type = static_cast<HandleSubtype>(constant_value->value);
   }
   return true;
 }
 
-bool CompileStep::ResolveSizeBound(Constant* size_constant, const Size** out_size) {
+bool CompileStep::ResolveSizeBound(Constant* size_constant, const SizeValue** out_size) {
   if (size_constant->kind == Constant::Kind::kIdentifier) {
     auto identifier_constant = static_cast<IdentifierConstant*>(size_constant);
     auto target = identifier_constant->reference.resolved().element();
     if (target->kind == Element::Kind::kBuiltin &&
         static_cast<Builtin*>(target)->id == Builtin::Identity::kMax) {
-      size_constant->ResolveTo(Size::Max().Clone(),
-                               typespace()->GetPrimitiveType(types::PrimitiveSubtype::kUint32));
+      size_constant->ResolveTo(SizeValue::Max().Clone(),
+                               typespace()->GetPrimitiveType(PrimitiveSubtype::kUint32));
     }
   }
   if (!size_constant->IsResolved()) {
-    if (!ResolveConstant(size_constant,
-                         typespace()->GetPrimitiveType(types::PrimitiveSubtype::kUint32))) {
+    if (!ResolveConstant(size_constant, typespace()->GetPrimitiveType(PrimitiveSubtype::kUint32))) {
       return false;
     }
   }
   if (out_size) {
-    *out_size = static_cast<const Size*>(&size_constant->Value());
+    *out_size = static_cast<const SizeValue*>(&size_constant->Value());
   }
   return true;
 }
@@ -1669,12 +1666,12 @@ bool CompileStep::ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl,
                        MemberType member, const AttributeList* attributes,
                        SourceSpan span) -> std::unique_ptr<Diagnostic> {
     switch (enum_decl->strictness) {
-      case types::Strictness::kStrict:
+      case Strictness::kStrict:
         if (attributes->Get("unknown") != nullptr) {
           return Diagnostic::MakeError(ErrUnknownAttributeOnStrictEnumMember, span);
         }
         return nullptr;
-      case types::Strictness::kFlexible:
+      case Strictness::kFlexible:
         if (member == default_unknown_value && !explicit_unknown_value.has_value()) {
           return Diagnostic::MakeError(ErrFlexibleEnumMemberWithMaxValue, span,
                                        std::to_string(default_unknown_value));
@@ -1689,4 +1686,4 @@ bool CompileStep::ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl,
   return true;
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

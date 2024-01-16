@@ -13,7 +13,7 @@
 #include <set>
 #include <string>
 
-namespace fidl {
+namespace fidlc {
 
 // This file defines types used for FIDL Versioning. For more detail, read
 // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0083_fidl_versioning#formalism.
@@ -367,6 +367,6 @@ class VersionSelection final {
   std::map<Platform, Version, Platform::Compare> map_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_VERSIONING_TYPES_H_

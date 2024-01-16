@@ -11,24 +11,19 @@
 
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl::raw {
-struct Ordinal64;
-struct SourceElement;
-}  // namespace fidl::raw
+namespace fidlc {
 
-namespace fidl::flat {
 struct AttributeList;
-}  // namespace fidl::flat
+struct RawOrdinal64;
+struct SourceElement;
 
-namespace fidl::ordinals {
-
-using MethodHasher = fit::function<raw::Ordinal64(
+using MethodHasher = fit::function<RawOrdinal64(
     const std::vector<std::string_view>& library_name, const std::string_view& protocol_name,
-    const std::string_view& selector_name, const raw::SourceElement& source_element)>;
+    const std::string_view& selector_name, const SourceElement& source_element)>;
 
 // Returns the selector. If the @selector attribute is present, the
 // function returns its value; otherwise, it returns the name parameter.
-std::string GetSelector(const flat::AttributeList* attributes, SourceSpan name);
+std::string GetSelector(const AttributeList* attributes, SourceSpan name);
 
 // Computes the 64bits ordinal for this |method|.
 //
@@ -40,11 +35,11 @@ std::string GetSelector(const flat::AttributeList* attributes, SourceSpan name);
 // Note: the slash separator is between the library_name and protocol_name.
 //
 // The selector_name is retrieved using GetSelector.
-raw::Ordinal64 GetGeneratedOrdinal64(const std::vector<std::string_view>& library_name,
-                                     const std::string_view& protocol_name,
-                                     const std::string_view& selector_name,
-                                     const raw::SourceElement& source_element);
+RawOrdinal64 GetGeneratedOrdinal64(const std::vector<std::string_view>& library_name,
+                                   const std::string_view& protocol_name,
+                                   const std::string_view& selector_name,
+                                   const SourceElement& source_element);
 
-}  // namespace fidl::ordinals
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_ORDINALS_H_

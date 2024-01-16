@@ -18,7 +18,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/findings.h"
 
-namespace fidl::utils {
+namespace fidlc {
 
 // Compares pointers by the values they point to.
 template <typename T>
@@ -245,7 +245,7 @@ std::string StringJoin(const std::vector<std::string_view>& strings, std::string
 
 // Used by fidl-lint FormatFindings, and for testing,
 // this generates the linter error message string in the format
-// required for the fidl::Reporter.
+// required for the Reporter.
 void PrintFinding(std::ostream& os, const Finding& finding);
 
 // Used by fidl-lint main() and for testing, this generates the linter error
@@ -257,6 +257,6 @@ std::vector<std::string> FormatFindings(const Findings& findings, bool enable_co
 // Used by the formatter to make sure that formatting was not destructive.
 bool OnlyWhitespaceChanged(std::string_view unformatted_input, std::string_view formatted_output);
 
-}  // namespace fidl::utils
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_UTILS_H_

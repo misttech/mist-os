@@ -13,20 +13,20 @@
 #include "tools/fidl/fidlc/include/fidl/json_writer.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl {
+namespace fidlc {
 
 // |JsonWriter| requires the derived type as a template parameter so it can
 // match methods declared with parameter overrides in the derived class.
 //
 // Specification of the output format is
 // https://chromium.googlesource.com/infra/infra/+/refs/heads/master/go/src/infra/tricium/api/v1/data.proto#135
-class DiagnosticsJson : public utils::JsonWriter<DiagnosticsJson> {
+class DiagnosticsJson : public JsonWriter<DiagnosticsJson> {
  public:
   // "using" is required for overridden methods, so the implementations in
   // both the base class and in this derived class are visible when matching
   // parameter types
-  using utils::JsonWriter<DiagnosticsJson>::Generate;
-  using utils::JsonWriter<DiagnosticsJson>::GenerateArray;
+  using JsonWriter<DiagnosticsJson>::Generate;
+  using JsonWriter<DiagnosticsJson>::GenerateArray;
 
   explicit DiagnosticsJson(std::vector<Diagnostic*> diagnostics)
       : JsonWriter(json_file_), diagnostics_(std::move(diagnostics)) {}
@@ -43,6 +43,6 @@ class DiagnosticsJson : public utils::JsonWriter<DiagnosticsJson> {
   std::ostringstream json_file_;
 };
 
-}  // namespace fidl
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_DIAGNOSTICS_JSON_H_

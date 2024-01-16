@@ -9,7 +9,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 Reference::Target::Target(Decl* decl) : target_(decl) {}
 Reference::Target::Target(Element* member, Decl* parent) : target_(member), maybe_parent_(parent) {}
@@ -57,7 +57,7 @@ Decl* Reference::Target::element_or_parent_decl() const {
   return maybe_parent_ ? maybe_parent_ : target_->AsDecl();
 }
 
-Reference::Reference(const raw::CompoundIdentifier& name) : span_(name.span()) {
+Reference::Reference(const RawCompoundIdentifier& name) : span_(name.span()) {
   ZX_ASSERT_MSG(!name.components.empty(), "expected at least one component");
   auto& raw = std::get<RawSourced>(state_);
   for (auto& identifier : name.components) {
@@ -68,7 +68,7 @@ Reference::Reference(const raw::CompoundIdentifier& name) : span_(name.span()) {
 Reference::Reference(Target target) : state_(RawSynthetic{target}) {}
 
 Reference::State Reference::state() const {
-  return std::visit(fidl::utils::matchers{
+  return std::visit(matchers{
                         [&](const RawSourced&) { return State::kRawSourced; },
                         [&](const RawSynthetic&) { return State::kRawSynthetic; },
                         [&](const Key&) { return State::kKey; },
@@ -102,4 +102,4 @@ void Reference::MarkFailed() {
   state_ = Failed{};
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

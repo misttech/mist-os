@@ -17,7 +17,7 @@
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl::linter {
+namespace fidlc {
 
 // The primary business logic for lint-checks on a FIDL file is implemented in
 // the |Linter| class. This class is not thread safe.
@@ -64,10 +64,10 @@ class Linter {
   //   excluded check IDs remain in this set.
   //
   // Returns true if no new findings were generated.
-  bool Lint(const std::unique_ptr<raw::File>& parsed_source, Findings* findings,
+  bool Lint(const std::unique_ptr<File>& parsed_source, Findings* findings,
             std::set<std::string>* excluded_checks_not_found);
 
-  bool Lint(const std::unique_ptr<raw::File>& parsed_source, Findings* findings) {
+  bool Lint(const std::unique_ptr<File>& parsed_source, Findings* findings) {
     return Lint(parsed_source, findings, nullptr);
   }
 
@@ -99,10 +99,10 @@ class Linter {
 
   // Initialization and checks at the start of a new file. The |Linter|
   // can be called multiple times with many different files.
-  void NewFile(const raw::File& element);
+  void NewFile(const File& element);
 
   // If a finding was added, return a pointer to that finding.
-  const Finding* CheckCase(std::string type, const std::unique_ptr<raw::Identifier>& identifier,
+  const Finding* CheckCase(std::string type, const std::unique_ptr<RawIdentifier>& identifier,
                            const CheckDef& check_def, const CaseType& case_type);
 
   void EnterContext(std::string type) { type_stack_.push(std::move(type)); }
@@ -181,9 +181,9 @@ class Linter {
   LintingTreeCallbacks callbacks_;
 
   // Case type functions used by CheckCase().
-  CaseType lower_snake_{utils::is_lower_snake_case, utils::to_lower_snake_case};
-  CaseType upper_snake_{utils::is_upper_snake_case, utils::to_upper_snake_case};
-  CaseType upper_camel_{utils::is_upper_camel_case, utils::to_upper_camel_case};
+  CaseType lower_snake_{is_lower_snake_case, to_lower_snake_case};
+  CaseType upper_snake_{is_upper_snake_case, to_upper_snake_case};
+  CaseType upper_camel_{is_upper_camel_case, to_upper_camel_case};
 
   // In IpcStyle, bits, protocols, protocol methods, structs, tables, unions,
   // and enums use UpperCamelCase. In CStyle used for syscalls, they
@@ -239,5 +239,5 @@ class Linter {
   std::set<FindingPtr, FindingPtrCompare> current_findings_;
 };
 
-}  // namespace fidl::linter
+}  // namespace fidlc
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_LINTER_H_

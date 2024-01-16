@@ -9,7 +9,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/types.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // See the comment on Object::Visitor<T> for more details.
 struct Object::VisitorAny {
@@ -52,6 +52,6 @@ T Object::Accept(Visitor<T>* visitor) const {
   return std::any_cast<T>(AcceptAny(visitor));
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_VISITOR_H_

@@ -17,7 +17,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 class Name;
 struct Library;
@@ -344,6 +344,6 @@ class Name final {
   }
 };
 
-}  // namespace fidl::flat
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FLAT_NAME_H_

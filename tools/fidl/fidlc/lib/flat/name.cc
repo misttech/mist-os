@@ -8,7 +8,7 @@
 
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 // static
 std::string NamingContext::BuildFlattenedName(SourceSpan name, Kind kind,
@@ -17,16 +17,16 @@ std::string NamingContext::BuildFlattenedName(SourceSpan name, Kind kind,
     case Kind::kDecl:
       return std::string(name.data());
     case Kind::kLayoutMember:
-      return utils::to_upper_camel_case(std::string(name.data()));
+      return to_upper_camel_case(std::string(name.data()));
     case Kind::kMethodRequest: {
-      std::string result = utils::to_upper_camel_case(std::string(parent->name_.data()));
-      result.append(utils::to_upper_camel_case(std::string(name.data())));
+      std::string result = to_upper_camel_case(std::string(parent->name_.data()));
+      result.append(to_upper_camel_case(std::string(name.data())));
       result.append("Request");
       return result;
     }
     case Kind::kMethodResponse: {
-      std::string result = utils::to_upper_camel_case(std::string(parent->name_.data()));
-      result.append(utils::to_upper_camel_case(std::string(name.data())));
+      std::string result = to_upper_camel_case(std::string(parent->name_.data()));
+      result.append(to_upper_camel_case(std::string(name.data())));
       result.append("Response");
       return result;
     }
@@ -122,4 +122,4 @@ std::string Name::full_name() const {
   return name;
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc

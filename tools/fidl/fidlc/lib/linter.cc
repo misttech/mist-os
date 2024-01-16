@@ -18,7 +18,7 @@
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
-namespace fidl::linter {
+namespace fidlc {
 
 namespace {
 
@@ -52,48 +52,44 @@ constexpr bool IsZirconLibrary(std::string_view name) {
 // to a std::string_view, spanning from the beginning of the start token, to the end
 // of the end token. The three methods support classes derived from
 // SourceElement, by reference, pointer, or unique_ptr.
-std::string_view to_string_view(const fidl::raw::SourceElement& element) {
-  return element.span().data();
-}
+std::string_view to_string_view(const SourceElement& element) { return element.span().data(); }
 
 template <typename SourceElementSubtype>
 std::string_view to_string_view(const std::unique_ptr<SourceElementSubtype>& element_ptr) {
-  static_assert(std::is_base_of<fidl::raw::SourceElement, SourceElementSubtype>::value,
+  static_assert(std::is_base_of<SourceElement, SourceElementSubtype>::value,
                 "template parameter type is not derived from SourceElement");
   return to_string_view(*element_ptr);
 }
 
 // Convert the SourceElement to a std::string, using the method described above
 // for std::string_view.
-std::string to_string(const fidl::raw::SourceElement& element) {
-  return std::string(to_string_view(element));
-}
+std::string to_string(const SourceElement& element) { return std::string(to_string_view(element)); }
 
 template <typename SourceElementSubtype>
 std::string to_string(const std::unique_ptr<SourceElementSubtype>& element_ptr) {
-  static_assert(std::is_base_of<fidl::raw::SourceElement, SourceElementSubtype>::value,
+  static_assert(std::is_base_of<SourceElement, SourceElementSubtype>::value,
                 "template parameter type is not derived from SourceElement");
   return to_string(*element_ptr);
 }
 
-std::string name_layout_kind(const raw::Layout& layout) {
+std::string name_layout_kind(const RawLayout& layout) {
   switch (layout.kind) {
-    case raw::Layout::Kind::kBits: {
+    case RawLayout::Kind::kBits: {
       return "bitfield";
     }
-    case raw::Layout::Kind::kEnum: {
+    case RawLayout::Kind::kEnum: {
       return "enum";
     }
-    case raw::Layout::Kind::kStruct: {
+    case RawLayout::Kind::kStruct: {
       return "struct";
     }
-    case raw::Layout::Kind::kTable: {
+    case RawLayout::Kind::kTable: {
       return "table";
     }
-    case raw::Layout::Kind::kUnion: {
+    case RawLayout::Kind::kUnion: {
       return "union";
     }
-    case raw::Layout::Kind::kOverlay: {
+    case RawLayout::Kind::kOverlay: {
       return "overlay";
     }
   }
@@ -129,20 +125,18 @@ std::string Linter::kPermittedLibraryPrefixesas_string() const {
 
 // Returns itself. Overloaded to support alternative type references by
 // pointer and unique_ptr as needed.
-static const fidl::raw::SourceElement& GetElementAsRef(
-    const fidl::raw::SourceElement& source_element) {
+static const SourceElement& GetElementAsRef(const SourceElement& source_element) {
   return source_element;
 }
 
-static const fidl::raw::SourceElement& GetElementAsRef(const fidl::raw::SourceElement* element) {
+static const SourceElement& GetElementAsRef(const SourceElement* element) {
   return GetElementAsRef(*element);
 }
 
 // Returns the pointed-to element as a reference.
 template <typename SourceElementSubtype>
-const fidl::raw::SourceElement& GetElementAsRef(
-    const std::unique_ptr<SourceElementSubtype>& element_ptr) {
-  static_assert(std::is_base_of<fidl::raw::SourceElement, SourceElementSubtype>::value,
+const SourceElement& GetElementAsRef(const std::unique_ptr<SourceElementSubtype>& element_ptr) {
+  static_assert(std::is_base_of<SourceElement, SourceElementSubtype>::value,
                 "template parameter type is not derived from SourceElement");
   return GetElementAsRef(element_ptr.get());
 }
@@ -196,7 +190,7 @@ CheckDef Linter::DefineCheck(std::string_view check_id, std::string message_temp
 }
 
 // Returns true if no new findings were generated
-bool Linter::Lint(const std::unique_ptr<raw::File>& parsed_source, Findings* findings,
+bool Linter::Lint(const std::unique_ptr<File>& parsed_source, Findings* findings,
                   std::set<std::string>* excluded_checks_not_found) {
   auto initial_findings_size = findings->size();
   callbacks_.Visit(parsed_source);
@@ -217,7 +211,7 @@ bool Linter::Lint(const std::unique_ptr<raw::File>& parsed_source, Findings* fin
   return findings->size() == initial_findings_size;
 }
 
-void Linter::NewFile(const raw::File& element) {
+void Linter::NewFile(const File& element) {
   // Reset file state variables (for a new file)
   line_comments_checked_ = 0;
   added_invalid_copyright_finding_ = false;
@@ -272,8 +266,7 @@ void Linter::NewFile(const raw::File& element) {
   EnterContext("library");
 }
 
-const Finding* Linter::CheckCase(std::string type,
-                                 const std::unique_ptr<raw::Identifier>& identifier,
+const Finding* Linter::CheckCase(std::string type, const std::unique_ptr<RawIdentifier>& identifier,
                                  const CheckDef& check_def, const CaseType& case_type) {
   std::string id = to_string(identifier);
   if (!case_type.matches(id)) {
@@ -392,7 +385,7 @@ Linter::Linter()
   callbacks_.OnFile(
     [& linter = *this]
     //
-    (const raw::File& element) {
+    (const File& element) {
       linter.NewFile(element);
     });
   // clang-format on
@@ -435,7 +428,7 @@ Linter::Linter()
 
   callbacks_.OnExitFile([&linter = *this]
                         //
-                        (const raw::File& element) {
+                        (const File& element) {
                           if (!linter.CopyrightCheckIsComplete()) {
                             auto& source_file = element.span().source_file();
                             std::string_view error_view = source_file.data();
@@ -450,7 +443,7 @@ Linter::Linter()
                                                "Using aliases must be named in lower_snake_case"),
                       &case_type = lower_snake_]
                      //
-                     (const raw::Using& element) {
+                     (const RawUsing& element) {
                        if (element.maybe_alias != nullptr) {
                          linter.CheckCase("using alias", element.maybe_alias, case_check,
                                           case_type);
@@ -460,7 +453,7 @@ Linter::Linter()
   callbacks_.OnConstDeclaration(
       [&linter = *this, case_check = invalid_case_for_constant, &case_type = upper_snake_]
       //
-      (const raw::ConstDeclaration& element) {
+      (const RawConstDeclaration& element) {
         linter.CheckCase("constants", element.identifier, case_check, case_type);
         linter.in_const_declaration_ = true;
       });
@@ -468,7 +461,7 @@ Linter::Linter()
   callbacks_.OnExitConstDeclaration(
       [&linter = *this]
       //
-      (const raw::ConstDeclaration& element) { linter.in_const_declaration_ = false; });
+      (const RawConstDeclaration& element) { linter.in_const_declaration_ = false; });
 
   callbacks_.OnProtocolDeclaration(
       [&linter = *this,
@@ -477,10 +470,10 @@ Linter::Linter()
        explicit_openness_modifier_check = DefineCheck(
            "explicit-openness-modifier", "${PROTOCOL} must have an explicit openness modifier")]
       //
-      (const raw::ProtocolDeclaration& element) {
+      (const RawProtocolDeclaration& element) {
         linter.CheckCase("protocols", element.identifier, linter.invalid_case_for_decl_name(),
                          linter.upper_camel_);
-        for (const auto& word : utils::id_to_words(to_string(element.identifier))) {
+        for (const auto& word : id_to_words(to_string(element.identifier))) {
           if (word == "service") {
             linter.AddFinding(element.identifier, name_contains_service_check);
             break;
@@ -502,7 +495,7 @@ Linter::Linter()
   callbacks_.OnMethod(
       [&linter = *this, explicit_flexible_method_modifier_check = explicit_flexible_method_modifier]
       //
-      (const raw::ProtocolMethod& element) {
+      (const RawProtocolMethod& element) {
         linter.CheckCase("methods", element.identifier, linter.invalid_case_for_decl_name(),
                          linter.upper_camel_);
         if (element.modifiers == nullptr || !element.modifiers->maybe_strictness.has_value()) {
@@ -523,7 +516,7 @@ Linter::Linter()
            DefineCheck("event-names-must-start-with-on", "Event names must start with 'On'"),
        explicit_flexible_method_modifier_check = explicit_flexible_method_modifier]
       //
-      (const raw::ProtocolMethod& element) {
+      (const RawProtocolMethod& element) {
         std::string id = to_string(element.identifier);
         auto finding = linter.CheckCase("events", element.identifier,
                                         linter.invalid_case_for_decl_name(), linter.upper_camel_);
@@ -556,7 +549,7 @@ Linter::Linter()
   callbacks_.OnExitProtocolDeclaration(
       [&linter = *this]
       //
-      (const raw::ProtocolDeclaration& element) { linter.ExitContext(); });
+      (const RawProtocolDeclaration& element) { linter.ExitContext(); });
 
   auto copyright_regex = std::make_unique<re2::RE2>(R"REGEX((?i)^[ \t]*Copyright \d\d\d\d\W)REGEX");
   auto todo_regex = std::make_unique<re2::RE2>(R"REGEX(^[ \t]*TODO\W)REGEX");
@@ -565,10 +558,10 @@ Linter::Linter()
        copyright_regex = std::move(copyright_regex), todo_check = todo_should_not_be_doc_comment,
        todo_regex = std::move(todo_regex)]
       //
-      (const raw::Attribute& element) {
-        if (element.provenance == raw::Attribute::Provenance::kDocComment) {
-          auto constant = static_cast<raw::LiteralConstant*>(element.args.front()->value.get());
-          auto doc_comment = static_cast<raw::DocCommentLiteral*>(constant->literal.get());
+      (const RawAttribute& element) {
+        if (element.provenance == RawAttribute::Provenance::kDocComment) {
+          auto constant = static_cast<RawLiteralConstant*>(element.args.front()->value.get());
+          auto doc_comment = static_cast<RawDocCommentLiteral*>(constant->literal.get());
           if (re2::RE2::PartialMatch(doc_comment->MakeContents(), *copyright_regex)) {
             linter.AddFinding(element, check, {}, "change '///' to '//'", "//");
           }
@@ -580,22 +573,22 @@ Linter::Linter()
   callbacks_.OnTypeDeclaration(
       [&linter = *this]
       //
-      (const raw::TypeDeclaration& element) {
+      (const RawTypeDeclaration& element) {
         auto* layout_ref = element.type_ctor->layout_ref.get();
 
         // TODO(https://fxbug.dev/7807): Delete this check once new-types are supported. Instead, we
         // should have new-type specific language to report the invalid naming case to the user.
-        if (layout_ref->kind == raw::LayoutReference::Kind::kNamed) {
+        if (layout_ref->kind == RawLayoutReference::Kind::kNamed) {
           return;
         }
-        auto* inline_layout = static_cast<raw::InlineLayoutReference*>(layout_ref);
+        auto* inline_layout = static_cast<RawInlineLayoutReference*>(layout_ref);
         std::string layout_kind = name_layout_kind(*inline_layout->layout);
         linter.CheckCase(layout_kind + "s", element.identifier, linter.invalid_case_for_decl_name(),
                          linter.upper_camel_);
       });
   callbacks_.OnAliasDeclaration([&linter = *this]
                                 //
-                                (const raw::AliasDeclaration& element) {
+                                (const RawAliasDeclaration& element) {
                                   linter.CheckCase("alias", element.alias,
                                                    linter.invalid_case_for_decl_name(),
                                                    linter.upper_camel_);
@@ -604,7 +597,7 @@ Linter::Linter()
       [&linter = *this, explicit_flexible_modifier_check = explicit_flexible_modifier,
        modifiers_order_check = modifiers_order]
       //
-      (const raw::Layout& element) {
+      (const RawLayout& element) {
         std::string layout_kind = name_layout_kind(element);
         linter.EnterContext(layout_kind);
 
@@ -636,7 +629,7 @@ Linter::Linter()
   callbacks_.OnOrdinaledLayoutMember(
       [&linter = *this, case_check = invalid_case_for_decl_member, &case_type = lower_snake_]
       //
-      (const raw::OrdinaledLayoutMember& element) {
+      (const RawOrdinaledLayoutMember& element) {
         if (element.reserved)
           return;
         std::string parent_type = linter.type_stack_.top();
@@ -645,7 +638,7 @@ Linter::Linter()
   callbacks_.OnStructLayoutMember(
       [&linter = *this, case_check = invalid_case_for_decl_member, &case_type = lower_snake_]
       //
-      (const raw::StructLayoutMember& element) {
+      (const RawStructLayoutMember& element) {
         std::string parent_type = linter.type_stack_.top();
         if (parent_type == "protocol") {
           linter.CheckCase("parameters", element.identifier, case_check, case_type);
@@ -657,13 +650,13 @@ Linter::Linter()
   callbacks_.OnValueLayoutMember(
       [&linter = *this, case_check = invalid_case_for_constant, &case_type = upper_snake_]
       //
-      (const raw::ValueLayoutMember& element) {
+      (const RawValueLayoutMember& element) {
         std::string parent_type = linter.type_stack_.top();
         linter.CheckCase(parent_type + " members", element.identifier, case_check, case_type);
       });
   callbacks_.OnExitLayout([&linter = *this]
                           //
-                          (const raw::Layout& element) { linter.ExitContext(); });
+                          (const RawLayout& element) { linter.ExitContext(); });
 
   // clang-format off
   callbacks_.OnIdentifierLayoutParameter(
@@ -671,7 +664,7 @@ Linter::Linter()
           string_bounds_check = string_bounds_not_specified,
           vector_bounds_check = vector_bounds_not_specified]
           //
-          (const raw::IdentifierLayoutParameter& element) {
+          (const RawIdentifierLayoutParameter& element) {
         if (element.identifier->span().data() == "string") {
           linter.AddFinding(element.identifier, string_bounds_check);
         }
@@ -681,10 +674,10 @@ Linter::Linter()
           string_bounds_check = string_bounds_not_specified,
           vector_bounds_check = vector_bounds_not_specified]
           //
-          (const raw::TypeConstructor& element) {
-        if (element.layout_ref->kind != raw::LayoutReference::Kind::kNamed)
+          (const RawTypeConstructor& element) {
+        if (element.layout_ref->kind != RawLayoutReference::Kind::kNamed)
           return;
-        const auto as_named = static_cast<raw::NamedLayoutReference*>(element.layout_ref.get());
+        const auto as_named = static_cast<RawNamedLayoutReference*>(element.layout_ref.get());
 
         if (as_named->identifier->components.size() != 1) {
           return;
@@ -696,12 +689,12 @@ Linter::Linter()
           bool has_size = false;
           if (element.constraints != nullptr && !element.constraints->items.empty()) {
             const auto& first_constraint = element.constraints->items.front();
-            if (first_constraint->kind == raw::Constant::Kind::kLiteral) {
-              const auto as_lit_const = static_cast<raw::LiteralConstant*>(first_constraint.get());
-              if (as_lit_const->literal->kind == raw::Literal::Kind::kNumeric) {
+            if (first_constraint->kind == RawConstant::Kind::kLiteral) {
+              const auto as_lit_const = static_cast<RawLiteralConstant*>(first_constraint.get());
+              if (as_lit_const->literal->kind == RawLiteral::Kind::kNumeric) {
                 has_size = true;
               }
-            } else if (first_constraint->kind == raw::Constant::Kind::kIdentifier && first_constraint->span().data() != "optional") {
+            } else if (first_constraint->kind == RawConstant::Kind::kIdentifier && first_constraint->span().data() != "optional") {
               // TODO(https://fxbug.dev/77561): This check currently fails to recognize a shadowing const
               //  named optional, like:
               //
@@ -724,4 +717,4 @@ Linter::Linter()
   // clang-format on
 }
 
-}  // namespace fidl::linter
+}  // namespace fidlc

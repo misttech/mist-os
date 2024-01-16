@@ -24,16 +24,16 @@
 // differ in unknown ways between host and fuchsia.
 bool RunBenchmark(perftest::RepeatState* state, const char* fidl) {
   while (state->KeepRunning()) {
-    fidl::SourceFile source_file("example.test.fidl", fidl);
-    fidl::Reporter reporter;
-    fidl::ExperimentalFlags experimental_flags;
-    fidl::Lexer lexer(source_file, &reporter);
-    fidl::Parser parser(&lexer, &reporter, experimental_flags);
-    fidl::VirtualSourceFile virtual_file("generated");
-    fidl::flat::Libraries all_libraries(&reporter, &virtual_file);
-    fidl::VersionSelection version_selection;
-    fidl::flat::Compiler compiler(&all_libraries, &version_selection,
-                                  fidl::ordinals::GetGeneratedOrdinal64, experimental_flags);
+    fidlc::SourceFile source_file("example.test.fidl", fidl);
+    fidlc::Reporter reporter;
+    fidlc::ExperimentalFlags experimental_flags;
+    fidlc::Lexer lexer(source_file, &reporter);
+    fidlc::Parser parser(&lexer, &reporter, experimental_flags);
+    fidlc::VirtualSourceFile virtual_file("generated");
+    fidlc::Libraries all_libraries(&reporter, &virtual_file);
+    fidlc::VersionSelection version_selection;
+    fidlc::Compiler compiler(&all_libraries, &version_selection, fidlc::GetGeneratedOrdinal64,
+                             experimental_flags);
     auto ast = parser.Parse();
     bool enable_color = !std::getenv("NO_COLOR") && isatty(fileno(stderr));
     if (!parser.Success()) {
@@ -49,7 +49,7 @@ bool RunBenchmark(perftest::RepeatState* state, const char* fidl) {
       return false;
     }
     auto compilation = all_libraries.Filter(&version_selection);
-    fidl::JSONGenerator json_generator(compilation.get(), experimental_flags);
+    fidlc::JSONGenerator json_generator(compilation.get(), experimental_flags);
     json_generator.Produce();
   }
   return true;

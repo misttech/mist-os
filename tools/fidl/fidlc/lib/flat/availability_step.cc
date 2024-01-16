@@ -12,7 +12,7 @@
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
-namespace fidl::flat {
+namespace fidlc {
 
 void AvailabilityStep::RunImpl() {
   PopulateLexicalParents();
@@ -383,7 +383,7 @@ class Validator {
     auto set = element->availability.set();
     auto added = set.ranges().first.pair().first;
     auto name = maybe_name.value();
-    auto canonical_name = utils::canonicalize(name);
+    auto canonical_name = canonicalize(name);
     auto& same_canonical_name = by_canonical_name_[canonical_name];
     CheckForNameCollisions(element, set, name, canonical_name, same_canonical_name);
     same_canonical_name.insert(element);
@@ -479,4 +479,4 @@ void AvailabilityStep::ValidateAvailabilities() {
   }
 }
 
-}  // namespace fidl::flat
+}  // namespace fidlc
