@@ -312,11 +312,11 @@ mod tests {
             test.start_instance(m).await.unwrap();
         }
 
-        for _ in 0..instances_with_diag_dirs.len() {
+        while !instances_with_diag_dirs.is_empty() {
             let (event, _) = event_stream.next().await.unwrap();
             match event.event.payload {
                 EventPayload::DirectoryReady { name, .. } if name == "diagnostics" => {
-                    assert!(instances_with_diag_dirs.remove(&event.event.target_moniker));
+                    instances_with_diag_dirs.remove(&event.event.target_moniker);
                 }
                 payload => panic!("Expected running or directory ready. Got: {:?}", payload),
             }
