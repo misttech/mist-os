@@ -226,7 +226,6 @@
                 "statx04",
                 "statx06",
                 "statx11",
-                "swapon03",
                 "sync01",
                 "sync_file_range01",
                 "syslog11",

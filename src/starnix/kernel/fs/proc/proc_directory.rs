@@ -89,6 +89,11 @@ impl ProcDirectory {
                 StatFile::new_node(&kernel.stats),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
+            "swaps".into() => fs.create_node(
+                current_task,
+                SwapsFile::new_node(kernel),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
             "sys".into() => sysctl_directory(current_task, fs),
             "pressure".into() => pressure_directory(current_task, fs),
             "net".into() => net_directory(current_task, fs),
@@ -641,6 +646,23 @@ impl DynamicFileSource for LoadavgFile {
 
         // TODO: Collect and report load stats.
         writeln!(sink, "0.50 0.50 0.50 {}/{} {}", runnable_tasks, existing_tasks, last_pid)?;
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+struct SwapsFile(Weak<Kernel>);
+impl SwapsFile {
+    pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(Arc::downgrade(kernel)))
+    }
+}
+impl DynamicFileSource for SwapsFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        writeln!(sink, "Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority")?;
+        // TODO: Include information about the `swap_files` in Kernel. We don't
+        // include this information yet because `swap_files` is an OrderedMutex
+        // and we don't have the lock state plumbed through this deep.
         Ok(())
     }
 }
