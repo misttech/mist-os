@@ -101,8 +101,8 @@ constexpr ErrorDef<43, std::vector<std::string_view>> ErrConflictingLibraryImpor
 constexpr ErrorDef<44, std::vector<std::string_view>, std::string_view>
     ErrConflictingLibraryImportAlias(
         "import of library '{0}' under alias '{1}' conflicts with another library import");
-constexpr ErrorDef<45, const raw::AttributeList *> ErrAttributesNotAllowedOnLibraryImport(
-    "no attributes allowed on library import, found: {0}");
+constexpr ErrorDef<45> ErrAttributesNotAllowedOnLibraryImport(
+    "attributes and doc comments are not allowed on `using` statements");
 constexpr ErrorDef<46, std::vector<std::string_view>> ErrUnknownLibrary(
     "Could not find library named {0}. Did you include its sources with --files?");
 constexpr ErrorDef<47, SourceSpan> ErrProtocolComposedMultipleTimes(

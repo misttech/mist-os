@@ -6,7 +6,6 @@
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 #define BORINGSSL_NO_CXX
-#include <cinttypes>
 
 #include <gtest/gtest.h>
 #include <openssl/sha.h>

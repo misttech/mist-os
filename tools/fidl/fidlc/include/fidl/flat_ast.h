@@ -57,7 +57,7 @@ std::string LibraryName(const std::vector<std::string_view>& components,
                         std::string_view separator);
 
 struct Element {
-  enum struct Kind {
+  enum class Kind : uint8_t {
     kAlias,
     kBits,
     kBitsMember,
@@ -115,7 +115,7 @@ struct Element {
 };
 
 struct Decl : public Element {
-  enum struct Kind {
+  enum class Kind : uint8_t {
     kAlias,
     kBits,
     kBuiltin,
@@ -186,7 +186,7 @@ struct Decl : public Element {
 };
 
 struct Builtin : public Decl {
-  enum struct Identity {
+  enum class Identity : uint8_t {
     // Layouts (primitive)
     kBool,
     kInt8,
@@ -333,7 +333,7 @@ struct TypeConstructor final : public HasClone<TypeConstructor> {
 struct LayoutParameter : public HasClone<LayoutParameter> {
  public:
   virtual ~LayoutParameter() = default;
-  enum Kind {
+  enum Kind : uint8_t {
     kIdentifier,
     kLiteral,
     kType,
@@ -979,7 +979,7 @@ struct NewType final : public TypeDecl {
 // those imported with "using" statements.
 class Dependencies {
  public:
-  enum class RegisterResult {
+  enum class RegisterResult : uint8_t {
     kSuccess,
     kDuplicate,
     kCollision,

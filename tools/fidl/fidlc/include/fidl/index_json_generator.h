@@ -7,10 +7,8 @@
 
 #include <zircon/assert.h>
 
-#include <memory>
 #include <sstream>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"

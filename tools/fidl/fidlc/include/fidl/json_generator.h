@@ -7,11 +7,9 @@
 
 #include <zircon/assert.h>
 
-#include <memory>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
@@ -114,7 +112,7 @@ class JSONGenerator : public utils::JsonWriter<JSONGenerator> {
   void Generate(const flat::Compilation::Dependency& dependency);
 
  private:
-  enum TypeKind {
+  enum TypeKind : uint8_t {
     kConcrete,
     kParameterized,
     kRequestPayload,

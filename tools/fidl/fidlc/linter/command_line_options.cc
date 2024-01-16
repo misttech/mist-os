@@ -6,8 +6,6 @@
 
 #include <lib/cmdline/args_parser.h>
 
-#include <iostream>
-
 namespace fidl::linter {
 
 namespace help {
@@ -105,12 +103,12 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
     if ((*params)[0] == "printcurrentoptions") {
       std::stringstream current_options;
       for (const auto& check : options->included_checks) {
-        current_options << "include-check: " << check << std::endl;
+        current_options << "include-check: " << check << '\n';
       }
       for (const auto& check : options->excluded_checks) {
-        current_options << "exclude-check: " << check << std::endl;
+        current_options << "exclude-check: " << check << '\n';
       }
-      current_options << "format: " << options->format << std::endl;
+      current_options << "format: " << options->format << '\n';
       return cmdline::Status::Error(current_options.str());
     }
   }

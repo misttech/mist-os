@@ -5,17 +5,15 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FORMATTER_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FORMATTER_H_
 
-#include <utility>
-
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/reporter.h"
 
 namespace fidl::fmt {
 
-class NewFormatter final {
+class Formatter final {
  public:
-  explicit NewFormatter(size_t cols, Reporter* reporter) : cols_(cols), reporter_(reporter) {}
+  explicit Formatter(size_t cols, Reporter* reporter) : cols_(cols), reporter_(reporter) {}
 
   std::optional<std::string> Format(const fidl::SourceFile& source_file,
                                     const fidl::ExperimentalFlags& experimental_flags) const;

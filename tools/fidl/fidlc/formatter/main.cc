@@ -6,8 +6,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include <algorithm>
-#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -59,7 +57,7 @@ bool Format(const fidl::SourceFile& source_file, fidl::Reporter* reporter, std::
   // set all the flags which could block parsing if disabled.
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
-  auto formatter = fidl::fmt::NewFormatter(100, reporter);
+  auto formatter = fidl::fmt::Formatter(100, reporter);
   auto result = formatter.Format(source_file, experimental_flags);
   if (!result.has_value()) {
     return false;

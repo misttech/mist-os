@@ -30,7 +30,7 @@ class ResolveStep : public Compiler::Step {
 
   // Context controls dynamic behavior during traversals of all references.
   struct Context {
-    enum struct Mode {
+    enum class Mode : uint8_t {
       // Calls ParseReference and InsertReferenceEdges.
       kParseAndInsert,
       // Calls ResolveReference and ValidateReference.

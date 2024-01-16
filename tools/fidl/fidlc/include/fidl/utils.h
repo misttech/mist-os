@@ -140,7 +140,7 @@ inline bool FirstLineIsRegularComment(std::string_view view) {
   return LineFromOffsetIsRegularComment(view, 0);
 }
 
-enum class ParseNumericResult {
+enum class ParseNumericResult : uint8_t {
   kSuccess,
   kOutOfBounds,
   kMalformed,

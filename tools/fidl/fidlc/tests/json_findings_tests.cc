@@ -70,7 +70,7 @@ class JsonFindingsTest {
     }
     if (start == std::string::npos) {
       std::cout << "ERROR: violation_string '" << args.violation_string
-                << "' was not found in template string:" << std::endl
+                << "' was not found in template string:\n"
                 << source_data;
       ZX_PANIC("violation_string not found in template string");
     }

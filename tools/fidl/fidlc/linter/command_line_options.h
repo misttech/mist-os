@@ -7,7 +7,6 @@
 
 #include <lib/cmdline/status.h>
 
-#include <optional>
 #include <string>
 #include <vector>
 

@@ -11,7 +11,7 @@
 
 namespace fidl::fmt {
 
-std::optional<std::string> NewFormatter::Format(
+std::optional<std::string> Formatter::Format(
     const fidl::SourceFile& source_file, const fidl::ExperimentalFlags& experimental_flags) const {
   fidl::Lexer lexer(source_file, reporter_);
   fidl::Parser parser(&lexer, reporter_, experimental_flags);
@@ -22,7 +22,7 @@ std::optional<std::string> NewFormatter::Format(
   return std::nullopt;
 }
 
-std::string NewFormatter::Print(std::unique_ptr<raw::File> ast, size_t original_file_size) const {
+std::string Formatter::Print(std::unique_ptr<raw::File> ast, size_t original_file_size) const {
   std::string out;
   auto visitor = SpanSequenceTreeVisitor(ast->tokens);
   visitor.OnFile(ast);

@@ -7,14 +7,13 @@
 
 #include <optional>
 #include <set>
-#include <string>
 #include <vector>
 
 namespace fidl::flat {
 
 // The class / namespace of the handle, used for compatibility checking with
 // transports.
-enum class HandleClass {
+enum class HandleClass : uint8_t {
   kZircon,  // zx.Handle
   kDriver,  // fdf.handle
   kBanjo,   // only referenced by client_end / server_end
@@ -24,7 +23,7 @@ std::string_view HandleClassName(HandleClass handle_class);
 std::optional<HandleClass> HandleClassFromName(std::string_view name);
 
 struct Transport {
-  enum class Kind {
+  enum class Kind : uint8_t {
     kZirconChannel,  // @transport("Channel")
     kDriverChannel,  // @transport("Driver")
     kBanjo,          // @transport("Banjo")

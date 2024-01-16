@@ -5,10 +5,7 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_DIAGNOSTICS_JSON_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_DIAGNOSTICS_JSON_H_
 
-#include <memory>
 #include <sstream>
-#include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 

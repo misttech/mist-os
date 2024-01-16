@@ -12,7 +12,6 @@
 #include <optional>
 #include <set>
 #include <string>
-#include <type_traits>
 
 namespace fidl {
 
@@ -236,7 +235,7 @@ class Availability final {
   // An availability advances through four states. All reach kNarrowed on
   // success, except for library availabilities, which stay at kInherited
   // because libraries do not get decomposed.
-  enum class State {
+  enum class State : uint8_t {
     // 1. Default constructed. All fields are null.
     kUnset,
     // 2. `Init` succeeded. Some fields might be set, and they are in order.
@@ -272,7 +271,7 @@ class Availability final {
   void Fail();
 
   // Represents whether an availability includes legacy support.
-  enum class Legacy {
+  enum class Legacy : uint8_t {
     // Not applicable because [added, removed) already includes LEGACY,
     // i.e. `removed` is +inf.
     kNotApplicable,
@@ -293,7 +292,7 @@ class Availability final {
   bool Init(InitArgs args);
 
   struct InheritResult {
-    enum class Status {
+    enum class Status : uint8_t {
       kOk,
       // Child {added, deprecated, or removed} < Parent added.
       kBeforeParentAdded,
@@ -304,7 +303,7 @@ class Availability final {
       kAfterParentRemoved,
     };
 
-    enum class LegacyStatus {
+    enum class LegacyStatus : uint8_t {
       kOk,
       // Child marked `legacy=false` or `legacy=true`, but was never removed
       // (neither directly nor through inheritance from parent).

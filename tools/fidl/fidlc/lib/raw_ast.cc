@@ -8,8 +8,6 @@
 
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 
-#include <map>
-
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
 
 namespace fidl::raw {

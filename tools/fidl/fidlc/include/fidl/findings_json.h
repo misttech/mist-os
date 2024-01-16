@@ -5,11 +5,8 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FINDINGS_JSON_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_FINDINGS_JSON_H_
 
-#include <memory>
 #include <sstream>
 #include <string>
-#include <string_view>
-#include <vector>
 
 #include "tools/fidl/fidlc/include/fidl/findings.h"
 #include "tools/fidl/fidlc/include/fidl/json_writer.h"

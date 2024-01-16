@@ -49,7 +49,7 @@ class AdjacentIndents final {
 // cause all source in the statement after it to be wrapped.
 class SpanSequence {
  public:
-  enum struct Kind {
+  enum class Kind : uint8_t {
     kAtomic,
     kDivisible,
     kInlineComment,
@@ -72,7 +72,7 @@ class SpanSequence {
   // indented, the latter is never is.  Next, kNewlineAligned is used to indicate that this line
   // should take the indentation of the sibling immediately before or after it, whichever is
   // greater. Finally, kDefault means that we do not want a newline at all.
-  enum struct Position {
+  enum class Position : uint8_t {
     kDefault,
     kNewlineAligned,
     kNewlineIndented,

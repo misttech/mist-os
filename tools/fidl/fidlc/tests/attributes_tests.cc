@@ -302,8 +302,7 @@ TEST(AttributesTests, BadNoAttributeOnUsingNotEventDoc) {
   ASSERT_COMPILED(dependency);
   TestLibrary library(&shared);
   library.AddFile("bad/fi-0045-b.test.fidl");
-  library.ExpectFail(fidl::ErrAttributesNotAllowedOnLibraryImport,
-                     "(doc comment), also_not_allowed");
+  library.ExpectFail(fidl::ErrAttributesNotAllowedOnLibraryImport);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

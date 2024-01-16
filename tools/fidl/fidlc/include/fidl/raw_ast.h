@@ -98,7 +98,7 @@ struct CompoundIdentifier final : public SourceElement {
 };
 
 struct Literal : public SourceElement {
-  enum class Kind {
+  enum class Kind : uint8_t {
     kBool,
     kDocComment,
     kNumeric,
@@ -160,7 +160,7 @@ struct Ordinal64 final : public SourceElement {
 };
 
 struct Constant : public SourceElement {
-  enum class Kind { kIdentifier, kLiteral, kBinaryOperator };
+  enum class Kind : uint8_t { kIdentifier, kLiteral, kBinaryOperator };
 
   explicit Constant(Token start, Token end, Kind kind) : SourceElement(start, end), kind(kind) {}
   explicit Constant(const SourceElement& element, Kind kind) : SourceElement(element), kind(kind) {}
@@ -189,7 +189,7 @@ struct LiteralConstant final : public Constant {
 };
 
 struct BinaryOperatorConstant final : public Constant {
-  enum class Operator { kOr };
+  enum class Operator : uint8_t { kOr };
   explicit BinaryOperatorConstant(std::unique_ptr<Constant> left_operand,
                                   std::unique_ptr<Constant> right_operand, Operator op)
       : Constant(SourceElement(left_operand->start_token, right_operand->end_token),
@@ -222,7 +222,7 @@ struct AttributeArg final : public SourceElement {
 };
 
 struct Attribute final : public SourceElement {
-  enum class Provenance {
+  enum class Provenance : uint8_t {
     kDefault,
     kDocComment,
   };
@@ -528,7 +528,7 @@ struct ServiceDeclaration final : public SourceElement {
 };
 
 struct LayoutMember : public SourceElement {
-  enum class Kind {
+  enum class Kind : uint8_t {
     kOrdinaled,
     kStruct,
     kValue,
@@ -550,7 +550,7 @@ struct LayoutMember : public SourceElement {
 };
 
 struct Layout final : public SourceElement {
-  enum class Kind {
+  enum class Kind : uint8_t {
     kBits,
     kEnum,
     kStruct,
@@ -631,7 +631,7 @@ struct StructLayoutMember final : public LayoutMember {
 };
 
 struct LayoutReference : public SourceElement {
-  enum class Kind {
+  enum class Kind : uint8_t {
     kInline,
     kNamed,
   };
@@ -667,7 +667,7 @@ struct NamedLayoutReference final : public LayoutReference {
 };
 
 struct LayoutParameter : public SourceElement {
-  enum class Kind {
+  enum class Kind : uint8_t {
     kIdentifier,
     kLiteral,
     kType,

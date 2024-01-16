@@ -6,6 +6,8 @@
 
 #include <zircon/assert.h>
 
+#include <sstream>
+
 namespace fidl {
 
 namespace {
@@ -256,22 +258,22 @@ void NameFlatTypeHelper(std::ostringstream& buf, const flat::Type* type) {
   switch (type->kind) {
     case flat::Type::Kind::kArray: {
       const auto* array_type = static_cast<const flat::ArrayType*>(type);
-      buf << "<";
+      buf << '<';
       NameFlatTypeHelper(buf, array_type->element_type);
       if (*array_type->element_count != flat::Size::Max()) {
         buf << ", ";
         buf << array_type->element_count->value;
       }
-      buf << ">";
+      buf << '>';
       break;
     }
     case flat::Type::Kind::kVector: {
       const auto* vector_type = static_cast<const flat::VectorType*>(type);
-      buf << "<";
+      buf << '<';
       NameFlatTypeHelper(buf, vector_type->element_type);
-      buf << ">";
+      buf << '>';
       if (vector_type->ElementCount() != flat::Size::Max().value) {
-        buf << ":";
+        buf << ':';
         buf << vector_type->ElementCount();
       }
       break;
@@ -279,22 +281,22 @@ void NameFlatTypeHelper(std::ostringstream& buf, const flat::Type* type) {
     case flat::Type::Kind::kString: {
       const auto* string_type = static_cast<const flat::StringType*>(type);
       if (string_type->MaxSize() != flat::Size::Max().value) {
-        buf << ":";
+        buf << ':';
         buf << string_type->MaxSize();
       }
       break;
     }
     case flat::Type::Kind::kZxExperimentalPointer: {
       const auto* pointer_type = static_cast<const flat::ZxExperimentalPointerType*>(type);
-      buf << "<";
+      buf << '<';
       NameFlatTypeHelper(buf, pointer_type->pointee_type);
-      buf << ">";
+      buf << '>';
       break;
     }
     case flat::Type::Kind::kHandle: {
       const auto* handle_type = static_cast<const flat::HandleType*>(type);
       if (handle_type->subtype != types::HandleSubtype::kHandle) {
-        buf << ":";
+        buf << ':';
         buf << NameHandleSubtype(handle_type->subtype);
       }
       break;
@@ -302,15 +304,15 @@ void NameFlatTypeHelper(std::ostringstream& buf, const flat::Type* type) {
     case flat::Type::Kind::kTransportSide: {
       const auto* transport_side = static_cast<const flat::TransportSideType*>(type);
       buf << (transport_side->end == flat::TransportSide::kClient ? "client" : "server");
-      buf << ":";
+      buf << ':';
       buf << NameFlatName(transport_side->protocol_decl->name);
       break;
     }
     case flat::Type::Kind::kBox: {
       const auto* box_type = static_cast<const flat::BoxType*>(type);
-      buf << "<";
+      buf << '<';
       buf << NameFlatName(box_type->boxed_type->name);
-      buf << ">";
+      buf << '>';
       break;
     }
     case flat::Type::Kind::kPrimitive:
@@ -322,7 +324,7 @@ void NameFlatTypeHelper(std::ostringstream& buf, const flat::Type* type) {
   }  // switch
   // TODO(https://fxbug.dev/93999): Use the new syntax, `:optional`.
   if (type->IsNullable()) {
-    buf << "?";
+    buf << '?';
   }
 }
 

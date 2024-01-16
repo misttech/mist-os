@@ -20,7 +20,7 @@ struct OverlayMemberUsed;
 
 }  // namespace flat
 
-enum class WireFormat {
+enum class WireFormat : uint8_t {
   kV2,  // The v2 wire format, using efficient envelopes. Request and response structs do not
         // receive any special treatment (e.g. having their size increased by 16 for the
         // transactional header).

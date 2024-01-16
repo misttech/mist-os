@@ -8,7 +8,6 @@
 
 #include <safemath/checked_math.h>
 
-#include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
 namespace fidl::flat {
@@ -178,10 +177,8 @@ void Constant::ResolveTo(std::unique_ptr<ConstantValue> value, const Type* type)
 }
 
 const ConstantValue& Constant::Value() const {
-  if (!IsResolved()) {
-    std::cout << span.data() << std::endl;
-  }
-  ZX_ASSERT_MSG(IsResolved(), "accessing the value of an unresolved Constant");
+  ZX_ASSERT_MSG(IsResolved(), "accessing the value of an unresolved Constant: %s",
+                std::string(span.data()).c_str());
   return *value_;
 }
 

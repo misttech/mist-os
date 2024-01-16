@@ -67,7 +67,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
   MultilineSpanSequence Result();
 
  private:
-  enum struct VisitorKind {
+  enum class VisitorKind : uint8_t {
     kAliasDeclaration,
     kAttributeArg,
     kAttribute,

@@ -81,8 +81,8 @@ struct TestCase {
       }
       ++version;
     }
-    source << ")";
-    target << ")";
+    source << ')';
+    target << ')';
     return Attributes{source.str(), target.str()};
   }
 

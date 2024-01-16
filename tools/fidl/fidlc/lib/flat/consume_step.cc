@@ -188,8 +188,7 @@ void ConsumeStep::ConsumeLiteralConstant(raw::LiteralConstant* raw_constant,
 
 void ConsumeStep::ConsumeUsing(std::unique_ptr<raw::Using> using_directive) {
   if (using_directive->attributes != nullptr) {
-    reporter()->Fail(ErrAttributesNotAllowedOnLibraryImport, using_directive->span(),
-                     using_directive->attributes.get());
+    reporter()->Fail(ErrAttributesNotAllowedOnLibraryImport, using_directive->span());
     return;
   }
 

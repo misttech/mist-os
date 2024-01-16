@@ -8,7 +8,6 @@
 #include <cassert>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"

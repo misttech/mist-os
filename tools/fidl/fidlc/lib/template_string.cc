@@ -4,7 +4,6 @@
 
 #include "tools/fidl/fidlc/include/fidl/template_string.h"
 
-#include <iostream>
 #include <sstream>
 
 #include <re2/re2.h>

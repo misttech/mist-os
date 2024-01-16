@@ -21,11 +21,6 @@
 
 namespace fidl {
 
-// Forward decls
-namespace raw {
-struct AttributeList;
-}  // namespace raw
-
 using ErrorId = uint32_t;
 
 namespace internal {
@@ -37,7 +32,6 @@ std::string Display(const std::set<std::string_view>& s);
 std::string Display(SourceSpan s);
 std::string Display(Token::KindAndSubkind t);
 std::string Display(types::Openness o);
-std::string Display(const raw::AttributeList* a);
 std::string Display(const std::vector<std::string_view>& library_name);
 std::string Display(const flat::Attribute* a);
 std::string Display(const flat::AttributeArg* a);
@@ -113,7 +107,7 @@ using utils::identity_t;
 
 // A tag that indicates whether a diagnostic definition is an error or warning.
 // In the future this could be extended to include hints, suggestions, etc.
-enum class DiagnosticKind {
+enum class DiagnosticKind : uint8_t {
   kError,
   kWarning,
   kRetired,

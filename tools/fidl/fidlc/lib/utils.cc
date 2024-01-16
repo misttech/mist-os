@@ -269,7 +269,7 @@ std::string StringJoin(const std::vector<std::string_view>& strings, std::string
 void PrintFinding(std::ostream& os, const Finding& finding) {
   os << finding.message() << " [";
   os << finding.subcategory();
-  os << "]";
+  os << ']';
   if (finding.suggestion().has_value()) {
     auto& suggestion = finding.suggestion();
     os << "; " << suggestion->description();

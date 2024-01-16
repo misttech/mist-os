@@ -6,6 +6,8 @@
 
 #include <zircon/assert.h>
 
+#include <sstream>
+
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 
 namespace fidl {
@@ -337,7 +339,7 @@ static std::string ToString(Availability::Legacy legacy) {
 
 std::string Availability::Debug() const {
   std::stringstream ss;
-  ss << ToString(added_) << " " << ToString(deprecated_) << " " << ToString(removed_) << " "
+  ss << ToString(added_) << ' ' << ToString(deprecated_) << ' ' << ToString(removed_) << ' '
      << ToString(legacy_);
   return ss.str();
 }

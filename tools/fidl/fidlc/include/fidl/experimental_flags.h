@@ -59,7 +59,7 @@ class ExperimentalFlags {
 
   ExperimentalFlags() = default;
   explicit ExperimentalFlags(Flag flag) : flags_(static_cast<FlagSet>(flag)) {}
-  explicit ExperimentalFlags(std::initializer_list<Flag> flags) {
+  ExperimentalFlags(std::initializer_list<Flag> flags) {
     for (const auto& flag : flags) {
       EnableFlag(flag);
     }
@@ -72,9 +72,9 @@ class ExperimentalFlags {
   void ForEach(const fit::function<void(const std::string_view, Flag, bool)>& fn) const;
 
  private:
-  static std::map<const std::string_view, const Flag> FLAG_STRINGS;
+  static std::map<const std::string_view, const Flag> kFlagStrings;
 
-  FlagSet flags_{0};
+  FlagSet flags_ = 0;
 };
 
 }  // namespace fidl

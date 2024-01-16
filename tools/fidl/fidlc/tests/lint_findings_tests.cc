@@ -48,7 +48,7 @@ class LintTest {
     size_t start = template_string.find(violation_string);
     if (start == std::string::npos) {
       std::cout << "ERROR: violation_string '" << violation_string
-                << "' was not found in template string:" << std::endl
+                << "' was not found in template string:\n"
                 << template_string;
       ZX_PANIC("violation_string not found in template string");
     }
@@ -182,14 +182,14 @@ class LintTest {
   void execute_helper(bool expect_findings, bool assert_positions_match) {
     std::ostringstream ss;
     if (default_check_id_.empty()) {
-      ss << std::endl << "Failed test";
+      ss << "\nFailed test";
     } else {
-      ss << std::endl << "Failed test for check '" << default_check_id_ << "'";
+      ss << "\nFailed test for check '" << default_check_id_ << "'";
     }
     if (!that_.empty()) {
-      ss << std::endl << "that " << that_;
+      ss << "\nthat " << that_;
     }
-    ss << ":" << std::endl;
+    ss << ":\n";
 
     // Start with checks for invalid test construction:
     auto context = (ss.str() + "Bad test!");
@@ -214,9 +214,9 @@ class LintTest {
     EXPECT_EQ(passed, library().findings().empty());
 
     if (!excluded_check_ids_to_confirm_.empty()) {
-      ss << "Excluded check-ids not found: " << std::endl;
+      ss << "Excluded check-ids not found: \n";
       for (auto& check_id : excluded_check_ids_to_confirm_) {
-        ss << "  * " << check_id << std::endl;
+        ss << "  * " << check_id << '\n';
       }
       context = ss.str();
       EXPECT_TRUE(excluded_check_ids_to_confirm_.empty());
@@ -313,15 +313,15 @@ class LintTest {
   template <typename Iter>
   void PrintFindings(std::ostream& os, Iter finding, Iter end, std::string_view title) {
     os << "\n\n";
-    os << "============================" << std::endl;
-    os << title << ":" << std::endl;
-    os << "============================" << std::endl;
+    os << "============================\n";
+    os << title << ":\n";
+    os << "============================\n";
     for (; finding != end; finding++) {
       os << finding->span().position_str() << ": ";
       utils::PrintFinding(os, *finding);
-      os << std::endl;
+      os << '\n';
     }
-    os << "============================" << std::endl;
+    os << "============================\n";
   }
 
   TestLibrary& library() {

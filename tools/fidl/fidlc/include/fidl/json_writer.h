@@ -109,7 +109,7 @@ class JsonWriter {
   DerivedT& self = *static_cast<DerivedT*>(this);
 
  protected:
-  enum class Position {
+  enum class Position : uint8_t {
     kFirst,
     kSubsequent,
   };
@@ -267,37 +267,37 @@ class JsonWriter {
     }
   }
 
-  void EmitNewline() { os_ << "\n"; }
+  void EmitNewline() { os_ << '\n'; }
 
   void EmitNewlineWithIndent() {
-    os_ << "\n";
+    os_ << '\n';
     int indent_level = indent_level_;
     while (indent_level--)
       os_ << kIndent;
   }
 
-  void EmitObjectBegin() { os_ << "{"; }
+  void EmitObjectBegin() { os_ << '{'; }
 
   void EmitObjectSeparator() {
-    os_ << ",";
+    os_ << ',';
     EmitNewlineWithIndent();
   }
 
-  void EmitObjectEnd() { os_ << "}"; }
+  void EmitObjectEnd() { os_ << '}'; }
 
   void EmitObjectKey(std::string_view key) {
     EmitString(key);
     os_ << ": ";
   }
 
-  void EmitArrayBegin() { os_ << "["; }
+  void EmitArrayBegin() { os_ << '['; }
 
   void EmitArraySeparator() {
-    os_ << ",";
+    os_ << ',';
     EmitNewlineWithIndent();
   }
 
-  void EmitArrayEnd() { os_ << "]"; }
+  void EmitArrayEnd() { os_ << ']'; }
 
  private:
   static constexpr const char* kIndent = "  ";

@@ -25,7 +25,7 @@ struct Type;
 struct ConstantValue : public HasClone<ConstantValue> {
   virtual ~ConstantValue() = default;
 
-  enum struct Kind {
+  enum class Kind : uint8_t {
     kInt8,
     kInt16,
     kInt32,
@@ -221,7 +221,7 @@ struct StringConstantValue final : ConstantValue {
 struct Constant : HasClone<Constant> {
   virtual ~Constant() = default;
 
-  enum struct Kind { kIdentifier, kLiteral, kBinaryOperator };
+  enum class Kind : uint8_t { kIdentifier, kLiteral, kBinaryOperator };
 
   explicit Constant(Kind kind, SourceSpan span) : kind(kind), span(span), value_(nullptr) {}
 
@@ -278,7 +278,7 @@ struct LiteralConstant final : Constant {
 };
 
 struct BinaryOperatorConstant final : Constant {
-  enum struct Operator { kOr };
+  enum class Operator : uint8_t { kOr };
 
   explicit BinaryOperatorConstant(std::unique_ptr<Constant> left_operand,
                                   std::unique_ptr<Constant> right_operand, Operator op,

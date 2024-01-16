@@ -21,12 +21,12 @@ class CompileStep;
 // required, and (if applicable) a special-case rule for resolving its value.
 class AttributeArgSchema {
  public:
-  enum class Optionality {
+  enum class Optionality : uint8_t {
     kOptional,
     kRequired,
   };
 
-  enum class SpecialCase {
+  enum class SpecialCase : uint8_t {
     // Allows a uint64 literal or the special constant `HEAD`.
     kVersion,
   };
@@ -104,7 +104,7 @@ class AttributeSchema {
   static AttributeSchemaMap OfficialAttributes();
 
  private:
-  enum class Kind {
+  enum class Kind : uint8_t {
     // Most attributes are validate-only. They do not participate in compilation
     // apart from validation at the end (possibly with a custom constraint).
     kValidateOnly,
@@ -125,7 +125,7 @@ class AttributeSchema {
     kUserDefined,
   };
 
-  enum class Placement {
+  enum class Placement : uint8_t {
     // Allowed anywhere.
     kAnywhere,
     // Only allowed in certain places specified by std::set<Element::Kind>.

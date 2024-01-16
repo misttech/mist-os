@@ -28,7 +28,7 @@ namespace {
   va_start(args, message);
   vfprintf(stderr, message, args);
   va_end(args);
-  std::cerr << fidl::linter::Usage(argv0) << std::endl;
+  std::cerr << fidl::linter::Usage(argv0) << '\n';
   exit(2);  // Exit code 1 is reserved to indicate lint findings
 }
 
@@ -158,11 +158,11 @@ int main(int argc, char* argv[]) {
 
   if (!excluded_checks_not_found.empty()) {
     std::ostringstream os;
-    os << "The following checks were excluded but were never encountered:" << std::endl;
+    os << "The following checks were excluded but were never encountered:\n";
     for (auto& check_id : excluded_checks_not_found) {
-      os << "  * " << check_id << std::endl;
+      os << "  * " << check_id << '\n';
     }
-    os << "Please remove these checks from your excluded_checks list and try again." << std::endl;
+    os << "Please remove these checks from your excluded_checks list and try again.\n";
     Fail(os.str().c_str());
   }
 

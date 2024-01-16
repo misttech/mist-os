@@ -39,7 +39,7 @@ class Parser {
   // currently the only use case for this enum is to identify the case where the parser
   // has seen a doc comment block, followed by a regular comment block, followed by
   // a doc comment block
-  enum class State {
+  enum class State : uint8_t {
     // the parser is currently in a doc comment block
     kDocCommentLast,
     // the parser is currently in a regular comment block, which directly followed a
@@ -117,7 +117,7 @@ class Parser {
 
   bool ConsumedEOF() const { return previous_token_.kind() == Token::Kind::kEndOfFile; }
 
-  enum class OnNoMatch {
+  enum class OnNoMatch : uint8_t {
     kReportAndConsume,  // on failure, report error and return consumed token
     kReportAndRecover,  // on failure, report error and return std::nullopt
     kIgnore,            // on failure, return std::nullopt
@@ -306,7 +306,7 @@ class Parser {
       std::unique_ptr<raw::AttributeList> attributes, ASTScope&);
   std::unique_ptr<raw::File> ParseFile();
 
-  enum class RecoverResult {
+  enum class RecoverResult : uint8_t {
     Failure,
     Continue,
     EndOfScope,

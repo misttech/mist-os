@@ -49,25 +49,6 @@ std::string Display(types::Openness o) {
   }
 }
 
-std::string Display(const raw::AttributeList* a) {
-  std::stringstream attributes_found;
-  for (auto it = a->attributes.begin(); it != a->attributes.end(); it++) {
-    if (it != a->attributes.cbegin()) {
-      attributes_found << ", ";
-    }
-    const raw::Attribute* attribute = it->get();
-    switch (attribute->provenance) {
-      case raw::Attribute::Provenance::kDefault:
-        attributes_found << (*it)->maybe_name->span().data();
-        break;
-      case raw::Attribute::Provenance::kDocComment:
-        attributes_found << "(doc comment)";
-        break;
-    }
-  }
-  return attributes_found.str();
-}
-
 std::string Display(const std::vector<std::string_view>& library_name) {
   return NameLibrary(library_name);
 }
@@ -309,7 +290,7 @@ std::string Diagnostic::Format() const {
   std::ostringstream out;
   out << msg;
   if (def.opts.documented) {
-    out << " [https://fuchsia.dev/error/" << def.FormatId() << "]";
+    out << " [https://fuchsia.dev/error/" << def.FormatId() << ']';
   }
   return out.str();
 }

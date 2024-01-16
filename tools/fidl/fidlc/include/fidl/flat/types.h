@@ -28,7 +28,7 @@ struct TypeConstraints;
 struct TypeDecl;
 
 struct Type : public Object {
-  enum struct Kind {
+  enum class Kind : uint8_t {
     kArray,
     kBox,
     kVector,
@@ -329,7 +329,7 @@ struct IdentifierType final : public Type, public Constraints<ConstraintKind::kN
                         LayoutInvocation* out_params) const override;
 };
 
-enum class TransportSide {
+enum class TransportSide : uint8_t {
   kClient,
   kServer,
 };

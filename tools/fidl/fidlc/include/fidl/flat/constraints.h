@@ -22,7 +22,7 @@ struct Protocol;
 struct LayoutInvocation;
 
 // Kinds of constraints that can be applied to types
-enum class ConstraintKind {
+enum class ConstraintKind : uint8_t {
   kHandleSubtype,
   kHandleRights,
   kSize,

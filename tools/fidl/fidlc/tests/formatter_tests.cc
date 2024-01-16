@@ -19,7 +19,7 @@ std::string Format(const std::string& source, bool reformat_and_compare = true) 
   // We use a column width of 40, rather than the "real world" 100, to make tests easier to read
   // and write.
   fidl::Reporter reporter;
-  auto formatter = fidl::fmt::NewFormatter(40, &reporter);
+  auto formatter = fidl::fmt::Formatter(40, &reporter);
   fidl::ExperimentalFlags experimental_flags;
   auto result = formatter.Format(source_file, experimental_flags);
 
@@ -155,7 +155,8 @@ alias MyAlias_Abcdefghijklmnopqr = bool;
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// TODO(https://fxbug.dev/78236): more tests need to be added here once multiple arguments are supported for
+// TODO(https://fxbug.dev/78236): more tests need to be added here once multiple arguments are
+// supported for
 //  attributes.
 
 // Ensure that already properly formatted attributes declarations are not modified by another run
@@ -4037,9 +4038,9 @@ type // C8
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// TODO(https://fxbug.dev/88107): This test currently behaves correctly per the specified line-wrapping
-// algorithm, but the output is unintuitive and unexpected. Once the referenced bug is fixed, this
-// test should result in the `unformatted` input being unmodified.
+// TODO(https://fxbug.dev/88107): This test currently behaves correctly per the specified
+// line-wrapping algorithm, but the output is unintuitive and unexpected. Once the referenced bug is
+// fixed, this test should result in the `unformatted` input being unmodified.
 TEST(FormatterTests, DISABLED_CommentsEmptyLayout) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(

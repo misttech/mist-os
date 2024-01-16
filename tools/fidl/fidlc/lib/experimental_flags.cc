@@ -7,8 +7,8 @@
 namespace fidl {
 
 bool ExperimentalFlags::EnableFlagByName(std::string_view flag) {
-  auto it = FLAG_STRINGS.find(flag);
-  if (it == FLAG_STRINGS.end()) {
+  auto it = kFlagStrings.find(flag);
+  if (it == kFlagStrings.end()) {
     return false;
   }
   EnableFlag(it->second);
@@ -23,13 +23,13 @@ bool ExperimentalFlags::IsFlagEnabled(Flag flag) const {
 
 void ExperimentalFlags::ForEach(
     const fit::function<void(const std::string_view, Flag, bool)>& fn) const {
-  for (const auto& [name, flag] : FLAG_STRINGS) {
+  for (const auto& [name, flag] : kFlagStrings) {
     bool is_enabled = IsFlagEnabled(flag);
     fn(name, flag, is_enabled);
   }
 }
 
-std::map<const std::string_view, const ExperimentalFlags::Flag> ExperimentalFlags::FLAG_STRINGS = {
+std::map<const std::string_view, const ExperimentalFlags::Flag> ExperimentalFlags::kFlagStrings = {
     {"noop", Flag::kNoop},
     {"unknown_interactions", Flag::kUnknownInteractions},
     {"unknown_interactions_mandate", Flag::kUnknownInteractionsMandate},

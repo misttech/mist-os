@@ -72,7 +72,7 @@ class Reference final {
   // Returns the span of a sourced reference.
   SourceSpan span() const { return span_.value(); }
 
-  enum class State {
+  enum class State : uint8_t {
     // Initial state of a sourced reference.
     kRawSourced,
     // Initial state of a synthetic reference.

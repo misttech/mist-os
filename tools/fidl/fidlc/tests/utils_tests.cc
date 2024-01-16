@@ -4,6 +4,8 @@
 
 #include <lib/fit/function.h>
 
+#include <sstream>
+
 #include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/utils.h"
@@ -16,7 +18,7 @@ void compare_id_to_words(std::string_view id, std::string_view expected_lowercas
   std::ostringstream actual;
   for (const auto& word : id_to_words(id)) {
     if (actual.tellp() > 0) {
-      actual << " ";
+      actual << ' ';
     }
     actual << word;
   }

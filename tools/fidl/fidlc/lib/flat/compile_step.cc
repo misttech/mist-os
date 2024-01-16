@@ -712,8 +712,8 @@ bool CompileStep::TypeIsConvertibleTo(const Type* from_type, const Type* to_type
         case types::PrimitiveSubtype::kBool:
           return from_primitive_type->subtype == types::PrimitiveSubtype::kBool;
         default:
-          // TODO(https://fxbug.dev/118282): be more precise about convertibility, e.g. it should not be
-          // allowed to convert a float to an int.
+          // TODO(https://fxbug.dev/118282): be more precise about convertibility, e.g. it should
+          // not be allowed to convert a float to an int.
           return from_primitive_type->subtype != types::PrimitiveSubtype::kBool;
       }
     }
@@ -1280,7 +1280,7 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       for (const auto part : library()->name) {
         method_name << part << '.';
       }
-      method_name << protocol_declaration->name.decl_name() << "." << method.name.data();
+      method_name << protocol_declaration->name.decl_name() << '.' << method.name.data();
       bool allowed = transitional_allowlist.find(method_name.str()) != transitional_allowlist.end();
 
       if (!allowed) {

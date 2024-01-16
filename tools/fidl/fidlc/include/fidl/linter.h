@@ -5,7 +5,6 @@
 #ifndef TOOLS_FIDL_FIDLC_INCLUDE_FIDL_LINTER_H_
 #define TOOLS_FIDL_FIDLC_INCLUDE_FIDL_LINTER_H_
 
-#include <array>
 #include <set>
 #include <stack>
 #include <utility>

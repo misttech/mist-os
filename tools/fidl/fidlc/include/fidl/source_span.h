@@ -7,7 +7,6 @@
 
 #include <zircon/assert.h>
 
-#include <cstdint>
 #include <string_view>
 
 #include "tools/fidl/fidlc/include/fidl/source_file.h"

@@ -15,22 +15,22 @@ namespace fidl::types {
 // TypesTests' rights test.
 using RightsWrappedType = uint32_t;
 
-enum struct Nullability {
+enum class Nullability : uint8_t {
   kNullable,
   kNonnullable,
 };
 
-enum struct Strictness {
+enum class Strictness : uint8_t {
   kFlexible,
   kStrict,
 };
 
-enum struct Resourceness {
+enum class Resourceness : uint8_t {
   kValue,
   kResource,
 };
 
-enum struct Openness {
+enum class Openness : uint8_t {
   kClosed,
   kAjar,
   kOpen,
@@ -43,7 +43,8 @@ enum struct Openness {
 // TODO(https://fxbug.dev/64629): Remove this enumeration once handle generalization is
 // fully implemented. The enum `obj_type` defined in the FIDL library zx will
 // become the only source of truth.
-enum struct HandleSubtype : uint32_t {
+// NOLINTNEXTLINE(performance-enum-size): The size matches zx_obj_type_t.
+enum class HandleSubtype : uint32_t {
   // special case to indicate subtype is not specified.
   kHandle = 0,
 
@@ -77,7 +78,7 @@ enum struct HandleSubtype : uint32_t {
   kVmo = 3,
 };
 
-enum struct PrimitiveSubtype {
+enum class PrimitiveSubtype : uint8_t {
   kBool,
   kInt8,
   kInt16,
@@ -94,11 +95,11 @@ enum struct PrimitiveSubtype {
   kFloat64,
 };
 
-enum struct InternalSubtype {
+enum class InternalSubtype : uint8_t {
   kFrameworkErr,
 };
 
-enum struct MessageKind {
+enum class MessageKind : uint8_t {
   kRequest,
   kResponse,
   kEvent,
