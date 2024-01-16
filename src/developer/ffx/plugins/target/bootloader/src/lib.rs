@@ -68,7 +68,7 @@ impl FfxMain for BootloaderTool {
             }
             Some(mode) => {
                 // Wait 10 seconds to allow the target to fully cycle to the bootloader
-                write!(writer, "Waiting for 10 seconds for Target to reboot")
+                writeln!(writer, "Waiting for Target to reboot to bootloader")
                     .user_message("Error writing user message")?;
                 writer.flush().user_message("Error flushing writer buffer")?;
 
@@ -81,22 +81,24 @@ impl FfxMain for BootloaderTool {
                     .map_err(|e| anyhow!("Got error rebooting target: {:#?}", e))
                     .user_message("Got an error rebooting")?;
 
-                Timer::new(
-                    Duration::seconds(10)
-                        .to_std()
-                        .user_message("Error converting 10 seconds to Duration")?,
-                )
-                .await;
+                let wait_duration = Duration::seconds(1)
+                    .to_std()
+                    .user_message("Error converting 1 seconds to Duration")?;
 
-                // Get the info again since the target changed state
-                info = self
-                    .target_proxy
-                    .identity()
-                    .await
-                    .user_message("Error getting the target's identity")?;
+                loop {
+                    // Get the info again since the target changed state
+                    info = self
+                        .target_proxy
+                        .identity()
+                        .await
+                        .user_message("Error getting the target's identity")?;
 
-                if !matches!(info.target_state, Some(TargetState::Fastboot)) {
-                    ffx_bail!("Target was requested to reboot to the bootloader, but was found in {:#?} state",info.target_state)
+                    if matches!(info.target_state, Some(TargetState::Fastboot)) {
+                        break;
+                    }
+
+                    tracing::debug!("Target was requested to reboot to the bootloader, but was found in {:#?} state. Waiting 1 second.", info.target_state);
+                    Timer::new(wait_duration).await;
                 }
             }
             None => {
@@ -118,9 +120,16 @@ impl FfxMain for BootloaderTool {
                 // We take the first address as when a target is in Fastboot mode and over
                 // UDP it only exposes one address
                 if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
+                    let target_name = if let Some(nodename) = info.nodename {
+                        nodename
+                    } else {
+                        write!(writer, "Warning: the target does not have a node name and is in UDP fastboot mode. Rediscovering the target after bootloader reboot will be impossible.")
+                        .user_message("Error writing user message")?;
+                        "".to_string()
+                    };
                     let target_addr: TargetAddr = addr.into();
                     let socket_addr: SocketAddr = target_addr.into();
-                    let proxy = udp_proxy(&socket_addr).await?;
+                    let proxy = udp_proxy(target_name, &socket_addr).await?;
                     bootloader_impl(proxy, self.cmd, &mut writer).await
                 } else {
                     ffx_bail!("Could not get a valid address for target");
@@ -130,9 +139,16 @@ impl FfxMain for BootloaderTool {
                 // We take the first address as when a target is in Fastboot mode and over
                 // TCP it only exposes one address
                 if let Some(addr) = info.addresses.unwrap().into_iter().take(1).next() {
+                    let target_name = if let Some(nodename) = info.nodename {
+                        nodename
+                    } else {
+                        write!(writer, "Warning: the target does not have a node name and is in TCP fastboot mode. Rediscovering the target after bootloader reboot will be impossible.")
+                        .user_message("Error writing user message")?;
+                        "".to_string()
+                    };
                     let target_addr: TargetAddr = addr.into();
                     let socket_addr: SocketAddr = target_addr.into();
-                    let proxy = tcp_proxy(&socket_addr).await?;
+                    let proxy = tcp_proxy(target_name, &socket_addr).await?;
                     bootloader_impl(proxy, self.cmd, &mut writer).await
                 } else {
                     ffx_bail!("Could not get a valid address for target");
