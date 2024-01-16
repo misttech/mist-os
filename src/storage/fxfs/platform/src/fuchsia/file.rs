@@ -421,6 +421,7 @@ impl File for FxFile {
     }
 
     async fn enable_verity(&self, options: fio::VerificationOptions) -> Result<(), Status> {
+        self.handle.set_read_only();
         self.handle.flush().await.map_err(map_to_status)?;
         self.handle.uncached_handle().enable_verity(options).await.map_err(map_to_status)
     }
@@ -1773,6 +1774,47 @@ mod tests {
             immutable_attributes.root_hash.expect("root hash not present in immutable attributes"),
             expected_root
         );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_write_fail_fsverity_enabled_file() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        file.write(&[8; 8192])
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("write failed");
+
+        let descriptor = fio::VerificationOptions {
+            hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+            salt: Some(vec![0xFF; 8]),
+            ..Default::default()
+        };
+
+        file.enable_verity(&descriptor)
+            .await
+            .expect("FIDL transport error")
+            .expect("enable verity failed");
+
+        file.write(&[2; 8192])
+            .await
+            .expect("FIDL transport error")
+            .map_err(Status::from_raw)
+            .expect_err("write succeeded on fsverity-enabled file");
 
         fixture.close().await;
     }

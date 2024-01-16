@@ -68,6 +68,11 @@ struct Inner {
 
     /// Stores whether the file needs to be shrunk or trimmed during the next flush.
     pending_shrink: PendingShrink,
+
+    /// This bit is set at the top of enable_verity(). Once this bit is set, all future calls to
+    /// mark_dirty() should fail. This ensures that the contents of the file do not change while
+    /// the merkle tree is being computed or thereon after.
+    read_only: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -205,6 +210,7 @@ impl Inner {
 
 impl PagedObjectHandle {
     pub fn new(handle: DataObjectHandle<FxVolume>, vmo: zx::Vmo) -> Self {
+        let verified_file = handle.verified_file();
         Self {
             vmo: TempClonable::new(vmo),
             handle,
@@ -214,6 +220,7 @@ impl PagedObjectHandle {
                 dirty_page_count: 0,
                 spare: 0,
                 pending_shrink: PendingShrink::None,
+                read_only: verified_file,
             }),
         }
     }
@@ -232,6 +239,10 @@ impl PagedObjectHandle {
 
     pub fn pager(&self) -> &Pager {
         self.owner().pager()
+    }
+
+    pub fn set_read_only(&self) {
+        self.inner.lock().unwrap().read_only = true
     }
 
     pub fn get_size(&self) -> u64 {
@@ -288,6 +299,11 @@ impl PagedObjectHandle {
 
     pub fn mark_dirty(&self, page_range: Range<u64>) -> Result<(), zx::Status> {
         let mut inner = self.inner.lock().unwrap();
+        if inner.read_only {
+            // Enable-verity has already been called on this file.
+            self.pager().report_failure(self.vmo(), page_range, zx::Status::BAD_STATE);
+            return Err(zx::Status::BAD_STATE);
+        }
         let new_inner = Inner {
             dirty_page_count: inner.dirty_page_count + page_count(page_range.clone()),
             spare: SPARE_SIZE,
