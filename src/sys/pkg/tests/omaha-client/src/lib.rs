@@ -631,14 +631,6 @@ impl TestEnv {
         stream
     }
 
-    async fn perform_pending_reboot(&self) -> bool {
-        self.proxies
-            .update_manager
-            .perform_pending_reboot()
-            .await
-            .expect("make perform_pending_reboot call")
-    }
-
     async fn inspect_hierarchy(&self) -> DiagnosticsHierarchy {
         let nested_environment_label = format!(
             "test_driver/realm_builder\\:{}/omaha_client_service:root",
@@ -1880,103 +1872,6 @@ async fn test_omaha_client_policy_config_inspect() {
             }
         }
     );
-}
-
-#[fasync::run_singlethreaded(test)]
-async fn test_omaha_client_perform_pending_reboot_after_out_of_space() {
-    let env = TestEnvBuilder::new().default_with_response(OmahaResponse::Update).build().await;
-
-    // We should be able to get the update package and images package just fine.
-    env.proxies
-        .resolver
-        .url("fuchsia-pkg://integration.test.fuchsia.com/update?hash=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
-        .resolve(
-        &env.proxies
-            .resolver
-            .package("update", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
-            .add_file(
-                "packages.json",
-                make_packages_json(["fuchsia-pkg://fuchsia.com/system_image/0?hash=1111111111111111111111111111111111111111111111111111111111111111"]),
-            )
-            .add_file(
-                "images.json",
-                serde_json::to_vec(
-                    &update_package::ImagePackagesManifest::builder()
-                    .fuchsia_package(
-                        update_package::ImageMetadata::new(
-                            8,
-                            [0; 32].into(),
-                            "fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=2222222222222222222222222222222222222222222222222222222222222222#zbi".parse().unwrap(),
-                        ),
-                        None
-                    )
-                    .clone()
-                    .build()
-                )
-                .unwrap()
-            )
-            .add_file("epoch.json", make_current_epoch_json())
-    );
-    env.proxies
-        .resolver
-        .url("fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=2222222222222222222222222222222222222222222222222222222222222222"
-        )
-        .resolve(
-            &env.proxies.resolver
-                .package(
-                    "update_images_fuchsia",
-                    "2222222222222222222222222222222222222222222222222222222222222222"
-                )
-                .add_file("zbi", "fake zbi")
-    );
-
-    // ...but the system image package should fail with NO_SPACE
-    env.proxies
-        .resolver.url("fuchsia-pkg://fuchsia.com/system_image/0?hash=1111111111111111111111111111111111111111111111111111111111111111")
-        .fail(fidl_fuchsia_pkg::ResolveError::NoSpace);
-
-    let mut stream = env.check_now().await;
-
-    // Consume the initial states
-    expect_states(
-        &mut stream,
-        &[
-            State::CheckingForUpdates(CheckingForUpdatesData::default()),
-            State::InstallingUpdate(InstallingData {
-                update: update_info(),
-                installation_progress: progress(None),
-                ..Default::default()
-            }),
-        ],
-    )
-    .await;
-
-    // Monitor the installation until we get an installation error.
-    let mut installation_error = false;
-    while let Some(request) = stream.try_next().await.unwrap() {
-        let MonitorRequest::OnState { state, responder } = request;
-        match state {
-            State::InstallingUpdate(InstallingData { update, .. }) => {
-                assert_eq!(update, update_info());
-            }
-            State::InstallationError(InstallationErrorData { update, .. }) => {
-                assert_eq!(update, update_info());
-                assert!(!installation_error);
-                installation_error = true;
-            }
-            state => {
-                panic!("Unexpected state: {state:?}");
-            }
-        }
-        responder.send().unwrap();
-    }
-    assert!(installation_error);
-
-    // Simulate an incoming call to PerformPendingReboot. It returns true if we're rebooting.
-    assert!(env.perform_pending_reboot().await);
-
-    // This will hang if reboot was not triggered.
-    env.reboot_called.await.unwrap();
 }
 
 /// Verifies the signature of the CrashReport is what's expected.

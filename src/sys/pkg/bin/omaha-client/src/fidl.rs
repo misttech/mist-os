@@ -214,8 +214,6 @@ where
     metrics_reporter: Box<dyn ApiMetricsReporter>,
 
     current_channel: Option<String>,
-
-    previous_out_of_space_failure: bool,
 }
 
 pub enum IncomingServices {
@@ -263,7 +261,6 @@ where
             attempt_monitor_queue,
             metrics_reporter,
             current_channel,
-            previous_out_of_space_failure: false,
         }
     }
 
@@ -335,30 +332,8 @@ where
             }
 
             ManagerRequest::PerformPendingReboot { responder } => {
-                // We should reboot if either we're in a WaitingForReboot state or we've previously
-                // received an error for OUT_OF_SPACE. In the second condition, a reboot will clear
-                // the dynamic index in pkgfs and allow subsequent OTAs to continue after a garbage
-                // collection.
-                //
-                // TODO(https://fxbug.dev/65571): remove previous_out_of_space_failure and this
-                // rebooting behavior when pkg-cache can clear previous OTA packages on its own
-
-                let (state_machine_state, previous_out_of_space_failure) = {
-                    let server_ref = server.borrow();
-                    (server_ref.state.manager_state, server_ref.previous_out_of_space_failure)
-                };
-
                 info!("Received PerformPendingRebootRequest");
-                if previous_out_of_space_failure {
-                    error!(
-                        "Received request for PerformPendingReboot, and have OUT_OF_SPACE from \
-                        a previous install attempt. Rebooting immediately."
-                    )
-                }
-
-                if state_machine_state == state_machine::State::WaitingForReboot
-                    || previous_out_of_space_failure
-                {
+                if server.borrow().state.manager_state == state_machine::State::WaitingForReboot {
                     connect_to_protocol::<fidl_fuchsia_hardware_power_statecontrol::AdminMarker>()?
                         .reboot(RebootReason::SystemUpdate)
                         .await?
@@ -677,18 +652,6 @@ where
 
     pub fn set_urgent_update(server: Rc<RefCell<Self>>, is_urgent: bool) {
         server.borrow_mut().state.urgent = Some(is_urgent);
-    }
-
-    /// Alert the `FidlServer` that a previous update attempt on this boot failed with an
-    /// OUT_OF_SPACE error.
-    pub fn set_previous_out_of_space_failure(server: Rc<RefCell<Self>>) {
-        server.borrow_mut().previous_out_of_space_failure = true;
-    }
-
-    /// Get the state of the `previous_out_of_space_failure` latch.
-    #[cfg(test)]
-    pub fn previous_out_of_space_failure(server: Rc<RefCell<Self>>) -> bool {
-        server.borrow().previous_out_of_space_failure
     }
 }
 
@@ -1638,22 +1601,6 @@ mod tests {
             install_progress: None,
             urgent: None,
         };
-
-        assert_fidl_server_calls_reboot(fidl).await;
-    }
-
-    // When the FidlServer has previous_out_of_space_error set to true, a call to
-    // PerformPendingReboot should call reboot, even if StateMachine state is not WaitingForReboot
-    #[fasync::run_singlethreaded(test)]
-    async fn test_perform_pending_reboot_with_previous_out_of_space_error() {
-        let fidl = FidlServerBuilder::new().build().await;
-        fidl.borrow_mut().state = State {
-            manager_state: state_machine::State::Idle,
-            version_available: None,
-            install_progress: None,
-            urgent: None,
-        };
-        fidl.borrow_mut().previous_out_of_space_failure = true;
 
         assert_fidl_server_calls_reboot(fidl).await;
     }
