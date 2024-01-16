@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_action.gni")
+import("//build/bazel/drivers/verify_driver_package.gni")
 import("//build/packages/prebuilt_package.gni")
 
 # Wraps a `fuchsia_package()` in a `BUILD.bazel` file.
@@ -29,6 +30,12 @@ import("//build/packages/prebuilt_package.gni")
 #     List of GN labels to bazel_input_xxx() targets required by the
 #     bazel_target.
 #     Type: list of strings (GN labels)
+#
+#   gn_driver_package_for_verification: (optional)
+#     A GN label which this driver will be checked against. If this is provided,
+#     a verify_driver_package target will be created. If not, the driver will
+#     not have any verification.
+#     Type: GN Label
 #
 #   deps:
 #   testonly:
@@ -64,6 +71,27 @@ template("bazel_driver_package") {
     ]
   }
 
+  if (defined(invoker.gn_driver_package_for_verification)) {
+    verify_against_gn = true
+
+    # Rule to verify that the GN built driver is identical to the Bazel built driver.
+    verify_target_name = "$target_name.verify_driver_package"
+    verify_driver_package(verify_target_name) {
+      gn_driver_package = invoker.gn_driver_package_for_verification
+      bazel_driver_package_target = bazel_target + "_fuchsia_package"
+      blobs_to_ignore = [
+        # These libraries are getting pulled in transitively in the Bazel SDK. We need
+        # to figure out why they are included an not include them
+        "lib/libasync-default.so",
+        "lib/libsyslog.so",
+        "lib/libbackend_fuchsia_globals.so",
+        "lib/libtrace-engine.so",
+      ]
+    }
+  } else {
+    verify_against_gn = false
+  }
+
   # From the perspective of GN/Ninja, this package is a prebuilt
   # even though we just built it ourselves.
   prebuilt_package(target_name) {
@@ -78,6 +106,11 @@ template("bazel_driver_package") {
     if (!defined(deps)) {
       deps = []
     }
+
     deps += [ ":$bazel_build_target" ]
+
+    if (verify_against_gn) {
+      deps += [ ":$verify_target_name" ]
+    }
   }
 }

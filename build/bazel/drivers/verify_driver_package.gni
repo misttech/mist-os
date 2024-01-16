@@ -137,8 +137,8 @@ template("verify_driver_package") {
     }
 
     if (defined(invoker.size_check_blobs)) {
-      args += [ "--size-check-blobs" ]
-      args += invoker.size_check_blobs
+      # This is needed to soft-transition
+      not_needed(invoker.size_check_blobs)
     }
 
     if (!is_debug) {

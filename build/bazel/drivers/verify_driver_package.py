@@ -19,6 +19,7 @@ class Package:
         pkg = json.load(manifest)
         self.repository: str = pkg.get("repository", "")
         self.blobs: Dict[str, str] = {}
+        self.driver_blobs: Dict[str, str] = {}
 
         ignored_blobs = ignored_blobs or []
 
@@ -29,20 +30,30 @@ class Package:
             if path == "meta/":
                 self.meta_merkle = blob
             elif path not in ignored_blobs:
-                self.blobs[path] = blob
+                if path.startswith("driver/"):
+                    self.driver_blobs[path] = blob
+                else:
+                    self.blobs[path] = blob
 
     def blob_paths(self) -> AbstractSet[str]:
         return set(self.blobs.keys())
 
-    def blob_merkle(self, path) -> str:
+    def driver_paths(self) -> AbstractSet[str]:
+        return set(self.driver_blobs.keys())
+
+    def merkle_for_blob(self, path) -> str:
         if path in self.blobs:
             return self.blobs[path]["merkle"]
+        elif path in self.driver_blobs:
+            return self.driver_blobs[path]["merkle"]
         else:
             return {}
 
-    def blob_size(self, path) -> int:
+    def size_for_blob(self, path) -> int:
         if path in self.blobs:
             return self.blobs[path]["size"]
+        elif path in self.driver_blobs:
+            return self.driver_blobs[path]["size"]
         else:
             return 0
 
@@ -50,7 +61,6 @@ class Package:
 def calculate_diff(
     gn_package: Package,
     bazel_package: Package,
-    size_check_blobs: Sequence[str],
     size_check_mode: SizeCheckMode,
 ) -> Sequence[str]:
     # If the blobs have the same merkle for their meta/ directory then they can
@@ -75,42 +85,53 @@ def calculate_diff(
             f"Repositories do not match '{gn_package.repository}' != '{bazel_package.repository}'"
         )
 
-    # find all the blob diffs
+    # Check to make sure that the driver blobs are the same and have the same size.
+    bazel_drivers: AbstractSet[str] = bazel_package.driver_paths()
+    gn_drivers: AbstractSet[str] = gn_package.driver_paths()
+    common_drivers: AbstractSet[str] = gn_drivers.intersection(bazel_drivers)
+
+    def compare_driver_size(path):
+        gn_size: int = gn_package.size_for_blob(path)
+        bazel_size: int = bazel_package.size_for_blob(path)
+        if size_check_mode == SizeCheckMode.EQUAL:
+            if gn_size != bazel_size:
+                findings.append(
+                    f"Drivers at '{path}' have different sizes '{gn_size}' != '{bazel_size}'"
+                )
+        elif size_check_mode == SizeCheckMode.BAZEL_SMALLER:
+            if bazel_size > gn_size:
+                findings.append(
+                    f"Driver blob at '{path}' is larger than GN driver '{bazel_size}' > '{gn_size}'"
+                )
+        else:
+            findings.append(
+                "Unknown size check mode passed to compare_driver_size"
+            )
+
+    for driver in common_drivers:
+        compare_driver_size(driver)
+
+    for driver in gn_drivers.difference(common_drivers):
+        findings.append(f"Driver at '{driver}' only exists in gn package")
+
+    for driver in bazel_drivers.difference(common_drivers):
+        findings.append(f"Driver at '{driver}' only exists in bazel package")
+
+    # find all the blob diffs - this does not include the drivers which are checked above
     bazel_blobs: AbstractSet[str] = bazel_package.blob_paths()
     gn_blobs: AbstractSet[str] = gn_package.blob_paths()
     common_blobs: AbstractSet[str] = gn_blobs.intersection(bazel_blobs)
 
     def compare_blob_merkles(path):
-        gn_merkle: int = gn_package.blob_merkle(path)
-        bazel_merkle: int = bazel_package.blob_merkle(path)
+        gn_merkle: int = gn_package.merkle_for_blob(path)
+        bazel_merkle: int = bazel_package.merkle_for_blob(path)
         if gn_merkle != bazel_merkle:
             findings.append(
                 f"Blobs at '{path}' have different merkle roots '{gn_merkle}' != '{bazel_merkle}'"
             )
 
-    def compare_blob_size(path):
-        gn_size: int = gn_package.blob_size(path)
-        bazel_size: int = bazel_package.blob_size(path)
-        if size_check_mode == SizeCheckMode.EQUAL:
-            if gn_size != bazel_size:
-                findings.append(
-                    f"Blobs at '{path}' have different sizes '{gn_size}' != '{bazel_size}'"
-                )
-        elif size_check_mode == SizeCheckMode.BAZEL_SMALLER:
-            if bazel_size > gn_size:
-                findings.append(
-                    f"Bazel blob at '{path}' is larger than GN blob '{bazel_size}' > '{gn_size}'"
-                )
-        else:
-            findings.append(
-                "Unknown size check mode passed to compare_blob_size"
-            )
-
     for blob in common_blobs:
-        if blob in size_check_blobs:
-            compare_blob_size(blob)
-        else:
-            compare_blob_merkles(blob)
+        compare_blob_merkles(blob)
 
     for blob in gn_blobs.difference(common_blobs):
         findings.append(f"Blob at '{blob}' only exists in gn package")
@@ -164,9 +185,7 @@ def main(argv: Sequence[str]):
         if args.require_exact_sizes
         else SizeCheckMode.BAZEL_SMALLER
     )
-    findings = calculate_diff(
-        gn_package, bazel_package, args.size_check_blobs, size_check_mode
-    )
+    findings = calculate_diff(gn_package, bazel_package, size_check_mode)
 
     if len(findings) > 0:
         findings_string = "\n".join(findings) + "\n"
