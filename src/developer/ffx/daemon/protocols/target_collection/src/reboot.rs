@@ -113,9 +113,8 @@ impl RebootController {
                                 .ok_or_else(|| anyhow!("No fastboot address"))?
                                 .0
                                 .into();
-                            let target_name = self.target.nodename_str();
                             self.fastboot_connection_builder
-                                .build_interface(FastbootConnectionKind::Tcp(target_name, address))
+                                .build_interface(FastbootConnectionKind::Tcp(address))
                                 .await?
                         }
                         FastbootInterface::Udp => {
@@ -125,9 +124,8 @@ impl RebootController {
                                 .ok_or_else(|| anyhow!("No fastboot address"))?
                                 .0
                                 .into();
-                            let target_name = self.target.nodename_str();
                             self.fastboot_connection_builder
-                                .build_interface(FastbootConnectionKind::Udp(target_name, address))
+                                .build_interface(FastbootConnectionKind::Udp(address))
                                 .await?
                         }
                         FastbootInterface::Usb => {
@@ -167,9 +165,8 @@ impl RebootController {
                                 .ok_or_else(|| anyhow!("No fastboot address"))?
                                 .0
                                 .into();
-                            let target_name = self.target.nodename_str();
                             self.fastboot_connection_builder
-                                .build_interface(FastbootConnectionKind::Tcp(target_name, address))
+                                .build_interface(FastbootConnectionKind::Tcp(address))
                                 .await?
                         }
                         FastbootInterface::Udp => {
@@ -179,9 +176,8 @@ impl RebootController {
                                 .ok_or_else(|| anyhow!("No fastboot address"))?
                                 .0
                                 .into();
-                            let target_name = self.target.nodename_str();
                             self.fastboot_connection_builder
-                                .build_interface(FastbootConnectionKind::Udp(target_name, address))
+                                .build_interface(FastbootConnectionKind::Udp(address))
                                 .await?
                         }
                         FastbootInterface::Usb => {

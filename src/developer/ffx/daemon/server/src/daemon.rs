@@ -841,7 +841,7 @@ impl Daemon {
                         tracing::debug!("Starting graceful shutdown of daemon socket");
 
                         match std::fs::remove_file(self.socket_path.clone()) {
-                            Ok(()) => tracing::debug!("Removed socket file: {}", self.socket_path.clone().display()),
+                            Ok(()) => {}
                             Err(e) => tracing::error!("failed to remove socket file: {}", e),
                         }
 
