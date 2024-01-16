@@ -31,32 +31,32 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       }
     }
     void OnSourceElementStart(const raw::SourceElement& element) override {
-      ProcessGaps(element.start());
+      ProcessGaps(element.start_token);
       for (auto& callback : callbacks_.source_element_callbacks_) {
         callback(element);
       }
     }
     void OnSourceElementEnd(const raw::SourceElement& element) override {
-      ProcessGaps(element.end());
+      ProcessGaps(element.end_token);
     }
     void OnAliasDeclaration(const std::unique_ptr<raw::AliasDeclaration>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.alias_callbacks_) {
         callback(*element);
       }
       DeclarationOrderTreeVisitor::OnAliasDeclaration(element);
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnUsing(const std::unique_ptr<raw::Using>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.using_callbacks_) {
         callback(*element);
       }
       DeclarationOrderTreeVisitor::OnUsing(element);
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnConstDeclaration(const std::unique_ptr<raw::ConstDeclaration>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.const_declaration_callbacks_) {
         callback(*element);
       }
@@ -64,10 +64,10 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       for (auto& callback : callbacks_.exit_const_declaration_callbacks_) {
         callback(*element);
       }
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnProtocolDeclaration(const std::unique_ptr<raw::ProtocolDeclaration>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.protocol_declaration_callbacks_) {
         callback(*element);
       }
@@ -75,10 +75,10 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       for (auto& callback : callbacks_.exit_protocol_declaration_callbacks_) {
         callback(*element);
       }
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnProtocolMethod(const std::unique_ptr<raw::ProtocolMethod>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       if (element->maybe_request != nullptr) {
         for (auto& callback : callbacks_.method_callbacks_) {
           callback(*element);
@@ -89,7 +89,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
         }
       }
       DeclarationOrderTreeVisitor::OnProtocolMethod(element);
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnAttribute(const std::unique_ptr<raw::Attribute>& element) override {
       for (auto& callback : callbacks_.attribute_callbacks_) {
@@ -98,31 +98,31 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
     }
     void OnOrdinaledLayoutMember(
         const std::unique_ptr<raw::OrdinaledLayoutMember>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.ordinaled_layout_member_callbacks_) {
         callback(*element);
       }
       DeclarationOrderTreeVisitor::OnOrdinaledLayoutMember(element);
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnStructLayoutMember(const std::unique_ptr<raw::StructLayoutMember>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.struct_layout_member_callbacks_) {
         callback(*element);
       }
       DeclarationOrderTreeVisitor::OnStructLayoutMember(element);
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnValueLayoutMember(const std::unique_ptr<raw::ValueLayoutMember>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.value_layout_member_callbacks_) {
         callback(*element);
       }
       DeclarationOrderTreeVisitor::OnValueLayoutMember(element);
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnLayout(const std::unique_ptr<raw::Layout>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.layout_callbacks_) {
         callback(*element);
       }
@@ -130,10 +130,10 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       for (auto& callback : callbacks_.exit_layout_callbacks_) {
         callback(*element);
       }
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnTypeDeclaration(const std::unique_ptr<raw::TypeDeclaration>& element) override {
-      ProcessGaps(element->start());
+      ProcessGaps(element->start_token);
       for (auto& callback : callbacks_.type_decl_callbacks_) {
         callback(*element);
       }
@@ -141,7 +141,7 @@ LintingTreeCallbacks::LintingTreeCallbacks() {
       for (auto& callback : callbacks_.exit_type_decl_callbacks_) {
         callback(*element);
       }
-      ProcessGaps(element->end());
+      ProcessGaps(element->end_token);
     }
     void OnIdentifierLayoutParameter(
         const std::unique_ptr<raw::IdentifierLayoutParameter>& element) override {

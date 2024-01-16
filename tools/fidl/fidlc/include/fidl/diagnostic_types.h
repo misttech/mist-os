@@ -23,7 +23,7 @@ namespace fidl {
 
 // Forward decls
 namespace raw {
-class AttributeList;
+struct AttributeList;
 }  // namespace raw
 
 using ErrorId = uint32_t;

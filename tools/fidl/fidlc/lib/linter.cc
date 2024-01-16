@@ -78,22 +78,22 @@ std::string to_string(const std::unique_ptr<SourceElementSubtype>& element_ptr) 
 
 std::string name_layout_kind(const raw::Layout& layout) {
   switch (layout.kind) {
-    case raw::Layout::kBits: {
+    case raw::Layout::Kind::kBits: {
       return "bitfield";
     }
-    case raw::Layout::kEnum: {
+    case raw::Layout::Kind::kEnum: {
       return "enum";
     }
-    case raw::Layout::kStruct: {
+    case raw::Layout::Kind::kStruct: {
       return "struct";
     }
-    case raw::Layout::kTable: {
+    case raw::Layout::Kind::kTable: {
       return "table";
     }
-    case raw::Layout::kUnion: {
+    case raw::Layout::Kind::kUnion: {
       return "union";
     }
-    case raw::Layout::kOverlay: {
+    case raw::Layout::Kind::kOverlay: {
       return "overlay";
     }
   }
@@ -566,7 +566,7 @@ Linter::Linter()
        todo_regex = std::move(todo_regex)]
       //
       (const raw::Attribute& element) {
-        if (element.provenance == raw::Attribute::kDocComment) {
+        if (element.provenance == raw::Attribute::Provenance::kDocComment) {
           auto constant = static_cast<raw::LiteralConstant*>(element.args.front()->value.get());
           auto doc_comment = static_cast<raw::DocCommentLiteral*>(constant->literal.get());
           if (re2::RE2::PartialMatch(doc_comment->MakeContents(), *copyright_regex)) {
@@ -583,9 +583,9 @@ Linter::Linter()
       (const raw::TypeDeclaration& element) {
         auto* layout_ref = element.type_ctor->layout_ref.get();
 
-        // TODO(https://fxbug.dev/7807): Delete this check once new-types are supported. Instead, we should
-        // have new-type specific language to report the invalid naming case to the user.
-        if (layout_ref->kind == raw::LayoutReference::kNamed) {
+        // TODO(https://fxbug.dev/7807): Delete this check once new-types are supported. Instead, we
+        // should have new-type specific language to report the invalid naming case to the user.
+        if (layout_ref->kind == raw::LayoutReference::Kind::kNamed) {
           return;
         }
         auto* inline_layout = static_cast<raw::InlineLayoutReference*>(layout_ref);
@@ -682,7 +682,7 @@ Linter::Linter()
           vector_bounds_check = vector_bounds_not_specified]
           //
           (const raw::TypeConstructor& element) {
-        if (element.layout_ref->kind != raw::LayoutReference::kNamed)
+        if (element.layout_ref->kind != raw::LayoutReference::Kind::kNamed)
           return;
         const auto as_named = static_cast<raw::NamedLayoutReference*>(element.layout_ref.get());
 

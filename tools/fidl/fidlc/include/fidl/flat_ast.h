@@ -40,8 +40,8 @@ class VirtualSourceFile;
 
 namespace fidl::raw {
 
-class Identifier;
-class Ordinal64;
+struct Identifier;
+struct Ordinal64;
 
 }  // namespace fidl::raw
 

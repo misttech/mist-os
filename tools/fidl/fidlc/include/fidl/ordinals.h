@@ -12,8 +12,8 @@
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 
 namespace fidl::raw {
-class Ordinal64;
-class SourceElement;
+struct Ordinal64;
+struct SourceElement;
 }  // namespace fidl::raw
 
 namespace fidl::flat {

@@ -157,16 +157,16 @@ class SourceSpanVisitor : public fidl::raw::TreeVisitor {
   }
   void OnLayout(const std::unique_ptr<fidl::raw::Layout>& element) override {
     switch (element->kind) {
-      case fidl::raw::Layout::kBits:
-      case fidl::raw::Layout::kEnum:
+      case fidl::raw::Layout::Kind::kBits:
+      case fidl::raw::Layout::Kind::kEnum:
         CheckSpanOfType(ElementType::kValueLayout, *element);
         break;
-      case fidl::raw::Layout::kStruct:
+      case fidl::raw::Layout::Kind::kStruct:
         CheckSpanOfType(ElementType::kStructLayout, *element);
         break;
-      case fidl::raw::Layout::kTable:
-      case fidl::raw::Layout::kOverlay:
-      case fidl::raw::Layout::kUnion:
+      case fidl::raw::Layout::Kind::kTable:
+      case fidl::raw::Layout::Kind::kOverlay:
+      case fidl::raw::Layout::Kind::kUnion:
         CheckSpanOfType(ElementType::kOrdinaledLayout, *element);
         break;
     }

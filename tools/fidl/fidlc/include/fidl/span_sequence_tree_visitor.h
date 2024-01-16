@@ -197,7 +197,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
     // Use these constructors when the entire SourceElement will be ingested by the SpanBuilder.
     SpanBuilder(SpanSequenceTreeVisitor* ftv, const raw::SourceElement& element,
                 SpanSequence::Position position = SpanSequence::Position::kDefault)
-        : Builder<T>(ftv, element.start(), element.end(), true), position_(position) {}
+        : Builder<T>(ftv, element.start_token, element.end_token, true), position_(position) {}
     SpanBuilder(SpanSequenceTreeVisitor* ftv, const Token& start, const Token& end,
                 SpanSequence::Position position = SpanSequence::Position::kDefault)
         : Builder<T>(ftv, start, end, true), position_(position) {}
@@ -243,7 +243,7 @@ class SpanSequenceTreeVisitor : public raw::DeclarationOrderTreeVisitor {
     // Use this constructor when the entire SourceElement will be ingested by the StatementBuilder.
     StatementBuilder(SpanSequenceTreeVisitor* ftv, const raw::SourceElement& element,
                      SpanSequence::Position position = SpanSequence::Position::kDefault)
-        : Builder<T>(ftv, element.start(), element.end(), true), position_(position) {}
+        : Builder<T>(ftv, element.start_token, element.end_token, true), position_(position) {}
     StatementBuilder(SpanSequenceTreeVisitor* ftv, const Token& start, const Token& end,
                      SpanSequence::Position position = SpanSequence::Position::kDefault)
         : Builder<T>(ftv, start, end, true), position_(position) {}

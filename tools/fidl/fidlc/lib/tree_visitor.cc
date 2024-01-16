@@ -38,30 +38,30 @@ void DeclarationOrderTreeVisitor::OnFile(const std::unique_ptr<File>& element) {
     // of declaration, so we put them in a map keyed by source position.
     m.clear();
     if (alias_decls_it != element->alias_list.end()) {
-      m[(*alias_decls_it)->start().ptr()] = kAlias;
+      m[(*alias_decls_it)->start_token.ptr()] = kAlias;
     }
     if (const_decls_it != element->const_declaration_list.end()) {
-      m[(*const_decls_it)->start().ptr()] = kConst;
+      m[(*const_decls_it)->start_token.ptr()] = kConst;
     }
     if (protocol_decls_it != element->protocol_declaration_list.end()) {
       if (*protocol_decls_it == nullptr) {
         // Used to indicate empty, so let's wind it forward.
         protocol_decls_it = element->protocol_declaration_list.end();
       } else {
-        m[(*protocol_decls_it)->start().ptr()] = kProtocol;
+        m[(*protocol_decls_it)->start_token.ptr()] = kProtocol;
       }
     }
     if (resource_decls_it != element->resource_declaration_list.end()) {
-      m[(*resource_decls_it)->start().ptr()] = kResource;
+      m[(*resource_decls_it)->start_token.ptr()] = kResource;
     }
     if (service_decls_it != element->service_declaration_list.end()) {
-      m[(*service_decls_it)->start().ptr()] = kService;
+      m[(*service_decls_it)->start_token.ptr()] = kService;
     }
     if (type_decls_it != element->type_decls.end()) {
-      m[(*type_decls_it)->start().ptr()] = kTypeDecl;
+      m[(*type_decls_it)->start_token.ptr()] = kTypeDecl;
     }
     if (using_decls_it != element->using_list.end()) {
-      m[(*using_decls_it)->start().ptr()] = kUsing;
+      m[(*using_decls_it)->start_token.ptr()] = kUsing;
     }
     if (m.empty())
       break;
@@ -122,10 +122,10 @@ void DeclarationOrderTreeVisitor::OnProtocolDeclaration(
     // Sort in declaration order.
     m.clear();
     if (compose_it != element->composed_protocols.end()) {
-      m[(*compose_it)->start().ptr()] = kCompose;
+      m[(*compose_it)->start_token.ptr()] = kCompose;
     }
     if (methods_it != element->methods.end()) {
-      m[(*methods_it)->start().ptr()] = kMethod;
+      m[(*methods_it)->start_token.ptr()] = kMethod;
     }
     if (m.empty())
       return;
