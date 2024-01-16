@@ -104,7 +104,7 @@ where
             }
             DeviceId::Ethernet(eth) => eth,
         };
-        crate::device::integration::with_ethernet_state(
+        crate::device::integration::with_device_state(
             &mut CoreCtx::new_deprecated(core_ctx),
             eth,
             |mut state| {
@@ -154,7 +154,7 @@ pub fn get_device_configuration<BC: BindingsContext>(
 ) -> DeviceConfiguration {
     match device_id {
         DeviceId::Loopback(_) => DeviceConfiguration { arp: None, ndp: None },
-        DeviceId::Ethernet(eth) => crate::device::integration::with_ethernet_state(
+        DeviceId::Ethernet(eth) => crate::device::integration::with_device_state(
             &mut CoreCtx::new_deprecated(core_ctx),
             eth,
             |mut state| {

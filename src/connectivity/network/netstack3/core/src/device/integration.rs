@@ -26,14 +26,14 @@ use crate::{
         ethernet::{
             self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
         },
-        loopback::{self, LoopbackDevice, LoopbackDeviceId},
+        loopback::{self, LoopbackDeviceId},
         queue::tx::TransmitQueueHandler,
         socket,
-        state::IpLinkDeviceState,
-        AnyDevice, DeviceCounters, DeviceId, DeviceIdContext, DeviceLayerEventDispatcher,
-        DeviceLayerState, DeviceLayerTypes, Devices, DevicesIter, EthernetDeviceId,
-        EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr, OriginTracker, RecvIpFrameMeta,
-        WeakDeviceId,
+        state::{DeviceStateSpec, IpLinkDeviceState},
+        AnyDevice, BaseDeviceId, DeviceCounters, DeviceId, DeviceIdContext,
+        DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices, DevicesIter,
+        EthernetDeviceId, EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr, OriginTracker,
+        RecvIpFrameMeta, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     ip::device::{
@@ -931,63 +931,31 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>
     }
 }
 
-pub(crate) fn with_ethernet_state_and_core_ctx<
+pub(crate) fn with_device_state<
     BC: BindingsContext,
     O,
-    F: FnOnce(CoreCtxAndResource<'_, BC, IpLinkDeviceState<EthernetLinkDevice, BC>, L>) -> O,
+    F: FnOnce(Locked<&'_ IpLinkDeviceState<D, BC>, L>) -> O,
     L,
+    D: DeviceStateSpec,
 >(
     core_ctx: &mut CoreCtx<'_, BC, L>,
-    id: &EthernetDeviceId<BC>,
+    device_id: &BaseDeviceId<D, BC>,
     cb: F,
 ) -> O {
-    let state = id.device_state();
-    // Make sure that the pointer belongs to this `sync_ctx`.
-    assert_eq!(
-        *core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>(),
-        state.origin
-    );
-    cb(core_ctx.adopt(state))
-}
-
-pub(crate) fn with_ethernet_state<
-    BC: BindingsContext,
-    O,
-    F: FnOnce(Locked<&IpLinkDeviceState<EthernetLinkDevice, BC>, L>) -> O,
-    L,
->(
-    core_ctx: &mut CoreCtx<'_, BC, L>,
-    device_id: &EthernetDeviceId<BC>,
-    cb: F,
-) -> O {
-    with_ethernet_state_and_core_ctx(core_ctx, device_id, |mut core_ctx_and_resource| {
+    with_device_state_and_core_ctx(core_ctx, device_id, |mut core_ctx_and_resource| {
         cb(core_ctx_and_resource.cast_resource())
     })
 }
 
-pub(crate) fn with_loopback_state<
+pub(crate) fn with_device_state_and_core_ctx<
     BC: BindingsContext,
     O,
-    F: FnOnce(Locked<&'_ IpLinkDeviceState<LoopbackDevice, BC>, L>) -> O,
+    F: FnOnce(CoreCtxAndResource<'_, BC, IpLinkDeviceState<D, BC>, L>) -> O,
     L,
+    D: DeviceStateSpec,
 >(
     core_ctx: &mut CoreCtx<'_, BC, L>,
-    device_id: &LoopbackDeviceId<BC>,
-    cb: F,
-) -> O {
-    with_loopback_state_and_core_ctx(core_ctx, device_id, |mut core_ctx_and_resource| {
-        cb(core_ctx_and_resource.cast_resource())
-    })
-}
-
-pub(crate) fn with_loopback_state_and_core_ctx<
-    BC: BindingsContext,
-    O,
-    F: FnOnce(CoreCtxAndResource<'_, BC, IpLinkDeviceState<LoopbackDevice, BC>, L>) -> O,
-    L,
->(
-    core_ctx: &mut CoreCtx<'_, BC, L>,
-    id: &LoopbackDeviceId<BC>,
+    id: &BaseDeviceId<D, BC>,
     cb: F,
 ) -> O {
     let state = id.device_state();
@@ -1010,8 +978,8 @@ pub(crate) fn with_ip_device_state<
     cb: F,
 ) -> O {
     match device {
-        DeviceId::Ethernet(id) => with_ethernet_state(core_ctx, id, |mut state| cb(state.cast())),
-        DeviceId::Loopback(id) => with_loopback_state(core_ctx, id, |mut state| cb(state.cast())),
+        DeviceId::Ethernet(id) => with_device_state(core_ctx, id, |mut state| cb(state.cast())),
+        DeviceId::Loopback(id) => with_device_state(core_ctx, id, |mut state| cb(state.cast())),
     }
 }
 
@@ -1027,12 +995,12 @@ pub(crate) fn with_ip_device_state_and_core_ctx<
 ) -> O {
     match device {
         DeviceId::Ethernet(id) => {
-            with_ethernet_state_and_core_ctx(core_ctx, id, |mut core_ctx_and_resource| {
+            with_device_state_and_core_ctx(core_ctx, id, |mut core_ctx_and_resource| {
                 cb(core_ctx_and_resource.cast_right(|r| r.as_ref()))
             })
         }
         DeviceId::Loopback(id) => {
-            with_loopback_state_and_core_ctx(core_ctx, id, |mut core_ctx_and_resource| {
+            with_device_state_and_core_ctx(core_ctx, id, |mut core_ctx_and_resource| {
                 cb(core_ctx_and_resource.cast_right(|r| r.as_ref()))
             })
         }

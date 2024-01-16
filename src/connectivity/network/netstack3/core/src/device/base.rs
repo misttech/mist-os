@@ -208,7 +208,7 @@ where
     let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     for device in device_ids {
         let id = device.clone();
-        integration::with_ethernet_state(&mut core_ctx, &id, |mut device_state| {
+        integration::with_device_state(&mut core_ctx, &id, |mut device_state| {
             let (arp, mut device_state) =
                 device_state.lock_and::<crate::lock_ordering::EthernetIpv4Arp>();
             let nud = device_state.lock::<crate::lock_ordering::EthernetIpv6Nud>();

@@ -958,7 +958,7 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
         cb: F,
     ) -> R {
         match device {
-            DeviceId::Ethernet(device) => device::integration::with_ethernet_state_and_core_ctx(
+            DeviceId::Ethernet(device) => device::integration::with_device_state_and_core_ctx(
                 self,
                 device,
                 |mut core_ctx_and_resource| {
@@ -969,7 +969,7 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
                     cb(&*device_sockets, &mut locked.cast_core_ctx())
                 },
             ),
-            DeviceId::Loopback(device) => device::integration::with_loopback_state_and_core_ctx(
+            DeviceId::Loopback(device) => device::integration::with_device_state_and_core_ctx(
                 self,
                 device,
                 |mut core_ctx_and_resource| {
@@ -992,7 +992,7 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
         cb: F,
     ) -> R {
         match device {
-            DeviceId::Ethernet(device) => device::integration::with_ethernet_state_and_core_ctx(
+            DeviceId::Ethernet(device) => device::integration::with_device_state_and_core_ctx(
                 self,
                 device,
                 |mut core_ctx_and_resource| {
@@ -1003,7 +1003,7 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
                     cb(&mut *device_sockets, &mut locked.cast_core_ctx())
                 },
             ),
-            DeviceId::Loopback(device) => device::integration::with_loopback_state_and_core_ctx(
+            DeviceId::Loopback(device) => device::integration::with_device_state_and_core_ctx(
                 self,
                 device,
                 |mut core_ctx_and_resource| {

@@ -133,7 +133,7 @@ impl<BC: BindingsContext, L> EthernetIpLinkDeviceStaticStateContext for CoreCtx<
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state(self, device_id, |state| {
+        device::integration::with_device_state(self, device_id, |state| {
             cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>())
         })
     }
@@ -150,7 +150,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDyna
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state(self, device_id, |mut state| {
+        device::integration::with_device_state(self, device_id, |mut state| {
             let (dynamic_state, locked) =
                 state.read_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
             cb(
@@ -168,7 +168,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDyna
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state(self, device_id, |mut state| {
+        device::integration::with_device_state(self, device_id, |mut state| {
             let (mut dynamic_state, locked) =
                 state.write_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
             cb(
@@ -207,7 +207,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_core_ctx(
+        device::integration::with_device_state_and_core_ctx(
             self,
             device_id,
             |mut core_ctx_and_resource| {
@@ -232,7 +232,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_core_ctx(
+        device::integration::with_device_state_and_core_ctx(
             self,
             device_id,
             |mut core_ctx_and_resource| {
@@ -300,7 +300,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceLear
 {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         let Self { device_id, core_ctx } = self;
-        device::integration::with_ethernet_state(core_ctx, device_id, |mut state| {
+        device::integration::with_device_state(core_ctx, device_id, |mut state| {
             let mut state = state.cast();
             let x = state
                 .read_lock::<crate::lock_ordering::Ipv6DeviceLearnedParams>()
@@ -311,7 +311,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::Ipv6DeviceLear
 
     fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
         let Self { device_id, core_ctx } = self;
-        device::integration::with_ethernet_state(core_ctx, device_id, |mut state| {
+        device::integration::with_device_state(core_ctx, device_id, |mut state| {
             let x = state.read_lock::<crate::lock_ordering::NudConfig<Ipv6>>();
             cb(&*x)
         })
@@ -726,7 +726,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state(self, device_id, |mut state| {
+        device::integration::with_device_state(self, device_id, |mut state| {
             let mut x = state.lock::<crate::lock_ordering::EthernetTxQueue>();
             cb(&mut x)
         })
@@ -760,7 +760,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_core_ctx(
+        device::integration::with_device_state_and_core_ctx(
             self,
             device_id,
             |mut core_ctx_and_resource| {
@@ -1212,7 +1212,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_core_ctx(
+        device::integration::with_device_state_and_core_ctx(
             self,
             device_id,
             |mut core_ctx_and_resource| {
@@ -1231,7 +1231,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         _bindings_ctx: &mut BC,
         device_id: &EthernetDeviceId<BC>,
     ) -> Option<Ipv4Addr> {
-        device::integration::with_ethernet_state(self, device_id, |mut state| {
+        device::integration::with_device_state(self, device_id, |mut state| {
             let mut state = state.cast();
             let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
             let x = ipv4.iter().next().map(|addr| addr.addr().get());
@@ -1258,7 +1258,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         device_id: &EthernetDeviceId<BC>,
         cb: F,
     ) -> O {
-        device::integration::with_ethernet_state_and_core_ctx(
+        device::integration::with_device_state_and_core_ctx(
             self,
             device_id,
             |mut core_ctx_and_resource| {
@@ -1278,7 +1278,7 @@ impl<'a, BC: BindingsContext, L: LockBefore<crate::lock_ordering::NudConfig<Ipv4
 {
     fn with_nud_user_config<O, F: FnOnce(&NudUserConfig) -> O>(&mut self, cb: F) -> O {
         let Self { device_id, core_ctx } = self;
-        device::integration::with_ethernet_state(core_ctx, device_id, |mut state| {
+        device::integration::with_device_state(core_ctx, device_id, |mut state| {
             let x = state.read_lock::<crate::lock_ordering::NudConfig<Ipv4>>();
             cb(&*x)
         })
