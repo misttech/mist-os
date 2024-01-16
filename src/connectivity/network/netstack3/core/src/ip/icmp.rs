@@ -494,6 +494,8 @@ impl<
         original_packet: B,
         Icmpv4Error { kind, header_len }: Icmpv4Error,
     ) {
+        let src_ip = SocketIpAddr::new_ipv4_specified(src_ip);
+        let dst_ip = SocketIpAddr::new_ipv4_specified(dst_ip);
         match kind {
             Icmpv4ErrorKind::ParameterProblem { code, pointer, fragment_type } => {
                 send_icmpv4_parameter_problem(
@@ -575,6 +577,21 @@ impl<
         original_packet: B,
         error: Icmpv6ErrorKind,
     ) {
+        let src_ip: SocketIpAddr<Ipv6Addr> = match src_ip.into_specified().try_into() {
+            Ok(addr) => addr,
+            Err(AddrIsMappedError {}) => {
+                trace!("send_icmpv6_error_message: src_ip is mapped");
+                return;
+            }
+        };
+        let dst_ip: SocketIpAddr<Ipv6Addr> = match dst_ip.try_into() {
+            Ok(addr) => addr,
+            Err(AddrIsMappedError {}) => {
+                trace!("send_icmpv6_error_message: dst_ip is mapped");
+                return;
+            }
+        };
+
         match error {
             Icmpv6ErrorKind::ParameterProblem { code, pointer, allow_dst_multicast } => {
                 send_icmpv6_parameter_problem(
@@ -978,7 +995,7 @@ impl<
                         bindings_ctx,
                         Some(device),
                         SocketIpAddr::new_ipv4_specified(remote_ip),
-                        local_ip,
+                        SocketIpAddr::new_ipv4_specified(local_ip),
                         |src_ip| {
                             buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                                 src_ip,
@@ -1045,7 +1062,7 @@ impl<
                             bindings_ctx,
                             Some(device),
                             SocketIpAddr::new_ipv4_specified(remote_ip),
-                            local_ip,
+                            SocketIpAddr::new_ipv4_specified(local_ip),
                             |src_ip| {
                                 buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                                     src_ip,
@@ -1765,26 +1782,33 @@ impl<
                 });
 
                 if let Some(src_ip) = SocketIpAddr::new_from_ipv6_source(src_ip) {
-                    let req = *echo_request.message();
-                    let code = echo_request.code();
-                    let (local_ip, remote_ip) = (dst_ip, src_ip);
-                    // TODO(joshlf): Do something if send_icmp_reply returns an
-                    // error?
-                    let _ = send_icmp_reply(
-                        core_ctx,
-                        bindings_ctx,
-                        Some(device),
-                        remote_ip,
-                        local_ip,
-                        |src_ip| {
-                            buffer.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
-                                src_ip,
-                                remote_ip.addr(),
-                                code,
-                                req.reply(),
-                            ))
-                        },
-                    );
+                    match SocketIpAddr::try_from(dst_ip) {
+                        Ok(dst_ip) => {
+                            let req = *echo_request.message();
+                            let code = echo_request.code();
+                            let (local_ip, remote_ip) = (dst_ip, src_ip);
+                            // TODO(joshlf): Do something if send_icmp_reply returns an
+                            // error?
+                            let _ = send_icmp_reply(
+                                core_ctx,
+                                bindings_ctx,
+                                Some(device),
+                                remote_ip,
+                                local_ip,
+                                |src_ip| {
+                                    buffer.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+                                        src_ip,
+                                        remote_ip.addr(),
+                                        code,
+                                        req.reply(),
+                                    ))
+                                },
+                            );
+                        }
+                        Err(AddrIsMappedError {}) => {
+                            trace!("IpTransportContext<Ipv6>::receive_ip_packet: Received echo request with an ipv4-mapped-ipv6 destination address");
+                        }
+                    }
                 } else {
                     trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received echo request with an unspecified source address");
                 }
@@ -1893,7 +1917,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     bindings_ctx: &mut BC,
     device: Option<&CC::DeviceId>,
     original_src_ip: SocketIpAddr<I::Addr>,
-    original_dst_ip: SpecifiedAddr<I::Addr>,
+    original_dst_ip: SocketIpAddr<I::Addr>,
     get_body_from_src_ip: F,
 ) where
     I: crate::ip::IpExt,
@@ -1907,18 +1931,6 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     core_ctx.with_counters(|counters| {
         counters.reply.increment();
     });
-
-    // TODO(https://fxbug.dev/132092): Plumb `SocketIpAddr` throughout the ICMP
-    // implementation, so that this error is surfaced earlier in the packet
-    // processing pipeline.
-    let original_dst_ip = match original_dst_ip.try_into() {
-        Ok(addr) => addr,
-        Err(AddrIsMappedError {}) => {
-            trace!("send_icmpv6_error_message: original_dst_ip is mapped");
-            return;
-        }
-    };
-
     core_ctx
         .send_oneshot_ip_packet(
             bindings_ctx,
@@ -2049,8 +2061,8 @@ pub(crate) fn send_icmpv4_protocol_unreachable<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: SpecifiedAddr<Ipv4Addr>,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    src_ip: SocketIpAddr<Ipv4Addr>,
+    dst_ip: SocketIpAddr<Ipv4Addr>,
     original_packet: B,
     header_len: usize,
 ) {
@@ -2095,8 +2107,8 @@ pub(crate) fn send_icmpv6_protocol_unreachable<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: UnicastAddr<Ipv6Addr>,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
+    src_ip: SocketIpAddr<Ipv6Addr>,
+    dst_ip: SocketIpAddr<Ipv6Addr>,
     original_packet: B,
     header_len: usize,
 ) {
@@ -2151,8 +2163,8 @@ pub(crate) fn send_icmpv4_port_unreachable<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: SpecifiedAddr<Ipv4Addr>,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    src_ip: SocketIpAddr<Ipv4Addr>,
+    dst_ip: SocketIpAddr<Ipv4Addr>,
     original_packet: B,
     header_len: usize,
 ) {
@@ -2196,8 +2208,8 @@ pub(crate) fn send_icmpv6_port_unreachable<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: UnicastAddr<Ipv6Addr>,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
+    src_ip: SocketIpAddr<Ipv6Addr>,
+    dst_ip: SocketIpAddr<Ipv6Addr>,
     original_packet: B,
 ) {
     core_ctx.with_counters(|counters| {
@@ -2236,8 +2248,8 @@ pub(crate) fn send_icmpv4_net_unreachable<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: SpecifiedAddr<Ipv4Addr>,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    src_ip: SocketIpAddr<Ipv4Addr>,
+    dst_ip: SocketIpAddr<Ipv4Addr>,
     proto: Ipv4Proto,
     original_packet: B,
     header_len: usize,
@@ -2286,8 +2298,8 @@ pub(crate) fn send_icmpv6_net_unreachable<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: UnicastAddr<Ipv6Addr>,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
+    src_ip: SocketIpAddr<Ipv6Addr>,
+    dst_ip: SocketIpAddr<Ipv6Addr>,
     proto: Ipv6Proto,
     original_packet: B,
     header_len: usize,
@@ -2334,8 +2346,8 @@ pub(crate) fn send_icmpv4_ttl_expired<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: SpecifiedAddr<Ipv4Addr>,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    src_ip: SocketIpAddr<Ipv4Addr>,
+    dst_ip: SocketIpAddr<Ipv4Addr>,
     proto: Ipv4Proto,
     original_packet: B,
     header_len: usize,
@@ -2385,8 +2397,8 @@ pub(crate) fn send_icmpv6_ttl_expired<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: UnicastAddr<Ipv6Addr>,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
+    src_ip: SocketIpAddr<Ipv6Addr>,
+    dst_ip: SocketIpAddr<Ipv6Addr>,
     proto: Ipv6Proto,
     original_packet: B,
     header_len: usize,
@@ -2433,8 +2445,8 @@ pub(crate) fn send_icmpv6_packet_too_big<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: UnicastAddr<Ipv6Addr>,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
+    src_ip: SocketIpAddr<Ipv6Addr>,
+    dst_ip: SocketIpAddr<Ipv6Addr>,
     proto: Ipv6Proto,
     mtu: Mtu,
     original_packet: B,
@@ -2490,8 +2502,8 @@ pub(crate) fn send_icmpv4_parameter_problem<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: SpecifiedAddr<Ipv4Addr>,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    src_ip: SocketIpAddr<Ipv4Addr>,
+    dst_ip: SocketIpAddr<Ipv4Addr>,
     code: Icmpv4ParameterProblemCode,
     parameter_problem: Icmpv4ParameterProblem,
     original_packet: B,
@@ -2536,8 +2548,8 @@ pub(crate) fn send_icmpv6_parameter_problem<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: UnicastAddr<Ipv6Addr>,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
+    src_ip: SocketIpAddr<Ipv6Addr>,
+    dst_ip: SocketIpAddr<Ipv6Addr>,
     code: Icmpv6ParameterProblemCode,
     parameter_problem: Icmpv6ParameterProblem,
     original_packet: B,
@@ -2576,8 +2588,8 @@ fn send_icmpv4_dest_unreachable<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: SpecifiedAddr<Ipv4Addr>,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    src_ip: SocketIpAddr<Ipv4Addr>,
+    dst_ip: SocketIpAddr<Ipv4Addr>,
     code: Icmpv4DestUnreachableCode,
     original_packet: B,
     header_len: usize,
@@ -2610,8 +2622,8 @@ fn send_icmpv6_dest_unreachable<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    src_ip: UnicastAddr<Ipv6Addr>,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
+    src_ip: SocketIpAddr<Ipv6Addr>,
+    dst_ip: SocketIpAddr<Ipv6Addr>,
     code: Icmpv6DestUnreachableCode,
     original_packet: B,
 ) {
@@ -2639,8 +2651,8 @@ fn send_icmpv4_error_message<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    original_src_ip: SpecifiedAddr<Ipv4Addr>,
-    original_dst_ip: SpecifiedAddr<Ipv4Addr>,
+    original_src_ip: SocketIpAddr<Ipv4Addr>,
+    original_dst_ip: SocketIpAddr<Ipv4Addr>,
     code: M::Code,
     message: M,
     mut original_packet: B,
@@ -2650,20 +2662,14 @@ fn send_icmpv4_error_message<
     // TODO(https://fxbug.dev/95827): Come up with rules for when to send ICMP
     // error messages.
 
-    if !should_send_icmpv4_error(frame_dst, original_src_ip, original_dst_ip, fragment_type) {
+    if !should_send_icmpv4_error(
+        frame_dst,
+        original_src_ip.into(),
+        original_dst_ip.into(),
+        fragment_type,
+    ) {
         return;
     }
-
-    // TODO(https://fxbug.dev/132092): Plumb `SocketIpAddr` throughout the ICMP
-    // implementation, so that this error is surfaced earlier in the packet
-    // processing pipeline.
-    let original_src_ip = match original_src_ip.try_into() {
-        Ok(addr) => addr,
-        Err(AddrIsMappedError {}) => {
-            trace!("send_icmpv6_error_message: original_src_ip is mapped");
-            return;
-        }
-    };
 
     // Per RFC 792, body contains entire IPv4 header + 64 bytes of original
     // body.
@@ -2704,8 +2710,8 @@ fn send_icmpv6_error_message<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: FrameDestination,
-    original_src_ip: UnicastAddr<Ipv6Addr>,
-    original_dst_ip: SpecifiedAddr<Ipv6Addr>,
+    original_src_ip: SocketIpAddr<Ipv6Addr>,
+    original_dst_ip: SocketIpAddr<Ipv6Addr>,
     code: M::Code,
     message: M,
     original_packet: B,
@@ -2714,21 +2720,14 @@ fn send_icmpv6_error_message<
     // TODO(https://fxbug.dev/95827): Come up with rules for when to send ICMP
     // error messages.
 
-    let original_src_ip = original_src_ip.into_specified();
-    if !should_send_icmpv6_error(frame_dst, original_src_ip, original_dst_ip, allow_dst_multicast) {
+    if !should_send_icmpv6_error(
+        frame_dst,
+        original_src_ip.into(),
+        original_dst_ip.into(),
+        allow_dst_multicast,
+    ) {
         return;
     }
-
-    // TODO(https://fxbug.dev/132092): Plumb `SocketIpAddr` throughout the ICMP
-    // implementation, so that this error is surfaced earlier in the packet
-    // processing pipeline.
-    let original_src_ip = match original_src_ip.try_into() {
-        Ok(addr) => addr,
-        Err(AddrIsMappedError {}) => {
-            trace!("send_icmpv6_error_message: original_src_ip is mapped");
-            return;
-        }
-    };
 
     // TODO(https://fxbug.dev/95828): Improve source address selection for ICMP
     // errors sent from unnumbered/router interfaces.
@@ -4717,8 +4716,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
-                FAKE_CONFIG_V4.remote_ip,
-                FAKE_CONFIG_V4.local_ip,
+                FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
+                FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
                 Buf::new(&mut [], ..),
                 0,
@@ -4735,8 +4734,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
-                FAKE_CONFIG_V4.remote_ip,
-                FAKE_CONFIG_V4.local_ip,
+                FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
+                FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
                 Icmpv4ParameterProblemCode::PointerIndicatesError,
                 Icmpv4ParameterProblem::new(0),
                 Buf::new(&mut [], ..),
@@ -4754,8 +4753,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
-                FAKE_CONFIG_V4.remote_ip,
-                FAKE_CONFIG_V4.local_ip,
+                FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
+                FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
                 Icmpv4DestUnreachableCode::DestNetworkUnreachable,
                 Buf::new(&mut [], ..),
                 0,
@@ -4772,8 +4771,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
-                UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
-                FAKE_CONFIG_V6.local_ip,
+                FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
+                FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
                 Buf::new(&mut [], ..),
                 0,
@@ -4789,8 +4788,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
-                UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
-                FAKE_CONFIG_V6.local_ip,
+                FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
+                FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
                 Mtu::new(0),
                 Buf::new(&mut [], ..),
@@ -4807,8 +4806,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
-                UnicastAddr::new(*FAKE_CONFIG_V6.remote_ip).expect("unicast source address"),
-                FAKE_CONFIG_V6.local_ip,
+                FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
+                FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
                 Icmpv6ParameterProblemCode::ErroneousHeaderField,
                 Icmpv6ParameterProblem::new(0),
                 Buf::new(&mut [], ..),
@@ -4825,8 +4824,8 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 FrameDestination::Individual { local: true },
-                UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
-                FAKE_CONFIG_V6.local_ip,
+                FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
+                FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
                 Icmpv6DestUnreachableCode::NoRoute,
                 Buf::new(&mut [], ..),
             );
