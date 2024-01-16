@@ -4,19 +4,17 @@
 
 // On x86_64, an atomic load is just a load.
 
+// Ref: https://godbolt.org/z/WWcreMrd4
+
 .globl atomic_load_u32_relaxed
 .globl atomic_load_u32_relaxed_end
 .globl atomic_load_u32_acquire
 .globl atomic_load_u32_acquire_end
 
 atomic_load_u32_relaxed:
-    movl (%rdi), %eax
-    retq
-atomic_load_u32_relaxed_end:
-    int3
-
 atomic_load_u32_acquire:
     movl (%rdi), %eax
     retq
+atomic_load_u32_relaxed_end:
 atomic_load_u32_acquire_end:
     int3

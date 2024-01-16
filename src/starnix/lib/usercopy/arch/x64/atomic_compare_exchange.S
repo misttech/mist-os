@@ -4,6 +4,8 @@
 
 // On x86_64, strong and weak compare_exchange operations with acquire/release semantics have the same implementation.
 
+// Ref: https://godbolt.org/z/WWcreMrd4
+
 .globl atomic_compare_exchange_u32_acq_rel
 .globl atomic_compare_exchange_u32_acq_rel_end
 .globl atomic_compare_exchange_weak_u32_acq_rel

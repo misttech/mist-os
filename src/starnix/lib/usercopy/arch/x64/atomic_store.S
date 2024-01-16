@@ -4,23 +4,19 @@
 
 // On x86_64, an atomic store (with released or relaxed memory order) is just a store.
 
+// Ref: https://godbolt.org/z/WWcreMrd4
+
 .globl atomic_store_u32_relaxed
 .globl atomic_store_u32_relaxed_end
 .globl atomic_store_u32_release
 .globl atomic_store_u32_release_end
 
 atomic_store_u32_relaxed:
-    movl %esi, (%rdi)
-    // Success!
-    xorl %eax, %eax
-    retq
-atomic_store_u32_relaxed_end:
-    int3
-
 atomic_store_u32_release:
     movl %esi, (%rdi)
     // Success!
     xorl %eax, %eax
     retq
+atomic_store_u32_relaxed_end:
 atomic_store_u32_release_end:
     int3
