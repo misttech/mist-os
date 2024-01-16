@@ -30,9 +30,11 @@ last 24 hours, so submission often doesn't need to wait for checks to rerun.
 
 ### How long does it take for auto-submit to submit my change? {#latency}
 
-Auto-submit is implemented as a cron job that runs every 10 minutes, so it may
-take up to 10 minutes for **Commit-Queue +2** to be applied to your change after
-being approved.
+Auto-submit will typically apply **Commit-Queue +2** to your change within 30
+seconds of it being approved, but it may take up to 2 minutes.
+
+Auto-submit is implemented as a job that polls Gerrit for submittable changes
+every 30 seconds, but there may be occasional delays when the job restarts.
 
 ### How do I tell if a change has auto-submit enabled?
 
