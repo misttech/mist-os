@@ -16,8 +16,6 @@
 #include <bitset>
 #include <optional>
 
-#include <fbl/macros.h>
-
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 
@@ -35,6 +33,12 @@ class Interrupts {
 
   Interrupts();
   ~Interrupts();
+
+  // Copying and moving are not allowed.
+  Interrupts(const Interrupts&) = delete;
+  Interrupts& operator=(const Interrupts&) = delete;
+  Interrupts(Interrupts&&) = delete;
+  Interrupts& operator=(Interrupts&&) = delete;
 
   // The lifetimes of |dev|, |pci|, and |mmio_space| must outlast the initialized Interrupts
   // instance.
@@ -86,8 +90,6 @@ class Interrupts {
 
   intel_gpu_core_interrupt_t gpu_interrupt_callback_ __TA_GUARDED(lock_) = {};
   uint32_t gpu_interrupt_mask_ __TA_GUARDED(lock_) = 0;
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(Interrupts);
 };
 
 }  // namespace i915

@@ -9,8 +9,6 @@
 
 #include <unordered_map>
 
-#include <fbl/macros.h>
-
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 
@@ -55,22 +53,31 @@ class PowerWellRef {
  public:
   PowerWellRef();
   ~PowerWellRef();
-  PowerWellRef(PowerWellRef&& o);
-  PowerWellRef& operator=(PowerWellRef&& o);
 
   PowerWellRef(Power* power, PowerWellId power_well);
+
+  // Copying is not allowed.
+  PowerWellRef(const PowerWellRef&) = delete;
+  PowerWellRef& operator=(const PowerWellRef&) = delete;
+
+  PowerWellRef(PowerWellRef&& o);
+  PowerWellRef& operator=(PowerWellRef&& o);
 
  private:
   Power* power_ = nullptr;
   PowerWellId power_well_;
-
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(PowerWellRef);
 };
 
 class Power {
  public:
   explicit Power(fdf::MmioBuffer* mmio_space, const PowerWellInfoMap* power_well_info);
   virtual ~Power() = default;
+
+  // Copying and moving are not allowed.
+  Power(const Power&) = delete;
+  Power& operator=(const Power&) = delete;
+  Power(Power&&) = delete;
+  Power& operator=(Power&&) = delete;
 
   static std::unique_ptr<Power> New(fdf::MmioBuffer* mmio_space, uint16_t device_id);
 
@@ -106,8 +113,6 @@ class Power {
   const PowerWellInfoMap* power_well_info_map_ = nullptr;
 
   friend PowerWellRef;
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(Power);
 };
 
 }  // namespace i915

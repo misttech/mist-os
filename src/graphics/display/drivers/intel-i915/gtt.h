@@ -75,6 +75,12 @@ class Gtt {
   Gtt();
   ~Gtt();
 
+  // Copying and moving are not allowed.
+  Gtt(const Gtt&) = delete;
+  Gtt& operator=(const Gtt&) = delete;
+  Gtt(Gtt&&) = delete;
+  Gtt& operator=(Gtt&&) = delete;
+
   // Initialize the GTT using the given parameters.
   //
   // |pci|: The PCI protocol implementation
@@ -99,8 +105,6 @@ class Gtt {
   zx::pmt scratch_buffer_pmt_;
   zx_paddr_t scratch_buffer_paddr_ = 0;
   uint64_t min_contiguity_;
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(Gtt);
 };
 
 }  // namespace i915
