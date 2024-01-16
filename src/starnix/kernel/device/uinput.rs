@@ -560,8 +560,7 @@ mod test {
         assert_eq!(r, error!(EFAULT));
     }
 
-    // TODO(b/319238817): Re-enable when the flakiness is fixed
-    #[ignore]
+    // TODO(b/319238817): Disable test again when next flake is observed
     #[::fuchsia::test]
     async fn ui_dev_create_keyboard() {
         let dev = UinputDevice::new();
@@ -579,8 +578,10 @@ mod test {
                 .expect("create Registry proxy and stream");
 
         let handle = thread::spawn(move || {
+            log_info!("[ui_dev_create_keyboard] thread spawned");
             fasync::LocalExecutor::new().run_singlethreaded(async {
                 if let Some(request) = stream.next().await {
+                    log_info!("[ui_dev_create_keyboard] stream receives request");
                     match request {
                         Ok(futinput::RegistryRequest::RegisterKeyboard {
                             payload,
@@ -602,8 +603,10 @@ mod test {
         assert_eq!(res, Ok(SUCCESS));
 
         handle.join().expect("stream panic");
+        log_info!("[ui_dev_create_keyboard] thread finishes");
 
         let request = req_receiver.next().await;
+        log_info!("[ui_dev_create_keyboard] received payload device");
 
         // Verify that ui_dev_create sends RegisterKeyboard request to Registry
         // and that the request includes some ServerEnd in `device`.
