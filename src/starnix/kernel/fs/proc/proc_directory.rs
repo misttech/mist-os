@@ -6,6 +6,7 @@ use crate::{
     fs::proc::{
         pid_directory::pid_directory,
         sysctl::{net_directory, sysctl_directory},
+        sysrq::SysRqNode,
     },
     task::{CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter},
     vfs::{
@@ -111,6 +112,13 @@ impl ProcDirectory {
                 current_task,
                 ConfigFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "sysrq-trigger".into() => fs.create_node(
+                current_task,
+                SysRqNode::new(kernel),
+                // This file is normally writable only by root.
+                // (https://man7.org/linux/man-pages/man5/proc.5.html)
+                FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
             ),
         };
 

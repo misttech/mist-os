@@ -25,7 +25,7 @@
     capabilities: [
         {
             directory: "fs_root",
-            rights: [ "r*" ],
+            rights: [ "rw*" ],
             path: "/fs_root",
         },
     ],
