@@ -1146,14 +1146,14 @@ mod tests {
 
         let trace_id = ftrace::Id::random();
         let static_selectors_matchers = pipeline.read().static_selectors_matchers();
-        let reader_server = Box::pin(ReaderServer::stream(
+        let reader_server = ReaderServer::stream(
             inspect_repo.fetch_inspect_data(&None, static_selectors_matchers),
             test_performance_config,
             // No selectors
             None,
             Arc::clone(&stats),
             trace_id,
-        ));
+        );
         let (consumer, batch_iterator_requests) =
             create_proxy_and_stream::<BatchIteratorMarker>().unwrap();
         (
