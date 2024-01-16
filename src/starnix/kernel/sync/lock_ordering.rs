@@ -6,6 +6,7 @@ use crate::{impl_lock_after, Unlocked};
 
 pub enum BpfMapEntries {}
 pub enum KernelIpTables {}
+pub enum KernelSwapFiles {}
 pub enum DiagnosticsCoreDumpList {}
 
 pub enum MmDumpable {}
@@ -16,5 +17,6 @@ pub enum MmDumpable {}
 
 impl_lock_after!(Unlocked => BpfMapEntries);
 impl_lock_after!(Unlocked => KernelIpTables);
+impl_lock_after!(Unlocked => KernelSwapFiles);
 impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);
 impl_lock_after!(Unlocked => MmDumpable);

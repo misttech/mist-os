@@ -24,7 +24,7 @@ use crate::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
         },
-        DelayedReleaser, FileOps, FileSystemHandle, FsNode, FsString,
+        DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString,
     },
 };
 use bstr::BString;
@@ -42,7 +42,7 @@ use once_cell::sync::OnceCell;
 use selinux::security_server::SecurityServer;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
 use starnix_logging::{log_error, CoreDumpList};
-use starnix_sync::{KernelIpTables, OrderedRwLock, RwLock};
+use starnix_sync::{KernelIpTables, KernelSwapFiles, OrderedMutex, OrderedRwLock, RwLock};
 use starnix_uapi::{
     device_type::DeviceType, errno, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
 };
@@ -157,6 +157,11 @@ pub struct Kernel {
     /// The table of devices installed on the netstack and their associated
     /// state local to this `Kernel`.
     pub netstack_devices: Arc<NetstackDevices>,
+
+    /// Files that are currently available for swapping.
+    /// Note: Starnix never actually swaps memory to these files. We just need to track them
+    /// to pass conformance tests.
+    pub swap_files: OrderedMutex<Vec<FileHandle>, KernelSwapFiles>,
 
     /// The implementation of generic Netlink protocol families.
     generic_netlink: OnceCell<GenericNetlink<NetlinkToClientSender<GenericMessage>>>,
@@ -312,6 +317,7 @@ impl Kernel {
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
             vdso: Vdso::new(),
             netstack_devices: Arc::default(),
+            swap_files: Default::default(),
             generic_netlink: OnceCell::new(),
             network_netlink: OnceCell::new(),
             inspect_node,

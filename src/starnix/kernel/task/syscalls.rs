@@ -18,7 +18,7 @@ use crate::{
         PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
         PR_SET_PTRACER_ANY,
     },
-    vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer},
+    vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer, VecOutputBuffer},
 };
 use starnix_logging::{log_error, log_trace, not_implemented, set_zx_name};
 use starnix_sync::MmDumpable;
@@ -1550,6 +1550,76 @@ pub fn sys_unshare(
         task_state.uts_ns = Arc::new(RwLock::new(new_uts_ns));
     }
 
+    Ok(())
+}
+
+pub fn sys_swapon(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    user_path: UserCString,
+    _flags: i32,
+) -> Result<(), Errno> {
+    const MAX_SWAPFILES: usize = 30; // See https://man7.org/linux/man-pages/man2/swapon.2.html
+
+    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+        return error!(EPERM);
+    }
+
+    // TODO: Validate flags.
+
+    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let file = current_task.open_file(path.as_ref(), OpenFlags::RDWR)?;
+
+    let node = file.node();
+    let mode = node.info().mode;
+    if !mode.is_reg() && !mode.is_blk() {
+        return error!(EINVAL);
+    }
+
+    // We determined this magic number by using the mkswap tool and the file tool. The mkswap tool
+    // populates a few bytes in the file, including a UUID, which can be replaced with zeros while
+    // still being recognized by the file tool. This string appears at a fixed offset
+    // (MAGIC_OFFSET) in the file, which looks quite like a magic number.
+    const MAGIC_OFFSET: usize = 0xff6;
+    let swap_magic = b"SWAPSPACE2";
+    let mut buffer = VecOutputBuffer::new(swap_magic.len());
+    if file.read_at(current_task, MAGIC_OFFSET, &mut buffer)? != swap_magic.len()
+        || buffer.data() != swap_magic
+    {
+        return error!(EINVAL);
+    }
+
+    let mut swap_files = current_task.kernel().swap_files.lock(locked);
+    for swap_file in swap_files.iter() {
+        if Arc::ptr_eq(swap_file.node(), file.node()) {
+            return error!(EBUSY);
+        }
+    }
+    if swap_files.len() >= MAX_SWAPFILES {
+        return error!(EPERM);
+    }
+    swap_files.push(file);
+    Ok(())
+}
+
+pub fn sys_swapoff(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    user_path: UserCString,
+) -> Result<(), Errno> {
+    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+        return error!(EPERM);
+    }
+
+    let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
+    let file = current_task.open_file(path.as_ref(), OpenFlags::RDWR)?;
+
+    let mut swap_files = current_task.kernel().swap_files.lock(locked);
+    let original_length = swap_files.len();
+    swap_files.retain(|swap_file| !Arc::ptr_eq(swap_file.node(), file.node()));
+    if swap_files.len() == original_length {
+        return error!(EINVAL);
+    }
     Ok(())
 }
 

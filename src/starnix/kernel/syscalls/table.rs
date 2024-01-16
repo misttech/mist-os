@@ -79,7 +79,8 @@ pub fn dispatch_syscall(
             sys_sched_setaffinity, sys_sched_setparam, sys_sched_setscheduler, sys_seccomp,
             sys_set_tid_address, sys_setfsgid, sys_setfsuid, sys_setgid, sys_setgroups, sys_setns,
             sys_setpgid, sys_setpriority, sys_setregid, sys_setresgid, sys_setresuid, sys_setreuid,
-            sys_setrlimit, sys_setsid, sys_setuid, sys_syslog, sys_unshare,
+            sys_setrlimit, sys_setsid, sys_setuid, sys_swapoff, sys_swapon, sys_syslog,
+            sys_unshare,
         },
         vfs::{
             bpf::sys_bpf,
@@ -399,6 +400,8 @@ pub fn dispatch_syscall(
         #[cfg(target_arch = "x86_64")] stat[2],
         statfs[2],
         statx[5],
+        swapoff[1],
+        swapon[2],
         #[cfg(target_arch = "x86_64")] symlink[2],
         symlinkat[3],
         sync[0],
