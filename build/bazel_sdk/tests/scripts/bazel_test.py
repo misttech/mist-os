@@ -546,6 +546,10 @@ def main():
     forward_build_metadata_from_env("BUILDBUCKET_ID", "go/bbid/%s")
     forward_build_metadata_from_env("BUILDBUCKET_BUILDER", "%s")
 
+    # Developers' builds will have one uuid per `fx build` invocation
+    # that can be used to correlate multiple bazel sub-builds.
+    forward_build_metadata_from_env("FX_BUILD_UUID", "%s")
+
     # These argument remove verbose output from Bazel, used in queries.
     bazel_quiet_args = [
         "--noshow_loading_progress",

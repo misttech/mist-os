@@ -259,14 +259,11 @@ else
 fi
 
 test "$BUILD_METRICS_ENABLED" = 0 || {
-  if which uuidgen 2>&1 > /dev/null
-  then build_uuid="$(uuidgen)"
+  if [[ "${FX_BUILD_UUID-NOT_SET}" == "NOT_SET" ]]
+  then
+    build_uuid=("$python" -S -c 'import uuid; print(uuid.uuid4())')
   else
-    cat <<EOF
-'uuidgen' is required for logs collection, but missing.
-On Debian/Ubuntu platforms, try: 'sudo apt install uuid-runtime'
-EOF
-    exit 1
+    build_uuid="${FX_BUILD_UUID}"
   fi
 }
 

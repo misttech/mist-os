@@ -86,6 +86,11 @@ build_metadata_opts=()
 [[ "${{BUILDBUCKET_BUILDER-NOT_SET}}" == "NOT_SET" ]] ||
   build_metadata_opts+=( "--build_metadata=BUILDBUCKET_BUILDER=$BUILDBUCKET_BUILDER" )
 
+# Developers' builds will have one uuid per `fx build` invocation
+# that can be used to correlate multiple bazel sub-builds.
+[[ "${{FX_BUILD_UUID-NOT_SET}}" == "NOT_SET" ]] ||
+  build_metadata_opts+=( "--build_metadata=FX_BUILD_UUID=$FX_BUILD_UUID" )
+
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
 # the USER is not actually used. See https://fxbug.dev/112206#c9.
 # In developer environments, use the real username so that authentication

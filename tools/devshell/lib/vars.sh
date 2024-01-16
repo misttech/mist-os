@@ -788,6 +788,12 @@ function fx-standard-switches {
   done
 }
 
+function fx-uuid {
+  # Emit a uuid string, same as the `uuidgen` tool.
+  # Using Python avoids requiring a separate tool.
+  "${PREBUILT_PYTHON3}" -S -c 'import uuid; print(uuid.uuid4())'
+}
+
 function fx-choose-build-concurrency {
   # If any remote execution is enabled (e.g. via Goma or RBE),
   # allow ninja to launch many more concurrent actions than what local
@@ -953,6 +959,7 @@ function fx-run-ninja {
   # rbe_wrapper is used to auto-start/stop a proxy process for the duration of
   # the build, so that RBE-enabled build actions can operate through the proxy.
   #
+  local build_uuid="$(fx-uuid)"
   local rbe_wrapper=()
   local user_rbe_env=()
   if fx-rbe-enabled
@@ -968,6 +975,7 @@ function fx-run-ninja {
 
   full_cmdline=(
     env -i
+    "FX_BUILD_UUID=$build_uuid"
     "${user_rbe_env[@]}"
     "TERM=${TERM}"
     "PATH=${PATH}"
