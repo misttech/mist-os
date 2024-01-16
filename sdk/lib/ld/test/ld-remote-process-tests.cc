@@ -73,49 +73,75 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
 
   const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
 
-  zx::vmo vmo = elfldltl::testing::GetTestLibVmo(executable_path);
+  zx::vmo vmo;
+  ASSERT_NO_FATAL_FAILURE(vmo = elfldltl::testing::GetTestLibVmo(executable_path));
 
   zx::vmo vdso_vmo;
   zx_status_t status = GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
-  EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
   zx::vmo stub_ld_vmo;
   stub_ld_vmo = elfldltl::testing::GetTestLibVmo("ld-stub.so");
 
-  auto get_dep_vmo = [this, vdso_name = GetVdsoSoname(), &vdso_vmo,
-                      &stub_ld_vmo](const elfldltl::Soname<>& soname) -> zx::vmo {
-    // Executables may depend on the stub linker and vdso implicitly, so return
-    // pre-fetched VMOs, asserting that these deps are requested once at most.
-    if (soname == vdso_name) {
-      EXPECT_TRUE(vdso_vmo) << vdso_name << " for passive ABI should not be looked up twice.";
-      return std::exchange(vdso_vmo, {});
-    }
-    if (soname == kLinkerName) {
-      EXPECT_TRUE(stub_ld_vmo) << kLinkerName << " for passive ABI should not be looked up twice.";
-      return std::exchange(stub_ld_vmo, {});
-    }
+  // Pre-decode the vDSO and stub modules.
+  constexpr size_t kVdso = 0, kStub = 1;
+  auto predecode = [&diag](RemoteModule& module, std::string_view what, zx::vmo vmo) {
+    // Set a temporary name until we decode the DT_SONAME.
+    module.set_name(what);
+    auto result = module.Decode(diag, std::move(vmo), -1);
+    ASSERT_TRUE(result.is_ok());
+    EXPECT_THAT(result->needed, ::testing::IsEmpty()) << what << " cannot have DT_NEEDED";
+    EXPECT_THAT(module.reloc_info().rel_relative(), ::testing::IsEmpty())
+        << what << " cannot have RELATIVE relocations";
+    EXPECT_THAT(module.reloc_info().rel_symbolic(), ::testing::IsEmpty())
+        << what << " cannot have symbolic relocations";
+    EXPECT_THAT(module.reloc_info().relr(), ::testing::IsEmpty())
+        << what << " cannot have RELR relocations";
+    std::visit(
+        [what](const auto& jmprel) {
+          EXPECT_THAT(jmprel, ::testing::IsEmpty()) << what << " cannot have DT_JMPREL relocations";
+        },
+        module.reloc_info().jmprel());
+    ASSERT_TRUE(module.HasModule());
+    module.set_name(module.module().soname);
+  };
+  std::array<RemoteModule, 2> predecoded_modules;
+  ASSERT_NO_FATAL_FAILURE(predecode(predecoded_modules[kVdso], "vDSO", std::move(vdso_vmo)));
+  ASSERT_NO_FATAL_FAILURE(
+      predecode(predecoded_modules[kStub], "stub ld.so", std::move(stub_ld_vmo)));
+
+  auto get_dep_vmo = [this](const RemoteModule::Soname& soname) {
     return mock_loader_->LoadObject(std::string{soname.str()});
   };
 
-  auto decode_result = RemoteModule::DecodeModules(diag, std::move(vmo), get_dep_vmo);
-  EXPECT_TRUE(decode_result);
+  auto decode_result =
+      RemoteModule::DecodeModules(diag, std::move(vmo), get_dep_vmo, std::move(predecoded_modules));
+  ASSERT_TRUE(decode_result);
   set_stack_size(decode_result->main_exec.stack_size);
 
   auto& modules = decode_result->modules;
   ASSERT_FALSE(modules.empty());
+
+  // TODO(https://fxbug.dev/318041873): Do the passive ABI layout in the stub
+  // here.
+  //RemoteModule& loaded_stub = modules[decode_result->predecoded_positions[kVdso]];
+
   EXPECT_TRUE(RemoteModule::AllocateModules(diag, modules, root_vmar().borrow()));
   EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules));
+
+  // TODO(https://fxbug.dev/318041873): Finish filling out passive ABI here.
+
   EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
-  RemoteModule::CommitModules(modules);
 
   // The executable will always be the first module, retrieve it to set the
   // loaded entry point.
-  set_entry(decode_result->main_exec.relative_entry + modules.front().load_bias());
+  set_entry(decode_result->main_exec.relative_entry + modules[kVdso].load_bias());
 
-  // Locate the loaded VDSO to set the vdso base pointer for the test.
-  auto loaded_vdso = std::find(modules.begin(), modules.end(), GetVdsoSoname());
-  ASSERT_TRUE(loaded_vdso != modules.end());
-  set_vdso_base(loaded_vdso->module().vaddr_start());
+  // Locate the loaded vDSO to pass its base pointer to the test process.
+  RemoteModule& loaded_vdso = modules[decode_result->predecoded_positions[kStub]];
+  set_vdso_base(loaded_vdso.module().vaddr_start());
+
+  RemoteModule::CommitModules(modules);
 }
 
 int64_t LdRemoteProcessTests::Run() {

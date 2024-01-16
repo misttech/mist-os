@@ -57,10 +57,18 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     ExecInfo exec_info;
   };
 
+  template <size_t Count>
+  using PredecodedPositions = std::array<size_t, Count>;
+
   // The result returned to the caller after all modules have been decoded.
+  template <size_t Count>
   struct DecodeModulesResult {
     List modules;        // The list of all decoded modules.
     ExecInfo main_exec;  // Decoded information for the main executable.
+
+    // This corresponds 1:1 to the pre_decoded_modules list passed into
+    // DecodeModules, giving the position in .modules where each was moved.
+    PredecodedPositions<Count> predecoded_positions;
   };
 
   RemoteLoadModule() = default;
@@ -111,7 +119,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
     // After successfully decoding the phdrs, we may now instantiate the module
     // and set its fields.
-    EmplaceModule(name(), modid);
+    EmplaceModule(modid);
 
     module().symbols_visible = true;
 
@@ -188,10 +196,10 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   // Decode the main executable VMO and all its dependencies. The `get_dep_vmo`
   // callback is used to retrieve the VMO for each DT_NEEDED entry; it takes a
   // `string_view` and should return a `zx::vmo`.
-  template <class Diagnostics, typename GetDepVmo>
-  static std::optional<DecodeModulesResult> DecodeModules(Diagnostics& diag,
-                                                          zx::vmo main_executable_vmo,
-                                                          GetDepVmo&& get_dep_vmo) {
+  template <class Diagnostics, typename GetDepVmo, size_t PredecodedCount>
+  static std::optional<DecodeModulesResult<PredecodedCount>> DecodeModules(
+      Diagnostics& diag, zx::vmo main_executable_vmo, GetDepVmo&& get_dep_vmo,
+      std::array<RemoteLoadModule, PredecodedCount> predecoded_modules) {
     // Decode the main executable first and save its decoded information to
     // include in the result returned to the caller.
     RemoteLoadModule exec{abi::Abi<>::kExecutableName};
@@ -201,15 +209,17 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     }
 
     // The main executable will always be the first entry of the modules list.
-    List modules = DecodeDeps(diag, std::move(exec), exec_decode_result->needed,
-                              std::forward<GetDepVmo>(get_dep_vmo));
+    auto [modules, predecoded_positions] =
+        DecodeDeps(diag, std::move(exec), exec_decode_result->needed,
+                   std::forward<GetDepVmo>(get_dep_vmo), std::move(predecoded_modules));
     if (modules.empty()) [[unlikely]] {
       return std::nullopt;
     }
 
-    return DecodeModulesResult{
+    return DecodeModulesResult<PredecodedCount>{
         .modules = std::move(modules),
         .main_exec = exec_decode_result->exec_info,
+        .predecoded_positions = predecoded_positions,
     };
   }
 
@@ -289,14 +299,57 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   // going after an error, the returned list may be partial and the individual
   // entries may be partially decoded.  They should not be presumed complete,
   // such as calling module(), unless no errors were reported via Diagnostics.
-  template <class Diagnostics, typename GetDepVmo>
-  static List DecodeDeps(Diagnostics& diag, RemoteLoadModule main_exec,
-                         const std::vector<Soname>& main_exec_needed, GetDepVmo&& get_dep_vmo) {
+  template <class Diagnostics, typename GetDepVmo, size_t PredecodedCount>
+  static std::pair<List, PredecodedPositions<PredecodedCount>> DecodeDeps(
+      Diagnostics& diag, RemoteLoadModule main_exec, const std::vector<Soname>& main_exec_needed,
+      GetDepVmo&& get_dep_vmo, std::array<RemoteLoadModule, PredecodedCount> predecoded_modules) {
+    assert(std::all_of(predecoded_modules.begin(), predecoded_modules.end(),
+                       [](const auto& m) { return m.HasModule(); }));
+
     // The list grows with enqueued DT_NEEDED dependencies of earlier elements.
     List modules;
-    auto enqueue_deps = [&modules](const std::vector<Soname>& needed) {
+
+    // This records the position in modules where each predecoded module lands.
+    // Initially, each element is -1 to indicate the corresponding argument
+    // hasn't been consumed yet.
+    constexpr size_t kNpos = -1;
+    PredecodedPositions<PredecodedCount> predecoded_positions;
+    for (size_t& pos : predecoded_positions) {
+      pos = kNpos;
+    }
+
+    auto enqueue_deps = [&modules, &predecoded_modules,
+                         &predecoded_positions](const std::vector<Soname>& needed) {
+      // Return true if it's already in the modules list.
+      auto in_modules = [&modules](const Soname& soname) -> bool {
+        return std::find(modules.begin(), modules.end(), soname) != modules.end();
+      };
+
+      // If it's in the predecoded_modules list, then move it to the end of the
+      // modules list and update predecoded_positions accordingly.
+      auto in_predecoded = [&modules, &predecoded_modules,
+                            &predecoded_positions](const Soname& soname) -> bool {
+        for (size_t i = 0; i < PredecodedCount; ++i) {
+          size_t& pos = predecoded_positions[i];
+          RemoteLoadModule& module = predecoded_modules[i];
+          if (pos == kNpos && module == soname) {
+            pos = modules.size();
+            RemoteLoadModule& mod = modules.emplace_back(std::move(module));
+            // Mark that the module is in the symbolic resolution set.
+            mod.module().symbols_visible = true;
+            // Use the exact pointer that's the dependent module's DT_NEEDED
+            // string for the name field, so remoting can transcribe it.
+            mod.set_name(soname);
+            // Assign the module ID that matches the position in the list.
+            mod.module().symbolizer_modid = static_cast<uint32_t>(pos);
+            return true;
+          }
+        }
+        return false;
+      };
+
       for (const Soname& soname : needed) {
-        if (std::find(modules.begin(), modules.end(), soname) == modules.end()) {
+        if (!in_modules(soname) && !in_predecoded(soname)) {
           modules.emplace_back(soname);
         }
       }
@@ -323,8 +376,12 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
         // this reference invalid, so make it go out of scope before then.
         RemoteLoadModule& mod = modules[idx];
 
-        // Only the main executable should already be decoded before this loop.
-        assert(!mod.HasModule());
+        // Only the main executable should already be decoded before this loop,
+        // but predecoded modules may have been added to the list during
+        // previous iterations.
+        if (mod.HasModule()) {
+          continue;
+        }
 
         auto vmo = get_dep_vmo(mod.name());
         if (!vmo) [[unlikely]] {
@@ -352,7 +409,21 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
       enqueue_deps(decode_result->needed);
     }
 
-    return modules;
+    // Any remaining predecoded modules that weren't reached go on the end of
+    // the list, with .symbols_visible=false.
+    for (size_t i = 0; i < PredecodedCount; ++i) {
+      size_t& pos = predecoded_positions[i];
+      RemoteLoadModule& module = predecoded_modules[i];
+      if (pos == kNpos) {
+        pos = modules.size();
+        RemoteLoadModule& mod = modules.emplace_back(std::move(module));
+        mod.module().symbols_visible = false;
+        mod.set_name(mod.module().symbols.soname());
+        mod.module().symbolizer_modid = static_cast<uint32_t>(pos);
+      }
+    }
+
+    return {std::move(modules), std::move(predecoded_positions)};
   }
 
   // Create and return a memory-adaptor object that serves as a wrapper

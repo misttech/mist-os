@@ -82,9 +82,10 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   }
 
   // Allocate the StartupModule for the main executable.
-  StartupModule* main_executable = StartupModule::New(diag, scratch, {}, startup.page_size);
+  StartupModule* main_executable =
+      StartupModule::New(diag, scratch, abi::Abi<>::kExecutableName, startup.page_size);
   fbl::AllocChecker ac;
-  main_executable->NewModule(abi::Abi<>::kExecutableName, 0, initial_exec, ac);
+  main_executable->NewModule(0, initial_exec, ac);
   CheckAlloc(diag, ac, "passive ABI module");
   Module& module = main_executable->module();
 

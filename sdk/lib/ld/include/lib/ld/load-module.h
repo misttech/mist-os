@@ -81,8 +81,14 @@ class LoadModule {
 
   constexpr const Soname& name() const { return name_; }
 
-  constexpr void set_name(const Soname& name) { name_ = name; }
-  constexpr void set_name(std::string_view name) { name_ = name; }
+  constexpr void set_name(const Soname& name) {
+    name_ = name;
+    SetAbiName();
+  }
+  constexpr void set_name(std::string_view name) {
+    name_ = name;
+    SetAbiName();
+  }
 
   // This returns an object that can be used like a LoadModule* pointing at
   // this, but is suitable for use in a container like std::unordered_set or
@@ -119,11 +125,11 @@ class LoadModule {
   // constructs Module{...}).
   template <typename... Args, bool Inline = InlineModule == LoadModuleInline::kYes,
             typename = std::enable_if_t<Inline>>
-  constexpr void EmplaceModule(Soname name, uint32_t modid, Args&&... args) {
+  constexpr void EmplaceModule(uint32_t modid, Args&&... args) {
     assert(!module_);
     module_.emplace(std::forward<Args>(args)...);
-    module_->link_map.name = name.c_str();
     module_->symbolizer_modid = modid;
+    SetAbiName();
   }
 
   // In an instantiation with InlineModule=false, NewModule(a..., c...) does
@@ -131,11 +137,11 @@ class LoadModule {
   // fbl::AllocChecker that indicates whether `new` succeeded.
   template <typename... Args, bool Inline = InlineModule == LoadModuleInline::kYes,
             typename = std::enable_if_t<!Inline>>
-  constexpr void NewModule(Soname name, uint32_t modid, Args&&... args) {
+  constexpr void NewModule(uint32_t modid, Args&&... args) {
     assert(!module_);
     module_ = new (std::forward<Args>(args)...) Module;
-    module_->link_map.name = name.c_str();
     module_->symbolizer_modid = modid;
+    SetAbiName();
   }
 
   LoadInfo& load_info() { return load_info_; }
@@ -243,6 +249,12 @@ class LoadModule {
 
   using RelocInfoStorage =
       std::conditional_t<WithRelocInfo == LoadModuleRelocInfo::kYes, RelocationInfo, Empty>;
+
+  constexpr void SetAbiName() {
+    if (module_) {
+      module_->link_map.name = name_.c_str();
+    }
+  }
 
   Soname name_;
   ModuleStorage module_{};

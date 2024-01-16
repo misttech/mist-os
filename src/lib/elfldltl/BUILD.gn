@@ -24,9 +24,16 @@ library_headers("headers") {
     ]
   }
   if (is_fuchsia && !is_kernel) {
+    # Make sure that there's no transitive deps on libzircon, so header-only
+    # use of the library doesn't affect dynamic linking dependencies.
+    if (zircon_toolchain == false) {
+      _headers = ""
+    } else {
+      _headers = ":headers"
+    }
     public_deps += [
       # <lib/elfldltl/vmo.h> has #include <lib/zx/vmo.h>.
-      "//zircon/system/ulib/zx",
+      "//zircon/system/ulib/zx$_headers",
     ]
   }
   if (is_kernel) {

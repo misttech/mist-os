@@ -177,7 +177,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // start filling it in with pointers into the loaded image.
 
     fbl::AllocChecker ac;
-    this->NewModule(this->name(), symbolizer_modid, allocator, ac);
+    this->NewModule(symbolizer_modid, allocator, ac);
     CheckAlloc(diag, ac, "passive ABI module");
 
     // All modules allocated by StartupModule are part of the initial exec set
