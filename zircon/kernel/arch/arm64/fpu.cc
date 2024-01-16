@@ -30,6 +30,7 @@ static void arm64_fpu_load_regs(const Thread* t) {
 
   static_assert(sizeof(fpstate->regs) == 16 * 32, "");
   __asm__ volatile(
+      ".arch_extension fp\n"
       "ldp     q0, q1, [%0, #(0 * 32)]\n"
       "ldp     q2, q3, [%0, #(1 * 32)]\n"
       "ldp     q4, q5, [%0, #(2 * 32)]\n"
@@ -47,7 +48,8 @@ static void arm64_fpu_load_regs(const Thread* t) {
       "ldp     q28, q29, [%0, #(14 * 32)]\n"
       "ldp     q30, q31, [%0, #(15 * 32)]\n"
       "msr     fpcr, %1\n"
-      "msr     fpsr, %2\n" ::"r"(fpstate->regs),
+      "msr     fpsr, %2\n"
+      ".arch_extension nofp\n" ::"r"(fpstate->regs),
       "r"((uint64_t)fpstate->fpcr), "r"((uint64_t)fpstate->fpsr));
 }
 
@@ -57,6 +59,7 @@ static void arm64_fpu_save_regs(Thread* t) {
   LTRACEF("cpu %u, thread %s, save fpstate %p\n", arch_curr_cpu_num(), t->name(), fpstate);
 
   __asm__ volatile(
+      ".arch_extension fp\n"
       "stp     q0, q1, [%0, #(0 * 32)]\n"
       "stp     q2, q3, [%0, #(1 * 32)]\n"
       "stp     q4, q5, [%0, #(2 * 32)]\n"
@@ -72,13 +75,22 @@ static void arm64_fpu_save_regs(Thread* t) {
       "stp     q24, q25, [%0, #(12 * 32)]\n"
       "stp     q26, q27, [%0, #(13 * 32)]\n"
       "stp     q28, q29, [%0, #(14 * 32)]\n"
-      "stp     q30, q31, [%0, #(15 * 32)]\n" ::"r"(fpstate->regs));
+      "stp     q30, q31, [%0, #(15 * 32)]\n"
+      ".arch_extension nofp\n" ::"r"(fpstate->regs));
 
   // These are 32-bit values, but the msr instruction always uses a
   // 64-bit destination register.
   uint64_t fpcr, fpsr;
-  __asm__("mrs %0, fpcr\n" : "=r"(fpcr));
-  __asm__("mrs %0, fpsr\n" : "=r"(fpsr));
+  __asm__(
+      ".arch_extension fp\n"
+      "mrs %0, fpcr\n"
+      ".arch_extension nofp\n"
+      : "=r"(fpcr));
+  __asm__(
+      ".arch_extension fp\n"
+      "mrs %0, fpsr\n"
+      ".arch_extension nofp\n"
+      : "=r"(fpsr));
   fpstate->fpcr = (uint32_t)fpcr;
   fpstate->fpsr = (uint32_t)fpsr;
 
