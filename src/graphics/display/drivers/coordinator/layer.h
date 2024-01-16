@@ -14,6 +14,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
 
+#include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
@@ -40,8 +41,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   fbl::RefPtr<Image> current_image() const { return displayed_image_; }
   bool is_skipped() const { return is_skipped_; }
 
-  // TODO(https://fxbug.dev/42686) Although this is nominally a POD, the state management and lifecycle are
-  // complicated by interactions with Client's threading model.
+  // TODO(https://fxbug.dev/42686) Although this is nominally a POD, the state management and
+  // lifecycle are complicated by interactions with Client's threading model.
   friend Client;
   friend LayerTest;
 

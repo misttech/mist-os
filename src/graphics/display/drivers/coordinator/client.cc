@@ -6,34 +6,44 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async/dispatcher.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
-#include <lib/fidl/cpp/wire/server.h>
 #include <lib/fit/defer.h>
+#include <lib/fit/function.h>
+#include <lib/fpromise/result.h>
 #include <lib/image-format/image_format.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/stdcompat/span.h>
+#include <lib/sync/completion.h>
 #include <lib/sysmem-version/sysmem-version.h>
-#include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
+#include <lib/zx/vmo.h>
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
+#include <zircon/syscalls.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cinttypes>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <random>
-#include <type_traits>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -41,24 +51,28 @@
 #include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
+#include <fbl/vector.h>
 
 #include "fidl/fuchsia.hardware.display/cpp/wire_types.h"
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
+#include "src/graphics/display/drivers/coordinator/fence.h"
+#include "src/graphics/display/drivers/coordinator/image.h"
+#include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
-#include "src/graphics/display/lib/edid/edid.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;

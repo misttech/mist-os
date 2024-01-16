@@ -6,12 +6,12 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
-#include <zircon/status.h>
+#include <zircon/errors.h>
 
-#include <cstdint>
+#include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>

@@ -10,11 +10,19 @@
 #include <zircon/assert.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <optional>
+#include <utility>
 
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
+#include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/fence.h"
+#include "src/graphics/display/drivers/coordinator/image.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"

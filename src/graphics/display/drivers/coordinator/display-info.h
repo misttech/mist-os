@@ -7,17 +7,16 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <cstdint>
-#include <functional>
-#include <memory>
+#include <optional>
 #include <queue>
+#include <vector>
 
 #include <fbl/array.h>
-#include <fbl/intrusive_double_list.h>
 #include <fbl/ref_counted.h>
 #include <fbl/string_printf.h>
 #include <fbl/vector.h>
@@ -29,6 +28,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display {

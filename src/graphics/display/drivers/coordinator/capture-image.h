@@ -10,6 +10,7 @@
 #include <cstdint>
 
 #include <fbl/ref_counted.h>
+#include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"

@@ -14,9 +14,11 @@
 #include <lib/fit/thread_checker.h>
 #include <lib/zx/event.h>
 #include <threads.h>
+#include <zircon/compiler.h>
 
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_single_list.h>
+#include <fbl/macros.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 

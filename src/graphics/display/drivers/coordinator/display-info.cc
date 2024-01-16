@@ -4,18 +4,34 @@
 
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 
-#include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/ddk/debug.h>
+#include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/device/audio.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/time.h>
 
 #include <cinttypes>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
+#include <utility>
 
 #include <audio-proto-utils/format-utils.h>
+#include <fbl/alloc_checker.h>
+#include <fbl/ref_ptr.h>
+#include <fbl/string_printf.h>
 #include <pretty/hexdump.h>
 
 #include "src/devices/lib/audio/audio.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/edid/edid.h"
 
 namespace display {
 
@@ -168,11 +184,11 @@ void DisplayInfo::PopulateDisplayAudio() {
     return;
   }
 
-  // TODO(https://fxbug.dev/32457): Revisit dedupe/merge logic once the audio API takes a stance. First,
-  // this code always adds the basic audio formats before processing the SADs, which is likely
-  // redundant on some hardware (the spec isn't clear about whether or not the basic audio formats
-  // should also be included in the SADs). Second, this code assumes that the SADs are compact
-  // and not redundant, which is not guaranteed.
+  // TODO(https://fxbug.dev/32457): Revisit dedupe/merge logic once the audio API takes a stance.
+  // First, this code always adds the basic audio formats before processing the SADs, which is
+  // likely redundant on some hardware (the spec isn't clear about whether or not the basic audio
+  // formats should also be included in the SADs). Second, this code assumes that the SADs are
+  // compact and not redundant, which is not guaranteed.
 
   // Add the range for basic audio support.
   audio_types_audio_stream_format_range_t range;

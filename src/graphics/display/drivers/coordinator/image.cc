@@ -7,17 +7,21 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
-#include <lib/zx/handle.h>
+#include <lib/zx/vmo.h>
+#include <threads.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <atomic>
 #include <utility>
 
-#include <fbl/intrusive_container_utils.h>
+#include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/fence.h"
 
 namespace display {
 

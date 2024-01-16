@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <atomic>
@@ -148,9 +149,10 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   // waiting list is only accessed on the loop and thus is not generally
   // protected. However, transfers between the lists are protected by the
   // controller mutex.
-  fbl::DoublyLinkedListNodeState<DoublyLinkedListPointer,
-                                 fbl::NodeOptions::AllowRemoveFromContainer>
-      doubly_linked_list_node_state_ __TA_GUARDED(mtx());
+  fbl::DoublyLinkedListNodeState<
+      DoublyLinkedListPointer,
+      fbl::NodeOptions::AllowRemoveFromContainer> doubly_linked_list_node_state_
+      __TA_GUARDED(mtx());
 
   image_t info_;
 

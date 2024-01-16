@@ -4,14 +4,27 @@
 
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
+#include <fuchsia/hardware/audiotypes/c/banjo.h>
+#include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
+#include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fit/function.h>
+#include <lib/stdcompat/span.h>
+#include <lib/trace/event.h>
 #include <lib/zbi-format/graphics.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/clock.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <threads.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 #include <zircon/time.h>
@@ -20,31 +33,36 @@
 #include <algorithm>
 #include <cinttypes>
 #include <cstdint>
-#include <iterator>
+#include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
 
-#include <audio-proto-utils/format-utils.h>
 #include <ddktl/device.h>
-#include <ddktl/fidl.h>
+#include <ddktl/unbind-txn.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
-#include <fbl/string_printf.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/eld.h"
+#include "src/graphics/display/drivers/coordinator/image.h"
+#include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/edid/edid.h"
+#include "src/graphics/display/lib/edid/timings.h"
 
 namespace fidl_display = fuchsia_hardware_display;
 

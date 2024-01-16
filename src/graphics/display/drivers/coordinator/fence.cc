@@ -4,15 +4,24 @@
 
 #include "src/graphics/display/drivers/coordinator/fence.h"
 
+#include <lib/async/cpp/wait.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fit/function.h>
 #include <lib/fit/thread_checker.h>
+#include <lib/zx/event.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <thread>
 #include <utility>
 
-#include "src/graphics/display/drivers/coordinator/client.h"
+#include <fbl/alloc_checker.h>
+#include <fbl/auto_lock.h>
+#include <fbl/intrusive_single_list.h>
+#include <fbl/ref_ptr.h>
+
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 
 namespace display {

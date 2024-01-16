@@ -11,25 +11,30 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/async/cpp/wait.h>
+#include <lib/ddk/device.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
+#include <threads.h>
+#include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/time.h>
+#include <zircon/types.h>
 
+#include <atomic>
 #include <cstdint>
-#include <functional>
+#include <cstdlib>
 #include <list>
 #include <memory>
-#include <queue>
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_hash_table.h>
+#include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
@@ -45,7 +50,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
-#include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/async-watchdog/watchdog.h"
 
 namespace display {

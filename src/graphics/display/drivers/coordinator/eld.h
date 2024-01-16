@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ELD_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_ELD_H_
 
+#include <cstdint>
+
 #include <fbl/array.h>
 
 #include "src/graphics/display/lib/edid/edid.h"

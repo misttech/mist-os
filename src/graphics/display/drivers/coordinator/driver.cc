@@ -4,11 +4,16 @@
 
 #include "src/graphics/display/drivers/coordinator/driver.h"
 
+#include <lib/zx/channel.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 
 #include <cstdint>
+#include <utility>
 
+#include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 
 namespace display {
 

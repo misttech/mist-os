@@ -7,6 +7,7 @@
 #include <zircon/assert.h>
 
 #include <cinttypes>
+#include <cstdint>
 
 namespace display {
 

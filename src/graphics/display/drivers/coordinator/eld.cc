@@ -4,6 +4,16 @@
 
 #include "src/graphics/display/drivers/coordinator/eld.h"
 
+#include <zircon/assert.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+
+#include <fbl/array.h>
+
+#include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/eld/eld.h"
 
 namespace display {

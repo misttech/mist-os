@@ -9,35 +9,25 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async/cpp/receiver.h>
 #include <lib/async/cpp/task.h>
-#include <lib/async/cpp/wait.h>
-#include <lib/fidl/cpp/wire/array.h>
-#include <lib/fidl/cpp/wire/server.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/completion.h>
-#include <lib/zx/channel.h>
-#include <lib/zx/event.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
-#include <zircon/errors.h>
-#include <zircon/fidl.h>
 #include <zircon/types.h>
 
 #include <cstdint>
-#include <cstring>
 #include <list>
 #include <map>
 #include <memory>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
-#include <ddktl/device.h>
+#include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
-#include <fbl/intrusive_hash_table.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/ring_buffer.h>
 #include <fbl/vector.h>

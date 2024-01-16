@@ -6,6 +6,8 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_MIGRATION_UTIL_H_
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
