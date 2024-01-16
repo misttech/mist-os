@@ -61,6 +61,7 @@ if (is_fuchsia) {
 
 if (current_toolchain == default_toolchain) {
   kernel_zbi_test("early-boot-single-process-test") {
+    generate_cuckoo = false
     deps = [ ":early-boot-single-process-test-bin" ]
     device_types = [
       "AEMU",
@@ -72,6 +73,7 @@ if (current_toolchain == default_toolchain) {
   }
 
   kernel_zbi_test("early-boot-multiple-process-test") {
+    generate_cuckoo = false
     deps = [
       ":early-boot-multiple-process-test-bin",
       "data-publisher:early-boot-data-publisher-bin",
