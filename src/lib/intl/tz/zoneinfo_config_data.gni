@@ -83,18 +83,16 @@ template("zoneinfo_config_data") {
     }
   }  # /foreach
 
-  if (invoker.include_revision_file) {
-    revision_target_label = "_${target_name}_revision_txt"
-    sub_targets += [ ":${revision_target_label}" ]
-    config_data(revision_target_label) {
-      forward_variables_from(invoker,
-                             [
-                               "for_pkg",
-                               "testonly",
-                             ])
-      sources = [ "//prebuilt/third_party/zoneinfo/version.txt" ]
-      outputs = [ "tzdata/revision.txt" ]
-    }
+  revision_target_label = "_${target_name}_revision_txt"
+  sub_targets += [ ":${revision_target_label}" ]
+  config_data(revision_target_label) {
+    forward_variables_from(invoker,
+                           [
+                             "for_pkg",
+                             "testonly",
+                           ])
+    sources = [ "//prebuilt/third_party/zoneinfo/version.txt" ]
+    outputs = [ "tzdata/revision.txt" ]
   }
 
   group(target_name) {
