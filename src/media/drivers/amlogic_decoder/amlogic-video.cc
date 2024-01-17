@@ -38,7 +38,6 @@
 #include "mpeg12_decoder.h"
 #include "pts_manager.h"
 #include "registers.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/memory_barriers/memory_barriers.h"
 #include "src/media/lib/internal_buffer/internal_buffer.h"
 #include "util.h"
@@ -59,8 +58,8 @@ namespace amlogic_decoder {
 //  search_pattern_ - HW only reads this
 //  parser_input_ - not used when secure)
 
-// TODO(https://fxbug.dev/41972): bti::release_quarantine() or zx_bti_release_quarantine() somewhere during
-// startup, after HW is known idle, before we allocate anything from sysmem.
+// TODO(https://fxbug.dev/41972): bti::release_quarantine() or zx_bti_release_quarantine() somewhere
+// during startup, after HW is known idle, before we allocate anything from sysmem.
 
 namespace {
 
@@ -850,6 +849,19 @@ void AmlogicVideo::SetMetrics(CodecMetrics* metrics) {
   metrics_ = metrics;
 }
 
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
+std::string GetObjectName(zx_handle_t handle) {
+  char name[ZX_MAX_NAME_LEN];
+  zx_status_t status = zx_object_get_property(handle, ZX_PROP_NAME, name, sizeof(name));
+  return status == ZX_OK ? std::string(name) : std::string();
+}
+
 zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
   TRACE_DURATION("media", "AmlogicVideo::InitRegisters");
   parent_ = parent;
@@ -925,10 +937,12 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
 
   if (is_tee_available_) {
     tee_proto_client_.Bind(std::move(endpoints->client));
-    // TODO(https://fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware TA
+    // TODO(https://fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware
+    // TA
     LOG(INFO, "Got ZX_PROTOCOL_TEE");
   } else {
-    // TODO(https://fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware TA
+    // TODO(https://fxbug.dev/39808): remove log spam once we're loading firmware via video_firmware
+    // TA
     LOG(INFO, "Skipped ZX_PROTOCOL_TEE");
   }
 
@@ -1042,10 +1056,12 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
     return status;
   }
 
+  auto pid = GetKoid(zx_process_self());
+  auto name = GetObjectName(zx_process_self());
+
   fidl::Arena arena;
-  fidl::StringView process_name(arena, fsl::GetCurrentProcessName());
-  auto set_debug_client_info_result =
-      sysmem_->SetDebugClientInfo(std::move(process_name), fsl::GetCurrentProcessKoid());
+  fidl::StringView process_name(arena, name);
+  auto set_debug_client_info_result = sysmem_->SetDebugClientInfo(std::move(process_name), pid);
   if (!set_debug_client_info_result.ok()) {
     DECODE_ERROR("sending SetDebugClientInfo failed: %s",
                  set_debug_client_info_result.status_string());
