@@ -19,11 +19,6 @@ the Fuchsia SDK.
 Note: For more details on the driver framework, see the
 [Driver Concepts][concepts-drivers].
 
-## Prerequisites
-
-*   [Fuchsia SDK fundamentals][guide-fundamentals]
-*   [Get started with driver development][driver-get-started]
-
 ## What you'll learn
 
 *   Discovering and binding to device nodes
@@ -38,7 +33,7 @@ Note: For more details on the driver framework, see the
     flow, you might run into issues. To help us improve, please
     [file a bug][sdk-bug]{:.external} if you discover issues on macOS.
 
-*   A configured [Fuchsia SDK environment][driver-get-started]
+*   A configured [Fuchsia SDK environment][driver-get-started]{:.external}
 *   [Emulator product bundle][driver-product-bundle]
     for `core.x64`
 
@@ -76,8 +71,8 @@ alias bazel=tools/bazel
 [concepts-components]: /docs/concepts/components/v2/introduction.md
 [concepts-driver-framework]: /docs/concepts/drivers/driver_framework.md
 [concepts-drivers]: /docs/concepts/drivers/README.md
-[driver-get-started]: /docs/get-started/sdk/get-started-with-driver.md
-[driver-product-bundle]: /docs/get-started/sdk/get-started-with-driver.md#start-the-emulator
+[driver-get-started]: https://fuchsia.googlesource.com/sdk-samples/drivers
+[driver-product-bundle]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
 [guide-fuchsia-emulator]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
 [guide-fundamentals]: /docs/get-started/sdk/learn/README.md
 [qemu]: https://www.qemu.org/

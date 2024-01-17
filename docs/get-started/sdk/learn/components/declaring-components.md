@@ -10,7 +10,7 @@
 
 The Fuchsia SDK system provides Bazel rules to build and package software
 into Fuchsia components. The
-[Fuchsia SDK environment](/docs/get-started/sdk/index.md#clone-the-sdk-samples-repository)
+[Fuchsia SDK environment](https://fuchsia.googlesource.com/sdk-samples/getting-started/){:.external}
 makes these rules available within a
 [Bazel workspace](https://bazel.build/concepts/build-ref#workspace){:.external}
 directory.

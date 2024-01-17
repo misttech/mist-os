@@ -14,13 +14,13 @@ Let's explore some of these fundamental concepts on a running system. In
 this exercise, you'll see how jobs and processes interact to form a tree.
 
 Note: To ensure that you’re using the right version of `ffx` (which
- needs to match the version of the SDK), consider updating your `PATH` to include
- the SDK's `tools` directory (for instance, `export
- PATH="$PATH:$HOME/getting-started/tools"`). However, if you don't wish to
- update your `PATH`, ensure that you specify the relative path (for instance,
- `tools/ffx`) or absolute path (for instance, `~/getting-started/tools/ffx`) to
- the tools in the [SDK samples repository][clone-the-sdk] whenever you run these
- commands.
+needs to match the version of the SDK), consider updating your `PATH` to include
+the SDK's `tools` directory (for instance, `export
+PATH="$PATH:$HOME/getting-started/tools"`). However, if you don't wish to
+update your `PATH`, ensure that you specify the relative path (for instance,
+`tools/ffx`) or absolute path (for instance, `~/getting-started/tools/ffx`) to
+the tools in the [SDK samples repository][clone-the-sdk]{:.external} whenever
+you run these commands.
 
 <<../_common/_start_femu.md>>
 
@@ -99,4 +99,4 @@ security model.
 
 <!-- Reference links -->
 
-[clone-the-sdk]: /docs/get-started/sdk/index.md#clone-the-sdk-samples-repository
+[clone-the-sdk]: https://fuchsia.googlesource.com/sdk-samples/getting-started/

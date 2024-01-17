@@ -253,7 +253,7 @@ be provided to libmagma using [magma_device_import][magmaheader]. If there are
 multiple magma devices on the system, the driver will have to use `magma_query`
 with `MAGMA_QUERY_VENDOR_ID` to determine which to device to use.
 
-After this stage the [magma_*][magmaheader] functions will work, so `ioctl()`
+After this stage the [`magma_*`][magmaheader] functions will work, so `ioctl()`
 calls can gradually be converted over to equivalent Magma calls.
 
 Testing at this stage:
@@ -332,6 +332,8 @@ The MSD and ICD must be updated with new code drops from the hardware vendor.
 Ideally the code is upstreamed and the GPU vendor will supply and maintain
 the system driver using the Zircon DDK.
 
+<!-- Reference links -->
+
 [glossary.bootfs]: /docs/glossary/README.md#bootfs
 [paving]: /docs/development/build/fx.md#what-is-paving
 [boarddriver]: /docs/development/drivers/concepts/device_driver_model/platform-bus.md
@@ -368,7 +370,7 @@ the system driver using the Zircon DDK.
 [extmemoryspec]: https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_FUCHSIA_external_memory.html
 [extsemaphorespec]: https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VK_FUCHSIA_external_semaphore.html
 [package-deployment]: /docs/development/build/fx.md#package_deployment_options
-[sdk-get-started]: /docs/get-started/sdk/index.md
+[sdk-get-started]: /docs/development/sdk/index.md
 [bazel]: https://bazel.build/
 [rules_foreign_cc]: https://github.com/bazelbuild/rules_foreign_cc
 [HLCPP]: /docs/reference/fidl/bindings/hlcpp-bindings.md

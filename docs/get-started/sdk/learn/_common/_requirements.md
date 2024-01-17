@@ -4,10 +4,10 @@
     flow, you might run into issues. To help us improve, please
     [file a bug][sdk-bug]{:.external} if you discover issues on macOS.
 
-*   A configured [Fuchsia SDK environment][get-started]
+*   A configured [Fuchsia SDK environment][get-started]{:.external}
 *   [Emulator product bundle][start-femu] for `workstation_eng.qemu-x64`
 
 
-[get-started]: /docs/get-started/sdk/index.md
-[start-femu]: /docs/get-started/sdk/index.md#start-the-emulator
+[get-started]: https://fuchsia.googlesource.com/sdk-samples/getting-started
+[start-femu]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
 [sdk-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Bazel

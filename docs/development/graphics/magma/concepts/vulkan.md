@@ -148,5 +148,5 @@ Again, may be an application error or driver bug. If you believe your app is inn
 [cml]: /docs/concepts/components/v2/component_manifests.md
 [environment]: /docs/contribute/testing/environments.md
 [vulkan_envs]: /src/lib/vulkan/vulkan.gni
-[bazel-sdk]: /docs/get-started/sdk/index.md
+[bazel-sdk]: /docs/development/sdk/index.md
 [validation-layers]: https://github.com/KhronosGroup/Vulkan-ValidationLayers

@@ -194,7 +194,7 @@ from [Configuring workflow](#rust-configure-workflow):
 
 ### Bazel
 
-The [Fuchsia SDK][sdk-get-started] uses the Bazel build system. The
+The [Fuchsia SDK][sdk-get-started]{:.external} uses the Bazel build system. The
 [Bazel extension][bazel-vscode-ext]{:.external} can build and run components
 directly from VS Code.
 
@@ -214,5 +214,6 @@ directly from VS Code.
 [extension-link]: https://marketplace.visualstudio.com/items?itemName=fuchsia-authors.vscode-fuchsia
 [structured-config-json5]: /docs/development/components/configuration/structured_config.md
 [bazel-vscode-ext]: https://marketplace.visualstudio.com/items?itemName=BazelBuild.vscode-bazel
-[sdk-get-started]: /docs/get-started/sdk/index.md?ide=vscode
+[sdk-get-started]: https://fuchsia.googlesource.com/sdk-samples/getting-started
+
 [code-workspace]: /docs/reference/tools/editors#fuchsia.code-workspace

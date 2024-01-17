@@ -38,7 +38,7 @@ target devices and allows you to easily switch between various Fuchsia devices.
 You can only connect to a single device at any given time.
 
 Note: For more information on getting started with the Fuchsia SDK and starting
-an emulator, see [Get started with the Fuchsia SDK][get-started-sdk].
+an emulator, see [Get started with the Fuchsia SDK][get-started-sdk]{:.external}.
 
 If your emulator is properly configured and started, you should see a
 <span class="material-icons">computer</span> and the
@@ -433,7 +433,7 @@ Once you have started the debugger:
   [Debug actions][vscode-debug-actions]{: .external}.
 
 [fuchsia-dev-ext]: /docs/reference/tools/editors/vscode/fuchsia-ext-install.md
-[get-started-sdk]: /docs/get-started/sdk/index.md
+[get-started-sdk]: https://fuchsia.googlesource.com/sdk-samples/getting-started
 [sdk-start-emulator]: /docs/development/sdk/ffx/start-the-fuchsia-emulator.md
 [zx_clock_get_monotonic]: /reference/syscalls/clock_get_monotonic.md
 [add-tags-logging]: /docs/development/languages/rust/logging.md#add_tags

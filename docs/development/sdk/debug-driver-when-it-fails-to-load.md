@@ -269,7 +269,7 @@ the Driver codelab.
 [driver-framework]: /docs/concepts/drivers/driver_framework.md
 [driver-binding]: /docs/concepts/drivers/driver_binding.md
 [fuchsia-package-server]: /docs/development/sdk/ffx/create-a-package-repository.md
-[bazel-run]: /docs/get-started/sdk/get-started-with-driver.md#build-and-load-the-sample-driver
+[bazel-run]: https://fuchsia.googlesource.com/sdk-samples/drivers
 [fuchsia-pci-bind]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/bind/fuchsia.pci/fuchsia.pci.bind
 [ffx-component-show]: /docs/development/sdk/ffx/view-component-information.md
 [ffx-log]: /docs/development/sdk/ffx/view-device-logs.md
