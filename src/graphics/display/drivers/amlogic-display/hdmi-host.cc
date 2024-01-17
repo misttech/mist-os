@@ -115,7 +115,7 @@ pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
   // clocks. This will do for now.
   params.viu_channel = 1;
   params.viu_type = VIU_ENCP;
-  params.vid_pll_div = VID_PLL_DIV_5;
+  params.vid_pll_divider_ratio = 5.0;
   params.vid_clk_div = 2;
   params.hdmi_tx_pixel_div = 1;
   params.encp_div = 1;

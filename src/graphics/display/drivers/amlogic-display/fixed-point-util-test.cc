@@ -34,6 +34,23 @@ TEST(DoubleToU28p4Test, Correctness) {
   EXPECT_EQ(ToU28_4(268435455.9375), 0xffff'fff'fu);
 }
 
+TEST(IntToU28p4Test, Correctness) {
+  EXPECT_EQ(ToU28_4(0), 0x0'0u);
+  EXPECT_EQ(ToU28_4(1), 0x1'0u);
+  EXPECT_EQ(ToU28_4(2), 0x2'0u);
+  EXPECT_EQ(ToU28_4(3), 0x3'0u);
+  EXPECT_EQ(ToU28_4(4), 0x4'0u);
+  EXPECT_EQ(ToU28_4(5), 0x5'0u);
+  EXPECT_EQ(ToU28_4(6), 0x6'0u);
+  EXPECT_EQ(ToU28_4(7), 0x7'0u);
+  EXPECT_EQ(ToU28_4(12), 0xc'0u);
+  EXPECT_EQ(ToU28_4(14), 0xe'0u);
+  EXPECT_EQ(ToU28_4(15), 0xf'0u);
+
+  // The maximum int number which can be represented in U28.4 format.
+  EXPECT_EQ(ToU28_4(0xFFF'FFFF), 0xFFFF'FFF0u);
+}
+
 TEST(U28p4ToDouble, ConversionIsPrecise) {
   EXPECT_EQ(U28_4ToDouble(0x0'0), 0.0);
   EXPECT_EQ(U28_4ToDouble(0x1'0), 1.0);

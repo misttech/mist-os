@@ -13,6 +13,7 @@
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 
 namespace amlogic_display {
@@ -310,22 +311,17 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_clock_enabled(false).WriteTo(&*hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
-  // Disable the div output clock
-  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/19,
-                                     /*field_size_bits=*/1, /*field_value=*/0),
-                     HHI_VID_PLL_CLK_DIV);
-  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/15,
-                                     /*field_size_bits=*/1, /*field_value=*/0),
-                     HHI_VID_PLL_CLK_DIV);
+  // Sets the HDMI clock tree frequency division ratio to 1.
 
-  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/18,
-                                     /*field_size_bits=*/1, /*field_value=*/1),
-                     HHI_VID_PLL_CLK_DIV);  // Undocumented register bit
+  // Disable the HDMI clock tree output
+  HdmiClockTreeControl hdmi_clock_tree_control = HdmiClockTreeControl::Get().ReadFrom(&*hhi_mmio_);
+  hdmi_clock_tree_control.set_clock_output_enabled(false).WriteTo(&*hhi_mmio_);
+
+  hdmi_clock_tree_control.set_preset_pattern_update_enabled(false).WriteTo(&*hhi_mmio_);
+  hdmi_clock_tree_control.SetFrequencyDividerRatio(ToU28_4(1.0)).WriteTo(&*hhi_mmio_);
 
   // Enable the final output clock
-  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/19,
-                                     /*field_size_bits=*/1, /*field_value=*/1),
-                     HHI_VID_PLL_CLK_DIV);  // Undocumented register bit
+  hdmi_clock_tree_control.set_clock_output_enabled(true).WriteTo(&*hhi_mmio_);
 
   // Enable DSI measure clocks.
   VideoInputMeasureClockControl::Get()

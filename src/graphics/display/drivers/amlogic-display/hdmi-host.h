@@ -16,22 +16,6 @@
 
 namespace amlogic_display {
 
-#define VID_PLL_DIV_1 0
-#define VID_PLL_DIV_2 1
-#define VID_PLL_DIV_3 2
-#define VID_PLL_DIV_3p5 3
-#define VID_PLL_DIV_3p75 4
-#define VID_PLL_DIV_4 5
-#define VID_PLL_DIV_5 6
-#define VID_PLL_DIV_6 7
-#define VID_PLL_DIV_6p25 8
-#define VID_PLL_DIV_7 9
-#define VID_PLL_DIV_7p5 10
-#define VID_PLL_DIV_12 11
-#define VID_PLL_DIV_14 12
-#define VID_PLL_DIV_15 13
-#define VID_PLL_DIV_2p5 14
-
 enum viu_type {
   VIU_ENCL = 0,
   VIU_ENCI,
@@ -47,7 +31,9 @@ struct pll_param {
   uint32_t od1;
   uint32_t od2;
   uint32_t od3;
-  uint32_t vid_pll_div;
+
+  // TODO(https://fxbug.dev/320616654): Support fractional divider ratios.
+  int vid_pll_divider_ratio;
   uint32_t vid_clk_div;
   uint32_t hdmi_tx_pixel_div;
   uint32_t encp_div;
@@ -131,7 +117,8 @@ class HdmiHost {
   void ConfigPhy();
 
   void ConfigureHpllClkOut(uint32_t hpll);
-  void ConfigureOd3Div(uint32_t div_sel);
+  // TODO(https://fxbug.dev/320616654): Support fractional divider ratios.
+  void ConfigureHdmiClockTree(int divider_ratio);
   void WaitForPllLocked();
 
   std::unique_ptr<HdmiTransmitter> hdmi_transmitter_;

@@ -4,25 +4,10 @@
 
 #include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
-
-#define VID_PLL_DIV_1 0
-#define VID_PLL_DIV_2 1
-#define VID_PLL_DIV_3 2
-#define VID_PLL_DIV_3p5 3
-#define VID_PLL_DIV_3p75 4
-#define VID_PLL_DIV_4 5
-#define VID_PLL_DIV_5 6
-#define VID_PLL_DIV_6 7
-#define VID_PLL_DIV_6p25 8
-#define VID_PLL_DIV_7 9
-#define VID_PLL_DIV_7p5 10
-#define VID_PLL_DIV_12 11
-#define VID_PLL_DIV_14 12
-#define VID_PLL_DIV_15 13
-#define VID_PLL_DIV_2p5 14
 
 namespace amlogic_display {
 
@@ -110,7 +95,7 @@ void HdmiHost::ConfigurePll(const pll_param& pll_params) {
       .set_hdmi_dpll_od3(pll_params.od3 >> 1)
       .WriteTo(&hhi_mmio_);
 
-  ConfigureOd3Div(static_cast<uint8_t>(pll_params.vid_pll_div));
+  ConfigureHdmiClockTree(pll_params.vid_pll_divider_ratio);
 
   VideoClock1Control::Get()
       .ReadFrom(&hhi_mmio_)
@@ -206,121 +191,40 @@ void HdmiHost::ConfigureHpllClkOut(uint32_t hpll) {
   WaitForPllLocked();
 }
 
-void HdmiHost::ConfigureOd3Div(uint32_t div_sel) {
-  int shift_val = 0;
-  int shift_sel = 0;
+void HdmiHost::ConfigureHdmiClockTree(int divider_ratio) {
+  ZX_DEBUG_ASSERT_MSG(std::find(HdmiClockTreeControl::kSupportedFrequencyDividerRatios.begin(),
+                                HdmiClockTreeControl::kSupportedFrequencyDividerRatios.end(),
+                                ToU28_4(divider_ratio)) !=
+                          HdmiClockTreeControl::kSupportedFrequencyDividerRatios.end(),
+                      "HDMI clock tree divider ratio %d is not supported.", divider_ratio);
 
-  /* When div 6.25, need to reset vid_pll_div */
-  if (div_sel == VID_PLL_DIV_6p25) {
-    usleep(1);
-    /* TODO(https://fxbug.dev/69679): Add in Resets
-    auto result = display->reset_register_.WriteRegister32(PRESET0_REGISTER, 1 << 7, 1 << 7);
-    if ((result.status() != ZX_OK) || result->is_error()) {
-      zxlogf(ERROR, "Reset0 Set failed");
-    }
-    */
-  }
-  // Disable the output clock
-  HhiVidPllClkDivReg::Get()
-      .ReadFrom(&hhi_mmio_)
-      .set_clk_final_en(0)
-      .set_set_preset(0)
+  // TODO(https://fxbug.dev/42086073): When the divider ratio is 6.25, some
+  // Amlogic-provided code triggers a software reset of the `vid_pll_div` clock
+  // before setting the HDMI clock tree, while some other Amlogic-provided code
+  // doesn't do any reset.
+  //
+  // Currently fractional divider ratios are not supported; this needs to
+  // be addressed once we add fraction divider ratio support.
+
+  HdmiClockTreeControl hdmi_clock_tree_control = HdmiClockTreeControl::Get().ReadFrom(&hhi_mmio_);
+  hdmi_clock_tree_control.set_clock_output_enabled(false).WriteTo(&hhi_mmio_);
+
+  // This implementation deviates from the Amlogic-provided code.
+  //
+  // The Amlogic-provided code changes the pattern generator enablement, mode
+  // selection and the state in different register writes, while the current
+  // implementation changes all of them at the same time. Experiments on Khadas
+  // VIM3 (A311D) show that our implementation works correctly.
+  hdmi_clock_tree_control.ReadFrom(&hhi_mmio_)
+      .SetFrequencyDividerRatio(ToU28_4(divider_ratio))
+      .set_preset_pattern_update_enabled(true)
       .WriteTo(&hhi_mmio_);
 
-  switch (div_sel) {
-    case VID_PLL_DIV_1:
-      shift_val = 0xFFFF;
-      shift_sel = 0;
-      break;
-    case VID_PLL_DIV_2:
-      shift_val = 0x0aaa;
-      shift_sel = 0;
-      break;
-    case VID_PLL_DIV_3:
-      shift_val = 0x0db6;
-      shift_sel = 0;
-      break;
-    case VID_PLL_DIV_3p5:
-      shift_val = 0x36cc;
-      shift_sel = 1;
-      break;
-    case VID_PLL_DIV_3p75:
-      shift_val = 0x6666;
-      shift_sel = 2;
-      break;
-    case VID_PLL_DIV_4:
-      shift_val = 0x0ccc;
-      shift_sel = 0;
-      break;
-    case VID_PLL_DIV_5:
-      shift_val = 0x739c;
-      shift_sel = 2;
-      break;
-    case VID_PLL_DIV_6:
-      shift_val = 0x0e38;
-      shift_sel = 0;
-      break;
-    case VID_PLL_DIV_6p25:
-      shift_val = 0x0000;
-      shift_sel = 3;
-      break;
-    case VID_PLL_DIV_7:
-      shift_val = 0x3c78;
-      shift_sel = 1;
-      break;
-    case VID_PLL_DIV_7p5:
-      shift_val = 0x78f0;
-      shift_sel = 2;
-      break;
-    case VID_PLL_DIV_12:
-      shift_val = 0x0fc0;
-      shift_sel = 0;
-      break;
-    case VID_PLL_DIV_14:
-      shift_val = 0x3f80;
-      shift_sel = 1;
-      break;
-    case VID_PLL_DIV_15:
-      shift_val = 0x7f80;
-      shift_sel = 2;
-      break;
-    case VID_PLL_DIV_2p5:
-      shift_val = 0x5294;
-      shift_sel = 2;
-      break;
-    default:
-      zxlogf(ERROR, "Error: clocks_set_vid_clk_div:  Invalid parameter");
-      break;
-  }
+  hdmi_clock_tree_control.ReadFrom(&hhi_mmio_)
+      .set_preset_pattern_update_enabled(false)
+      .WriteTo(&hhi_mmio_);
 
-  if (shift_val == 0xffff) {  // if divide by 1
-    hhi_mmio_.Write32(SetFieldValue32(hhi_mmio_.Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/18,
-                                      /*field_size_bits=*/1, /*field_value=*/1),
-                      HHI_VID_PLL_CLK_DIV);
-    HhiVidPllClkDivReg::Get().ReadFrom(&hhi_mmio_).set_clk_div1(1).WriteTo(&hhi_mmio_);
-  } else {
-    HhiVidPllClkDivReg::Get()
-        .ReadFrom(&hhi_mmio_)
-        .set_clk_div1(0)
-        .set_clk_sel(0)
-        .set_set_preset(0)
-        .set_shift_preset(0)
-        .WriteTo(&hhi_mmio_);
-
-    HhiVidPllClkDivReg::Get()
-        .ReadFrom(&hhi_mmio_)
-        .set_clk_sel(shift_sel)
-        .set_set_preset(1)
-        .WriteTo(&hhi_mmio_);
-
-    HhiVidPllClkDivReg::Get()
-        .ReadFrom(&hhi_mmio_)
-        .set_shift_preset(shift_val)
-        .set_set_preset(0)
-        .WriteTo(&hhi_mmio_);
-  }
-  // Enable the final output clock
-  HhiVidPllClkDivReg::Get().ReadFrom(&hhi_mmio_).set_clk_final_en(1).WriteTo(&hhi_mmio_);
+  hdmi_clock_tree_control.ReadFrom(&hhi_mmio_).set_clock_output_enabled(true).WriteTo(&hhi_mmio_);
 }
 
 }  // namespace amlogic_display

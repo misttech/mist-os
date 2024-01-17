@@ -8,6 +8,7 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <limits>
 
 namespace amlogic_display {
 
@@ -25,6 +26,22 @@ inline constexpr uint32_t ToU28_4(double value) {
   ZX_ASSERT(value >= 0);
   uint32_t fixed_value = static_cast<uint32_t>(value * 16);
   ZX_ASSERT(static_cast<double>(fixed_value) / 16 == value);
+  return fixed_value;
+}
+
+// Lossless conversion from an integer `value` to a U28.4 fixed point number.
+//
+// The Um.n notation is defined in:
+// https://source.android.com/docs/core/audio/data_formats#q.
+//
+// The function will error on values that doesn't fit in a U28.4 fixed-point
+// number.
+//
+// TODO(https://fxbug.dev/113689): In C++20 this can be consteval.
+inline constexpr uint32_t ToU28_4(int value) {
+  ZX_ASSERT(value >= 0);
+  ZX_ASSERT(int64_t{value} * 16 <= std::numeric_limits<uint32_t>::max());
+  uint32_t fixed_value = static_cast<uint32_t>(int64_t{value} * 16);
   return fixed_value;
 }
 

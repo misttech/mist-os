@@ -17,7 +17,6 @@
 #define HHI_MIPI_CNTL1 (0x001 << 2)
 #define HHI_MIPI_CNTL2 (0x002 << 2)
 #define HHI_GCLK_MPEG2 (0x052 << 2)
-#define HHI_VID_PLL_CLK_DIV (0x068 << 2)
 #define HHI_VDAC_CNTL0_G12A (0x0bb << 2)
 #define HHI_VDAC_CNTL1_G12A (0x0bc << 2)
 #define HHI_HDMI_PLL_CNTL0 (0x0c8 << 2)
@@ -254,20 +253,6 @@ class HhiHdmiPllVlockCntl : public hwreg::RegisterBase<HhiHdmiPllVlockCntl, uint
   DEF_BIT(0, hdmi_pll_vlock_cntl_en);
 
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllVlockCntl>(HHI_HDMI_PLL_VLOCK_CNTL); }
-};
-
-//
-// A311D datasheet Section 8.7.1.3 "HDMI Clock Tree" Figure 8-12 "HDMI Clock
-// Tree"
-class HhiVidPllClkDivReg : public hwreg::RegisterBase<HhiVidPllClkDivReg, uint32_t> {
- public:
-  DEF_BIT(19, clk_final_en);
-  DEF_BIT(18, clk_div1);
-  DEF_FIELD(17, 16, clk_sel);
-  DEF_BIT(15, set_preset);
-  DEF_FIELD(14, 0, shift_preset);
-
-  static auto Get() { return hwreg::RegisterAddr<HhiVidPllClkDivReg>(HHI_VID_PLL_CLK_DIV); }
 };
 
 class HhiGclkMpeg2Reg : public hwreg::RegisterBase<HhiGclkMpeg2Reg, uint32_t> {
