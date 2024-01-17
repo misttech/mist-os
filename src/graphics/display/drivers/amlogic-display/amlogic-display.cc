@@ -48,7 +48,6 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace amlogic_display {
@@ -1208,9 +1207,16 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   return ZX_OK;
 }
 
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
+}
+
 zx_status_t AmlogicDisplay::InitializeSysmemAllocator() {
   ZX_ASSERT(sysmem_.is_valid());
-  const zx_koid_t current_process_koid = fsl::GetCurrentProcessKoid();
+  const zx_koid_t current_process_koid = GetKoid(zx_process_self());
   const std::string debug_name = fxl::StringPrintf("amlogic-display[%lu]", current_process_koid);
   fidl::OneWayStatus set_debug_status =
       sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name), current_process_koid);
