@@ -41,9 +41,8 @@ zx::result<> MagmaDevice::Initialize(const fidl::ClientEnd<fuchsia_io::Directory
           fidl::WireUnownedResult<fuchsia_gpu_magma::IcdLoaderDevice::GetIcdList>& result) {
         FIT_DCHECK_IS_THREAD_VALID(main_thread_);
         if (!result.ok()) {
-          FX_LOGS(ERROR) << "GetIcdList transport error: " << result;
-          app()->RemoveDevice(this);
-          return;
+          FX_LOGS(ERROR) << "GetIcdList transport error: " << result.error();
+          return;  // Device will be removed by `on_fidl_error`.
         }
         uint32_t i = 0;
         for (auto& icd : result->icd_list) {
