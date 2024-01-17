@@ -4,8 +4,8 @@
 
 use quote::quote;
 use syn::{
-    parse::Parse, parse_macro_input, punctuated::Punctuated, Generics, Ident, Lit, Path, Token,
-    Type,
+    parse::Parse, parse_macro_input, punctuated::Punctuated, Attribute, Generics, Ident, Lit, Path,
+    Token, Type,
 };
 
 // TODO(b/316034512): Derive macro for structs and enums
@@ -23,6 +23,20 @@ use syn::{
 /// * `impl`s omit the trait, since the trait is always known.
 ///
 ///   Example: `impl for serde_json::Value = json::Any`
+///
+/// * `type` and `impl` can use the `#[transparent]` attribute to emit the raw schema type instead
+///   of wrapping it in a type alias.
+///
+/// * `fn` declares a plain `[ffx_validation::schema::Walker]` function without an internal type
+///   alias.
+///
+///   Example: `fn reusable_schema = u32 | bool;`
+///
+/// * `fn` can use the `#[foreign(RealType)]` attribute to create a type alias for a type declared
+///   outside of the current crate.
+///
+///   Example: `#[foreign(Point2D)] fn point2d = struct { x: f32, y: f32 };`
+///   `type Polygon = struct { points: [fn point2d], center: fn point2d };`
 ///
 /// ## Types
 ///
@@ -82,16 +96,33 @@ struct SchemaField<K, V = K> {
     value: V,
 }
 
-struct StructItemImpl {
-    // TODO: #[transparent] attribute to remove add_alias
+#[derive(Default)]
+struct ImplItemAttr {
+    transparent: bool,
+}
+
+struct SchemaImplItem {
     generics: Generics,
-    name: Ident,
     impl_path: proc_macro2::TokenStream,
     ty: SchemaType,
+    attr: ImplItemAttr,
+}
+
+#[derive(Default)]
+struct FnItemAttr {
+    foreign: Option<Type>,
+}
+
+struct SchemaFnItem {
+    name: Ident,
+    generics: Generics,
+    ty: SchemaType,
+    attr: FnItemAttr,
 }
 
 enum SchemaItem {
-    Impl(StructItemImpl),
+    Impl(SchemaImplItem),
+    Fn(SchemaFnItem),
 }
 
 struct SchemaItems {
@@ -116,22 +147,74 @@ enum SchemaType {
         // TODO(b/316035686): Struct attributes (for #[strict])
     },
     // TODO: enums
-    // TODO: fn <path> to indicate a direct call to a walker function
+    Fn(Path),
     Optional(Box<SchemaType>),
 }
 
+impl ImplItemAttr {
+    fn from_attrs(attrs: &mut Vec<Attribute>) -> syn::Result<Self> {
+        let mut out = Self::default();
+        attrs.retain_mut(|attr| {
+            if attr.path.is_ident("transparent") {
+                out.transparent = true;
+                false
+            } else {
+                true
+            }
+        });
+        Ok(out)
+    }
+}
+
+impl FnItemAttr {
+    fn from_attrs(attrs: &mut Vec<Attribute>) -> syn::Result<Self> {
+        let mut out = Self::default();
+        let mut errors = Vec::new();
+        attrs.retain_mut(|attr| {
+            if attr.path.is_ident("foreign") {
+                let res =
+                    attr.parse_args_with(|input: syn::parse::ParseStream<'_>| -> syn::Result<()> {
+                        let paren;
+                        syn::parenthesized!(paren in input);
+                        let ty = paren.parse()?;
+                        paren.parse::<syn::parse::Nothing>()?;
+                        out.foreign = Some(ty);
+                        Ok(())
+                    });
+
+                if let Err(err) = res {
+                    errors.push(err);
+                }
+
+                false
+            } else {
+                true
+            }
+        });
+        Ok(out)
+    }
+}
+
 // Parses:
-// type Type<T> where T: Trait = `SchemaType`;
-// impl<T> for module::ImplPath<T> where T: Trait = `SchemaType`;
+// `Attribute...` type Type<T> where T: Trait = `SchemaType`;
+// `Attribute...` impl<T> for module::ImplPath<T> where T: Trait = `SchemaType`;
+// `Attribute...` fn module::fn_path = `SchemaType`;
 impl Parse for SchemaItem {
     fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let mut attrs = Vec::new();
+
+        if input.peek(Token![#]) {
+            attrs = Attribute::parse_outer(input)?;
+        }
+
         let lookahead = input.lookahead1();
+
         Ok(if lookahead.peek(Token![type]) {
             // type Type<T> where T: Trait = T...;
 
             input.parse::<Token![type]>()?;
 
-            let name = input.parse()?;
+            let name = input.parse::<Ident>()?;
 
             let mut generics = if input.lookahead1().peek(Token![<]) {
                 input.parse::<Generics>()?
@@ -151,7 +234,12 @@ impl Parse for SchemaItem {
 
             let ty = input.parse()?;
 
-            Self::Impl(StructItemImpl { generics, name, impl_path, ty })
+            Self::Impl(SchemaImplItem {
+                generics,
+                impl_path,
+                ty,
+                attr: ImplItemAttr::from_attrs(&mut attrs)?,
+            })
         } else if lookahead.peek(Token![impl]) {
             // impl<T> for module::ImplPath<T> where T: Trait = T...;
 
@@ -182,40 +270,93 @@ impl Parse for SchemaItem {
             input.parse::<Token![=]>()?;
             let ty = input.parse()?;
 
-            Self::Impl(StructItemImpl {
+            Self::Impl(SchemaImplItem {
                 generics,
-                name: path.segments.last().unwrap().ident.clone(),
                 impl_path: quote!(#path),
                 ty,
+                attr: ImplItemAttr::from_attrs(&mut attrs)?,
             })
         } else if lookahead.peek(Token![enum]) {
             return Err(input.error("inline enums not yet supported"));
         } else if lookahead.peek(Token![fn]) {
-            return Err(input.error("fn references not yet supported"));
+            input.parse::<Token![fn]>()?;
+
+            let name = input.parse()?;
+            let generics = if input.lookahead1().peek(Token![<]) {
+                input.parse::<Generics>()?
+            } else {
+                Default::default()
+            };
+
+            input.parse::<Token![=]>()?;
+            let ty = input.parse()?;
+
+            Self::Fn(SchemaFnItem { name, generics, ty, attr: FnItemAttr::from_attrs(&mut attrs)? })
         } else {
             return Err(lookahead.error());
         })
     }
 }
 
-impl StructItemImpl {
+fn maybe_wrap_alias(
+    ty: Option<impl quote::ToTokens>,
+    walker: &proc_macro2::TokenStream,
+    body: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    if let Some(ty) = ty {
+        quote! {
+            #walker
+                .add_alias(
+                    ::std::any::type_name::<#ty>(),
+                    ::std::any::TypeId::of::<#ty>(),
+                    |#walker| {
+                        #body
+                        #walker.ok()
+                    }
+                )?;
+        }
+    } else {
+        body
+    }
+}
+
+impl SchemaImplItem {
     fn build(&self) -> proc_macro2::TokenStream {
-        let StructItemImpl { generics, name, impl_path, ty } = self;
-        let name_str = name.to_string();
+        let SchemaImplItem { generics, impl_path, ty, attr } = self;
         let walker = quote! { walker };
         let body = ty.build(&walker);
         let (impl_generics, _, where_clause) = generics.split_for_impl();
+
+        let fn_body = maybe_wrap_alias(
+            if attr.transparent { None } else { Some(<Token![Self]>::default()) },
+            &walker,
+            body,
+        );
+
         quote! {
             impl #impl_generics ::ffx_validation::schema::Schema for #impl_path #where_clause {
                 fn walk_schema(#walker: &mut dyn ::ffx_validation::schema::Walker) -> ::std::ops::ControlFlow<()> {
-                    // TODO: Use std::any::type_name
-                    #walker
-                        .add_alias(#name_str, ::std::any::TypeId::of::<Self>(), |#walker| {
-                            #body
-                            #walker.ok()
-                        })?
-                        .ok()
+                    #fn_body
+                    #walker.ok()
                 }
+            }
+        }
+    }
+}
+
+impl SchemaFnItem {
+    fn build(&self) -> proc_macro2::TokenStream {
+        let SchemaFnItem { name, generics, ty, attr } = self;
+        let walker = quote! { walker };
+        let (impl_generics, _, where_clause) = generics.split_for_impl();
+        let body = ty.build(&walker);
+
+        let fn_body = maybe_wrap_alias(attr.foreign.as_ref(), &walker, body);
+
+        quote! {
+            fn #name #impl_generics (#walker: &mut dyn ::ffx_validation::schema::Walker) -> ::std::ops::ControlFlow<()> #where_clause {
+                #fn_body
+                #walker.ok()
             }
         }
     }
@@ -225,6 +366,7 @@ impl SchemaItem {
     fn build(&self) -> proc_macro2::TokenStream {
         match self {
             SchemaItem::Impl(item) => item.build(),
+            SchemaItem::Fn(item) => item.build(),
         }
     }
 }
@@ -281,16 +423,27 @@ impl<K: Parse, V: Parse> Parse for SchemaField<K, V> {
 // `Type`
 impl Parse for SchemaType {
     fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
-        let mut ty = if input.parse::<Option<Token![struct]>>()?.is_some() {
+        let lookahead = input.lookahead1();
+        let mut ty = if lookahead.peek(Token![struct]) {
+            input.parse::<Token![struct]>()?;
             let braced;
             syn::braced!(braced in input);
             Self::Struct { fields: braced.parse_terminated(SchemaField::parse)? }
-        } else if input.parse::<Option<Token![const]>>()?.is_some() {
-            Self::Literal(input.parse::<SchemaLiteral>()?)
+        } else if lookahead.peek(Token![enum]) {
+            input.parse::<Token![enum]>()?;
+            return Err(input.error("not yet implemented"));
+        } else if lookahead.peek(Token![const]) {
+            input.parse::<Token![const]>()?;
+            Self::Literal(input.parse()?)
+        } else if lookahead.peek(Token![fn]) {
+            input.parse::<Token![fn]>()?;
+            Self::Fn(input.parse()?)
         } else if let Ok(ty) = input.parse::<Type>() {
             Self::Alias(ty)
         } else {
-            return Err(input.error("Expected type or literal"));
+            let mut err = lookahead.error();
+            err.combine(input.error("expected type"));
+            return Err(err);
         };
 
         if let Some(..) = input.parse::<Option<Token![?]>>()? {
@@ -335,6 +488,11 @@ impl SchemaType {
                         &[#fields],
                         None
                     )?;
+                }
+            }
+            Self::Fn(path) => {
+                quote! {
+                    #path(#walker)?;
                 }
             }
             Self::Optional(ty) => {

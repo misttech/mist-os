@@ -18,6 +18,11 @@ mod test {
     struct Generic<T>(T);
     struct NotASchema<T>(T);
 
+    struct Transparent;
+
+    #[allow(dead_code)]
+    struct ForeignType;
+
     // Schema macro syntax tests.
     schema! {
         type RustType = Option<u32>;
@@ -33,5 +38,10 @@ mod test {
 
         type Generic<T> where T: Schema + 'static = T;
         impl<T> for Generic<NotASchema<T>> where T: Schema + 'static = T;
+
+        #[transparent] type Transparent = u32;
+
+        fn my_lone_function = Option<InlineStruct>;
+        #[foreign(ForeignType)] fn foreign_schema = (i32, i32, i32);
     }
 }
