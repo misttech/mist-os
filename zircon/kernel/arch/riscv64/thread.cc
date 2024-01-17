@@ -22,6 +22,13 @@
 // stack alignment requirements per ABI
 static_assert(sizeof(riscv64_context_switch_frame) % 16 == 0);
 
+// A scratch word of memory to store into during context switches to wipe out any existing
+// memory reservation in a LR/SC sequence. It is explicitly aligned and not shared with any
+// other variables in the system to avoid it being aliased with another atomic.
+namespace {
+uint32_t memory_reservation_scratch __CPU_ALIGN_EXCLUSIVE;
+}  // anonymous namespace
+
 void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
   // zero out the entire arch state, including fpu state, which defaults to all zero
   t->arch() = {};
@@ -94,6 +101,9 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   LTRACEF("old %p (%s), new %p (%s)\n", oldthread, oldthread->name(), newthread, newthread->name());
+
+  // Wipe out any LR/SC reservations this cpu may have.
+  __asm__ volatile("sc.w zero, zero, %0" ::"A"(memory_reservation_scratch) : "memory");
 
   // FPU context switch
   // Based on a combination of the current hardware state and whether or not the threads have
