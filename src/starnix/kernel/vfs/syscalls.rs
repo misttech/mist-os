@@ -711,8 +711,7 @@ pub fn sys_newfstatat(
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) != 0 {
-        // TODO(https://fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
-        not_implemented!("newfstatat", flags);
+        not_implemented!(fxb@297370602, "newfstatat", flags);
         return error!(ENOSYS);
     }
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
@@ -1685,16 +1684,14 @@ pub fn sys_timerfd_create(
             if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
                 return error!(EPERM);
             }
-            // TODO(https://fxbug.dev/121415): Add proper support for _ALARM clocks.
-            not_implemented!("timerfd_create: CLOCK_BOOTTIME_ALARM");
+            not_implemented!(fxb@297375023, "timerfd_create: CLOCK_BOOTTIME_ALARM");
             TimerFileClock::Monotonic
         }
         CLOCK_REALTIME_ALARM => {
             if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
                 return error!(EPERM);
             }
-            // TODO(https://fxbug.dev/121415): Add proper support for _ALARM clocks.
-            not_implemented!("timerfd_create: CLOCK_REALTIME_ALARM");
+            not_implemented!(fxb@297375023, "timerfd_create: CLOCK_REALTIME_ALARM");
             TimerFileClock::Realtime
         }
         CLOCK_REALTIME => TimerFileClock::Realtime,
@@ -1749,8 +1746,7 @@ pub fn sys_timerfd_settime(
     }
 
     if flags & TFD_TIMER_CANCEL_ON_SET != 0 {
-        // TODO(https://fxbug.dev/121607): Respect the cancel on set.
-        not_implemented!("timerfd_settime: TFD_TIMER_CANCEL_ON_SET");
+        not_implemented!(fxb@297433837, "timerfd_settime: TFD_TIMER_CANCEL_ON_SET");
     }
 
     let file = current_task.files.get(fd)?;

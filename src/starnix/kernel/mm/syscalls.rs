@@ -332,8 +332,7 @@ pub fn sys_membarrier(
     _flags: u32,
     _cpu_id: i32,
 ) -> Result<u32, Errno> {
-    // TODO(https://fxbug.dev/103867): This membarrier implementation does not do any real work.
-    not_implemented!("membarrier", cmd);
+    not_implemented!(fxb@297526152, "membarrier", cmd);
     match cmd {
         uapi::membarrier_cmd_MEMBARRIER_CMD_QUERY => Ok(0),
         uapi::membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ => Ok(0),
@@ -487,8 +486,7 @@ pub fn sys_mlock(
     _addr: UserAddress,
     _length: usize,
 ) -> Result<(), Errno> {
-    // TODO(https://fxbug.dev/297591218): Implement mlock.
-    not_implemented!("mlock not implemented");
+    not_implemented!(fxb@297591218, "mlock not implemented");
     Ok(())
 }
 
@@ -498,8 +496,7 @@ pub fn sys_munlock(
     _addr: UserAddress,
     _length: usize,
 ) -> Result<(), Errno> {
-    // TODO(https://fxbug.dev/297591218): Implement munlock.
-    not_implemented!("munlock not implemented");
+    not_implemented!(fxb@297591218, "munlock not implemented");
     Ok(())
 }
 

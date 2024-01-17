@@ -242,7 +242,7 @@ impl NetlinkSocketInner {
         }
 
         if self.passcred {
-            not_implemented!("fxb/128863 SCM_CREDENTIALS/SO_PASSCRED");
+            not_implemented!(fxb@297373991, "SCM_CREDENTIALS/SO_PASSCRED");
             info.ancillary_data.push(AncillaryData::Unix(UnixControlData::unknown_creds()));
         }
 

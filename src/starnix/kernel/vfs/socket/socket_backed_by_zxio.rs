@@ -371,9 +371,7 @@ impl SocketOps for ZxioBackedSocket {
         let optval = task.mm().read_buffer(&user_opt)?;
 
         if level == SOL_SOCKET && optname == SO_ATTACH_FILTER {
-            not_implemented!(
-                "TODO(https://fxbug.dev/129596): `SOL_SOCKET` -> `SO_ATTACH_FILTER` unsupported; returning success anyways"
-            );
+            not_implemented!(fxb@42079971, "SOL_SOCKET.SO_ATTACH_FILTER");
             return Ok(());
         }
 
