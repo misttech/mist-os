@@ -379,12 +379,9 @@ impl LogsArtifactsContainer {
     }
 
     /// Updates log stats in inspect and push the message onto the container's buffer.
-    pub fn ingest_message(&self, mut message: StoredMessage) {
+    pub fn ingest_message(&self, message: StoredMessage) {
         self.budget.allocate(message.size());
         self.stats.ingest_message(&message);
-        if !message.has_stats() {
-            message.with_stats(Arc::clone(&self.stats));
-        }
         self.buffer.push_back(message);
     }
 

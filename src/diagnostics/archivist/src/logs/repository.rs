@@ -79,7 +79,8 @@ impl LogsRepository {
         let container = mutable_state.get_log_container(KERNEL_IDENTITY.clone());
         mutable_state.drain_klog_task = Some(fasync::Task::spawn(async move {
             debug!("Draining debuglog.");
-            let mut kernel_logger = DebugLogBridge::create(klog_reader);
+            let mut kernel_logger =
+                DebugLogBridge::create(klog_reader, Arc::clone(&container.stats));
             let mut messages = match kernel_logger.existing_logs() {
                 Ok(messages) => messages,
                 Err(e) => {

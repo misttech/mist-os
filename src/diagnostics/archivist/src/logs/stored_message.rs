@@ -16,7 +16,7 @@ use std::{convert::TryInto, sync::Arc};
 #[derive(Debug)]
 pub struct StoredMessage {
     bytes: MessageBytes,
-    stats: Option<Arc<LogStreamStats>>,
+    stats: Arc<LogStreamStats>,
 }
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ enum MessageBytes {
 impl StoredMessage {
     pub fn legacy(buf: &[u8], stats: Arc<LogStreamStats>) -> Self {
         match buf.try_into() {
-            Ok(msg) => StoredMessage { bytes: MessageBytes::Legacy(msg), stats: Some(stats) },
+            Ok(msg) => StoredMessage { bytes: MessageBytes::Legacy(msg), stats },
             Err(err) => StoredMessage::invalid(err, stats),
         }
     }
@@ -43,7 +43,7 @@ impl StoredMessage {
                     severity,
                     timestamp,
                 },
-                stats: Some(stats),
+                stats,
             },
             Err(err) => StoredMessage::invalid(err, stats),
         }
@@ -54,13 +54,10 @@ impl StoredMessage {
         // message was received. We'll be adding an error for this.
         let severity = Severity::Warn;
         let timestamp = zx::Time::get_monotonic().into_nanos();
-        StoredMessage {
-            bytes: MessageBytes::Invalid { err, severity, timestamp },
-            stats: Some(stats),
-        }
+        StoredMessage { bytes: MessageBytes::Invalid { err, severity, timestamp }, stats }
     }
 
-    pub fn debuglog(record: zx::sys::zx_log_record_t) -> Option<Self> {
+    pub fn debuglog(record: zx::sys::zx_log_record_t, stats: Arc<LogStreamStats>) -> Self {
         let data_len = record.datalen as usize;
 
         let mut contents = String::from_utf8_lossy(&record.data[0..data_len]).into_owned();
@@ -90,10 +87,7 @@ impl StoredMessage {
         };
 
         let size = METADATA_SIZE + 5 /*'klog' tag*/ + contents.len() + 1;
-        Some(StoredMessage {
-            bytes: MessageBytes::DebugLog { msg: record, severity, size },
-            stats: None,
-        })
+        StoredMessage { bytes: MessageBytes::DebugLog { msg: record, severity, size }, stats }
     }
 
     pub fn size(&self) -> usize {
@@ -103,14 +97,6 @@ impl StoredMessage {
             MessageBytes::DebugLog { size, .. } => *size,
             MessageBytes::Invalid { .. } => std::mem::size_of::<MessageError>(),
         }
-    }
-
-    pub fn has_stats(&self) -> bool {
-        self.stats.is_some()
-    }
-
-    pub fn with_stats(&mut self, stats: Arc<LogStreamStats>) {
-        self.stats = Some(stats)
     }
 
     pub fn severity(&self) -> Severity {
@@ -134,9 +120,7 @@ impl StoredMessage {
 
 impl Drop for StoredMessage {
     fn drop(&mut self) {
-        if let Some(stats) = &self.stats {
-            stats.increment_rolled_out(&*self);
-        }
+        self.stats.increment_rolled_out(&*self);
     }
 }
 
