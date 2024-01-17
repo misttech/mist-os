@@ -95,7 +95,7 @@ class Graph {
   // Finds the processor node that is assigned the given logical id.
   // Sets processor to point to that node. If it wasn't found, returns ZX_ERR_NOT_FOUND.
   zx_status_t ProcessorByLogicalId(cpu_num_t id, Node** processor) const {
-    if (id > processors_by_logical_id_.size()) {
+    if (id >= processors_by_logical_id_.size()) {
       return ZX_ERR_NOT_FOUND;
     }
 

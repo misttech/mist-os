@@ -38,6 +38,7 @@ bool test_flat_to_heap_simple() {
   Graph graph;
   ASSERT_EQ(ZX_OK, Graph::Initialize(&graph, topo.nodes, topo.node_count));
   ASSERT_EQ(3u, graph.processors().size());
+  ASSERT_EQ(4u, graph.logical_processor_count());  // One of the cores is SMT2.
 
   // Test lookup.
   system_topology::Node* node;
@@ -46,6 +47,10 @@ bool test_flat_to_heap_simple() {
   ASSERT_EQ(ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY, node->entity.processor.flags);
   ASSERT_EQ(ZBI_TOPOLOGY_ENTITY_CLUSTER, node->parent->entity.discriminant);
   ASSERT_EQ(1, node->parent->entity.cluster.performance_class);
+
+  // Test out of bounds lookup.
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, graph.ProcessorByLogicalId(
+                                  static_cast<cpu_num_t>(graph.logical_processor_count()), &node));
 
   END_TEST;
 }
@@ -174,7 +179,7 @@ UNITTEST_END_TESTCASE(system_topology_tests, "system-topology",
 
 // Generic ARM big.LITTLE layout.
 //   [cluster]       [cluster]
-//     [p1]         [p3]   [p4]
+//   [p1a,p1b]      [p3]   [p4]
 FlatTopo SimpleTopology() {
   FlatTopo topo;
   zbi_topology_node_t* nodes = topo.nodes;
