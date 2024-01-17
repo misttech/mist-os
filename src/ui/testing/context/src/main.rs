@@ -11,6 +11,7 @@ use {
     fidl_fuchsia_tracing_provider::RegistryMarker,
     fidl_fuchsia_ui_composition::FlatlandMarker,
     fidl_fuchsia_ui_display_singleton::InfoMarker,
+    fidl_fuchsia_ui_focus::FocusChainListenerRegistryMarker,
     fidl_fuchsia_ui_input3::KeyboardMarker,
     fidl_fuchsia_ui_test_context as ui_test_context, fidl_fuchsia_ui_test_input as ui_input,
     fidl_fuchsia_ui_test_scene as test_scene,
@@ -111,6 +112,7 @@ async fn assemble_puppet_realm() -> RealmInstance {
                 .capability(Capability::protocol::<FlatlandMarker>())
                 .capability(Capability::protocol::<KeyboardMarker>())
                 .capability(Capability::protocol::<InfoMarker>())
+                .capability(Capability::protocol::<FocusChainListenerRegistryMarker>())
                 .capability(Capability::protocol::<ui_input::RegistryMarker>())
                 .from(Ref::child(TEST_UI_STACK))
                 .to(Ref::parent()),

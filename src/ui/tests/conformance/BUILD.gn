@@ -7,6 +7,7 @@ import("//build/components.gni")
 group("conformance") {
   testonly = true
   deps = [
+    ":key-conformance-test",
     ":mouse-conformance-test",
     ":touch-conformance-test",
   ]
@@ -136,6 +137,70 @@ fuchsia_test_package("mouse-conformance-test") {
   test_components = [ ":mouse-conformance-test-component" ]
   subpackages = [
     ":mouse-test-suite",
+    "//src/ui/testing/context:ui-context-factory",
+  ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+    environments = [
+      {
+        dimensions = {
+          # Ensure the device has Vulkan.
+          device_type = "AEMU"
+        }
+      },
+    ]
+  }
+}
+
+############# KEY CONFORMANCE TEST #############
+executable("key-validator-bin") {
+  testonly = true
+  sources = [ "key-validator.cc" ]
+  output_name = "key-validator"
+  deps = [
+    ":conformance-test-base",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
+    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
+    "//sdk/lib/syslog/cpp",
+    "//sdk/lib/ui/scenic/cpp",
+    "//src/lib/fsl",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_component("key-validator") {
+  testonly = true
+  manifest = "meta/key-validator.cml"
+  deps = [ ":key-validator-bin" ]
+}
+
+fuchsia_package("key-test-suite") {
+  package_name = "key-test-suite"
+  testonly = true
+  deps = [
+    ":key-validator",
+    "//src/ui/testing/puppet:ui-puppet-component",
+  ]
+}
+
+fuchsia_test_component("key-conformance-test-component") {
+  testonly = true
+  component_name = "key-conformance-test"
+  manifest = "meta/key-conformance-test.cml"
+  test_type = "system"
+}
+
+fuchsia_test_package("key-conformance-test") {
+  test_components = [ ":key-conformance-test-component" ]
+  subpackages = [
+    ":key-test-suite",
     "//src/ui/testing/context:ui-context-factory",
   ]
   test_specs = {

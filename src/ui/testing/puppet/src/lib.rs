@@ -108,7 +108,7 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                     let device_pixel_ratio =
                         payload.device_pixel_ratio.expect("missing device_pixel_ratio");
 
-                    let view = view::View::new(
+                    let (view, view_ref) = view::View::new(
                         flatland,
                         keyboard,
                         view_token,
@@ -116,12 +116,14 @@ pub async fn run_puppet_factory(request_stream: PuppetFactoryRequestStream) {
                         mouse_listener,
                         keyboard_listener,
                         device_pixel_ratio,
+                        payload.focuser,
                     )
                     .await;
 
                     responder
                         .send(PuppetFactoryCreateResponse {
                             result: Some(Result_::Success),
+                            view_ref: Some(view_ref),
                             ..Default::default()
                         })
                         .expect("failed to respond to PuppetFactoryRequest::Create");

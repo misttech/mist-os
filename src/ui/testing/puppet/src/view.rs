@@ -4,9 +4,10 @@
 
 use {
     crate::presentation_loop,
+    async_utils::event::Event as AsyncEvent,
     async_utils::hanging_get::client::HangingGetStream,
     euclid::{Point2D, Transform2D},
-    fidl::endpoints::{create_proxy, create_request_stream},
+    fidl::endpoints::{create_proxy, create_request_stream, ServerEnd},
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as ui_comp,
     fidl_fuchsia_ui_input3::{self as ui_input3, KeyEvent},
     fidl_fuchsia_ui_pointer::{
@@ -68,7 +69,6 @@ pub(super) struct View {
     id_generator: scenic::flatland::IdGenerator,
 
     /// Flatland `TransformId` that corresponds to our view's root transform.
-    #[allow(dead_code)]
     root_transform_id: ui_comp::TransformId,
 
     /// View dimensions, in its own logical coordinate space.
@@ -118,7 +118,8 @@ impl View {
         mouse_input_listener: Option<test_input::MouseInputListenerProxy>,
         keyboard_input_listener: Option<test_input::KeyboardInputListenerProxy>,
         device_pixel_ratio: f32,
-    ) -> Rc<RefCell<Self>> {
+        view_focuser: Option<ServerEnd<ui_views::FocuserMarker>>,
+    ) -> (Rc<RefCell<Self>>, ui_views::ViewRef) {
         let flatland = Rc::new(flatland);
         let (presentation_sender, presentation_receiver) = mpsc::unbounded();
         presentation_loop::start_flatland_presentation_loop(
@@ -139,11 +140,14 @@ impl View {
         let view_bound_protocols = ui_comp::ViewBoundProtocols {
             touch_source: Some(touch_source_request),
             mouse_source: Some(mouse_source_request),
+            view_focuser,
             ..Default::default()
         };
         let view_ref_pair = scenic::ViewRefPair::new().expect("failed to create view ref pair");
         let view_ref = scenic::duplicate_view_ref(&view_ref_pair.view_ref)
             .expect("failed to duplicate view ref");
+        let view_ref_clone =
+            scenic::duplicate_view_ref(&view_ref).expect("failed to duplicate view ref");
         let view_identity = ui_views::ViewIdentityOnCreation::from(view_ref_pair);
 
         // Create root transform ID.
@@ -181,11 +185,11 @@ impl View {
             embedded_views: HashMap::new(),
         }));
 
-        let (view_initialized_sender, view_initialized_receiver) = oneshot::channel::<()>();
+        let view_initialized = AsyncEvent::new();
         let view_events_task = fasync::Task::local(Self::listen_for_view_events(
             this.clone(),
             parent_viewport_watcher,
-            view_initialized_sender,
+            view_initialized.clone(),
         ));
         this.borrow_mut()
             .view_event_listener
@@ -207,10 +211,12 @@ impl View {
             .set(mouse_task)
             .expect("set mouse watcher task more than once");
 
+        let keyboard_ready = AsyncEvent::new();
         let keyboard_task = fasync::Task::local(Self::listen_for_key_events(
             this.clone(),
             keyboard_client,
             view_ref,
+            keyboard_ready.clone(),
         ));
         this.borrow_mut()
             .keyboard_watched_task
@@ -218,9 +224,12 @@ impl View {
             .expect("set keyboard watcher task more than once");
 
         // Wait for view to be initialized.
-        _ = view_initialized_receiver.await.expect("failed to receive 'view initialized' signal");
+        _ = view_initialized.wait().await;
 
-        this
+        // Wait for keyboard listener ready.
+        _ = keyboard_ready.wait().await;
+
+        (this, view_ref_clone)
     }
 
     /// Returns true if the parent viewport is connected to the display AND we've received non-zero
@@ -238,9 +247,9 @@ impl View {
     async fn listen_for_view_events(
         this: Rc<RefCell<Self>>,
         parent_viewport_watcher: ui_comp::ParentViewportWatcherProxy,
-        view_initialized_sender: oneshot::Sender<()>,
+        view_initialized: AsyncEvent,
     ) {
-        let mut view_initialized_sender = Some(view_initialized_sender);
+        let mut view_initialized = Some(view_initialized);
 
         let mut layout_info_stream = HangingGetStream::new(
             parent_viewport_watcher.clone(),
@@ -285,12 +294,8 @@ impl View {
             }
 
             // If the view has become initialized, ping the `view_is_initialized` channel.
-            if view_initialized_sender.is_some() && this.borrow().is_initialized() {
-                view_initialized_sender
-                    .take()
-                    .expect("failed to take view initialized sender")
-                    .send(())
-                    .expect("failed to declare view initialized");
+            if view_initialized.is_some() && this.borrow().is_initialized() {
+                view_initialized.take().expect("failed to take view initialized sender").signal();
             }
         }
     }
@@ -709,18 +714,23 @@ impl View {
         if key_event.type_ != Some(ui_input3::KeyEventType::Pressed) {
             return None;
         }
-        let s = match key_event.key_meaning.unwrap() {
+        match key_event.key_meaning.unwrap() {
             ui_input3::KeyMeaning::Codepoint(code) => {
-                char::from_u32(code).expect("key event is not a valid char").to_string()
+                let s = char::from_u32(code).expect("key event is not a valid char").to_string();
+                info!("Key received {:?}", s);
+                Some(test_input::KeyboardInputListenerReportTextInputRequest {
+                    text: Some(s),
+                    ..Default::default()
+                })
             }
-            ui_input3::KeyMeaning::NonPrintableKey(_) => {
-                panic!("not support NonPrintableKey");
+            ui_input3::KeyMeaning::NonPrintableKey(key) => {
+                info!("NonPrintableKey received {:?}", key);
+                Some(test_input::KeyboardInputListenerReportTextInputRequest {
+                    non_printable: Some(key),
+                    ..Default::default()
+                })
             }
-        };
-        Some(test_input::KeyboardInputListenerReportTextInputRequest {
-            text: Some(s),
-            ..Default::default()
-        })
+        }
     }
 
     fn process_key_event(&mut self, event: KeyEvent) {
@@ -744,6 +754,7 @@ impl View {
         this: Rc<RefCell<Self>>,
         keyboard: ui_input3::KeyboardProxy,
         view_ref: ui_views::ViewRef,
+        keyboard_ready: AsyncEvent,
     ) {
         let (keyboard_client, mut keyboard_stream) =
             create_request_stream::<ui_input3::KeyboardListenerMarker>()
@@ -753,6 +764,9 @@ impl View {
             .add_listener(view_ref, keyboard_client)
             .await
             .expect("failed to add keyboard listener");
+
+        keyboard_ready.signal();
+
         loop {
             let listener_request = keyboard_stream.next().await;
             match listener_request {

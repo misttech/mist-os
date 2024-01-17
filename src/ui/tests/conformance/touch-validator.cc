@@ -33,7 +33,8 @@ const std::string AUXILIARY_PUPPET_FACTORY_SERVICE = "auxiliary-puppet-factory-s
 // Maximum distance between two physical pixel coordinates so that they are considered equal.
 constexpr double kEpsilon = 0.5f;
 
-// TODO(https://fxbug.dev/125831): Two coordinates (x/y) systems can differ in scale (size of pixels).
+// TODO(https://fxbug.dev/125831): Two coordinates (x/y) systems can differ in scale (size of
+// pixels).
 void ExpectLocationAndPhase(
     const std::string& scoped_message,
     const fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest& e, double expected_x,
