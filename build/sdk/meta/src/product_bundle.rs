@@ -7,7 +7,7 @@
 mod v2;
 
 use crate::VirtualDeviceManifest;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_repo::repository::FileSystemRepository;
 use serde::{Deserialize, Serialize};
@@ -45,9 +45,15 @@ impl ZipLoadedProductBundle {
     }
 
     pub fn load_from(mut zip: ZipArchive<File>) -> Result<Self> {
+        let product_bundle_manifest_name = zip
+            .file_names()
+            .find(|x| x == &"product_bundle.json" || x.ends_with("/product_bundle.json"))
+            .ok_or(anyhow!("finding file 'product_bundle.json' in zip archive"))?
+            .to_owned();
+
         let product_bundle_manifest = zip
-            .by_name("product_bundle.json")
-            .with_context(|| format!("finding file 'product_bundle.json' in zip archive"))?;
+            .by_name(&product_bundle_manifest_name)
+            .with_context(|| format!("getting 'product_bundle.json' in zip archive"))?;
         let product_bundle = try_load_product_bundle(product_bundle_manifest)?;
         // Do not need to canonicalize paths for this as it is a part of a zip ZipArchive
         Ok(Self::new(product_bundle))
@@ -226,7 +232,11 @@ pub fn get_repositories(product_bundle_dir: Utf8PathBuf) -> Result<Vec<FileSyste
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::io::Write;
     use tempfile::TempDir;
+    use zip::write::FileOptions;
+    use zip::CompressionMethod;
+    use zip::ZipWriter;
 
     fn make_sample_pbv1(name: &str) -> serde_json::Value {
         json!({
@@ -261,6 +271,33 @@ mod tests {
         }};
     }
 
+    fn make_sample_pbv2(name: &str) -> serde_json::Value {
+        json!({
+            "version": "2",
+            "product_name": name,
+            "product_version": "fake.pb-version",
+            "sdk_version": "fake.sdk-version",
+            "partitions": {
+                "hardware_revision": "board",
+                "bootstrap_partitions": [],
+                "bootloader_partitions": [],
+                "partitions": [],
+                "unlock_credentials": [],
+            },
+        })
+    }
+    /// Macro to create a v1 product bundle in the tmp directory
+    macro_rules! make_pb_v2_in {
+        ($dir:expr,$name:expr) => {{
+            let pb_dir = Utf8Path::from_path($dir.path()).unwrap();
+
+            let pb_file = File::create(pb_dir.join("product_bundle.json")).unwrap();
+            serde_json::to_writer(&pb_file, &make_sample_pbv2($name)).unwrap();
+
+            pb_dir
+        }};
+    }
+
     #[test]
     fn test_parse_v1() {
         let tmp = TempDir::new().unwrap();
@@ -274,24 +311,203 @@ mod tests {
         let pb_dir = Utf8Path::from_path(tmp.path()).unwrap();
 
         let pb_file = File::create(pb_dir.join("product_bundle.json")).unwrap();
-        serde_json::to_writer(
-            &pb_file,
-            &json!({
-                "version": "2",
-                "product_name": "fake.pb-name",
-                "product_version": "fake.pb-version",
-                "sdk_version": "fake.sdk-version",
-                "partitions": {
-                    "hardware_revision": "board",
-                    "bootstrap_partitions": [],
-                    "bootloader_partitions": [],
-                    "partitions": [],
-                    "unlock_credentials": [],
-                },
-            }),
-        )
-        .unwrap();
+        serde_json::to_writer(&pb_file, &make_sample_pbv2(&"fake.pb-name")).unwrap();
         let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
         assert!(matches!(pb.deref(), &ProductBundle::V2 { .. }));
+    }
+
+    #[test]
+    fn test_loaded_from_path() {
+        let tmp = TempDir::new().unwrap();
+        let pb_dir = make_pb_v2_in!(tmp, "generic-x64");
+        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
+        assert_eq!(pb_dir, pb.loaded_from_path());
+    }
+
+    #[test]
+    fn test_loaded_product_bundle_into() {
+        let tmp = TempDir::new().unwrap();
+        let pb_dir = make_pb_v2_in!(tmp, "generic-x64");
+        let pb: ProductBundle = LoadedProductBundle::try_load_from(pb_dir).unwrap().into();
+        assert!(matches!(pb, ProductBundle::V2 { .. }));
+    }
+
+    #[test]
+    fn test_loaded_from_product_bundle_deref() {
+        let tmp = TempDir::new().unwrap();
+        let pb_dir = make_pb_v2_in!(tmp, "generic-x64");
+        let pb = LoadedProductBundle::try_load_from(pb_dir).unwrap();
+
+        fn check_deref(_inner_pb: &ProductBundle) {
+            // Just make sure we have a compile time check.
+            assert!(true);
+        }
+
+        check_deref(&pb);
+        assert!(matches!(*pb.deref(), ProductBundle::V2 { .. }));
+    }
+
+    #[test]
+    fn test_zip_loaded() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+
+        let pb = make_sample_pbv2("generic-x64");
+        let pb_filename = tmp.into_path().join("pb.zip");
+        let pb_file = File::create(pb_filename.clone())?;
+
+        let mut zip = ZipWriter::new(pb_file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("product_bundle.json", options)?;
+        let buf = serde_json::to_vec(&pb)?;
+        let _ = zip.write(&buf)?;
+        zip.flush()?;
+        let _ = zip.finish()?;
+
+        let _ = ZipLoadedProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_zip_product_bundle_into() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+        let pb = make_sample_pbv2("generic-x64");
+        let pb_filename = tmp.into_path().join("pb.zip");
+        let pb_file = File::create(pb_filename.clone())?;
+
+        let mut zip = ZipWriter::new(pb_file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("product_bundle.json", options)?;
+        let buf = serde_json::to_vec(&pb)?;
+        let _ = zip.write(&buf)?;
+        zip.flush()?;
+        let _ = zip.finish()?;
+        let pb: ProductBundle =
+            ZipLoadedProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?
+                .into();
+        assert!(matches!(pb, ProductBundle::V2 { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn test_zip_from_product_bundle_deref() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+        let pb = make_sample_pbv2("generic-x64");
+        let pb_filename = tmp.into_path().join("pb.zip");
+        let pb_file = File::create(pb_filename.clone())?;
+
+        let mut zip = ZipWriter::new(pb_file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("product_bundle.json", options)?;
+        let buf = serde_json::to_vec(&pb)?;
+        let _ = zip.write(&buf)?;
+        zip.flush()?;
+        let _ = zip.finish()?;
+
+        let pb = ZipLoadedProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?;
+
+        fn check_deref(_inner_pb: &ProductBundle) {
+            // Just make sure we have a compile time check.
+            assert!(true);
+        }
+
+        check_deref(&pb);
+        assert!(matches!(*pb.deref(), ProductBundle::V2 { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn test_product_bundle_try_load_from_for_zip() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+
+        let pb = make_sample_pbv2("generic-x64");
+        let pb_filename = tmp.into_path().join("pb.zip");
+        let pb_file = File::create(pb_filename.clone())?;
+
+        let mut zip = ZipWriter::new(pb_file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("product_bundle.json", options)?;
+        let buf = serde_json::to_vec(&pb)?;
+        let _ = zip.write(&buf)?;
+        zip.flush()?;
+        let _ = zip.finish()?;
+
+        // This should detect zip file and load from the zip
+        let _ = ProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_no_file_fail_zip() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+
+        let pb = make_sample_pbv2("generic-x64");
+        let pb_filename = tmp.into_path().join("pb.zip");
+        let pb_file = File::create(pb_filename.clone())?;
+
+        let mut zip = ZipWriter::new(pb_file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("for_sure_not_a_product_bundle.json", options)?;
+        let buf = serde_json::to_vec(&pb)?;
+        let _ = zip.write(&buf)?;
+        zip.flush()?;
+        let _ = zip.finish()?;
+
+        // This should detect zip file and load from the zip
+        assert!(ProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap()).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_product_bundle_try_load_from_for_zip_deep_path() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+
+        let pb = make_sample_pbv2("generic-x64");
+        let pb_filename = tmp.into_path().join("pb.zip");
+        let pb_file = File::create(pb_filename.clone())?;
+
+        let mut zip = ZipWriter::new(pb_file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        // Now start the file deeper in the tree
+        zip.start_file("foo/bar/baz/biz/product_bundle.json", options)?;
+        let buf = serde_json::to_vec(&pb)?;
+        let _ = zip.write(&buf)?;
+        zip.flush()?;
+        let _ = zip.finish()?;
+
+        // This should detect zip file and load from the zip
+        let _ = ProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap())?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_v1_from_zip_fails() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+        let pb = make_sample_pbv1("generic-x64");
+        let pb_filename = tmp.into_path().join("pb.zip");
+        let pb_file = File::create(pb_filename.clone())?;
+
+        let mut zip = ZipWriter::new(pb_file);
+        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.start_file("for_sure_not_a_product_bundle.json", options)?;
+        let buf = serde_json::to_vec(&pb)?;
+        let _ = zip.write(&buf)?;
+        zip.flush()?;
+        let _ = zip.finish()?;
+
+        // This should fail as pbv1 is no longer supported.
+        assert!(ProductBundle::try_load_from(Utf8Path::from_path(&pb_filename).unwrap()).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_product_bundle_try_load_from_for_dir() -> anyhow::Result<()> {
+        let tmp = TempDir::new().unwrap();
+        let pb_dir = make_pb_v2_in!(tmp, "generic-x64");
+        let _ = ProductBundle::try_load_from(pb_dir).unwrap();
+        Ok(())
     }
 }
