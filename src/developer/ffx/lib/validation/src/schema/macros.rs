@@ -23,6 +23,8 @@ mod test {
     #[allow(dead_code)]
     struct ForeignType;
 
+    struct Enum;
+
     // Schema macro syntax tests.
     schema! {
         type RustType = Option<u32>;
@@ -43,5 +45,9 @@ mod test {
 
         fn my_lone_function = Option<InlineStruct>;
         #[foreign(ForeignType)] fn foreign_schema = (i32, i32, i32);
+
+        type Enum = enum {
+            A, B, C(String), D { field: u32, b: u32 },
+        };
     }
 }

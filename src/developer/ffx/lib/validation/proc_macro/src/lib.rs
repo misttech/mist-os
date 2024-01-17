@@ -91,9 +91,23 @@ pub fn schema(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     items.items.iter().map(|item| item.build()).collect::<proc_macro2::TokenStream>().into()
 }
 
+fn stringify_ident(id: &Ident) -> String {
+    let mut s = id.to_string();
+    if s.starts_with("r#") {
+        s.drain(..2);
+    }
+    s
+}
+
 struct SchemaField<K, V = K> {
     key: K,
     value: V,
+}
+
+struct SchemaEnumVariant {
+    // TODO: Support string literals as variant names
+    name: Ident,
+    tys: Vec<SchemaType>,
 }
 
 #[derive(Default)]
@@ -146,7 +160,10 @@ enum SchemaType {
         // TODO(b/316035760): Spread syntax (needs SchemaStructField enum)
         // TODO(b/316035686): Struct attributes (for #[strict])
     },
-    // TODO: enums
+    Enum {
+        // TODO: Support serde rename_all?
+        variants: Punctuated<SchemaEnumVariant, Token![,]>,
+    },
     Fn(Path),
     Optional(Box<SchemaType>),
 }
@@ -407,6 +424,36 @@ impl Parse for SchemaLiteral {
     }
 }
 
+// Parses:
+// Variant
+// Variant( `SchemaType,...` )
+// Variant { `field: SchemaType,...` }
+impl Parse for SchemaEnumVariant {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let name = input.parse()?;
+
+        let lookahead = input.lookahead1();
+        let mut tys = vec![];
+
+        // TODO: Support = for constants?
+        if lookahead.peek(syn::token::Paren) {
+            // Tuple enum variant
+            let paren;
+            syn::parenthesized!(paren in input);
+            tys.extend(paren.parse_terminated::<_, Token![,]>(SchemaType::parse)?);
+        } else if lookahead.peek(syn::token::Brace) {
+            // Struct enum variant
+            let braced;
+            syn::braced!(braced in input);
+            tys.push(SchemaType::Struct { fields: braced.parse_terminated(SchemaField::parse)? });
+        } else {
+            // Empty enum variant
+        }
+
+        Ok(SchemaEnumVariant { name, tys })
+    }
+}
+
 // Parses `K`: `V`
 impl<K: Parse, V: Parse> Parse for SchemaField<K, V> {
     fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
@@ -419,6 +466,7 @@ impl<K: Parse, V: Parse> Parse for SchemaField<K, V> {
 
 // Parses:
 // struct { field: `Type`, ... }
+// enum { `SchemaEnumVariant,...` }
 // const `SchemaLiteral`
 // `Type`
 impl Parse for SchemaType {
@@ -431,7 +479,9 @@ impl Parse for SchemaType {
             Self::Struct { fields: braced.parse_terminated(SchemaField::parse)? }
         } else if lookahead.peek(Token![enum]) {
             input.parse::<Token![enum]>()?;
-            return Err(input.error("not yet implemented"));
+            let braced;
+            syn::braced!(braced in input);
+            Self::Enum { variants: braced.parse_terminated(SchemaEnumVariant::parse)? }
         } else if lookahead.peek(Token![const]) {
             input.parse::<Token![const]>()?;
             Self::Literal(input.parse()?)
@@ -471,14 +521,21 @@ impl SchemaType {
                     <#ty as ::ffx_validation::schema::Schema>::walk_schema(#walker)?;
                 }
             }
-            Self::Literal(_lit) => {
-                // TODO(b/316036318): serde_json macro invocation
-                todo!("literals not yet supported")
+            Self::Literal(lit) => {
+                let constant = match lit {
+                    // TODO(b/316036318): serde_json macro invocation
+                    SchemaLiteral::Simple(lit) => quote! { ::std::convert::Into::into(#lit) },
+                    _ => todo!("literals not yet supported"),
+                };
+
+                quote! {
+                    #walker.add_constant(#constant)?;
+                }
             }
             Self::Struct { fields } => {
                 let fields: proc_macro2::TokenStream = fields.iter().map(|field| {
                     let ty = field.value.build(walker);
-                    let key_str = field.key.to_string();
+                    let key_str = stringify_ident(&field.key);
                     quote! {
                         ::ffx_validation::schema::Field { key: #key_str, value: |#walker| { #ty walker.ok() }, ..::ffx_validation::schema::FIELD },
                     }
@@ -487,6 +544,54 @@ impl SchemaType {
                     #walker.add_struct(
                         &[#fields],
                         None
+                    )?;
+                }
+            }
+            Self::Enum { variants } => {
+                let variants: proc_macro2::TokenStream = variants
+                    .iter()
+                    .map(|variant| {
+                        let key_str = stringify_ident(&variant.name);
+                        let ty = match &*variant.tys {
+                            [] => quote! { ::ffx_validation::schema::nothing },
+                            [single] => {
+                                let single = single.build(walker);
+                                quote! {
+                                    |#walker| {
+                                        #single
+                                        #walker.ok()
+                                    }
+                                }
+                            }
+                            multi => {
+                                let multi: proc_macro2::TokenStream = multi
+                                    .iter()
+                                    .map(|ty| {
+                                        let ty = ty.build(walker);
+                                        quote! {
+                                            |#walker| {
+                                                #ty
+                                                #walker.ok()
+                                            },
+                                        }
+                                    })
+                                    .collect();
+                                quote! {
+                                    |#walker| {
+                                        #walker.add_tuple(&[#multi])?;
+                                        #walker.ok()
+                                    }
+                                }
+                            }
+                        };
+                        quote! {
+                            (#key_str, #ty),
+                        }
+                    })
+                    .collect();
+                quote! {
+                    #walker.add_enum(
+                        &[#variants],
                     )?;
                 }
             }
