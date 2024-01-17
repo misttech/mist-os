@@ -10,30 +10,50 @@
 
 __BEGIN_CDECLS
 
-// A somewhat arbitrary limitation on the number of IOBuffer regions to protect us from having to
-// handle IOBuffers with extremely large numbers of regions.
+// A somewhat arbitrary limitation on the number of IOBuffer regions to protect
+// us from having to handle IOBuffers with extremely large numbers of regions.
 #define ZX_IOB_MAX_REGIONS 64
 
-// TODO(https://fxbug.dev/118650): Clarify and finalize the ringbuffer disciplines.
-#define ZX_IOB_DISCIPLINE_TYPE_NONE (0)
+// The type of IOBuffer discipline.
+typedef uint64_t zx_iob_discipline_type_t;
 
-#define ZX_IOB_REGION_TYPE_PRIVATE (0)
+// No particular discipline indicates that the region is treated as a raw byte
+// buffer from the kernel's perspective, the organization of its contents being
+// a private userspace matter.
+#define ZX_IOB_DISCIPLINE_TYPE_NONE ((zx_iob_discipline_type_t)(0u))
 
-// Access modifiers
-#define ZX_IOB_EP0_CAN_MAP_READ (1 << 0)
-#define ZX_IOB_EP0_CAN_MAP_WRITE (1 << 1)
-#define ZX_IOB_EP0_CAN_MEDIATED_READ (1 << 2)
-#define ZX_IOB_EP0_CAN_MEDIATED_WRITE (1 << 3)
-#define ZX_IOB_EP1_CAN_MAP_READ (1 << 4)
-#define ZX_IOB_EP1_CAN_MAP_WRITE (1 << 5)
-#define ZX_IOB_EP1_CAN_MEDIATED_READ (1 << 6)
-#define ZX_IOB_EP1_CAN_MEDIATED_WRITE (1 << 7)
+// TODO(https://fxbug.dev/319501447): + ID allocator discipline.
+// TODO(https://fxbug.dev/319500512): + ring buffer discipline.
 
-// IOBuffer types describing the structure of a region
+// An IOBuffer (memory access) discipline specifies the layout of a region's
+// memory and manner in which it should be directly accessed. Disciplines may
+// correspond to particular syscalls that operate on IOBuffer handles to further
+// facilitate indirect, mediated access in the correct manner.
 typedef struct zx_iob_discipline {
   uint64_t type;
   uint64_t reserved[8];
 } zx_iob_discipline_t;
+
+// The type of a region specifies the nature of its backing memory object and
+// its ownership semantics.
+typedef uint32_t zx_iob_region_type_t;
+
+// Specifies a region backed by a private memory object uniquely owned and
+// accessible by the associated IOBuffer.
+#define ZX_IOB_REGION_TYPE_PRIVATE ((zx_iob_region_type_t)(0u))
+
+// Region access controls for IOBuffer peers, specifying both mapped and
+// mediated access.
+typedef uint32_t zx_iob_access_t;
+
+#define ZX_IOB_EP0_CAN_MAP_READ ((zx_iob_access_t)(1u << 0))
+#define ZX_IOB_EP0_CAN_MAP_WRITE ((zx_iob_access_t)(1u << 1))
+#define ZX_IOB_EP0_CAN_MEDIATED_READ ((zx_iob_access_t)(1u << 2))
+#define ZX_IOB_EP0_CAN_MEDIATED_WRITE ((zx_iob_access_t)(1u << 3))
+#define ZX_IOB_EP1_CAN_MAP_READ ((zx_iob_access_t)(1u << 4))
+#define ZX_IOB_EP1_CAN_MAP_WRITE ((zx_iob_access_t)(1u << 5))
+#define ZX_IOB_EP1_CAN_MEDIATED_READ ((zx_iob_access_t)(1u << 6))
+#define ZX_IOB_EP1_CAN_MEDIATED_WRITE ((zx_iob_access_t)(1u << 7))
 
 typedef struct zx_iob_region_private {
   uint32_t options;
@@ -42,8 +62,8 @@ typedef struct zx_iob_region_private {
 } zx_iob_region_private_t;
 
 typedef struct zx_iob_region {
-  uint32_t type;
-  uint32_t access;
+  zx_iob_region_type_t type;
+  zx_iob_access_t access;
   uint64_t size;
   zx_iob_discipline_t discipline;
   union {

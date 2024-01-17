@@ -24,12 +24,13 @@ closed protocol Iob {
     ///
     /// `zx_iob_create()` creates an IOBuffer, a memory object designed for
     /// efficient point-to-point communication. An IOBuffer can be thought
-    /// of an abstraction over a shared buffer with (optionally kernel mediated)
-    /// reads and writes that maintain data integrity and enforce permissions.
+    /// of as an abstraction over a shared buffer with (optionally
+    /// kernel-mediated) reads and writes that maintain data integrity and
+    /// enforce permissions.
     ///
     /// An IOBuffer may have multiple regions, specified by *region_count*.
     /// Each region may be set to support varying access patterns or permissions
-    /// configured by **regions*.
+    /// configured by *regions*.
     ///
     /// ### Region Descriptions
     ///
@@ -39,8 +40,8 @@ closed protocol Iob {
     ///
     /// ```C++
     /// struct zx_iob_region_t {
-    ///   uint32_t type;
-    ///   uint32_t access;
+    ///   zx_iob_region_type_t type;
+    ///   zx_iob_access_t access;
     ///   uint64_t size;
     ///   zx_iob_discipline_t discipline;
     ///   union {
