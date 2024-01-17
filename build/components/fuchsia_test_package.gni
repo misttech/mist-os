@@ -128,7 +128,7 @@ template("fuchsia_test_package") {
         if (!defined(build_rule)) {
           build_rule = "fuchsia_test_package"
         }
-        target = get_label_info(":$target_name", "label_with_toolchain")
+        target = get_label_info(package_label, "label_with_toolchain")
         package_label = package_label
         component_label = component_label
         package_manifests = [ package_manifest ]
