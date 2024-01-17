@@ -77,6 +77,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
   explicit RemoteLoadModule(const Soname& name) : RemoteLoadModuleBase{name} {}
 
+  const zx::vmo& vmo() const { return vmo_; }
+
   // Initialize the module from the provided VMO, representing either the
   // binary or shared library to be loaded.  Create the data structures that
   // make make the VMO readable, and scan and decode its phdrs to set and

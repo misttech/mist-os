@@ -25,7 +25,13 @@ void TestPipeReader::Init(fbl::unique_fd& write_pipe) {
   thread_ = std::thread(&TestPipeReader::ReaderThread, this);
 }
 
-TestPipeReader::~TestPipeReader() { EXPECT_FALSE(thread_.joinable()); }
+TestPipeReader::~TestPipeReader() {
+  if (thread_.joinable()) {
+    ADD_FAILURE() << "elfldltl::testing::TestPipeReader::Finish() not called";
+    // Join the thread so its destructor doesn't panic.
+    thread_.join();
+  }
+}
 
 // The reader thread will append everything read from the pipe to the string.
 void TestPipeReader::ReaderThread() {
