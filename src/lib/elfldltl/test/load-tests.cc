@@ -35,10 +35,10 @@ TYPED_TEST(ElfldltlLoadTests, FailToAdd) {
 
   ExpectedSingleError error("too many PT_LOAD segments", ": maximum 0 < requested ", 1);
 
-  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container> loadInfo;
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container> load_info;
 
   Phdr phdr{.memsz = 1};
-  EXPECT_FALSE(loadInfo.AddSegment(error.diag(), kPageSize, phdr));
+  EXPECT_FALSE(load_info.AddSegment(error.diag(), kPageSize, phdr));
 }
 
 TYPED_TEST(ElfldltlLoadTests, AddEmptyPhdr) {
@@ -47,10 +47,10 @@ TYPED_TEST(ElfldltlLoadTests, AddEmptyPhdr) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container> loadInfo;
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container> load_info;
 
   Phdr phdr{};
-  EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
+  EXPECT_TRUE(load_info.AddSegment(diag, kPageSize, phdr));
 }
 
 TYPED_TEST(ElfldltlLoadTests, CreateConstantSegment) {
@@ -59,13 +59,13 @@ TYPED_TEST(ElfldltlLoadTests, CreateConstantSegment) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> loadInfo;
-  using ConstantSegment = typename decltype(loadInfo)::ConstantSegment;
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> load_info;
+  using ConstantSegment = typename decltype(load_info)::ConstantSegment;
 
   Phdr phdr{.memsz = kPageSize * 10};
-  EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
+  EXPECT_TRUE(load_info.AddSegment(diag, kPageSize, phdr));
 
-  const auto& segments = loadInfo.segments();
+  const auto& segments = load_info.segments();
   ASSERT_EQ(segments.size(), 1u);
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<ConstantSegment>(variant));
@@ -78,14 +78,14 @@ TYPED_TEST(ElfldltlLoadTests, CreateZeroFillSegment) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> loadInfo;
-  using ZeroFillSegment = typename decltype(loadInfo)::ZeroFillSegment;
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> load_info;
+  using ZeroFillSegment = typename decltype(load_info)::ZeroFillSegment;
 
   Phdr phdr{.memsz = kPageSize * 5};
   phdr.flags = Phdr::kRead | Phdr::kWrite;
-  EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
+  EXPECT_TRUE(load_info.AddSegment(diag, kPageSize, phdr));
 
-  const auto& segments = loadInfo.segments();
+  const auto& segments = load_info.segments();
   ASSERT_EQ(segments.size(), 1u);
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<ZeroFillSegment>(variant));
@@ -98,14 +98,14 @@ TYPED_TEST(ElfldltlLoadTests, CreateDataWithZeroFillSegment) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> loadInfo;
-  using DataWithZeroFillSegment = typename decltype(loadInfo)::DataWithZeroFillSegment;
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> load_info;
+  using DataWithZeroFillSegment = typename decltype(load_info)::DataWithZeroFillSegment;
 
   Phdr phdr{.filesz = kPageSize, .memsz = kPageSize * 5};
   phdr.flags = Phdr::kRead | Phdr::kWrite;
-  EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
+  EXPECT_TRUE(load_info.AddSegment(diag, kPageSize, phdr));
 
-  const auto& segments = loadInfo.segments();
+  const auto& segments = load_info.segments();
   ASSERT_EQ(segments.size(), 1u);
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<DataWithZeroFillSegment>(variant));
@@ -118,14 +118,14 @@ TYPED_TEST(ElfldltlLoadTests, CreateDataSegment) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> loadInfo;
-  using DataSegment = typename decltype(loadInfo)::DataSegment;
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> load_info;
+  using DataSegment = typename decltype(load_info)::DataSegment;
 
   Phdr phdr{.filesz = kPageSize, .memsz = kPageSize};
   phdr.flags = Phdr::kRead | Phdr::kWrite;
-  EXPECT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
+  EXPECT_TRUE(load_info.AddSegment(diag, kPageSize, phdr));
 
-  const auto& segments = loadInfo.segments();
+  const auto& segments = load_info.segments();
   ASSERT_EQ(segments.size(), 1u);
   const auto& variant = segments[0];
   ASSERT_TRUE(std::holds_alternative<DataSegment>(variant));
@@ -144,19 +144,19 @@ void DoMergeTest() {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<2>::Container> loadInfo;
-  const auto& segments = loadInfo.segments();
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<2>::Container> load_info;
+  const auto& segments = load_info.segments();
 
   size_type offset = 0;
   auto phdr1 = GetPhdr1<Elf>{}(offset);
   auto phdr2 = GetPhdr2<Elf>{}(offset);
   auto expectedSize = Merged ? phdr1.memsz() + phdr2.memsz() : phdr2.memsz();
 
-  loadInfo.AddSegment(diag, kPageSize, phdr1);
+  load_info.AddSegment(diag, kPageSize, phdr1);
   ASSERT_EQ(segments.size(), 1u);
   ASSERT_TRUE(std::holds_alternative<Segment1T>(segments.back()));
   EXPECT_EQ(std::get<Segment1T>(segments.back()).memsz(), phdr1.memsz());
-  loadInfo.AddSegment(diag, kPageSize, phdr2);
+  load_info.AddSegment(diag, kPageSize, phdr2);
   ASSERT_EQ(segments.size(), totalSegments);
   ASSERT_TRUE(std::holds_alternative<Segment2T>(segments.back()));
   EXPECT_EQ(std::get<Segment2T>(segments.back()).memsz(), expectedSize);
@@ -257,9 +257,9 @@ TYPED_TEST(ElfldltlLoadTests, GetPhdrObserver) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
-  using ConstantSegment = typename decltype(loadInfo)::ConstantSegment;
-  using DataWithZeroFillSegment = typename decltype(loadInfo)::DataWithZeroFillSegment;
+  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
+  using ConstantSegment = typename decltype(load_info)::ConstantSegment;
+  using DataWithZeroFillSegment = typename decltype(load_info)::DataWithZeroFillSegment;
 
   size_type offset = 0;
   const Phdr kPhdrs[] = {
@@ -268,8 +268,8 @@ TYPED_TEST(ElfldltlLoadTests, GetPhdrObserver) {
   };
 
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), loadInfo.GetPhdrObserver(kPageSize)));
-  const auto& segments = loadInfo.segments();
+      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
+  const auto& segments = load_info.segments();
   EXPECT_EQ(segments.size(), 2u);
   ASSERT_TRUE(std::holds_alternative<ConstantSegment>(segments[0]));
   EXPECT_EQ(std::get<ConstantSegment>(segments[0]).memsz(), kPhdrs[0].memsz + kPhdrs[1].memsz);
@@ -285,10 +285,10 @@ TYPED_TEST(ElfldltlLoadTests, VisitSegments) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
+  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
 
-  ASSERT_EQ(loadInfo.segments().size(), 0u);
-  EXPECT_TRUE(loadInfo.VisitSegments([](auto&& segment) {
+  ASSERT_EQ(load_info.segments().size(), 0u);
+  EXPECT_TRUE(load_info.VisitSegments([](auto&& segment) {
     ADD_FAILURE();
     return true;
   }));
@@ -300,51 +300,95 @@ TYPED_TEST(ElfldltlLoadTests, VisitSegments) {
   };
 
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), loadInfo.GetPhdrObserver(kPageSize)));
-  ASSERT_EQ(loadInfo.segments().size(), 2u);
+      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
+  ASSERT_EQ(load_info.segments().size(), 2u);
 
   int currentIndex = 0;
-  EXPECT_TRUE(loadInfo.VisitSegments([&](auto&& segment) {
+  EXPECT_TRUE(load_info.VisitSegments([&](auto&& segment) {
     EXPECT_EQ(segment.offset(), kPhdrs[currentIndex++].offset);
     return true;
   }));
 
   currentIndex = 0;
-  EXPECT_FALSE(loadInfo.VisitSegments([&](auto&& segment) {
+  EXPECT_FALSE(load_info.VisitSegments([&](auto&& segment) {
     EXPECT_EQ(currentIndex++, 0);
     return false;
   }));
+}
+
+TYPED_TEST(ElfldltlLoadTests, RemoveLastSegment) {
+  using Elf = typename TestFixture::Elf;
+  using Phdr = typename Elf::Phdr;
+  using size_type = typename Elf::size_type;
+  using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container>;
+
+  auto diag = ExpectOkDiagnostics();
+
+  LoadInfo load_info;
+
+  size_type offset = 0;
+  const Phdr kPhdrs[] = {
+      ConstantPhdr<Elf>{}(offset),
+      DataPhdr<Elf>{}(offset),
+  };
+  EXPECT_TRUE(
+      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), load_info.GetPhdrObserver(kPageSize)));
+  ASSERT_EQ(load_info.segments().size(), 2u);
+
+  EXPECT_EQ(load_info.vaddr_size(), 2 * kPageSize);
+
+  auto segment = load_info.RemoveLastSegment();
+  static_assert(std::is_same_v<decltype(segment), typename LoadInfo::Segment>);
+
+  EXPECT_EQ(load_info.segments().size(), 1u);
+  EXPECT_TRUE(
+      std::holds_alternative<typename LoadInfo::ConstantSegment>(load_info.segments().front()));
+  EXPECT_EQ(load_info.vaddr_size(), kPageSize);
+}
+
+TYPED_TEST(ElfldltlLoadTests, AddSegmentUpdatesVaddrSize) {
+  using Elf = typename TestFixture::Elf;
+  using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container>;
+
+  auto diag = ExpectOkDiagnostics();
+
+  LoadInfo load_info;
+  EXPECT_EQ(load_info.vaddr_size(), 0u);
+
+  EXPECT_TRUE(load_info.AddSegment(diag, typename LoadInfo::ZeroFillSegment(0, kPageSize)));
+  ASSERT_EQ(load_info.segments().size(), 1u);
+  EXPECT_EQ(load_info.vaddr_size(), kPageSize);
 }
 
 TYPED_TEST(ElfldltlLoadTests, RelroBounds) {
   using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
 
-  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
-  using Region = typename decltype(loadInfo)::Region;
+  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
+  using Region = typename decltype(load_info)::Region;
 
   {
-    Region r = loadInfo.RelroBounds({}, kPageSize);
+    Region r = load_info.RelroBounds({}, kPageSize);
     EXPECT_EQ(r.start, 0u);
     EXPECT_EQ(r.end, 0u);
     EXPECT_TRUE(r.empty());
   }
   {
     Phdr phdr{.memsz = kPageSize - 1};
-    Region r = loadInfo.RelroBounds(phdr, kPageSize);
+    Region r = load_info.RelroBounds(phdr, kPageSize);
     EXPECT_EQ(r.start, 0u);
     EXPECT_EQ(r.end, 0u);
     EXPECT_TRUE(r.empty());
   }
   {
     Phdr phdr{.memsz = kPageSize};
-    Region r = loadInfo.RelroBounds(phdr, kPageSize);
+    Region r = load_info.RelroBounds(phdr, kPageSize);
     EXPECT_EQ(r.start, 0u);
     EXPECT_EQ(r.end, kPageSize);
   }
   {
     Phdr phdr{.memsz = kPageSize + 1};
-    Region r = loadInfo.RelroBounds(phdr, kPageSize);
+    Region r = load_info.RelroBounds(phdr, kPageSize);
     EXPECT_EQ(r.start, 0u);
     EXPECT_EQ(r.end, kPageSize);
   }
@@ -357,7 +401,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroMissing) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
+  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
 
   size_type offset = kPageSize;
   Phdr phdrs[] = {
@@ -365,21 +409,21 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroMissing) {
       {.type = elfldltl::ElfPhdrType::kRelro, .memsz = kPageSize},
   };
 
-  ASSERT_FALSE(loadInfo.RelroBounds(phdrs[1], kPageSize).empty());
+  ASSERT_FALSE(load_info.RelroBounds(phdrs[1], kPageSize).empty());
 
   {
-    ASSERT_EQ(loadInfo.segments().size(), 0u);
+    ASSERT_EQ(load_info.segments().size(), 0u);
     ExpectedSingleError expected("PT_GNU_RELRO not in any data segment");
-    EXPECT_TRUE(loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
+    EXPECT_TRUE(load_info.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
   }
 
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
-                                    loadInfo.GetPhdrObserver(kPageSize)));
+                                    load_info.GetPhdrObserver(kPageSize)));
 
   {
-    ASSERT_EQ(loadInfo.segments().size(), 1u);
+    ASSERT_EQ(load_info.segments().size(), 1u);
     ExpectedSingleError expected("PT_GNU_RELRO not in any data segment");
-    EXPECT_TRUE(loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
+    EXPECT_TRUE(load_info.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
   }
 }
 
@@ -389,7 +433,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroBadStart) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
+  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
 
   Phdr phdrs[] = {
       {.type = elfldltl::ElfPhdrType::kLoad, .filesz = 2 * kPageSize, .memsz = 2 * kPageSize},
@@ -398,14 +442,14 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroBadStart) {
 
   phdrs[0].flags = elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite;
 
-  ASSERT_EQ(loadInfo.RelroBounds(phdrs[1], kPageSize).start, kPageSize);
-  ASSERT_EQ(loadInfo.RelroBounds(phdrs[1], kPageSize).end, kPageSize * 2);
+  ASSERT_EQ(load_info.RelroBounds(phdrs[1], kPageSize).start, kPageSize);
+  ASSERT_EQ(load_info.RelroBounds(phdrs[1], kPageSize).end, kPageSize * 2);
 
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
-                                    loadInfo.GetPhdrObserver(kPageSize)));
+                                    load_info.GetPhdrObserver(kPageSize)));
 
   ExpectedSingleError expected("PT_GNU_RELRO not at segment start");
-  EXPECT_TRUE(loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
+  EXPECT_TRUE(load_info.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
 }
 
 TYPED_TEST(ElfldltlLoadTests, ApplyRelroTooManyLoads) {
@@ -414,7 +458,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroTooManyLoads) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> loadInfo;
+  elfldltl::LoadInfo<Elf, elfldltl::StaticVector<1>::Container> load_info;
 
   Phdr phdrs[] = {
       {.type = elfldltl::ElfPhdrType::kLoad, .filesz = 2 * kPageSize, .memsz = 2 * kPageSize},
@@ -423,12 +467,12 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroTooManyLoads) {
   phdrs[0].flags = elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite;
 
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
-                                    loadInfo.GetPhdrObserver(kPageSize)));
+                                    load_info.GetPhdrObserver(kPageSize)));
 
-  ASSERT_EQ(loadInfo.segments().size(), 1u);
+  ASSERT_EQ(load_info.segments().size(), 1u);
 
   auto expected = ExpectedSingleError("too many PT_LOAD segments", ": maximum 1 < requested ", 2);
-  loadInfo.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false);
+  load_info.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false);
 }
 
 using SomeLI = elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container>;
@@ -523,13 +567,13 @@ void RelroTest(PhdrsPattern input, PhdrsPattern expected, SplitStrategy strategy
 
   auto diag = ExpectOkDiagnostics();
 
-  RelroTestLoadInfo<Elf, SegmentWrapper> loadInfo;
+  RelroTestLoadInfo<Elf, SegmentWrapper> load_info;
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag,
                                     cpp20::span<const Phdr>(input_phdrs.data(), input_phdrs.size()),
-                                    loadInfo.GetPhdrObserver(kPageSize)));
-  ASSERT_TRUE(loadInfo.ApplyRelro(diag, creator.get_relro_phdr(), kPageSize, merge_ro))
+                                    load_info.GetPhdrObserver(kPageSize)));
+  ASSERT_TRUE(load_info.ApplyRelro(diag, creator.get_relro_phdr(), kPageSize, merge_ro))
       << "line " << loc.line();
-  auto& segments = loadInfo.segments();
+  auto& segments = load_info.segments();
   ASSERT_EQ(segments.size(), expected.size()) << "line " << loc.line();
 
   for (size_t i = 0; i < segments.size(); i++) {
@@ -645,14 +689,14 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroCantMerge) {
   Phdr relro = {.type = elfldltl::ElfPhdrType::kRelro, .vaddr = kPageSize, .memsz = kPageSize};
 
   for (bool merge_ro : {true, false}) {
-    elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
-    using ConstantSegment = typename decltype(loadInfo)::ConstantSegment;
+    elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
+    using ConstantSegment = typename decltype(load_info)::ConstantSegment;
 
     EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
-                                      loadInfo.GetPhdrObserver(kPageSize)));
-    auto& segments = loadInfo.segments();
+                                      load_info.GetPhdrObserver(kPageSize)));
+    auto& segments = load_info.segments();
     ASSERT_EQ(segments.size(), 2u);
-    EXPECT_TRUE(loadInfo.ApplyRelro(diag, relro, kPageSize, merge_ro));
+    EXPECT_TRUE(load_info.ApplyRelro(diag, relro, kPageSize, merge_ro));
     ASSERT_EQ(segments.size(), 2u);
     ASSERT_TRUE(std::holds_alternative<ConstantSegment>(segments[0]));
     EXPECT_EQ(std::get<ConstantSegment>(segments[0]).flags(), phdrs[0].flags);
@@ -712,11 +756,11 @@ TYPED_TEST(ElfldltlLoadTests, FindSegment) {
 
   auto diag = ExpectOkDiagnostics();
 
-  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> loadInfo;
+  elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container> load_info;
 
   // Expect the first lookup to an empty segment list to return not found.
-  ASSERT_TRUE(loadInfo.segments().empty());
-  ASSERT_EQ(loadInfo.FindSegment(0u), loadInfo.segments().end());
+  ASSERT_TRUE(load_info.segments().empty());
+  ASSERT_EQ(load_info.FindSegment(0u), load_info.segments().end());
 
   size_type offset = kPageSize;
   const std::array kPhdrs = {ConstantPhdr<Elf>{}(offset), DataPhdr<Elf>{}(offset),
@@ -724,26 +768,26 @@ TYPED_TEST(ElfldltlLoadTests, FindSegment) {
   // Load all segments first so we can search the segments container with
   // multiple entries.
   for (const Phdr& phdr : kPhdrs) {
-    ASSERT_TRUE(loadInfo.AddSegment(diag, kPageSize, phdr));
+    ASSERT_TRUE(load_info.AddSegment(diag, kPageSize, phdr));
   }
 
-  ASSERT_EQ(loadInfo.segments().size(), 3u);
+  ASSERT_EQ(load_info.segments().size(), 3u);
 
   // Test finding a segment from its starting vaddr.
   for (const Phdr& phdr : kPhdrs) {
     size_type vaddr = phdr.vaddr;
-    const auto found = loadInfo.FindSegment(vaddr);
-    ASSERT_NE(found, loadInfo.segments().end());
+    const auto found = load_info.FindSegment(vaddr);
+    ASSERT_NE(found, load_info.segments().end());
     ASSERT_TRUE(
-        loadInfo.VisitSegment([vaddr](const auto& s) { return s.vaddr() == vaddr; }, *found));
+        load_info.VisitSegment([vaddr](const auto& s) { return s.vaddr() == vaddr; }, *found));
   };
 
   // Test finding a segment from a vaddr in its vaddr range.
   for (const Phdr& phdr : kPhdrs) {
     size_type vaddr = phdr.vaddr + (phdr.memsz / 2);
-    const auto found = loadInfo.FindSegment(vaddr);
-    ASSERT_NE(found, loadInfo.segments().end());
-    ASSERT_TRUE(loadInfo.VisitSegment(
+    const auto found = load_info.FindSegment(vaddr);
+    ASSERT_NE(found, load_info.segments().end());
+    ASSERT_TRUE(load_info.VisitSegment(
         [vaddr](const auto& s) { return s.vaddr() < vaddr && vaddr < s.vaddr() + s.memsz(); },
         *found));
   };
@@ -751,13 +795,13 @@ TYPED_TEST(ElfldltlLoadTests, FindSegment) {
   // Test finding a segment out of bounds of the first and last segments
   {
     size_type under_bounds_vaddr = kPhdrs[0].vaddr / 2;
-    const auto found = loadInfo.FindSegment(under_bounds_vaddr);
-    ASSERT_EQ(found, loadInfo.segments().end());
+    const auto found = load_info.FindSegment(under_bounds_vaddr);
+    ASSERT_EQ(found, load_info.segments().end());
   }
   {
     size_type over_bounds_vaddr = kPhdrs[2].vaddr * 2;
-    const auto found = loadInfo.FindSegment(over_bounds_vaddr);
-    ASSERT_EQ(found, loadInfo.segments().end());
+    const auto found = load_info.FindSegment(over_bounds_vaddr);
+    ASSERT_EQ(found, load_info.segments().end());
   }
 }
 

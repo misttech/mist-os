@@ -251,15 +251,6 @@ class LoadInfo {
   template <class Diagnostics>
   constexpr bool AddSegment(Diagnostics& diagnostics, size_type page_size, const Phdr& phdr,
                             bool merge = true) {
-    // Merge with the last segment if possible, or else append a new one.
-    // SegmentMerger::Merge overloads match each specific type as it's created below.
-    auto add = [this, &diagnostics, merge](auto&& segment) -> bool {
-      using T = decltype(segment);
-      return (merge && !segments_.empty() &&
-              SegmentMerger::Merge(segments_.back(), std::forward<T>(segment))) ||
-             segments_.emplace_back(diagnostics, internal::kTooManyLoads, std::forward<T>(segment));
-    };
-
     // Normalize the file and memory bounds to whole pages.
     auto [offset, filesz] = PageBounds(page_size, phdr.offset, phdr.filesz);
     auto [vaddr, memsz] = PageBounds(page_size, phdr.vaddr, phdr.memsz);
@@ -270,15 +261,35 @@ class LoadInfo {
       return true;
     }
     if (!(phdr.flags() & Phdr::kWrite)) {
-      return add(ConstantSegment(offset, vaddr, memsz, phdr.flags));
+      return AddSegment(diagnostics, ConstantSegment(offset, vaddr, memsz, phdr.flags), merge);
     }
     if (phdr.filesz == 0) {
-      return add(ZeroFillSegment(vaddr, memsz));
+      return AddSegment(diagnostics, ZeroFillSegment(vaddr, memsz), merge);
     }
     if (phdr.memsz > phdr.filesz) {
-      return add(DataWithZeroFillSegment(offset, vaddr, memsz, phdr.offset + phdr.filesz - offset));
+      return AddSegment(
+          diagnostics,
+          DataWithZeroFillSegment(offset, vaddr, memsz, phdr.offset + phdr.filesz - offset), merge);
     }
-    return add(DataSegment(offset, vaddr, memsz, filesz));
+    return AddSegment(diagnostics, DataSegment(offset, vaddr, memsz, filesz), merge);
+  }
+
+  // Add a Segment or *Segment object already constructed.
+  template <class Diagnostics, class NewSegment>
+  constexpr bool AddSegment(Diagnostics& diagnostics, NewSegment new_segment, bool merge = true) {
+    // Merge with the last segment if possible, or else append a new one.
+    // SegmentMerger::Merge overloads match each specific type as it's created
+    // below.  It only merges when it could copy, it never merges when the new
+    // segment would have to be moved.  So it takes const& even when the
+    // segment type is move-only.
+    if ((merge && !segments_.empty() && SegmentMerger::Merge(segments_.back(), new_segment)) ||
+        segments_.emplace_back(diagnostics, internal::kTooManyLoads, std::move(new_segment))) {
+      // If this call didn't come from the PhdrObserver then it might be
+      // extending the original vaddr_size_.
+      RecomputeVaddrSize();
+      return true;
+    }
+    return false;
   }
 
   // Get an ephemeral object to pass to elfldltl::DecodePhdrs.  The returned
@@ -291,6 +302,14 @@ class LoadInfo {
       return this->AddSegment(diagnostics, page_size, phdr, merge);
     };
     return GetPhdrObserver(page_size, add_segment);
+  }
+
+  constexpr Segment RemoveLastSegment() {
+    assert(!segments_.empty());
+    Segment segment = std::move(segments_.back());
+    segments_.pop_back();
+    RecomputeVaddrSize();
+    return segment;
   }
 
   // Iterate over segments() by calling std::visit(visitor, segment).
@@ -334,8 +353,8 @@ class LoadInfo {
   // When loading before relocation, the RelroBounds() region can just be made
   // read-only in memory after relocation. Partial pages in the RELRO region are
   // excluded from RelroBounds, as protections can only be applied per-page.
-  // TODO(https://fxbug.dev/123468): Address the discrepancy between our round-up behavior and glibc's
-  // round-down behavior for RELRO start.
+  // TODO(https://fxbug.dev/123468): Address the discrepancy between our round-up behavior and
+  // glibc's round-down behavior for RELRO start.
   static constexpr Region RelroBounds(const std::optional<Phdr>& relro, size_type page_size) {
     Region region;
     if (relro) {
@@ -465,6 +484,17 @@ class LoadInfo {
   constexpr auto GetPhdrObserver(size_type page_size, T&& add_segment) {
     return MakePhdrLoadObserver<Elf, Policy>(page_size, vaddr_start_, vaddr_size_,
                                              std::forward<T>(add_segment));
+  }
+
+  constexpr void RecomputeVaddrSize() {
+    if (!segments_.empty()) {
+      VisitSegment(
+          [this](const auto& segment) -> std::true_type {
+            vaddr_size_ = segment.vaddr() - vaddr_start_ + segment.memsz();
+            return {};
+          },
+          segments_.back());
+    }
   }
 
   template <class SegmentType>
