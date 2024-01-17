@@ -94,6 +94,8 @@ VulkanDeviceQueues::Params GetDefaultVulkanDeviceQueuesParams(bool enable_protec
   device_params.required_extension_names.insert(VK_FUCHSIA_EXTERNAL_MEMORY_EXTENSION_NAME);
   if (enable_protected_memory)
     device_params.flags = VulkanDeviceQueues::Params::kAllowProtectedMemory;
+#else
+  device_params.required_extension_names.insert(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 #endif
   return device_params;
 }
