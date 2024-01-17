@@ -49,5 +49,7 @@ source_set("dfv2") {
   public_deps = [
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/stdcompat",
+    "//zircon/system/ulib/trace",
   ]
 }
