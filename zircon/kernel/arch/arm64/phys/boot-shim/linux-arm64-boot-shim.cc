@@ -78,17 +78,15 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
         .type = memalloc::Type::kPeripheral,
     };
 
-    // Look for the range that comes right after `peripheral_range`.
-    bool found = false;
-    for (const auto range : pool) {
-      if (range.addr >= peripheral_range.end()) {
-        peripheral_range.size = range.addr - peripheral_range.addr;
-        found = true;
-        break;
-      }
-    }
+    // Look for the range that comes right after `peripheral_range`. While fancier search algorithms
+    // exist, the underlying structure is a linked list, so a linear search is unavoidable.
+    auto next_range_it = ktl::find_if(
+        pool.begin(), pool.end(),
+        [peripheral_range](const auto& range) { return range.addr >= peripheral_range.end(); });
 
-    if (!found) {
+    if (next_range_it != pool.end()) {
+      peripheral_range.size = next_range_it->addr - peripheral_range.addr;
+    } else {
       peripheral_range.size = fbl::round_up(peripheral_range.end(), 1ull << 30);
     }
 
