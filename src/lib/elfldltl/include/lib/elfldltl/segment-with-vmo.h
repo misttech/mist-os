@@ -97,6 +97,14 @@ class SegmentWithVmo {
         static_assert(std::is_move_assignable_v<WithVmo>);
         return !vmo();
       }
+
+      // Similar to `CanMergeWith`, this segment can't be replaced by another
+      // segment if there's a VMO installed.
+      bool CanReplace() const {
+        static_assert(std::is_move_constructible_v<WithVmo>);
+        static_assert(std::is_move_assignable_v<WithVmo>);
+        return !vmo();
+      }
     };
 
     // Use the wrapper if need be, or the original type if not.

@@ -586,10 +586,6 @@ startup dynamic linking failed with 1 errors and 0 warnings
 }
 
 TYPED_TEST(LdLoadFailureTests, Relro) {
-  if constexpr (!TestFixture::kHasRelro) {
-    GTEST_SKIP() << "test requires Relro support";
-  }
-
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
   ASSERT_NO_FATAL_FAILURE(this->Load("relro"));

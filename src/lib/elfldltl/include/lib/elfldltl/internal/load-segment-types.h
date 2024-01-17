@@ -112,6 +112,8 @@ struct LoadSegmentTypes {
 
     constexpr std::false_type executable() const { return {}; }
 
+    constexpr std::false_type relro() const { return {}; }
+
     constexpr size_type offset() const { return offset_; }
 
     constexpr size_type memsz() const { return memsz_; }

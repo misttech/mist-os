@@ -65,7 +65,7 @@ class LoadInfoMutableMemory {
   bool Init() {
     using namespace std::literals::string_view_literals;
     constexpr auto is_mutable = [](const auto& segment) -> bool {
-      return segment.writable() && segment.filesz() > 0;
+      return (segment.writable() || segment.relro()) && segment.filesz() > 0;
     };
     for (auto& segment : load_info_.segments()) {
       if (LoadInfo::VisitSegment(is_mutable, segment) &&

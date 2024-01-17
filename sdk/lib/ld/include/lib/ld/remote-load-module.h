@@ -106,9 +106,11 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     auto& [ehdr_owner, phdrs_owner] = *headers;
     const Ehdr& ehdr = ehdr_owner;
     const cpp20::span<const Phdr> phdrs = phdrs_owner;
+    std::optional<Phdr> relro_phdr;
     std::optional<elfldltl::ElfNote> build_id;
     auto result =
         DecodeModulePhdrs(diag, phdrs, load_info().GetPhdrObserver(Loader::page_size()),
+                          elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr),
                           elfldltl::PhdrFileNoteObserver(
                               elfldltl::Elf<>{}, mapped_vmo_, elfldltl::NoArrayFromFile<Phdr>{},
                               elfldltl::ObserveBuildIdNote(build_id, true)));
@@ -127,6 +129,12 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
     if (build_id) {
       module().build_id = build_id->desc;
+    }
+
+    // Apply relro protections before segments are aligned & equipped with VMOs.
+    if (!load_info().ApplyRelro(diag, relro_phdr, Loader::page_size(), false)) {
+      // ApplyRelro only fails if Diagnostics said to give up.
+      return fit::error{false};
     }
 
     // Fix up segments to be compatible with AlignedRemoteVmarLoader.

@@ -24,7 +24,6 @@ class LdLoadTestsBase {
   // An indicator to GTEST of whether the test fixture supports the following
   // features so that it may skip related tests if not supported.
   static constexpr bool kHasPassiveAbi = true;
-  static constexpr bool kHasRelro = true;
   static constexpr bool kHasTls = true;
   static constexpr bool kCanCollectLog = true;
 
