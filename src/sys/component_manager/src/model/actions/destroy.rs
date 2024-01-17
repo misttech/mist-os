@@ -141,7 +141,7 @@ pub mod tests {
                 test_utils::{is_child_deleted, is_destroyed},
                 ActionNotifier, ShutdownAction,
             },
-            component::{Component, StartReason},
+            component::StartReason,
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::{
@@ -153,7 +153,7 @@ pub mod tests {
             },
         },
         assert_matches::assert_matches,
-        cm_rust::{Availability, ComponentDecl, UseEventStreamDecl, UseSource},
+        cm_rust::{Availability, UseEventStreamDecl, UseSource},
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_zircon as zx,
@@ -453,14 +453,7 @@ pub mod tests {
             ActionKey::Resolve,
             // The mocked action must return a result, even though the result is not used
             // by the Destroy action.
-            Ok(Component {
-                resolved_url: "unused".to_string(),
-                context_to_resolve_children: None,
-                decl: ComponentDecl::default(),
-                package: None,
-                config: None,
-                abi_revision: None,
-            }) as Result<Component, ActionError>,
+            Ok(()) as Result<(), ActionError>,
         )
         .await;
     }

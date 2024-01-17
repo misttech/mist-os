@@ -100,15 +100,8 @@ async fn do_start(
     numbered_handles: Vec<fprocess::HandleInfo>,
     additional_namespace_entries: Vec<NamespaceEntry>,
 ) -> Result<fsys::StartResult, StartActionError> {
-    // Resolve the component.
-    let resolved_component =
-        component.resolve().await.map_err(|err| StartActionError::ResolveActionError {
-            moniker: component.moniker.clone(),
-            err: Box::new(err),
-        })?;
-
-    // Find the runner to use.
-    let runner = {
+    // Resolve the component and find the runner to use.
+    let (runner, resolved_component) = {
         // Obtain the runner declaration under a short lock, as `open_runner` may lock the
         // resolved state re-entrantly.
         let resolved_state = component.lock_resolved_state().await.map_err(|err| {
@@ -117,7 +110,7 @@ async fn do_start(
                 err: Box::new(err),
             }
         })?;
-        resolved_state.decl().get_runner()
+        (resolved_state.decl().get_runner(), resolved_state.resolved_component.clone())
     };
     let runner = match runner {
         Some(runner) => open_runner(component, runner).await.map_err(|err| {

@@ -32,7 +32,7 @@ impl ResolveAction {
 
 #[async_trait]
 impl Action for ResolveAction {
-    type Output = Component;
+    type Output = ();
     async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
         do_resolve(component).await.map_err(Into::into)
     }
@@ -41,7 +41,7 @@ impl Action for ResolveAction {
     }
 }
 
-async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, ResolveActionError> {
+async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveActionError> {
     {
         let execution = component.lock_execution().await;
         if execution.is_shut_down() {
@@ -125,25 +125,25 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
     }
     .await;
 
-    match result {
-        Ok((component_info, false)) => Ok(component_info),
-        Ok((component_info, true)) => {
-            let event = Event::new(
-                component,
-                EventPayload::Resolved {
-                    component: WeakComponentInstance::from(component),
-                    decl: component_info.decl.clone(),
-                    package_dir: component_info
-                        .package
-                        .as_ref()
-                        .and_then(|pkg| clone_dir(Some(&pkg.package_dir))),
-                },
-            );
-            component.hooks.dispatch(&event).await;
-            Ok(component_info)
-        }
-        Err(e) => Err(e),
+    let (component_info, first_resolve) = result?;
+
+    if !first_resolve {
+        return Ok(());
     }
+
+    let event = Event::new(
+        component,
+        EventPayload::Resolved {
+            component: WeakComponentInstance::from(component),
+            decl: component_info.decl.clone(),
+            package_dir: component_info
+                .package
+                .as_ref()
+                .and_then(|pkg| clone_dir(Some(&pkg.package_dir))),
+        },
+    );
+    component.hooks.dispatch(&event).await;
+    Ok(())
 }
 
 #[cfg(test)]

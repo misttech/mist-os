@@ -519,7 +519,7 @@ impl ComponentInstance {
     /// Resolves the component declaration, populating `ResolvedInstanceState` as necessary. A
     /// `Resolved` event is dispatched if the instance was not previously resolved or an error
     /// occurs.
-    pub async fn resolve(self: &Arc<Self>) -> Result<Component, ActionError> {
+    pub async fn resolve(self: &Arc<Self>) -> Result<(), ActionError> {
         ActionSet::register(self.clone(), ResolveAction::new()).await
     }
 
