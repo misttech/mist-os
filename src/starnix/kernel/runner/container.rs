@@ -361,10 +361,14 @@ async fn create_container(
     let fs_context = create_fs_context(&kernel, &features, config, &pkg_dir_proxy)
         .source_context("creating FsContext")?;
     let init_pid = kernel.pids.write().allocate_pid();
-    debug_assert!(init_pid == 1);
+    // Lots of software assumes that the pid for the init process is 1.
+    debug_assert_eq!(init_pid, 1);
 
     let system_task = CurrentTask::create_system_task(&kernel, Arc::clone(&fs_context))
         .source_context("create system task")?;
+    // The system task gives pid 2. This value is less critical than giving
+    // pid 1 to init, but this value matches what is supposed to happen.
+    debug_assert_eq!(system_task.id, 2);
 
     kernel.kthreads.init(system_task).source_context("initializing kthreads")?;
     let system_task = kernel.kthreads.system_task();

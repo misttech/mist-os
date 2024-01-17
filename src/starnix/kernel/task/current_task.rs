@@ -956,6 +956,20 @@ impl CurrentTask {
         }
     }
 
+    /// Create a process that is a child of the `init` process.
+    ///
+    /// The created process will be a task that is the leader of a new thread group.
+    ///
+    /// Most processes are created by userspace and are descendants of the `init` process. In
+    /// some situations, the kernel needs to create a process itself. This function is the
+    /// preferred way of creating an actual userspace process because making the process a child of
+    /// `init` means that `init` is responsible for waiting on the process when it dies and thereby
+    /// cleaning up its zombie.
+    ///
+    /// If you just need a kernel task, and not an entire userspace process, consider using
+    /// `create_system_task` instead. Even better, consider using the `kthreads` threadpool.
+    ///
+    /// This function creates an underlying Zircon process to host the new task.
     pub fn create_init_child_process(
         kernel: &Arc<Kernel>,
         binary_path: &CString,
@@ -980,10 +994,19 @@ impl CurrentTask {
         Ok(task)
     }
 
-    /// Create a task that is the leader of a new thread group.
+    /// Create a process that does not have a parent.
     ///
-    /// This function creates an underlying Zircon process to host the new
-    /// task.
+    /// The created process will be a task that is the leader of a new thread group.
+    ///
+    /// The processes with this function are strange because following their `parent` chain
+    /// does not lead to `init`, unlike every task created by userspace. When these tasks die,
+    /// there might not be any other process that is responsible for waiting on them, which can
+    /// leak zombie processes.  (Normally `init` waits on dead processes in its task tree.)
+    ///
+    /// Instead of calling this function, consider calling `create_init_child_process`, which
+    /// creates a more normal process.
+    ///
+    /// This function creates an underlying Zircon process to host the new task.
     pub fn create_process_without_parent(
         kernel: &Arc<Kernel>,
         initial_name: CString,
@@ -1002,6 +1025,24 @@ impl CurrentTask {
         })
     }
 
+    /// Creates the initial process for a kernel.
+    ///
+    /// The created process will be a task that is the leader of a new thread group.
+    ///
+    /// The init process is special because it's the root of the parent/child relationship between
+    /// tasks. If a task dies, the init process is ultimately responsible for waiting on that task
+    /// and removing it from the zombie list.
+    ///
+    /// It's possible for the kernel to create tasks whose ultimate parent isn't init, but such
+    /// tasks cannot be created by userspace directly.
+    ///
+    /// This function should only be called as part of booting a kernel instance. To create a
+    /// process after the kernel has already booted, consider `create_init_child_process`
+    /// or `create_system_task`.
+    ///
+    /// The process created by this function should always have pid 1. We require the caller to
+    /// pass the `pid` as an argument to clarify that it's the callers responsibility to determine
+    /// the pid for the process.
     pub fn create_init_process(
         kernel: &Arc<Kernel>,
         pid: pid_t,
@@ -1024,7 +1065,15 @@ impl CurrentTask {
 
     /// Create a task that runs inside the kernel.
     ///
-    /// There is no underlying Zircon process to host the task.
+    /// There is no underlying Zircon process to host the task. Instead, the work done by this task
+    /// is performed by a thread in the original Starnix process, possible as part of a thread
+    /// pool.
+    ///
+    /// This function is the preferred way to create a context for doing background work inside the
+    /// kernel.
+    ///
+    /// Rather than calling this function directly, consider using `kthreads`, which provides both
+    /// a system task and a threadpool on which the task can do work.
     pub fn create_system_task(
         kernel: &Arc<Kernel>,
         fs: Arc<FsContext>,
