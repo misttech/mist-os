@@ -92,7 +92,11 @@ def main():
     file_stats = {}
     for path in modified.splitlines():
         p = os.path.join(git_base, path)
-        if not p.endswith("BUILD.gn") and os.path.exists(p):
+        if (
+            not p.endswith("BUILD.gn")
+            and not p.endswith(".gni")
+            and os.path.exists(p)
+        ):
             stat = os.stat(p)
             file_stats[p] = stat.st_atime, stat.st_mtime
             os.utime(p)
