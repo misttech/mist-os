@@ -405,7 +405,7 @@ foreach(test, netstack3_tests) {
       }
     }
 
-    ns3_packages += [ ":${no_err_logs_package_name}" ]
+    ns3_packages += [ ":${err_logs_package_name}" ]
   } else {
     ns3_test_component_names += [ _component_name ]
   }
