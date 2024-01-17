@@ -78,36 +78,23 @@ template("_hermetic_code_blob") {
   }
 }
 
-# TODO: Implement support for non-x86_64 arches
-
-_usercopy_non_rust_deps = []
-
-if (target_cpu == "x64" || target_cpu == "arm64") {
-  static_library("usercopy_assembly_routines") {
-    arch_dir = "arch/${target_cpu}"
-    sources = rebase_path([
-                            "hermetic_copy_error.S",
-                            "atomic_load.S",
-                            "atomic_store.S",
-                            "atomic_error.S",
-                            "atomic_compare_exchange.S",
-                          ],
-                          ".",
-                          arch_dir)
-  }
-  _hermetic_code_blob("hermetic_copy") {
-  }
-  _hermetic_code_blob("hermetic_copy_until_null_byte") {
-  }
-  _hermetic_code_blob("hermetic_zero") {
-  }
-
-  _usercopy_non_rust_deps = [
-    ":hermetic_copy_bin.basic",
-    ":hermetic_copy_until_null_byte_bin.basic",
-    ":hermetic_zero_bin.basic",
-    ":usercopy_assembly_routines",
-  ]
+static_library("usercopy_assembly_routines") {
+  arch_dir = "arch/${target_cpu}"
+  sources = rebase_path([
+                          "hermetic_copy_error.S",
+                          "atomic_load.S",
+                          "atomic_store.S",
+                          "atomic_error.S",
+                          "atomic_compare_exchange.S",
+                        ],
+                        ".",
+                        arch_dir)
+}
+_hermetic_code_blob("hermetic_copy") {
+}
+_hermetic_code_blob("hermetic_copy_until_null_byte") {
+}
+_hermetic_code_blob("hermetic_zero") {
 }
 
 rustc_library("usercopy") {
@@ -120,7 +107,12 @@ rustc_library("usercopy") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:zerocopy",
   ]
-  non_rust_deps = _usercopy_non_rust_deps
+  non_rust_deps = [
+    ":hermetic_copy_bin.basic",
+    ":hermetic_copy_until_null_byte_bin.basic",
+    ":hermetic_zero_bin.basic",
+    ":usercopy_assembly_routines",
+  ]
   with_unit_tests = true
   test_deps = [
     "//src/lib/fuchsia",

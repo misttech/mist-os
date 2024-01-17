@@ -88,9 +88,7 @@ fn usercopy() -> Option<&'static usercopy::Usercopy> {
         if UNIFIED_ASPACES_ENABLED {
             // ASUMPTION: All Starnix managed Linux processes have the same
             // restricted mode address range.
-            Some(
-                usercopy::Usercopy::new(PRIVATE_ASPACE_BASE..PRIVATE_ASPACE_SIZE).unwrap().unwrap(),
-            )
+            Some(usercopy::Usercopy::new(PRIVATE_ASPACE_BASE..PRIVATE_ASPACE_SIZE).unwrap())
         } else {
             None
         }

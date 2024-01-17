@@ -11,7 +11,6 @@ use fuchsia_zircon as zx;
 use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Task};
 
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 extern "C" {
     // This function generates a "return" from the usercopy routine with an error.
     fn hermetic_copy_error();
@@ -87,32 +86,6 @@ extern "C" {
     fn atomic_compare_exchange_weak_u32_acq_rel_end();
 }
 
-// Used to provide empty/unused implementations to make the platform-agnostic code
-// easier to write.
-#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-mod missing_impls {
-    pub(crate) extern "C" fn atomic_load_u32_relaxed(_addr: usize) -> u64 {
-        unimplemented!()
-    }
-
-    pub(crate) extern "C" fn atomic_load_u32_acquire(_addr: usize) -> u64 {
-        unimplemented!()
-    }
-
-    pub(crate) extern "C" fn atomic_store_u32_relaxed(_addr: usize, _value: u32) -> u64 {
-        unimplemented!()
-    }
-
-    pub(crate) extern "C" fn atomic_store_u32_release(_addr: usize, _value: u32) -> u64 {
-        unimplemented!()
-    }
-}
-#[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-use missing_impls::{
-    atomic_load_u32_acquire, atomic_load_u32_relaxed, atomic_store_u32_relaxed,
-    atomic_store_u32_release,
-};
-
 /// Converts a slice to an equivalent MaybeUninit slice.
 pub fn slice_to_maybe_uninit_mut<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
     let ptr = slice.as_mut_ptr();
@@ -175,15 +148,12 @@ fn parse_fault_exception(
         (pc, fault_address as usize)
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[cfg(target_arch = "riscv64")]
     {
-        // Avoid unused errors.
-        let _ = regs;
-        let _ = report;
+        let pc = regs.pc as usize;
+        let fault_address = unsafe { report.context.arch.riscv_64.tval };
 
-        unreachable!(
-            "Should not have started usercopy exception thread on unsupported architecture"
-        )
+        (pc, fault_address as usize)
     }
 }
 
@@ -203,19 +173,13 @@ fn set_registers_for_hermetic_error(
         regs.r[0] = fault_address as u64;
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[cfg(target_arch = "riscv64")]
     {
-        // Avoid unused errors.
-        let _ = regs;
-        let _ = fault_address;
-
-        unreachable!(
-            "Should not have started usercopy exception thread on unsupported architecture"
-        )
+        regs.pc = hermetic_copy_error as u64;
+        regs.a0 = fault_address as u64;
     }
 }
 
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 const ATOMIC_ERROR_MASK: u64 = 0xFFFFFFFF00000000;
 
 fn set_registers_for_atomic_error(regs: &mut zx::sys::zx_thread_state_general_regs_t) {
@@ -231,14 +195,10 @@ fn set_registers_for_atomic_error(regs: &mut zx::sys::zx_thread_state_general_re
         regs.pc = atomic_error as u64;
     }
 
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    #[cfg(target_arch = "riscv64")]
     {
-        // Avoid unused errors.
-        let _ = regs;
-
-        unreachable!(
-            "Should not have started usercopy exception thread on unsupported architecture"
-        )
+        regs.a0 = ATOMIC_ERROR_MASK;
+        regs.pc = atomic_error as u64;
     }
 }
 
@@ -317,11 +277,7 @@ unsafe fn do_hermetic_copy(
 impl Usercopy {
     /// Returns a new instance of `Usercopy` if unified address spaces is
     /// supported on the target architecture.
-    pub fn new(restricted_address_range: Range<usize>) -> Result<Option<Self>, zx::Status> {
-        if cfg!(not(any(target_arch = "x86_64", target_arch = "aarch64"))) {
-            return Ok(None);
-        }
-
+    pub fn new(restricted_address_range: Range<usize>) -> Result<Self, zx::Status> {
         let hermetic_copy_addr_range = get_hermetic_copy_bin("/pkg/hermetic_copy.bin")?;
         let hermetic_copy_fn: HermeticCopyFn =
             unsafe { std::mem::transmute(hermetic_copy_addr_range.start) };
@@ -335,43 +291,25 @@ impl Usercopy {
         let hermetic_zero_fn: HermeticZeroFn =
             unsafe { std::mem::transmute(hermetic_zero_addr_range.start) };
 
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         let atomic_load_relaxed_range = atomic_load_u32_relaxed as *const () as usize
             ..atomic_load_u32_relaxed_end as *const () as usize;
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        let atomic_load_relaxed_range = 0..0;
 
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         let atomic_load_acquire_range = atomic_load_u32_acquire as *const () as usize
             ..atomic_load_u32_acquire_end as *const () as usize;
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        let atomic_load_acquire_range = 0..0;
 
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         let atomic_store_relaxed_range = atomic_store_u32_relaxed as *const () as usize
             ..atomic_store_u32_relaxed_end as *const () as usize;
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        let atomic_store_relaxed_range = 0..0;
 
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         let atomic_store_release_range = atomic_store_u32_release as *const () as usize
             ..atomic_store_u32_release_end as *const () as usize;
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        let atomic_store_release_range = 0..0;
 
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         let atomic_compare_exchange_range = atomic_compare_exchange_u32_acq_rel as *const ()
             as usize
             ..atomic_compare_exchange_u32_acq_rel_end as *const () as usize;
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        let atomic_compare_exchange_range = 0..0;
 
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         let atomic_compare_exchange_weak_range = atomic_compare_exchange_weak_u32_acq_rel
             as *const () as usize
             ..atomic_compare_exchange_weak_u32_acq_rel_end as *const () as usize;
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        let atomic_compare_exchange_weak_range = 0..0;
 
         let (tx, rx) = std::sync::mpsc::channel::<zx::Status>();
 
@@ -475,14 +413,14 @@ impl Usercopy {
             }
         };
 
-        Ok(Some(Self {
+        Ok(Self {
             hermetic_copy_fn,
             hermetic_copy_until_null_byte_fn,
             hermetic_zero_fn,
             shutdown_event,
             join_handle: Some(join_handle),
             restricted_address_range,
-        }))
+        })
     }
 
     /// Copies bytes from the source address to the destination address.
@@ -627,20 +565,11 @@ impl Usercopy {
         load_fn: unsafe extern "C" fn(usize) -> u64,
         addr: usize,
     ) -> Result<u32, ()> {
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        {
-            let _ = load_fn;
-            let _ = addr;
-            return Err(());
-        }
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-        {
-            let value_or_error = unsafe { load_fn(addr) };
-            if value_or_error & ATOMIC_ERROR_MASK == 0 {
-                Ok(value_or_error as u32)
-            } else {
-                Err(())
-            }
+        let value_or_error = unsafe { load_fn(addr) };
+        if value_or_error & ATOMIC_ERROR_MASK == 0 {
+            Ok(value_or_error as u32)
+        } else {
+            Err(())
         }
     }
 
@@ -662,14 +591,6 @@ impl Usercopy {
         addr: usize,
         value: u32,
     ) -> Result<(), ()> {
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        {
-            let _ = store_fn;
-            let _ = addr;
-            let _ = value;
-            return Err(());
-        }
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         match unsafe { store_fn(addr, value) } {
             0 => Ok(()),
             _ => Err(()),
@@ -696,21 +617,11 @@ impl Usercopy {
         expected: u32,
         desired: u32,
     ) -> Result<Result<u32, u32>, ()> {
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        {
-            let _ = addr;
-            let _ = expected;
-            let _ = desired;
-            return Err(());
-        }
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-        {
-            let mut expected = expected;
-            let value_or_error = unsafe {
-                atomic_compare_exchange_u32_acq_rel(addr, &mut expected as *mut u32, desired)
-            };
-            Self::parse_compare_exchange_result(expected, value_or_error)
-        }
+        let mut expected = expected;
+        let value_or_error = unsafe {
+            atomic_compare_exchange_u32_acq_rel(addr, &mut expected as *mut u32, desired)
+        };
+        Self::parse_compare_exchange_result(expected, value_or_error)
     }
 
     /// Performs a weak atomic compare and exchange of a 32 bit value at addr `addr`.
@@ -721,24 +632,13 @@ impl Usercopy {
         expected: u32,
         desired: u32,
     ) -> Result<Result<u32, u32>, ()> {
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-        {
-            let _ = addr;
-            let _ = expected;
-            let _ = desired;
-            return Err(());
-        }
-        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
-        {
-            let mut expected = expected;
-            let value_or_error = unsafe {
-                atomic_compare_exchange_weak_u32_acq_rel(addr, &mut expected as *mut u32, desired)
-            };
-            Self::parse_compare_exchange_result(expected, value_or_error)
-        }
+        let mut expected = expected;
+        let value_or_error = unsafe {
+            atomic_compare_exchange_weak_u32_acq_rel(addr, &mut expected as *mut u32, desired)
+        };
+        Self::parse_compare_exchange_result(expected, value_or_error)
     }
 
-    #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
     fn parse_compare_exchange_result(
         expected: u32,
         value_or_error: u64,
@@ -764,17 +664,10 @@ mod test {
 
     use test_case::test_case;
 
-    macro_rules! new_usercopy_for_test {
-        ($stmt:expr) => {{
-            let usercopy = $stmt.unwrap();
-            if cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
-                usercopy.unwrap()
-            } else {
-                // Skip test if not a supported architecture
-                assert!(usercopy.is_none());
-                return;
-            }
-        }};
+    impl Usercopy {
+        fn new_for_test(restricted_address_range: Range<usize>) -> Self {
+            Self::new(restricted_address_range).unwrap()
+        }
     }
 
     #[test_case(0, 0)]
@@ -800,7 +693,7 @@ mod test {
             unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, page_size) };
         mapped_bytes.fill(ch);
 
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size);
 
         let result = usercopy.zero(mapped_addr, zero_len);
         assert_eq!(result, zero_len);
@@ -845,8 +738,7 @@ mod test {
             unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, page_size) };
         mapped_bytes.fill(ch);
 
-        let usercopy =
-            new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size * 2);
 
         let dest_addr = mapped_addr + page_size - offset;
 
@@ -879,7 +771,7 @@ mod test {
             .map(0, &dest_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
             .unwrap();
 
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size);
 
         let result = usercopy.copyout(&source, mapped_addr);
         assert_eq!(result, buf_len);
@@ -925,8 +817,7 @@ mod test {
             )
             .unwrap();
 
-        let usercopy =
-            new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size * 2);
 
         let dest_addr = mapped_addr + page_size - offset;
 
@@ -964,7 +855,7 @@ mod test {
 
         unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, buf_len) }.fill('a' as u8);
 
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size);
         let (read_bytes, unread_bytes) = usercopy.copyin(mapped_addr, dest.spare_capacity_mut());
         let expected = vec!['a' as u8; buf_len];
         assert_eq!(read_bytes, &expected);
@@ -1014,8 +905,7 @@ mod test {
 
         unsafe { std::slice::from_raw_parts_mut(source_addr as *mut u8, offset) }.fill('a' as u8);
 
-        let usercopy =
-            new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size * 2);
 
         let (read_bytes, unread_bytes) =
             usercopy.copyin(source_addr, slice_to_maybe_uninit_mut(&mut dest));
@@ -1052,7 +942,7 @@ mod test {
 
         unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, buf_len) }.fill('a' as u8);
 
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size);
 
         let (read_bytes, unread_bytes) =
             usercopy.copyin_until_null_byte(mapped_addr, dest.spare_capacity_mut());
@@ -1104,8 +994,7 @@ mod test {
 
         unsafe { std::slice::from_raw_parts_mut(source_addr as *mut u8, offset) }.fill('a' as u8);
 
-        let usercopy =
-            new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size * 2);
 
         let (read_bytes, unread_bytes) =
             usercopy.copyin_until_null_byte(source_addr, slice_to_maybe_uninit_mut(&mut dest));
@@ -1146,7 +1035,7 @@ mod test {
             slice[zero_idx] = 0;
         };
 
-        let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
+        let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size);
 
         let (read_bytes, unread_bytes) =
             usercopy.copyin_until_null_byte(mapped_addr, slice_to_maybe_uninit_mut(&mut dest));
@@ -1172,7 +1061,7 @@ mod test {
     #[test_case(5..10, 10)]
     #[::fuchsia::test]
     fn starting_fault_address_copyin_until_null_byte(range: Range<usize>, addr: usize) {
-        let usercopy = new_usercopy_for_test!(Usercopy::new(range));
+        let usercopy = Usercopy::new_for_test(range);
 
         let mut dest = vec![0u8];
 
@@ -1194,7 +1083,7 @@ mod test {
     #[test_case(5..10, 10)]
     #[::fuchsia::test]
     fn starting_fault_address_copyin(range: Range<usize>, addr: usize) {
-        let usercopy = new_usercopy_for_test!(Usercopy::new(range));
+        let usercopy = Usercopy::new_for_test(range);
 
         let mut dest = vec![0u8];
 
@@ -1216,7 +1105,7 @@ mod test {
     #[test_case(5..10, 10)]
     #[::fuchsia::test]
     fn starting_fault_address_copyout(range: Range<usize>, addr: usize) {
-        let usercopy = new_usercopy_for_test!(Usercopy::new(range));
+        let usercopy = Usercopy::new_for_test(range);
 
         let source = vec![0u8];
 
@@ -1230,7 +1119,7 @@ mod test {
     }
 
     impl MappedPageUsercopy {
-        fn new(flags: zx::VmarFlags) -> Option<Self> {
+        fn new(flags: zx::VmarFlags) -> Self {
             let page_size = zx::system_get_page_size() as usize;
 
             let vmo = zx::Vmo::create(page_size as u64).unwrap();
@@ -1239,12 +1128,8 @@ mod test {
 
             let addr = root_vmar.map(0, &vmo, 0, page_size, flags).unwrap();
 
-            if cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
-                let usercopy = Usercopy::new(addr..addr + page_size).unwrap().unwrap();
-                Some(Self { usercopy, addr })
-            } else {
-                None
-            }
+            let usercopy = Usercopy::new_for_test(addr..addr + page_size);
+            Self { usercopy, addr }
         }
     }
 
@@ -1256,26 +1141,11 @@ mod test {
         }
     }
 
-    macro_rules! new_mapped_page_usercopy_for_test {
-        ($perms:expr) => {{
-            let m = MappedPageUsercopy::new($perms);
-            if cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
-                m.unwrap()
-            } else {
-                // Skip test if not a supported architecture
-                assert!(m.is_none());
-                return;
-            }
-        }};
-    }
-
     #[test_case(|usercopy, mapped_addr| usercopy.atomic_load_u32_relaxed(mapped_addr); "relaxed")]
     #[test_case(|usercopy, mapped_addr| usercopy.atomic_load_u32_acquire(mapped_addr); "acquire")]
     #[::fuchsia::test]
     fn atomic_load_u32_no_fault(load_fn: fn(&Usercopy, usize) -> Result<u32, ()>) {
-        let m = new_mapped_page_usercopy_for_test!(
-            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
-        );
+        let m = MappedPageUsercopy::new(zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE);
 
         unsafe { *(m.addr as *mut u32) = 0x12345678 };
 
@@ -1288,7 +1158,7 @@ mod test {
     #[test_case(|usercopy, mapped_addr| usercopy.atomic_load_u32_acquire(mapped_addr); "acquire")]
     #[::fuchsia::test]
     fn atomic_load_u32_fault(load_fn: fn(&Usercopy, usize) -> Result<u32, ()>) {
-        let m = new_mapped_page_usercopy_for_test!(zx::VmarFlags::empty());
+        let m = MappedPageUsercopy::new(zx::VmarFlags::empty());
 
         let result = load_fn(&m.usercopy, m.addr);
         assert_eq!(Err(()), result);
@@ -1298,9 +1168,7 @@ mod test {
     #[test_case(|usercopy, mapped_addr, val| usercopy.atomic_store_u32_release(mapped_addr, val); "release")]
     #[::fuchsia::test]
     fn atomic_store_u32_no_fault(store_fn: fn(&Usercopy, usize, u32) -> Result<(), ()>) {
-        let m = new_mapped_page_usercopy_for_test!(
-            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
-        );
+        let m = MappedPageUsercopy::new(zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE);
 
         assert_eq!(store_fn(&m.usercopy, m.addr, 0x12345678), Ok(()));
 
@@ -1311,7 +1179,7 @@ mod test {
     #[test_case(|usercopy, mapped_addr, val| usercopy.atomic_store_u32_release(mapped_addr, val); "release")]
     #[::fuchsia::test]
     fn atomic_store_u32_fault(store_fn: fn(&Usercopy, usize, u32) -> Result<(), ()>) {
-        let m = new_mapped_page_usercopy_for_test!(zx::VmarFlags::empty());
+        let m = MappedPageUsercopy::new(zx::VmarFlags::empty());
 
         let result = store_fn(&m.usercopy, m.addr, 0x12345678);
         assert_eq!(Err(()), result);
@@ -1327,9 +1195,7 @@ mod test {
 
     #[::fuchsia::test]
     fn atomic_compare_exchange_u32_acq_rel_no_fault() {
-        let m = new_mapped_page_usercopy_for_test!(
-            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
-        );
+        let m = MappedPageUsercopy::new(zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE);
 
         unsafe { *(m.addr as *mut u32) = 0x12345678 };
 
@@ -1350,7 +1216,7 @@ mod test {
 
     #[::fuchsia::test]
     fn atomic_compare_exchange_u32_acq_rel_fault() {
-        let m = new_mapped_page_usercopy_for_test!(zx::VmarFlags::empty());
+        let m = MappedPageUsercopy::new(zx::VmarFlags::empty());
 
         let result = m.usercopy.atomic_compare_exchange_u32_acq_rel(m.addr, 0x00000000, 0x11111111);
         assert_eq!(Err(()), result);
