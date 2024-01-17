@@ -31,7 +31,7 @@ use {
 };
 
 const FAKE_CHIP_ID: u32 = 1;
-const IFACE_NAME: &str = "sta-iface-name";
+const IFACE_NAME: &str = "fnpwlan";
 
 async fn handle_wifi_sta_iface_request(req: fidl_wlanix::WifiStaIfaceRequest) -> Result<(), Error> {
     match req {
@@ -1203,7 +1203,7 @@ mod tests {
             test_helper.exec.run_until_stalled(&mut get_name_fut),
             Poll::Ready(Ok(response)) => response
         );
-        assert_eq!(response.iface_name, Some("sta-iface-name".to_string()));
+        assert_eq!(response.iface_name, Some(IFACE_NAME.to_string()));
     }
 
     struct WifiTestHelper {
