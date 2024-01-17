@@ -633,3 +633,8 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/python/typing_extensions
 	name = third_party/github.com/python/typing_extensions
 	ignore = all
+[submodule "third_party/bazel_rules_proto"]
+	path = third_party/bazel_rules_proto
+	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_proto
+	name = third_party/bazel_rules_proto
+	ignore = all
