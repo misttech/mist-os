@@ -6,6 +6,7 @@
 
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/ld/abi.h>
+#include <lib/ld/remote-abi-stub.h>
 #include <lib/ld/remote-load-module.h>
 #include <lib/ld/testing/test-vmo.h>
 #include <lib/zx/job.h>
@@ -109,6 +110,19 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   ASSERT_NO_FATAL_FAILURE(predecode(predecoded_modules[kVdso], "vDSO", std::move(vdso_vmo)));
   ASSERT_NO_FATAL_FAILURE(
       predecode(predecoded_modules[kStub], "stub ld.so", std::move(stub_ld_vmo)));
+
+  // Acquire the layout details from the stub.  The same values collected here
+  // can be reused along with the decoded RemoteLoadModule for the stub for
+  // creating and populating the RemoteLoadModule for the passive ABI of any
+  // number of separate dynamic linking domains in however many processes.
+  RemoteAbiStub<> abi_stub;
+  EXPECT_TRUE(abi_stub.Init(diag, predecoded_modules[kStub]));
+  EXPECT_GE(abi_stub.data_size(), sizeof(ld::abi::Abi<>) + sizeof(elfldltl::Elf<>::RDebug<>));
+  EXPECT_LT(abi_stub.data_size(), zx_system_get_page_size());
+  EXPECT_LE(abi_stub.abi_offset(), abi_stub.data_size() - sizeof(ld::abi::Abi<>));
+  EXPECT_LE(abi_stub.rdebug_offset(), abi_stub.data_size() - sizeof(elfldltl::Elf<>::RDebug<>));
+  EXPECT_NE(abi_stub.rdebug_offset(), abi_stub.abi_offset())
+      << "with data_size() " << abi_stub.data_size();
 
   auto get_dep_vmo = [this](const RemoteModule::Soname& soname) {
     return mock_loader_->LoadObject(std::string{soname.str()});

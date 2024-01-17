@@ -17,14 +17,33 @@ library_headers("headers") {
     "lib/ld/load-module.h",
     "lib/ld/load.h",
     "lib/ld/memory.h",
-    "lib/ld/remote-load-module.h",
     "lib/ld/tlsdesc.h",
   ]
 
   public_deps = [
     ":abi-headers",
-    "//zircon/kernel/lib/arch",
+    "//sdk/lib/fit",
+    "//zircon/kernel/lib/arch:headers",
   ]
+
+  if (is_fuchsia) {
+    headers += [
+      "lib/ld/remote-abi-stub.h",
+      "lib/ld/remote-load-module.h",
+    ]
+
+    # Make sure that there's no transitive deps on libzircon, so header-only
+    # use of the library doesn't affect dynamic linking dependencies.
+    if (zircon_toolchain == false) {
+      _headers = ""
+    } else {
+      _headers = ":headers"
+    }
+    public_deps += [
+      "//src/zircon/lib/zircon:headers",
+      "//zircon/system/ulib/zx$_headers",
+    ]
+  }
 }
 
 # This is the linkable target for using the passive ABI.
