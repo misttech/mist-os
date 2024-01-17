@@ -450,8 +450,10 @@ if (current_toolchain != default_toolchain) {
     # the biggest time consumption being printing to serial.
     # On arm64, 80 iterations occasionally takes over 5 minutes (boot
     # performance appears to have regressed since March 2023)
-    # so 70 leaves a little headroom for variance in performance.
-    args = [ "trampoline.user_total_iters=70" ]
+    # so 50 leaves a little headroom for variance in performance, with a
+    # 5 min timeout leaves roughly 6 sec per iteration which should have
+    # enough spare time per iteration.
+    args = [ "trampoline.user_total_iters=50" ]
   }
 
   mobius_turducken_test("trampoline-boot-zbi-test") {
