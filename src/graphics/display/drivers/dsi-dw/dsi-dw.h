@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_DSI_DW_DSI_DW_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_DSI_DW_DSI_DW_H_
 
-#include <fidl/fuchsia.hardware.dsi/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -41,9 +40,7 @@ namespace dsi_dw {
 
 class DsiDw;
 
-namespace fidl_dsi = fuchsia_hardware_dsi;
-
-using DeviceType = ddk::Device<DsiDw, ddk::Messageable<fidl_dsi::DsiBase>::Mixin>;
+using DeviceType = ddk::Device<DsiDw>;
 
 class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_protocol> {
  public:
@@ -77,9 +74,6 @@ class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_pr
   zx_status_t DsiImplReadReg(uint32_t reg, uint32_t* val);
   zx_status_t DsiImplEnableBist(uint32_t pattern);
 
-  // fuchsia_hardware_dsi::DsiBase
-  void SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& completer) override;
-
   // ddk::Device implementation:
   void DdkRelease();
 
@@ -107,12 +101,8 @@ class DsiDw : public DeviceType, public ddk::DsiImplProtocol<DsiDw, ddk::base_pr
   zx_status_t GenWriteShort(const mipi_dsi_cmd_t& cmd) TA_REQ(command_lock_);
   zx_status_t DcsWriteShort(const mipi_dsi_cmd_t& cmd) TA_REQ(command_lock_);
   zx_status_t GenWriteLong(const mipi_dsi_cmd_t& cmd) TA_REQ(command_lock_);
-  zx_status_t DcsWriteShort(const fidl_dsi::wire::MipiDsiCmd& cmd,
-                            fidl::VectorView<uint8_t>& txdata) TA_REQ(command_lock_);
   zx_status_t GenRead(const mipi_dsi_cmd_t& cmd) TA_REQ(command_lock_);
   zx_status_t SendCommand(const mipi_dsi_cmd_t& cmd);
-  zx_status_t SendCommand(const fidl_dsi::wire::MipiDsiCmd& cmd, fidl::VectorView<uint8_t>& txdata,
-                          fidl::VectorView<uint8_t>& response);
   zx_status_t GetColorCode(color_code_t c, bool& packed, uint8_t& code);
   zx_status_t GetVideoMode(video_mode_t v, uint8_t& mode);
 

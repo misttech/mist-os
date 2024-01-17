@@ -21,7 +21,6 @@ test("mipidsi") {
   sources = [ "mipi-dsi-test.cc" ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp",
     "//sdk/lib/fdio",
     "//src/graphics/display/lib/mipi-dsi",
     "//src/lib/fxl/test:gtest_main",

@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
 
-#include <fidl/fuchsia.hardware.dsi/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -94,12 +93,8 @@ namespace mipi_dsi {
 
 class MipiDsi {
  public:
-  // TODO(payamm): Deprecate once DSI FIDL is implemented by all DSI Drivers
   static zx_status_t CreateCommand(const uint8_t* tbuf, size_t tlen, uint8_t* rbuf, size_t rlen,
                                    bool is_dcs, mipi_dsi_cmd_t* cmd);
-
-  static std::optional<fuchsia_hardware_dsi::wire::MipiDsiCmd> CreateCommandFidl(
-      uint32_t tlen, uint32_t rlen, bool is_dcs, fidl::AnyArena& allocator);
 };
 
 }  // namespace mipi_dsi

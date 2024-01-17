@@ -202,37 +202,6 @@ zx_status_t DsiDw::DsiImplSendCmd(const mipi_dsi_cmd_t* cmd_list, size_t cmd_cou
   return status;
 }
 
-// TODO(payamm): Add support for other types of commands
-zx_status_t DsiDw::SendCommand(const fidl_dsi::wire::MipiDsiCmd& cmd,
-                               fidl::VectorView<uint8_t>& txdata,
-                               fidl::VectorView<uint8_t>& response) {
-  fbl::AutoLock lock(&command_lock_);
-  zx_status_t status = ZX_OK;
-  switch (cmd.dsi_data_type()) {
-    case kMipiDsiDtDcsShortWrite0:
-    case kMipiDsiDtDcsShortWrite1:
-    case /*kMipiDsiDtDcsShortWrite2=*/0x25:
-      status = DcsWriteShort(cmd, txdata);
-      break;
-    case kMipiDsiDtDcsLongWrite:
-    case kMipiDsiDtGenLongWrite:
-      mipi_dsi_cmd_t banjo_cmd;
-      banjo_cmd.virt_chn_id = cmd.virtual_channel_id();
-      banjo_cmd.dsi_data_type = cmd.dsi_data_type();
-      banjo_cmd.pld_data_list = txdata.data();
-      banjo_cmd.pld_data_count = txdata.count();
-      banjo_cmd.rsp_data_list = response.data();
-      banjo_cmd.rsp_data_count = response.count();
-      banjo_cmd.flags = cmd.flags();
-      status = GenWriteLong(banjo_cmd);
-      break;
-    default:
-      zxlogf(ERROR, "Unsupported / invalid DSI command type: %d", cmd.dsi_data_type());
-      status = ZX_ERR_NOT_SUPPORTED;
-  }
-  return status;
-}
-
 void DsiDw::DsiImplSetMode(dsi_mode_t mode) {
   // Configure the operation mode (cmd or vid)
   DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_cmd_video_mode(mode).WriteTo(&dsi_mmio_);
@@ -643,26 +612,6 @@ zx_status_t DsiDw::GenWriteShort(const mipi_dsi_cmd_t& cmd) {
   return GenericHdrWrite(regVal);
 }
 
-zx_status_t DsiDw::DcsWriteShort(const fidl_dsi::wire::MipiDsiCmd& cmd,
-                                 fidl::VectorView<uint8_t>& txdata) {
-  // Check that the payload size and command match
-  if ((txdata.count() != 1 && txdata.count() != 2) ||
-      (cmd.dsi_data_type() & kMipiDsiDtDcsShortWrite0) != kMipiDsiDtDcsShortWrite0) {
-    zxlogf(ERROR, "Rejecting invalid DCS short command");
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  uint32_t regVal = 0;
-  regVal |= GEN_HDR_DT(cmd.dsi_data_type());
-  regVal |= GEN_HDR_VC(cmd.virtual_channel_id());
-  regVal |= GEN_HDR_WC_LSB(txdata[0]);
-  if (txdata.count() == 2) {
-    regVal |= GEN_HDR_WC_MSB(txdata[1]);
-  }
-
-  return GenericHdrWrite(regVal);
-}
-
 zx_status_t DsiDw::DcsWriteShort(const mipi_dsi_cmd_t& cmd) {
   // Check that the payload size and command match
   if ((cmd.pld_data_count != 1 && cmd.pld_data_count != 2) || (cmd.pld_data_list == nullptr) ||
@@ -859,20 +808,6 @@ zx_status_t DsiDw::SendCommand(const mipi_dsi_cmd_t& cmd) {
   }
 
   return status;
-}
-
-void DsiDw::SendCmd(SendCmdRequestView request, SendCmdCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/126565): We don't support READ at the moment. READ is complicated because it
-  // consumes additional cycles required to get info from the LCD. This may cause issues if the
-  // command is issued during the last line of a frame. If we want to support READ, we would want to
-  // properly stop VIDEO, switch to COMMAND mode and perform the read. For now, we will not support
-  // it.
-  fidl::VectorView<uint8_t> rsp_data(nullptr, 0);
-  zx_status_t status = SendCommand(request->cmd, request->txdata, rsp_data);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-  }
-  completer.ReplySuccess(rsp_data);
 }
 
 void DsiDw::DdkRelease() { delete this; }
