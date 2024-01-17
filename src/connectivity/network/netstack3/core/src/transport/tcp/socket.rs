@@ -3695,7 +3695,7 @@ mod tests {
         testutil::ContextPair,
         testutil::{
             new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, MonotonicIdentifier,
-            TestIpExt,
+            TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
         transport::tcp::{
             buffer::{
@@ -4315,7 +4315,11 @@ mod tests {
                     ))
                     .expect("failed to add address");
             }
-            DualStackIpDeviceState { ipv4, ipv6: Default::default() }
+            DualStackIpDeviceState {
+                ipv4,
+                ipv6: Default::default(),
+                metric: DEFAULT_INTERFACE_METRIC,
+            }
         }
     }
 
@@ -4346,7 +4350,11 @@ mod tests {
                     ))
                     .expect("failed to add address");
             }
-            DualStackIpDeviceState { ipv4: Default::default(), ipv6 }
+            DualStackIpDeviceState {
+                ipv4: Default::default(),
+                ipv6,
+                metric: DEFAULT_INTERFACE_METRIC,
+            }
         }
     }
 

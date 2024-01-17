@@ -26,6 +26,7 @@ use crate::{
             IpDeviceAddr, IpDeviceIpExt, Ipv6DeviceAddr,
         },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
+        types::RawMetric,
     },
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
     Instant,
@@ -660,14 +661,21 @@ impl<I: Instant> AsMut<IpDeviceState<I, Ipv6>> for Ipv6DeviceState<I> {
 }
 
 /// IPv4 and IPv6 state combined.
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
 pub(crate) struct DualStackIpDeviceState<I: Instant> {
     /// IPv4 state.
     pub ipv4: Ipv4DeviceState<I>,
 
     /// IPv6 state.
     pub ipv6: Ipv6DeviceState<I>,
+
+    /// The device's routing metric.
+    pub metric: RawMetric,
+}
+
+impl<I: Instant> DualStackIpDeviceState<I> {
+    pub(crate) fn new(metric: RawMetric) -> Self {
+        Self { ipv4: Default::default(), ipv6: Default::default(), metric }
+    }
 }
 
 /// The various states DAD may be in for an address.

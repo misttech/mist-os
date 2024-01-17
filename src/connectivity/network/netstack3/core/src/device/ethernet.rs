@@ -68,7 +68,6 @@ use crate::{
             NudHandler, NudSenderContext, NudState, NudTimerId, NudUserConfig,
         },
         icmp::NdpCounters,
-        types::RawMetric,
     },
     sync::{Mutex, RwLock},
     BindingsContext, CoreCtx, Instant,
@@ -495,16 +494,11 @@ impl MaxEthernetFrameSize {
 pub(crate) struct EthernetDeviceStateBuilder {
     mac: UnicastAddr<Mac>,
     max_frame_size: MaxEthernetFrameSize,
-    metric: RawMetric,
 }
 
 impl EthernetDeviceStateBuilder {
     /// Create a new `EthernetDeviceStateBuilder`.
-    pub(crate) fn new(
-        mac: UnicastAddr<Mac>,
-        max_frame_size: MaxEthernetFrameSize,
-        metric: RawMetric,
-    ) -> Self {
+    pub(crate) fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxEthernetFrameSize) -> Self {
         // TODO(https://fxbug.dev/121480): Add a minimum frame size for all
         // Ethernet devices such that you can't create an `EthernetDeviceState`
         // with a `MaxEthernetFrameSize` smaller than the minimum. The absolute minimum
@@ -518,21 +512,21 @@ impl EthernetDeviceStateBuilder {
         // A few questions:
         // - How do we wire error information back up the call stack? Should
         //   this just return a Result or something?
-        Self { mac, max_frame_size, metric }
+        Self { mac, max_frame_size }
     }
 
     /// Build the `EthernetDeviceState` from this builder.
     pub(super) fn build<I: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>>(
         self,
     ) -> EthernetDeviceState<I, N> {
-        let Self { mac, max_frame_size, metric } = self;
+        let Self { mac, max_frame_size } = self;
 
         EthernetDeviceState {
             ipv4_arp: Default::default(),
             ipv6_nud: Default::default(),
             ipv4_nud_config: Default::default(),
             ipv6_nud_config: Default::default(),
-            static_state: StaticEthernetDeviceState { mac, max_frame_size, metric },
+            static_state: StaticEthernetDeviceState { mac, max_frame_size },
             dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
             tx_queue: Default::default(),
         }
@@ -564,9 +558,6 @@ pub(crate) struct StaticEthernetDeviceState {
 
     /// The maximum frame size allowed by the hardware.
     max_frame_size: MaxEthernetFrameSize,
-
-    /// The routing metric of the device this state is for.
-    metric: RawMetric,
 }
 
 /// The state associated with an Ethernet device.
@@ -1158,14 +1149,6 @@ pub(super) fn leave_link_multicast<
     })
 }
 
-/// Get the routing metric associated with this device.
-pub(super) fn get_routing_metric<CC: EthernetIpLinkDeviceStaticStateContext>(
-    core_ctx: &mut CC,
-    device_id: &CC::DeviceId,
-) -> RawMetric {
-    core_ctx.with_static_ethernet_device_state(device_id, |static_state| static_state.metric)
-}
-
 /// Get the MTU associated with this device.
 pub(super) fn get_mtu<
     BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
@@ -1491,11 +1474,7 @@ mod tests {
     impl FakeEthernetCtx {
         fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxEthernetFrameSize) -> FakeEthernetCtx {
             FakeEthernetCtx {
-                static_state: StaticEthernetDeviceState {
-                    max_frame_size,
-                    mac,
-                    metric: DEFAULT_INTERFACE_METRIC,
-                },
+                static_state: StaticEthernetDeviceState { max_frame_size, mac },
                 dynamic_state: DynamicEthernetDeviceState::new(max_frame_size),
                 tx_queue: Default::default(),
                 counters: Default::default(),

@@ -34,7 +34,7 @@ use crate::{
             StrongId, WeakId,
         },
         loopback::{
-            self, LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackPrimaryDeviceId,
+            LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackPrimaryDeviceId,
         },
         queue::{
             rx::ReceiveQueueApi,
@@ -134,10 +134,11 @@ where
     Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
 {
     fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        match device_id {
-            DeviceId::Ethernet(id) => self::ethernet::get_routing_metric(self, id),
-            DeviceId::Loopback(id) => self::loopback::get_routing_metric(self, id),
-        }
+        let ip_state = match device_id {
+            DeviceId::Ethernet(id) => id.ip_device_state(),
+            DeviceId::Loopback(id) => id.ip_device_state(),
+        };
+        ip_state.metric
     }
 
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
@@ -151,14 +152,14 @@ where
 
 /// Gets the routing metric for the device.
 pub fn get_routing_metric<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
+    _core_ctx: &SyncCtx<BC>,
     device_id: &DeviceId<BC>,
 ) -> RawMetric {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    match device_id {
-        DeviceId::Ethernet(id) => ethernet::get_routing_metric(&mut core_ctx, id),
-        DeviceId::Loopback(id) => loopback::get_routing_metric(&mut core_ctx, id),
-    }
+    let ip_state = match device_id {
+        DeviceId::Ethernet(id) => id.ip_device_state(),
+        DeviceId::Loopback(id) => id.ip_device_state(),
+    };
+    ip_state.metric
 }
 
 /// Creates a snapshot of the devices in the stack at the time of invocation.
@@ -499,7 +500,8 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
         let (external_state, bindings_id) = bindings_state();
         let primary = EthernetPrimaryDeviceId::new(
             IpLinkDeviceStateInner::new(
-                EthernetDeviceStateBuilder::new(mac, max_frame_size, metric).build(),
+                EthernetDeviceStateBuilder::new(mac, max_frame_size).build(),
+                metric,
                 self.origin.clone(),
             ),
             external_state,
@@ -529,7 +531,7 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
 
         let (external_state, bindings_id) = bindings_state();
         let primary = LoopbackPrimaryDeviceId::new(
-            IpLinkDeviceStateInner::new(LoopbackDeviceState::new(mtu, metric), self.origin.clone()),
+            IpLinkDeviceStateInner::new(LoopbackDeviceState::new(mtu), metric, self.origin.clone()),
             external_state,
             bindings_id,
         );

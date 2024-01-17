@@ -8,7 +8,7 @@ use alloc::sync::Arc;
 
 use crate::{
     device::{socket::HeldDeviceSockets, DeviceLayerTypes, OriginTracker},
-    ip::device::state::DualStackIpDeviceState,
+    ip::{device::state::DualStackIpDeviceState, types::RawMetric},
     sync::RwLock,
     sync::WeakRc,
 };
@@ -61,9 +61,9 @@ pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
 
 impl<T, BT: DeviceLayerTypes> IpLinkDeviceStateInner<T, BT> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
-    pub(super) fn new(link: T, origin: OriginTracker) -> Self {
+    pub(super) fn new(link: T, metric: RawMetric, origin: OriginTracker) -> Self {
         Self {
-            ip: DualStackIpDeviceState::default(),
+            ip: DualStackIpDeviceState::new(metric),
             link,
             origin,
             sockets: RwLock::new(HeldDeviceSockets::default()),

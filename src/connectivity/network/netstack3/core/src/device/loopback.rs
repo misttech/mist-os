@@ -48,7 +48,6 @@ use crate::{
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
         DeviceSendFrameError, FrameDestination,
     },
-    ip::types::RawMetric,
     BindingsContext, CoreCtx,
 };
 
@@ -103,20 +102,13 @@ impl<BC: BindingsContext, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BC,
 /// State for a loopback device.
 pub struct LoopbackDeviceState {
     mtu: Mtu,
-    /// The routing metric of the loopback device this state is for.
-    metric: RawMetric,
     rx_queue: ReceiveQueue<(), Buf<Vec<u8>>>,
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
 }
 
 impl LoopbackDeviceState {
-    pub(super) fn new(mtu: Mtu, metric: RawMetric) -> LoopbackDeviceState {
-        LoopbackDeviceState {
-            mtu,
-            metric,
-            rx_queue: Default::default(),
-            tx_queue: Default::default(),
-        }
+    pub(super) fn new(mtu: Mtu) -> LoopbackDeviceState {
+        LoopbackDeviceState { mtu, rx_queue: Default::default(), tx_queue: Default::default() }
     }
 }
 
@@ -314,16 +306,6 @@ where
             Err(s)
         }
     }
-}
-
-/// Get the routing metric associated with this device.
-pub(super) fn get_routing_metric<BC: BindingsContext, L>(
-    core_ctx: &mut CoreCtx<'_, BC, L>,
-    device_id: &LoopbackDeviceId<BC>,
-) -> RawMetric {
-    device::integration::with_device_state(core_ctx, device_id, |mut state| {
-        state.cast_with(|s| &s.link.metric).copied()
-    })
 }
 
 /// Gets the MTU associated with this device.

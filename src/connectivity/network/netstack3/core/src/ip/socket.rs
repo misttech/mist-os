@@ -966,6 +966,7 @@ pub(crate) mod testutil {
             TransportIpContext, DEFAULT_HOP_LIMITS,
         },
         sync::PrimaryRc,
+        testutil::DEFAULT_INTERFACE_METRIC,
     };
 
     /// A fake implementation of [`IpSocketContext`].
@@ -1358,7 +1359,7 @@ pub(crate) mod testutil {
         ) -> Self {
             Self::with_devices_state(devices.into_iter().map(
                 |FakeDeviceConfig { device, local_ips, remote_ips }| {
-                    let mut device_state = DualStackIpDeviceState::default();
+                    let mut device_state = DualStackIpDeviceState::new(DEFAULT_INTERFACE_METRIC);
                     for ip in local_ips {
                         match IpAddr::from(ip.into()) {
                             IpAddr::V4(ip) => crate::ip::device::state::testutil::add_addr_subnet(
