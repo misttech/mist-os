@@ -26,7 +26,7 @@ use crate::{
 ///
 /// IMPORTANT: When changing this (major or minor), update the list of possible versions at
 /// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/local_storage/versions.txt.
-pub const LATEST_VERSION: Version = Version { major: 34, minor: 0 };
+pub const LATEST_VERSION: Version = Version { major: 35, minor: 0 };
 
 /// The version where the journal block size changed.
 pub const JOURNAL_BLOCK_SIZE_CHANGE_VERSION: Version = Version { major: 26, minor: 0 };
@@ -132,6 +132,7 @@ fn type_fprint_latest_version() {
     // These should only ever change when adding a new version.
     // The checks below are to ensure that we don't inadvertently change a serialized type.
     // Every versioned_type above should have a corresponding line entry here.
+    // NOTE: Versions 34 and 35 are identical, so type_fprint_v34() is not necessary.
     let mut success = true;
     success &= assert_type_fprint::<AllocatorInfo>("struct {layers:Vec<u64>,allocated_bytes:BTreeMap<u64,u64>,marked_for_deletion:HashSet<u64>,limit_bytes:BTreeMap<u64,u64>}");
     success &= assert_type_fprint::<AllocatorKey>("struct {device_range:Range<u64>}");

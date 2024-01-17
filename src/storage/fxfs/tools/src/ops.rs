@@ -5,6 +5,7 @@
 use {
     anyhow::{bail, Error},
     chrono::{TimeZone, Utc},
+    fidl_fuchsia_io as fio,
     fxfs::{
         errors::FxfsError,
         filesystem::OpenFxFilesystem,
@@ -174,7 +175,7 @@ pub async fn get(vol: &Arc<ObjectStore>, src: &Path) -> Result<Vec<u8>, Error> {
         }
         Ok(out)
     } else {
-        bail!("File not found");
+        bail!("File not found: {}", src.display());
     }
 }
 
@@ -203,6 +204,25 @@ pub async fn put(
     buf.as_mut_slice().copy_from_slice(&data);
     handle.write_or_append(Some(0), buf.as_ref()).await?;
     handle.flush().await
+}
+
+/// Enable verity on an existing file. Upon enabling verity, the file will be readonly.
+pub async fn enable_verity(vol: &Arc<ObjectStore>, dst: &Path) -> Result<(), Error> {
+    let dir = walk_dir(vol, dst.parent().unwrap()).await?;
+    let filename = dst.file_name().unwrap().to_str().unwrap();
+    let handle = if let Some((oid, _)) = dir.lookup(filename).await? {
+        ObjectStore::open_object(vol, oid, HandleOptions::default(), None).await?
+    } else {
+        bail!("{} does not exist", filename);
+    };
+
+    handle
+        .enable_verity(fio::VerificationOptions {
+            hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+            salt: Some(vec![0xFF; 8]),
+            ..Default::default()
+        })
+        .await
 }
 
 /// Create a directory.

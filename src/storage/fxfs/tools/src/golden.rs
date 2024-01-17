@@ -22,6 +22,8 @@ use {
 };
 
 const IMAGE_BLOCKS: u64 = 8192;
+// Version of first image with a verified file included in `create_image()`
+const FSVERITY_VERSION_START: u32 = 35;
 const IMAGE_BLOCK_SIZE: u32 = 1024;
 const EXPECTED_FILE_CONTENT: &[u8; 8] = b"content.";
 const FXFS_GOLDEN_IMAGE_DIR: &str = "src/storage/fxfs/testdata";
@@ -89,6 +91,8 @@ pub async fn create_image() -> Result<(), Error> {
     ops::set_project_for_node(&vol, PROJECT_ID, &Path::new("some")).await?;
 
     ops::put(&fs, &vol, &Path::new("some/file.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
+    ops::put(&fs, &vol, &Path::new("some/fsverity.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
+    ops::enable_verity(&vol, &Path::new("some/fsverity.txt")).await?;
     ops::put(&fs, &vol, &Path::new("some/deleted.txt"), EXPECTED_FILE_CONTENT.to_vec()).await?;
     ops::unlink(&fs, &vol, &Path::new("some/deleted.txt")).await?;
 
@@ -149,17 +153,25 @@ pub async fn create_image() -> Result<(), Error> {
 /// Validates an image by looking for expected data and performing an fsck.
 async fn check_image(path: &Path) -> Result<(), Error> {
     let crypt: Arc<dyn Crypt> = Arc::new(InsecureCrypt::new());
-    {
+    let version = {
         let device = DeviceHolder::new(load_device(path)?);
         let fs = FxFilesystem::open(device).await?;
         ops::fsck(&fs, true).await.context("fsck failed")?;
-    }
+        fs.journal().super_block_header().earliest_version
+    };
     {
         let device = DeviceHolder::new(load_device(path)?);
         let fs = FxFilesystem::open(device).await?;
         let vol = ops::open_volume(&fs, crypt.clone()).await?;
         if ops::get(&vol, &Path::new("some/file.txt")).await? != EXPECTED_FILE_CONTENT.to_vec() {
             bail!("Expected file content incorrect.");
+        }
+        if version.major >= FSVERITY_VERSION_START {
+            if ops::get(&vol, &Path::new("some/fsverity.txt")).await?
+                != EXPECTED_FILE_CONTENT.to_vec()
+            {
+                bail!("Expected fsverity content incorrect.");
+            }
         }
         if ops::get(&vol, &Path::new("some/deleted.txt")).await.is_ok() {
             bail!("Found deleted file.");
