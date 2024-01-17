@@ -214,7 +214,7 @@ struct Builtin : public Decl {
     kHead,
   };
 
-  explicit Builtin(Identity id, Name name)
+  Builtin(Identity id, Name name)
       : Decl(Decl::Kind::kBuiltin, std::make_unique<AttributeList>(), std::move(name)), id(id) {}
 
   const Identity id;
@@ -303,8 +303,8 @@ struct TypeConstraints;
 // step (i.e. RegisterDecl) and the compilation step (i.e. Typespace::Create),
 // while ensuring that users cannot refer to anonymous layouts by name.
 struct TypeConstructor final : public HasClone<TypeConstructor> {
-  explicit TypeConstructor(Reference layout, std::unique_ptr<LayoutParameterList> parameters,
-                           std::unique_ptr<TypeConstraints> constraints)
+  TypeConstructor(Reference layout, std::unique_ptr<LayoutParameterList> parameters,
+                  std::unique_ptr<TypeConstraints> constraints)
       : layout(std::move(layout)),
         parameters(std::move(parameters)),
         constraints(std::move(constraints)) {}
@@ -330,7 +330,7 @@ struct LayoutParameter : public HasClone<LayoutParameter> {
     kType,
   };
 
-  explicit LayoutParameter(Kind kind, SourceSpan span) : kind(kind), span(span) {}
+  LayoutParameter(Kind kind, SourceSpan span) : kind(kind), span(span) {}
 
   // A layout parameter is either a type constructor or a constant. One of these
   // two methods must return non-null, and the other one must return null.
@@ -342,7 +342,7 @@ struct LayoutParameter : public HasClone<LayoutParameter> {
 };
 
 struct LiteralLayoutParameter final : public LayoutParameter {
-  explicit LiteralLayoutParameter(std::unique_ptr<LiteralConstant> literal, SourceSpan span)
+  LiteralLayoutParameter(std::unique_ptr<LiteralConstant> literal, SourceSpan span)
       : LayoutParameter(Kind::kLiteral, span), literal(std::move(literal)) {}
 
   TypeConstructor* AsTypeCtor() const override;
@@ -353,7 +353,7 @@ struct LiteralLayoutParameter final : public LayoutParameter {
 };
 
 struct TypeLayoutParameter final : public LayoutParameter {
-  explicit TypeLayoutParameter(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan span)
+  TypeLayoutParameter(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan span)
       : LayoutParameter(Kind::kType, span), type_ctor(std::move(type_ctor)) {}
 
   TypeConstructor* AsTypeCtor() const override;
@@ -364,7 +364,7 @@ struct TypeLayoutParameter final : public LayoutParameter {
 };
 
 struct IdentifierLayoutParameter final : public LayoutParameter {
-  explicit IdentifierLayoutParameter(Reference reference, SourceSpan span)
+  IdentifierLayoutParameter(Reference reference, SourceSpan span)
       : LayoutParameter(Kind::kIdentifier, span), reference(std::move(reference)) {}
 
   // Disambiguates between type constructor and constant. Must call after
@@ -383,8 +383,8 @@ struct IdentifierLayoutParameter final : public LayoutParameter {
 
 struct LayoutParameterList final : public HasClone<LayoutParameterList> {
   LayoutParameterList() = default;
-  explicit LayoutParameterList(std::vector<std::unique_ptr<LayoutParameter>> items,
-                               std::optional<SourceSpan> span)
+  LayoutParameterList(std::vector<std::unique_ptr<LayoutParameter>> items,
+                      std::optional<SourceSpan> span)
       : items(std::move(items)), span(span) {}
 
   std::unique_ptr<LayoutParameterList> Clone() const override;
@@ -395,8 +395,7 @@ struct LayoutParameterList final : public HasClone<LayoutParameterList> {
 
 struct TypeConstraints final : public HasClone<TypeConstraints> {
   TypeConstraints() = default;
-  explicit TypeConstraints(std::vector<std::unique_ptr<Constant>> items,
-                           std::optional<SourceSpan> span)
+  TypeConstraints(std::vector<std::unique_ptr<Constant>> items, std::optional<SourceSpan> span)
       : items(std::move(items)), span(span) {}
 
   std::unique_ptr<TypeConstraints> Clone() const override;
@@ -1033,7 +1032,7 @@ class Dependencies {
 struct LibraryComparator;
 
 struct Library final : public Element {
-  explicit Library() : Element(Element::Kind::kLibrary, std::make_unique<AttributeList>()) {}
+  Library() : Element(Element::Kind::kLibrary, std::make_unique<AttributeList>()) {}
 
   // Creates the root library which holds all Builtin decls.
   static std::unique_ptr<Library> CreateRootLibrary();

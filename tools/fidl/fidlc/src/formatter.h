@@ -13,7 +13,7 @@ namespace fidlc {
 
 class Formatter final {
  public:
-  explicit Formatter(size_t cols, Reporter* reporter) : cols_(cols), reporter_(reporter) {}
+  Formatter(size_t cols, Reporter* reporter) : cols_(cols), reporter_(reporter) {}
 
   std::optional<std::string> Format(const SourceFile& source_file,
                                     const ExperimentalFlags& experimental_flags) const;

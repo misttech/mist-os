@@ -366,7 +366,7 @@ struct CmpAvailability {
 // * For each @available(removed=N) there IS NOT a corresponding @available(added=N)
 class Validator {
  public:
-  explicit Validator(Reporter* reporter, const Platform& platform, ExperimentalFlags flags)
+  Validator(Reporter* reporter, const Platform& platform, ExperimentalFlags flags)
       : reporter_(reporter), platform_(platform), flags_(flags) {}
   Validator(const Validator&) = delete;
 

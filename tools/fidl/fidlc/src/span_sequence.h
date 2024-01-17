@@ -79,7 +79,7 @@ class SpanSequence {
     kNewlineUnindented,
   };
 
-  explicit SpanSequence(Kind kind, Position position, size_t leading_blank_lines = 0)
+  SpanSequence(Kind kind, Position position, size_t leading_blank_lines = 0)
       : kind_(kind), position_(position), leading_blank_lines_(leading_blank_lines) {}
 
   virtual ~SpanSequence() = default;
@@ -226,12 +226,12 @@ class TokenSpanSequence final : public SpanSequence {
 // Divisible, or Multiline) instead.
 class CompositeSpanSequence : public SpanSequence {
  protected:
-  explicit CompositeSpanSequence(Kind kind, Position position, size_t leading_blank_lines)
+  CompositeSpanSequence(Kind kind, Position position, size_t leading_blank_lines)
       : SpanSequence(kind, position, leading_blank_lines),
         has_non_leading_comments_(false),
         has_tokens_(false) {}
-  explicit CompositeSpanSequence(Kind kind, std::vector<std::unique_ptr<SpanSequence>> children,
-                                 Position position, size_t leading_blank_lines)
+  CompositeSpanSequence(Kind kind, std::vector<std::unique_ptr<SpanSequence>> children,
+                        Position position, size_t leading_blank_lines)
       : SpanSequence(kind, position, leading_blank_lines),
         children_(std::move(children)),
         has_non_leading_comments_(false),
@@ -374,7 +374,7 @@ class MultilineSpanSequence final : public CompositeSpanSequence {
 // distinction between them.
 class CommentSpanSequence : public SpanSequence {
  protected:
-  explicit CommentSpanSequence(Kind kind, Position position, size_t leading_blank_lines)
+  CommentSpanSequence(Kind kind, Position position, size_t leading_blank_lines)
       : SpanSequence(kind, position, leading_blank_lines) {}
 
  public:

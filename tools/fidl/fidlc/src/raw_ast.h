@@ -105,8 +105,7 @@ struct RawLiteral : public SourceElement {
     kString,
   };
 
-  explicit RawLiteral(const SourceElement& element, Kind kind)
-      : SourceElement(element), kind(kind) {}
+  RawLiteral(const SourceElement& element, Kind kind) : SourceElement(element), kind(kind) {}
 
   const Kind kind;
 };
@@ -165,9 +164,8 @@ struct RawOrdinal64 final : public SourceElement {
 struct RawConstant : public SourceElement {
   enum class Kind : uint8_t { kIdentifier, kLiteral, kBinaryOperator };
 
-  explicit RawConstant(Token start, Token end, Kind kind) : SourceElement(start, end), kind(kind) {}
-  explicit RawConstant(const SourceElement& element, Kind kind)
-      : SourceElement(element), kind(kind) {}
+  RawConstant(Token start, Token end, Kind kind) : SourceElement(start, end), kind(kind) {}
+  RawConstant(const SourceElement& element, Kind kind) : SourceElement(element), kind(kind) {}
 
   const Kind kind;
 };
@@ -546,9 +544,9 @@ struct RawLayoutMember : public SourceElement {
     kValue,
   };
 
-  explicit RawLayoutMember(const SourceElement& element, Kind kind,
-                           std::unique_ptr<RawAttributeList> attributes,
-                           std::unique_ptr<RawIdentifier> identifier)
+  RawLayoutMember(const SourceElement& element, Kind kind,
+                  std::unique_ptr<RawAttributeList> attributes,
+                  std::unique_ptr<RawIdentifier> identifier)
       : SourceElement(element),
         kind(kind),
         attributes(std::move(attributes)),
@@ -591,17 +589,17 @@ struct RawLayout final : public SourceElement {
 };
 
 struct RawOrdinaledLayoutMember final : public RawLayoutMember {
-  explicit RawOrdinaledLayoutMember(const SourceElement& element,
-                                    std::unique_ptr<RawAttributeList> attributes,
-                                    std::unique_ptr<RawOrdinal64> ordinal,
-                                    std::unique_ptr<RawIdentifier> identifier,
-                                    std::unique_ptr<RawTypeConstructor> type_ctor)
+  RawOrdinaledLayoutMember(const SourceElement& element,
+                           std::unique_ptr<RawAttributeList> attributes,
+                           std::unique_ptr<RawOrdinal64> ordinal,
+                           std::unique_ptr<RawIdentifier> identifier,
+                           std::unique_ptr<RawTypeConstructor> type_ctor)
       : RawLayoutMember(element, Kind::kOrdinaled, std::move(attributes), std::move(identifier)),
         ordinal(std::move(ordinal)),
         type_ctor(std::move(type_ctor)) {}
-  explicit RawOrdinaledLayoutMember(const SourceElement& element,
-                                    std::unique_ptr<RawAttributeList> attributes,
-                                    std::unique_ptr<RawOrdinal64> ordinal)
+  RawOrdinaledLayoutMember(const SourceElement& element,
+                           std::unique_ptr<RawAttributeList> attributes,
+                           std::unique_ptr<RawOrdinal64> ordinal)
       : RawLayoutMember(element, Kind::kOrdinaled, std::move(attributes), nullptr),
         ordinal(std::move(ordinal)),
         type_ctor(nullptr),
@@ -615,10 +613,9 @@ struct RawOrdinaledLayoutMember final : public RawLayoutMember {
 };
 
 struct RawValueLayoutMember final : public RawLayoutMember {
-  explicit RawValueLayoutMember(const SourceElement& element,
-                                std::unique_ptr<RawAttributeList> attributes,
-                                std::unique_ptr<RawIdentifier> identifier,
-                                std::unique_ptr<RawConstant> value)
+  RawValueLayoutMember(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                       std::unique_ptr<RawIdentifier> identifier,
+                       std::unique_ptr<RawConstant> value)
       : RawLayoutMember(element, Kind::kValue, std::move(attributes), std::move(identifier)),
         value(std::move(value)) {}
 
@@ -628,11 +625,10 @@ struct RawValueLayoutMember final : public RawLayoutMember {
 };
 
 struct RawStructLayoutMember final : public RawLayoutMember {
-  explicit RawStructLayoutMember(const SourceElement& element,
-                                 std::unique_ptr<RawAttributeList> attributes,
-                                 std::unique_ptr<RawIdentifier> identifier,
-                                 std::unique_ptr<RawTypeConstructor> type_ctor,
-                                 std::unique_ptr<RawConstant> default_value)
+  RawStructLayoutMember(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
+                        std::unique_ptr<RawIdentifier> identifier,
+                        std::unique_ptr<RawTypeConstructor> type_ctor,
+                        std::unique_ptr<RawConstant> default_value)
       : RawLayoutMember(element, Kind::kStruct, std::move(attributes), std::move(identifier)),
         type_ctor(std::move(type_ctor)),
         default_value(std::move(default_value)) {}
@@ -657,9 +653,9 @@ struct RawLayoutReference : public SourceElement {
 };
 
 struct RawInlineLayoutReference final : public RawLayoutReference {
-  explicit RawInlineLayoutReference(const SourceElement& element,
-                                    std::unique_ptr<RawAttributeList> attributes,
-                                    std::unique_ptr<RawLayout> layout)
+  RawInlineLayoutReference(const SourceElement& element,
+                           std::unique_ptr<RawAttributeList> attributes,
+                           std::unique_ptr<RawLayout> layout)
       : RawLayoutReference(element, Kind::kInline),
         attributes(std::move(attributes)),
         layout(std::move(layout)) {}
@@ -671,8 +667,8 @@ struct RawInlineLayoutReference final : public RawLayoutReference {
 };
 
 struct RawNamedLayoutReference final : public RawLayoutReference {
-  explicit RawNamedLayoutReference(const SourceElement& element,
-                                   std::unique_ptr<RawCompoundIdentifier> identifier)
+  RawNamedLayoutReference(const SourceElement& element,
+                          std::unique_ptr<RawCompoundIdentifier> identifier)
       : RawLayoutReference(element, Kind::kNamed), identifier(std::move(identifier)) {}
 
   void Accept(TreeVisitor* visitor) const;
@@ -696,8 +692,8 @@ struct RawLayoutParameter : public SourceElement {
 };
 
 struct RawLiteralLayoutParameter final : public RawLayoutParameter {
-  explicit RawLiteralLayoutParameter(const SourceElement& element,
-                                     std::unique_ptr<RawLiteralConstant> literal)
+  RawLiteralLayoutParameter(const SourceElement& element,
+                            std::unique_ptr<RawLiteralConstant> literal)
       : RawLayoutParameter(element, Kind::kLiteral), literal(std::move(literal)) {}
 
   void Accept(TreeVisitor* visitor) const;
@@ -706,8 +702,8 @@ struct RawLiteralLayoutParameter final : public RawLayoutParameter {
 };
 
 struct RawTypeLayoutParameter final : public RawLayoutParameter {
-  explicit RawTypeLayoutParameter(const SourceElement& element,
-                                  std::unique_ptr<RawTypeConstructor> type_ctor)
+  RawTypeLayoutParameter(const SourceElement& element,
+                         std::unique_ptr<RawTypeConstructor> type_ctor)
       : RawLayoutParameter(element, Kind::kType), type_ctor(std::move(type_ctor)) {}
 
   void Accept(TreeVisitor* visitor) const;
@@ -716,8 +712,8 @@ struct RawTypeLayoutParameter final : public RawLayoutParameter {
 };
 
 struct RawIdentifierLayoutParameter final : public RawLayoutParameter {
-  explicit RawIdentifierLayoutParameter(const SourceElement& element,
-                                        std::unique_ptr<RawCompoundIdentifier> identifier)
+  RawIdentifierLayoutParameter(const SourceElement& element,
+                               std::unique_ptr<RawCompoundIdentifier> identifier)
       : RawLayoutParameter(element, Kind::kIdentifier), identifier(std::move(identifier)) {}
 
   void Accept(TreeVisitor* visitor) const;

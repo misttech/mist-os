@@ -45,7 +45,7 @@ class Reference final {
   class Target {
    public:
     explicit Target(Decl* decl);
-    explicit Target(Element* member, Decl* parent);
+    Target(Element* member, Decl* parent);
 
     Element* element() const { return target_; }
     Name name() const;

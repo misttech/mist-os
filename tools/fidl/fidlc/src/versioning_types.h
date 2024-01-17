@@ -123,8 +123,7 @@ class Version final {
 // inclusive lower bound to an exclusive upper bound.
 class VersionRange final {
  public:
-  constexpr explicit VersionRange(Version lower, Version upper_exclusive)
-      : pair_(lower, upper_exclusive) {
+  constexpr VersionRange(Version lower, Version upper_exclusive) : pair_(lower, upper_exclusive) {
     ZX_ASSERT_MSG(lower < upper_exclusive, "invalid version range");
   }
 
@@ -220,7 +219,7 @@ class VersionSet final {
 //
 class Availability final {
  public:
-  constexpr explicit Availability() = default;
+  constexpr Availability() = default;
 
   // Returns an availability that exists forever. This only exists as the base
   // case for calling `Inherit`. It never occurs as a final result.

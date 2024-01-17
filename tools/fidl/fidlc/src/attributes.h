@@ -63,7 +63,7 @@ struct Attribute final : public HasClone<Attribute> {
 // In the flat AST, "no attributes" is represented by an AttributeList
 // containing an empty vector. (In the raw AST, null is used instead.)
 struct AttributeList final : public HasClone<AttributeList> {
-  explicit AttributeList() = default;
+  AttributeList() = default;
   explicit AttributeList(std::vector<std::unique_ptr<Attribute>> attributes)
       : attributes(std::move(attributes)) {}
 

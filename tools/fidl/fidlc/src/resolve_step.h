@@ -37,7 +37,7 @@ class ResolveStep : public Compiler::Step {
       kResolveAndValidate,
     };
 
-    explicit Context(Mode mode, Element* enclosing) : mode(mode), enclosing(enclosing) {}
+    Context(Mode mode, Element* enclosing) : mode(mode), enclosing(enclosing) {}
 
     // What to do when we reach leaves (references).
     Mode mode;

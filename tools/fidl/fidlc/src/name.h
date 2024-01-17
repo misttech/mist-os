@@ -174,10 +174,10 @@ class Name final {
                                ? std::make_optional(std::string_view(name.member_name().value()))
                                : std::nullopt) {}
 
-    explicit Key(const Library* library, std::string_view decl_name)
+    Key(const Library* library, std::string_view decl_name)
         : compare_context_(library, decl_name, std::nullopt) {}
 
-    explicit Key(const Library* library, std::string_view decl_name, std::string_view member_name)
+    Key(const Library* library, std::string_view decl_name, std::string_view member_name)
         : compare_context_(library, decl_name, member_name) {}
 
     friend bool operator==(const Key& lhs, const Key& rhs) {
@@ -292,8 +292,8 @@ class Name final {
   };
 
   struct AnonymousNameContext {
-    explicit AnonymousNameContext(std::shared_ptr<NamingContext> context, Provenance provenance,
-                                  SourceSpan span)
+    AnonymousNameContext(std::shared_ptr<NamingContext> context, Provenance provenance,
+                         SourceSpan span)
         : flattened_name(context->flattened_name()),
           context(std::move(context)),
           provenance(provenance),

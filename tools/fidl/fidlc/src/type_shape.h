@@ -22,8 +22,8 @@ enum class WireFormat : uint8_t {
 };
 
 struct TypeShape {
-  explicit TypeShape(const Object& object, WireFormat wire_format);
-  explicit TypeShape(const Object* object, WireFormat wire_format);
+  TypeShape(const Object& object, WireFormat wire_format);
+  TypeShape(const Object* object, WireFormat wire_format);
 
   // The inline size of this type, including padding for the type's minimum alignment. For example,
   // "struct S { uint32 a; uint16 b; };" will have an inline_size of 8, not 6: the "packed" size of
@@ -56,7 +56,7 @@ struct TypeShape {
   static TypeShape ForEmptyPayload();
 
  private:
-  explicit TypeShape(uint32_t inline_size, uint32_t alignment)
+  TypeShape(uint32_t inline_size, uint32_t alignment)
       : inline_size(inline_size),
         alignment(alignment),
         depth(0),
@@ -69,10 +69,10 @@ struct TypeShape {
 // |FieldShape| describes the offset and padding information for members that are contained within
 // an aggregate type (e.g. struct/union).
 struct FieldShape {
-  explicit FieldShape(const StructMember&, WireFormat wire_format);
-  explicit FieldShape(const TableMemberUsed&, WireFormat wire_format);
-  explicit FieldShape(const UnionMemberUsed&, WireFormat wire_format);
-  explicit FieldShape(const OverlayMemberUsed&, WireFormat wire_format);
+  FieldShape(const StructMember&, WireFormat wire_format);
+  FieldShape(const TableMemberUsed&, WireFormat wire_format);
+  FieldShape(const UnionMemberUsed&, WireFormat wire_format);
+  FieldShape(const OverlayMemberUsed&, WireFormat wire_format);
 
   uint32_t offset = 0;
   uint32_t padding = 0;

@@ -53,7 +53,7 @@ class JSONGenerator : public JsonWriter<JSONGenerator> {
   using JsonWriter<JSONGenerator>::Generate;
   using JsonWriter<JSONGenerator>::GenerateArray;
 
-  explicit JSONGenerator(const Compilation* compilation, ExperimentalFlags experimental_flags)
+  JSONGenerator(const Compilation* compilation, ExperimentalFlags experimental_flags)
       : JsonWriter(json_file_),
         compilation_(compilation),
         experimental_flags_(experimental_flags) {}

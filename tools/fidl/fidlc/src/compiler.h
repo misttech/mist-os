@@ -84,7 +84,7 @@ struct Compilation;
 // came before it, and lastly the target library.
 class Libraries {
  public:
-  explicit Libraries(Reporter* reporter, VirtualSourceFile* generated_source_file)
+  Libraries(Reporter* reporter, VirtualSourceFile* generated_source_file)
       : reporter_(reporter),
         root_library_(Library::CreateRootLibrary()),
         typespace_(root_library_.get(), reporter),

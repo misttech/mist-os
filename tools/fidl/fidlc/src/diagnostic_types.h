@@ -118,8 +118,8 @@ struct DiagnosticOptions {
 };
 
 struct DiagnosticDef {
-  constexpr explicit DiagnosticDef(ErrorId id, DiagnosticKind kind, std::string_view msg,
-                                   DiagnosticOptions opts)
+  constexpr DiagnosticDef(ErrorId id, DiagnosticKind kind, std::string_view msg,
+                          DiagnosticOptions opts)
       : id(id), kind(kind), msg(msg), opts(opts) {}
   DiagnosticDef(const DiagnosticDef&) = delete;
 

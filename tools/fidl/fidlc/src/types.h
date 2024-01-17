@@ -42,7 +42,7 @@ struct Type : public Object {
     kIdentifier,
   };
 
-  explicit Type(Name name, Kind kind) : name(std::move(name)), kind(kind) {}
+  Type(Name name, Kind kind) : name(std::move(name)), kind(kind) {}
 
   const Name name;
   const Kind kind;
@@ -259,7 +259,7 @@ struct HandleType final : public Type, HandleConstraints {
 struct PrimitiveType final : public Type, public RejectOptionalConstraints {
   using Constraints = RejectOptionalConstraints;
 
-  explicit PrimitiveType(const Name& name, PrimitiveSubtype subtype)
+  PrimitiveType(const Name& name, PrimitiveSubtype subtype)
       : Type(name, Kind::kPrimitive), subtype(subtype) {}
 
   PrimitiveSubtype subtype;
@@ -285,7 +285,7 @@ struct PrimitiveType final : public Type, public RejectOptionalConstraints {
 struct InternalType final : public Type, public Constraints<> {
   using Constraints = Constraints<>;
 
-  explicit InternalType(const Name& name, InternalSubtype subtype)
+  InternalType(const Name& name, InternalSubtype subtype)
       : Type(name, Kind::kInternal), subtype(subtype) {}
 
   InternalSubtype subtype;
@@ -425,7 +425,7 @@ struct UntypedNumericType final : public Type, public Constraints<> {
 struct ZxExperimentalPointerType final : public Type, public Constraints<> {
   using Constraints = Constraints<>;
 
-  explicit ZxExperimentalPointerType(const Name& name, const Type* pointee_type)
+  ZxExperimentalPointerType(const Name& name, const Type* pointee_type)
       : Type(name, Kind::kZxExperimentalPointer), pointee_type(pointee_type) {}
 
   const Type* pointee_type;

@@ -29,7 +29,7 @@ struct TypeConstraints;
 class Typespace final {
  public:
   // Initializes the typespace with builtin types from the root library.
-  explicit Typespace(const Library* root_library, Reporter* reporter);
+  Typespace(const Library* root_library, Reporter* reporter);
   Typespace(const Typespace&) = delete;
   Typespace(Typespace&&) = default;
 

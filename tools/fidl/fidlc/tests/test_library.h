@@ -162,14 +162,14 @@ class TestLibrary final : public SharedInterface {
   }
 
   // Constructor for a single-library, multi-file test (call AddSource after).
-  explicit TestLibrary() {
+  TestLibrary() {
     owned_shared_.emplace();
     shared_ = &owned_shared_.value();
   }
 
   // Constructor for a multi-library, single-file test.
-  explicit TestLibrary(SharedAmongstLibraries* shared, const std::string& filename,
-                       const std::string& raw_source_code)
+  TestLibrary(SharedAmongstLibraries* shared, const std::string& filename,
+              const std::string& raw_source_code)
       : TestLibrary(shared) {
     AddSource(filename, raw_source_code);
   }

@@ -127,7 +127,7 @@ class DeriveResourceness {
 // A helper class to track when a Decl is compiling and compiled.
 class Compiling {
  public:
-  explicit Compiling(Decl* decl, std::vector<const Decl*>& decl_stack)
+  Compiling(Decl* decl, std::vector<const Decl*>& decl_stack)
       : decl_(decl), decl_stack_(decl_stack) {
     decl_->compiling = true;
     decl_stack_.push_back(decl);

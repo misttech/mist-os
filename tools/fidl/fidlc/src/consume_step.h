@@ -12,7 +12,7 @@ namespace fidlc {
 // We run a separate ConsumeStep for each file in the library.
 class ConsumeStep : public Compiler::Step {
  public:
-  explicit ConsumeStep(Compiler* compiler, std::unique_ptr<File> file);
+  ConsumeStep(Compiler* compiler, std::unique_ptr<File> file);
 
  private:
   void RunImpl() override;

@@ -223,7 +223,7 @@ struct Constant : HasClone<Constant> {
 
   enum class Kind : uint8_t { kIdentifier, kLiteral, kBinaryOperator };
 
-  explicit Constant(Kind kind, SourceSpan span) : kind(kind), span(span), value_(nullptr) {}
+  Constant(Kind kind, SourceSpan span) : kind(kind), span(span), value_(nullptr) {}
 
   bool IsResolved() const { return value_ != nullptr; }
   void ResolveTo(std::unique_ptr<ConstantValue> value, const Type* type);
@@ -248,10 +248,10 @@ struct Constant : HasClone<Constant> {
 };
 
 struct IdentifierConstant final : Constant {
-  explicit IdentifierConstant(const RawCompoundIdentifier& name, SourceSpan span)
+  IdentifierConstant(const RawCompoundIdentifier& name, SourceSpan span)
       : Constant(Kind::kIdentifier, span), reference(name) {}
   // This constructor is needed for IdentifierLayoutParameter::Disambiguate().
-  explicit IdentifierConstant(Reference reference, SourceSpan span)
+  IdentifierConstant(Reference reference, SourceSpan span)
       : Constant(Kind::kIdentifier, span), reference(std::move(reference)) {}
 
   Reference reference;
@@ -280,9 +280,8 @@ struct LiteralConstant final : Constant {
 struct BinaryOperatorConstant final : Constant {
   enum class Operator : uint8_t { kOr };
 
-  explicit BinaryOperatorConstant(std::unique_ptr<Constant> left_operand,
-                                  std::unique_ptr<Constant> right_operand, Operator op,
-                                  SourceSpan span)
+  BinaryOperatorConstant(std::unique_ptr<Constant> left_operand,
+                         std::unique_ptr<Constant> right_operand, Operator op, SourceSpan span)
       : Constant(Kind::kBinaryOperator, span),
         left_operand(std::move(left_operand)),
         right_operand(std::move(right_operand)),
