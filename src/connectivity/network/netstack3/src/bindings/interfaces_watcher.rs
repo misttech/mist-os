@@ -516,42 +516,54 @@ impl Worker {
                         involves_assigned || include_non_assigned_addresses
                     };
 
-                    if let Some((event, changed_address_properties)) =
-                        Self::consume_event(&mut interface_state, e)?
-                    {
-                        current_watchers.iter_mut().for_each(|watcher| {
-                            let WatcherOptions {
-                                address_properties_interest,
-                                include_non_assigned_addresses,
-                            } = &watcher.options;
+                    match Self::consume_event(&mut interface_state, e)? {
+                        None => tracing::debug!("not publishing No-Op event."),
+                        Some((event, changed_address_properties)) => {
+                            let num_published = current_watchers
+                                .iter_mut()
+                                .filter_map(|watcher| {
+                                    let WatcherOptions {
+                                        address_properties_interest,
+                                        include_non_assigned_addresses,
+                                    } = &watcher.options;
 
-                            let should_push = match &changed_address_properties {
-                                ChangedAddressProperties::InterestNotApplicable => true,
-                                ChangedAddressProperties::PropertiesChanged {
-                                    address_properties,
-                                    is_assigned,
-                                } => {
-                                    address_properties_interest
-                                        .intersects(address_properties.clone())
-                                        && is_address_visible(
-                                            *is_assigned,
+                                    let should_push = match &changed_address_properties {
+                                        ChangedAddressProperties::InterestNotApplicable => true,
+                                        ChangedAddressProperties::PropertiesChanged {
+                                            address_properties,
+                                            is_assigned,
+                                        } => {
+                                            address_properties_interest
+                                                .intersects(address_properties.clone())
+                                                && is_address_visible(
+                                                    *is_assigned,
+                                                    *include_non_assigned_addresses,
+                                                )
+                                        }
+                                        ChangedAddressProperties::AssignmentStateChanged {
+                                            involves_assigned,
+                                        } => is_address_visible(
+                                            *involves_assigned,
                                             *include_non_assigned_addresses,
-                                        )
-                                }
-                                ChangedAddressProperties::AssignmentStateChanged {
-                                    involves_assigned,
-                                } => is_address_visible(
-                                    *involves_assigned,
-                                    *include_non_assigned_addresses,
-                                ),
-                            };
-
-                            // TODO(https://fxbug.dev/110587): Mask address properties fields
-                            // from address-added events according to watcher interest.
-                            if should_push {
-                                watcher.push(event.clone());
-                            }
-                        });
+                                        ),
+                                    };
+                                    // TODO(https://fxbug.dev/110587): Mask address properties fields
+                                    // from address-added events according to watcher interest.
+                                    if should_push {
+                                        watcher.push(event.clone());
+                                    }
+                                    // Filter out watchers that didn't receive
+                                    // the event, so that calling `count()`
+                                    // returns the number of published events.
+                                    should_push.then_some(())
+                                })
+                                .count();
+                            tracing::debug!(
+                                "published event to {} of {} watchers",
+                                num_published,
+                                current_watchers.len()
+                            );
+                        }
                     }
                 }
                 // If all of the sinks close, shutdown the worker.

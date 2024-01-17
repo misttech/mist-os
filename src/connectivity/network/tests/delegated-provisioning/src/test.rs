@@ -36,6 +36,7 @@ async fn delegated_provisioning_test() {
 
     let mut interfaces = HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<()>>::new();
     fnet_interfaces_ext::wait_interface(event_stream, &mut interfaces, |interfaces| {
+        info!("Observed change on interfaces watcher. Current State: {:?}", interfaces);
         interfaces
             .values()
             .any(
