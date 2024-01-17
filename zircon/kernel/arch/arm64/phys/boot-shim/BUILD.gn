@@ -22,6 +22,7 @@ shim_executable("linux-arm64-boot-shim") {
     "//zircon/kernel/phys:boot-zbi",
     "//zircon/kernel/phys:exception",
     "//zircon/kernel/phys:main",
+    "//zircon/kernel/phys:new",
     "//zircon/kernel/phys:stdio",
     "//zircon/kernel/phys:symbolize",
     "//zircon/kernel/phys:uart",

@@ -646,21 +646,23 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
       cpp20::span<zbi_topology_node_t> nodes) const;
 
   template <typename T>
-  T* Allocate(size_t count,
-              cpp20::source_location location = cpp20::source_location::current()) const {
-    auto* alloc = static_cast<T*>((*allocator_)(sizeof(T) * count, alignof(T)));
+  cpp20::span<T> Allocate(
+      size_t count, fbl::AllocChecker& ac, 
+      cpp20::source_location location = cpp20::source_location::current()) const {
+    auto* alloc = static_cast<T*>((*allocator_)(sizeof(T) * count, alignof(T), ac));
     if (!alloc) {
       // Log allocation failure. The effect is that the matcher will keep looking and will fail to
       // make progress. But the error will be logged.
       auto* self = const_cast<DevictreeCpuTopologyItem*>(this);
       self->OnError("Allocation Failed.");
       self->Log("at %s:%u\n", location.file_name(), static_cast<unsigned int>(location.line()));
+      count = 0;
     }
-    return alloc;
+    return cpp20::span<T>(alloc, count);
   }
 
   // Flattened 'cpu-map'.
-  CpuMapEntry* map_entries_ = nullptr;
+  cpp20::span<CpuMapEntry> map_entries_;
   uint32_t map_entry_index_ = 0;
   uint32_t map_entry_count_ = 0;
   bool has_cpu_map_ = false;
@@ -670,7 +672,7 @@ class DevictreeCpuTopologyItem : public DevicetreeItemBase<DevictreeCpuTopologyI
   std::optional<uint32_t> current_cluster_;
   std::optional<uint32_t> current_core_;
 
-  CpuEntry* cpu_entries_ = nullptr;
+  cpp20::span<CpuEntry> cpu_entries_;
   uint32_t cpu_entry_count_ = 0;
   uint32_t cpu_entry_index_ = 0;
   uint32_t cluster_count_ = 0;

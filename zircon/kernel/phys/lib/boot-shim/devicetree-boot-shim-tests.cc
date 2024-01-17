@@ -21,6 +21,7 @@
 #include <string>
 #include <string_view>
 
+#include <fbl/alloc_checker.h>
 #include <zxtest/zxtest.h>
 
 namespace {
@@ -231,10 +232,11 @@ TEST_F(DevicetreeBootShimTest, ItemsWithoutMatchingNodes) {
       boot_shim::RiscvDevicetreePlicItem, boot_shim::RiscvDevicetreeTimerItem,
       boot_shim::RiscvDevictreeCpuTopologyItem>
       shim("devicetree-boot-shim-test", fdt());
-  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
+  shim.set_allocator([&allocs](size_t size, size_t alignment, fbl::AllocChecker& ac) -> void* {
     // Custom aligned_alloc since OS X doesnt support it in some versions.
     void* alloc = malloc(size + alignment);
     allocs.push_back(alloc);
+    ac.arm(size + alignment, alloc != nullptr);
     return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
                                    ~(alignment - 1));
   });

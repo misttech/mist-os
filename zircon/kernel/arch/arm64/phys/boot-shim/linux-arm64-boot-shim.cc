@@ -23,6 +23,7 @@
 #include <zircon/limits.h>
 
 #include <fbl/algorithm.h>
+#include <fbl/alloc_checker.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
 #include <phys/address-space.h>
@@ -30,6 +31,7 @@
 #include <phys/boot-shim/devicetree.h>
 #include <phys/boot-zbi.h>
 #include <phys/main.h>
+#include <phys/new.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 #include <phys/uart.h>
@@ -106,12 +108,9 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
              peripheral_range.end());
     }
   });
-  shim.set_allocator([](size_t size, size_t align) -> void* {
-    if (auto alloc = Allocation::GetPool().Allocate(memalloc::Type::kPhysScratch, size, align);
-        alloc.is_ok()) {
-      return reinterpret_cast<void*>(*alloc);
-    }
-    return nullptr;
+  shim.set_allocator([](size_t size, size_t align, fbl::AllocChecker& ac) -> void* {
+    return new (std::align_val_t{align}, gPhysNew<memalloc::Type::kPhysScratch>, ac)
+        uint8_t[size];
   });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
   shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());

@@ -11,12 +11,39 @@
 #include <lib/zbi-format/cpu.h>
 #include <lib/zbitl/image.h>
 
+#include <fbl/alloc_checker.h>
 #include <zxtest/zxtest.h>
 
 namespace {
 
 using boot_shim::testing::LoadDtb;
 using boot_shim::testing::LoadedDtb;
+
+class TestAllocator {
+ public:
+  TestAllocator() = default;
+  TestAllocator(TestAllocator&& other) {
+    allocs_ = std::move(other.allocs_);
+    other.allocs_.clear();
+  }
+
+  ~TestAllocator() {
+    for (auto* alloc : allocs_) {
+      free(alloc);
+    }
+  }
+
+  void* operator()(size_t size, size_t alignment, fbl::AllocChecker& ac) {
+    void* alloc = malloc(size + alignment);
+    allocs_.push_back(alloc);
+    ac.arm(size + alignment, alloc != nullptr);
+    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
+                                   ~(alignment - 1));
+  }
+
+ private:
+  std::vector<void*> allocs_;
+};
 
 class ArmCpuTopologyItemTest
     : public boot_shim::testing::TestMixin<boot_shim::testing::ArmDevicetreeTest> {
@@ -201,25 +228,12 @@ TEST_F(ArmCpuTopologyItemTest, CpusMultipleCells) {
   };
 
   std::array<std::byte, 1024> image_buffer;
-  std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = cpus();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
-  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
-    // Custom aligned_alloc since OS X doesnt support it in some versions.
-    void* alloc = malloc(size + alignment);
-    allocs.push_back(alloc);
-    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
-                                   ~(alignment - 1));
-  });
-
-  auto release_memory = fit::defer([&]() {
-    for (auto* alloc : allocs) {
-      free(alloc);
-    }
-  });
+  shim.set_allocator(TestAllocator());
 
   shim.Init();
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
@@ -381,26 +395,12 @@ TEST_F(ArmCpuTopologyItemTest, CpusSingleCell) {
   };
 
   std::array<std::byte, 1024> image_buffer;
-  std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = cpus_single_cell();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
-  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
-    // Custom aligned_alloc since OS X doesnt support it in some versions.
-    void* alloc = malloc(size + alignment);
-    allocs.push_back(alloc);
-    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
-                                   ~(alignment - 1));
-  });
-
-  auto release_memory = fit::defer([&]() {
-    for (auto* alloc : allocs) {
-      free(alloc);
-    }
-  });
-
+  shim.set_allocator(TestAllocator());
   shim.Init();
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
@@ -529,25 +529,12 @@ TEST_F(ArmCpuTopologyItemTest, CpusNoCpuMap) {
   };
 
   std::array<std::byte, 1024> image_buffer;
-  std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = cpus_no_cpu_map();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
-  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
-    // Custom aligned_alloc since OS X doesnt support it in some versions.
-    void* alloc = malloc(size + alignment);
-    allocs.push_back(alloc);
-    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
-                                   ~(alignment - 1));
-  });
-
-  auto release_memory = fit::defer([&]() {
-    for (auto* alloc : allocs) {
-      free(alloc);
-    }
-  });
+  shim.set_allocator(TestAllocator());
 
   shim.Init();
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
@@ -677,25 +664,12 @@ TEST_F(ArmCpuTopologyItemTest, Qemu) {
   };
 
   std::array<std::byte, 1024> image_buffer;
-  std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_arm_gic3();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
-  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
-    // Custom aligned_alloc since OS X doesnt support it in some versions.
-    void* alloc = malloc(size + alignment);
-    allocs.push_back(alloc);
-    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
-                                   ~(alignment - 1));
-  });
-
-  auto release_memory = fit::defer([&]() {
-    for (auto* alloc : allocs) {
-      free(alloc);
-    }
-  });
+  shim.set_allocator(TestAllocator());
 
   shim.Init();
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
@@ -743,26 +717,12 @@ TEST_F(ArmCpuTopologyItemTest, Crosvm) {
       }};
 
   std::array<std::byte, 1024> image_buffer;
-  std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = crosvm_arm();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
-  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
-    // Custom aligned_alloc since OS X doesnt support it in some versions.
-    void* alloc = malloc(size + alignment);
-    allocs.push_back(alloc);
-    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
-                                   ~(alignment - 1));
-  });
-
-  auto release_memory = fit::defer([&]() {
-    for (auto* alloc : allocs) {
-      free(alloc);
-    }
-  });
-
+  shim.set_allocator(TestAllocator());
   shim.Init();
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
@@ -973,25 +933,12 @@ TEST_F(ArmCpuTopologyItemTest, KhadasVim3) {
           };
 
   std::array<std::byte, 1024> image_buffer;
-  std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = khadas_vim3();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevictreeCpuTopologyItem> shim("test", fdt);
-  shim.set_allocator([&allocs](size_t size, size_t alignment) -> void* {
-    // Custom aligned_alloc since OS X doesnt support it in some versions.
-    void* alloc = malloc(size + alignment);
-    allocs.push_back(alloc);
-    return reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(alloc) + alignment) &
-                                   ~(alignment - 1));
-  });
-
-  auto release_memory = fit::defer([&]() {
-    for (auto* alloc : allocs) {
-      free(alloc);
-    }
-  });
+  shim.set_allocator(TestAllocator());
 
   shim.Init();
   auto clear_errors = fit::defer([&]() { image.ignore_error(); });
