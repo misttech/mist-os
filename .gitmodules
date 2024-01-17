@@ -618,3 +618,18 @@
 	url = https://fuchsia.googlesource.com/third_party/pigweed.googlesource.com/pigweed/pigweed
 	name = third_party/pigweed
 	ignore = all
+[submodule "third_party/github.com/python/mypy/src"]
+	path = third_party/github.com/python/mypy/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/python/mypy
+	name = third_party/github.com/python/mypy
+	ignore = all
+[submodule "third_party/github.com/python/mypy_extensions/src"]
+	path = third_party/github.com/python/mypy_extensions/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/python/mypy_extensions
+	name = third_party/github.com/python/mypy_extensions
+	ignore = all
+[submodule "third_party/github.com/python/typing_extensions/src"]
+	path = third_party/github.com/python/typing_extensions/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/python/typing_extensions
+	name = third_party/github.com/python/typing_extensions
+	ignore = all
