@@ -11,7 +11,6 @@ fuchsia_library_fuzzer("syslog-fuzzer") {
   sources = [ "fuzz.cc" ]
   deps = [
     "//sdk/lib/syslog/cpp",
-    "//sdk/lib/syslog/cpp:backend",
     "//zircon/system/ulib/zircon-internal",
   ]
 }

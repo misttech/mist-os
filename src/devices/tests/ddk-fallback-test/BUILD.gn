@@ -24,7 +24,6 @@ fuchsia_driver("ddk-fallback-test-driver") {
   deps = [
     ":ddk-fallback-test-bind",
     "//sdk/lib/fdio",
-    "//sdk/lib/syslog/cpp:backend",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
@@ -50,7 +49,6 @@ fuchsia_driver("ddk-not-fallback-test-driver") {
   deps = [
     ":ddk-fallback-test-bind",
     "//sdk/lib/fdio",
-    "//sdk/lib/syslog/cpp:backend",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
