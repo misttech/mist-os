@@ -38,12 +38,6 @@ impl Socket {
         Socket(RWHandle::new(socket))
     }
 
-    /// Available for soft migration of b/319131778.
-    // TODO(https://fxbug.dev/319131778) delete this function
-    pub fn try_from_socket(socket: zx::Socket) -> Result<Self, zx::Status> {
-        Ok(Self::from_socket(socket))
-    }
-
     /// Consumes `self` and returns the underlying `zx::Socket`.
     pub fn into_zx_socket(self) -> zx::Socket {
         self.0.into_inner()
