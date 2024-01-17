@@ -120,6 +120,19 @@ zx_status_t vfs_internal_pseudo_file_create(size_t max_bytes,
                                             const vfs_internal_file_context_t* context,
                                             vfs_internal_node_t** out_vnode);
 
+// Create a composed service directory which allows dynamic fallback services.
+zx_status_t vfs_internal_composed_svc_dir_create(vfs_internal_node_t** out_vnode);
+
+// Adds a service instance to this composed service directory.
+zx_status_t vfs_internal_composed_svc_dir_add(vfs_internal_node_t* dir,
+                                              const vfs_internal_node_t* service_node,
+                                              const char* name);
+
+// Sets the fallback directory for a composed service directory. `fallback_channel` must be
+// compatible with the fuchsia.io protocol.
+zx_status_t vfs_internal_composed_svc_dir_set_fallback(vfs_internal_node_t* dir,
+                                                       zx_handle_t fallback_channel);
+
 // NOLINTEND(modernize-use-using)
 
 __END_CDECLS

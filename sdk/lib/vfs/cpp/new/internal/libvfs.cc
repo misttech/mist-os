@@ -53,6 +53,56 @@ static_assert(static_cast<vfs_internal_sharing_mode_t>(DefaultSharingMode::kDupl
 static_assert(static_cast<vfs_internal_sharing_mode_t>(DefaultSharingMode::kCloneCow) ==
               VFS_INTERNAL_SHARING_MODE_COW);
 
+// TODO(https://fxbug.dev/309685624): Remove when all callers have migrated.
+class ComposedServiceDir final : public fs::PseudoDir {
+ public:
+  zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) override {
+    zx_status_t status = fs::PseudoDir::Lookup(name, out);
+    if (status == ZX_OK) {
+      return status;
+    }
+    if (fallback_dir_) {
+      auto entry = fallback_services_.find(name);
+      if (entry != fallback_services_.end()) {
+        *out = entry->second;
+      } else {
+        auto connector = [name = std::string(name.data(), name.length()),
+                          dir = &fallback_dir_](zx::channel channel) -> zx_status_t {
+          auto response = fidl::WireCall(*dir)->Open(
+              fuchsia_io::OpenFlags(), fuchsia_io::ModeType(), fidl::StringView::FromExternal(name),
+              fidl::ServerEnd<fuchsia_io::Node>{std::move(channel)});
+          if (!response.ok()) {
+            return response.error().status();
+          }
+          return ZX_OK;
+        };
+
+        auto service = fbl::MakeRefCounted<fs::Service>(std::move(connector));
+        *out = service;
+        fallback_services_[std::string(name)] = std::move(service);
+      }
+      return ZX_OK;
+    }
+    return ZX_ERR_NOT_FOUND;
+  }
+
+  void SetFallback(fidl::ClientEnd<fuchsia_io::Directory> dir) { fallback_dir_ = std::move(dir); }
+
+  zx_status_t AddService(std::string_view name, fbl::RefPtr<fs::Service> service) {
+    return this->AddEntry(name, std::move(service));
+  }
+
+ private:
+  friend fbl::internal::MakeRefCountedHelper<ComposedServiceDir>;
+  friend fbl::RefPtr<ComposedServiceDir>;
+
+  fidl::ClientEnd<fuchsia_io::Directory> fallback_dir_;
+
+  // The collection of services that have been looked up on the fallback directory. These services
+  // just forward connection requests to the fallback directory.
+  mutable std::map<std::string, fbl::RefPtr<fs::Service>, std::less<>> fallback_services_;
+};
+
 }  // namespace
 
 typedef struct vfs_internal_vfs {
@@ -62,7 +112,8 @@ typedef struct vfs_internal_vfs {
 typedef struct vfs_internal_node {
   using NodeVariant =
       std::variant<fbl::RefPtr<fs::PseudoDir>, fbl::RefPtr<fs::Service>, fbl::RefPtr<fs::RemoteDir>,
-                   fbl::RefPtr<fs::VmoFile>, fbl::RefPtr<fs::BufferedPseudoFile>>;
+                   fbl::RefPtr<fs::VmoFile>, fbl::RefPtr<fs::BufferedPseudoFile>,
+                   fbl::RefPtr<ComposedServiceDir>>;
   NodeVariant node;
 
   template <typename T>
@@ -245,6 +296,46 @@ __EXPORT zx_status_t vfs_internal_pseudo_file_create(size_t max_bytes,
   *out_vnode =
       new vfs_internal_node_t{.node = fbl::MakeRefCounted<fs::BufferedPseudoFile>(
                                   std::move(read_handler), std::move(write_handler), max_bytes)};
+  return ZX_OK;
+}
+
+__EXPORT zx_status_t vfs_internal_composed_svc_dir_create(vfs_internal_node_t** out_vnode) {
+  if (!out_vnode) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  *out_vnode = new vfs_internal_node_t{.node = fbl::MakeRefCounted<ComposedServiceDir>()};
+  return ZX_OK;
+}
+
+__EXPORT zx_status_t vfs_internal_composed_svc_dir_add(vfs_internal_node_t* dir,
+                                                       const vfs_internal_node_t* service_node,
+                                                       const char* name) {
+  if (!dir || !service_node || !name) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  ComposedServiceDir* downcasted = dir->Downcast<ComposedServiceDir>();
+  if (!downcasted) {
+    return ZX_ERR_WRONG_TYPE;
+  }
+  return downcasted->AddEntry(name, service_node->AsNode());
+}
+
+__EXPORT zx_status_t vfs_internal_composed_svc_dir_set_fallback(vfs_internal_node_t* dir,
+                                                                zx_handle_t fallback_channel) {
+  if (!dir) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  ComposedServiceDir* downcasted = dir->Downcast<ComposedServiceDir>();
+  if (!downcasted) {
+    return ZX_ERR_WRONG_TYPE;
+  }
+  // TODO(https://fxbug.dev/293936429): We might have to relax this check, as VmoFile should
+  // gracefully handle this case. The existing SDK VFS node constructors are infallible even when
+  // `vmo` is invalid.
+  if (fallback_channel == ZX_HANDLE_INVALID) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  downcasted->SetFallback(fidl::ClientEnd<fuchsia_io::Directory>{zx::channel(fallback_channel)});
   return ZX_OK;
 }
 

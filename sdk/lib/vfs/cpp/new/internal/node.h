@@ -12,7 +12,9 @@
 #include <lib/vfs/cpp/new/internal/libvfs_private.h>
 
 namespace vfs {
+// Types that require access to the `handle()` for adding child node entries.
 class PseudoDir;
+class ComposedServiceDir;
 }  // namespace vfs
 
 namespace vfs::internal {
@@ -90,8 +92,10 @@ class Node {
  protected:
   explicit Node(vfs_internal_node_t* handle) : handle_(handle) {}
 
-  // `vfs::PseudoDir` requires access to the `handle()` for arbitrary `Node` types.
+  // Types that require access to the `handle()` for adding child node entries.
   friend class vfs::PseudoDir;
+  friend class vfs::ComposedServiceDir;
+
   const vfs_internal_node_t* handle() const { return handle_; }
   vfs_internal_node_t* handle() { return handle_; }
 
