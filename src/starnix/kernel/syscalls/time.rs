@@ -110,7 +110,7 @@ pub fn sys_gettimeofday(
         current_task.write_object(user_tv, &tv)?;
     }
     if !user_tz.is_null() {
-        not_implemented!("gettimeofday does not implement tz argument");
+        not_implemented!("gettimeofday tz argument");
     }
     Ok(())
 }

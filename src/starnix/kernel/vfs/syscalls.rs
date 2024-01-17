@@ -550,7 +550,7 @@ impl LookupFlags {
         let automount =
             if allowed_flags & AT_NO_AUTOMOUNT != 0 { flags & AT_NO_AUTOMOUNT == 0 } else { false };
         if automount {
-            not_implemented!("LookupFlags::automount is not implemented");
+            not_implemented!("LookupFlags::automount");
         }
         Ok(LookupFlags {
             allow_empty_path: flags & AT_EMPTY_PATH != 0,
@@ -914,7 +914,7 @@ pub fn sys_renameat2(
 
     // RENAME_WHITEOUT is not supported.
     if flags.contains(RenameFlags::WHITEOUT) {
-        not_implemented!("RENAME_WHITEOUT is not implemented");
+        not_implemented!("RENAME_WHITEOUT");
         return error!(ENOSYS);
     };
 
@@ -1482,7 +1482,7 @@ fn do_mount_remount(
     data_addr: UserCString,
 ) -> Result<(), Errno> {
     if !data_addr.is_null() {
-        not_implemented!("mount: MS_REMOUNT: Updating data is not implemented.");
+        not_implemented!("MS_REMOUNT: Updating data");
     }
     let mount = target.mount_if_root()?;
     let updated_flags = flags & MountFlags::CHANGEABLE_WITH_REMOUNT;
@@ -1494,7 +1494,7 @@ fn do_mount_remount(
         //   to modify only the per-mount-point flags.  This is particularly
         //   useful for setting or clearing the "read-only" flag on a mount
         //   without changing the underlying filesystem.
-        not_implemented!("mount: MS_REMOUNT: Updating superblock flags is not implemented.");
+        not_implemented!("MS_REMOUNT: Updating superblock flags");
     }
     Ok(())
 }
@@ -1686,7 +1686,7 @@ pub fn sys_timerfd_create(
                 return error!(EPERM);
             }
             // TODO(https://fxbug.dev/121415): Add proper support for _ALARM clocks.
-            not_implemented!("timerfd_create: CLOCK_BOOTTIME_ALARM is mapped to CLOCK_BOOTTIME");
+            not_implemented!("timerfd_create: CLOCK_BOOTTIME_ALARM");
             TimerFileClock::Monotonic
         }
         CLOCK_REALTIME_ALARM => {
@@ -1694,7 +1694,7 @@ pub fn sys_timerfd_create(
                 return error!(EPERM);
             }
             // TODO(https://fxbug.dev/121415): Add proper support for _ALARM clocks.
-            not_implemented!("timerfd_create: CLOCK_REALTIME_ALARM is mapped to CLOCK_REALTIME");
+            not_implemented!("timerfd_create: CLOCK_REALTIME_ALARM");
             TimerFileClock::Realtime
         }
         CLOCK_REALTIME => TimerFileClock::Realtime,

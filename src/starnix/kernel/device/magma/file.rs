@@ -147,7 +147,7 @@ use magma::{
     MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
 };
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name};
+use starnix_logging::{impossible_error, log_error, log_warn, not_implemented, set_zx_name};
 use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -996,7 +996,7 @@ impl FileOps for MagmaFile {
                         };
 
                         // Force EINTR every second to allow signals to interrupt the wait.
-                        // TODO(fxbug.dev/42080364): Only interrupt the wait when needed.
+                        // TODO(https://fxbug.dev/42080364): Only interrupt the wait when needed.
                         let capped_rel_timeout_ns = std::cmp::min(rel_timeout_ns, 1_000_000_000);
 
                         status = unsafe {
@@ -1246,7 +1246,7 @@ impl FileOps for MagmaFile {
                 current_task.write_object(UserRef::new(response_address), &response)
             }
             t => {
-                log_warn!("Got unknown request: {:?}", t);
+                not_implemented!("virtio magma ioctl", t);
                 error!(ENOSYS)
             }
         }?;

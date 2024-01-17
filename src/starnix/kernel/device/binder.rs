@@ -3204,7 +3204,7 @@ impl BinderDriver {
                 Ok(SUCCESS)
             }
             uapi::BINDER_ENABLE_ONEWAY_SPAM_DETECTION => {
-                not_implemented!("binder ignoring ENABLE_ONEWAY_SPAM_DETECTION ioctl");
+                not_implemented!("binder ENABLE_ONEWAY_SPAM_DETECTION");
                 Ok(SUCCESS)
             }
             uapi::BINDER_THREAD_EXIT => {
@@ -3213,18 +3213,19 @@ impl BinderDriver {
                 Ok(SUCCESS)
             }
             uapi::BINDER_GET_NODE_DEBUG_INFO => {
-                not_implemented!("binder GET_NODE_DEBUG_INFO ioctl not supported");
+                not_implemented!("binder GET_NODE_DEBUG_INFO");
                 error!(EOPNOTSUPP)
             }
             uapi::BINDER_GET_NODE_INFO_FOR_REF => {
-                not_implemented!("binder GET_NODE_INFO_FOR_REF ioctl not supported");
+                not_implemented!("binder GET_NODE_INFO_FOR_REF");
                 error!(EOPNOTSUPP)
             }
             uapi::BINDER_FREEZE => {
-                not_implemented!("binder BINDER_FREEZE ioctl not supported");
+                not_implemented!("binder BINDER_FREEZE");
                 error!(EOPNOTSUPP)
             }
             _ => {
+                not_implemented!("binder unknown ioctl", request);
                 log_error!("binder received unknown ioctl request 0x{:08x}", request);
                 error!(EINVAL)
             }
@@ -4207,7 +4208,7 @@ impl SerializedBinderObject {
                 })
             }
             object_type => {
-                log_error!("unknown object type 0x{:08x}", object_type);
+                not_implemented!("unknown object type", object_type);
                 error!(EINVAL)
             }
         }

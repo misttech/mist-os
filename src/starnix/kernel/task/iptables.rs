@@ -176,7 +176,7 @@ impl IpTables {
                 Ok(revision.as_bytes().to_vec())
             }
             _ => {
-                not_implemented!("optname is stubbed for network sockets.");
+                not_implemented!("optname for network sockets");
                 Ok(vec![])
             }
         }

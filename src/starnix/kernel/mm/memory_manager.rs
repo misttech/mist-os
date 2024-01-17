@@ -872,7 +872,7 @@ impl MemoryManagerState {
 
         // TODO(https://fxbug.dev/88262): Implement support for MREMAP_DONTUNMAP.
         if flags.contains(MremapFlags::DONTUNMAP) {
-            not_implemented!("mremap flag MREMAP_DONTUNMAP not implemented");
+            not_implemented!("MREMAP_DONTUNMAP");
             return error!(EOPNOTSUPP);
         }
 

@@ -288,7 +288,7 @@ pub fn sys_bpf(
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
         bpf_cmd_BPF_PROG_ATTACH => {
             log_trace!("BPF_PROG_ATTACH");
-            not_implemented!("Bpf::BPF_PROG_ATTACH is stubbed");
+            not_implemented!("Bpf::BPF_PROG_ATTACH");
             Ok(SUCCESS)
         }
 
@@ -297,7 +297,7 @@ pub fn sys_bpf(
             let mut prog_attr: bpf_attr__bindgen_ty_10 =
                 read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_PROG_QUERY");
-            not_implemented!("Bpf::BPF_PROG_QUERY is stubbed");
+            not_implemented!("Bpf::BPF_PROG_QUERY");
             current_task.write_memory(UserAddress::from(prog_attr.prog_ids), 1.as_bytes())?;
             prog_attr.prog_cnt = std::mem::size_of::<u64>() as u32;
             current_task.write_memory(attr_addr, prog_attr.as_bytes())?;

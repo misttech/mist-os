@@ -9,7 +9,7 @@ use starnix_core::{
     task::CurrentTask,
     vfs::{FileObject, FileOps, InputBuffer, OutputBuffer, SeekTarget},
 };
-use starnix_logging::{log_error, log_info, log_warn};
+use starnix_logging::{log_error, log_info, not_implemented};
 use starnix_sync::Mutex;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -119,7 +119,7 @@ impl FileOps for GrallocFile {
                 current_task.write_object(UserRef::new(user_addr), &request)
             }
             unknown_ioctl => {
-                log_warn!("Got unknown request: {:?}", unknown_ioctl);
+                not_implemented!("gralloc ioctl", unknown_ioctl);
                 error!(ENOSYS)
             }
         }?;

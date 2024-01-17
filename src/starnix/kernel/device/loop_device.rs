@@ -389,7 +389,7 @@ impl FileOps for LoopDeviceFile {
                 Ok(SUCCESS)
             }
             BLKFLSBUF => {
-                not_implemented!("Loop device does not implement BLKFLSBUF");
+                not_implemented!("Loop device BLKFLSBUF");
                 Ok(SUCCESS)
             }
             LOOP_SET_FD => {
@@ -473,7 +473,7 @@ impl FileOps for LoopDeviceFile {
                 Ok(SUCCESS)
             }
             LOOP_SET_DIRECT_IO => {
-                not_implemented!("Loop device does not implement LOOP_SET_DIRECT_IO");
+                not_implemented!("Loop device LOOP_SET_DIRECT_IO");
                 error!(ENOTTY)
             }
             LOOP_SET_BLOCK_SIZE => {

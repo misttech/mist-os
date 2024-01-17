@@ -823,7 +823,7 @@ impl OverlayFs {
             None => (),
             Some(o) if o == "off" => (),
             Some(_) => {
-                not_implemented!("redirect_dir is not implemented in overlayfs yet.");
+                not_implemented!("overlayfs redirect_dir");
                 return error!(ENOTSUP);
             }
         }

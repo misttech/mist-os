@@ -14,7 +14,7 @@ use crate::{
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
-use starnix_logging::{log_info, log_warn, not_implemented};
+use starnix_logging::{log_warn, not_implemented};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode, off_t,
     open_flags::OpenFlags,
@@ -35,7 +35,6 @@ impl FsNodeOps for SysRqNode {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        log_info!("creating sysrq file from node {_node:?} w flags {_flags:?}");
         Ok(Box::new(SysRqFile {}))
     }
 

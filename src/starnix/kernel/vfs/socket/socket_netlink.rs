@@ -242,7 +242,7 @@ impl NetlinkSocketInner {
         }
 
         if self.passcred {
-            not_implemented!("TODO(https://fxbug.dev/128863): SCM_CREDENTIALS/SO_PASSCRED not fully implemented, returning unknown credentials for now");
+            not_implemented!("fxb/128863 SCM_CREDENTIALS/SO_PASSCRED");
             info.ancillary_data.push(AncillaryData::Unix(UnixControlData::unknown_creds()));
         }
 
@@ -466,7 +466,7 @@ impl SocketOps for BaseNetlinkSocket {
         };
 
         if destination.groups != 0 {
-            not_implemented!("BaseNetlinkSockets multicasting is stubbed");
+            not_implemented!("BaseNetlinkSockets multicasting");
             return Ok(data.drain());
         }
 
@@ -493,7 +493,7 @@ impl SocketOps for BaseNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("BaseNetlinkSocket::shutdown is stubbed");
+        not_implemented!("BaseNetlinkSocket::shutdown");
         Ok(())
     }
 
@@ -650,7 +650,7 @@ impl SocketOps for UEventNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("BaseNetlinkSocket::shutdown is stubbed");
+        not_implemented!("BaseNetlinkSocket::shutdown");
         Ok(())
     }
 
@@ -1110,7 +1110,7 @@ impl SocketOps for GenericNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("BaseNetlinkSocket::shutdown is stubbed");
+        not_implemented!("BaseNetlinkSocket::shutdown");
         Ok(())
     }
 

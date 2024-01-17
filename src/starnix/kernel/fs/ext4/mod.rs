@@ -20,7 +20,7 @@ use ext4_read_only::{
 };
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use starnix_logging::log_warn;
+use starnix_logging::not_implemented;
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::FileMode, ino_t, mount_flags::MountFlags,
     off_t, open_flags::OpenFlags, statfs, EXT4_SUPER_MAGIC,
@@ -161,8 +161,24 @@ impl FsNodeOps for ExtDirectory {
                 EntryType::RegularFile => Box::new(ExtFile::new(ext_node, name.to_owned())),
                 EntryType::Directory => Box::new(ExtDirectory { inner: Arc::new(ext_node) }),
                 EntryType::SymLink => Box::new(ExtSymlink { inner: ext_node }),
-                _ => {
-                    log_warn!("unhandled ext entry type {:?}", entry_type);
+                EntryType::Unknown => {
+                    not_implemented!("ext4 unknown entry type");
+                    Box::new(ExtFile::new(ext_node, name.to_owned()))
+                }
+                EntryType::CharacterDevice => {
+                    not_implemented!("ext4 character device");
+                    Box::new(ExtFile::new(ext_node, name.to_owned()))
+                }
+                EntryType::BlockDevice => {
+                    not_implemented!("ext4 block device");
+                    Box::new(ExtFile::new(ext_node, name.to_owned()))
+                }
+                EntryType::FIFO => {
+                    not_implemented!("ext4 fifo");
+                    Box::new(ExtFile::new(ext_node, name.to_owned()))
+                }
+                EntryType::Socket => {
+                    not_implemented!("ext4 socket");
                     Box::new(ExtFile::new(ext_node, name.to_owned()))
                 }
             };

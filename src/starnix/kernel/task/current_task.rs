@@ -664,7 +664,7 @@ impl CurrentTask {
         // TODO(https://fxbug.dev/132623): Starnix doesn't yet support running exec on a
         // multi-thread process.
         if self.thread_group.read().tasks_count() > 1 {
-            not_implemented!("exec on multithread process is not supported");
+            not_implemented!("exec on multithread process");
             return error!(EINVAL);
         }
 
@@ -951,7 +951,8 @@ impl CurrentTask {
                 ExceptionResult::Signal(SignalInfo::default(SIGBUS))
             }
             zx::sys::ZX_EXCP_SW_BREAKPOINT => ExceptionResult::Signal(SignalInfo::default(SIGTRAP)),
-            _ => {
+            unknown => {
+                not_implemented!("zircon exception", unknown);
                 log_error!("Unknown exception {:?}", report);
                 ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
             }

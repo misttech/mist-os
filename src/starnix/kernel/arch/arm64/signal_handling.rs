@@ -212,7 +212,7 @@ fn parse_sigcontext_data(
                     return error!(EINVAL);
                 }
 
-                not_implemented!("Skipping `EXTRA_MAGIC` section in `sigcontext`");
+                not_implemented!("sigcontext EXTRA_MAGIC");
                 offset += ESR_CONTEXT_SIZE as usize;
             }
 
