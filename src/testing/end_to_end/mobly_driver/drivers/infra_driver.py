@@ -108,7 +108,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
                 botanist_honeydew_translation_map,
             )
             if transport:
-                api_mobly.set_transport_in_config(config, transport)
+                api_mobly.set_transport(config, transport)
             return yaml.dump(config)
         except (IOError, OSError) as e:
             raise common.DriverException("Failed to open file: %")

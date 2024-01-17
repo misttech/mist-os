@@ -57,7 +57,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
     @patch("common.read_json_from_file")
     @patch("common.read_yaml_from_file")
     @patch("api_mobly.new_testbed_config")
-    @patch("api_mobly.set_transport_in_config")
+    @patch("api_mobly.set_transport")
     def test_generate_test_config_with_transport_success(
         self, mock_set_transport, *unused_args
     ):

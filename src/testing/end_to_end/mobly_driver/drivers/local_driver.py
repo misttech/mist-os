@@ -178,13 +178,14 @@ class LocalDriver(base_mobly_driver.BaseDriver):
                 config = common.read_yaml_from_file(self._config_path)
             except (IOError, OSError) as e:
                 raise common.DriverException(f"Local config parse failed: {e}")
+            api_mobly.set_ffx_path(config, self._ffx_path)
 
         if self._params_path:
             test_params = common.read_yaml_from_file(self._params_path)
             config = api_mobly.get_config_with_test_params(config, test_params)
 
         if transport:
-            api_mobly.set_transport_in_config(config, transport)
+            api_mobly.set_transport(config, transport)
 
         return yaml.dump(config)
 

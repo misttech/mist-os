@@ -67,10 +67,10 @@ def main():
     underlying Mobly test.
     """
     factory = driver_factory.DriverFactory(
+        ffx_path=os.path.abspath(args.ffx_path),
         multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
-        ffx_path=os.path.abspath(args.ffx_path),
     )
     driver = factory.get_driver()
 

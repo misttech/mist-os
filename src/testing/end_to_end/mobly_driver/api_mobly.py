@@ -17,6 +17,7 @@ LATEST_RES_SYMLINK_NAME: str = "latest"
 # https://osscs.corp.google.com/fuchsia/fuchsia/+/main:src/testing/end_to_end/mobly_controller/fuchsia_device.py
 MOBLY_CONTROLLER_FUCHSIA_DEVICE: str = "FuchsiaDevice"
 TRANSPORT_KEY: str = "transport"
+FFX_PATH_KEY: str = "ffx_path"
 
 MoblyConfigComponent = Dict[str, Any]
 
@@ -146,7 +147,7 @@ def new_testbed_config(
         del controller["type"]
         if api_infra.FUCHSIA_DEVICE == controller_type:
             # Add the "ffx_path" field for every Fuchsia device.
-            controller["ffx_path"] = ffx_path
+            controller[FFX_PATH_KEY] = ffx_path
             # Convert botanist key names to relative Honeydew key names for
             # fuchsia devices. This is done here so that Honeydew does not have
             # to do the conversions itself.
@@ -199,15 +200,43 @@ def get_config_with_test_params(
         raise ApiException("Unexpected Mobly config content: %s" % e)
 
 
-def set_transport_in_config(mobly_config: MoblyConfigComponent, transport: str):
-    """Updates a mobly config to ensure the fuchsia devices in the config use
-    the specified transport.
+def set_transport(mobly_config: MoblyConfigComponent, transport: str):
+    """Updates all fuchsia device configs to use the specified transport.
+
+    Overwrites the existing value if the key already exists.
 
     Args:
       mobly_config: Mobly config object to update.
       transport: Transport to set on fuchsia devices in the Mobly config.
     """
+    _set_per_device_config(mobly_config, TRANSPORT_KEY, transport)
+
+
+def set_ffx_path(mobly_config: MoblyConfigComponent, ffx_path: str):
+    """Updates all fuchsia device configs use the specified ffx_path.
+
+    Overwrites the existing value if the key already exists.
+
+    Args:
+      mobly_config: Mobly config object to update.
+      ffx_path: FFX path to set on fuchsia devices in the Mobly config.
+    """
+    _set_per_device_config(mobly_config, FFX_PATH_KEY, ffx_path)
+
+
+def _set_per_device_config(
+    mobly_config: MoblyConfigComponent, key: str, value: object
+):
+    """Updates all fuchsia device configs to contain a key-value pair.
+
+    Overwrites the existing value if the key already exists.
+
+    Args:
+      mobly_config: Mobly config object to update.
+      key: Device config key to update.
+      value: Config value to use.
+    """
     for testbed in mobly_config.get(keys.Config.key_testbed.value, []):
         controllers = testbed.get(keys.Config.key_testbed_controllers.value, {})
         for device in controllers.get(MOBLY_CONTROLLER_FUCHSIA_DEVICE, []):
-            device[TRANSPORT_KEY] = transport
+            device[key] = value

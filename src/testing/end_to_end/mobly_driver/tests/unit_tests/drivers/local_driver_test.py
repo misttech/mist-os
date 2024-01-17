@@ -58,18 +58,21 @@ class LocalDriverTest(unittest.TestCase):
     @patch("yaml.dump", return_value="yaml_str")
     @patch("common.read_yaml_from_file")
     @patch("api_mobly.get_config_with_test_params")
-    @patch("api_mobly.set_transport_in_config")
+    @patch("api_mobly.set_ffx_path")
+    @patch("api_mobly.set_transport")
     def test_generate_test_config_from_file_with_transport_success(
-        self, mock_set_transport, *unused_args
+        self, mock_set_transport, mock_set_ffx_path, *unused_args
     ):
         """Test case for successful config without params generation"""
         transport_name = "transport"
+        ffx_path = "ffx/path"
         driver = local_driver.LocalDriver(
-            ffx_path="ffx/path", log_path="log/path", config_path="config/path"
+            ffx_path=ffx_path, log_path="log/path", config_path="config/path"
         )
         ret = driver.generate_test_config(transport=transport_name)
 
         mock_set_transport.assert_called_with(ANY, transport_name)
+        mock_set_ffx_path.assert_called_with(ANY, ffx_path)
 
     @patch("builtins.print")
     @patch(
