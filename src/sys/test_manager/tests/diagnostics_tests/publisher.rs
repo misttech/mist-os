@@ -8,11 +8,10 @@ use {
     fidl::AsyncChannel,
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zircon as zx,
-    futures::{StreamExt, TryStreamExt},
+    futures::TryStreamExt,
     tracing::{debug, info},
 };
 
@@ -20,14 +19,11 @@ use {
 async fn main() -> Result<(), Error> {
     info!("Started diagnostics publisher");
     debug!("I'm a debug log from the publisher!");
-    let mut fs = ServiceFs::new();
     let _inspect_server_task = inspect_runtime::publish(
         component::inspector(),
         inspect_runtime::PublishOptions::default(),
     );
     component::health().set_ok();
-    fs.take_and_serve_directory_handle()?;
-    fasync::Task::spawn(fs.collect::<()>()).detach();
 
     match take_startup_handle(HandleInfo::new(HandleType::Lifecycle, 0)) {
         Some(lifecycle_handle) => {
