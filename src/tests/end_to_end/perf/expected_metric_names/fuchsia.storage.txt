@@ -1,3 +1,4 @@
+[no-summarize-metrics]
 fuchsia.storage: GitStatus/f2fs
 fuchsia.storage: GitStatus/fxfs
 fuchsia.storage: GitStatus/memfs

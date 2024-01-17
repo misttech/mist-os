@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/perf/test.gni")
 import("//src/storage/testing/driver_test_realm.gni")
 
 rustc_binary("fuchsia-storage-benchmarks") {
@@ -78,8 +79,7 @@ fuchsia_test_component("fuchsia-storage-benchmarks-component") {
   test_type = "device"
 }
 
-fuchsia_test_package("benchmarks") {
-  package_name = "storage-benchmarks"
+fuchsia_test_package("storage-benchmarks") {
   test_components = [ ":fuchsia-storage-benchmarks-component" ]
 
   # Prevent this test from being run as a target-side test, because it
@@ -124,7 +124,30 @@ fuchsia_test_package("fuchsia-storage-benchmarks-tests") {
   }
 }
 
+fuchsia_component_perf_test("storage_benchmarks") {
+  package = ":storage-benchmarks"
+  component_name = "storage-benchmarks"
+  expected_metric_names_filepath =
+      "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.storage.txt"
+  results_path_test_arg = "--output-fuchsiaperf"
+  test_type = "device"
+
+  # We don't enable this test on Astro because of the potential for it to cause extra flash wear
+  # on that device type.
+  environments = performance_testing_environments - [ astro_env ]
+}
+
+group("benchmarks") {
+  testonly = true
+  deps = [ ":storage_benchmarks" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":fuchsia-storage-benchmarks-tests" ]
+}
+
+group("benchmark-packages") {
+  testonly = true
+  deps = [ ":storage-benchmarks" ]
 }

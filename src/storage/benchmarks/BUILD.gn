@@ -48,7 +48,7 @@ fuchsia_unittest_package("storage-benchmarks-framework-tests") {
 group("benchmarks") {
   testonly = true
   deps = [
-    "fuchsia:benchmarks",
+    "fuchsia:benchmark-packages",
     "host:benchmarks",
     "starnix:benchmarks",
   ]

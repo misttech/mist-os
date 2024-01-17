@@ -1,4 +1,3 @@
 per-file netstack3_benchmarks_test.dart = file: /src/connectivity/network/netstack3/bench/OWNERS
 per-file netstack_iperf_test.dart = iyerm@google.com
-per-file storage_benchmarks_test.dart = file: /src/storage/OWNERS
 per-file starnix_gvisor_benchmarks.dart = file: /src/starnix/OWNERS

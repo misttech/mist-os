@@ -20,7 +20,6 @@ test_list = [
   # keep-sorted start
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
-  "storage_benchmarks_test",
   "tracing_microbenchmarks_test",
 
   # keep-sorted end
@@ -53,15 +52,6 @@ foreach(target_name, test_list) {
       nuc_env,
       vim3_env,
     ]
-
-    # We don't enable this test on Astro because of the potential for
-    # it to cause extra flash wear on that device type.
-    if (target_name == "storage_benchmarks_test") {
-      environments += [
-        sherlock_env,
-        nelson_env,
-      ]
-    }
   }
 }
 
@@ -197,7 +187,6 @@ if (is_host) {
     "fuchsia.netstack.iperf_benchmarks.localhost_udp.txt",
     "fuchsia.storage.starnix_data.txt",
     "fuchsia.storage.starnix_tmp.txt",
-    "fuchsia.storage.txt",
     "fuchsia.trace_records.rust.tracing_categories_disabled.txt",
     "fuchsia.trace_records.rust.tracing_disabled.txt",
 
@@ -237,7 +226,6 @@ _python_benchmarks += [
   "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
   "//src/starnix:benchmarks",
   "//src/storage/benchmarks/fuchsia:benchmarks",
-  "//src/storage/benchmarks/starnix:benchmarks",
   "//src/tests/benchmarks",
   "//src/tests/microbenchmarks:benchmarks",
 ]
@@ -259,9 +247,6 @@ group("test") {
     # These are used by flatland_benchmarks and input_latency_benchmarks
     "//src/ui/examples:flatland-examples",
 
-    # This is used by storage_benchmarks_test.
-    "//src/storage/benchmarks/fuchsia:benchmarks",
-
     # Used by the tracing_microbenchmarks test
     "//src/lib/trace/rust/bench",
   ]
@@ -282,7 +267,6 @@ group("tests_to_run_on_internal_builders") {
   testonly = true
 
   deps = [
-    ":storage_benchmarks_test($host_toolchain)",
     "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
     "//src/storage/benchmarks/fuchsia:benchmarks",
     "//src/tests/benchmarks:kernel_boot_benchmarks",

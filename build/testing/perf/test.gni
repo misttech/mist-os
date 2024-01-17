@@ -114,7 +114,11 @@ template("python_perf_test") {
 
       # Enabling on internal builders is primarily controlled by GN groups and not by the
       # "environments" list
-      environments = performance_testing_environments
+      if (defined(invoker.environments)) {
+        environments = invoker.environments
+      } else {
+        environments = performance_testing_environments
+      }
 
       transport = "fuchsia-controller"
       if (defined(invoker.transport)) {
