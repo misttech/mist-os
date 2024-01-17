@@ -30,6 +30,7 @@ library_headers("headers") {
     headers += [
       "lib/ld/remote-abi-heap.h",
       "lib/ld/remote-abi-stub.h",
+      "lib/ld/remote-abi.h",
       "lib/ld/remote-load-module.h",
     ]
 

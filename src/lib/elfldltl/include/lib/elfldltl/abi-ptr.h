@@ -87,6 +87,12 @@ struct AbiPtr {
     return AbiPtr{Traits::template FromAddress<Elf, T>(address), std::in_place};
   }
 
+  // Like `reinterpret_cast<Other*>(this->get())`.
+  template <typename Other>
+  constexpr AbiPtr<Other, Elf, Traits> Reinterpret() const {
+    return AbiPtr<Other, Elf, Traits>::FromAddress(address());
+  }
+
   constexpr explicit operator bool() const { return *this != AbiPtr{}; }
 
   constexpr bool operator==(const AbiPtr& other) const {

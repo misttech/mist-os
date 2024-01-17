@@ -8,6 +8,7 @@
 #include <lib/ld/abi.h>
 #include <lib/ld/remote-abi-heap.h>
 #include <lib/ld/remote-abi-stub.h>
+#include <lib/ld/remote-abi.h>
 #include <lib/ld/remote-load-module.h>
 #include <lib/ld/testing/test-vmo.h>
 #include <lib/zx/job.h>
@@ -70,7 +71,6 @@ void LdRemoteProcessTests::Needed(std::initializer_list<std::string_view> names)
 
 void LdRemoteProcessTests::Load(std::string_view executable_name) {
   using RemoteModule = RemoteLoadModule<>;
-  using AbiHeap = RemoteAbiHeap<elfldltl::Elf<>, elfldltl::RemoteAbiTraits>;
 
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
@@ -138,20 +138,16 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   auto& modules = decode_result->modules;
   ASSERT_FALSE(modules.empty());
 
-  RemoteAbiHeapLayout abi_layout{abi_stub.data_size()};
   RemoteModule& loaded_stub = modules[decode_result->predecoded_positions[kStub]];
-  // TODO(https://fxbug.dev/318041873): Do the passive ABI layout in the stub
-  // here.
-
-  // Create the AbiHeap, by modifying the stub module so its mutable segment is
-  // replaced by a longer ConstantSegment whose VMO the AbiHeap writes into.
-  auto abi_heap = AbiHeap::Create(diag, abi_stub.data_size(), loaded_stub, std::move(abi_layout));
-  ASSERT_TRUE(abi_heap.is_ok()) << abi_heap.status_string();
+  RemoteAbi<> remote_abi;
+  zx::result<> abi_result = remote_abi.Init(diag, abi_stub, loaded_stub, modules);
+  ASSERT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
   EXPECT_TRUE(RemoteModule::AllocateModules(diag, modules, root_vmar().borrow()));
   EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules));
 
-  // TODO(https://fxbug.dev/318041873): Finish filling out passive ABI here.
+  abi_result = std::move(remote_abi).Finish(abi_stub, loaded_stub, modules);
+  EXPECT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
   EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
 
