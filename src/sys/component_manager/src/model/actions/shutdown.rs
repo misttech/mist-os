@@ -70,6 +70,12 @@ async fn shutdown_component(
             // TODO: Put `self` in a "shutting down" state so that if it creates
             // new instances after this point, they are created in a shut down
             // state.
+            //
+            // NOTE: we cannot register a `StopAction { shutdown: true }` action because
+            // that would be overridden by any concurrent `StopAction { shutdown: false }`.
+            // More over, for reasons detailed in
+            // https://fxrev.dev/I8ccfa1deed368f2ccb77cde0d713f3af221f7450, an in-progress
+            // Shutdown action will block Stop actions, so registering the latter will deadlock.
             target.component.stop_instance_internal(true).await?;
         }
         ComponentRef::Child(_) => {
