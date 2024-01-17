@@ -155,8 +155,7 @@ pub mod tests {
         assert_matches::assert_matches,
         cm_rust::{Availability, UseEventStreamDecl, UseSource},
         cm_rust_testing::ComponentDeclBuilder,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
-        fuchsia_zircon as zx,
+        fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt},
         moniker::{ChildName, Moniker, MonikerBase},
         std::fmt::Debug,
@@ -464,7 +463,7 @@ pub mod tests {
             ActionKey::Start,
             // The mocked action must return a result, even though the result is not used
             // by the Destroy action.
-            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, ActionError>,
+            Ok(()) as Result<(), ActionError>,
         )
         .await;
     }
@@ -496,10 +495,8 @@ pub mod tests {
         component_a.blocking_task_group().spawn(fut);
 
         let mock_action_key = ActionKey::Start;
-        let (mock_action, mut mock_action_unblocker) = MockAction::new(
-            mock_action_key.clone(),
-            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, ActionError>,
-        );
+        let (mock_action, mut mock_action_unblocker) =
+            MockAction::new(mock_action_key.clone(), Ok(()) as Result<(), ActionError>);
 
         // Spawn a mock action on 'a' that stalls
         {
@@ -522,7 +519,7 @@ pub mod tests {
             // Check the reference count on the notifier of the mock action
             let rx = &actions.rep[&mock_action_key];
             let rx = rx
-                .downcast_ref::<ActionNotifier<fsys::StartResult>>()
+                .downcast_ref::<ActionNotifier<()>>()
                 .expect("action notifier has unexpected type");
             let refcount = rx.refcount.load(Ordering::Relaxed);
 

@@ -31,8 +31,7 @@ use {
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
     serve_processargs::NamespaceBuilder,
@@ -67,7 +66,7 @@ impl StartAction {
 
 #[async_trait]
 impl Action for StartAction {
-    type Output = fsys::StartResult;
+    type Output = ();
     async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
         do_start(
             component,
@@ -99,7 +98,7 @@ async fn do_start(
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     numbered_handles: Vec<fprocess::HandleInfo>,
     additional_namespace_entries: Vec<NamespaceEntry>,
-) -> Result<fsys::StartResult, StartActionError> {
+) -> Result<(), StartActionError> {
     // Resolve the component and find the runner to use.
     let (runner, resolved_component) = {
         // Obtain the runner declaration under a short lock, as `open_runner` may lock the
@@ -181,7 +180,7 @@ async fn start_component(
     decl: ComponentDecl,
     mut pending_runtime: ComponentRuntime,
     start_context: StartContext,
-) -> Result<fsys::StartResult, StartActionError> {
+) -> Result<(), StartActionError> {
     let _actions = component.lock_actions().await;
     let mut state = component.lock_state().await;
     let mut execution = component.lock_execution().await;
@@ -259,18 +258,19 @@ async fn start_component(
         ))
         .await;
 
-    Ok(fsys::StartResult::Started)
+    Ok(())
 }
 
-/// Returns `Some(Result)` if `start` should return early due to any of the following:
-/// - The component instance is destroyed.
-/// - The component instance is shut down.
-/// - The component instance is already started.
+/// Determines if `start` should return early. Returns the following values:
+/// - None: `start` should not return early because the component is not currently running
+/// - Some(Ok(())): `start` should return early because the component has already been started
+/// - Some(Err(err)): `start` should return early because it will be unable to start the component
+/// due to `err` (for example, perhaps the component is destroyed or shut down).
 pub fn should_return_early(
     component: &InstanceState,
     execution: &ExecutionState,
     moniker: &Moniker,
-) -> Option<Result<fsys::StartResult, StartActionError>> {
+) -> Option<Result<(), StartActionError>> {
     match component {
         InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Resolved(_) => {}
         InstanceState::Destroyed => {
@@ -280,7 +280,7 @@ pub fn should_return_early(
     if execution.is_shut_down() {
         Some(Err(StartActionError::InstanceShutDown { moniker: moniker.clone() }))
     } else if execution.runtime.is_some() {
-        Some(Ok(fsys::StartResult::AlreadyStarted))
+        Some(Ok(()))
     } else {
         None
     }
@@ -512,7 +512,7 @@ mod tests {
         async_trait::async_trait,
         cm_rust::ComponentDecl,
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder},
-        fidl_fuchsia_sys2 as fsys, fuchsia, fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt},
         moniker::Moniker,
         routing::resolving::ComponentAddress,
@@ -562,13 +562,12 @@ mod tests {
             )])
             .await;
 
-        let start_result = ActionSet::register(
+        ActionSet::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, vec![], vec![]),
         )
         .await
         .unwrap();
-        assert_eq!(start_result, fsys::StartResult::Started);
 
         // Wait until the action in the hook is done.
         hook_done_receiver.next().await.unwrap();
@@ -627,13 +626,12 @@ mod tests {
             )])
             .await;
 
-        let start_result = ActionSet::register(
+        ActionSet::register(
             child.clone(),
             StartAction::new(StartReason::Debug, None, vec![], vec![]),
         )
         .await
         .unwrap();
-        assert_eq!(start_result, fsys::StartResult::Started);
 
         // Wait until the action in the hook is done.
         hook_done_receiver.next().await.unwrap();
@@ -807,10 +805,7 @@ mod tests {
             let mut es = ExecutionState::new();
             es.runtime = Some(ComponentRuntime::new(StartReason::Debug, None, None));
             assert!(!es.is_shut_down());
-            assert_matches!(
-                should_return_early(&InstanceState::New, &es, &m),
-                Some(Ok(fsys::StartResult::AlreadyStarted))
-            );
+            assert_matches!(should_return_early(&InstanceState::New, &es, &m), Some(Ok(())));
         }
 
         // Check for shut_down:
@@ -827,24 +822,15 @@ mod tests {
     async fn check_already_started() {
         let (_test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
-        assert_eq!(
-            ActionSet::register(
-                child.clone(),
-                StartAction::new(StartReason::Debug, None, vec![], vec![])
-            )
-            .await
-            .expect("failed to start child"),
-            fsys::StartResult::Started
-        );
+        ActionSet::register(
+            child.clone(),
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        )
+        .await
+        .expect("failed to start child");
 
-        assert_eq!(
-            ActionSet::register(
-                child.clone(),
-                StartAction::new(StartReason::Debug, None, vec![], vec![])
-            )
-            .await
-            .expect("failed to start child"),
-            fsys::StartResult::AlreadyStarted
-        );
+        let m = Moniker::try_from(vec!["TEST_CHILD_NAME"]).unwrap();
+        let execution = child.lock_execution().await;
+        assert_matches!(should_return_early(&InstanceState::New, &execution, &m), Some(Ok(())));
     }
 }

@@ -69,7 +69,7 @@ use {
     },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
     fuchsia_component::client,
     fuchsia_zircon::{self as zx},
     futures::{
@@ -984,7 +984,7 @@ impl ComponentInstance {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         numbered_handles: Vec<fprocess::HandleInfo>,
         additional_namespace_entries: Vec<NamespaceEntry>,
-    ) -> Result<fsys::StartResult, ActionError> {
+    ) -> Result<(), ActionError> {
         // Skip starting a component instance that was already started. It's important to bail out
         // here so we don't waste time starting eager children more than once.
         {
@@ -1033,7 +1033,7 @@ impl ComponentInstance {
                 err: Box::new(e),
             }),
         })?;
-        Ok(fsys::StartResult::Started)
+        Ok(())
     }
 
     /// Starts a list of instances, and any eager children they may return.
@@ -1048,10 +1048,7 @@ impl ComponentInstance {
                     component.start(&StartReason::Eager, None, vec![], vec![]).await
                 })
                 .collect();
-            join_all(futures)
-                .await
-                .into_iter()
-                .fold(Ok(fsys::StartResult::Started), |acc, r| acc.and_then(|_| r))?;
+            join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))?;
             Ok(())
         };
         Box::pin(f)

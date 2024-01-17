@@ -30,8 +30,8 @@ use {
     cm_types::Name,
     fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     moniker::{ChildName, Moniker, MonikerBase},
     sandbox::Dict,
@@ -151,14 +151,9 @@ async fn bind_concurrent() {
     // Unblock the start hook, then check the result of both starts.
     unblocker.try_send(()).unwrap();
 
-    // The first and second start results must:
-    // * be the same
-    // * be successful
-    // * indicate that the component was just started
-    let first_result = first_start.await.expect("first start failed");
-    let second_result = second_start.await.expect("second start failed");
-    assert_eq!(first_result, fsys::StartResult::Started);
-    assert_eq!(first_result, second_result);
+    // The first and second start results must both be successful.
+    first_start.await.expect("first start failed");
+    second_start.await.expect("second start failed");
 
     // Verify that the component was started only once.
     mock_runner.wait_for_urls(&["test:///system_resolved"]).await;
