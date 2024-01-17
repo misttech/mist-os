@@ -669,6 +669,24 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroMergeBoth) {
   RelroTest<Elf>({C, RO, C}, {C}, {}, true);
 }
 
+template <class Segment>
+class CantMergeSegmentWrapper : public Segment {
+ public:
+  using Segment::Segment;
+  template <class Other>
+  constexpr std::false_type CanMergeWith(const Other& other) const {
+    return {};
+  }
+};
+
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroCantMergeSegmentWrapper) {
+  using Elf = typename TestFixture::Elf;
+
+  RelroTest<Elf, CantMergeSegmentWrapper>({RO, C}, {C, C}, {});
+  RelroTest<Elf, CantMergeSegmentWrapper>({C, RO, C}, {C, C, C}, {});
+  RelroTest<Elf, CantMergeSegmentWrapper>({C, RO}, {C, C}, {});
+}
+
 TYPED_TEST(ElfldltlLoadTests, ApplyRelroCantMerge) {
   using Elf = typename TestFixture::Elf;
   using Phdr = typename Elf::Phdr;
@@ -703,6 +721,43 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroCantMerge) {
     ASSERT_TRUE(std::holds_alternative<ConstantSegment>(segments[1]));
     auto expected_flags = elfldltl::PhdrBase::kRead | (!merge_ro ? elfldltl::PhdrBase::kWrite : 0);
     EXPECT_EQ(std::get<ConstantSegment>(segments[1]).flags(), expected_flags);
+  }
+}
+
+template <class Segment>
+class CantReplaceSegmentWrapper : public Segment {
+ public:
+  using Segment::Segment;
+  constexpr std::false_type CanReplace() const { return {}; }
+};
+
+TYPED_TEST(ElfldltlLoadTests, ApplyRelroCantReplaceSegmentWrapper) {
+  using Elf = typename TestFixture::Elf;
+  using Phdr = typename Elf::Phdr;
+
+  Phdr phdrs[] = {
+      {.type = elfldltl::ElfPhdrType::kLoad, .filesz = kPageSize, .memsz = kPageSize},
+      {.type = elfldltl::ElfPhdrType::kLoad,
+       .offset = kPageSize,
+       .vaddr = kPageSize,
+       .filesz = kPageSize,
+       .memsz = kPageSize},
+  };
+
+  phdrs[0].flags = elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kExecute;
+  phdrs[1].flags = elfldltl::PhdrBase::kRead | elfldltl::PhdrBase::kWrite;
+  Phdr relro = {.type = elfldltl::ElfPhdrType::kRelro, .vaddr = kPageSize, .memsz = kPageSize};
+
+  std::string error;
+  auto diag = elfldltl::OneStringDiagnostics(error);
+
+  RelroTestLoadInfo<Elf, CantReplaceSegmentWrapper> load_info;
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
+                                    load_info.GetPhdrObserver(kPageSize)));
+
+  for (bool merge_ro : {true, false}) {
+    EXPECT_FALSE(load_info.ApplyRelro(diag, relro, kPageSize, merge_ro));
+    EXPECT_EQ(error, "Cannot split segment to apply PT_GNU_RELRO protections");
   }
 }
 

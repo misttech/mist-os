@@ -102,6 +102,10 @@ struct LoadSegmentTypes {
       return {};
     }
 
+    // Similar to `CanMergeWith`, this hook adds a constraint to replacing one
+    // segment with another segment.
+    constexpr std::true_type CanReplace() const { return {}; }
+
     constexpr std::true_type readable() const { return {}; }
 
     constexpr std::true_type writable() const { return {}; }

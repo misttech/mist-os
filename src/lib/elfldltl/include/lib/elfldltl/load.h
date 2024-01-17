@@ -552,6 +552,10 @@ class LoadInfo {
       // repeating the iterator dereference and the std::get from the variant.
       typename Container<Segment>::iterator it, const SegmentType& segment,  //
       size_type relro_size, bool merge_ro) {
+    if (!segment.CanReplace()) {
+      return diagnostics.FormatError("Cannot split segment to apply PT_GNU_RELRO protections");
+    }
+
     auto [relro_segment, split_segment] = SplitRelro(segment, relro_size, merge_ro);
 
     auto merge = [this](auto it1, auto it2) {
