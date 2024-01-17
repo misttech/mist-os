@@ -217,6 +217,31 @@ pub async fn remove_route<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
     result_fut.await
 }
 
+/// Dispatches `authenticate_for_interface` on either the `RouteSetV4` or
+/// `RouteSetV6` proxy.
+pub async fn authenticate_for_interface<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
+    route_set: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
+    credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
+) -> Result<Result<(), fnet_routes_admin::AuthenticateForInterfaceError>, fidl::Error> {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct AuthenticateForInterfaceInput<'a, I: FidlRouteAdminIpExt + FidlRouteIpExt> {
+        route_set: &'a <I::RouteSetMarker as ProtocolMarker>::Proxy,
+        credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
+    }
+
+    let IpInvariant(result_fut) = I::map_ip(
+        AuthenticateForInterfaceInput { route_set, credential },
+        |AuthenticateForInterfaceInput { route_set, credential }| {
+            IpInvariant(Either::Left(route_set.authenticate_for_interface(credential)))
+        },
+        |AuthenticateForInterfaceInput { route_set, credential }| {
+            IpInvariant(Either::Right(route_set.authenticate_for_interface(credential)))
+        },
+    );
+    result_fut.await
+}
+
 /// GenericOverIp version of RouteSetV{4, 6}Request.
 #[derive(GenericOverIp, Debug)]
 #[generic_over_ip(I, Ip)]

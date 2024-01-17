@@ -28,6 +28,7 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_ext as fposix_socket_ext;
 use fidl_fuchsia_posix_socket_packet as fposix_socket_packet;
 use fidl_fuchsia_posix_socket_raw as fposix_socket_raw;
+use fnet_interfaces_admin::GrantForInterfaceAuthorization;
 use fuchsia_zircon as zx;
 
 use anyhow::{anyhow, Context as _};
@@ -1011,6 +1012,11 @@ impl<'a> TestInterface<'a> {
     /// Returns the interface's control handle.
     pub fn control(&self) -> &fnet_interfaces_ext::admin::Control {
         &self.control
+    }
+
+    /// Returns the authorization token for this interface.
+    pub async fn get_authorization(&self) -> Result<GrantForInterfaceAuthorization> {
+        Ok(self.control.get_authorization_for_interface().await?)
     }
 
     /// Connects to fuchsia.net.stack in this interface's realm.

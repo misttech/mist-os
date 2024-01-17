@@ -547,6 +547,15 @@ async fn does_not_crash_with_overlapping_subnet_route<
         .expect("connect to routes-admin V4");
     let route_set = fnet_routes_ext::admin::new_route_set::<Ipv4>(&set_provider)
         .expect("new route set should succeed");
+
+    let client_interface = client_interfaces.iter().last().expect("should have client interface");
+    let grant = client_interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fidl_fuchsia_net_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<Ipv4>(&route_set, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
     assert!(fnet_routes_ext::admin::add_route::<Ipv4>(
         &route_set,
         &dhcp_added_route.try_into().expect("convert to FIDL route")
@@ -558,11 +567,7 @@ async fn does_not_crash_with_overlapping_subnet_route<
     let route_to_use_for_flushing = fnet_routes_ext::Route {
         destination: net_subnet_v4!("199.198.197.0/32"),
         action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
-            outbound_interface: client_interfaces
-                .iter()
-                .last()
-                .expect("should have client interface")
-                .id(),
+            outbound_interface: client_interface.id(),
             next_hop: None,
         }),
         properties: fnet_routes_ext::RouteProperties {
