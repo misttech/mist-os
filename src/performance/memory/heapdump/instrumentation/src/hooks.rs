@@ -81,7 +81,13 @@ pub extern "C" fn __scudo_realloc_allocate_hook(
     with_profiler_and_call_site(|profiler, thread_data, timestamp, compressed_stack_trace| {
         // Has the memory block been reallocated in-place?
         if old_ptr == new_ptr {
-            // TODO(b/315316408): Update the size associated to this memory block.
+            profiler.update_allocation(
+                thread_data,
+                old_ptr as u64,
+                size as u64,
+                compressed_stack_trace,
+                timestamp.into_nanos(),
+            );
         } else {
             profiler.record_allocation(
                 thread_data,
