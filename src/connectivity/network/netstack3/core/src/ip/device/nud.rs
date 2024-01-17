@@ -34,7 +34,7 @@ use crate::{
         link::{LinkAddress, LinkDevice, LinkUnicastAddress},
         AnyDevice, DeviceIdContext, StrongId,
     },
-    error::{AddressResolutionFailed, NotFoundError},
+    error::AddressResolutionFailed,
     Instant,
 };
 
@@ -1792,53 +1792,8 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, BC: LinkResolutionContext<D>>:
         source: DynamicNeighborUpdateSource,
     );
 
-    /// Sets a static neighbor entry for the neighbor.
-    ///
-    /// If no entry exists, a new one may be created. If an entry already
-    /// exists, it will be updated with the provided link address and set
-    /// to be a static entry.
-    ///
-    /// Dynamic updates for the neighbor will be ignored for static entries.
-    fn set_static_neighbor(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
-        // disallow the address with all host bits equal to 0, and the
-        // subnet broadcast addresses with all host bits equal to 1.
-        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
-        neighbor: SpecifiedAddr<I::Addr>,
-        // TODO(https://fxbug.dev/134102): Wrap in `UnicastAddr`.
-        link_addr: D::Address,
-    );
-
-    /// Deletes a static or dynamic neighbor entry.
-    fn delete_neighbor(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
-        // disallow subnet and subnet broadcast addresses.
-        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
-        neighbor: SpecifiedAddr<I::Addr>,
-    ) -> Result<(), NotFoundError>;
-
     /// Clears the neighbor table.
     fn flush(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
-
-    /// Resolve the link-address of a device's neighbor.
-    fn resolve_link_addr(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &Self::DeviceId,
-        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
-        // disallow subnet and subnet broadcast addresses.
-        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
-        dst: &SpecifiedAddr<I::Addr>,
-    ) -> LinkResolutionResult<
-        D::Address,
-        <<BC as LinkResolutionContext<D>>::Notifier as LinkResolutionNotifier<D>>::Observer,
-    >;
 
     /// Send an IP packet to the neighbor.
     ///
@@ -2136,73 +2091,6 @@ impl<
         );
     }
 
-    fn set_static_neighbor(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &CC::DeviceId,
-        neighbor: SpecifiedAddr<I::Addr>,
-        link_address: D::Address,
-    ) {
-        self.with_nud_state_mut_and_sender_ctx(
-            device_id,
-            |NudState { neighbors, last_gc: _ }, core_ctx| match neighbors.entry(neighbor) {
-                Entry::Occupied(mut occupied) => {
-                    let previous =
-                        core::mem::replace(occupied.get_mut(), NeighborState::Static(link_address));
-                    let event_state = occupied.get().to_event_state();
-                    if event_state != previous.to_event_state() {
-                        bindings_ctx.on_event(Event::changed(
-                            device_id,
-                            event_state,
-                            neighbor,
-                            bindings_ctx.now(),
-                        ));
-                    }
-                    match previous {
-                        NeighborState::Dynamic(entry) => {
-                            entry.cancel_timer_and_complete_resolution(
-                                core_ctx,
-                                bindings_ctx,
-                                device_id,
-                                neighbor,
-                                link_address,
-                            );
-                        }
-                        NeighborState::Static(_) => {}
-                    }
-                }
-                Entry::Vacant(vacant) => {
-                    let state = vacant.insert(NeighborState::Static(link_address));
-                    let event = Event::added(
-                        device_id,
-                        state.to_event_state(),
-                        neighbor,
-                        bindings_ctx.now(),
-                    );
-                    bindings_ctx.on_event(event);
-                }
-            },
-        );
-    }
-
-    fn delete_neighbor(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &CC::DeviceId,
-        neighbor: SpecifiedAddr<I::Addr>,
-    ) -> Result<(), NotFoundError> {
-        self.with_nud_state_mut(device_id, |NudState { neighbors, last_gc: _ }, _config| {
-            match neighbors.remove(&neighbor).ok_or(NotFoundError)? {
-                NeighborState::Dynamic(mut entry) => {
-                    entry.cancel_timer(bindings_ctx, device_id, neighbor);
-                }
-                NeighborState::Static(_) => {}
-            }
-            bindings_ctx.on_event(Event::removed(device_id, neighbor, bindings_ctx.now()));
-            Ok(())
-        })
-    }
-
     fn flush(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
         self.with_nud_state_mut(device_id, |NudState { neighbors, last_gc: _ }, _config| {
             neighbors.drain().for_each(|(neighbor, state)| {
@@ -2215,54 +2103,6 @@ impl<
                 bindings_ctx.on_event(Event::removed(device_id, neighbor, bindings_ctx.now()));
             });
         });
-    }
-
-    fn resolve_link_addr(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &CC::DeviceId,
-        dst: &SpecifiedAddr<I::Addr>,
-    ) -> LinkResolutionResult<D::Address, <BC::Notifier as LinkResolutionNotifier<D>>::Observer>
-    {
-        let (result, do_multicast_solicit) =
-            self.with_nud_state_mut(device, |NudState { neighbors, last_gc: _ }, core_ctx| {
-                match neighbors.entry(*dst) {
-                    Entry::Vacant(entry) => {
-                        // Initiate link resolution.
-                        let (notifier, observer) = BC::Notifier::new();
-                        let state = entry.insert(NeighborState::Dynamic(
-                            DynamicNeighborState::Incomplete(Incomplete::new_with_notifier(
-                                core_ctx,
-                                bindings_ctx,
-                                device,
-                                *dst,
-                                notifier,
-                            )),
-                        ));
-                        bindings_ctx.on_event(Event::added(
-                            device,
-                            state.to_event_state(),
-                            *dst,
-                            bindings_ctx.now(),
-                        ));
-                        (LinkResolutionResult::Pending(observer), true)
-                    }
-                    Entry::Occupied(e) => match e.into_mut() {
-                        NeighborState::Static(link_address) => {
-                            (LinkResolutionResult::Resolved(*link_address), false)
-                        }
-                        NeighborState::Dynamic(e) => {
-                            e.resolve_link_addr(core_ctx, bindings_ctx, device, *dst)
-                        }
-                    },
-                }
-            });
-
-        if do_multicast_solicit {
-            self.send_neighbor_solicitation(bindings_ctx, &device, *dst, /* multicast */ None);
-        }
-
-        result
     }
 
     fn send_ip_packet_to_neighbor<S>(
@@ -2635,7 +2475,7 @@ mod tests {
                 FakeCtxWithCoreCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork,
                 FakeNetworkLinks, FakeTimerCtxExt as _, WrappedFakeCoreCtx,
             },
-            InstantContext, SendFrameContext as _,
+            CtxPair, InstantContext, SendFrameContext as _,
         },
         device::{
             ethernet::EthernetLinkDevice,
@@ -2646,7 +2486,7 @@ mod tests {
         },
         ip::{
             device::{
-                slaac::SlaacConfiguration,
+                nud::api::NeighborApi, slaac::SlaacConfiguration,
                 testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt as _,
                 Ipv6DeviceConfigurationUpdate,
             },
@@ -3275,15 +3115,12 @@ mod tests {
         link_address: FakeLinkAddress,
         expected_event: ExpectedEvent,
     ) {
-        NudHandler::set_static_neighbor(
-            core_ctx,
-            bindings_ctx,
-            &FakeLinkDeviceId,
-            ip_address,
-            link_address,
-        );
+        let mut ctx = CtxPair { core_ctx, bindings_ctx };
+        NeighborApi::new(&mut ctx)
+            .insert_static_entry(&FakeLinkDeviceId, *ip_address, link_address)
+            .unwrap();
         assert_eq!(
-            bindings_ctx.take_events(),
+            ctx.bindings_ctx.take_events(),
             [Event {
                 device: FakeLinkDeviceId,
                 addr: ip_address,
@@ -3291,7 +3128,7 @@ mod tests {
                     ExpectedEvent::Added => EventKind::Added(EventState::Static(link_address)),
                     ExpectedEvent::Changed => EventKind::Changed(EventState::Static(link_address)),
                 },
-                at: bindings_ctx.now(),
+                at: ctx.bindings_ctx.now(),
             }],
         );
     }
@@ -3317,11 +3154,13 @@ mod tests {
         core_ctx: &mut FakeCoreCtxImpl<I>,
         bindings_ctx: &mut FakeBindingsCtxImpl<I>,
     ) {
-        NudHandler::delete_neighbor(core_ctx, bindings_ctx, &FakeLinkDeviceId, I::LOOKUP_ADDR1)
+        let mut ctx = CtxPair { core_ctx, bindings_ctx };
+        NeighborApi::new(&mut ctx)
+            .remove_entry(&FakeLinkDeviceId, *I::LOOKUP_ADDR1)
             .expect("neighbor entry should exist");
         assert_eq!(
-            bindings_ctx.take_events(),
-            [Event::removed(&FakeLinkDeviceId, I::LOOKUP_ADDR1, bindings_ctx.now())],
+            ctx.bindings_ctx.take_events(),
+            [Event::removed(&FakeLinkDeviceId, I::LOOKUP_ADDR1, ctx.bindings_ctx.now())],
         );
     }
 
@@ -4569,17 +4408,14 @@ mod tests {
     #[test_case(InitialState::Probe; "probe neighbor")]
     #[test_case(InitialState::Unreachable; "unreachable neighbor")]
     fn resolve_cached_linked_addr<I: Ip + TestIpExt>(initial_state: InitialState) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeCoreCtxImpl::<I>::new());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_eq!(core_ctx.inner.take_frames(), []);
+        let mut ctx = FakeCtxWithCoreCtx::with_core_ctx(FakeCoreCtxImpl::<I>::new());
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_eq!(ctx.core_ctx.inner.take_frames(), []);
 
-        let _ = init_neighbor_in_state(&mut core_ctx, &mut bindings_ctx, initial_state);
+        let _ = init_neighbor_in_state(&mut ctx.core_ctx, &mut ctx.bindings_ctx, initial_state);
 
         let link_addr = assert_matches!(
-            NudHandler::resolve_link_addr(
-                &mut core_ctx,
-                &mut bindings_ctx,
+            NeighborApi::new(ctx.as_mut()).resolve_link_addr(
                 &FakeLinkDeviceId,
                 &I::LOOKUP_ADDR1,
             ),
@@ -4588,12 +4424,12 @@ mod tests {
         assert_eq!(link_addr, LINK_ADDR1);
         if initial_state == InitialState::Stale {
             assert_eq!(
-                bindings_ctx.take_events(),
+                ctx.bindings_ctx.take_events(),
                 [Event::changed(
                     &FakeLinkDeviceId,
                     EventState::Dynamic(EventDynamicState::Delay(LINK_ADDR1)),
                     I::LOOKUP_ADDR1,
-                    bindings_ctx.now(),
+                    ctx.bindings_ctx.now(),
                 )],
             );
         }
@@ -4608,15 +4444,12 @@ mod tests {
     #[test_case(ResolutionSuccess::Confirmation; "incomplete entry timed out")]
     #[test_case(ResolutionSuccess::StaticEntryAdded; "incomplete entry removed from table")]
     fn dynamic_neighbor_resolution_success<I: Ip + TestIpExt>(reason: ResolutionSuccess) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeCoreCtxImpl::<I>::new());
+        let mut ctx = FakeCtxWithCoreCtx::with_core_ctx(FakeCoreCtxImpl::<I>::new());
 
         let observers = (0..10)
             .map(|_| {
                 let observer = assert_matches!(
-                    NudHandler::resolve_link_addr(
-                        &mut core_ctx,
-                        &mut bindings_ctx,
+                    NeighborApi::new(ctx.as_mut()).resolve_link_addr(
                         &FakeLinkDeviceId,
                         &I::LOOKUP_ADDR1,
                     ),
@@ -4626,14 +4459,14 @@ mod tests {
                 observer
             })
             .collect::<Vec<_>>();
-
+        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
         let max_multicast_solicit = core_ctx.inner.max_multicast_solicit().get();
 
         // We should have initialized an incomplete neighbor and sent a neighbor probe
         // to attempt resolution.
         assert_neighbor_state(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             DynamicNeighborState::Incomplete(Incomplete {
                 transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                 pending_frames: VecDeque::new(),
@@ -4643,14 +4476,14 @@ mod tests {
             }),
             Some(ExpectedEvent::Added),
         );
-        assert_neighbor_probe_sent(&mut core_ctx, /* multicast */ None);
+        assert_neighbor_probe_sent(core_ctx, /* multicast */ None);
 
         match reason {
             ResolutionSuccess::Confirmation => {
                 // Complete neighbor resolution with an incoming neighbor confirmation.
                 NudHandler::handle_neighbor_update(
-                    &mut core_ctx,
-                    &mut bindings_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     &FakeLinkDeviceId,
                     I::LOOKUP_ADDR1,
                     LINK_ADDR1,
@@ -4661,8 +4494,8 @@ mod tests {
                 );
                 let now = bindings_ctx.now();
                 assert_neighbor_state(
-                    &core_ctx,
-                    &mut bindings_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     DynamicNeighborState::Reachable(Reachable {
                         link_address: LINK_ADDR1,
                         last_confirmed_at: now,
@@ -4671,12 +4504,7 @@ mod tests {
                 );
             }
             ResolutionSuccess::StaticEntryAdded => {
-                init_static_neighbor(
-                    &mut core_ctx,
-                    &mut bindings_ctx,
-                    LINK_ADDR1,
-                    ExpectedEvent::Changed,
-                );
+                init_static_neighbor(core_ctx, bindings_ctx, LINK_ADDR1, ExpectedEvent::Changed);
                 assert_eq!(
                     core_ctx.outer.nud.neighbors.get(&I::LOOKUP_ADDR1),
                     Some(&NeighborState::Static(LINK_ADDR1))
@@ -4699,15 +4527,12 @@ mod tests {
     #[test_case(ResolutionFailure::Timeout; "incomplete entry timed out")]
     #[test_case(ResolutionFailure::Removed; "incomplete entry removed from table")]
     fn dynamic_neighbor_resolution_failure<I: Ip + TestIpExt>(reason: ResolutionFailure) {
-        let FakeCtxWithCoreCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtxWithCoreCtx::with_core_ctx(FakeCoreCtxImpl::<I>::new());
+        let mut ctx = FakeCtxWithCoreCtx::with_core_ctx(FakeCoreCtxImpl::<I>::new());
 
         let observers = (0..10)
             .map(|_| {
                 let observer = assert_matches!(
-                    NudHandler::resolve_link_addr(
-                        &mut core_ctx,
-                        &mut bindings_ctx,
+                    NeighborApi::new(ctx.as_mut()).resolve_link_addr(
                         &FakeLinkDeviceId,
                         &I::LOOKUP_ADDR1,
                     ),
@@ -4718,13 +4543,14 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
+        let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
         let max_multicast_solicit = core_ctx.inner.max_multicast_solicit().get();
 
         // We should have initialized an incomplete neighbor and sent a neighbor probe
         // to attempt resolution.
         assert_neighbor_state(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             DynamicNeighborState::Incomplete(Incomplete {
                 transmit_counter: NonZeroU16::new(max_multicast_solicit - 1),
                 pending_frames: VecDeque::new(),
@@ -4734,7 +4560,7 @@ mod tests {
             }),
             Some(ExpectedEvent::Added),
         );
-        assert_neighbor_probe_sent(&mut core_ctx, /* multicast */ None);
+        assert_neighbor_probe_sent(core_ctx, /* multicast */ None);
 
         match reason {
             ResolutionFailure::Timeout => {
@@ -4746,7 +4572,7 @@ mod tests {
                         bindings_ctx.trigger_timers_for(
                             retrans_timer,
                             handle_timer_helper_with_sc_ref_mut(
-                                &mut core_ctx,
+                                core_ctx,
                                 TimerHandler::handle_timer
                             ),
                         ),
@@ -4760,11 +4586,11 @@ mod tests {
             }
             ResolutionFailure::Removed => {
                 // Flush the neighbor table so the entry is removed.
-                NudHandler::flush(&mut core_ctx, &mut bindings_ctx, &FakeLinkDeviceId);
+                NudHandler::flush(core_ctx, bindings_ctx, &FakeLinkDeviceId);
             }
         }
 
-        assert_neighbor_removed_with_ip(&mut core_ctx, &mut bindings_ctx, I::LOOKUP_ADDR1);
+        assert_neighbor_removed_with_ip(core_ctx, bindings_ctx, I::LOOKUP_ADDR1);
         // Each observer should have been notified of link resolution failure.
         for observer in observers {
             assert_eq!(*observer.lock(), Some(Err(AddressResolutionFailed)));

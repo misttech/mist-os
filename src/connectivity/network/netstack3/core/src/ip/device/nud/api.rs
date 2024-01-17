@@ -8,17 +8,18 @@ use core::marker::PhantomData;
 
 use net_types::{
     ip::{Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6},
-    SpecifiedAddr, UnicastAddr, UnicastAddress as _, Witness as _,
+    SpecifiedAddr, UnicastAddress as _, Witness as _,
 };
 use thiserror::Error;
 
 use crate::{
-    context::{ContextPair, InstantBindingsTypes},
+    context::{ContextPair, EventContext as _, InstantBindingsTypes, InstantContext as _},
     device::{link::LinkDevice, DeviceIdContext},
     error::NotFoundError,
     ip::device::nud::{
-        LinkResolutionContext, LinkResolutionNotifier, LinkResolutionResult, NeighborStateInspect,
-        NudBindingsContext, NudContext, NudHandler,
+        DynamicNeighborState, Entry, Event, Incomplete, LinkResolutionContext,
+        LinkResolutionNotifier, LinkResolutionResult, NeighborState, NeighborStateInspect,
+        NudBindingsContext, NudContext, NudHandler, NudState,
     },
 };
 
@@ -110,7 +111,10 @@ where
     /// complete.
     pub fn resolve_link_addr(
         &mut self,
-        device: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
+        device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
+    // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+    // disallow subnet and subnet broadcast addresses.
+    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
         dst: &SpecifiedAddr<I::Addr>,
     ) -> LinkResolutionResult<
         D::Address,
@@ -119,7 +123,53 @@ where
         >>::Observer,
     >{
         let (core_ctx, bindings_ctx) = self.contexts();
-        NudHandler::<I, D, _>::resolve_link_addr(core_ctx, bindings_ctx, device, dst)
+        let (result, do_multicast_solicit) = core_ctx.with_nud_state_mut(
+            device_id,
+            |NudState { neighbors, last_gc: _ }, core_ctx| {
+                match neighbors.entry(*dst) {
+                    Entry::Vacant(entry) => {
+                        // Initiate link resolution.
+                        let (notifier, observer) =
+                            <C::BindingsContext as LinkResolutionContext<D>>::Notifier::new();
+                        let state = entry.insert(NeighborState::Dynamic(
+                            DynamicNeighborState::Incomplete(Incomplete::new_with_notifier(
+                                core_ctx,
+                                bindings_ctx,
+                                device_id,
+                                *dst,
+                                notifier,
+                            )),
+                        ));
+                        bindings_ctx.on_event(Event::added(
+                            device_id,
+                            state.to_event_state(),
+                            *dst,
+                            bindings_ctx.now(),
+                        ));
+                        (LinkResolutionResult::Pending(observer), true)
+                    }
+                    Entry::Occupied(e) => match e.into_mut() {
+                        NeighborState::Static(link_address) => {
+                            (LinkResolutionResult::Resolved(*link_address), false)
+                        }
+                        NeighborState::Dynamic(e) => {
+                            e.resolve_link_addr(core_ctx, bindings_ctx, device_id, *dst)
+                        }
+                    },
+                }
+            },
+        );
+
+        if do_multicast_solicit {
+            core_ctx.send_neighbor_solicitation(
+                bindings_ctx,
+                &device_id,
+                *dst,
+                /* multicast */ None,
+            );
+        }
+
+        result
     }
 
     /// Flush neighbor table entries.
@@ -128,37 +178,97 @@ where
         NudHandler::<I, D, _>::flush(core_ctx, bindings_ctx, device)
     }
 
-    /// Inserts a static neighbor entry for a neighbor.
+    /// Sets a static neighbor entry for the neighbor.
+    ///
+    /// If no entry exists, a new one may be created. If an entry already
+    /// exists, it will be updated with the provided link address and set to be
+    /// a static entry.
+    ///
+    /// Dynamic updates for the neighbor will be ignored for static entries.
     pub fn insert_static_entry(
         &mut self,
-        device: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
-        addr: I::Addr,
-        link_addr: D::Address,
+        device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
+        neighbor: I::Addr,
+        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // disallow the address with all host bits equal to 0, and the
+        // subnet broadcast addresses with all host bits equal to 1.
+        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        link_address: D::Address,
     ) -> Result<(), StaticNeighborInsertionError> {
-        let link_addr = UnicastAddr::new(link_addr)
-            .ok_or(StaticNeighborInsertionError::MacAddressNotUnicast)?;
-        let addr =
-            validate_neighbor_addr(addr).ok_or(StaticNeighborInsertionError::IpAddressInvalid)?;
+        if !link_address.is_unicast() {
+            return Err(StaticNeighborInsertionError::MacAddressNotUnicast);
+        }
+        let neighbor = validate_neighbor_addr(neighbor)
+            .ok_or(StaticNeighborInsertionError::IpAddressInvalid)?;
         let (core_ctx, bindings_ctx) = self.contexts();
-        Ok(NudHandler::<I, D, _>::set_static_neighbor(
-            core_ctx,
-            bindings_ctx,
-            device,
-            addr,
-            *link_addr,
-        ))
+
+        core_ctx.with_nud_state_mut_and_sender_ctx(
+            device_id,
+            |NudState { neighbors, last_gc: _ }, core_ctx| match neighbors.entry(neighbor) {
+                Entry::Occupied(mut occupied) => {
+                    let previous =
+                        core::mem::replace(occupied.get_mut(), NeighborState::Static(link_address));
+                    let event_state = occupied.get().to_event_state();
+                    if event_state != previous.to_event_state() {
+                        bindings_ctx.on_event(Event::changed(
+                            device_id,
+                            event_state,
+                            neighbor,
+                            bindings_ctx.now(),
+                        ));
+                    }
+                    match previous {
+                        NeighborState::Dynamic(entry) => {
+                            entry.cancel_timer_and_complete_resolution(
+                                core_ctx,
+                                bindings_ctx,
+                                device_id,
+                                neighbor,
+                                link_address,
+                            );
+                        }
+                        NeighborState::Static(_) => {}
+                    }
+                }
+                Entry::Vacant(vacant) => {
+                    let state = vacant.insert(NeighborState::Static(link_address));
+                    let event = Event::added(
+                        device_id,
+                        state.to_event_state(),
+                        neighbor,
+                        bindings_ctx.now(),
+                    );
+                    bindings_ctx.on_event(event);
+                }
+            },
+        );
+        Ok(())
     }
 
     /// Remove a static or dynamic neighbor table entry.
     pub fn remove_entry(
         &mut self,
-        device: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
-        addr: I::Addr,
+        device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
+        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // disallow the address with all host bits equal to 0, and the
+        // subnet broadcast addresses with all host bits equal to 1.
+        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        neighbor: I::Addr,
     ) -> Result<(), NeighborRemovalError> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        let addr = validate_neighbor_addr(addr).ok_or(NeighborRemovalError::IpAddressInvalid)?;
-        NudHandler::<I, D, _>::delete_neighbor(core_ctx, bindings_ctx, device, addr)
-            .map_err(Into::into)
+        let neighbor =
+            validate_neighbor_addr(neighbor).ok_or(NeighborRemovalError::IpAddressInvalid)?;
+
+        core_ctx.with_nud_state_mut(device_id, |NudState { neighbors, last_gc: _ }, _config| {
+            match neighbors.remove(&neighbor).ok_or(NotFoundError)? {
+                NeighborState::Dynamic(mut entry) => {
+                    entry.cancel_timer(bindings_ctx, device_id, neighbor);
+                }
+                NeighborState::Static(_) => {}
+            }
+            bindings_ctx.on_event(Event::removed(device_id, neighbor, bindings_ctx.now()));
+            Ok(())
+        })
     }
 
     /// Provides access to NUD state via a `visitor`.

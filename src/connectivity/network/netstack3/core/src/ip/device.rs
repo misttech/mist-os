@@ -2418,22 +2418,21 @@ mod tests {
     use crate::{
         context::testutil::FakeInstant,
         device::{
-            ethernet::MaxEthernetFrameSize,
+            ethernet::{EthernetLinkDevice, MaxEthernetFrameSize},
             testutil::{update_ipv4_configuration, update_ipv6_configuration},
             DeviceId,
         },
         ip::{
             device::{
-                nud::{LinkResolutionResult, NudHandler},
-                state::Lifetime,
+                nud::LinkResolutionResult, state::Lifetime,
                 testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt,
             },
             gmp::GmpDelayedReportTimerId,
         },
         state::StackStateBuilder,
         testutil::{
-            assert_empty, Ctx, DispatchedEvent, FakeBindingsCtx, FakeCoreCtx, FakeCtx,
-            TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, Ctx, DispatchedEvent, FakeBindingsCtx, FakeCtx, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
         TimerId,
@@ -2441,31 +2440,34 @@ mod tests {
 
     #[test]
     fn enable_disable_ipv4() {
-        let FakeCtx { core_ctx, mut bindings_ctx } =
-            Ctx::new_with_builder(StackStateBuilder::default());
-        let core_ctx = &core_ctx;
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+
         let local_mac = Ipv4::FAKE_CONFIG.local_mac;
         let ethernet_device_id = crate::device::add_ethernet_device(
-            core_ctx,
+            &ctx.core_ctx,
             local_mac,
             MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = ethernet_device_id.clone().into();
 
-        assert_eq!(bindings_ctx.take_events()[..], []);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
-        let set_ipv4_enabled =
-            |ctx: &mut crate::testutil::FakeBindingsCtx, enabled, expected_prev| {
-                Ipv4::set_ip_device_enabled(core_ctx, ctx, &device_id, enabled, expected_prev)
-            };
+        let set_ipv4_enabled = |ctx: &mut FakeCtx, enabled, expected_prev| {
+            Ipv4::set_ip_device_enabled(
+                &ctx.core_ctx,
+                &mut ctx.bindings_ctx,
+                &device_id,
+                enabled,
+                expected_prev,
+            )
+        };
 
-        set_ipv4_enabled(&mut bindings_ctx, true, false);
+        set_ipv4_enabled(&mut ctx, true, false);
 
         let weak_device_id = device_id.downgrade();
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
                 device: weak_device_id.clone(),
                 ip_enabled: true,
@@ -2473,42 +2475,38 @@ mod tests {
         );
 
         let addr = SpecifiedAddr::new(net_ip_v4!("192.0.2.1")).expect("addr should be unspecified");
-        let mac = net_mac!("01:23:45:67:89:ab");
-        NudHandler::<Ipv4, _, _>::set_static_neighbor(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
-            &ethernet_device_id,
-            addr,
-            mac,
-        );
+        let mac = net_mac!("02:23:45:67:89:ab");
+
+        ctx.core_api()
+            .neighbor::<Ipv4, EthernetLinkDevice>()
+            .insert_static_entry(&ethernet_device_id, *addr, mac)
+            .unwrap();
         assert_eq!(
-            bindings_ctx.take_events(),
+            ctx.bindings_ctx.take_events(),
             [DispatchedEvent::NeighborIpv4(nud::Event {
                 device: ethernet_device_id.downgrade(),
                 addr,
                 kind: nud::EventKind::Added(nud::EventState::Static(mac)),
-                at: bindings_ctx.now(),
+                at: ctx.bindings_ctx.now(),
             })]
         );
         assert_matches!(
-            NudHandler::<Ipv4, _, _>::resolve_link_addr(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+            ctx.core_api().neighbor::<Ipv4, EthernetLinkDevice>().resolve_link_addr(
                 &ethernet_device_id,
                 &addr,
             ),
             LinkResolutionResult::Resolved(got) => assert_eq!(got, mac)
         );
 
-        set_ipv4_enabled(&mut bindings_ctx, false, true);
+        set_ipv4_enabled(&mut ctx, false, true);
         assert_eq!(
-            bindings_ctx.take_events(),
+            ctx.bindings_ctx.take_events(),
             [
                 DispatchedEvent::NeighborIpv4(nud::Event {
                     device: ethernet_device_id.downgrade(),
                     addr,
                     kind: nud::EventKind::Removed,
-                    at: bindings_ctx.now(),
+                    at: ctx.bindings_ctx.now(),
                 }),
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
                     device: weak_device_id.clone(),
@@ -2519,22 +2517,22 @@ mod tests {
 
         // Assert that static ARP entries are flushed on link down.
         nud::testutil::assert_neighbor_unknown::<Ipv4, _, _, _>(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
             ethernet_device_id,
             addr,
         );
 
         let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
         add_ipv4_addr_subnet(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.bindings_ctx,
             &device_id,
             ipv4_addr_subnet.clone(),
             Ipv4AddrConfig::default(),
         )
         .expect("failed to add IPv4 Address");
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressAdded {
                 device: weak_device_id.clone(),
                 addr: ipv4_addr_subnet.clone(),
@@ -2543,9 +2541,9 @@ mod tests {
             })]
         );
 
-        set_ipv4_enabled(&mut bindings_ctx, true, false);
+        set_ipv4_enabled(&mut ctx, true, false);
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
                     device: weak_device_id.clone(),
@@ -2559,20 +2557,20 @@ mod tests {
             ]
         );
         // Verify that a redundant "enable" does not generate any events.
-        set_ipv4_enabled(&mut bindings_ctx, true, true);
-        assert_eq!(bindings_ctx.take_events()[..], []);
+        set_ipv4_enabled(&mut ctx, true, true);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
         let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
         set_ipv4_addr_properties(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.bindings_ctx,
             &device_id,
             ipv4_addr_subnet.addr(),
             valid_until,
         )
         .expect("set properties should succeed");
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressPropertiesChanged {
                 device: weak_device_id.clone(),
                 addr: ipv4_addr_subnet.addr(),
@@ -2582,18 +2580,18 @@ mod tests {
 
         // Verify that a redundant "set properties" does not generate any events.
         set_ipv4_addr_properties(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.bindings_ctx,
             &device_id,
             ipv4_addr_subnet.addr(),
             valid_until,
         )
         .expect("set properties should succeed");
-        assert_eq!(bindings_ctx.take_events()[..], []);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
-        set_ipv4_enabled(&mut bindings_ctx, false, true);
+        set_ipv4_enabled(&mut ctx, false, true);
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
                     device: weak_device_id.clone(),
@@ -2607,22 +2605,27 @@ mod tests {
             ]
         );
         // Verify that a redundant "disable" does not generate any events.
-        set_ipv4_enabled(&mut bindings_ctx, false, false);
-        assert_eq!(bindings_ctx.take_events()[..], []);
+        set_ipv4_enabled(&mut ctx, false, false);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
     }
 
     fn enable_ipv6_device(
-        core_ctx: &mut &FakeCoreCtx,
-        bindings_ctx: &mut FakeBindingsCtx,
+        ctx: &mut FakeCtx,
         device_id: &DeviceId<FakeBindingsCtx>,
         ll_addr: AddrSubnet<Ipv6Addr, LinkLocalAddr<UnicastAddr<Ipv6Addr>>>,
         expected_prev: bool,
     ) {
-        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, device_id, true, expected_prev);
+        Ipv6::set_ip_device_enabled(
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
+            device_id,
+            true,
+            expected_prev,
+        );
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(*core_ctx),
+                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
                 device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
@@ -2635,13 +2638,11 @@ mod tests {
 
     #[test]
     fn enable_disable_ipv6() {
-        let FakeCtx { core_ctx, mut bindings_ctx } =
-            Ctx::new_with_builder(StackStateBuilder::default());
-        let mut core_ctx = &core_ctx;
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
         let ethernet_device_id = crate::device::add_ethernet_device(
-            core_ctx,
+            &ctx.core_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
             DEFAULT_INTERFACE_METRIC,
@@ -2649,8 +2650,8 @@ mod tests {
         let device_id = ethernet_device_id.clone().into();
         let ll_addr = local_mac.to_ipv6_link_local();
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            &mut bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD and router
@@ -2670,16 +2671,13 @@ mod tests {
             },
         )
         .unwrap();
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_eq!(bindings_ctx.take_events()[..], []);
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
         // Enable the device and observe an auto-generated link-local address,
         // router solicitation and DAD for the auto-generated address.
-        let test_enable_device = |core_ctx: &mut &FakeCoreCtx,
-                                  bindings_ctx: &mut FakeBindingsCtx,
-                                  extra_group,
-                                  expected_prev| {
-            enable_ipv6_device(core_ctx, bindings_ctx, &device_id, ll_addr, expected_prev);
+        let test_enable_device = |ctx: &mut FakeCtx, extra_group, expected_prev| {
+            enable_ipv6_device(ctx, &device_id, ll_addr, expected_prev);
             let mut timers = vec![
                 (
                     TimerId(TimerIdInner::Ipv6Device(
@@ -2720,12 +2718,12 @@ mod tests {
                     ..,
                 ))
             }
-            bindings_ctx.timer_ctx().assert_timers_installed(timers);
+            ctx.bindings_ctx.timer_ctx().assert_timers_installed(timers);
         };
-        test_enable_device(&mut core_ctx, &mut bindings_ctx, None, false);
+        test_enable_device(&mut ctx, None, false);
         let weak_device_id = device_id.downgrade();
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
                     device: weak_device_id.clone(),
@@ -2744,8 +2742,8 @@ mod tests {
         let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
         assert_matches!(
             set_ipv6_addr_properties(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+                &mut ctx.bindings_ctx,
                 &device_id,
                 ll_addr.addr().into(),
                 valid_until,
@@ -2755,48 +2753,47 @@ mod tests {
 
         let addr =
             SpecifiedAddr::new(net_ip_v6!("2001:db8::1")).expect("addr should be unspecified");
-        let mac = net_mac!("01:23:45:67:89:ab");
-        NudHandler::<Ipv6, _, _>::set_static_neighbor(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
-            &ethernet_device_id,
-            addr,
-            mac,
-        );
+        let mac = net_mac!("02:23:45:67:89:ab");
+        ctx.core_api()
+            .neighbor::<Ipv6, _>()
+            .insert_static_entry(&ethernet_device_id, *addr, mac)
+            .unwrap();
         assert_eq!(
-            bindings_ctx.take_events(),
+            ctx.bindings_ctx.take_events(),
             [DispatchedEvent::NeighborIpv6(nud::Event {
                 device: ethernet_device_id.downgrade(),
                 addr,
                 kind: nud::EventKind::Added(nud::EventState::Static(mac)),
-                at: bindings_ctx.now(),
+                at: ctx.bindings_ctx.now(),
             })]
         );
         assert_matches!(
-            NudHandler::<Ipv6, _, _>::resolve_link_addr(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+            ctx.core_api().neighbor::<Ipv6, _>().resolve_link_addr(
                 &ethernet_device_id,
                 &addr,
             ),
             LinkResolutionResult::Resolved(got) => assert_eq!(got, mac)
         );
 
-        let test_disable_device = |core_ctx: &mut &FakeCoreCtx,
-                                   bindings_ctx: &mut FakeBindingsCtx,
-                                   expected_prev| {
-            Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, false, expected_prev);
-            bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let test_disable_device = |ctx: &mut FakeCtx, expected_prev| {
+            Ipv6::set_ip_device_enabled(
+                &ctx.core_ctx,
+                &mut ctx.bindings_ctx,
+                &device_id,
+                false,
+                expected_prev,
+            );
+            ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
         };
-        test_disable_device(&mut core_ctx, &mut bindings_ctx, true);
+        test_disable_device(&mut ctx, true);
         assert_eq!(
-            bindings_ctx.take_events(),
+            ctx.bindings_ctx.take_events(),
             [
                 DispatchedEvent::NeighborIpv6(nud::Event {
                     device: ethernet_device_id.downgrade(),
                     addr,
                     kind: nud::EventKind::Removed,
-                    at: bindings_ctx.now(),
+                    at: ctx.bindings_ctx.now(),
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
                     device: weak_device_id.clone(),
@@ -2811,7 +2808,7 @@ mod tests {
         );
 
         IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
             &device_id,
             |addrs, _core_ctx| {
                 assert_empty(addrs);
@@ -2820,21 +2817,21 @@ mod tests {
 
         // Assert that static NDP entry was removed on link down.
         nud::testutil::assert_neighbor_unknown::<Ipv6, _, _, _>(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
             ethernet_device_id,
             addr,
         );
 
         let multicast_addr = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS;
         join_ip_multicast::<Ipv6, _, _>(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.bindings_ctx,
             &device_id,
             multicast_addr,
         );
         add_ipv6_addr_subnet(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.bindings_ctx,
             &device_id,
             ll_addr.to_unicast().add_witness::<NonMappedAddr<_>>().unwrap(),
             Ipv6AddrManualConfig::default(),
@@ -2842,7 +2839,7 @@ mod tests {
         .expect("add MAC based IPv6 link-local address");
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
@@ -2851,7 +2848,7 @@ mod tests {
             HashSet::from([ll_addr.ipv6_unicast_addr()])
         );
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
                 device: weak_device_id.clone(),
                 addr: ll_addr.to_witness(),
@@ -2860,9 +2857,9 @@ mod tests {
             })]
         );
 
-        test_enable_device(&mut core_ctx, &mut bindings_ctx, Some(multicast_addr), false);
+        test_enable_device(&mut ctx, Some(multicast_addr), false);
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
                     device: weak_device_id.clone(),
@@ -2877,15 +2874,15 @@ mod tests {
         );
 
         set_ipv6_addr_properties(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.bindings_ctx,
             &device_id,
             ll_addr.addr().into(),
             valid_until,
         )
         .expect("set properties should succeed");
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressPropertiesChanged {
                 device: weak_device_id.clone(),
                 addr: ll_addr.addr().into(),
@@ -2895,19 +2892,19 @@ mod tests {
 
         // Verify that a redundant "set properties" does not generate any events.
         set_ipv6_addr_properties(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.bindings_ctx,
             &device_id,
             ll_addr.addr().into(),
             valid_until,
         )
         .expect("set properties should succeed");
-        assert_eq!(bindings_ctx.take_events()[..], []);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
-        test_disable_device(&mut core_ctx, &mut bindings_ctx, true);
+        test_disable_device(&mut ctx, true);
         // The address was manually added, don't expect it to be removed.
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
                     device: weak_device_id.clone(),
@@ -2922,12 +2919,12 @@ mod tests {
         );
 
         // Verify that a redundant "disable" does not generate any events.
-        test_disable_device(&mut core_ctx, &mut bindings_ctx, false);
-        assert_eq!(bindings_ctx.take_events()[..], []);
+        test_disable_device(&mut ctx, false);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
@@ -2938,14 +2935,14 @@ mod tests {
         );
 
         leave_ip_multicast::<Ipv6, _, _>(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.bindings_ctx,
             &device_id,
             multicast_addr,
         );
-        test_enable_device(&mut core_ctx, &mut bindings_ctx, None, false);
+        test_enable_device(&mut ctx, None, false);
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            ctx.bindings_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
                     device: weak_device_id.clone(),
@@ -2960,15 +2957,19 @@ mod tests {
         );
 
         // Verify that a redundant "enable" does not generate any events.
-        test_enable_device(&mut core_ctx, &mut bindings_ctx, None, true);
-        assert_eq!(bindings_ctx.take_events()[..], []);
+        test_enable_device(&mut ctx, None, true);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
+
+        // Disable device again so timers are cancelled.
+        test_disable_device(&mut ctx, true);
+        let _ = ctx.bindings_ctx.take_events();
     }
 
     #[test]
     fn notify_on_dad_failure_ipv6() {
-        let FakeCtx { core_ctx, mut bindings_ctx } =
-            Ctx::new_with_builder(StackStateBuilder::default());
-        let mut core_ctx = &core_ctx;
+        let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         bindings_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
         let device_id = crate::device::add_ethernet_device(
@@ -2980,7 +2981,7 @@ mod tests {
         .into();
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             core_ctx,
-            &mut bindings_ctx,
+            bindings_ctx,
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 dad_transmits: Some(NonZeroU8::new(1)),
@@ -3001,8 +3002,9 @@ mod tests {
         bindings_ctx.timer_ctx().assert_no_timers_installed();
         let ll_addr = local_mac.to_ipv6_link_local();
 
-        enable_ipv6_device(&mut core_ctx, &mut bindings_ctx, &device_id, ll_addr, false);
+        enable_ipv6_device(&mut ctx, &device_id, ll_addr, false);
         let weak_device_id = device_id.downgrade();
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
             bindings_ctx.take_events()[..],
             [
@@ -3022,7 +3024,7 @@ mod tests {
         let assigned_addr = AddrSubnet::new(net_ip_v6!("fe80::1"), 64).unwrap();
         add_ipv6_addr_subnet(
             &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            bindings_ctx,
             &device_id,
             assigned_addr,
             Ipv6AddrManualConfig::default(),
@@ -3044,7 +3046,7 @@ mod tests {
         assert_eq!(
             Ipv6DeviceHandler::remove_duplicate_tentative_address(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &device_id,
                 assigned_addr.ipv6_unicast_addr()
             ),
@@ -3071,6 +3073,9 @@ mod tests {
             HashSet::from([ll_addr.ipv6_unicast_addr()]),
             "manual addresses should be removed on DAD failure"
         );
+        // Disable device and take all events to cleanup references.
+        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, false, true);
+        let _ = ctx.bindings_ctx.take_events();
     }
 
     #[ip_test]

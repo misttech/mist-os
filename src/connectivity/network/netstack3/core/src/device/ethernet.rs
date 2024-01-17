@@ -1466,7 +1466,7 @@ mod tests {
         error::NotFoundError,
         ip::{
             device::{
-                nud::{self, api::NeighborApi, DynamicNeighborUpdateSource, LinkResolutionResult},
+                nud::{self, api::NeighborApi, DynamicNeighborUpdateSource},
                 slaac::SlaacConfiguration,
                 IpAddressId as _, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
             },
@@ -1638,39 +1638,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn set_static_neighbor(
-            &mut self,
-            _bindings_ctx: &mut FakeBindingsCtx,
-            _device_id: &Self::DeviceId,
-            _neighbor: SpecifiedAddr<Ipv6Addr>,
-            _link_addr: Mac,
-        ) {
-            unimplemented!()
-        }
-
-        fn delete_neighbor(
-            &mut self,
-            _bindings_ctx: &mut FakeBindingsCtx,
-            _device_id: &Self::DeviceId,
-            _neighbor: SpecifiedAddr<Ipv6Addr>,
-        ) -> Result<(), NotFoundError> {
-            unimplemented!()
-        }
-
         fn flush(&mut self, _bindings_ctx: &mut FakeBindingsCtx, _device_id: &Self::DeviceId) {
-            unimplemented!()
-        }
-
-        fn resolve_link_addr(
-            &mut self,
-            _bindings_ctx: &mut FakeBindingsCtx,
-            _device_id: &Self::DeviceId,
-            _dst: &SpecifiedAddr<Ipv6Addr>,
-        ) -> LinkResolutionResult<
-            Mac,
-            <<FakeBindingsCtx as LinkResolutionContext<EthernetLinkDevice>>::Notifier as
-                LinkResolutionNotifier<EthernetLinkDevice>>::Observer
-        >{
             unimplemented!()
         }
 

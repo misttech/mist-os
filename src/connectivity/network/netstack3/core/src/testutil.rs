@@ -104,21 +104,21 @@ pub mod context {
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
 /// A structure holding a core and a bindings context.
-// TODO(https://fxbug.dev/42083910): Remove this struct and alias
-// `crate::context::CtxPair` here instead.
 #[derive(Default, Clone)]
 pub struct ContextPair<CC, BT> {
     /// The core context.
     pub core_ctx: CC,
     /// The bindings context.
     // We put `bindings_ctx` after `core_ctx` to make sure that `core_ctx` is
-    // dropped before `bindings_ctx` so that the existence of strongly-referenced
-    // device IDs in `bindings_ctx` causes test failures, forcing proper cleanup
-    // of device IDs in our unit tests.
+    // dropped before `bindings_ctx` so that the existence of
+    // strongly-referenced device IDs in `bindings_ctx` causes test failures,
+    // forcing proper cleanup of device IDs in our unit tests.
     //
     // Note that if strongly-referenced (device) IDs exist when dropping the
     // primary reference, the primary reference's drop impl will panic. See
     // `crate::sync::PrimaryRc::drop` for details.
+    // TODO(https://fxbug.dev/320021524): disallow destructuring to actually
+    // uphold the intent above.
     pub bindings_ctx: BT,
 }
 

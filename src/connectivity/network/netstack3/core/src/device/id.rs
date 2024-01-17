@@ -152,11 +152,21 @@ impl<BT: DeviceLayerTypes> Debug for WeakDeviceId<BT> {
 /// use this device ID will never fail as a result of "unrecognized device"-like
 /// errors.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
+#[derivative(Eq(bound = ""), PartialEq(bound = ""), Hash(bound = ""))]
 #[allow(missing_docs)]
 pub enum DeviceId<BT: DeviceLayerTypes> {
     Ethernet(EthernetDeviceId<BT>),
     Loopback(LoopbackDeviceId<BT>),
+}
+
+impl<BT: DeviceLayerTypes> Clone for DeviceId<BT> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    fn clone(&self) -> Self {
+        match self {
+            Self::Ethernet(d) => Self::Ethernet(d.clone()),
+            Self::Loopback(d) => Self::Loopback(d.clone()),
+        }
+    }
 }
 
 impl<BT: DeviceLayerTypes> PartialEq<WeakDeviceId<BT>> for DeviceId<BT> {
@@ -309,11 +319,19 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BaseWeakDeviceId<T, BT> {
 /// Allows multiple device implementations to share the same shape for
 /// maintaining reference identifiers.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
+#[derivative(Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
 pub struct BaseDeviceId<T: DeviceStateSpec, BT: DeviceLayerTypes> {
     // NB: This is not a tuple struct because regular structs play nicer with
     // type aliases, which is how we use BaseDeviceId.
     rc: StrongRc<BaseDeviceState<T, BT>>,
+}
+
+impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Clone for BaseDeviceId<T, BT> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
+    fn clone(&self) -> Self {
+        let Self { rc } = self;
+        Self { rc: StrongRc::clone(rc) }
+    }
 }
 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> PartialEq<BaseWeakDeviceId<T, BT>>
