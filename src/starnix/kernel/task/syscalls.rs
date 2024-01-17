@@ -1722,7 +1722,7 @@ pub fn sys_syslog(
                 return error!(EINVAL);
             }
             let mut output_buffer =
-                UserBuffersOutputBuffer::new_at(current_task.mm(), address, length as usize)?;
+                UserBuffersOutputBuffer::new_at(current_task, address, length as usize)?;
             syslog.blocking_read(current_task, &mut output_buffer)
         }
         SyslogAction::ReadAll => {
@@ -1730,7 +1730,7 @@ pub fn sys_syslog(
                 return error!(EINVAL);
             }
             let mut output_buffer =
-                UserBuffersOutputBuffer::new_at(current_task.mm(), address, length as usize)?;
+                UserBuffersOutputBuffer::new_at(current_task, address, length as usize)?;
             syslog.read_all(&mut output_buffer)
         }
         SyslogAction::SizeUnread => syslog.size_unread(),

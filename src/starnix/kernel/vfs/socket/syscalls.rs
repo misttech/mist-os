@@ -443,7 +443,7 @@ fn recvmsg_internal(
     let info = socket_ops.recvmsg(
         current_task,
         file,
-        &mut UserBuffersOutputBuffer::new(current_task.mm(), iovec)?,
+        &mut UserBuffersOutputBuffer::new(current_task, iovec)?,
         flags,
         deadline,
     )?;
@@ -602,7 +602,7 @@ pub fn sys_recvfrom(
     let info = socket_ops.recvmsg(
         current_task,
         &file,
-        &mut UserBuffersOutputBuffer::new_at(current_task.mm(), user_buffer, buffer_length)?,
+        &mut UserBuffersOutputBuffer::new_at(current_task, user_buffer, buffer_length)?,
         flags,
         None,
     )?;
@@ -674,7 +674,7 @@ fn sendmsg_internal(
     socket_ops.sendmsg(
         current_task,
         file,
-        &mut UserBuffersInputBuffer::new(current_task.mm(), iovec)?,
+        &mut UserBuffersInputBuffer::new(current_task, iovec)?,
         dest_address,
         ancillary_data,
         flags,
@@ -752,7 +752,7 @@ pub fn sys_sendto(
 
     let dest_address =
         maybe_parse_socket_address(current_task, user_dest_address, dest_address_length as usize)?;
-    let mut data = UserBuffersInputBuffer::new_at(current_task.mm(), user_buffer, buffer_length)?;
+    let mut data = UserBuffersInputBuffer::new_at(current_task, user_buffer, buffer_length)?;
 
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EOPNOTSUPP))?;
     let socket_file = file.downcast_file::<SocketFile>().unwrap();

@@ -1986,6 +1986,11 @@ pub trait MemoryAccessor {
     fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
 }
 
+pub trait TaskMemoryAccessor: MemoryAccessor {
+    /// Returns the maximum valid address for this memory accessor.
+    fn maximum_valid_address(&self) -> UserAddress;
+}
+
 // TODO(https://fxbug.dev/129310): replace this with MaybeUninit::as_bytes_mut.
 #[inline]
 fn object_as_mut_bytes<T: FromBytes + Sized>(

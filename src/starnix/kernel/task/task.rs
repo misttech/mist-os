@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
+    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor},
     mutable_state::{state_accessor, state_implementation},
     signals::{SignalInfo, SignalState},
     task::{
@@ -1343,6 +1343,12 @@ impl MemoryAccessor for Task {
 
     fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.mm().vmo_zero(addr, length)
+    }
+}
+
+impl TaskMemoryAccessor for Task {
+    fn maximum_valid_address(&self) -> UserAddress {
+        self.mm().maximum_valid_user_address
     }
 }
 

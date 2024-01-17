@@ -9,7 +9,7 @@ use crate::{
     },
     execution::{create_zircon_process, TaskInfo},
     loader::{load_executable, resolve_executable, ResolvedElf},
-    mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
+    mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor},
     signals::{send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
         Kernel, PidTable, ProcessGroup, SeccompFilter, SeccompFilterContainer,
@@ -1589,6 +1589,12 @@ impl MemoryAccessor for CurrentTask {
 
     fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.mm().vmo_zero(addr, length)
+    }
+}
+
+impl TaskMemoryAccessor for CurrentTask {
+    fn maximum_valid_address(&self) -> UserAddress {
+        self.mm().maximum_valid_user_address
     }
 }
 
