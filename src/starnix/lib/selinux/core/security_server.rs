@@ -97,25 +97,20 @@ impl SecurityServer {
 
     /// Applies the supplied policy to the security server.
     pub fn load_policy(&self, binary_policy: Vec<u8>) -> Result<(), anyhow::Error> {
-        // TODO(b/318647906, b/319442240): Re-enabled policy parse-and-validate after investigating
-        // flake in affected tests.
-        if false {
-            // Parse the supplied policy, and reject the load operation if it is
-            // malformed or invalid.
-            let (parsed, binary) = parse_policy_by_value(binary_policy)?;
-            let parsed = parsed.validate()?;
+        // Parse the supplied policy, and reject the load operation if it is
+        // malformed or invalid.
+        let (parsed, binary) = parse_policy_by_value(binary_policy)?;
+        let parsed = parsed.validate()?;
 
-            // Bundle the binary policy together with a parsed copy for the
-            // [`SecurityServer`] to use to answer queries. This will fail if the
-            // supplied policy cannot be parsed due to being malformed, or if the
-            // parsed policy is not valid.
-            let policy = Arc::new(LoadedPolicy { parsed, binary });
+        // Bundle the binary policy together with a parsed copy for the
+        // [`SecurityServer`] to use to answer queries. This will fail if the
+        // supplied policy cannot be parsed due to being malformed, or if the
+        // parsed policy is not valid.
+        let policy = Arc::new(LoadedPolicy { parsed, binary });
 
-            // Replace any existing policy.
-            // TODO(b/315531456): Update the policy load count for "status".
-            self.state.lock().policy = Some(policy);
-        }
-
+        // Replace any existing policy.
+        // TODO(b/315531456): Update the policy load count for "status".
+        self.state.lock().policy = Some(policy);
         Ok(())
     }
 
@@ -259,9 +254,6 @@ mod tests {
         assert_eq!(fake_security_server.is_fake(), true);
     }
 
-    // TODO(b/318647906, b/319442240): Re-enabled policy parse-and-validate after investigating
-    // flake in affected tests.
-    #[ignore]
     #[fuchsia::test]
     fn loaded_policy_can_be_retrieved() {
         let policy_bytes = MINIMAL_BINARY_POLICY.to_vec();
@@ -270,9 +262,6 @@ mod tests {
         assert_eq!(MINIMAL_BINARY_POLICY, security_server.get_binary_policy().as_slice());
     }
 
-    // TODO(b/318647906, b/319442240): Re-enabled policy parse-and-validate after investigating
-    // flake in affected tests.
-    #[ignore]
     #[fuchsia::test]
     fn loaded_policy_is_validated() {
         let not_really_a_policy = "not a real policy".as_bytes().to_vec();
