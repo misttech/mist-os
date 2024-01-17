@@ -130,7 +130,9 @@ mod tests {
     use super::*;
     use crate::{
         logs::{
-            container::LogsArtifactsContainer, multiplex::PinStream, stored_message::StoredMessage,
+            container::LogsArtifactsContainer,
+            multiplex::PinStream,
+            stored_message::{GenericStoredMessage, StructuredStoredMessage},
         },
         testing::TEST_IDENTITY,
     };
@@ -198,7 +200,7 @@ mod tests {
         assert_eq!(cursor.next().await, None);
     }
 
-    fn fake_message_bytes(timestamp: i64) -> StoredMessage {
+    fn fake_message_bytes(timestamp: i64) -> GenericStoredMessage {
         let record = Record {
             timestamp,
             severity: StreamSeverity::Debug,
@@ -211,7 +213,7 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer);
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StoredMessage::structured(encoded.to_vec(), Default::default())
+        StructuredStoredMessage::new(encoded.to_vec(), Default::default())
     }
 
     fn fake_message(timestamp: i64) -> LogsData {

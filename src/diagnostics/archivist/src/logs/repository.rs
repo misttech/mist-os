@@ -13,6 +13,7 @@ use crate::{
         container::LogsArtifactsContainer,
         debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY},
         multiplex::{Multiplexer, MultiplexerHandle},
+        stored_message::StoredMessage,
     },
 };
 use diagnostics_data::LogsData;
@@ -90,13 +91,13 @@ impl LogsRepository {
             };
             messages.sort_by_key(|m| m.timestamp());
             for message in messages {
-                container.ingest_message(message);
+                container.ingest_message(Box::new(message));
             }
 
             let res = kernel_logger
                 .listen()
                 .try_for_each(|message| async {
-                    container.ingest_message(message);
+                    container.ingest_message(Box::new(message));
                     Ok(())
                 })
                 .await;
@@ -372,7 +373,7 @@ impl MultiplexerBroker {
 mod tests {
     use {
         super::*,
-        crate::logs::stored_message::StoredMessage,
+        crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage},
         diagnostics_log_encoding::{
             encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
         },
@@ -432,7 +433,7 @@ mod tests {
         }
     }
 
-    fn make_message(msg: &str, timestamp: i64) -> StoredMessage {
+    fn make_message(msg: &str, timestamp: i64) -> GenericStoredMessage {
         let record = Record {
             timestamp,
             severity: StreamSeverity::Debug,
@@ -446,6 +447,6 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer);
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StoredMessage::structured(encoded.to_vec(), Default::default())
+        StructuredStoredMessage::new(encoded.to_vec(), Default::default())
     }
 }

@@ -6,7 +6,7 @@
 
 use crate::{
     identity::ComponentIdentity,
-    logs::{error::LogsError, stats::LogStreamStats, stored_message::StoredMessage},
+    logs::{error::LogsError, stats::LogStreamStats, stored_message::DebugLogStoredMessage},
 };
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity};
 use fidl::prelude::*;
@@ -74,12 +74,12 @@ impl<K: DebugLog> DebugLogBridge<K> {
         DebugLogBridge { debug_log, stats }
     }
 
-    fn read_log(&mut self) -> Result<StoredMessage, zx::Status> {
+    fn read_log(&mut self) -> Result<DebugLogStoredMessage, zx::Status> {
         let record = self.debug_log.read()?;
-        Ok(StoredMessage::debuglog(record, Arc::clone(&self.stats)))
+        Ok(DebugLogStoredMessage::new(record, Arc::clone(&self.stats)))
     }
 
-    pub fn existing_logs(&mut self) -> Result<Vec<StoredMessage>, zx::Status> {
+    pub fn existing_logs(&mut self) -> Result<Vec<DebugLogStoredMessage>, zx::Status> {
         let mut result = vec![];
         loop {
             match self.read_log() {
@@ -91,7 +91,7 @@ impl<K: DebugLog> DebugLogBridge<K> {
         Ok(result)
     }
 
-    pub fn listen(self) -> impl Stream<Item = Result<StoredMessage, zx::Status>> {
+    pub fn listen(self) -> impl Stream<Item = Result<DebugLogStoredMessage, zx::Status>> {
         unfold((true, self), move |(mut is_readable, mut klogger)| async move {
             loop {
                 if !is_readable {
@@ -175,7 +175,7 @@ pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Opt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::testing::*;
+    use crate::logs::{stored_message::StoredMessage, testing::*};
 
     use fidl_fuchsia_diagnostics as fdiagnostics;
     use fidl_fuchsia_logger::LogMessage;

@@ -6,58 +6,118 @@ use crate::{
     identity::ComponentIdentity,
     logs::{debuglog, stats::LogStreamStats},
 };
-use anyhow::format_err;
+use anyhow::{format_err, Result};
 use diagnostics_data::{LogsData, Severity};
 use diagnostics_message::error::MessageError;
 use diagnostics_message::{LoggerMessage, METADATA_SIZE};
 use fuchsia_zircon as zx;
-use std::{convert::TryInto, sync::Arc};
+use std::{convert::TryInto, fmt::Debug, sync::Arc};
+
+pub type GenericStoredMessage = Box<dyn StoredMessage>;
+
+pub trait StoredMessage: Debug + Send + Sync {
+    fn size(&self) -> usize;
+    fn severity(&self) -> Severity;
+    fn timestamp(&self) -> i64;
+    fn parse(&self, source: &ComponentIdentity) -> Result<LogsData, anyhow::Error>;
+}
 
 #[derive(Debug)]
-pub struct StoredMessage {
-    bytes: MessageBytes,
+pub struct LegacyStoredMessage {
+    msg: LoggerMessage,
     stats: Arc<LogStreamStats>,
 }
 
-#[derive(Debug)]
-enum MessageBytes {
-    Legacy(LoggerMessage),
-    Structured { bytes: Box<[u8]>, severity: Severity, timestamp: i64 },
-    DebugLog { msg: zx::sys::zx_log_record_t, severity: Severity, size: usize },
-    Invalid { err: MessageError, severity: Severity, timestamp: i64 },
+impl LegacyStoredMessage {
+    pub fn new(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
+        match buf.as_slice().try_into() {
+            Ok(msg) => Box::new(Self { msg, stats }),
+            Err(err) => Box::new(InvalidStoredMessage::new(err, stats)),
+        }
+    }
 }
 
-impl StoredMessage {
-    pub fn legacy(buf: &[u8], stats: Arc<LogStreamStats>) -> Self {
-        match buf.try_into() {
-            Ok(msg) => StoredMessage { bytes: MessageBytes::Legacy(msg), stats },
-            Err(err) => StoredMessage::invalid(err, stats),
-        }
+impl Drop for LegacyStoredMessage {
+    fn drop(&mut self) {
+        self.stats.increment_rolled_out(&*self);
+    }
+}
+
+impl StoredMessage for LegacyStoredMessage {
+    fn size(&self) -> usize {
+        self.msg.size_bytes
     }
 
-    pub fn structured(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> Self {
+    fn severity(&self) -> Severity {
+        self.msg.severity
+    }
+
+    fn timestamp(&self) -> i64 {
+        self.msg.timestamp
+    }
+
+    fn parse(&self, source: &ComponentIdentity) -> Result<LogsData> {
+        Ok(diagnostics_message::from_logger(source.into(), self.msg.clone()))
+    }
+}
+
+#[derive(Debug)]
+pub struct StructuredStoredMessage {
+    bytes: Box<[u8]>,
+    severity: Severity,
+    timestamp: i64,
+    stats: Arc<LogStreamStats>,
+}
+
+impl StructuredStoredMessage {
+    pub fn new(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
         match diagnostics_message::parse_basic_structured_info(&buf) {
-            Ok((timestamp, severity)) => StoredMessage {
-                bytes: MessageBytes::Structured {
-                    bytes: buf.into_boxed_slice(),
-                    severity,
-                    timestamp,
-                },
+            Ok((timestamp, severity)) => Box::new(StructuredStoredMessage {
+                bytes: buf.into_boxed_slice(),
+                severity,
+                timestamp,
                 stats,
-            },
-            Err(err) => StoredMessage::invalid(err, stats),
+            }),
+            Err(err) => Box::new(InvalidStoredMessage::new(err, stats)),
         }
     }
+}
 
-    fn invalid(err: MessageError, stats: Arc<LogStreamStats>) -> Self {
-        // When we fail to parse a message set a WARN for it and use the timestamp for when the
-        // message was received. We'll be adding an error for this.
-        let severity = Severity::Warn;
-        let timestamp = zx::Time::get_monotonic().into_nanos();
-        StoredMessage { bytes: MessageBytes::Invalid { err, severity, timestamp }, stats }
+impl Drop for StructuredStoredMessage {
+    fn drop(&mut self) {
+        self.stats.increment_rolled_out(&*self);
+    }
+}
+
+impl StoredMessage for StructuredStoredMessage {
+    fn size(&self) -> usize {
+        self.bytes.len()
     }
 
-    pub fn debuglog(record: zx::sys::zx_log_record_t, stats: Arc<LogStreamStats>) -> Self {
+    fn severity(&self) -> Severity {
+        self.severity
+    }
+
+    fn timestamp(&self) -> i64 {
+        self.timestamp
+    }
+
+    fn parse(&self, source: &ComponentIdentity) -> Result<LogsData> {
+        let data = diagnostics_message::from_structured(source.into(), &self.bytes)?;
+        Ok(data)
+    }
+}
+
+#[derive(Debug)]
+pub struct DebugLogStoredMessage {
+    msg: zx::sys::zx_log_record_t,
+    severity: Severity,
+    size: usize,
+    stats: Arc<LogStreamStats>,
+}
+
+impl DebugLogStoredMessage {
+    pub fn new(record: zx::sys::zx_log_record_t, stats: Arc<LogStreamStats>) -> Self {
         let data_len = record.datalen as usize;
 
         let mut contents = String::from_utf8_lossy(&record.data[0..data_len]).into_owned();
@@ -87,56 +147,73 @@ impl StoredMessage {
         };
 
         let size = METADATA_SIZE + 5 /*'klog' tag*/ + contents.len() + 1;
-        StoredMessage { bytes: MessageBytes::DebugLog { msg: record, severity, size }, stats }
-    }
-
-    pub fn size(&self) -> usize {
-        match &self.bytes {
-            MessageBytes::Legacy(msg) => msg.size_bytes,
-            MessageBytes::Structured { bytes, .. } => bytes.len(),
-            MessageBytes::DebugLog { size, .. } => *size,
-            MessageBytes::Invalid { .. } => std::mem::size_of::<MessageError>(),
-        }
-    }
-
-    pub fn severity(&self) -> Severity {
-        match &self.bytes {
-            MessageBytes::Legacy(msg) => msg.severity,
-            MessageBytes::Structured { severity, .. } => *severity,
-            MessageBytes::DebugLog { severity, .. } => *severity,
-            MessageBytes::Invalid { severity, .. } => *severity,
-        }
-    }
-
-    pub fn timestamp(&self) -> i64 {
-        match &self.bytes {
-            MessageBytes::Legacy(msg) => msg.timestamp,
-            MessageBytes::Structured { timestamp, .. } => *timestamp,
-            MessageBytes::DebugLog { msg, .. } => msg.timestamp,
-            MessageBytes::Invalid { timestamp, .. } => *timestamp,
-        }
+        DebugLogStoredMessage { msg: record, severity, size, stats }
     }
 }
 
-impl Drop for StoredMessage {
+impl Drop for DebugLogStoredMessage {
     fn drop(&mut self) {
         self.stats.increment_rolled_out(&*self);
     }
 }
 
-impl StoredMessage {
-    pub fn parse(&self, source: &ComponentIdentity) -> Result<LogsData, anyhow::Error> {
-        match &self.bytes {
-            MessageBytes::Legacy(msg) => {
-                Ok(diagnostics_message::from_logger(source.into(), msg.clone()))
-            }
-            MessageBytes::Structured { bytes, .. } => {
-                let data = diagnostics_message::from_structured(source.into(), bytes)?;
-                Ok(data)
-            }
-            MessageBytes::DebugLog { msg, .. } => debuglog::convert_debuglog_to_log_message(msg)
-                .ok_or(format_err!("couldn't convert debuglog message")),
-            MessageBytes::Invalid { err, .. } => Err(err.clone().into()),
-        }
+impl StoredMessage for DebugLogStoredMessage {
+    fn size(&self) -> usize {
+        self.size
+    }
+
+    fn severity(&self) -> Severity {
+        self.severity
+    }
+
+    fn timestamp(&self) -> i64 {
+        self.msg.timestamp
+    }
+
+    fn parse(&self, _source: &ComponentIdentity) -> Result<LogsData> {
+        debuglog::convert_debuglog_to_log_message(&self.msg)
+            .ok_or(format_err!("couldn't convert debuglog message"))
+    }
+}
+
+#[derive(Debug)]
+pub struct InvalidStoredMessage {
+    err: MessageError,
+    severity: Severity,
+    timestamp: i64,
+    stats: Arc<LogStreamStats>,
+}
+
+impl InvalidStoredMessage {
+    pub fn new(err: MessageError, stats: Arc<LogStreamStats>) -> Self {
+        // When we fail to parse a message set a WARN for it and use the timestamp for when the
+        // message was received. We'll be adding an error for this.
+        let severity = Severity::Warn;
+        let timestamp = zx::Time::get_monotonic().into_nanos();
+        InvalidStoredMessage { err, severity, timestamp, stats }
+    }
+}
+
+impl Drop for InvalidStoredMessage {
+    fn drop(&mut self) {
+        self.stats.increment_rolled_out(&*self);
+    }
+}
+
+impl StoredMessage for InvalidStoredMessage {
+    fn size(&self) -> usize {
+        std::mem::size_of::<MessageError>()
+    }
+
+    fn severity(&self) -> Severity {
+        self.severity
+    }
+
+    fn timestamp(&self) -> i64 {
+        self.timestamp
+    }
+
+    fn parse(&self, _source: &ComponentIdentity) -> Result<LogsData> {
+        Err(self.err.clone().into())
     }
 }

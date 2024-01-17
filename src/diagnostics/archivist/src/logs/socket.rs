@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use super::stats::LogStreamStats;
-use crate::logs::stored_message::StoredMessage;
+use crate::logs::stored_message::{
+    GenericStoredMessage, LegacyStoredMessage, StructuredStoredMessage,
+};
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::Stream;
@@ -16,7 +18,7 @@ use std::{
 /// An `Encoding` is able to parse a `Message` from raw bytes.
 pub trait Encoding {
     /// Attempt to parse a message from the given buffer
-    fn wrap_bytes(bytes: Vec<u8>, stats: Arc<LogStreamStats>) -> StoredMessage;
+    fn wrap_bytes(bytes: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage;
 }
 
 /// An encoding that can parse the legacy [logger/syslog wire format]
@@ -32,14 +34,14 @@ pub struct LegacyEncoding;
 pub struct StructuredEncoding;
 
 impl Encoding for LegacyEncoding {
-    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> StoredMessage {
-        StoredMessage::legacy(&buf, stats)
+    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
+        LegacyStoredMessage::new(buf, stats)
     }
 }
 
 impl Encoding for StructuredEncoding {
-    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> StoredMessage {
-        StoredMessage::structured(buf, stats)
+    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
+        StructuredStoredMessage::new(buf, stats)
     }
 }
 
@@ -72,7 +74,7 @@ impl<E> Stream for LogMessageSocket<E>
 where
     E: Encoding + Unpin,
 {
-    type Item = Result<StoredMessage, zx::Status>;
+    type Item = Result<GenericStoredMessage, zx::Status>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();

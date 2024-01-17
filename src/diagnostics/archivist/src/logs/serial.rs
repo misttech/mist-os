@@ -193,7 +193,10 @@ impl<'a, S: Write> SerialWriter<'a, S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{identity::ComponentIdentity, logs::stored_message::StoredMessage};
+    use crate::{
+        identity::ComponentIdentity,
+        logs::stored_message::{GenericStoredMessage, StructuredStoredMessage},
+    };
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
     use diagnostics_log_encoding::{
         encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
@@ -339,7 +342,7 @@ mod tests {
         );
     }
 
-    fn make_message(msg: &str, tag: Option<&str>, timestamp: i64) -> StoredMessage {
+    fn make_message(msg: &str, tag: Option<&str>, timestamp: i64) -> GenericStoredMessage {
         let mut record = Record {
             timestamp,
             severity: StreamSeverity::Debug,
@@ -358,6 +361,6 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer);
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StoredMessage::structured(encoded.to_vec(), Default::default())
+        StructuredStoredMessage::new(encoded.to_vec(), Default::default())
     }
 }

@@ -38,11 +38,11 @@ impl LogStreamStats {
         self.sockets_closed.add(1);
     }
 
-    pub fn increment_rolled_out(&self, msg: &StoredMessage) {
+    pub fn increment_rolled_out<T: StoredMessage + ?Sized>(&self, msg: &T) {
         self.rolled_out.count(msg);
     }
 
-    pub fn ingest_message(&self, msg: &StoredMessage) {
+    pub fn ingest_message<T: StoredMessage + ?Sized>(&self, msg: &T) {
         self.last_timestamp.set(msg.timestamp());
         self.total.count(msg);
         match msg.severity() {
@@ -65,7 +65,7 @@ struct LogCounter {
 }
 
 impl LogCounter {
-    fn count(&self, msg: &StoredMessage) {
+    fn count<T: StoredMessage + ?Sized>(&self, msg: &T) {
         self.number.add(1);
         self.bytes.add(msg.size() as u64);
     }

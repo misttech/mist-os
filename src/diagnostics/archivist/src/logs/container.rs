@@ -10,7 +10,7 @@ use crate::{
         multiplex::PinStream,
         socket::{Encoding, LogMessageSocket},
         stats::LogStreamStats,
-        stored_message::StoredMessage,
+        stored_message::GenericStoredMessage,
     },
     utils::AutoCall,
 };
@@ -55,7 +55,7 @@ pub struct LogsArtifactsContainer {
 
     /// Buffer for all log messages.
     #[derivative(Debug = "ignore")]
-    buffer: ArcList<StoredMessage>,
+    buffer: ArcList<GenericStoredMessage>,
 
     /// Mutable state for the container.
     state: Arc<Mutex<ContainerState>>,
@@ -379,9 +379,9 @@ impl LogsArtifactsContainer {
     }
 
     /// Updates log stats in inspect and push the message onto the container's buffer.
-    pub fn ingest_message(&self, message: StoredMessage) {
+    pub fn ingest_message(&self, message: GenericStoredMessage) {
         self.budget.allocate(message.size());
-        self.stats.ingest_message(&message);
+        self.stats.ingest_message(message.as_ref());
         self.buffer.push_back(message);
     }
 
@@ -474,7 +474,7 @@ impl LogsArtifactsContainer {
     }
 
     /// Remove the oldest message from this buffer, returning it.
-    pub fn pop(&self) -> Option<Arc<StoredMessage>> {
+    pub fn pop(&self) -> Option<Arc<GenericStoredMessage>> {
         self.buffer.pop_front()
     }
 
@@ -500,7 +500,7 @@ impl LogsArtifactsContainer {
     }
 
     #[cfg(test)]
-    pub fn buffer(&self) -> &ArcList<StoredMessage> {
+    pub fn buffer(&self) -> &ArcList<GenericStoredMessage> {
         &self.buffer
     }
 
