@@ -638,3 +638,8 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/bazelbuild/rules_proto
 	name = third_party/bazel_rules_proto
 	ignore = all
+[submodule "third_party/Vulkan-Utility-Libraries/src"]
+	path = third_party/Vulkan-Utility-Libraries/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/KhronosGroup/Vulkan-Utility-Libraries
+	name = third_party/Vulkan-Utility-Libraries
+	ignore = all
