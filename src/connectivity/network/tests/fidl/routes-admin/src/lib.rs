@@ -51,6 +51,11 @@ enum SystemRouteProtocol {
     NetStack,
 }
 
+enum RouteSet {
+    Global,
+    User,
+}
+
 impl<'a, I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt> TestSetup<'a, I> {
     async fn new<N: Netstack>(sandbox: &'a netemul::TestSandbox, name: &str) -> TestSetup<'a, I> {
         let realm = sandbox
@@ -99,13 +104,38 @@ fn test_route<I: Ip>(
 }
 
 #[netstack_test]
-#[test_case(true, METRIC_TRACKS_INTERFACE, false; "explicitly removing the route")]
-#[test_case(true, METRIC_TRACKS_INTERFACE, true; "explicitly removing the route, global")]
-#[test_case(false, METRIC_TRACKS_INTERFACE, false; "dropping the route set")]
-#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(0), false; "explicit zero metric")]
-#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(0), true; "explicit zero metric, global")]
-#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(12345), false; "explicit non-zero metric")]
-#[test_case(true, fnet_routes::SpecifiedMetric::ExplicitMetric(12345), true; "explicit non-zero metric, global")]
+#[test_case(true, METRIC_TRACKS_INTERFACE, RouteSet::User; "explicitly removing the route")]
+#[test_case(
+    true,
+    METRIC_TRACKS_INTERFACE,
+    RouteSet::Global;
+    "explicitly removing the route, global"
+)]
+#[test_case(false, METRIC_TRACKS_INTERFACE, RouteSet::User; "dropping the route set")]
+#[test_case(
+    true,
+    fnet_routes::SpecifiedMetric::ExplicitMetric(0),
+    RouteSet::User;
+    "explicit zero metric"
+)]
+#[test_case(
+    true,
+    fnet_routes::SpecifiedMetric::ExplicitMetric(0),
+    RouteSet::Global;
+    "explicit zero metric, global"
+)]
+#[test_case(
+    true,
+    fnet_routes::SpecifiedMetric::ExplicitMetric(12345),
+    RouteSet::User;
+    "explicit non-zero metric"
+)]
+#[test_case(
+    true,
+    fnet_routes::SpecifiedMetric::ExplicitMetric(12345),
+    RouteSet::Global;
+    "explicit non-zero metric, global"
+)]
 async fn add_remove_route<
     I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
@@ -113,7 +143,7 @@ async fn add_remove_route<
     name: &str,
     explicit_remove: bool,
     metric: fnet_routes::SpecifiedMetric,
-    global: bool,
+    route_set_type: RouteSet,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let TestSetup {
@@ -136,11 +166,12 @@ async fn add_remove_route<
 
     println!("initial routes = {routes:?}");
 
-    let proxy = if global {
-        fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
-            .expect("new global route set")
-    } else {
-        fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+    let proxy = match route_set_type {
+        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            .expect("new global route set"),
+        RouteSet::User => {
+            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+        }
     };
 
     let route_to_add = test_route(&interface, metric);
