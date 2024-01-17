@@ -48,12 +48,16 @@ void AmlSaradcDevice::Enable(bool ena) {
     adc_mmio_.ClearBits32(REG11_RSV6_MASK, AO_SAR_ADC_REG11_OFFS);
     // Select bandgap as reference
     adc_mmio_.ClearBits32(REG11_RSV5_MASK, AO_SAR_ADC_REG11_OFFS);
+    // Enable IRQ
+    adc_mmio_.SetBits32(REG0_FIFO_IRQ_EN_MASK, AO_SAR_ADC_REG0_OFFS);
     // Enable the ADC
     adc_mmio_.SetBits32(REG3_ADC_EN_MASK, AO_SAR_ADC_REG3_OFFS);
     zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
     // Enable clock source
     ClkEna(true);
   } else {
+    // Disable IRQ
+    adc_mmio_.ClearBits32(REG0_FIFO_IRQ_EN_MASK, AO_SAR_ADC_REG0_OFFS);
     // Disable clock source
     ClkEna(false);
     // Disable the ADC
@@ -86,36 +90,27 @@ void AmlSaradcDevice::GetSample(GetSampleRequest& request, GetSampleCompleter::S
   // Start sampling
   adc_mmio_.SetBits32(REG0_SAMPLING_START_MASK, AO_SAR_ADC_REG0_OFFS);
 
-  uint32_t busy;
-  uint32_t count = 0;
-  // Wait for busy state to clear
-  do {
-    zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
-    busy = adc_mmio_.Read32(AO_SAR_ADC_REG0_OFFS);
-    if (++count > 10000) {
-      Stop();
-      ClkEna(false);
-      SetClock(CLK_SRC_OSCIN, 20);
-      ClkEna(true);
-      FDF_LOG(ERROR, "reg0 = %08x", busy);
-      completer.Reply(fit::error(ZX_ERR_UNAVAILABLE));
-      return;
-    }
-  } while (busy & 0x70000000);
+  fit::result<uint32_t, zx_status_t> result = fit::error(ZX_ERR_UNAVAILABLE);
+  auto status = irq_.wait(nullptr);
+  if (status == ZX_OK) {
+    uint32_t value = adc_mmio_.Read32(AO_SAR_ADC_FIFO_RD_OFFS);
+    result = fit::ok((value >> 2) & 0x3ff);
+  } else {
+    result = fit::error(status);
+  }
 
-  uint32_t value = adc_mmio_.Read32(AO_SAR_ADC_FIFO_RD_OFFS);
-
-  auto sample = (value >> 2) & 0x3ff;
   Stop();
   ClkEna(false);
   SetClock(CLK_SRC_OSCIN, 20);
   ClkEna(true);
 
-  completer.Reply(fit::ok(sample));
+  completer.Reply(result);
 }
 
 void AmlSaradcDevice::HwInit() {
   adc_mmio_.Write32(0x84004040, AO_SAR_ADC_REG0_OFFS);
+  // Set IRQ trigger to one sample.
+  adc_mmio_.ModifyBits32(1 << REG0_FIFO_CNT_IRQ_POS, REG0_FIFO_CNT_IRQ_MASK, AO_SAR_ADC_REG0_OFFS);
 
   // Set channel list to only channel zero
   adc_mmio_.Write32(0x00000000, AO_SAR_ADC_CHAN_LIST_OFFS);

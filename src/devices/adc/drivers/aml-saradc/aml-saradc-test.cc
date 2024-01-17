@@ -58,6 +58,7 @@ class AmlSaradcTest : public zxtest::Test {
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     config.mmios[0] = mmio_[0].mmio();
     config.mmios[1] = mmio_[1].mmio();
+    irq_ = config.irqs[0].borrow();
 
     fuchsia_driver_framework::DriverStartArgs start_args;
     fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
@@ -134,6 +135,7 @@ class AmlSaradcTest : public zxtest::Test {
 
  protected:
   fdf::WireSyncClient<fuchsia_hardware_adcimpl::Device> adc_;
+  zx::unowned_interrupt irq_;
 };
 
 TEST_F(AmlSaradcTest, GetResolution) {
@@ -146,6 +148,7 @@ TEST_F(AmlSaradcTest, GetResolution) {
 
 TEST_F(AmlSaradcTest, GetSample) {
   mmio(0).set(AO_SAR_ADC_FIFO_RD_OFFS >> 2, 0x4);
+  irq_->trigger(0, zx::clock::get_monotonic());
 
   fdf::Arena arena('TEST');
   auto result = adc_.buffer(arena)->GetSample(0);

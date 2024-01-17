@@ -30,6 +30,9 @@ static constexpr uint32_t AO_SAR_ADC_CHNL67_OFFS         = (0x11 << 2);
 
 // reg0 bit definitions
 static constexpr uint32_t REG0_SAMPLING_STOP_MASK  = (0x01 << 14);
+static constexpr uint32_t REG0_FIFO_CNT_IRQ_POS  = 4;
+static constexpr uint32_t REG0_FIFO_CNT_IRQ_MASK  = (0x1F << REG0_FIFO_CNT_IRQ_POS);
+static constexpr uint32_t REG0_FIFO_IRQ_EN_MASK  = (0x01 << 3);
 static constexpr uint32_t REG0_SAMPLING_START_MASK  = (0x01 << 2);
 static constexpr uint32_t REG0_SAMPLING_ENABLE_MASK  = (0x01 << 0);
 
