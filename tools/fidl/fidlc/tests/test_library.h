@@ -13,20 +13,20 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
-#include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
-#include "tools/fidl/fidlc/include/fidl/findings.h"
-#include "tools/fidl/fidlc/include/fidl/flat/compiler.h"
-#include "tools/fidl/fidlc/include/fidl/flat_ast.h"
-#include "tools/fidl/fidlc/include/fidl/json_generator.h"
-#include "tools/fidl/fidlc/include/fidl/lexer.h"
-#include "tools/fidl/fidlc/include/fidl/linter.h"
-#include "tools/fidl/fidlc/include/fidl/ordinals.h"
-#include "tools/fidl/fidlc/include/fidl/parser.h"
-#include "tools/fidl/fidlc/include/fidl/source_file.h"
-#include "tools/fidl/fidlc/include/fidl/utils.h"
-#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
-#include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
+#include "tools/fidl/fidlc/src/compiler.h"
+#include "tools/fidl/fidlc/src/diagnostic_types.h"
+#include "tools/fidl/fidlc/src/experimental_flags.h"
+#include "tools/fidl/fidlc/src/findings.h"
+#include "tools/fidl/fidlc/src/flat_ast.h"
+#include "tools/fidl/fidlc/src/json_generator.h"
+#include "tools/fidl/fidlc/src/lexer.h"
+#include "tools/fidl/fidlc/src/linter.h"
+#include "tools/fidl/fidlc/src/ordinals.h"
+#include "tools/fidl/fidlc/src/parser.h"
+#include "tools/fidl/fidlc/src/source_file.h"
+#include "tools/fidl/fidlc/src/utils.h"
+#include "tools/fidl/fidlc/src/versioning_types.h"
+#include "tools/fidl/fidlc/src/virtual_source_file.h"
 
 #define ASSERT_COMPILED(library)                         \
   {                                                      \

@@ -5,7 +5,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/diagnostics.h"
+#include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 // This file tests ways of interleaving the availability of a source element

@@ -89,8 +89,8 @@ Some other FIDL related areas are:
 Path | Contents
 -----|---------
 [/tools/fidl/fidlgen_*](/tools/fidl/) | Various other compiler back-ends.
-[/tools/fidl/fidlc/formatter] | FIDL formatter.
-[/tools/fidl/fidlc/linter] | FIDL linter.
+[/tools/fidl/fidlc/cmd/fidl-format] | FIDL formatter.
+[/tools/fidl/fidlc/cmd/fidl-lint] | FIDL linter.
 [/tools/fidl/fidldoc] | Generate documentation for FIDL.
 [/tools/fidl/fidlmerge] | Tool for generating code from FIDL JSON.
 [/tools/fidl/measure-tape] | Tool to [max out pagination][pagination].
@@ -731,8 +731,8 @@ fidl fmt --library my_library.fidl -i
 [pagination]: /docs/development/languages/fidl/guides/max-out-pagination.md
 [commit-message]: /docs/contribute/commit-message-style-guide.md
 
-[/tools/fidl/fidlc/formatter]: /tools/fidl/fidlc/formatter
-[/tools/fidl/fidlc/linter]: /tools/fidl/fidlc/linter
+[/tools/fidl/fidlc/cmd/fidl-format]: /tools/fidl/fidlc/cmd/fidl-format
+[/tools/fidl/fidlc/cmd/fidl-lint]: /tools/fidl/fidlc/cmd/fidl-lint
 [/tools/fidl/fidlgen_hlcpp]: /tools/fidl/fidlgen_hlcpp
 [/tools/fidl/fidlgen_cpp]: /tools/fidl/fidlgen_cpp
 [/tools/fidl/fidlgen_go]: /tools/fidl/fidlgen_go
@@ -744,6 +744,7 @@ fidl fmt --library my_library.fidl -i
 [/third_party/go/src/syscall/zx/fidl]: /third_party/go/src/syscall/zx/fidl
 [/sdk/dart/fidl]: /sdk/dart/fidl
 [/src/lib/fidl/c]: /src/lib/fidl/c
+[/src/lib/fidl/cpp]: /src/lib/fidl/cpp
 [/src/lib/fidl/llcpp]: /src/lib/fidl/llcpp
 [/tools/fidl/lib/fidlgen]: /tools/fidl/lib/fidlgen
 

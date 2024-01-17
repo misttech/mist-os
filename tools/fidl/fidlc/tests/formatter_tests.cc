@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
-#include "tools/fidl/fidlc/include/fidl/formatter.h"
-#include "tools/fidl/fidlc/include/fidl/utils.h"
+#include "tools/fidl/fidlc/src/experimental_flags.h"
+#include "tools/fidl/fidlc/src/formatter.h"
+#include "tools/fidl/fidlc/src/utils.h"
 
 #define ASSERT_FORMATTED(source, expected)                   \
   std::string actual = Format(source);                       \

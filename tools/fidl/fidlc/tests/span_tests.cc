@@ -8,8 +8,8 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/raw_ast.h"
-#include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
+#include "tools/fidl/fidlc/src/raw_ast.h"
+#include "tools/fidl/fidlc/src/tree_visitor.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 // This test provides a way to write comprehensive unit tests on the fidlc

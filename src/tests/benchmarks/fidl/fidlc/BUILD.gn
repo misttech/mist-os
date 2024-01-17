@@ -10,7 +10,7 @@ executable("bin") {
   testonly = true
   sources = [ "main.cc" ]
   deps = [
-    "//tools/fidl/fidlc:fidl",
+    "//tools/fidl/fidlc:lib",
     "//zircon/system/ulib/perftest",
   ]
 }

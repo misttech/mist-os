@@ -7,9 +7,9 @@
 #include <sstream>
 #include <utility>
 
-#include "tools/fidl/fidlc/include/fidl/findings.h"
-#include "tools/fidl/fidlc/include/fidl/template_string.h"
-#include "tools/fidl/fidlc/include/fidl/utils.h"
+#include "tools/fidl/fidlc/src/findings.h"
+#include "tools/fidl/fidlc/src/template_string.h"
+#include "tools/fidl/fidlc/src/utils.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {

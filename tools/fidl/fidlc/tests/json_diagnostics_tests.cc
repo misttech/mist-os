@@ -6,7 +6,7 @@
 #include <string_view>
 #include <utility>
 
-#include "tools/fidl/fidlc/include/fidl/diagnostics_json.h"
+#include "tools/fidl/fidlc/src/diagnostics_json.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {

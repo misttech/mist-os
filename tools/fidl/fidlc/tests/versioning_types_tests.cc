@@ -7,7 +7,7 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/versioning_types.h"
+#include "tools/fidl/fidlc/src/versioning_types.h"
 
 namespace {
 

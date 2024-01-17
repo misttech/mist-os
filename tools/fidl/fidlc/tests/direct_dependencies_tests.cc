@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/names.h"
+#include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {

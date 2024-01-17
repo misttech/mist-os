@@ -12,8 +12,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/flat_ast.h"
-#include "tools/fidl/fidlc/include/fidl/names.h"
+#include "tools/fidl/fidlc/src/flat_ast.h"
+#include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {

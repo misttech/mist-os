@@ -1,0 +1,44 @@
+// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "tools/fidl/fidlc/src/experimental_flags.h"
+
+namespace fidlc {
+
+bool ExperimentalFlags::EnableFlagByName(std::string_view flag) {
+  auto it = kFlagStrings.find(flag);
+  if (it == kFlagStrings.end()) {
+    return false;
+  }
+  EnableFlag(it->second);
+  return true;
+}
+
+void ExperimentalFlags::EnableFlag(Flag flag) { flags_ |= static_cast<FlagSet>(flag); }
+
+bool ExperimentalFlags::IsFlagEnabled(Flag flag) const {
+  return (flags_ & static_cast<FlagSet>(flag)) != 0;
+}
+
+void ExperimentalFlags::ForEach(
+    const fit::function<void(const std::string_view, Flag, bool)>& fn) const {
+  for (const auto& [name, flag] : kFlagStrings) {
+    bool is_enabled = IsFlagEnabled(flag);
+    fn(name, flag, is_enabled);
+  }
+}
+
+std::map<const std::string_view, const ExperimentalFlags::Flag> ExperimentalFlags::kFlagStrings = {
+    {"noop", Flag::kNoop},
+    {"unknown_interactions", Flag::kUnknownInteractions},
+    {"unknown_interactions_mandate", Flag::kUnknownInteractionsMandate},
+    {"unknown_interactions_new_defaults", Flag::kUnknownInteractionsNewDefaults},
+    {"allow_new_types", Flag::kAllowNewTypes},
+    {"output_index_json", Flag::kOutputIndexJson},
+    {"zx_c_types", Flag::kZxCTypes},
+    {"allow_arbitrary_error_types", Flag::kAllowArbitraryErrorTypes},
+    {"transitional_allow_list", Flag::kTransitionalAllowList},
+};
+
+}  // namespace fidlc

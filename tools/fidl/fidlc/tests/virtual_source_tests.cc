@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/source_span.h"
-#include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
+#include "tools/fidl/fidlc/src/source_span.h"
+#include "tools/fidl/fidlc/src/virtual_source_file.h"
 
 namespace {
 

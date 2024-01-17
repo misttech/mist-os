@@ -103,6 +103,6 @@ test("fidlc-test") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/boringssl",
     "//third_party/googletest:gmock",
-    "//tools/fidl/fidlc:fidl",
+    "//tools/fidl/fidlc:lib",
   ]
 }

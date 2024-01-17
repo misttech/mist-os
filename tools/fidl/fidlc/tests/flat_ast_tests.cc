@@ -8,10 +8,10 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/diagnostics.h"
-#include "tools/fidl/fidlc/include/fidl/flat_ast.h"
-#include "tools/fidl/fidlc/include/fidl/source_file.h"
-#include "tools/fidl/fidlc/include/fidl/source_span.h"
+#include "tools/fidl/fidlc/src/diagnostics.h"
+#include "tools/fidl/fidlc/src/flat_ast.h"
+#include "tools/fidl/fidlc/src/source_file.h"
+#include "tools/fidl/fidlc/src/source_span.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {

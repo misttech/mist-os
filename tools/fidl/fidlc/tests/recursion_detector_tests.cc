@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/recursion_detector.h"
+#include "tools/fidl/fidlc/src/recursion_detector.h"
 
 namespace {
 

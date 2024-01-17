@@ -6,52 +6,52 @@ import("//build/sdk/sdk_host_tool.gni")
 import("//build/testing/golden_files.gni")
 import("//tools/fidl/fidlc/testdata/info.gni")
 
-source_set("fidl") {
+source_set("lib") {
   sources = [
-    "lib/diagnostic_types.cc",
-    "lib/diagnostics_json.cc",
-    "lib/experimental_flags.cc",
-    "lib/findings_json.cc",
-    "lib/flat/attribute_schema.cc",
-    "lib/flat/attributes.cc",
-    "lib/flat/availability_step.cc",
-    "lib/flat/compile_step.cc",
-    "lib/flat/compiler.cc",
-    "lib/flat/constraints.cc",
-    "lib/flat/consume_step.cc",
-    "lib/flat/name.cc",
-    "lib/flat/reference.cc",
-    "lib/flat/resolve_step.cc",
-    "lib/flat/sort_step.cc",
-    "lib/flat/transport.cc",
-    "lib/flat/type_resolver.cc",
-    "lib/flat/types.cc",
-    "lib/flat/typespace.cc",
-    "lib/flat/values.cc",
-    "lib/flat/verify_steps.cc",
-    "lib/flat_ast.cc",
-    "lib/formatter.cc",
-    "lib/index_json_generator.cc",
-    "lib/json_generator.cc",
-    "lib/lexer.cc",
-    "lib/linter.cc",
-    "lib/linting_tree_callbacks.cc",
-    "lib/names.cc",
-    "lib/ordinals.cc",
-    "lib/parser.cc",
-    "lib/raw_ast.cc",
-    "lib/reporter.cc",
-    "lib/source_file.cc",
-    "lib/source_manager.cc",
-    "lib/source_span.cc",
-    "lib/span_sequence.cc",
-    "lib/span_sequence_tree_visitor.cc",
-    "lib/template_string.cc",
-    "lib/tree_visitor.cc",
-    "lib/type_shape.cc",
-    "lib/utils.cc",
-    "lib/versioning_types.cc",
-    "lib/virtual_source_file.cc",
+    "src/attribute_schema.cc",
+    "src/attributes.cc",
+    "src/availability_step.cc",
+    "src/compile_step.cc",
+    "src/compiler.cc",
+    "src/constraints.cc",
+    "src/consume_step.cc",
+    "src/diagnostic_types.cc",
+    "src/diagnostics_json.cc",
+    "src/experimental_flags.cc",
+    "src/findings_json.cc",
+    "src/flat_ast.cc",
+    "src/formatter.cc",
+    "src/index_json_generator.cc",
+    "src/json_generator.cc",
+    "src/lexer.cc",
+    "src/linter.cc",
+    "src/linting_tree_callbacks.cc",
+    "src/name.cc",
+    "src/names.cc",
+    "src/ordinals.cc",
+    "src/parser.cc",
+    "src/raw_ast.cc",
+    "src/reference.cc",
+    "src/reporter.cc",
+    "src/resolve_step.cc",
+    "src/sort_step.cc",
+    "src/source_file.cc",
+    "src/source_manager.cc",
+    "src/source_span.cc",
+    "src/span_sequence.cc",
+    "src/span_sequence_tree_visitor.cc",
+    "src/template_string.cc",
+    "src/transport.cc",
+    "src/tree_visitor.cc",
+    "src/type_resolver.cc",
+    "src/type_shape.cc",
+    "src/types.cc",
+    "src/typespace.cc",
+    "src/utils.cc",
+    "src/values.cc",
+    "src/verify_steps.cc",
+    "src/versioning_types.cc",
+    "src/virtual_source_file.cc",
   ]
   public_deps = [
     "//sdk/lib/fit",
@@ -95,21 +95,21 @@ group("host") {
 
 if (is_host) {
   executable("fidlc") {
-    sources = [ "compiler/main.cc" ]
-    deps = [ ":fidl" ]
+    sources = [ "cmd/fidlc/main.cc" ]
+    deps = [ ":lib" ]
   }
 
   executable("fidl-format") {
-    sources = [ "formatter/main.cc" ]
-    deps = [ ":fidl" ]
+    sources = [ "cmd/fidl-format/main.cc" ]
+    deps = [ ":lib" ]
   }
 
   executable("fidl-lint") {
     sources = [
-      "linter/command_line_options.cc",
-      "linter/main.cc",
+      "cmd/fidl-lint/command_line_options.cc",
+      "cmd/fidl-lint/main.cc",
     ]
-    deps = [ ":fidl" ]
+    deps = [ ":lib" ]
   }
 
   sdk_host_tool("fidlc_sdk") {

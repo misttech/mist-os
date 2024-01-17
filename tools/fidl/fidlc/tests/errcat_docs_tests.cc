@@ -12,8 +12,8 @@
 #include <gtest/gtest.h>
 #include <re2/re2.h>
 
-#include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
-#include "tools/fidl/fidlc/include/fidl/diagnostics.h"
+#include "tools/fidl/fidlc/src/diagnostic_types.h"
+#include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {

@@ -6,8 +6,8 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/diagnostics.h"
-#include "tools/fidl/fidlc/include/fidl/utils.h"
+#include "tools/fidl/fidlc/src/diagnostics.h"
+#include "tools/fidl/fidlc/src/utils.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {

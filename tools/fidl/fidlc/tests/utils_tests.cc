@@ -8,7 +8,7 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/include/fidl/utils.h"
+#include "tools/fidl/fidlc/src/utils.h"
 
 namespace fidlc {
 

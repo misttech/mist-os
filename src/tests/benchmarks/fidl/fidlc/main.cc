@@ -7,12 +7,12 @@
 #include <perftest/perftest.h>
 
 #include "src/tests/benchmarks/fidl/fidlc/benchmarks.h"
-#include "tools/fidl/fidlc/include/fidl/json_generator.h"
-#include "tools/fidl/fidlc/include/fidl/lexer.h"
-#include "tools/fidl/fidlc/include/fidl/ordinals.h"
-#include "tools/fidl/fidlc/include/fidl/parser.h"
-#include "tools/fidl/fidlc/include/fidl/source_file.h"
-#include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
+#include "tools/fidl/fidlc/src/json_generator.h"
+#include "tools/fidl/fidlc/src/lexer.h"
+#include "tools/fidl/fidlc/src/ordinals.h"
+#include "tools/fidl/fidlc/src/parser.h"
+#include "tools/fidl/fidlc/src/source_file.h"
+#include "tools/fidl/fidlc/src/virtual_source_file.h"
 
 // This measures the time to compile the given input fidl text and generate
 // JSON IR output, which is discarded after it is produced in-memory.

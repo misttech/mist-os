@@ -58,7 +58,7 @@ Follow these steps if the script doesn't work:
 
       Deprecated: This error code has been retired.
 
-- Change `//tools/fidl/fidlc/include/fidl/diagnostics.h` to define the error
+- Change `//tools/fidl/fidlc/src/diagnostics.h` to define the error
   using `RetiredDef` instead of `ErrorDef`. For example:
 
       -constexpr ErrorDef<10, std::string_view> ErrInvalidIdentifier("invalid identifier '{}'");

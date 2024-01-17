@@ -7,7 +7,7 @@
 #include <fstream>
 #include <string_view>
 
-#include "tools/fidl/fidlc/include/fidl/findings_json.h"
+#include "tools/fidl/fidlc/src/findings_json.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {
