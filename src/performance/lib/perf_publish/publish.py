@@ -62,15 +62,19 @@ def publish_fuchsiaperf(
             against a set of expected metrics.
     """
     converter = CatapultConverter.from_env(
-        fuchsia_perf_file_paths, env, runtime_deps_dir=runtime_deps_dir
+        fuchsia_perf_file_paths,
+        expected_metric_names_filename,
+        env=env,
+        runtime_deps_dir=runtime_deps_dir,
     )
-    converter.run(expected_metric_names_filename)
+    converter.run()
 
 
 class CatapultConverter:
     def __init__(
         self,
         fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
+        expected_metric_names_filename: str,
         master: str | None = None,
         bot: str | None = None,
         build_bucket_id: str | None = None,
@@ -86,6 +90,8 @@ class CatapultConverter:
         Args:
             fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
                 These will be summarized into a single fuchsiaperf.json file.
+            expected_metric_names_filename: allows to optionally validate the metrics in the perf
+                file.
             fuchsia_expected_metric_names_dest_dir: directory to which expected metrics are written.
             current_time: the current time, useful for testing. Defaults to time.time.
             subprocess_check_call: allows to execute a process raising an exception on error.
@@ -140,14 +146,29 @@ class CatapultConverter:
             fuchsia_perf_file_paths
         )
 
-        results = summarize.summarize_perf_files(fuchsia_perf_file_paths)
+        expected_metric_names_file: str = os.path.join(
+            self._runtime_deps_dir, expected_metric_names_filename
+        )
+
+        _LOGGER.debug("Checking metrics naming")
+        should_summarize: bool = self._check_fuchsia_perf_metrics_naming(
+            expected_metric_names_file,
+            fuchsia_perf_file_paths,
+        )
+
         self._results_path = os.path.join(
             os.path.dirname(fuchsia_perf_file_paths[0]),
             _SUMMARIZED_RESULTS_FILE,
         )
-        assert not os.path.exists(self._results_path)
-        with open(self._results_path, "w") as f:
-            summarize.write_fuchsiaperf_json(f, results)
+        if should_summarize:
+            results = summarize.summarize_perf_files(fuchsia_perf_file_paths)
+            assert not os.path.exists(self._results_path)
+            with open(self._results_path, "w") as f:
+                summarize.write_fuchsiaperf_json(f, results)
+        else:
+            if len(fuchsia_perf_file_paths) > 1:
+                raise ValueError("Expected a single file when not summarizing")
+            os.rename(fuchsia_perf_file_paths[0], self._results_path)
 
         catapult_extension = (
             _CATAPULT_UPLOAD_ENABLED_EXT
@@ -194,6 +215,7 @@ class CatapultConverter:
     def from_env(
         cls,
         fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
+        expected_metric_names_filename: str,
         env: Union[dict[str, str], type(os.environ)] = os.environ,
         runtime_deps_dir: Union[str, os.PathLike] | None = None,
         current_time: int | None = None,
@@ -203,6 +225,8 @@ class CatapultConverter:
 
         Args:
             fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
+            expected_metric_names_filename: allows to optionally validate the metrics in the perf
+                file.
             env: map holding the environment variables.
             current_time: the current time, useful for testing. Defaults to time.time.
             runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
@@ -212,6 +236,7 @@ class CatapultConverter:
         """
         return cls(
             fuchsia_perf_file_paths,
+            expected_metric_names_filename,
             master=env.get(ENV_CATAPULT_DASHBOARD_MASTER),
             bot=env.get(ENV_CATAPULT_DASHBOARD_BOT),
             build_bucket_id=env.get(ENV_BUILDBUCKET_ID),
@@ -225,26 +250,11 @@ class CatapultConverter:
             subprocess_check_call=subprocess_check_call,
         )
 
-    def run(
-        self,
-        expected_metric_names_filename: str,
-    ) -> None:
-        """Publishes the given metrics.
-
-        Args:
-            expected_metric_names_filename: file required to validate the metrics in the perf file
-                against a set of expected metrics.
-        """
+    def run(self) -> None:
+        """Publishes the given metrics."""
         converter_path = os.path.join(
             self._runtime_deps_dir, "catapult_converter"
         )
-
-        expected_metric_names_file: str = os.path.join(
-            self._runtime_deps_dir, expected_metric_names_filename
-        )
-
-        _LOGGER.info("Converting the results to the catapult format")
-        self._check_fuchsia_perf_metrics_naming(expected_metric_names_file)
         args = self._args()
         _LOGGER.info(f'Performance: Running {converter_path} {" ".join(args)}')
         self._subprocess_check_call([str(converter_path)] + args)
@@ -255,65 +265,69 @@ class CatapultConverter:
     def _check_fuchsia_perf_metrics_naming(
         self,
         expected_metric_names_file: str,
-    ) -> None:
-        metrics = self._extract_perf_file_metrics()
+        input_files: list[str],
+    ) -> bool:
+        metrics = self._extract_perf_file_metrics(input_files)
         if self._fuchsia_expected_metric_names_dest_dir is None:
             metric_allowlist = metrics_allowlist.MetricsAllowlist(
                 expected_metric_names_file
             )
             metric_allowlist.check(metrics)
+            return metric_allowlist.should_summarize
         else:
             self._write_expectation_file(
                 metrics,
                 expected_metric_names_file,
                 self._fuchsia_expected_metric_names_dest_dir,
             )
+            return True
 
-    def _extract_perf_file_metrics(self) -> set[str]:
-        with open(self._results_path) as f:
-            json_data: str = json.load(f)
-
-        if not isinstance(json_data, list):
-            raise ValueError("Top level fuchsiaperf node should be a list")
-
-        errors: list[str] = []
+    def _extract_perf_file_metrics(self, input_files: list[str]) -> set[str]:
         entries: set[str] = set()
-        for entry in json_data:
-            if not isinstance(entry, dict):
+        for input_file in input_files:
+            with open(input_file) as f:
+                json_data: str = json.load(f)
+
+            if not isinstance(json_data, list):
+                raise ValueError("Top level fuchsiaperf node should be a list")
+
+            errors: list[str] = []
+            for entry in json_data:
+                if not isinstance(entry, dict):
+                    raise ValueError(
+                        "Expected entries in fuchsiaperf list to be objects"
+                    )
+                if "test_suite" not in entry:
+                    raise ValueError(
+                        'Expected key "test_suite" in fuchsiaperf entry'
+                    )
+                if "label" not in entry:
+                    raise ValueError(
+                        'Expected key "label" in fuchsiaperf entry'
+                    )
+
+                test_suite: str = entry["test_suite"]
+                if not re.match(_TEST_SUITE_REGEX, test_suite):
+                    errors.append(
+                        f'test_suite field "{test_suite}" does not match the pattern '
+                        f'"{_TEST_SUITE_REGEX}"'
+                    )
+                    continue
+
+                label: str = entry["label"]
+                if not re.match(_LABEL_REGEX, label):
+                    errors.append(
+                        f'test_suite field {label} does not match the pattern "{_LABEL_REGEX}"'
+                    )
+                    continue
+
+                entries.add(f"{test_suite}: {label}")
+            if errors:
+                errors_string = "\n".join(errors)
                 raise ValueError(
-                    "Expected entries in fuchsiaperf list to be objects"
+                    "Some performance test metrics don't follow the naming conventions:\n"
+                    f"{errors_string}"
                 )
-            if "test_suite" not in entry:
-                raise ValueError(
-                    'Expected key "test_suite" in fuchsiaperf entry'
-                )
-            if "label" not in entry:
-                raise ValueError('Expected key "label" in fuchsiaperf entry')
-
-            test_suite: str = entry["test_suite"]
-            if not re.match(_TEST_SUITE_REGEX, test_suite):
-                errors.append(
-                    f'test_suite field "{test_suite}" does not match the pattern '
-                    f'"{_TEST_SUITE_REGEX}"'
-                )
-                continue
-
-            label: str = entry["label"]
-            if not re.match(_LABEL_REGEX, label):
-                errors.append(
-                    f'test_suite field {label} does not match the pattern "{_LABEL_REGEX}"'
-                )
-                continue
-
-            entries.add(f"{test_suite}: {label}")
-
-        if errors:
-            errors_string = "\n".join(errors)
-            raise ValueError(
-                "Some performance test metrics don't follow the naming conventions:\n"
-                f"{errors_string}"
-            )
-
         return entries
 
     def _write_expectation_file(

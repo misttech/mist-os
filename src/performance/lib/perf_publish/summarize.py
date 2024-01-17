@@ -41,22 +41,8 @@ def summarize_perf_files(json_files: list[os.PathLike]) -> list[dict[str, Any]]:
     and produces the contents of a "summary" fuchsiaperf file as output.
     The output contains just the average values for each test case.
 
-    This summarization does two things that are worth calling out:
-
-     * We treat the first value in each fuchsiaperf entry as a warm-up
-       run and drop it.
-     * There may be multiple entries for the same test case (for
-       multiple process runs), in which case we merge them.
-
-    Doing this as a postprocessing step has these benefits:
-
-     * It avoids the need to implement this processing either upstream
-       (in the C++ perftest library or in similar libraries for other
-       languages) or in downstream consumers.
-     * The summary fuchsiaperf file is much smaller than the "raw data"
-       fuchsiaperf files and hence more manageable.
-     * The "raw data" fuchsiaperf files can still be made available for
-       anyone who wishes to analyze the raw data.
+    See `//docs/development/performance/metric_name_expectations.md` for a
+    description of how the summarization is done and what benefits it provides.
     """
     output_by_name: dict[Tuple[str, str], dict[str, Any]] = {}
     result: list[dict[str, Any]] = []

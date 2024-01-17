@@ -17,9 +17,19 @@ class MetricsAllowlist:
         self.file_path: str = file_path
         self.optional_metrics: set[str] = set()
         self.expected_metrics: set[str] = set()
+        self._should_summarize = True
+
+        allow_command = True
         with open(self.file_path) as f:
             for line in f:
                 line = line.rstrip("\n")
+                if line.strip() == "[no-summarize-metrics]":
+                    if not allow_command:
+                        raise ValueError(
+                            "[no-summarize-metrics] can only appear at the beginning of the file"
+                        )
+                    self._should_summarize = False
+                    continue
                 if line.strip().startswith("#") or line.strip() == "":
                     continue
                 if line.endswith(_OPTIONAL_SUFFIX):
@@ -28,6 +38,11 @@ class MetricsAllowlist:
                     )
                 else:
                     self.expected_metrics.add(line)
+                allow_command = False
+
+    @property
+    def should_summarize(self) -> bool:
+        return self._should_summarize
 
     def check(self, actual_metrics: set[str]) -> None:
         """Checks that the given `actual_metrics` matches the expected metrics.

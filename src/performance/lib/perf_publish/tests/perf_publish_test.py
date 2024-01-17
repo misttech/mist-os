@@ -24,7 +24,12 @@ fuchsia.my.benchmark: metric_3
 fuchsia.my.benchmark: metric_4 [optional]
 """
 
+_EXPECTED_METRICS_NO_SUMMARIZE = (
+    f"""[no-summarize-metrics]\n{_EXPECTED_METRICS}"""
+)
+
 _EXPECTED_METRICS_FILE = "expected_metrics.txt"
+_EXPECTED_METRICS_NO_SUMMARIZE_FILE = "expected_metrics_no_summarize.txt"
 _EMPTY_EXPECTED_METRICS_FILE = "empty_metrics.txt"
 
 _TEST_FUCHSIA_PERF = json.dumps(
@@ -102,6 +107,9 @@ class CatapultConverterTest(unittest.TestCase):
         self._expected_metrics_txt: str = self._init_file(
             _EXPECTED_METRICS_FILE, _EXPECTED_METRICS
         )
+        self._expected_metrics_no_summarize_txt: str = self._init_file(
+            _EXPECTED_METRICS_NO_SUMMARIZE_FILE, _EXPECTED_METRICS_NO_SUMMARIZE
+        )
         self._empty_expected_metrics: str = self._init_file(
             _EMPTY_EXPECTED_METRICS_FILE, ""
         )
@@ -136,6 +144,7 @@ class CatapultConverterTest(unittest.TestCase):
         converter: publish.CatapultConverter = (
             publish.CatapultConverter.from_env(
                 [self._empty_fuchsia_perf_json],
+                _EMPTY_EXPECTED_METRICS_FILE,
                 env={
                     publish.ENV_RELEASE_VERSION: "1",
                 },
@@ -156,7 +165,7 @@ class CatapultConverterTest(unittest.TestCase):
             )
         )
 
-        converter.run(_EMPTY_EXPECTED_METRICS_FILE)
+        converter.run()
 
         subprocess_check_call.assert_called_with(
             [
@@ -184,6 +193,7 @@ class CatapultConverterTest(unittest.TestCase):
         converter: publish.CatapultConverter = (
             publish.CatapultConverter.from_env(
                 [self._test_fuchsia_perf_json],
+                self._expected_metrics_txt,
                 env={
                     publish.ENV_RELEASE_VERSION: "1",
                 },
@@ -193,7 +203,7 @@ class CatapultConverterTest(unittest.TestCase):
             )
         )
 
-        converter.run(self._expected_metrics_txt)
+        converter.run()
 
         self.assertTrue(os.path.isfile(self._expected_input_path))
 
@@ -251,6 +261,7 @@ class CatapultConverterTest(unittest.TestCase):
         converter: publish.CatapultConverter = (
             publish.CatapultConverter.from_env(
                 [self._empty_fuchsia_perf_json],
+                _EMPTY_EXPECTED_METRICS_FILE,
                 env={
                     publish.ENV_CATAPULT_DASHBOARD_MASTER: "the-master",
                     publish.ENV_CATAPULT_DASHBOARD_BOT: "the-bot",
@@ -264,7 +275,7 @@ class CatapultConverterTest(unittest.TestCase):
             )
         )
 
-        converter.run(_EMPTY_EXPECTED_METRICS_FILE)
+        converter.run()
 
         subprocess_check_call.assert_called_with(
             [
@@ -301,14 +312,15 @@ class CatapultConverterTest(unittest.TestCase):
         converter: publish.CatapultConverter = (
             publish.CatapultConverter.from_env(
                 [self._empty_fuchsia_perf_json],
-                env,
+                _EMPTY_EXPECTED_METRICS_FILE,
+                env=env,
                 current_time=12345,
                 subprocess_check_call=subprocess_check_call,
                 runtime_deps_dir=self._temp_dir.name,
             )
         )
 
-        converter.run(_EMPTY_EXPECTED_METRICS_FILE)
+        converter.run()
 
         subprocess_check_call.assert_called_with(
             [
@@ -337,15 +349,13 @@ class CatapultConverterTest(unittest.TestCase):
         Test case that ensures that we correctly validate the expected metrics
         """
         subprocess_check_call: mock.Mock = mock.Mock()
-        converter: publish.CatapultConverter = (
+        with self.assertRaises(ValueError) as context:
             publish.CatapultConverter.from_env(
                 [self._mismatch_metrics_fuchsia_perf_json],
-                subprocess_check_call=subprocess_check_call,
+                _EXPECTED_METRICS_FILE,
                 runtime_deps_dir=self._temp_dir.name,
+                subprocess_check_call=subprocess_check_call,
             )
-        )
-        with self.assertRaises(ValueError) as context:
-            converter.run(_EXPECTED_METRICS_FILE)
         self.assertIn(
             (
                 " fuchsia.my.benchmark: metric_1\n"
@@ -367,12 +377,13 @@ class CatapultConverterTest(unittest.TestCase):
         converter: publish.CatapultConverter = (
             publish.CatapultConverter.from_env(
                 [self._test_fuchsia_perf_json],
+                _EXPECTED_METRICS_FILE,
                 current_time=12345,
                 runtime_deps_dir=self._temp_dir.name,
                 subprocess_check_call=subprocess_check_call,
             )
         )
-        converter.run(_EXPECTED_METRICS_FILE)
+        converter.run()
 
         subprocess_check_call.assert_called_with(
             [
@@ -402,6 +413,7 @@ class CatapultConverterTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             converter: publish.CatapultConverter = publish.CatapultConverter.from_env(
                 [self._mismatch_metrics_fuchsia_perf_json],
+                _EXPECTED_METRICS_FILE,
                 env={
                     publish.ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR: tmpdir,
                 },
@@ -409,7 +421,7 @@ class CatapultConverterTest(unittest.TestCase):
                 subprocess_check_call=subprocess_check_call,
                 runtime_deps_dir="/fake/path",
             )
-            converter.run(_EXPECTED_METRICS_FILE)
+            converter.run()
             with open(os.path.join(tmpdir, _EXPECTED_METRICS_FILE), "r") as f:
                 contents = f.read()
                 self.assertEqual(
@@ -441,13 +453,11 @@ class CatapultConverterTest(unittest.TestCase):
         """
         Test case that ensures that we correctly validate the expected metrics
         """
-        converter: publish.CatapultConverter = (
+        with self.assertRaises(ValueError) as context:
             publish.CatapultConverter.from_env(
                 [self._invalid_suite_fuchsia_perf_json],
+                _EXPECTED_METRICS_FILE,
             )
-        )
-        with self.assertRaises(ValueError) as context:
-            converter.run(_EXPECTED_METRICS_FILE)
         self.assertTrue(
             '"invalid_test_suite_name" does not match' in str(context.exception)
         )
@@ -480,15 +490,62 @@ class CatapultConverterTest(unittest.TestCase):
         converter: publish.CatapultConverter = (
             publish.CatapultConverter.from_env(
                 [test_perf_file],
+                expected_metrics_file,
                 env={
                     publish.ENV_RELEASE_VERSION: "1",
                 },
             )
         )
 
-        converter.run(expected_metrics_file)
+        converter.run()
         self.assertTrue(os.path.isfile(self._expected_local_output_path))
         self.assertFalse(os.path.isfile(self._expected_output_path))
+
+    def test_converter_with_summarization_disabled(self) -> None:
+        """Test case that ensures we correctly run the Converter with summarization disabled."""
+        with open(self._test_fuchsia_perf_json, "r") as f:
+            input_perf_json = json.load(f)
+
+        subprocess_check_call: mock.Mock = mock.Mock()
+        converter: publish.CatapultConverter = (
+            publish.CatapultConverter.from_env(
+                [self._test_fuchsia_perf_json],
+                self._expected_metrics_no_summarize_txt,
+                env={
+                    publish.ENV_RELEASE_VERSION: "1",
+                },
+                current_time=12345,
+                subprocess_check_call=subprocess_check_call,
+                runtime_deps_dir=self._temp_dir.name,
+            )
+        )
+
+        self.assertTrue(os.path.isfile(self._expected_input_path))
+        with open(self._expected_input_path, "r") as f:
+            final_perf_json = json.load(f)
+        self.assertEqual(final_perf_json, input_perf_json)
+
+        converter.run()
+
+        subprocess_check_call.assert_called_with(
+            [
+                os.path.join(self._temp_dir.name, "catapult_converter"),
+                "--input",
+                self._expected_input_path,
+                "--output",
+                self._expected_local_output_path,
+                "--execution-timestamp-ms",
+                "12345000",
+                "--masters",
+                "local-master",
+                "--log-url",
+                "http://ci.example.com/build/300",
+                "--bots",
+                "local-bot",
+                "--product-versions",
+                "1",
+            ]
+        )
 
     def _init_file(self, filename: str, contents: str):
         file_path = os.path.join(self._temp_dir.name, filename)

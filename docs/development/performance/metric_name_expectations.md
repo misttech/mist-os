@@ -93,3 +93,32 @@ are optional.  (Comment lines start with "#".)
 This also allows for metrics to be non-determistic in whether they are
 produced or not.  However, having a non-deterministic metric will
 usually be considered a bug that should be fixed.
+
+## Skipping summarization of metrics
+
+By default, when using the Python `perf_publish` library, the fuchsiaperf files
+that get published are the summarized versions.
+
+This summarization does two things that are worth calling out:
+
+*   We treat the first value in each fuchsiaperf entry as a warm-up run and drop
+    it.
+*   There may be multiple entries for the same test case (for
+    multiple process runs), in which case we merge them.
+
+Doing this as a postprocessing step has these benefits:
+
+*   It avoids the need to implement this processing either upstream (in the C++
+    perftest library or in similar libraries for other languages) or in
+    downstream consumers.
+*   The summary fuchsiaperf file is much smaller than the "raw data" fuchsiaperf
+    files and hence more manageable.
+*   The "raw data" fuchsiaperf files can still be made available for anyone who
+    wishes to analyze the raw data.
+
+In some cases though, this might be undesirable: to keep the initial iterations'
+times instead of dropping them or to allow standard deviations to be reported
+to Chromeperf and have them displayed in the graphs.
+
+Therefore, summarization can be turned off by adding `[no-summarize-metrics]`
+at the top of a metric names expectations file.
