@@ -218,5 +218,12 @@
       cpu_stats_handler: "cpu_stats",
       syscall_handler: "syscall_handler"
     }
+  },
+  {
+    type: "ThermalWatcher",
+    name: "thermal_watcher",
+    dependencies: {
+      thermal_handler_node: "cpu_manager_main"
+    }
   }
 ]

@@ -7,6 +7,34 @@
             {
                 "properties": {
                     "type": {
+                        "pattern": "ThermalWatcher"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "thermal_handler_node": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "thermal_handler_node"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
                         "pattern": "CpuControlHandler"
                     },
                     "name": {

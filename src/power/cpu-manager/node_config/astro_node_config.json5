@@ -30,5 +30,12 @@
       cpu_stats_handler_node: "cpu_stats",
       cpu_dev_handler_node: "cpu_dev"
     }
+  },
+  {
+    type: "ThermalWatcher",
+    name: "thermal_watcher",
+    dependencies: {
+      thermal_handler_node: "cpu_control"
+    }
   }
 ]

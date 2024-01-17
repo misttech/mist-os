@@ -8,7 +8,10 @@ use cpu_manager_config_lib;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
-use futures::{future::join_all, stream::StreamExt};
+use futures::{
+    future::{join_all, LocalBoxFuture},
+    stream::{FuturesUnordered, StreamExt},
+};
 use serde_json as json;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -17,7 +20,7 @@ use tracing::*;
 // nodes
 use crate::{
     cpu_control_handler, cpu_device_handler, cpu_manager_main, cpu_stats_handler,
-    dev_control_handler, syscall_handler,
+    dev_control_handler, syscall_handler, thermal_watcher,
 };
 
 pub struct CpuManager {
@@ -43,7 +46,8 @@ impl CpuManager {
         structured_config.record_inspect(fuchsia_inspect::component::inspector().root());
         log_config(&structured_config);
 
-        self.create_nodes_from_config(&structured_config)
+        let node_futures = FuturesUnordered::new();
+        self.create_nodes_from_config(&structured_config, &node_futures)
             .await
             .context("Failed to create nodes from config")?;
 
@@ -52,12 +56,15 @@ impl CpuManager {
         // process.
         fs.take_and_serve_directory_handle()?;
 
+        let node_futures_task = fasync::Task::local(node_futures.collect::<()>());
+        let service_fs_task = fasync::Task::local(fs.collect::<()>());
+
         self.init_nodes().await?;
 
         info!("Setup complete");
 
-        // Run the ServiceFs futures. This future never completes.
-        fs.collect::<()>().await;
+        // Run the ServiceFs and node futures. This future never completes.
+        futures::join!(service_fs_task, node_futures_task);
 
         Err(format_err!("Tasks completed unexpectedly"))
     }
@@ -66,6 +73,7 @@ impl CpuManager {
     async fn create_nodes_from_config(
         &mut self,
         structured_config: &cpu_manager_config_lib::Config,
+        node_futures: &FuturesUnordered<LocalBoxFuture<'_, ()>>,
     ) -> Result<(), Error> {
         let node_config_path = &structured_config.node_config_path;
         let contents = std::fs::read_to_string(node_config_path)?;
@@ -73,17 +81,21 @@ impl CpuManager {
             .context(format!("Failed to parse file {}", node_config_path))?;
 
         info!("Creating nodes from config file: {}", node_config_path);
-        self.create_nodes(json_data).await
+        self.create_nodes(json_data, node_futures).await
     }
 
     /// Creates the nodes using the specified JSON object, adding them to the `nodes` HashMap.
-    async fn create_nodes(&mut self, json_data: json::Value) -> Result<(), Error> {
+    async fn create_nodes(
+        &mut self,
+        json_data: json::Value,
+        node_futures: &FuturesUnordered<LocalBoxFuture<'_, ()>>,
+    ) -> Result<(), Error> {
         // Iterate through each object in the top-level array, which represents configuration for a
         // single node
         for node_config in json_data.as_array().unwrap().iter() {
             info!("Creating node {}", node_config["name"]);
             let node = self
-                .create_node(node_config.clone())
+                .create_node(node_config.clone(), node_futures)
                 .await
                 .with_context(|| format!("Failed creating node {}", node_config["name"]))?;
             self.nodes.insert(node_config["name"].as_str().unwrap().to_string(), node);
@@ -93,7 +105,11 @@ impl CpuManager {
 
     /// Uses the supplied `json_data` to construct a single node, where `json_data` is the JSON
     /// object corresponding to a single node configuration.
-    async fn create_node(&mut self, json_data: json::Value) -> Result<Rc<dyn Node>, Error> {
+    async fn create_node(
+        &mut self,
+        json_data: json::Value,
+        node_futures: &FuturesUnordered<LocalBoxFuture<'_, ()>>,
+    ) -> Result<Rc<dyn Node>, Error> {
         let node_name = json_data["name"].clone();
         let _log_warning_task = fasync::Task::local(async move {
             fasync::Timer::new(fasync::Duration::from_seconds(30)).await;
@@ -101,6 +117,10 @@ impl CpuManager {
         });
 
         Ok(match json_data["type"].as_str().unwrap() {
+            "ThermalWatcher" => {
+                thermal_watcher::ThermalWatcherBuilder::new_from_json(json_data, &self.nodes)
+                    .build(node_futures)?
+            }
             "CpuControlHandler" => {
                 cpu_control_handler::CpuControlHandlerBuilder::new_from_json(json_data, &self.nodes)
                     .build()?
@@ -179,7 +199,8 @@ mod tests {
             },
         ]);
         let mut cpu_manager = CpuManager::new();
-        cpu_manager.create_nodes(json_data).await.unwrap();
+        let node_futures = FuturesUnordered::new();
+        cpu_manager.create_nodes(json_data, &node_futures).await.unwrap();
     }
 
     /// Tests that all nodes in a given config file have a unique name.

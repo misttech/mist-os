@@ -18,6 +18,7 @@ cpu_manager_deps = [
   "//src/lib/diagnostics/inspect/contrib/rust",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
+  "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia",
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-component",
@@ -53,6 +54,7 @@ cpu_manager_sources = [
   "src/syscall_handler.rs",
   "src/test/mock_node.rs",
   "src/test/mod.rs",
+  "src/thermal_watcher.rs",
 ]
 
 rustc_binary("bin") {
