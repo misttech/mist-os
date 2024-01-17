@@ -133,7 +133,7 @@ fuchsia_structured_config_values("default_config_values") {
     reject_incoming_voice_call = false
     three_way_calling = false
     in_band_ringtone = false
-    echo_canceling_and_noise_reduction = true
+    echo_canceling_and_noise_reduction = false
     voice_recognition = false
     attach_phone_number_to_voice_tag = false
     respond_and_hold = false
