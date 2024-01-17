@@ -141,10 +141,10 @@ The format may be expanded as need arises.
 
     * `name` (String): The name of the platform surface element.
 
-    * `file` (optional[String]): The file path to the file where the element is
+    * `file` (optional\[String\]): The file path to the file where the element is
         located.
 
-    * `line` (optional[Integer]): The line of `file` where the element is
+    * `line` (optional\[Integer\]): The line of `file` where the element is
         defined.
 
 #### Sample

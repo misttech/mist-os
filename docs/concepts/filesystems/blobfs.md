@@ -132,7 +132,7 @@ An ExtentContainer holds references to several (up to 6) extents, which store
 some of the contents of a blob.
 
 The extents in an ExtentContainer are logically contiguous (i.e. the logical
-addressable chunk of the blob stored in extents[0] is before extents[1]) and are
+addressable chunk of the blob stored in `extents[0]` is before `extents[1]`) and are
 filled in order. If `next_node` is set, then the ExtentContainer must be full.
 
 ![Layout of a BlobFS ExtentContainer](images/blobfs-extentcontainer-layout.svg "extentcontainer_layout")

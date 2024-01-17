@@ -198,7 +198,7 @@ The following are a list of changes that must be transitionable:
     *   Motivation: it must be possible to gradually add members, fields,
         or variants.
 *   Removing a member of an enum or bits, field of a table, or variant of
-    an extensible union marked as [Transitional].
+    an extensible union marked as `[Transitional].`
     *   Use: it must be possible to access all non-transitional
         members/bits/fields/variants and to construct values of the
         enum/bits/table/extensible union that do not include the

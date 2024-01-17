@@ -115,7 +115,7 @@ to serialized the data.
 
 | Key      | Value Type                               | Description                               |
 | -------- | ---------------------------------------- | ----------------------------------------- |
-| logSpam  | List of [LogSpamEntry] (#log-spam-entry) | List of log spam entries                  |
+| logSpam  | List of [LogSpamEntry](#log-spam-entry) | List of log spam entries                  |
 
 The following example represents an empty Log Spam Definition:
 

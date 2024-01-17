@@ -7,8 +7,6 @@ Note: Formerly known as [FTP](../deprecated-ftp-process.md)-048.
 
 ## Summary
 
-## Summary
-
 To better align ABI implications around extensible unions (or simply unions), we
 propose to:
 
@@ -20,7 +18,7 @@ propose to:
    (rather than 32 bits).
 
 These changes **make flexible unions syntactically closer to tables**, and
-**correct odd[[2]](#footnote2) and unduly strict ABI restrictions** today around
+**correct odd[^2] and unduly strict ABI restrictions** today around
 renaming unions or union members.
 
 ## Motivation and design
@@ -52,7 +50,7 @@ motivated by two key use cases:
 
 * **Protocols can be composed**, and we therefore need a global ordinal
   assignment scheme to avoid breakage at a distance issues. See [RFC-0063:
-  [OrdinalRange]](/docs/contribute/governance/rfcs/0063_OrdinalRange.md), [RFC-0020: Interface Ordinal Hashing](/docs/contribute/governance/rfcs/0020_interface_ordinal_hashing.md),
+  [OrdinalRange](/docs/contribute/governance/rfcs/0063_OrdinalRange.md), [RFC-0020: Interface Ordinal Hashing](/docs/contribute/governance/rfcs/0020_interface_ordinal_hashing.md),
   and [RFC-0029: Increasing Method Ordinals](/docs/contribute/governance/rfcs/0029_increasing_method_ordinals.md).
 * Practically **globally unique identifiers** greatly simplify and bolster
   monitoring and tracing like needs, e.g. fidlcat hinges on the ability to
@@ -71,9 +69,13 @@ Right now, there are 4 bytes of padding in a union inline content:
 * Padding (`uint32`)
 * [Envelope][wire-format-envelopes] (16 bytes)
 
-Instead, we want all bytes to be called for explicitly in the format and therefore change the ordinal to 64b. Generally, we prefer padding-less structures since they are more efficient (e.g. do not require explicit memsets or extra coding tables).
+Instead, we want all bytes to be called for explicitly in the format
+and therefore change the ordinal to 64b. Generally, we prefer padding-less
+structures since they are more efficient (e.g. do not require explicit memsets
+or extra coding tables).
 
-See the [Implementation Strategy](#implementation-strategy) section for how to soft-transition to 64-bit ordinals.
+See the [Implementation Strategy](#implementation-strategy) section for how to
+soft-transition to 64-bit ordinals.
 
 ### JSON Wire Format
 
@@ -110,18 +112,18 @@ can be done by:
    is never lower than N. For example, if N is 512, a hashed ordinal's hex value
    MUST be at least 0x200.
   * A hashed ordinal that is < 0x200 will result in a compile error, and the
-    field name must be manually renamed with the [Selector=] attribute. We would
-    add [Selector] to the appropriate fields before landing this change in
+    field name must be manually renamed with the `[Selector=]` attribute. We would
+    add `[Selector]` to the appropriate fields before landing this change in
     fidlc.
   * Given the randomness of the existing hashing scheme, we expect a hashing
     error to occur near-zero times, so manual resolution will likely not be
     necessary.
-  * Adding this check effectively allocates the [0..N] ordinal space for
+  * Adding this check effectively allocates the `[0..N]` ordinal space for
     explicit ordinals, and ensures it will not clash with hashed ordinals.
 2. When language bindings interpret the ordinal value:
-  * if the ordinal is between [0, N), the ordinal is 64-bit & explicit.
-  * if the ordinal is between [N, UINT32_MAX], the ordinal is 32-bit and hashed.
-  * if the ordinal is between [UINT32_MAX, UINT64_MAX), bindings MUST evoke an
+  * if the ordinal is between `[0, N)`, the ordinal is 64-bit & explicit.
+  * if the ordinal is between `[N, UINT32_MAX]`, the ordinal is 32-bit and hashed.
+  * if the ordinal is between `[UINT32_MAX, UINT64_MAX)`, bindings MUST evoke an
     error and close the channel with epitaph.
 
 ## Ergonomics
@@ -184,11 +186,9 @@ None that is particularly relevant.
 "Union" in this document refers to [extensible unions](/docs/contribute/governance/rfcs/0061_extensible_unions.md), not "static"
 unions nearing their end-of-life.
 
-##### Footnote2
-
-Odd in the sense that names have no impact on the binary wire format of messages
-(i.e. bits, enum, struct, table), except for unions. It's therefore a case that
-stands out as being different than others.
+[^2]: Odd in the sense that names have no impact on the binary wire format of messages
+    (i.e. bits, enum, struct, table), except for unions. It's therefore a case that
+    stands out as being different than others.
 
 ##### Footnote3
 

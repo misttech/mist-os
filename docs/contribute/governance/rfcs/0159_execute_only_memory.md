@@ -154,7 +154,7 @@ using the only 4 available bits. EL0 is the exception level for userspace. Rows
 0 and 2 show how to create userspace execute-only pages. See Table D5-34 Stage 1
 from the ARMv8 Reference Manual.
 
-| UXN | PXN | AP[2:1] | Access from a higher Exception level | Access from EL0  |
+| UXN | PXN | AP\[2:1\] | Access from a higher Exception level | Access from EL0  |
 |-----|-----|---------|--------------------------------------|------------------|
 | 0   | 1   | 00      | R, W                                 | X                |
 | 0   | 1   | 01      | R, W                                 | R, W, X          |

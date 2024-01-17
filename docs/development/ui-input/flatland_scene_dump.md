@@ -151,7 +151,7 @@ Information about each image is represented on three lines.
 The first line shows the image properties. This includes:
 
 *   The size in pixels, represented as "`[width]x[height]`"
-*   The RGBA color, with each value in the range [0.0, 1.0]
+*   The RGBA color, with each value in the range `[0.0, 1.0]`
 *   The
     [fuchsia.ui.composition.Flatland.BlendMode](/sdk/fidl/fuchsia.ui.composition/flatland.fidl)
 
@@ -163,7 +163,7 @@ The third line lists the properties of the Image Rectangle. This includes:
 *   The extent, representing the width and the height of the Rectangle.
 *   The clockwise mapping UVs. Starting at the top-left corner and rotating
     clockwise, each corner's `(x, y)` sample point is represented with a value
-    in the range [0.0, 1.0]. The clockwise UVs therefore contain information
+    in the range `[0.0, 1.0]`. The clockwise UVs therefore contain information
     about the sample region, clipping region and rotation.
 
 [flatland-concepts]: /docs/concepts/ui/scenic/flatland/index.md

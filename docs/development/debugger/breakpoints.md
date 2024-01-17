@@ -144,7 +144,7 @@ Notes:
 
   * Unlike GDB, "watch" will evaluate the expression once and set a breakpoint on the result. It
     won't re-evaluate the expression. In the above example, it will trigger when "bar" changes but
-    not if "foo[5]" changes to point to a different "bar".
+    not if `foo[5]` changes to point to a different "bar".
 
   * If you watch a variable on the stack and nobody touches it, you will often see it hit in
     another part of the program when the stack memory is re-used. If you get a surprising breakpoint

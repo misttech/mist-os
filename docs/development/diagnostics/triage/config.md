@@ -152,7 +152,7 @@ Selectors with wildcards, selectors for `bootstrap/driver_manager` and
 multiple items in a vector. To process such values, Triage provides the
 following functions:
 
-*   Fn(parameters, expression) - for example, "Fn([a, b], a+b)"
+*   Fn(parameters, expression) - for example, `Fn([a, b], a+b)`
 *   Map(function, vector1, vector2...)
 *   Fold(function, vector) or Fold(function, vector, start_value)
 *   Filter(function, vector)

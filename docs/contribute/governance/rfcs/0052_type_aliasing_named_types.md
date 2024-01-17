@@ -72,7 +72,7 @@ this deprecation is threefold:
 where type generics exist, the language would have a better and more formal way
 to describe types and type aliases that can be parameterized.
 2. The FIDL language has not undergone a formal decision on how generics would
-translate to languages that don't support generics (i.e. Go [[1]](#Footnote1), C).
+translate to languages that don't support generics (i.e. Go [^1], C).
 3. The current syntax creates scenarios where type parameters may be
 *implicitly* required to create a fully-formed type. Furthermore, the specifics
 of how to parse and parameterize a nested partial type alias (i.e.
@@ -91,7 +91,7 @@ revisit this decision in the future, if or when protocols become more type-like
 | C                      | (vectors do not exist in simple C bindings)<br>`typedef small_bytes uint8_t*;` |
 | C++                    | `using SmallBytes = std::vector<uint8_t>;` |
 | Rust                   | `type SmallBytes = Vec<u8>;` |
-| Dart [[2]](#Footnote2) | `typedef SmallBytes = List<int>;` |
+| Dart [^2]              | `typedef SmallBytes = List<int>;` |
 | Go                     | `type SmallBytes = []uint8;` |
 
 ### New Type
@@ -151,7 +151,7 @@ language feature or make the new type ergonomic to use. For example:
 | C        | Unfortunately, C's type system has no good representation. Fallback to `typedef`.|
 | C++      | The new type can be translated to a `class` that may expose the functionality of the following from the underlying type: (1) explicit conversion constructor, (2) explicit assignment operator, (3) arithmetic & bitwise operations, and (4) misc operators (`[]`, `*`, `->`, etc.) |
 | Rust     | The new type can be translated to a singleton struct that derives traits such as `From<UnderlyingType>`, `Into<UnderlyingType>`, `Hash`, `PartialEq`, `Copy`, `Clone`, `std::ops::*`, etc. that the underlying type implements. |
-| Dart     | From conversations with the Dart team, there is currently no way to map new type semantics to the language, though there have been discussions of supporting such a use case [[3]](#Footnote3).<br>A new type can be downgraded to a type alias, pending #65 [[2]](#Footnote2). |
+| Dart     | From conversations with the Dart team, there is currently no way to map new type semantics to the language, though there have been discussions of supporting such a use case [^3].<br>A new type can be downgraded to a type alias, pending #65 [^2]. |
 | Go       | A new type maps directly to a type definition.<br>`type <NewType> <UnderlyingType>` |
 
 The set of innate functionality of the underlying type are henceforth referred
@@ -278,18 +278,10 @@ impl Mul for MyNumber {
 // ...implement other traits here...
 ```
 
-------------------------------------------------------------------------------------------
+[^1]: Go [will have generics](https://blog.golang.org/generics-next-step) in the near future.
 
-##### Footnote1
+[^2]: Pending Dart's introduction of
+    [typedefs for non-function types (#65)](https://github.com/dart-lang/language/issues/65).
 
-Go [will have generics](https://blog.golang.org/generics-next-step) in the near future.
-
-##### Footnote2
-
-Pending Dart's introduction of
-[typedefs for non-function types (#65)](https://github.com/dart-lang/language/issues/65).
-
-##### Footnote3
-
-See comment at Dart's issue
-[#42](https://github.com/dart-lang/language/issues/42#issuecomment-502966868).
+[^3]: See comment at Dart's issue
+    [#42](https://github.com/dart-lang/language/issues/42#issuecomment-502966868).

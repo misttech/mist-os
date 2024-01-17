@@ -149,8 +149,8 @@ Relevant syscall docs need to be updated:
 
 ## Drawbacks, alternatives, and unknowns
 
-The original discardable RFC describes an [optimizing using atomics]
-(https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0012_zircon_discardable_memory#faster_locking_api_with_atomics)
+The original discardable RFC describes an
+[optimizing using atomics][using-atomics]
 that could provide the majority of the desired performance increase. There are
 two drawbacks to this approach:
 
@@ -164,3 +164,6 @@ two drawbacks to this approach:
 ## Prior art and references
 
 None
+
+<!-- xrefs -->
+[using-atomics]: /docs/contribute/governance/rfcs/0012_zircon_discardable_memory.md#faster_locking_api_with_atomics

@@ -133,7 +133,7 @@ source_set("foo_client") {
 ```
 
 See also:
-[474231: [build] Add library_headers() template.](https://fuchsia-review.googlesource.com/c/fuchsia/+/474231)
+[474231: \[build\] Add library_headers() template.](https://fuchsia-review.googlesource.com/c/fuchsia/+/474231)
 
 ### Completing a task
 
@@ -145,8 +145,8 @@ Send the change for review using the regular process.
 
 ## Examples
 
-*   [479158: [teec] Migrate from zx_library](https://fuchsia-review.googlesource.com/c/fuchsia/+/479158)
-*   [535943: [zxio] Move off of zx unification build rules to a regular static_library](https://fuchsia-review.googlesource.com/q/I634226a6c5d9ad053f01e703e2836c5e9b7b5fa8)
+*   [479158: \[teec\] Migrate from zx_library](https://fuchsia-review.googlesource.com/c/fuchsia/+/479158)
+*   [535943: \[zxio\] Move off of zx unification build rules to a regular static_library](https://fuchsia-review.googlesource.com/q/I634226a6c5d9ad053f01e703e2836c5e9b7b5fa8)
 
 ## Sponsors
 

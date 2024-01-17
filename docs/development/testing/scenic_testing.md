@@ -181,7 +181,7 @@ fx set workstation_eng.x64 --with "//src/ui/examples"
 
 You can launch the stories (modules) in any shell you are in:
 
-* In Ermine shell, you can run modules by typing in the package name (e.g. `flatland-view-provider`) in the [ASK] bar to run modules.
+* In Ermine shell, you can run modules by typing in the package name (e.g. `flatland-view-provider`) in the \[ASK\] bar to run modules.
 
 * Or, use command `ffx session add <component_name>` command to launch a component in the shell.
 
@@ -195,4 +195,3 @@ You can launch the stories (modules) in any shell you are in:
 
 <!-- Reference links -->
 
-[run_fuchsia_tests]: /docs/development/testing/run_fuchsia_tests.md

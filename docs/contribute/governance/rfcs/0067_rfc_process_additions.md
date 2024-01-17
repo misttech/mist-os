@@ -133,8 +133,8 @@ For any significant changes in design, please submit a new RFC.
  * If there are multiple RFCs that make changes to the same area, create a new RFC
  compiling the existing RFCs. Please also amend the existing RFCs to reference the new one.
 
-If the RFC process is being updated, please also update the [RFC process page]
-(rfc_process.md).
+If the RFC process is being updated, please also update the
+[RFC process page](rfc_process.md).
 
 ## Drawbacks, alternatives, and unknowns
 

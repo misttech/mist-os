@@ -154,7 +154,7 @@ this suppression, you should remove the suppression, attempt to reproduce the
 issue as outlined above, and fix it.
 
 If instead of fixing it right away, you file a bug, title the bug with
-"[hermetic]" and include the output of tracing from the failed build action in
+"\[hermetic\]" and include the output of tracing from the failed build action in
 the description. Comment about the access violation if you know where it is
 coming from.
 
@@ -166,7 +166,7 @@ Sometimes an input/output is well-known at build time but just isn't specified,
 or it's specified incorrectly. These are common and straightforward to fix.
 For instance:
 
-*   [472657: [build] Fix hermeticity of hotsort_target_internal](https://fuchsia-review.googlesource.com/c/fuchsia/+/472657)
+*   [472657: \[build\] Fix hermeticity of hotsort_target_internal](https://fuchsia-review.googlesource.com/c/fuchsia/+/472657)
 
 ### Inputs not known until action runtime
 
@@ -176,11 +176,11 @@ are for.
 
 You can find an example for fixing a build action to generate a depfile here:
 
-*   [472565: [build] Generate depfile in generate_fidl_json.py](https://fuchsia-review.googlesource.com/c/fuchsia/+/472565)
-*   [472657: [build] Fix hermeticity of hotsort_target_internal](https://fuchsia-review.googlesource.com/c/fuchsia/+/472657)
-*   [473980: [build] Fix hermeticity of fidl-c-header](https://fuchsia-review.googlesource.com/c/fuchsia/+/473980)
-*   [472658: [build] Make go_library build hermetically](https://fuchsia-review.googlesource.com/c/fuchsia/+/472658)
-*   [472637: [build] Fix hermeticity of flatbuffer](https://fuchsia-review.googlesource.com/c/third_party/flatbuffers/+/472637)
+*   [472565: \[build\] Generate depfile in generate_fidl_json.py](https://fuchsia-review.googlesource.com/c/fuchsia/+/472565)
+*   [472657: \[build\] Fix hermeticity of hotsort_target_internal](https://fuchsia-review.googlesource.com/c/fuchsia/+/472657)
+*   [473980: \[build\] Fix hermeticity of fidl-c-header](https://fuchsia-review.googlesource.com/c/fuchsia/+/473980)
+*   [472658: \[build\] Make go_library build hermetically](https://fuchsia-review.googlesource.com/c/fuchsia/+/472658)
+*   [472637: \[build\] Fix hermeticity of flatbuffer](https://fuchsia-review.googlesource.com/c/third_party/flatbuffers/+/472637)
 
 ### Action arguments missing from inputs/outputs
 

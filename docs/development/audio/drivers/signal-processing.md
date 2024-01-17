@@ -118,7 +118,7 @@ defined by the PE types and parameters. PE types define standard signal processi
 `DELAY`, `EQUALIZER`, etc), vendor specific signal processing (`VENDOR_SPECIFIC` e.g. a type not
 defined in the `SignalProcessing` protocol) and `CONNECTION_POINT`s/`ENDPOINT`s used to construct
 multi-pipelines topologies (allow for pipelines start, end, routing and mixing definitions, see
-[Connection points](#connection-points) and [Endpoints](endpoints} below).
+[Connection points](#connection-points) and [Endpoints](#endpoints)} below).
 
 Each individual PE may have one or more inputs and one or more output channels. For routing and
 mixing, PEs may make the number of output channels different from the number of input channels.

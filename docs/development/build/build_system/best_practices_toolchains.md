@@ -150,8 +150,8 @@ action](#put-toolchain-agnostic-actions-in-the-default-toolchain).
 
 To get to a non-default toolchain, you have to redirect to it at some point.
 Push these redirections as far up the build graph as possible. This results in
-fewer redirections, and allows you to [assert on the expected toolchain]
-(#assert-on-the-expected-toolchain).
+fewer redirections, and allows you to
+[assert on the expected toolchain](#assert-on-the-expected-toolchain).
 
 <span class="compare-better">Recommended</span>: Redirecting to `host_toolchain`
 once earlier in the build.

@@ -145,9 +145,7 @@ In order to land the change, we need to:
     system-updater's out directory.
 * Modify the [BUILD](https://cs.opensource.google/fuchsia/fuchsia/+/main:build/resources/BUILD.gn;l=2074;drc=2f584c4a62374f37361ac04875e60b5459fcc3b5)
   so that `epoch.json` also gets put into the update package.
-* The system-updater should examine `epoch.json` at the end of the [Prepare](https://cs.opensource.g
-  oogle/fuchsia/fuchsia/+/main:src/sys/pkg/bin/system-updater/src/update.rs;l=373;drc=91f4bd84db87
-  4b5693f4f8040e4f5a39facc701b) phase.
+* The system-updater should examine `epoch.json` at the end of the [Prepare][src-prepare] phase.
   * If there is no `epoch.json` in the update package or there is a problem with deserializing it,
     assume epoch is 0. We deliberately ignore errors so that we can still OTA if the `epoch.json`
     schema changes.
@@ -228,3 +226,7 @@ systems have their own version identifiers), it seems that would be a simpler op
 
 James Sullivan contributed to the motiviation and stepping stone sections. Zach Kirschenbaum wrote
 the original design doc, which was reviewed by Dan Johnson.
+
+<!-- xrefs -->
+
+[src-prepare]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/sys/pkg/bin/system-updater/src/update.rs;l=373;drc=91f4bd84db874b5693f4f8040e4f5a39facc701b

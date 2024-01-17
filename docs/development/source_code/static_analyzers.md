@@ -181,7 +181,7 @@ temp file, and report its contents, as an example see [buildifier].
 
 By default, `os_exec` raises an un-recoverable error if the subprocess produces
 a nonzero return code. If non-zero return codes are expected, you can use the
-ok_retcodes parameter, e.g. ok_retcodes = [0, 1] may be appropriate if the
+ok_retcodes parameter, e.g. `ok_retcodes = [0, 1]` may be appropriate if the
 formatter produces a return code of 1 when the file is unformatted.
 
 ### Locally running checks

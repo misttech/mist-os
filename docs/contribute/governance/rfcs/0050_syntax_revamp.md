@@ -179,7 +179,7 @@ This syntax provides a simplified way to consider ABI implications of a change,
 and in particular leads to two shorthand rules:
 
 1. If two types have a different layout, it is not possible to soft transition
-   from one to the other, and vice versa [[1]](#Footnote1), i.e. **changing the
+   from one to the other, and vice versa [^1], i.e. **changing the
    left hand side breaks ABI**
 2. Constraints can evolve, and as long as writers are more constrained than
    readers, things are compatible, i.e. **it is possible to evolve the right
@@ -1180,12 +1180,8 @@ On type aliasing and named types
 
 *   [RFC-0052: Type Aliasing and New Types][rfc-0052]
 
---------------------------------------------------------------------------------------------
-
-##### Footnote1
-
-Or at least, not without a good understanding of the wire format and care, e.g.
-[https://fxbug.dev/360015](https://fuchsia-review.googlesource.com/c/fuchsia/+/360015)
+[^1]: Or at least, not without a good understanding of the wire format and care, e.g.
+    [https://fxbug.dev/360015](https://fuchsia-review.googlesource.com/c/fuchsia/+/360015)
 
 ##### Footnote2
 
