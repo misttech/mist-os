@@ -50,6 +50,11 @@ typedef struct {
 typedef struct {
   // ID that represents this logical CPU (i.e., hart) in SBI.
   uint64_t hart_id;
+
+  // Index into the ZBI_TYPE_RISCV64_ISA_STRTAB string table payload giving
+  // the start of the associated ISA string.
+  uint32_t isa_strtab_index;
+  uint32_t reserved;
 } zbi_topology_riscv64_info_t;
 
 #define ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64 ((uint64_t)(1u))

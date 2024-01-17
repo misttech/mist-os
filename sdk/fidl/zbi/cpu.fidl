@@ -41,6 +41,12 @@ type TopologyX64Info = struct {
 type TopologyRiscv64Info = struct {
     /// ID that represents this logical CPU (i.e., hart) in SBI.
     hart_id uint64;
+
+    /// Index into the ZBI_TYPE_RISCV64_ISA_STRTAB string table payload giving
+    /// the start of the associated ISA string.
+    isa_strtab_index uint32;
+
+    reserved uint32;
 };
 
 type TopologyArchitectureInfo = strict overlay {

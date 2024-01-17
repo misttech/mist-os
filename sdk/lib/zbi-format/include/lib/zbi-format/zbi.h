@@ -261,6 +261,23 @@ typedef uint32_t zbi_type_t;
 // 'DBGD'
 #define ZBI_TYPE_DEBUGDATA ((zbi_type_t)(0x44474244u))
 
+// Each RISC-V hart has an associated "ISA string" encoding its supported
+// extensions: see Chapter 27 (ISA Extension Naming Conventions) in
+// https://riscv.org/wp-content/uploads/2019/12/riscv-spec-20191213.pdf.
+// This item gives the NUL-separated (and -terminated) concatenation of
+// all such strings in the system.
+//
+// The first character of the table must be NUL; that is, the first entry
+// in the table must be the empty and invalid, which is pointed to by a
+// default-constructructed index. Beyond that, there are no guarantees to
+// order the strings in the table or the extent of their (de)duplication.
+//
+// A given hart's index into the table is encoded within its associated
+// node structure in the ZBI_TYPE_CPU_TOPOLOGY item.
+//
+// 'VISA'
+#define ZBI_TYPE_RISCV64_ISA_STRTAB ((zbi_type_t)(0x41534956u))
+
 // LSW of sha256("bootdata")
 #define ZBI_CONTAINER_MAGIC ((uint32_t)(0x868cf7e6u))
 
