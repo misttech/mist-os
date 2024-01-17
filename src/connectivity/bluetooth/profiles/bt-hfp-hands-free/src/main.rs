@@ -2,56 +2,46 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
-use fuchsia_async::pin_mut;
-use fuchsia_component::server::ServiceFs;
-use futures::channel::mpsc;
-use futures::future;
-use tracing::{debug, error, warn};
+use anyhow::{Context, Error};
+use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
+use fuchsia_component::server::{ServiceFs, ServiceObj};
+use futures::StreamExt;
+use std::iter::Iterator;
+use tracing::{debug, error, info};
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::hfp::Hfp;
 
 mod config;
 mod features;
-mod fidl_service;
 mod hfp;
 mod peer;
 mod profile;
 mod service_definition;
 
+type HandsFreeFidlService = ServiceFs<ServiceObj<'static, fidl_hfp::HandsFreeRequestStream>>;
+
 #[fuchsia::main(logging_tags = ["bt-hfp-hf"])]
 async fn main() -> Result<(), Error> {
     debug!("Starting HFP Hands Free");
 
-    let fs = ServiceFs::new();
+    let mut fs = ServiceFs::new();
 
     let _inspect_server_task = start_inspect();
 
     let feature_support = HandsFreeFeatureSupport::load()?;
     let (profile_client, profile_proxy) = profile::register_hands_free(feature_support)?;
 
-    let (call_client_sender, call_client_receiver) = mpsc::channel(0);
+    serve_fidl(&mut fs)?;
 
-    let hfp = Hfp::new(profile_client, profile_proxy, feature_support, call_client_receiver);
-    let hfp_fut = hfp.run();
-    pin_mut!(hfp_fut);
+    let hfp = Hfp::new(feature_support, profile_client, profile_proxy, fs.fuse());
+    let result = hfp.run().await;
 
-    let fidl_service_fut = fidl_service::serve(fs, call_client_sender);
-    pin_mut!(fidl_service_fut);
-
-    let result = future::select(fidl_service_fut, hfp_fut).await;
     match result {
-        future::Either::Left((Ok(()), _)) => {
-            warn!("Service FS directory handle closed. Exiting.");
+        Ok(()) => {
+            info!("Profile client connection closed. Exiting.");
         }
-        future::Either::Left((Err(e), _)) => {
-            error!("Error encountered running Service FS: {e}. Exiting");
-        }
-        future::Either::Right((Ok(()), _)) => {
-            warn!("Profile client connection closed. Exiting.");
-        }
-        future::Either::Right((Err(e), _)) => {
+        Err(e) => {
             error!("Error encountered running main HFP loop: {e}. Exiting.");
         }
     }
@@ -60,6 +50,14 @@ async fn main() -> Result<(), Error> {
 }
 
 fn start_inspect() -> Option<fuchsia_async::Task<()>> {
+    // TODO(fxb/136817) Add inspect.
     let inspector = fuchsia_inspect::Inspector::default();
     inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default())
+}
+
+fn serve_fidl(fs: &mut HandsFreeFidlService) -> Result<(), Error> {
+    let _ = fs.dir("svc").add_fidl_service(|s: fidl_hfp::HandsFreeRequestStream| s);
+    let _ = fs.take_and_serve_directory_handle().context("Failed to serve ServiceFs directory")?;
+
+    Ok(())
 }

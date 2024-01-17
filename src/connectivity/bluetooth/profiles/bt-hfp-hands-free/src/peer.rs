@@ -4,8 +4,10 @@
 
 use anyhow::{format_err, Result};
 use bt_rfcomm::profile as rfcomm;
+use fidl::endpoints::create_proxy_and_stream;
 use fidl_fuchsia_bluetooth as fidl_bt;
 use fidl_fuchsia_bluetooth_bredr as bredr;
+use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::{Channel, PeerId};
@@ -44,19 +46,32 @@ impl Peer {
         Self { peer_id, config, profile_proxy, task: None }
     }
 
-    pub fn handle_peer_connected(&mut self, channel: Channel) {
+    /// Handle an PeerConnected ProfileEvent.  This creates a new peer task, so return the
+    /// PeerHandlerProxy appropriate to it.
+    pub fn handle_peer_connected(&mut self, channel: Channel) -> fidl_hfp::PeerHandlerProxy {
         if self.task.take().is_some() {
             info!(peer = %self.peer_id, "Shutting down existing task on incoming RFCOMM channel");
         }
 
-        let task = PeerTask::spawn(self.peer_id, self.config, channel);
+        let (peer_handler_proxy, peer_handler_request_stream) =
+            create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>()
+                .expect("Unable to create proxy and stream for PeerHandler protocol");
+
+        let task = PeerTask::spawn(self.peer_id, self.config, peer_handler_request_stream, channel);
         self.task = Some(task);
+
+        peer_handler_proxy
     }
 
-    pub async fn handle_search_result(&mut self, protocol: Option<Vec<ProtocolDescriptor>>) {
+    /// Handle a SearchResult ProfileEvent.  If a new peer task is created, return the
+    /// PeerHandlerProxy appropriate to it.
+    pub async fn handle_search_result(
+        &mut self,
+        protocol: Option<Vec<ProtocolDescriptor>>,
+    ) -> Result<Option<fidl_hfp::PeerHandlerProxy>> {
         if self.task.is_some() {
             info!(peer=%self.peer_id, "Already connected, ignoring search result");
-            return;
+            return Ok(None);
         }
         // If we haven't started the task, connect to the peer and do so.
         info!(peer=%self.peer_id, "Connecting RFCOMM.");
@@ -66,12 +81,18 @@ impl Peer {
             Ok(channel) => channel,
             Err(err) => {
                 warn!(peer=%self.peer_id, ?err, "Unable to connect RFCOMM to peer.");
-                return;
+                return Err(err);
             }
         };
 
-        let task = PeerTask::spawn(self.peer_id, self.config, channel);
+        let (peer_handler_proxy, peer_handler_request_stream) =
+            create_proxy_and_stream::<fidl_hfp::PeerHandlerMarker>()
+                .expect("Unable to create proxy for PeerHandler");
+
+        let task = PeerTask::spawn(self.peer_id, self.config, peer_handler_request_stream, channel);
         self.task = Some(task);
+
+        Ok(Some(peer_handler_proxy))
     }
 
     async fn connect_from_protocol(

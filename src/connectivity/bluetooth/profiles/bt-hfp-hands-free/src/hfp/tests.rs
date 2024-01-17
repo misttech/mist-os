@@ -31,10 +31,10 @@ const PEER_ID: PeerId = PeerId(1);
 const ZERO_TIME: fasync::Time = fasync::Time::from_nanos(0);
 
 const BEFORE_SEARCH_RESULT_CONNECT_DELAY_TIME: fasync::Time =
-    fasync::Time::from_nanos(SEARCH_RESULT_CONNECT_DELAY_SECONDS / 2);
+    fasync::Time::from_nanos(SEARCH_RESULT_CONNECT_DELAY_SECONDS / 2 * 1_000_000_000);
 
 const AFTER_SEARCH_RESULT_CONNECT_DELAY_TIME: fasync::Time =
-    fasync::Time::from_nanos(SEARCH_RESULT_CONNECT_DELAY_SECONDS * 2);
+    fasync::Time::from_nanos(SEARCH_RESULT_CONNECT_DELAY_SECONDS * 2 * 1_000_000_000);
 
 type HfpRunFuture = Pin<Box<dyn Future<Output = Result<()>>>>;
 
@@ -54,9 +54,9 @@ fn hfp_future(
     let (fidl_connection_sender, fidl_connection_receiver) = mpsc::channel(0);
 
     let hfp = Hfp::new(
+        HandsFreeFeatureSupport::default(),
         profile_client,
         profile_proxy,
-        HandsFreeFeatureSupport::default(),
         fidl_connection_receiver,
     );
 
@@ -152,8 +152,8 @@ fn expect_channel_still_open(exec: &mut fasync::TestExecutor, channel: &Channel)
 
 // Tests //////////////////////////////////////////////////////////////////
 
-// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
-#[ignore]
+// TODO(https://fxbug.deb/127364) Make sure to hold on to the PeerHandlerProxy once the peer is sending it to
+// prevent the stream from closing and the test failing.
 #[fuchsia::test]
 fn hfp_connected_starts_task() {
     let mut exec = fasync::TestExecutor::new();
@@ -182,8 +182,6 @@ fn hfp_connected_starts_task() {
     expect_channel_still_open(&mut exec, &near);
 }
 
-// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
-#[ignore]
 #[fuchsia::test]
 fn search_result_connects_channel_and_starts_task_after_delay() {
     let mut exec = fasync::TestExecutor::new_with_fake_time();
@@ -222,8 +220,6 @@ fn search_result_connects_channel_and_starts_task_after_delay() {
     expect_channel_still_open(&mut exec, &near);
 }
 
-// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
-#[ignore]
 #[fuchsia::test]
 fn peer_connected_then_search_result_starts_task_and_does_not_connect() {
     let mut exec = fasync::TestExecutor::new_with_fake_time();
@@ -263,8 +259,6 @@ fn peer_connected_then_search_result_starts_task_and_does_not_connect() {
     expect_channel_still_open(&mut exec, &near);
 }
 
-// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
-#[ignore]
 #[fuchsia::test]
 fn search_result_then_peer_connected_before_delay_starts_task_and_does_not_connect() {
     let mut exec = fasync::TestExecutor::new_with_fake_time();
@@ -314,8 +308,6 @@ fn search_result_then_peer_connected_before_delay_starts_task_and_does_not_conne
     expect_channel_still_open(&mut exec, &near);
 }
 
-// TODO(https://fxbug.dev/136469)  Remove this ignore when the Peer Task does not exit immediately.
-#[ignore]
 #[fuchsia::test]
 fn search_result_then_peer_connected_after_delay_starts_task_and_connects() {
     let mut exec = fasync::TestExecutor::new_with_fake_time();

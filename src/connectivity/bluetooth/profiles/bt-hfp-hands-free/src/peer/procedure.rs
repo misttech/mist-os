@@ -50,7 +50,9 @@ macro_rules! at_cmd {
 pub(crate) use at_cmd;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum CommandFromHf {}
+pub enum CommandFromHf {
+    CallActionDialFromNumber { number: String },
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureInput {
