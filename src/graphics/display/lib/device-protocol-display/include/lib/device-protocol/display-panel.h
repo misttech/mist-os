@@ -21,7 +21,7 @@
 // Touch IC: Goodix GT9293
 #define PANEL_P070ACB_FT UINT8_C(0x01)
 
-// Panel: BOE TV101WXM-LG0
+// Panel: BOE TV101WXM-AG0
 // DDIC: Fitipower JD9364
 // Board: Sherlock
 // Touch IC: FocalTech FT5726
@@ -37,7 +37,7 @@
 // 0x05 was for PANEL_ST7701S
 // 0x06 was for PANEL_TV080WXM_FT
 
-// Panel: BOE TV101WXM-LG0
+// Panel: BOE TV101WXM-AG0
 // DDIC: Fitipower JD9365
 // Board: Sherlock
 // Touch IC: FocalTech FT5726

@@ -193,6 +193,22 @@ The code contains references to the following documents.
 * [MIPI Alliance Specification for Display Command Set (MIPI DCS)][mipi-dcs-spec] -
   Version 2.0, dated 6 November 2022, referenced as "DCS spec"
 
+### Panel references
+
+The code also contains references to the following documents, which will likely
+move to different drivers in the future.
+
+* BOE Technology TV070WSM-TG1 Product Specification - Revision P4,
+  issued 2020.07.10, referenced as "BOE TV070WSM-TG1 spec"
+* BOE Technology TV101WXM-AG0 Product Specification - Revision P0,
+  issued 2018.02.28, referenced as "BOE TV101WXM-AG0 spec"
+* Innolux Corp P070ACB-DB0 Specification - Version 07, dated 2018/01/04,
+  referenced as "Innolux P070ACB-DB0 spec"
+* Shenzhen K&D Technology KD070D82-39TI-A010 Specification - Version A1,
+  dated 2019.12.20, referenced as "K&D KD070D82-39TI-A010 spec"
+* [Microtech MTF050FHDI-03 Specification Sheet][ts050-panel-spec] - Version 1.0,
+  dated July 7, 2015, distributed by icbanq.com
+
 [a311d-datasheet]: https://dl.khadas.com/products/vim3/datasheet/a311d_datasheet_08_wesion.pdf
 [a311d2-datasheet]: https://dl.khadas.com/products/vim4/datasheet/amlogic_a311d2_datasheet_v06.pdf
 [s905d3-datasheet]: https://dl.khadas.com/products/vim3l/datasheet/s905d3_datasheet_0.2_wesion.pdf
@@ -205,3 +221,4 @@ The code contains references to the following documents.
 [mipi-dsi2-spec]: https://www.mipi.org/specifications/dsi-2
 [mipi-dphy-spec]: https://www.mipi.org/specifications/d-phy
 [mipi-dcs-spec]: https://www.mipi.org/specifications/display-command-set
+[ts050-panel-spec]: https://www.icbanq.com/icdownload/data/ICBShop/Board/MTF050FHDI-03-spec(350%20nits).pdf
