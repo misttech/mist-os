@@ -60,8 +60,28 @@ fuchsia_component("test-root") {
   deps = [ ":diagnostics_test_bin" ]
 }
 
+rustc_test("logger_test_bin") {
+  name = "logger_bin"
+  source_root = "logger.rs"
+  edition = "2021"
+  deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  sources = [ "logger.rs" ]
+}
+
+fuchsia_unittest_component("logger-test-generated-manifest") {
+  component_name = "logger-test-generated-manifest"
+  deps = [ ":logger_test_bin" ]
+}
+
 fuchsia_test_package("test-manager-diagnostics-tests") {
-  test_components = [ ":test-root" ]
+  test_components = [
+    ":test-root",
+    ":logger-test-generated-manifest",
+  ]
 
   deps = [ ":diagnostics-publisher" ]
 }

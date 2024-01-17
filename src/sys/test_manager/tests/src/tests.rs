@@ -523,6 +523,14 @@ async fn collect_isolated_logs_using_default_log_iterator() {
 }
 
 #[fuchsia::test]
+async fn collect_isolated_logs_from_generated_component_manifest() {
+    let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/logger-test-generated-manifest.cm";
+    let (_events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
+
+    assert_eq!(logs, vec!["I'm a info log from a test".to_owned()]);
+}
+
+#[fuchsia::test]
 async fn collect_isolated_logs_using_batch() {
     let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
     let mut options = default_run_option();
