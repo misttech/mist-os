@@ -8,10 +8,7 @@ use {
     fuchsia_inspect::{self, Inspector},
     fuchsia_inspect_contrib::auto_persist,
     fuchsia_zircon::{self as zx, HandleBased},
-    futures::{
-        channel::{mpsc, oneshot},
-        Future, FutureExt, StreamExt,
-    },
+    futures::{channel::mpsc, Future, FutureExt, StreamExt},
     std::pin::Pin,
     tracing::{error, info},
     wlan_mlme::{
@@ -25,10 +22,7 @@ use {
     wlan_sme::{self, serve::create_sme},
 };
 
-pub struct WlanSoftmacHandle {
-    driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
-    join_handle: Option<std::thread::JoinHandle<()>>,
-}
+pub struct WlanSoftmacHandle(mpsc::UnboundedSender<DriverEvent>);
 
 impl std::fmt::Debug for WlanSoftmacHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -39,9 +33,9 @@ impl std::fmt::Debug for WlanSoftmacHandle {
 pub type DriverEvent = wlan_mlme::DriverEvent;
 
 impl WlanSoftmacHandle {
-    pub fn stop(&mut self, stop_sta_completer: StopStaCompleter) {
-        if let Err(e) = self.driver_event_sink.unbounded_send(DriverEvent::Stop(stop_sta_completer))
-        {
+    pub fn stop(mut self, stop_sta_completer: StopStaCompleter) {
+        let driver_event_sink = &mut self.0;
+        if let Err(e) = driver_event_sink.unbounded_send(DriverEvent::Stop(stop_sta_completer)) {
             error!("Failed to signal WlanSoftmac main loop thread to stop: {}", e);
             if let DriverEvent::Stop(stop_sta_completer) = e.into_inner() {
                 stop_sta_completer.complete();
@@ -49,34 +43,12 @@ impl WlanSoftmacHandle {
                 unreachable!();
             }
         }
-        self.driver_event_sink.disconnect();
-    }
-
-    pub fn delete(mut self) {
-        let join_handle = if let Some(join_handle) = self.join_handle.take() {
-            join_handle
-        } else {
-            error!("WlanSoftmac main loop thread already shutdown.");
-            return;
-        };
-
-        // If stop() was not called first, then delete() must send the shutdown signal
-        // itself before calling JoinHandle::join(). Otherwise, join() will deadlock.
-        let (shutdown_sender, _shutdown_receiver) = oneshot::channel::<()>();
-        if !self.driver_event_sink.is_closed() {
-            error!("Called delete on WlanSoftmacHandle without first calling stop");
-            self.stop(StopStaCompleter::new(Box::new(move || {
-                shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
-            })));
-        }
-
-        if let Err(e) = join_handle.join() {
-            error!("Couldn't join WlanSoftmac main loop thread: {:?}", e);
-        }
+        driver_event_sink.disconnect();
     }
 
     pub fn queue_eth_frame_tx(&mut self, bytes: Vec<u8>) -> Result<(), zx::Status> {
-        self.driver_event_sink.unbounded_send(DriverEvent::EthFrameTx { bytes }).map_err(|e| {
+        let driver_event_sink = &mut self.0;
+        driver_event_sink.unbounded_send(DriverEvent::EthFrameTx { bytes }).map_err(|e| {
             error!("Failed to queue ethernet frame: {:?}", e);
             zx::Status::INTERNAL
         })
@@ -84,11 +56,11 @@ impl WlanSoftmacHandle {
 }
 
 pub fn start_wlansoftmac(
-    start_sta_completer: StartStaCompleter<impl FnOnce(Result<(), zx::Status>) + Send + 'static>,
+    start_sta_completer: impl FnOnce(Result<WlanSoftmacHandle, zx::Status>) + Send + 'static,
     device: DeviceInterface,
     buf_provider: BufferProvider,
     wlan_softmac_bridge_proxy_raw_handle: fuchsia_zircon::sys::zx_handle_t,
-) -> WlanSoftmacHandle {
+) {
     let wlan_softmac_bridge_proxy = {
         let handle = unsafe { fidl::Handle::from_raw(wlan_softmac_bridge_proxy_raw_handle) };
         let channel = fidl::Channel::from(handle);
@@ -110,32 +82,30 @@ const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
 /// TODO(316928740): This function is no longer async, but removing the async keyword is non-trivial
 /// because of the number of tests that treat this function as async.
 async fn start_wlansoftmac_async<D: DeviceOps + Send + 'static>(
-    start_sta_completer: StartStaCompleter<impl FnOnce(Result<(), zx::Status>) + Send + 'static>,
+    start_sta_completer: impl FnOnce(Result<WlanSoftmacHandle, zx::Status>) + Send + 'static,
     device: D,
     buf_provider: BufferProvider,
-) -> WlanSoftmacHandle {
+) {
     let (driver_event_sink, driver_event_stream) = mpsc::unbounded();
     let inspector =
         Inspector::new(fuchsia_inspect::InspectorConfig::default().size(INSPECT_VMO_SIZE_BYTES));
     let inspect_usme_node = inspector.root().create_child("usme");
 
-    let driver_event_sink_clone = driver_event_sink.clone();
     info!("Spawning wlansoftmac main loop thread.");
 
-    let join_handle = std::thread::spawn(move || {
-        let mut executor = fasync::LocalExecutor::new();
-        let future = wlansoftmac_thread(
-            start_sta_completer,
-            device,
-            buf_provider,
-            driver_event_sink_clone,
-            driver_event_stream,
-            inspector,
-            inspect_usme_node,
-        );
-        executor.run_singlethreaded(future);
-    });
-    WlanSoftmacHandle { driver_event_sink, join_handle: Some(join_handle) }
+    let driver_event_sink_clone = driver_event_sink.clone();
+    wlansoftmac_thread(
+        StartStaCompleter::new(move |result: Result<(), zx::Status>| {
+            start_sta_completer(result.map(|()| WlanSoftmacHandle(driver_event_sink_clone)))
+        }),
+        device,
+        buf_provider,
+        driver_event_sink,
+        driver_event_stream,
+        inspector,
+        inspect_usme_node,
+    )
+    .await;
 }
 
 async fn wlansoftmac_thread<D: DeviceOps>(
@@ -382,7 +352,7 @@ mod tests {
     use {
         super::*,
         fidl::endpoints::Proxy,
-        futures::channel::oneshot,
+        futures::{channel::oneshot, task::Poll},
         pin_utils::pin_mut,
         wlan_common::assert_variant,
         wlan_mlme::{self, device::test_utils::FakeDevice},
@@ -390,23 +360,31 @@ mod tests {
 
     fn run_wlansoftmac_setup(
         exec: &mut fasync::TestExecutor,
-    ) -> Result<(WlanSoftmacHandle, fidl_sme::GenericSmeProxy), anyhow::Error> {
-        run_wlansoftmac_setup_with_device(exec, FakeDevice::new(exec).0)
+        handle_sender: oneshot::Sender<Result<WlanSoftmacHandle, zx::Status>>,
+    ) -> Result<
+        (Option<Pin<Box<impl Future<Output = ()>>>>, fidl_sme::GenericSmeProxy),
+        anyhow::Error,
+    > {
+        run_wlansoftmac_setup_with_device(exec, handle_sender, FakeDevice::new(exec).0)
     }
 
     fn run_wlansoftmac_setup_with_device(
         exec: &mut fasync::TestExecutor,
+        handle_sender: oneshot::Sender<Result<WlanSoftmacHandle, zx::Status>>,
         fake_device: FakeDevice,
-    ) -> Result<(WlanSoftmacHandle, fidl_sme::GenericSmeProxy), anyhow::Error> {
+    ) -> Result<
+        (Option<Pin<Box<impl Future<Output = ()>>>>, fidl_sme::GenericSmeProxy),
+        anyhow::Error,
+    > {
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
-        let (startup_sender, startup_receiver) = oneshot::channel::<Result<(), zx::Status>>();
-        let handle_fut = start_wlansoftmac_async(
-            StartStaCompleter::new(move |status: Result<(), zx::Status>| {
-                startup_sender.send(status).expect("Failed to signal startup completion.")
-            }),
+        let main_fut = start_wlansoftmac_async(
+            move |result: Result<WlanSoftmacHandle, zx::Status>| {
+                handle_sender.send(result).expect("Failed to signal startup completion.")
+            },
             fake_device.clone(),
             fake_buf_provider,
         );
+        let mut main_fut = Box::pin(main_fut);
 
         let usme_client_proxy = fake_device
             .state()
@@ -422,78 +400,58 @@ mod tests {
             fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>()?;
 
         let inspect_vmo_fut = usme_client_proxy.start(generic_sme_server, &legacy_privacy_support);
-        let (handle, startup_status, inspect_vmo) = exec.run_singlethreaded(async {
-            futures::join!(handle_fut, startup_receiver, inspect_vmo_fut,)
-        });
-        startup_status.expect("startup_receiver canceled!")?;
+        let main_fut = match exec.run_until_stalled(&mut main_fut) {
+            Poll::Pending => Some(main_fut),
+            Poll::Ready(()) => None,
+        };
+        let inspect_vmo = exec.run_singlethreaded(inspect_vmo_fut);
         inspect_vmo.expect("Failed to bootstrap USME.");
 
-        Ok((handle, generic_sme_proxy))
+        Ok((main_fut, generic_sme_proxy))
     }
 
     #[test]
-    fn wlansoftmac_delete_no_crash() {
+    fn stop_leads_to_graceful_shutdown() {
         let mut exec = fasync::TestExecutor::new();
-        let (mut handle, _generic_sme_proxy) =
-            run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
-        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
-        handle.stop(StopStaCompleter::new(Box::new(move || {
-            shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
-        })));
-        assert_eq!(Ok(()), exec.run_singlethreaded(&mut shutdown_receiver));
-        handle.delete();
-    }
-
-    #[test]
-    fn wlansoftmac_delete_without_stop_no_crash() {
-        let mut exec = fasync::TestExecutor::new();
-        let (handle, _generic_sme_proxy) =
-            run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
-        handle.delete();
-    }
-
-    #[test]
-    fn wlansoftmac_handle_use_after_stop() {
-        let mut exec = fasync::TestExecutor::new();
-        let (mut handle, _generic_sme_proxy) =
-            run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
-
-        handle
-            .queue_eth_frame_tx(vec![0u8; 10])
-            .expect("Should be able to queue tx before stopping wlansoftmac");
-
-        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
-        handle.stop(StopStaCompleter::new(Box::new(move || {
-            shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
-        })));
-        assert_eq!(Ok(()), exec.run_singlethreaded(&mut shutdown_receiver));
-
-        handle
-            .queue_eth_frame_tx(vec![0u8; 10])
-            .expect_err("Shouldn't be able to queue tx after stopping wlansoftmac");
-    }
-
-    #[test]
-    fn generic_sme_stops_on_shutdown() {
-        let mut exec = fasync::TestExecutor::new();
-        let (mut handle, generic_sme_proxy) =
-            run_wlansoftmac_setup(&mut exec).expect("Failed to start wlansoftmac");
+        let (handle_sender, handle_receiver) =
+            oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
+        let (main_fut, generic_sme_proxy) = run_wlansoftmac_setup(&mut exec, handle_sender)
+            .expect("Failed to initiate wlansoftmac setup.");
+        let mut main_fut = main_fut.unwrap();
         let (sme_telemetry_proxy, sme_telemetry_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
         let (client_proxy, client_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
-        exec.run_singlethreaded(generic_sme_proxy.get_sme_telemetry(sme_telemetry_server))
+        assert_eq!(exec.run_until_stalled(&mut main_fut), Poll::Pending);
+        let handle = exec
+            .run_singlethreaded(handle_receiver)
+            .unwrap()
+            .expect("Failed to start wlansoftmac.");
+
+        let resp_fut = generic_sme_proxy.get_sme_telemetry(sme_telemetry_server);
+        pin_mut!(resp_fut);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_eq!(exec.run_until_stalled(&mut main_fut), Poll::Pending);
+        exec.run_singlethreaded(resp_fut)
             .expect("Generic SME proxy failed")
             .expect("SME telemetry request failed");
-        exec.run_singlethreaded(generic_sme_proxy.get_client_sme(client_server))
+
+        let resp_fut = generic_sme_proxy.get_client_sme(client_server);
+        pin_mut!(resp_fut);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_eq!(exec.run_until_stalled(&mut main_fut), Poll::Pending);
+        exec.run_singlethreaded(resp_fut)
             .expect("Generic SME proxy failed")
             .expect("Client SME request failed");
-        let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
+
+        let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
         handle.stop(StopStaCompleter::new(Box::new(move || {
             shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
         })));
-        assert_eq!(Ok(()), exec.run_singlethreaded(&mut shutdown_receiver));
-        handle.delete();
+        assert_variant!(
+            exec.run_singlethreaded(async { futures::join!(main_fut, shutdown_receiver) }),
+            ((), Ok(()))
+        );
 
         // All SME proxies should shutdown.
         assert!(generic_sme_proxy.is_closed());
@@ -508,8 +466,20 @@ mod tests {
         fake_device_state.lock().unwrap().mac_sublayer_support.device.is_synthetic = true;
         fake_device_state.lock().unwrap().mac_sublayer_support.device.mac_implementation_type =
             fidl_common::MacImplementationType::Fullmac;
-        run_wlansoftmac_setup_with_device(&mut exec, fake_device)
-            .expect_err("Softmac setup should fail");
+        let (handle_sender, mut handle_receiver) =
+            oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
+        let (main_fut, _generic_sme_proxy) =
+            run_wlansoftmac_setup_with_device(&mut exec, handle_sender, fake_device)
+                .expect("Failed to initiate wlansoftmac setup.");
+        assert_variant!(
+            main_fut,
+            None,
+            "Main future did not immediately terminate upon failed setup."
+        );
+
+        exec.run_singlethreaded(&mut handle_receiver)
+            .unwrap()
+            .expect_err("Softmac setup should fail.");
     }
 
     #[test]
@@ -517,19 +487,19 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
-        let (startup_sender, startup_receiver) = oneshot::channel::<Result<(), zx::Status>>();
-        let handle_fut = start_wlansoftmac_async(
-            StartStaCompleter::new(move |status: Result<(), zx::Status>| {
-                startup_sender.send(status).expect("Failed to signal startup completion.")
-            }),
+        let (handle_sender, handle_receiver) =
+            oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
+        let main_fut = start_wlansoftmac_async(
+            move |result: Result<WlanSoftmacHandle, zx::Status>| {
+                handle_sender.send(result).expect("Failed to signal startup completion.")
+            },
             fake_device.clone(),
             fake_buf_provider,
         );
-        pin_mut!(handle_fut);
         fake_device_state.lock().unwrap().usme_bootstrap_client_end = None; // Drop the client end.
         assert_variant!(
-            exec.run_singlethreaded(async { futures::join!(handle_fut, startup_receiver,) }),
-            (_, Ok(Err(zx::Status::INTERNAL)))
+            exec.run_singlethreaded(async { futures::join!(main_fut, handle_receiver,) }),
+            ((), Ok(Err(zx::Status::INTERNAL)))
         )
     }
 }

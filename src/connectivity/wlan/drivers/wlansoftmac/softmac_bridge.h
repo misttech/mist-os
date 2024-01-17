@@ -19,7 +19,8 @@
 
 namespace wlan::drivers::wlansoftmac {
 
-using StartStaCompleter = fit::callback<void(zx_status_t status)>;
+using StartStaCompleter =
+    fit::callback<void(zx_status_t status, wlansoftmac_handle_t* rust_handle)>;
 using StopStaCompleter = fit::callback<void()>;
 
 class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacBridge> {
@@ -59,8 +60,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
 
  private:
   explicit SoftmacBridge(DeviceInterface* device_interface,
-                         fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client)
-      : softmac_client_(std::move(softmac_client)), device_interface_(device_interface) {}
+                         fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client);
 
   template <typename, typename = void>
   static constexpr bool has_value_type = false;
@@ -85,6 +85,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
 
   DeviceInterface* device_interface_;
   wlansoftmac_handle_t* rust_handle_;
+  fdf::Dispatcher rust_dispatcher_;
 
   static wlansoftmac_in_buf_t IntoRustInBuf(std::unique_ptr<Buffer> owned_buffer);
   wlansoftmac_buffer_provider_ops_t rust_buffer_provider{

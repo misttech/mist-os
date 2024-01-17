@@ -112,12 +112,6 @@ class SoftmacBinding : public DeviceInterface {
   std::mutex ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
 
-  // Informs the message loop to shut down. Calling this function more than once
-  // has no effect.
-  void ShutdownMainLoop();
-
-  bool main_loop_dead_ = false;
-
   // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
   // calls to this protocol should only be performed by the vendor driver.
   std::unique_ptr<wlan_softmac_ifc_protocol_ops_t> wlan_softmac_ifc_protocol_ops_;

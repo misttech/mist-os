@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
 #include <lib/sync/cpp/completion.h>
@@ -17,9 +18,34 @@
 
 namespace wlan::drivers::wlansoftmac {
 
+SoftmacBridge::SoftmacBridge(
+    DeviceInterface* device_interface,
+    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client)
+    : softmac_client_(
+          std::forward<fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>>(softmac_client)),
+      device_interface_(device_interface) {
+  WLAN_TRACE_DURATION();
+  auto rust_dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac-mlme",
+      [](fdf_dispatcher_t* rust_dispatcher) { fdf_dispatcher_destroy(rust_dispatcher); });
+  if (rust_dispatcher.is_error()) {
+    ZX_ASSERT_MSG(false, "Failed to create dispatcher for MLME: %s",
+                  zx_status_get_string(rust_dispatcher.status_value()));
+  }
+  rust_dispatcher_ = *std::move(rust_dispatcher);
+}
+
+SoftmacBridge::~SoftmacBridge() {
+  WLAN_TRACE_DURATION();
+  ldebug(0, nullptr, "Entering.");
+  rust_dispatcher_.ShutdownAsync();
+  // The provided ShutdownHandler will call fdf_dispatcher_destroy().
+  rust_dispatcher_.release();
+}
+
 zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
-    fdf::Dispatcher& softmac_bridge_server_dispatcher, std::unique_ptr<StartStaCompleter> completer,
-    DeviceInterface* device,
+    fdf::Dispatcher& softmac_bridge_server_dispatcher,
+    std::unique_ptr<fit::callback<void(zx_status_t status)>> completer, DeviceInterface* device,
     fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client) {
   WLAN_TRACE_DURATION();
   auto softmac_bridge = std::unique_ptr<SoftmacBridge>(new SoftmacBridge(
@@ -78,23 +104,35 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
         server_binding_task_complete.Signal();
       });
 
-  softmac_bridge->rust_handle_ = start_sta(
-      completer.release(),
-      [](void* ctx, zx_status_t status) {
-        auto completer = static_cast<StartStaCompleter*>(ctx);
-        if (completer == nullptr) {
-          lerror("Received NULL StartStaCompleter pointer!");
-          return;
-        }
-        // Skip the check for whether completer has already been
-        // called.  This is the only location where completer is
-        // called, and its deallocated immediately after. Thus, such a
-        // check would be a use-after-free violation.
+  auto start_sta_completer = std::make_unique<StartStaCompleter>(
+      [softmac_bridge = softmac_bridge.get(), completer = std::move(completer)](
+          zx_status_t status, wlansoftmac_handle_t* rust_handle) mutable {
+        softmac_bridge->rust_handle_ = rust_handle;
         (*completer)(status);
-        delete completer;
-      },
-      wlansoftmac_rust_ops, softmac_bridge->rust_buffer_provider,
-      endpoints->client.TakeHandle().release());
+      });
+
+  async::PostTask(softmac_bridge->rust_dispatcher_.async_dispatcher(),
+                  [start_sta_completer = std::move(start_sta_completer),
+                   wlansoftmac_rust_ops = wlansoftmac_rust_ops,
+                   rust_buffer_provider = softmac_bridge->rust_buffer_provider,
+                   client_end = endpoints->client.TakeHandle().release()]() mutable {
+                    start_sta(
+                        start_sta_completer.release(),
+                        [](void* ctx, zx_status_t status, wlansoftmac_handle_t* rust_handle) {
+                          auto start_sta_completer = static_cast<StartStaCompleter*>(ctx);
+                          if (start_sta_completer == nullptr) {
+                            lerror("Received NULL StartStaCompleter pointer!");
+                            return;
+                          }
+                          // Skip the check for whether completer has already been
+                          // called.  This is the only location where completer is
+                          // called, and its deallocated immediately after. Thus, such a
+                          // check would be a use-after-free violation.
+                          (*start_sta_completer)(status, rust_handle);
+                          delete start_sta_completer;
+                        },
+                        wlansoftmac_rust_ops, rust_buffer_provider, client_end);
+                  });
 
   // Wait for the task posted to softmac_bridge_server_dispatcher to complete before returning.
   // Otherwise, the softmac_bridge pointer captured by the task might not be valid when the task
@@ -126,15 +164,6 @@ zx_status_t SoftmacBridge::StopSta(std::unique_ptr<StopStaCompleter> completer) 
       },
       rust_handle_);
   return ZX_OK;
-}
-
-SoftmacBridge::~SoftmacBridge() {
-  WLAN_TRACE_DURATION();
-  ldebug(0, nullptr, "Entering.");
-  if (rust_handle_ == nullptr) {
-    lerror("Failed to call delete_sta()! Encountered NULL rust_handle_");
-  }
-  delete_sta(rust_handle_);
 }
 
 void SoftmacBridge::Query(QueryCompleter::Sync& completer) {

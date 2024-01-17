@@ -116,7 +116,6 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
           // dispatcher its bound too.
           async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(), [&]() {
             softmac_ifc_bridge_.reset();
-            softmac_ifc_bridge_client_dispatcher_.ShutdownAsync();
             device_unbind_reply(child_device_);
           });
           // Explicitly call destroy since Unbind() calls releases this dispatcher before
@@ -188,7 +187,7 @@ void SoftmacBinding::Init() {
   linfo("Connected to WlanSoftmac service.");
 
   linfo("Initializing Rust WlanSoftmac...");
-  auto completer = std::make_unique<StartStaCompleter>(
+  auto completer = std::make_unique<fit::callback<void(zx_status_t status)>>(
       [dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher(),
        child_device = child_device_](zx_status_t status) {
         if (status == ZX_OK) {

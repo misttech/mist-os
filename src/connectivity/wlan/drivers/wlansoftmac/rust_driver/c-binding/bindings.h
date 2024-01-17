@@ -117,25 +117,33 @@ typedef struct {
   uintptr_t size;
 } wlan_span_t;
 
-extern "C" wlansoftmac_handle_t *start_sta(
-    void *completer, void (*run_completer)(void *completer, zx_status_t status),
-    rust_device_interface_t device, wlansoftmac_buffer_provider_ops_t buf_provider,
-    zx_handle_t wlan_softmac_bridge_client_handle);
-
-extern "C" void stop_sta(void *completer, void (*run_completer)(void *completer),
-                         wlansoftmac_handle_t *softmac);
-
 /**
- * FFI interface: Stop and delete a WlanSoftmac via the WlanSoftmacHandle.
- * Takes ownership and invalidates the passed WlanSoftmacHandle.
+ * FFI interface: Start the Rust portion of the wlansoftmac driver which will implement
+ * an MLME server and an SME server.
  *
  * # Safety
  *
- * This fn accepts a raw pointer that is held by the FFI caller as a handle to
- * the Softmac. This API is fundamentally unsafe, and relies on the caller to
- * pass the correct pointer and make no further calls on it later.
+ * The caller of this function should provide raw pointers that will be valid in the address space
+ * where the Rust portion of wlansoftmac will run.
  */
-extern "C" void delete_sta(wlansoftmac_handle_t *softmac);
+extern "C" void start_sta(void *completer,
+                          void (*run_completer)(void *completer, zx_status_t status,
+                                                wlansoftmac_handle_t *wlan_softmac_handle),
+                          rust_device_interface_t device,
+                          wlansoftmac_buffer_provider_ops_t buf_provider,
+                          zx_handle_t wlan_softmac_bridge_client_handle);
+
+/**
+ * FFI interface: Stop a WlanSoftmac via the WlanSoftmacHandle. Takes ownership and invalidates
+ * the passed WlanSoftmacHandle.
+ *
+ * # Safety
+ *
+ * This function casts a raw pointer to a WlanSoftmacHandle. This API is fundamentally
+ * unsafe, and relies on the caller passing ownership of the correct pointer.
+ */
+extern "C" void stop_sta(void *completer, void (*run_completer)(void *completer),
+                         wlansoftmac_handle_t *softmac);
 
 extern "C" zx_status_t sta_queue_eth_frame_tx(wlansoftmac_handle_t *softmac, wlan_span_t frame);
 
