@@ -89,7 +89,7 @@ and commit your changes, this will make `jiri` simply warn that `//integration`
 is not on `JIRI_HEAD`. To ensure your project was correctly updated, run
 `cat ${path_to_proj}/src/.git/HEAD`. Run tests as normal.
 
-## [Googlers Only] Leveraging bots
+## \[Googlers Only\] Leveraging bots
 
 Only Google employees can make push changes to `//integration` and view tqr/
 

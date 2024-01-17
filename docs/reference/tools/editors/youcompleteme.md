@@ -8,7 +8,7 @@ integrated with other editors through [ycmd](https://github.com/Valloric/ycmd).
 
 {% dynamic if user.is_googler %}
 
-### [Googlers only]  gLinux
+### \[Googlers only\]  gLinux
 
 (This applies to anyone compiling on gLinux, even if editing over SSHFS on
 MacOS) See the Google intranet specific instructions [go/ycm](http://go/ycm).

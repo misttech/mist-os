@@ -30,7 +30,8 @@ Records consist of a number of 8-byte words and are 8-byte aligned.
 ## Records
 
 Implementors are encouraged to use FIDL bindings from
-[/sdk/fidl/fuchsia.diagnostics.stream/record.fidl] as the "reference" API for records when testing
+[/sdk/fidl/fuchsia.diagnostics.stream/record.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.diagnostics.stream/record.fidl)
+as the "reference" API for records when testing
 their encoder. These types allow for cross-validating interoperability of log readers and writers.
 
 ### Header
@@ -60,7 +61,8 @@ TimestampNanos = {64,127}
 
 Currently all records are expected to have type=9. This was chosen to mirror the [trace format] but
 may require a change before these records can be processed by tracing tools.
-Values for severity are defined in [/sdk/fidl/fuchsia.diagnostics/severity.fidl]
+Values for severity are defined in
+[/sdk/fidl/fuchsia.diagnostics/severity.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.diagnostics/severity.fidl)
 
 ## Arguments
 

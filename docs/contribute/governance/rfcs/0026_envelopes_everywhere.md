@@ -19,7 +19,7 @@ discussion and separate independent features into their own RFCs.
 
 This RFC has two goals:
 
-1. Improve the efficiency of the existing [envelope] format, by making
+1. Improve the efficiency of the existing `envelope` format, by making
    envelopes more than twice as compact.
 2. Use envelopes as the sole means of referencing _all_ out-of-line objects.
    This increases the consistency of the wire format, and the uniformity of

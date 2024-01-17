@@ -72,7 +72,7 @@ natural and wire APIs; the wire APIs were called LLCPP).
   best practices and patterns.
   * Incorporate example code which compiles and runs in the build (e.g.
     [//examples/fidl/go/fidl_packages/fidl_test.go][go-example]).
-* Update any relevant [guides].
+* Update any relevant guides:
   * [FIDL API rubric][api-rubric] for guidance on using this feature.
   * For example, when changing the memory allocation APIs in C++ wire types, the
     [C++ wire domain object memory ownership guide][llcpp-allocators] should be

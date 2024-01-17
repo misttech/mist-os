@@ -72,7 +72,7 @@ value of zero.
 + The units of frequency adjustment for all clock objects are specified to be
   parts per million, or PPM.
 + The maximum permissible range of frequency adjustment of a clock object is
-  specified to be [-1000, +1000] PPM. This property is not configurable.
+  specified to be \[-1000, +1000\] PPM. This property is not configurable.
 
 ### Additional creation options
 

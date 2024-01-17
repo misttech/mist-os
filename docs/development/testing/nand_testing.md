@@ -35,7 +35,7 @@ Note that all other devices created by nandpart must also be removed. Use
 drivers.
 
 For example, this command will test an existing ram-nand device making sure the
-test does not modify anything outside blocks [100, 109]:
+test does not modify anything outside blocks \[100, 109\]:
 
 ```shell
 $ /boot/test/sys/nand-test --device /dev/sys/platform/00:00:2e/nand-ctl/ram-nand-0 --first-block 100 --num-blocks 10

@@ -15,7 +15,8 @@ When fuzzing locally, it is often convenient to use the interactive fuzzing shel
 started using `ffx fuzz shell`. This shell can maintain a connection to a fuzzer, and provides
 utilities such as tab-completion. It supports a number of commands:
 
-* To list available fuzzers:7
+* To list available fuzzers:
+  <pre class="devsite-terminal">
   list [-p <pattern>]
   </pre>
 * To connect to a fuzzer, starting it if needed:

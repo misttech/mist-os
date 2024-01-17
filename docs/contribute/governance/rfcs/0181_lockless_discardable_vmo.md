@@ -12,8 +12,8 @@
 
 ## Summary
 
-Lockless discardable VMOs are a sub-type of [discardable VMOs]
-(https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0012_zircon_discardable_memory)
+Lockless discardable VMOs are a sub-type of
+[discardable VMOs](/docs/contribute/governance/rfcs/0012_zircon_discardable_memory.md)
 where they are allowed to be accessed even if not locked. The VMO may still be
 discarded at any time, and users must be tolerant of sudden complete data loss.
 To improve usage in the motivating use case the VMO hinting operations are

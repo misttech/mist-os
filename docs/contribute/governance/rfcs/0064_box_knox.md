@@ -99,10 +99,10 @@ verifiable**, and **efficient** mechanism for transmitting large data objects.
 
 A **box** is a container for a possibly large data object that may need to be
 transmitted out of band when the total message size (including headers) exceeds
-the limit for a Zircon **channel**[[1]](#footnote1).
+the limit for a Zircon **channel**[^1].
 
 A **box** only holds data objects; it cannot hold objects that have
-handles[[2]](#footnote2).
+handles[^2].
 
 At **design time**, a FIDL protocol author..
 
@@ -316,15 +316,13 @@ runtime behavior to properly paginate messages, or manually 'box' them.
 
 --------------------------------------------------------------------------------
 
-##### Footnote1
-Hypothetically, FIDL could be transmitted over other channels for which boxing
-may take on a different nature.  How that would be implemented is out of scope
-for this proposal.
+[^1]: Hypothetically, FIDL could be transmitted over other channels for which boxing
+    may take on a different nature.  How that would be implemented is out of scope
+    for this proposal.
 
-##### Footnote2
-_Editor's note:_ Since this RFC was authored in 2018, the distinction between
-value types and resources is formally part of the FIDL language, see
-[RFC-0057][rfc0057].
+[^2]: _Editor's note:_ Since this RFC was authored in 2018, the distinction between
+    value types and resources is formally part of the FIDL language, see
+    [RFC-0057][rfc0057].
 
 <!-- xrefs -->
 [rfc0062]: /docs/contribute/governance/rfcs/0062_method_impossible.md

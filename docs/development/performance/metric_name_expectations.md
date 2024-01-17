@@ -85,7 +85,7 @@ GN build will fail if the file does not exist.
 ## Optional metrics
 
 The expectation files may contain entries with the suffix
-"[optional]".  These metrics are allowed to be absent in the test's
+`[optional]`.  These metrics are allowed to be absent in the test's
 output.  This allows metrics to be architecture-specific or
 machine-specific.  These metrics should be commented to say why they
 are optional.  (Comment lines start with "#".)

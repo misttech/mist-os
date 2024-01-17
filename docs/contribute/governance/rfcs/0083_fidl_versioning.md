@@ -43,8 +43,7 @@ But these can be fixed asynchronously, without reverting the original change in
 Fuchsia and grinding the project to a halt.
 
 
-![API evolution diagram with text description above]
-(resources/0083_fidl_versioning/fig_1.png){:#fig-1}
+![API evolution diagram with text description above](resources/0083_fidl_versioning/fig_1.png){:#fig-1}
 
 **Figure 1: API evolution before (left) and after (right) FIDL Versioning**
 

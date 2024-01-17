@@ -78,7 +78,7 @@ command line arguments as strings to Reverse:
 1. See usage
 
    Depending on the part of the codelab you wish to run, you'd launch the
-   `client_i` component, where `i` is a number in range [1, 5]. For example, to
+   `client_i` component, where `i` is a number in range \[1, 5\]. For example, to
    launch the client talking to the reverser from part 2 of the codelab:
 
    * {C++}

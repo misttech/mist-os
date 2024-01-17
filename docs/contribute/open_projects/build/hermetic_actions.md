@@ -100,11 +100,11 @@ Find reviewers by OWNERS and merge your change.
 
 ## Examples
 
-*   [472565: [build] Generate depfile in generate_fidl_json.py](https://fuchsia-review.googlesource.com/c/fuchsia/+/472565)
-*   [472657: [build] Fix hermeticity of hotsort_target_internal](https://fuchsia-review.googlesource.com/c/fuchsia/+/472657)
-*   [473980: [build] Fix hermeticity of fidl-c-header](https://fuchsia-review.googlesource.com/c/fuchsia/+/473980)
-*   [472658: [build] Make go_library build hermetically](https://fuchsia-review.googlesource.com/c/fuchsia/+/472658)
-*   [472637: [build] Fix hermeticity of flatbuffer](https://fuchsia-review.googlesource.com/c/third_party/flatbuffers/+/472637)
+*   [472565: \[build\] Generate depfile in generate_fidl_json.py](https://fuchsia-review.googlesource.com/c/fuchsia/+/472565)
+*   [472657: \[build\] Fix hermeticity of hotsort_target_internal](https://fuchsia-review.googlesource.com/c/fuchsia/+/472657)
+*   [473980: \[build\] Fix hermeticity of fidl-c-header](https://fuchsia-review.googlesource.com/c/fuchsia/+/473980)
+*   [472658: \[build\] Make go_library build hermetically](https://fuchsia-review.googlesource.com/c/fuchsia/+/472658)
+*   [472637: \[build\] Fix hermeticity of flatbuffer](https://fuchsia-review.googlesource.com/c/third_party/flatbuffers/+/472637)
 
 ## Sponsors
 

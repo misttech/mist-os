@@ -52,8 +52,8 @@ ZIRCON_DRIVER(Driver, Ops, VendorName, Version);
  - `VendorName` is a string representing the name of the driver vendor.
  - `Version` is a string representing the version of the driver.
 
-For more details, see [the driver development documentation]
-(/docs/concepts/drivers/driver-development).
+For more details, see
+[the driver development documentation](/docs/development/drivers/developer_guide/driver-development.md).
 
 ## Bind rules {#bind-rules}
 

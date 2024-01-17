@@ -76,7 +76,7 @@ The 'Review' step is changed as follows:
 > a decision about that language's bindings. If necessary, controversial decisions
 > can be escalated like any other technical decision in Fuchsia._
 >
-> _[ADD] Most commonly, the review is conducted during one or multiple in-person
+> _\[ADD\] Most commonly, the review is conducted during one or multiple in-person
 > meetings 'The FTP review meeting'. The review can also occur using asynchronous
 > communication if appropriate)._
 >
@@ -84,13 +84,13 @@ The 'Review' step is changed as follows:
 > facilitator will then work through the comments in the FTP, asking people who
 > left comments in the doc to present their feedback._
 >
-> _[ADD] The facilitator and presenter are ideally different people. The goal of
+> _\[ADD\] The facilitator and presenter are ideally different people. The goal of
 > the facilitator is to ensure that all aspects of the design are addressed, and
 > to keep the meeting flowing. Ideally, the facilitator does not have a particular
 > stake in the outcome to avoid the perception of bias, and the presenter
 > implicitly has a stake in the design they're presenting._
 >
-> _[ADD] We don't necessarily need to come to closure on every piece of feedback
+> _\[ADD\] We don't necessarily need to come to closure on every piece of feedback
 > during the meeting or discuss every last comment (e.g., if there are a large
 > number of comments or several comments are getting at the same underlying
 > issue). Instead, the facilitator should optimize for giving the presenter a

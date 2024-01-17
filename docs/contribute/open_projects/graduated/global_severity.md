@@ -71,11 +71,11 @@ Find reviewers by OWNERS and merge your change.
 
 ## Examples
 
-* [555759: [log] Move intl_services log severity config to test definition](https://fuchsia-review.googlesource.com/c/fuchsia/+/555759)
-* [410049: [blobfs] blobfs stress tests v1](https://fuchsia-review.googlesource.com/c/fuchsia/+/410049)
-* [436337: [network/tests] Split up integration test binary](https://fuchsia-review.googlesource.com/c/fuchsia/+/436337)
-* [426214: [isolated-ota] Refactor into a library for integration tests.](https://fuchsia-review.googlesource.com/c/fuchsia/+/426214)
-* [440054: [run_test_component] Prune network test allowlist](https://fuchsia-review.googlesource.com/c/fuchsia/+/440054)
+* [555759: \[log\] Move intl_services log severity config to test definition](https://fuchsia-review.googlesource.com/c/fuchsia/+/555759)
+* [410049: \[blobfs\] blobfs stress tests v1](https://fuchsia-review.googlesource.com/c/fuchsia/+/410049)
+* [436337: \[network/tests\] Split up integration test binary](https://fuchsia-review.googlesource.com/c/fuchsia/+/436337)
+* [426214: \[isolated-ota\] Refactor into a library for integration tests.](https://fuchsia-review.googlesource.com/c/fuchsia/+/426214)
+* [440054: \[run_test_component\] Prune network test allowlist](https://fuchsia-review.googlesource.com/c/fuchsia/+/440054)
 
 ## Sponsors
 

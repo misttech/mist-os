@@ -62,7 +62,8 @@ about how to extend input handling for future use cases.
     unnecessary blocking calls.
 * _Customizability:_ The system should support different user input behavior for
   different products built on the Fuchsia platform.
-  * Specifically, the product [session][session] should have the
+  * Specifically, the product [session][glossary.session-component] should have
+    the
     capability to customize input behavior. However, the initial implementation
     proposed in this RFC will only meet a subset of the eventual requirements
     for customization. (See [Input pipeline

@@ -60,9 +60,9 @@ Find reviewers by OWNERS and merge your change.
 
 ## Examples
 
-*   [463175: [core] Move bootfs_test() to core.](https://fuchsia-review.googlesource.com/c/fuchsia/+/463175)
-*   [434303: [unification] Package and move several bringup tests](https://fuchsia-review.googlesource.com/c/fuchsia/+/434303)
-*   [435589: [testing] Package and move several bringup tests](https://fuchsia-review.googlesource.com/c/fuchsia/+/435589)
+*   [463175: \[core\] Move bootfs_test() to core.](https://fuchsia-review.googlesource.com/c/fuchsia/+/463175)
+*   [434303: \[unification\] Package and move several bringup tests](https://fuchsia-review.googlesource.com/c/fuchsia/+/434303)
+*   [435589: \[testing\] Package and move several bringup tests](https://fuchsia-review.googlesource.com/c/fuchsia/+/435589)
 
 ## Sponsors
 

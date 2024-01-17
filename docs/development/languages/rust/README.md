@@ -81,7 +81,7 @@ Email tq-rust-reviewers@google.com with any issues.
 
 {% dynamic if user.is_googler %}
 
-**[Googlers only]** You can view the
+**\[Googlers only\]** You can view the
 [list of Rust Reviewers](https://goto.corp.google.com/tq-rust-reviewers-list).
 New reviewers can be nominated by an existing reviewer using
 [this form](https://goto.corp.google.com/tq-rust-reviewers-nominate).
@@ -94,7 +94,7 @@ Public discussion happens on the [rust-users@fuchsia.dev] mailing list.
 
 {% dynamic if user.is_googler %}
 
-**[Googlers only]** For Googler-only channels, see
+**\[Googlers only\]** For Googler-only channels, see
 [go/fuchsia-rust-googlers].
 
 {% dynamic endif %}

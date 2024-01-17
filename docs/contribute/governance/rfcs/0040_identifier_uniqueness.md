@@ -26,7 +26,7 @@ languages are targeted.
 
 This proposes introducing a constraint on FIDL identifiers that no existing
 libraries violate.
-It doesn't change the FIDL language, IR (yet [[1]](#Footnote1)), bindings, style
+It doesn't change the FIDL language, IR (yet [^1]), bindings, style
 guide or rubric.
 
 In practice, identifiers consist of a series of words that are joined together.
@@ -43,8 +43,8 @@ lower-case.
 In FIDL, identifiers must be used in their original form.
 So if a type is named `FooBar`, attempting to refer to it as `foo_bar` is an error.
 
-There is a simple algorithm to carry out this transformation, here in Python:
-[[2]](#Footnote2)
+There is a simple algorithm to carry out this transformation,
+here in Python[^2]:
 
 ```python
 def canonical(identifier):
@@ -198,11 +198,9 @@ In proto3 similar rules are applied to generate a `lowerCamelCase` name
 for JSON encoding.
 
 -------------------------
-##### Footnote1
-until a new version of the IR schema, which would likely carry names with
-additional structure, rather than the fully-qualified name as it exists
-today.
+[^1]: Until a new version of the IR schema, which would likely carry names with
+    additional structure, rather than the fully-qualified name as it exists
+    today.
 
-##### Footnote2
-This algorithm was modified on 2020-06-03, after the FTP was accepted, in order
-to more closely match the existing behavior of FIDL backends.
+[^2]: This algorithm was modified on 2020-06-03, after the FTP was accepted, in order
+    to more closely match the existing behavior of FIDL backends.

@@ -96,8 +96,9 @@ When proposing a CL to bump the backstop, authors should:
 
 ## Design
 
-Let's introduce an `epoch.json` file to be present both in the [update package](/docs/concepts/
-packages/update_pkg.md) and on the system. It should be a JSON file with two string keys:
+Let's introduce an `epoch.json` file to be present both in the
+[update package](/docs/concepts/packages/update_pkg.md) and on the system.
+It should be a JSON file with two string keys:
 
 * "version", which should have a single string value for the `epoch.json` schema version. In
   practice, this will not be checked when performing updates -- this key only exists to make it
