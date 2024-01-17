@@ -38,6 +38,7 @@ use {
     std::string::ToString,
     std::sync::Arc,
     tracing::warn,
+    vfs::execution_scope::ExecutionScope,
 };
 
 /// Starts a component instance.
@@ -88,6 +89,7 @@ struct StartContext {
     runner: Option<RemoteRunner>,
     url: String,
     namespace_builder: NamespaceBuilder,
+    scope: ExecutionScope,
     numbered_handles: Vec<fprocess::HandleInfo>,
     encoded_config: Option<fmem::Data>,
 }
@@ -120,13 +122,18 @@ async fn do_start(
     };
 
     // Create the component's namespace.
-    let mut namespace_builder =
-        create_namespace(resolved_component.package.as_ref(), component, &resolved_component.decl)
-            .await
-            .map_err(|err| StartActionError::CreateNamespaceError {
-                moniker: component.moniker.clone(),
-                err,
-            })?;
+    let scope = ExecutionScope::new();
+    let mut namespace_builder = create_namespace(
+        resolved_component.package.as_ref(),
+        component,
+        &resolved_component.decl,
+        scope.clone(),
+    )
+    .await
+    .map_err(|err| StartActionError::CreateNamespaceError {
+        moniker: component.moniker.clone(),
+        err,
+    })?;
     for NamespaceEntry { directory, path } in additional_namespace_entries {
         let directory: sandbox::Directory = directory.into();
         namespace_builder.add_entry(Box::new(directory), &path).map_err(|err| {
@@ -163,6 +170,7 @@ async fn do_start(
         runner,
         url: resolved_component.resolved_url.clone(),
         namespace_builder,
+        scope,
         numbered_handles,
         encoded_config,
     };
@@ -192,7 +200,7 @@ async fn start_component(
     let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
 
-    let StartContext { runner, url, namespace_builder, numbered_handles, encoded_config } =
+    let StartContext { runner, url, namespace_builder, numbered_handles, scope, encoded_config } =
         start_context;
     if let Some(runner) = runner {
         let moniker = &component.moniker;
@@ -215,7 +223,7 @@ async fn start_component(
         };
 
         pending_runtime.set_program(
-            Program::start(&runner, start_info, diagnostics_sender).map_err(|err| {
+            Program::start(&runner, start_info, diagnostics_sender, scope).map_err(|err| {
                 StartActionError::StartProgramError { moniker: moniker.clone(), err }
             })?,
             component.as_weak(),
@@ -491,6 +499,7 @@ async fn create_scoped_logger(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use {
         crate::model::{
             actions::{

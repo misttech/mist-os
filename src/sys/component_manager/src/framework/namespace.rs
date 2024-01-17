@@ -10,7 +10,6 @@ use {
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
     cm_types::Name,
-    cm_util::TaskGroup,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent,
     futures::{
@@ -23,6 +22,7 @@ use {
     serve_processargs::{BuildNamespaceError, NamespaceBuilder},
     std::sync::Arc,
     tracing::warn,
+    vfs::execution_scope::ExecutionScope,
 };
 
 lazy_static! {
@@ -53,12 +53,18 @@ impl InternalCapabilityProvider for NamespaceCapabilityProvider {
 }
 
 pub struct NamespaceCapabilityHost {
-    namespace_tasks: TaskGroup,
+    namespace_scope: ExecutionScope,
+}
+
+impl Drop for NamespaceCapabilityHost {
+    fn drop(&mut self) {
+        self.namespace_scope.shutdown();
+    }
 }
 
 impl NamespaceCapabilityHost {
     pub fn new() -> Self {
-        Self { namespace_tasks: TaskGroup::new() }
+        Self { namespace_scope: ExecutionScope::new() }
     }
 
     pub async fn serve(
@@ -100,7 +106,8 @@ impl NamespaceCapabilityHost {
         &self,
         entries: Vec<fcomponent::NamespaceDictPair>,
     ) -> Result<Vec<fcomponent::NamespaceEntry>, fcomponent::NamespaceError> {
-        let mut namespace_builder = NamespaceBuilder::new(Self::ignore_not_found());
+        let mut namespace_builder =
+            NamespaceBuilder::new(self.namespace_scope.clone(), Self::ignore_not_found());
         for entry in entries {
             let path = entry.path;
             let dict = entry.dict.into_proxy().unwrap();
@@ -113,8 +120,7 @@ impl NamespaceCapabilityHost {
                 namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;
             }
         }
-        let (namespace, fut) = namespace_builder.serve().map_err(Self::error_to_fidl)?;
-        self.namespace_tasks.spawn(fut);
+        let namespace = namespace_builder.serve().map_err(Self::error_to_fidl)?;
         let out = namespace.flatten().into_iter().map(Into::into).collect();
         Ok(out)
     }

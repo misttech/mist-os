@@ -75,8 +75,8 @@ impl Open {
 
     /// Converts the [Open] capability into a [Directory] capability such that it will be
     /// opened with `open_flags`.
-    pub fn into_directory(self, open_flags: fio::OpenFlags) -> Directory {
-        Directory::from_open(self, open_flags)
+    pub fn into_directory(self, open_flags: fio::OpenFlags, scope: ExecutionScope) -> Directory {
+        Directory::from_open(self, open_flags, scope)
     }
 
     /// Opens the corresponding entry.
@@ -514,17 +514,20 @@ mod tests {
         let open = Open::from(dir_client_end);
 
         // Verify that the connection is read-write.
-        let directory = open
-            .clone()
-            .into_directory(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE);
+        let directory = open.clone().into_directory(
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
+            ExecutionScope::new(),
+        );
         let (status, flags) = get_connection_rights(directory).await.unwrap();
         assert_eq!(status, zx::Status::OK.into_raw());
         assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
 
         // Downscope the rights to read-only.
         let open = open.downscope_rights(fio::OpenFlags::RIGHT_READABLE);
-        let directory =
-            open.into_directory(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE);
+        let directory = open.into_directory(
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
+            ExecutionScope::new(),
+        );
 
         // Verify that the connection is read-only.
         let (status, flags) = get_connection_rights(directory).await.unwrap();
@@ -550,13 +553,15 @@ mod tests {
         let open = Open::from(dir_client_end);
 
         // Verify that the connection has a directory named `foo`.
-        let directory = open.clone().into_directory(fio::OpenFlags::RIGHT_READABLE);
+        let directory =
+            open.clone().into_directory(fio::OpenFlags::RIGHT_READABLE, ExecutionScope::new());
         let entries = get_entries(directory).await.unwrap();
         assert_eq!(entries, vec!["foo".to_owned()]);
 
         // Downscope the path to `foo`.
         let open = open.clone().downscope_path(crate::Path::new("foo"));
-        let directory = Directory::from_open(open, fio::OpenFlags::RIGHT_READABLE);
+        let directory =
+            Directory::from_open(open, fio::OpenFlags::RIGHT_READABLE, ExecutionScope::new());
 
         // Verify that the connection does not have anymore children, since `foo` has no children.
         let entries = get_entries(directory).await.unwrap();

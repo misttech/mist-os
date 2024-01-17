@@ -4,20 +4,12 @@
 
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io as fio;
-use futures::stream::FuturesUnordered;
-use futures::{
-    channel::mpsc::{unbounded, UnboundedSender},
-    future::{BoxFuture, Future},
-    FutureExt, StreamExt,
-};
+use futures::channel::mpsc::{unbounded, UnboundedSender};
 use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as NamespacePath, Tree};
 use sandbox::{AnyCapability, Dict, Directory};
-use std::pin::Pin;
 use std::sync::Arc;
 use thiserror::Error;
-
-/// Variant of [futures::future::BoxFuture] where the Future is Sync.
-pub type BoxFutureSync<'a, T> = Pin<Box<dyn Future<Output = T> + Send + Sync + 'a>>;
+use vfs::execution_scope::ExecutionScope;
 
 /// A builder object for assembling a program's incoming namespace.
 pub struct NamespaceBuilder {
@@ -27,7 +19,10 @@ pub struct NamespaceBuilder {
     /// Path-not-found errors are sent here.
     not_found: UnboundedSender<String>,
 
-    futures: FuturesUnordered<BoxFutureSync<'static, ()>>,
+    /// Scope in which the namespace vfs executes.
+    ///
+    /// This can be used to terminate the vfs.
+    scope: ExecutionScope,
 }
 
 #[derive(Error, Debug, Clone)]
@@ -47,12 +42,8 @@ pub enum BuildNamespaceError {
 }
 
 impl NamespaceBuilder {
-    pub fn new(not_found: UnboundedSender<String>) -> Self {
-        return NamespaceBuilder {
-            entries: Default::default(),
-            not_found,
-            futures: FuturesUnordered::new(),
-        };
+    pub fn new(scope: ExecutionScope, not_found: UnboundedSender<String>) -> Self {
+        return NamespaceBuilder { entries: Default::default(), not_found, scope };
     }
 
     /// Add a capability `cap` at `path`. As a result, the framework will create a
@@ -100,7 +91,7 @@ impl NamespaceBuilder {
         Ok(())
     }
 
-    pub fn serve(self: Self) -> Result<(Namespace, BoxFuture<'static, ()>), BuildNamespaceError> {
+    pub fn serve(self: Self) -> Result<Namespace, BuildNamespaceError> {
         let ns = self
             .entries
             .flatten()
@@ -112,35 +103,27 @@ impl NamespaceBuilder {
                     let open = cap.try_into_open().map_err(|err| {
                         BuildNamespaceError::Conversion { path: path.clone(), err: Arc::new(err) }
                     })?;
-                    open.into_directory(fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE)
+                    open.into_directory(
+                        fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+                        self.scope.clone(),
+                    )
                 };
                 let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
                 Ok(NamespaceEntry { path, directory: client_end.into() })
             })
             .collect::<Result<Vec<_>, _>>()?
             .try_into()?;
-
-        let mut futures = self.futures;
-        let fut = async move { while let Some(()) = futures.next().await {} }.boxed();
-
-        Ok((ns, fut))
+        Ok(ns)
     }
 
     fn make_dict_with_not_found_logging(&self, root_path: String) -> Dict {
-        let (entry_not_found, mut entry_not_found_receiver) = unbounded();
-        let new_dict = Dict::new_with_not_found(entry_not_found);
         let not_found = self.not_found.clone();
-        // Grab a copy of the directory path, it will be needed if we log a
-        // failed open request.
-        let fut = Box::pin(async move {
-            while let Some(path) = entry_not_found_receiver.next().await {
-                let requested_path = format!("{}/{}", root_path, path);
-                // Ignore the result of sending. The receiver is free to break away to ignore all the
-                // not-found errors.
-                let _ = not_found.unbounded_send(requested_path);
-            }
+        let new_dict = Dict::new_with_not_found(move |key| {
+            let requested_path = format!("{}/{}", root_path, key);
+            // Ignore the result of sending. The receiver is free to break away to ignore all the
+            // not-found errors.
+            let _ = not_found.unbounded_send(requested_path);
         });
-        self.futures.push(fut);
         new_dict
     }
 }
@@ -150,7 +133,7 @@ impl Clone for NamespaceBuilder {
         Self {
             entries: self.entries.clone(),
             not_found: self.not_found.clone(),
-            futures: FuturesUnordered::new(),
+            scope: self.scope.clone(),
         }
     }
 }
@@ -187,7 +170,7 @@ mod tests {
     }
 
     fn parents_valid(paths: Vec<&str>) -> Result<(), BuildNamespaceError> {
-        let mut shadow = NamespaceBuilder::new(ignore_not_found());
+        let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         for path in paths {
             shadow.add_object(open_cap(), &ns_path(path))?;
         }
@@ -203,18 +186,18 @@ mod tests {
         assert_matches!(parents_valid(vec!["/foo/bar/a", "/foo/bar/b", "/foo/bar/c"]), Ok(()));
         assert_matches!(parents_valid(vec!["/a", "/b", "/c"]), Ok(()));
 
-        let mut shadow = NamespaceBuilder::new(ignore_not_found());
+        let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         shadow.add_object(open_cap(), &ns_path("/svc/foo")).unwrap();
         assert_matches!(shadow.add_object(open_cap(), &ns_path("/svc/foo/bar")), Err(_));
 
-        let mut shadow = NamespaceBuilder::new(ignore_not_found());
+        let mut shadow = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         shadow.add_object(open_cap(), &ns_path("/svc/foo")).unwrap();
         assert_matches!(shadow.add_entry(open_cap(), &ns_path("/svc2")), Ok(_));
     }
 
     #[fuchsia::test]
     async fn test_duplicate_object() {
-        let mut namespace = NamespaceBuilder::new(ignore_not_found());
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_object(open_cap(), &ns_path("/svc/a")).expect("");
         // Adding again will fail.
         assert_matches!(
@@ -226,7 +209,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_duplicate_entry() {
-        let mut namespace = NamespaceBuilder::new(ignore_not_found());
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_entry(open_cap(), &ns_path("/svc/a")).expect("");
         // Adding again will fail.
         assert_matches!(
@@ -238,7 +221,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_duplicate_object_and_entry() {
-        let mut namespace = NamespaceBuilder::new(ignore_not_found());
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_object(open_cap(), &ns_path("/svc/a")).expect("");
         assert_matches!(
             namespace.add_entry(open_cap(), &ns_path("/svc/a")),
@@ -251,7 +234,7 @@ mod tests {
     /// we cannot add another entry directly at "/foo" again.
     #[fuchsia::test]
     async fn test_duplicate_entry_at_object_parent() {
-        let mut namespace = NamespaceBuilder::new(ignore_not_found());
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_object(open_cap(), &ns_path("/foo/bar")).expect("");
         assert_matches!(
             namespace.add_entry(open_cap(), &ns_path("/foo")),
@@ -265,7 +248,7 @@ mod tests {
     /// the framework.
     #[fuchsia::test]
     async fn test_duplicate_object_parent_at_entry() {
-        let mut namespace = NamespaceBuilder::new(ignore_not_found());
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_entry(open_cap(), &ns_path("/foo")).expect("");
         assert_matches!(
             namespace.add_object(open_cap(), &ns_path("/foo/bar")),
@@ -276,21 +259,18 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_empty() {
-        let namespace = NamespaceBuilder::new(ignore_not_found());
-        let (ns, fut) = namespace.serve().unwrap();
-        let fut = fasync::Task::spawn(fut);
+        let namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
+        let ns = namespace.serve().unwrap();
         assert_eq!(ns.flatten().len(), 0);
-        fut.await;
     }
 
     #[fuchsia::test]
     async fn test_one_sender_end_to_end() {
         let (open, receiver) = multishot();
 
-        let mut namespace = NamespaceBuilder::new(ignore_not_found());
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_object(Box::new(open), &ns_path("/svc/a")).unwrap();
-        let (ns, fut) = namespace.serve().unwrap();
-        let fut = fasync::Task::spawn(fut);
+        let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
         assert_eq!(ns.len(), 1);
@@ -313,17 +293,15 @@ mod tests {
         let server_end: zx::Channel = receiver.0.recv().await.unwrap().get_handle().unwrap().into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).unwrap();
-
-        fut.await
     }
 
     #[fuchsia::test]
     async fn test_two_senders_in_same_namespace_entry() {
-        let mut namespace = NamespaceBuilder::new(ignore_not_found());
+        let scope = ExecutionScope::new();
+        let mut namespace = NamespaceBuilder::new(scope.clone(), ignore_not_found());
         namespace.add_object(open_cap(), &ns_path("/svc/a")).unwrap();
         namespace.add_object(open_cap(), &ns_path("/svc/b")).unwrap();
-        let (ns, fut) = namespace.serve().unwrap();
-        let fut = fasync::Task::spawn(fut);
+        let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
         assert_eq!(ns.len(), 1);
@@ -341,16 +319,14 @@ mod tests {
         assert_eq!(entries, expectation);
 
         drop(dir);
-        fut.await
     }
 
     #[fuchsia::test]
     async fn test_two_senders_in_different_namespace_entries() {
-        let mut namespace = NamespaceBuilder::new(ignore_not_found());
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         namespace.add_object(open_cap(), &ns_path("/svc1/a")).unwrap();
         namespace.add_object(open_cap(), &ns_path("/svc2/b")).unwrap();
-        let (ns, fut) = namespace.serve().unwrap();
-        let fut = fasync::Task::spawn(fut);
+        let ns = namespace.serve().unwrap();
 
         let ns = ns.flatten();
         assert_eq!(ns.len(), 2);
@@ -377,16 +353,14 @@ mod tests {
 
         drop(svc1);
         drop(svc2);
-        fut.await
     }
 
     #[fuchsia::test]
     async fn test_not_found() {
         let (not_found_sender, mut not_found_receiver) = unbounded();
-        let mut namespace = NamespaceBuilder::new(not_found_sender);
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found_sender);
         namespace.add_object(open_cap(), &ns_path("/svc/a")).unwrap();
-        let (ns, fut) = namespace.serve().unwrap();
-        let fut = fasync::Task::spawn(fut);
+        let ns = namespace.serve().unwrap();
 
         let mut ns = ns.flatten();
         assert_eq!(ns.len(), 1);
@@ -407,6 +381,5 @@ mod tests {
         assert_eq!(not_found_receiver.next().await, Some("/svc/non_existent".to_string()));
 
         drop(ns);
-        fut.await
     }
 }

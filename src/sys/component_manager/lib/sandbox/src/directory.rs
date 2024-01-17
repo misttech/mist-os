@@ -7,8 +7,6 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::{future::BoxFuture, FutureExt};
-use std::sync::{Arc, Mutex};
 use vfs::execution_scope::ExecutionScope;
 
 use crate::{registry, Capability, Open};
@@ -22,9 +20,6 @@ pub struct Directory {
     ///
     /// Invariant: Always Some when the Directory is outside of the registry.
     client_end: Option<ClientEnd<fio::DirectoryMarker>>,
-
-    // The mutex makes the Directory implement `Sync`.
-    future: Arc<Mutex<Option<BoxFuture<'static, ()>>>>,
 }
 
 impl Directory {
@@ -33,12 +28,8 @@ impl Directory {
     /// Arguments:
     ///
     /// * `client_end` - A `fuchsia.io/Directory` client endpoint.
-    /// * `future` - If present, the future will serve the contents in the directory.
-    pub fn new(
-        client_end: ClientEnd<fio::DirectoryMarker>,
-        future: Option<BoxFuture<'static, ()>>,
-    ) -> Self {
-        Directory { client_end: Some(client_end), future: Arc::new(Mutex::new(future)) }
+    pub fn new(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
+        Directory { client_end: Some(client_end) }
     }
 
     /// Create a new [Directory] capability that will open entries using the [Open] capability.
@@ -47,15 +38,9 @@ impl Directory {
     ///
     /// * `open_flags` - The flags that will be used to open a new connection from the [Open]
     ///   capability.
-    pub fn from_open(open: Open, open_flags: fio::OpenFlags) -> Self {
-        let scope = ExecutionScope::new();
+    pub fn from_open(open: Open, open_flags: fio::OpenFlags, scope: ExecutionScope) -> Self {
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        // If this future is dropped, stop serving the connection.
-        let guard = scopeguard::guard(scope.clone(), move |scope| {
-            scope.shutdown();
-        });
-        let fut = async move {
-            let _guard = guard;
+        scope.clone().spawn(async move {
             // Wait for the client endpoint to be written or closed. These are the only two
             // operations the client could do that warrants our attention.
             let server_end = fasync::Channel::from_channel(server_end.into_channel());
@@ -72,11 +57,8 @@ impl Directory {
                     server_end.into_zx_channel().into(),
                 );
             }
-            scope.wait().await;
-        }
-        .boxed();
-
-        Self::new(client_end, Some(fut))
+        });
+        Self::new(client_end)
     }
 
     /// Sets this directory's client end to the provided one.
@@ -109,7 +91,7 @@ impl Clone for Directory {
             std::mem::forget(directory.into_channel());
         }
         let client_end: ClientEnd<fio::DirectoryMarker> = clone_client_end.into();
-        Self { client_end: Some(client_end), future: self.future.clone() }
+        Self { client_end: Some(client_end) }
     }
 }
 
@@ -117,7 +99,7 @@ impl Capability for Directory {}
 
 impl From<ClientEnd<fio::DirectoryMarker>> for Directory {
     fn from(client_end: ClientEnd<fio::DirectoryMarker>) -> Self {
-        Directory { client_end: Some(client_end), future: Arc::new(Mutex::new(None)) }
+        Directory { client_end: Some(client_end) }
     }
 }
 
@@ -131,13 +113,7 @@ impl From<Directory> for ClientEnd<fio::DirectoryMarker> {
 
         // Move this capability into the registry.
         let koid = client_end.get_koid().unwrap();
-        let future = directory.future.lock().unwrap().take();
-        if let Some(fut) = future {
-            let task = fasync::Task::spawn(fut);
-            registry::insert_with_task(Box::new(directory), koid, task);
-        } else {
-            registry::insert(Box::new(directory), koid);
-        }
+        registry::insert(Box::new(directory), koid);
 
         client_end
     }
@@ -198,7 +174,7 @@ mod tests {
             fio::DirentType::Directory,
         );
 
-        let directory = open.into_directory(fio::OpenFlags::DIRECTORY);
+        let directory = open.into_directory(fio::OpenFlags::DIRECTORY, ExecutionScope::new());
         let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
         zx::Channel::from(client_end)
             .write(&[1], &mut [])
@@ -227,7 +203,7 @@ mod tests {
         );
 
         assert_eq!(OPEN_COUNT.get(), 0);
-        let directory = open.into_directory(fio::OpenFlags::DIRECTORY);
+        let directory = open.into_directory(fio::OpenFlags::DIRECTORY, ExecutionScope::new());
         let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
         drop(client_end);
         assert_eq!(OPEN_COUNT.get(), 0);

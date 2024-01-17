@@ -23,6 +23,7 @@ mod test {
     };
     use sandbox::{AnyCapability, Dict, Receiver};
     use serve_processargs::NamespaceBuilder;
+    use vfs::execution_scope::ExecutionScope;
 
     fn ignore_not_found() -> UnboundedSender<String> {
         let (sender, _receiver) = unbounded();
@@ -42,7 +43,8 @@ mod test {
     async fn create_from_dicts(
         entries: Vec<fcomponent::NamespaceDictPair>,
     ) -> Result<Vec<fcomponent::NamespaceEntry>, anyhow::Error> {
-        let mut namespace_builder = NamespaceBuilder::new(ignore_not_found());
+        let mut namespace_builder =
+            NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
         for entry in entries {
             let path = entry.path;
             let dict = entry.dict.into_proxy().unwrap();
@@ -54,8 +56,7 @@ mod test {
                 namespace_builder.add_object(capability, &path).context("failed to add object")?;
             }
         }
-        let (namespace, task) = namespace_builder.serve().context("failed to serve namespace")?;
-        fasync::Task::spawn(task).detach();
+        let namespace = namespace_builder.serve().context("failed to serve namespace")?;
         let out = namespace
             .flatten()
             .into_iter()

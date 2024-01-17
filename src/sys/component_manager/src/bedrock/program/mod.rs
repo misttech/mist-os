@@ -11,7 +11,6 @@ use fidl_fuchsia_diagnostics_types as fdiagnostics;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_mem as fmem;
 use fidl_fuchsia_process as fprocess;
-use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_zircon as zx;
 use futures::{
@@ -20,8 +19,8 @@ use futures::{
     FutureExt,
 };
 use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
-use std::sync::Mutex;
 use thiserror::Error;
+use vfs::execution_scope::ExecutionScope;
 
 mod component_controller;
 use component_controller::ComponentController;
@@ -44,8 +43,9 @@ pub struct Program {
     /// Only here to keep the diagnostics task alive. Never read.
     _send_diagnostics: Task<()>,
 
-    /// Dropping the task will stop serving the namespace.
-    namespace_task: Mutex<Option<fasync::Task<()>>>,
+    /// The scope in which the namespace is run. component_manager will use this to gracefully shutdown
+    /// the namespace when the component is stopped.
+    namespace_scope: ExecutionScope,
 }
 
 impl Program {
@@ -68,6 +68,7 @@ impl Program {
         runner: &RemoteRunner,
         start_info: StartInfo,
         diagnostics_sender: oneshot::Sender<fdiagnostics::ComponentDiagnostics>,
+        namespace_scope: ExecutionScope,
     ) -> Result<Program, StartError> {
         let (controller, server_end) =
             endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
@@ -75,7 +76,7 @@ impl Program {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let (runtime_dir, runtime_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let (start_info, fut) = start_info.into_fidl(outgoing_server, runtime_server)?;
+        let start_info = start_info.into_fidl(outgoing_server, runtime_server)?;
 
         runner.start(start_info, server_end);
         let mut controller = ComponentController::new(controller);
@@ -91,7 +92,7 @@ impl Program {
             outgoing_dir,
             runtime_dir,
             _send_diagnostics: send_diagnostics,
-            namespace_task: Mutex::new(Some(fasync::Task::spawn(fut))),
+            namespace_scope,
         })
     }
 
@@ -114,7 +115,6 @@ impl Program {
     /// Request to stop this program immediately.
     pub fn kill(&self) -> Result<(), StopError> {
         self.controller.kill().map_err(StopError::Internal)?;
-        _ = self.namespace_task.lock().unwrap().take();
         Ok(())
     }
 
@@ -135,14 +135,17 @@ impl Program {
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
     ) -> Result<ComponentStopOutcome, StopError> {
-        match self.stop_with_timeout(stop_timer).await {
+        let outcome = match self.stop_with_timeout(stop_timer).await {
             Some(r) => r,
             None => {
                 // We must have hit the stop timeout because calling stop didn't return
                 // a result, move to killing the component.
                 self.kill_with_timeout(kill_timer).await
             }
-        }
+        }?;
+        self.namespace_scope.shutdown();
+        self.namespace_scope.wait().await;
+        Ok(outcome)
     }
 
     /// Stops the program or returns early if the operation times out.
@@ -218,7 +221,7 @@ impl Program {
             outgoing_dir,
             runtime_dir,
             _send_diagnostics: send_diagnostics,
-            namespace_task: Mutex::new(None),
+            namespace_scope: ExecutionScope::new(),
         }
     }
 }
@@ -350,23 +353,20 @@ impl StartInfo {
         self,
         outgoing_server_end: ServerEnd<fio::DirectoryMarker>,
         runtime_server_end: ServerEnd<fio::DirectoryMarker>,
-    ) -> Result<(fcrunner::ComponentStartInfo, BoxFuture<'static, ()>), StartError> {
-        let (ns, fut) = self.namespace.serve().map_err(StartError::ServeNamespace)?;
-        Ok((
-            fcrunner::ComponentStartInfo {
-                resolved_url: Some(self.resolved_url),
-                program: Some(self.program),
-                ns: Some(ns.into()),
-                outgoing_dir: Some(outgoing_server_end),
-                runtime_dir: Some(runtime_server_end),
-                numbered_handles: Some(self.numbered_handles),
-                encoded_config: self.encoded_config,
-                break_on_start: self.break_on_start,
-                component_instance: Some(self.component_instance.into()),
-                ..Default::default()
-            },
-            fut,
-        ))
+    ) -> Result<fcrunner::ComponentStartInfo, StartError> {
+        let ns = self.namespace.serve().map_err(StartError::ServeNamespace)?;
+        Ok(fcrunner::ComponentStartInfo {
+            resolved_url: Some(self.resolved_url),
+            program: Some(self.program),
+            ns: Some(ns.into()),
+            outgoing_dir: Some(outgoing_server_end),
+            runtime_dir: Some(runtime_server_end),
+            numbered_handles: Some(self.numbered_handles),
+            encoded_config: self.encoded_config,
+            break_on_start: self.break_on_start,
+            component_instance: Some(self.component_instance.into()),
+            ..Default::default()
+        })
     }
 }
 

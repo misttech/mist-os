@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::channel::mpsc::UnboundedSender;
-use futures::future::{BoxFuture, FutureExt};
 use process_builder::StartupHandle;
 use processargs::ProcessArgs;
 use sandbox::{AnyCapability, Dict, DictKey, OneShotHandle};
 use std::collections::HashMap;
 use std::iter::once;
 use thiserror::Error;
+use vfs::execution_scope::ExecutionScope;
 
 mod namespace;
 
@@ -77,12 +77,13 @@ pub type DeliveryMap = HashMap<DictKey, DeliveryMapEntry>;
 ///
 /// On success, returns a future that services the namespace.
 pub fn add_to_processargs(
+    scope: ExecutionScope,
     dict: Dict,
     processargs: &mut ProcessArgs,
     delivery_map: &DeliveryMap,
     not_found: UnboundedSender<String>,
-) -> Result<BoxFuture<'static, ()>, DeliveryError> {
-    let mut namespace = NamespaceBuilder::new(not_found);
+) -> Result<(), DeliveryError> {
+    let mut namespace = NamespaceBuilder::new(scope, not_found);
 
     // Iterate over the delivery map.
     // Take entries away from dict and install them accordingly.
@@ -99,11 +100,11 @@ pub fn add_to_processargs(
         }
     })?;
 
-    let (namespace, namespace_fut) = namespace.serve().map_err(DeliveryError::NamespaceError)?;
+    let namespace = namespace.serve().map_err(DeliveryError::NamespaceError)?;
     let namespace: Vec<_> = namespace.into();
     processargs.namespace_entries.extend(namespace);
 
-    Ok(namespace_fut.boxed())
+    Ok(())
 }
 
 #[derive(Error, Debug)]
@@ -241,6 +242,7 @@ mod tests {
         futures::TryStreamExt,
         maplit::hashmap,
         sandbox::OneShotHandle,
+        std::pin::pin,
         std::str::FromStr,
         test_util::{multishot, open},
     };
@@ -250,13 +252,14 @@ mod tests {
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
         let delivery_map = DeliveryMap::new();
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
+        let scope = ExecutionScope::new();
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 0);
 
         drop(processargs);
-        fut.await;
+        scope.wait().await;
         Ok(())
     }
 
@@ -275,7 +278,8 @@ mod tests {
                 Delivery::Handle(HandleInfo::new(HandleType::FileDescriptor, 0))
             )
         };
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
+        let scope = ExecutionScope::new();
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 1);
@@ -293,7 +297,7 @@ mod tests {
         assert_eq!(&buf[..PAYLOAD.len()], PAYLOAD);
 
         drop(processargs);
-        fut.await;
+        scope.wait().await;
         Ok(())
     }
 
@@ -318,7 +322,8 @@ mod tests {
                 )
             })
         };
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
+        let scope = ExecutionScope::new();
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 1);
@@ -327,7 +332,7 @@ mod tests {
         assert_eq!(processargs.handles[0].info.arg(), 0);
 
         drop(processargs);
-        fut.await;
+        scope.wait().await;
         Ok(())
     }
 
@@ -352,7 +357,8 @@ mod tests {
                 )
             })
         };
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
+        let scope = ExecutionScope::new();
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.namespace_entries.len(), 0);
         assert_eq!(processargs.handles.len(), 1);
@@ -366,7 +372,7 @@ mod tests {
 
         drop(ep0);
         drop(processargs);
-        fut.await;
+        scope.wait().await;
         Ok(())
     }
 
@@ -391,7 +397,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::NotADict(name)
             if &name == "handles"
         );
@@ -408,7 +414,7 @@ mod tests {
         let delivery_map = DeliveryMap::new();
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::UnusedCapabilities(keys)
             if keys == vec![DictKey::from("stdin")]
         );
@@ -429,7 +435,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::UnsupportedHandleType(handle_type)
             if handle_type == HandleType::DirectoryRequest
         );
@@ -446,7 +452,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::NotInDict(name)
             if &name == "stdin"
         );
@@ -475,8 +481,8 @@ mod tests {
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Closed").unwrap())
             )
         };
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
-        let fut = fasync::Task::spawn(fut);
+        let scope = ExecutionScope::new();
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.handles.len(), 0);
         assert_eq!(processargs.namespace_entries.len(), 1);
@@ -513,7 +519,57 @@ mod tests {
 
         drop(dir);
         drop(processargs);
-        fut.await;
+        scope.wait().await;
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_namespace_scope_shutdown() -> Result<()> {
+        let (open, receiver) = multishot();
+
+        let mut processargs = ProcessArgs::new();
+        let dict = Dict::new();
+        {
+            let mut entries = dict.lock_entries();
+            entries.insert("normal".to_string(), Box::new(open));
+        }
+        let delivery_map = hashmap! {
+            "normal".to_string() => DeliveryMapEntry::Delivery(
+                Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())
+            ),
+        };
+        let scope = ExecutionScope::new();
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
+
+        assert_eq!(processargs.handles.len(), 0);
+        assert_eq!(processargs.namespace_entries.len(), 1);
+        let entry = processargs.namespace_entries.pop().unwrap();
+        assert_eq!(entry.path.to_str().unwrap(), "/svc");
+
+        let dir = entry.directory.into_proxy().unwrap();
+        let dir = dir.into_channel().unwrap().into_zx_channel();
+
+        // Connect to the protocol using namespace functionality.
+        let (client_end, server_end) = zx::Channel::create();
+        fdio::service_connect_at(&dir, "fuchsia.Normal", server_end).unwrap();
+
+        // Make sure the server_end is received, and test connectivity.
+        let server_end: zx::Channel = receiver.0.recv().await.unwrap().get_handle().unwrap().into();
+        client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).unwrap();
+
+        // Shutdown the execution scope.
+        scope.shutdown();
+        scope.wait().await;
+
+        // Connect to the protocol again. This time, because the namespace was shutdown, anything we send
+        // should get peer-closed.
+        let (client_end, server_end) = zx::Channel::create();
+        fdio::service_connect_at(&dir, "fuchsia.Normal", server_end).unwrap();
+        fasync::Channel::from_channel(client_end).on_closed().await.unwrap();
+
+        drop(dir);
+        drop(processargs);
         Ok(())
     }
 
@@ -526,7 +582,7 @@ mod tests {
         use futures::task::Poll;
         let mut exec = fasync::TestExecutor::new();
         let (open, receiver) = open();
-        let directory = open.into_directory(fio::OpenFlags::DIRECTORY);
+        let directory = open.into_directory(fio::OpenFlags::DIRECTORY, ExecutionScope::new());
 
         let mut processargs = ProcessArgs::new();
         let dict = Dict::new();
@@ -536,8 +592,8 @@ mod tests {
                 Delivery::NamespaceEntry(cm_types::Path::from_str("/data").unwrap())
             ),
         };
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
-        let fut = fasync::Task::spawn(fut);
+        let scope = ExecutionScope::new();
+        add_to_processargs(scope.clone(), dict, &mut processargs, &delivery_map, ignore())?;
 
         assert_eq!(processargs.handles.len(), 0);
         assert_eq!(processargs.namespace_entries.len(), 1);
@@ -578,7 +634,7 @@ mod tests {
 
         drop(dir);
         drop(processargs);
-        exec.run_singlethreaded(fut);
+        exec.run_singlethreaded(pin!(scope.wait()));
         Ok(())
     }
 
@@ -597,7 +653,7 @@ mod tests {
         };
 
         assert_matches!(
-            add_to_processargs(dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
+            add_to_processargs(ExecutionScope::new(), dict, &mut processargs, &delivery_map, ignore()).err().unwrap(),
             DeliveryError::NamespaceError(BuildNamespaceError::Conversion {
                 path, ..
             })

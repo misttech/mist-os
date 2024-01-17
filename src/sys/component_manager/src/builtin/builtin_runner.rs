@@ -445,10 +445,8 @@ mod tests {
         // This way we can monitor when that program is running.
         let (ch1, ch2) = zx::Channel::create();
         let (not_found, _) = channel::mpsc::unbounded();
-        let mut namespace = NamespaceBuilder::new(not_found);
-        namespace
-            .add_entry(Box::new(Directory::new(pkg, None)), &Path::new("/pkg").unwrap())
-            .unwrap();
+        let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found);
+        namespace.add_entry(Box::new(Directory::new(pkg)), &Path::new("/pkg").unwrap()).unwrap();
 
         let moniker = Moniker::try_from(vec!["signal_then_hang"]).unwrap();
         let token = builtin_runner.elf_runner_resources.instance_registry.add_for_tests(moniker);
@@ -481,7 +479,9 @@ mod tests {
 
         let elf_runner = RemoteRunner::new(component_runner);
         let (diagnostics_sender, _) = oneshot::channel();
-        let program = Program::start(&elf_runner, start_info, diagnostics_sender).unwrap();
+        let program =
+            Program::start(&elf_runner, start_info, diagnostics_sender, ExecutionScope::new())
+                .unwrap();
 
         // Wait for the ELF component to signal on the channel.
         let signals = fasync::OnSignals::new(&ch2, zx::Signals::USER_0).await.unwrap();

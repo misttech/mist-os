@@ -42,16 +42,17 @@ pub async fn create_namespace(
     package: Option<&Package>,
     component: &Arc<ComponentInstance>,
     decl: &ComponentDecl,
+    scope: ExecutionScope,
 ) -> Result<NamespaceBuilder, CreateNamespaceError> {
     let not_found_sender = not_found_logging(component);
-    let mut namespace = NamespaceBuilder::new(not_found_sender);
+    let mut namespace = NamespaceBuilder::new(scope.clone(), not_found_sender);
     if let Some(package) = package {
         let pkg_dir = fuchsia_fs::directory::clone_no_describe(&package.package_dir, None)
             .map_err(CreateNamespaceError::ClonePkgDirFailed)?;
         add_pkg_directory(&mut namespace, pkg_dir)?;
     }
     let uses = deduplicate_event_stream(decl.uses.iter());
-    add_use_decls(&mut namespace, component, uses).await?;
+    add_use_decls(&mut namespace, component, uses, scope).await?;
     Ok(namespace)
 }
 
@@ -96,6 +97,7 @@ async fn add_use_decls(
     namespace: &mut NamespaceBuilder,
     component: &Arc<ComponentInstance>,
     uses: impl Iterator<Item = &UseDecl>,
+    scope: ExecutionScope,
 ) -> Result<(), CreateNamespaceError> {
     for use_ in uses {
         if let cm_rust::UseDecl::Runner(_) = use_ {
@@ -110,8 +112,12 @@ async fn add_use_decls(
         let target_path =
             use_.path().ok_or_else(|| CreateNamespaceError::UseDeclWithoutPath(use_.clone()))?;
         let capability: AnyCapability = match use_ {
-            cm_rust::UseDecl::Directory(_) => directory_use(&use_, component.as_weak()),
-            cm_rust::UseDecl::Storage(storage) => storage_use(storage, use_, component).await?,
+            cm_rust::UseDecl::Directory(_) => {
+                directory_use(&use_, component.as_weak(), scope.clone())
+            }
+            cm_rust::UseDecl::Storage(storage) => {
+                storage_use(storage, use_, component, scope.clone()).await?
+            }
             cm_rust::UseDecl::Protocol(s) => {
                 service_or_protocol_use(UseDecl::Protocol(s.clone()), component.as_weak())
             }
@@ -156,6 +162,7 @@ async fn storage_use(
     use_storage_decl: &UseStorageDecl,
     use_decl: &UseDecl,
     component: &Arc<ComponentInstance>,
+    scope: ExecutionScope,
 ) -> Result<Box<Directory>, CreateNamespaceError> {
     // Prevent component from using storage capability if it is restricted to the component ID
     // index, and the component isn't in the index.
@@ -172,7 +179,7 @@ async fn storage_use(
             .map_err(CreateNamespaceError::InstanceNotInInstanceIdIndex)?;
     }
 
-    Ok(directory_use(use_decl, component.as_weak()))
+    Ok(directory_use(use_decl, component.as_weak(), scope))
 }
 
 /// Makes a capability representing the directory described by `use_`. Once the
@@ -182,7 +189,11 @@ async fn storage_use(
 /// `component` is a weak pointer, which is important because we don't want the task
 /// waiting for channel readability to hold a strong pointer to this component lest it
 /// create a reference cycle.
-fn directory_use(use_: &UseDecl, component: WeakComponentInstance) -> Box<Directory> {
+fn directory_use(
+    use_: &UseDecl,
+    component: WeakComponentInstance,
+    scope: ExecutionScope,
+) -> Box<Directory> {
     let flags = match use_ {
         UseDecl::Directory(dir) => Rights::from(dir.rights).into_legacy(),
         UseDecl::Storage(_) => fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -222,7 +233,7 @@ fn directory_use(use_: &UseDecl, component: WeakComponentInstance) -> Box<Direct
     };
 
     let open = Open::new(open_fn, fio::DirentType::Directory);
-    Box::new(open.into_directory(flags))
+    Box::new(open.into_directory(flags, scope))
 }
 
 async fn route_directory(

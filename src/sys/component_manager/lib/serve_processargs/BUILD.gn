@@ -24,6 +24,7 @@ rustc_library("serve_processargs") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-runtime",
     "//src/lib/process_builder",
+    "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/component_manager/lib/processargs",
     "//src/sys/component_manager/lib/sandbox",
     "//src/sys/lib/cm_types",

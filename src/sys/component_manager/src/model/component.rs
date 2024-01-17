@@ -1450,10 +1450,11 @@ impl ResolvedInstanceState {
         component_input_dict: Dict,
     ) -> Result<Self, ResolveActionError> {
         let weak_component = WeakComponentInstance::new(component);
+        let execution_scope = ExecutionScope::new();
 
         // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
         let exposed_dir = ExposedDir::new(
-            ExecutionScope::new(),
+            execution_scope.clone(),
             weak_component.clone(),
             &resolved_component.decl,
         )?;
@@ -1464,7 +1465,7 @@ impl ResolvedInstanceState {
         let mut state = Self {
             weak_component,
             instance_token_state,
-            execution_scope: ExecutionScope::new(),
+            execution_scope,
             resolved_component,
             children: HashMap::new(),
             next_dynamic_instance_id: 1,
@@ -1748,11 +1749,11 @@ impl ResolvedInstanceState {
                 self.resolved_component.package.as_ref(),
                 &component,
                 &self.resolved_component.decl,
+                self.execution_scope.clone(),
             )
             .await?;
-            let (namespace, fut) =
+            let namespace =
                 namespace_builder.serve().map_err(CreateNamespaceError::BuildNamespaceError)?;
-            component.nonblocking_task_group().spawn(fasync::Task::spawn(fut));
             let namespace_dir: Arc<pfs::Simple> = namespace.try_into().map_err(|err| {
                 CreateNamespaceError::ConvertToDirectory(ClonableError::from(anyhow::Error::from(
                     err,
@@ -2063,6 +2064,12 @@ impl ResolvedInstanceState {
                 .await
                 .register_no_wait(&child_instance, DiscoverAction::new(child_dict));
         }
+    }
+}
+
+impl Drop for ResolvedInstanceState {
+    fn drop(&mut self) {
+        self.execution_scope.shutdown();
     }
 }
 

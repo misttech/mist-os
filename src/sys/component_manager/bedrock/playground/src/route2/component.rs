@@ -622,7 +622,8 @@ mod test {
 
                     // Install the Open into a namespace. The "/svc/echo2" corresponds to the
                     // "path" in a UseDecl (program contract).
-                    let mut namespace = NamespaceBuilder::new(ignore_not_found());
+                    let mut namespace =
+                        NamespaceBuilder::new(ExecutionScope::new(), ignore_not_found());
                     namespace
                         .add_object(
                             Box::new(echo),
@@ -671,10 +672,7 @@ mod test {
         }
 
         // Obtain the namespace of child_b when it is started.
-        let (namespace, fut) = child_b_started.await.context("should receive one start request")?;
-
-        // Serve the namespace in the background.
-        fasync::Task::spawn(fut).detach();
+        let namespace = child_b_started.await.context("should receive one start request")?;
 
         // Connect to "/svc/echo2" in the namespace.
         // We should reach the `echo_server` in child_a.

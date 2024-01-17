@@ -201,6 +201,8 @@ async fn static_aggregate_offer() {
                 let mut handles_sender = handles_sender.clone();
                 async move {
                     handles_sender.send(handles).await.unwrap();
+                    // Keep the component running so that component_manager keeps the namespace alive
+                    futures::pending!();
                     Ok(())
                 }
                 .boxed()

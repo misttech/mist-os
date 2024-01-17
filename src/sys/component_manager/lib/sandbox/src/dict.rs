@@ -8,10 +8,7 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::{
-    channel::mpsc::{unbounded, UnboundedSender},
-    SinkExt, TryStreamExt,
-};
+use futures::TryStreamExt;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Debug,
@@ -41,8 +38,9 @@ pub struct Dict {
     entries: Arc<Mutex<BTreeMap<Key, AnyCapability>>>,
 
     /// When an external request tries to access a non-existent entry,
-    /// the name of the entry will be sent using `not_found`.
-    not_found: UnboundedSender<Key>,
+    /// this closure will be invoked with the name of the entry.
+    #[derivative(Debug = "ignore")]
+    not_found: Arc<dyn Fn(Key) -> () + 'static + Send + Sync>,
 
     /// Tasks that serve [DictIterator]s.
     #[derivative(Debug = "ignore")]
@@ -59,7 +57,7 @@ impl Default for Dict {
     fn default() -> Self {
         Self {
             entries: Arc::new(Mutex::new(BTreeMap::new())),
-            not_found: unbounded().0,
+            not_found: Arc::new(|_key: Key| {}),
             iterator_tasks: fasync::TaskGroup::new(),
             client_end: None,
         }
@@ -85,10 +83,10 @@ impl Dict {
 
     /// Creates an empty dictionary. When an external request tries to access a non-existent entry,
     /// the name of the entry will be sent using `not_found`.
-    pub fn new_with_not_found(not_found: UnboundedSender<Key>) -> Self {
+    pub fn new_with_not_found(not_found: impl Fn(Key) -> () + 'static + Send + Sync) -> Self {
         Self {
             entries: Arc::new(Mutex::new(BTreeMap::new())),
-            not_found,
+            not_found: Arc::new(not_found),
             iterator_tasks: fasync::TaskGroup::new(),
             client_end: None,
         }
@@ -134,9 +132,7 @@ impl Dict {
                     let result = match self.entries.lock().unwrap().get(&key) {
                         Some(cap) => Ok(cap.clone().into_fidl()),
                         None => {
-                            // Ignore the result of sending. The receiver is free to break away to
-                            // ignore all the not-found errors.
-                            let _ = self.not_found.send(key);
+                            (self.not_found)(key);
                             Err(fsandbox::DictError::NotFound)
                         }
                     };
@@ -146,9 +142,7 @@ impl Dict {
                     let result = match self.entries.lock().unwrap().remove(&key) {
                         Some(cap) => Ok(cap.into_fidl()),
                         None => {
-                            // Ignore the result of sending. The receiver is free to break away to
-                            // ignore all the not-found errors.
-                            let _ = self.not_found.send(key);
+                            (self.not_found)(key);
                             Err(fsandbox::DictError::NotFound)
                         }
                     };
@@ -290,9 +284,7 @@ impl Capability for Dict {
         }
         let not_found = self.not_found.clone();
         dir.clone().set_not_found_handler(Box::new(move |path| {
-            // Ignore the result of sending. The receiver is free to break away to ignore all the
-            // not-found errors.
-            let _ = not_found.unbounded_send(path.to_owned());
+            not_found(path.to_owned());
         }));
         Ok(Open::new(
             move |scope: ExecutionScope,
