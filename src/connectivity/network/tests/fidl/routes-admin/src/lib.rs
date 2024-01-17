@@ -12,14 +12,16 @@ use std::collections::HashSet;
 use assert_matches::assert_matches;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::{
-    self as fnet_routes_ext, admin::FidlRouteAdminIpExt, FidlRouteIpExt,
+    self as fnet_routes_ext, admin::FidlRouteAdminIpExt, FidlRouteIpExt, RouteAction,
 };
 use fidl_fuchsia_net_stack as fnet_stack;
 use fuchsia_async::TimeoutExt as _;
+use fuchsia_zircon as zx;
 use futures::{future::FutureExt as _, pin_mut, StreamExt};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
@@ -173,6 +175,13 @@ async fn add_remove_route<
             fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
         }
     };
+
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
 
     let route_to_add = test_route(&interface, metric);
 
@@ -329,6 +338,13 @@ async fn validates_route_v4<N: Netstack>(
     } = TestSetup::<Ipv4>::new::<N>(&sandbox, name).await;
     let proxy =
         fnet_routes_ext::admin::new_route_set::<Ipv4>(&set_provider).expect("new route set");
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<Ipv4>(&proxy, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
     let route = fnet_routes::RouteV4 {
         destination,
         action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
@@ -430,6 +446,13 @@ async fn validates_route_v6<N: Netstack>(
     } = TestSetup::<Ipv6>::new::<N>(&sandbox, name).await;
     let proxy =
         fnet_routes_ext::admin::new_route_set::<Ipv6>(&set_provider).expect("new route set");
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<Ipv6>(&proxy, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
     let route = fnet_routes::RouteV6 {
         destination,
         action: fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6 {
@@ -484,6 +507,13 @@ async fn add_route_twice_with_same_set<
             fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
         }
     };
+
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
 
     let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
 
@@ -561,6 +591,21 @@ async fn add_route_with_multiple_route_sets<
         || fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
     let proxy_a = get_route_set();
     let proxy_b = get_route_set();
+
+    async fn authenticate<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
+        proxy: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
+        grant: &fidl_fuchsia_net_interfaces_admin::GrantForInterfaceAuthorization,
+    ) {
+        let proof = fnet_interfaces_ext::admin::proof_from_grant(grant);
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+            .await
+            .expect("no FIDL error")
+            .expect("authentication should succeed");
+    }
+
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    authenticate::<I>(&proxy_a, &grant).await;
+    authenticate::<I>(&proxy_b, &grant).await;
 
     let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
 
@@ -641,6 +686,13 @@ async fn add_remove_system_route<
 
     let route_set =
         fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
     let route_to_add = test_route::<I>(&interface, METRIC_TRACKS_INTERFACE);
 
     // Add a "system route".
@@ -648,6 +700,13 @@ async fn add_remove_system_route<
         SystemRouteProtocol::NetRootRoutes => {
             let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
                 .expect("new global route set");
+
+            let grant = interface.get_authorization().await.expect("getting grant should succeed");
+            let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+            fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+                .await
+                .expect("no FIDL error")
+                .expect("authentication should succeed");
 
             assert!(fnet_routes_ext::admin::add_route::<I>(
                 &proxy,
@@ -737,6 +796,13 @@ async fn system_removes_route_from_route_set<
 
     let route_set =
         fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
     let route_to_add = test_route::<I>(&interface, METRIC_TRACKS_INTERFACE);
 
     // Add a route with the RouteSet.
@@ -759,6 +825,13 @@ async fn system_removes_route_from_route_set<
         SystemRouteProtocol::NetRootRoutes => {
             let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
                 .expect("new global route set");
+
+            let grant = interface.get_authorization().await.expect("getting grant should succeed");
+            let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+            fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+                .await
+                .expect("no FIDL error")
+                .expect("authentication should succeed");
 
             assert!(fnet_routes_ext::admin::remove_route::<I>(
                 &proxy,
@@ -856,6 +929,33 @@ async fn root_route_apis_can_remove_loopback_route<
         SystemRouteProtocol::NetRootRoutes => {
             let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
                 .expect("new global route set");
+
+            let iface_id = if let RouteAction::Forward(target) = loopback_route.route.action {
+                target.outbound_interface
+            } else {
+                panic!("could not determine interface for route");
+            };
+
+            let root_interfaces = realm
+                .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+                .expect("connect to protocol");
+            let (interface_control, interface_control_server_end) =
+                fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                    .expect("create proxy");
+            let () = root_interfaces
+                .get_admin(iface_id, interface_control_server_end)
+                .expect("create root interfaces connection");
+
+            let grant = interface_control
+                .get_authorization_for_interface()
+                .await
+                .expect("getting grant should succeed");
+            let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+            fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+                .await
+                .expect("no FIDL error")
+                .expect("authentication should succeed");
+
             assert!(fnet_routes_ext::admin::remove_route::<I>(
                 &proxy,
                 &loopback_route.route.try_into().expect("convert to FIDL")
@@ -920,6 +1020,18 @@ async fn removing_one_default_route_does_not_flip_presence<
         fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
     let route_set_2 =
         fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
+    let authenticate = |proxy| async {
+        let grant = interface.get_authorization().await.expect("getting grant should succeed");
+        let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+            .await
+            .expect("no FIDL error")
+            .expect("authentication should succeed");
+        proxy
+    };
+
+    let route_set_1 = authenticate(route_set_1).await;
+    let route_set_2 = authenticate(route_set_2).await;
 
     let events = interface.get_interface_event_stream().expect("get interface event stream").fuse();
     pin_mut!(events);
@@ -1075,6 +1187,13 @@ async fn dropping_global_route_set_does_not_remove_routes<
     // Create a new global route set and add a new route with it.
     let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
         .expect("new global route set");
+    let grant = interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
     assert!(fnet_routes_ext::admin::add_route::<I>(
         &proxy,
         &route_to_add.try_into().expect("convert to FIDL")
@@ -1097,6 +1216,264 @@ async fn dropping_global_route_set_does_not_remove_routes<
     assert_matches!(
         fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
             routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+        })
+        .map(Some)
+        .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || None)
+        .await,
+        None
+    );
+}
+
+enum InvalidProofKind {
+    /// The invalid token is one generated by the client.
+    ClientGenerated,
+    /// The invalid token is one generated by the netstack, but is for a
+    /// different interface.
+    WrongInterface,
+    /// The interface ID doesn't correspond to an extant interface.
+    BadInterface,
+}
+
+#[netstack_test]
+#[test_case(
+    InvalidProofKind::ClientGenerated,
+    RouteSet::Global;
+    "client-generated token global routeset"
+)]
+#[test_case(
+    InvalidProofKind::ClientGenerated,
+    RouteSet::User;
+    "client-generated token user routeset"
+)]
+#[test_case(
+    InvalidProofKind::WrongInterface,
+    RouteSet::Global;
+    "wrong interface token global routeset"
+)]
+#[test_case(
+    InvalidProofKind::WrongInterface,
+    RouteSet::User;
+    "wrong interface token user routeset"
+)]
+#[test_case(
+    InvalidProofKind::BadInterface,
+    RouteSet::Global;
+    "bad interface token global routeset"
+)]
+#[test_case(
+    InvalidProofKind::BadInterface,
+    RouteSet::User;
+    "bad interface token user routeset"
+)]
+async fn interface_authorization_fails_with_invalid_token<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+    invalid_proof_kind: InvalidProofKind,
+    route_set_type: RouteSet,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm, network: _, interface, set_provider, global_set_provider, state } =
+        TestSetup::<I>::new::<N>(&sandbox, name).await;
+
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let second_interface = realm
+        .install_endpoint(device, netemul::InterfaceConfig::default())
+        .await
+        .expect("install interface");
+
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    pin_mut!(routes_stream);
+
+    let proxy = match route_set_type {
+        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            .expect("new global route set"),
+        RouteSet::User => {
+            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+        }
+    };
+
+    let proof = match invalid_proof_kind {
+        InvalidProofKind::ClientGenerated => fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+            token: zx::Event::create(),
+            interface_id: interface.id(),
+        },
+        InvalidProofKind::WrongInterface => {
+            let grant =
+                second_interface.get_authorization().await.expect("getting grant should succeed");
+
+            // Note that the token comes from a different interface than the ID.
+            fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+                token: grant.token,
+                interface_id: interface.id(),
+            }
+        }
+        InvalidProofKind::BadInterface => {
+            let grant = interface.get_authorization().await.expect("getting grant should succeed");
+            fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+                token: grant.token,
+                interface_id: interface.id() + 1000,
+            }
+        }
+    };
+
+    assert_matches!(
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+            .await
+            .expect("no FIDL error"),
+        Err(fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication)
+    );
+
+    // Try adding a route just to be sure that the netstack didn't somehow
+    // authorize the interface.
+    let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
+
+    assert_matches!(
+        fnet_routes_ext::admin::add_route::<I>(
+            &proxy,
+            &route_to_add.try_into().expect("convert to FIDL")
+        )
+        .await
+        .expect("no FIDL error"),
+        Err(fnet_routes_admin::RouteSetError::Unauthenticated)
+    );
+
+    let routes = fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+        .await
+        .expect("collect routes should succeed");
+    assert!(!routes.iter().any(|installed_route| &installed_route.route == &route_to_add));
+}
+
+#[netstack_test]
+#[test_case(RouteSet::User; "user routeset")]
+#[test_case(RouteSet::Global; "global routeset")]
+async fn authorizing_for_one_interface_out_of_two<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+    route_set_type: RouteSet,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm, network: _, interface, set_provider, global_set_provider, state: _ } =
+        TestSetup::<I>::new::<N>(&sandbox, name).await;
+
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let second_interface = realm
+        .install_endpoint(device, netemul::InterfaceConfig::default())
+        .await
+        .expect("install interface");
+
+    let proxy = match route_set_type {
+        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            .expect("new global route set"),
+        RouteSet::User => {
+            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+        }
+    };
+
+    let grant = second_interface.get_authorization().await.expect("getting grant should succeed");
+    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+    fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+        .await
+        .expect("no FIDL error")
+        .expect("authentication should succeed");
+
+    // Adding a route for the primary interface should fail, since this channel
+    // was only authenticated for the second interface.
+    let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
+    assert_matches!(
+        fnet_routes_ext::admin::add_route::<I>(
+            &proxy,
+            &route_to_add.try_into().expect("convert to FIDL")
+        )
+        .await
+        .expect("no FIDL error"),
+        Err(fnet_routes_admin::RouteSetError::Unauthenticated)
+    );
+}
+
+// interface_authorization_fails_with_invalid_token ensures that unauthenticated
+// connections can't add routes.
+#[netstack_test]
+#[test_case(RouteSet::User)]
+#[test_case(RouteSet::Global)]
+async fn unauthenticated_connections_cannot_remove_routes<
+    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    N: Netstack,
+>(
+    name: &str,
+    route_set_type: RouteSet,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let TestSetup { realm: _, network: _, interface, set_provider, global_set_provider, state } =
+        TestSetup::<I>::new::<N>(&sandbox, name).await;
+    let routes_stream =
+        fnet_routes_ext::event_stream_from_state::<I>(&state).expect("should succeed");
+    pin_mut!(routes_stream);
+
+    let route_to_add = test_route(&interface, METRIC_TRACKS_INTERFACE);
+    let mut routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, HashSet<_>>(&mut routes_stream)
+            .await
+            .expect("collect routes should succeed");
+
+    {
+        let proxy = fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            .expect("new global route set");
+
+        let grant = interface
+            .control()
+            .get_authorization_for_interface()
+            .await
+            .expect("getting grant should succeed");
+        let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(&proxy, proof)
+            .await
+            .expect("no FIDL error")
+            .expect("authentication should succeed");
+
+        // Add a route to ensure authentication took effect.
+        assert!(fnet_routes_ext::admin::add_route::<I>(
+            &proxy,
+            &route_to_add.try_into().expect("convert to FIDL")
+        )
+        .await
+        .expect("no FIDL error")
+        .expect("add route"));
+
+        // Ensure the route was added
+        fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+            routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
+        })
+        .await
+        .expect("should succeed");
+    }
+
+    let proxy = match route_set_type {
+        RouteSet::Global => fnet_routes_ext::admin::new_global_route_set::<I>(&global_set_provider)
+            .expect("new global route set"),
+        RouteSet::User => {
+            fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set")
+        }
+    };
+
+    assert_matches!(
+        fnet_routes_ext::admin::remove_route::<I>(
+            &proxy,
+            &route_to_add.try_into().expect("convert to FIDL")
+        )
+        .await
+        .expect("no FIDL error"),
+        Err(fnet_routes_admin::RouteSetError::Unauthenticated)
+    );
+
+    // The route should not have been removed.
+    assert_matches!(
+        fnet_routes_ext::wait_for_routes::<I, _, _>(&mut routes_stream, &mut routes, |routes| {
+            !routes.iter().any(|installed_route| &installed_route.route == &route_to_add)
         })
         .map(Some)
         .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || None)

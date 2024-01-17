@@ -9,5 +9,21 @@
                 "*",
             ],
         },
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/42069034): Remove once interface
+                // authorization is implemented in NS2.
+                "interface_authorization_fails_with_invalid_token_*_ns2*",
+                "authorizing_for_one_interface_out_of_two_*_ns2*",
+                "unauthenticated_connections_cannot_remove_routes_*_ns2*",
+
+                // TODO(https://fxbug.dev/42084185): Remove once interface
+                // authorization is implemented in NS3.
+                "interface_authorization_fails_with_invalid_token_*_ns3*",
+                "authorizing_for_one_interface_out_of_two_*_ns3*",
+                "unauthenticated_connections_cannot_remove_routes_*_ns3*",
+            ],
+        },
     ],
 }
