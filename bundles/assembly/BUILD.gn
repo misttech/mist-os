@@ -657,7 +657,7 @@ assembly_input_bundle("network_realm_packages") {
     "//src/connectivity/network/dhcpv4/server:package",
     "//src/connectivity/network/dhcpv6/client:package",
     "//src/connectivity/network/dns:package",
-    "//src/connectivity/network/http-client:package",
+    "//src/connectivity/policy/http-client:package",
     "//src/connectivity/policy/reachability:package",
   ]
 }
@@ -675,7 +675,7 @@ assembly_input_bundle("network_realm_packages_gub") {
     "//src/connectivity/network/dhcpv4/server:package_gub",
     "//src/connectivity/network/dhcpv6/client:package_gub",
     "//src/connectivity/network/dns:package_gub",
-    "//src/connectivity/network/http-client:package_gub",
+    "//src/connectivity/policy/http-client:package_gub",
     "//src/connectivity/policy/reachability:package_gub",
   ]
 }

@@ -113,7 +113,6 @@ group("tests") {
     "dhcpv6:tests",
     "dns:tests",
     "drivers:tests",
-    "http-client:tests",
     "lib:tests",
     "mdns:tests",
     "net-cli:tests",
