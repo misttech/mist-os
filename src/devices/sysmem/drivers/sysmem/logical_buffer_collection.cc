@@ -648,13 +648,17 @@ void LogicalBufferCollection::HandleTokenFailure(BufferCollectionToken& token, z
     NodeProperties* tree_to_fail = FindTreeToFail(&token.node_properties());
     token.node_properties().LogError(FROM_HERE, "token failure - status: %d", status);
     if (tree_to_fail == root_.get()) {
-      LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
-                         "Token failure causing LogicalBufferCollection failure - status: %d",
-                         status);
+      LogAndFailDownFrom(
+          FROM_HERE, tree_to_fail, status,
+          "Token failure causing LogicalBufferCollection failure - status: %d client: %s:%" PRIu64,
+          status, token.node_properties().client_debug_info().name.c_str(),
+          token.node_properties().client_debug_info().id);
     } else {
-      LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
-                         "Token failure causing AttachToken() sub-tree failure - status: %d",
-                         status);
+      LogAndFailDownFrom(
+          FROM_HERE, tree_to_fail, status,
+          "Token failure causing AttachToken() sub-tree failure - status: %d client: %s:%" PRIu64,
+          status, token.node_properties().client_debug_info().name.c_str(),
+          token.node_properties().client_debug_info().id);
     }
     return;
   }
@@ -784,13 +788,17 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenGroupStage1(
       // this failure.
       NodeProperties* tree_to_fail = FindTreeToFail(&group.node_properties());
       if (tree_to_fail == root_.get()) {
-        LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
-                           "Group failure causing LogicalBufferCollection failure - status: %d",
-                           status);
+        LogAndFailDownFrom(
+            FROM_HERE, tree_to_fail, status,
+            "Group failure causing LogicalBufferCollection failure - status: %d client: %s:%" PRIu64,
+            status, group.node_properties().client_debug_info().name.c_str(),
+            group.node_properties().client_debug_info().id);
       } else {
-        LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
-                           "Group failure causing failure domain sub-tree failure - status: %d",
-                           status);
+        LogAndFailDownFrom(
+            FROM_HERE, tree_to_fail, status,
+            "Group failure causing failure domain sub-tree failure - status: %d client: %s:%" PRIu64,
+            status, group.node_properties().client_debug_info().name.c_str(),
+            group.node_properties().client_debug_info().id);
       }
       return;
     }
@@ -2043,8 +2051,9 @@ void LogicalBufferCollection::BindSharedCollectionInternal(
         // Hopefully this won't be too noisy.
         LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
                            "BufferCollection failure causing sub-tree failure (SetDispensable() or "
-                           "AttachToken() was used) - status: %d",
-                           status);
+                           "AttachToken() was used) - status: %d client: %s:%" PRIu64,
+                           status, collection.node_properties().client_debug_info().name.c_str(),
+                           collection.node_properties().client_debug_info().id);
       }
       return;
     }
