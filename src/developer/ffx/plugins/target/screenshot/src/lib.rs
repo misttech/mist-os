@@ -307,7 +307,8 @@ mod test {
         let screenshot_proxy = setup_fake_screenshot_server();
 
         let test_buffers = TestBuffers::default();
-        let mut writer = MachineWriter::new_test(Some(WriterFormat::Json), &test_buffers);
+        let mut writer =
+            MachineWriter::<ScreenshotOutput>::new_test(Some(WriterFormat::Json), &test_buffers);
         let result = screenshot_impl(screenshot_proxy, cmd, &mut writer).await;
         assert!(result.is_ok());
 

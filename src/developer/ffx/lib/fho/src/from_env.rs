@@ -401,7 +401,7 @@ impl TryFromEnv for ffx_writer::SimpleWriter {
 }
 
 #[async_trait(?Send)]
-impl<T: serde::Serialize> TryFromEnv for ffx_writer::MachineWriter<T> {
+impl<T: serde::Serialize, S: ?Sized> TryFromEnv for ffx_writer::MachineWriter<T, S> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         Ok(ffx_writer::MachineWriter::new(env.ffx.global.machine))
     }

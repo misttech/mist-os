@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
-use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{daemon_protocol, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{
     TargetCollectionProxy, TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetQuery,
 };
@@ -40,9 +40,11 @@ pub struct ListTool {
 
 fho::embedded_plugin!(ListTool);
 
+type ListToolWriter = VerifiedMachineWriter<Vec<JsonTarget>>;
+
 #[async_trait(?Send)]
 impl FfxMain for ListTool {
-    type Writer = MachineWriter<Vec<JsonTarget>>;
+    type Writer = ListToolWriter;
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         list_targets(self.tc_proxy, writer, self.cmd, &self.context).await?;
         Ok(())
@@ -51,7 +53,7 @@ impl FfxMain for ListTool {
 
 async fn list_targets(
     tc_proxy: TargetCollectionProxy,
-    mut writer: MachineWriter<Vec<JsonTarget>>,
+    mut writer: ListToolWriter,
     cmd: ListCommand,
     context: &EnvironmentContext,
 ) -> Result<()> {
@@ -119,7 +121,7 @@ mod test {
     use super::*;
     use addr::TargetAddr;
     use ffx_list_args::Format;
-    use ffx_writer::TestBuffers;
+    use ffx_writer::{MachineWriter, TestBuffers};
     use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_developer_ffx::{
         RemoteControlState, TargetInfo as FidlTargetInfo, TargetState,
