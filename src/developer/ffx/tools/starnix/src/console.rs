@@ -101,10 +101,8 @@ async fn run_console(
     let (_, exit_result) = join!(forward_future, exit_future);
     std::mem::drop(raw_mode);
     let exit_code = exit_result?.map_err(|e| {
-        let status = fidl::Status::from_raw(e);
         anyhow!(
-            "Failed to spawn console: {}. Verify that the console binary exists at the specified path in the container.",
-            status
+            "Failed to spawn console: {e:?}. Verify that the console binary exists at the specified path in the container.",
         )
     })?;
     Ok(exit_code)

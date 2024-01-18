@@ -11,7 +11,6 @@ use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async::{
     DurationExt, {self as fasync},
 };
-use fuchsia_zircon as zx;
 use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, TryStreamExt};
 use starnix_core::{
     execution::execute_task_with_prerun_result,
@@ -72,7 +71,7 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
 async fn spawn_console(
     kernel: &Arc<Kernel>,
     payload: fstarcontainer::ControllerSpawnConsoleRequest,
-) -> Result<Result<u8, i32>, Error> {
+) -> Result<Result<u8, fstarcontainer::SpawnConsoleError>, Error> {
     if let (Some(console_in), Some(console_out), Some(binary_path)) =
         (payload.console_in, payload.console_out, payload.binary_path)
     {
@@ -91,7 +90,7 @@ async fn spawn_console(
             .collect::<Result<Vec<_>, _>>()?;
         let window_size = to_winsize(payload.window_size);
         let current_task = CurrentTask::create_init_child_process(kernel, &binary_path)?;
-        let (sender, receiver) = oneshot::channel::<Result<u8, i32>>();
+        let (sender, receiver) = oneshot::channel();
         let pty = execute_task_with_prerun_result(
             current_task,
             move |_, current_task| {
@@ -108,7 +107,7 @@ async fn spawn_console(
             move |result| {
                 let _ = match result {
                     Ok(ExitStatus::Exit(exit_code)) => sender.send(Ok(exit_code)),
-                    _ => sender.send(Err(zx::Status::CANCELED.into_raw())),
+                    _ => sender.send(Err(fstarcontainer::SpawnConsoleError::Canceled)),
                 };
             },
             None,
@@ -119,7 +118,7 @@ async fn spawn_console(
 
         Ok(receiver.await?)
     } else {
-        Ok(Err(zx::Status::INVALID_ARGS.into_raw()))
+        Ok(Err(fstarcontainer::SpawnConsoleError::InvalidArgs))
     }
 }
 
@@ -144,13 +143,6 @@ pub async fn serve_container_controller(
                         log_warn!("vsock connection missing bridge_socket");
                         return Ok(());
                     };
-                    connect_to_vsock(port, bridge_socket, system_task).await.unwrap_or_else(|e| {
-                        log_error!("failed to connect to vsock {:?}", e);
-                    });
-                }
-                fstarcontainer::ControllerRequest::VsockConnect2 {
-                    port, bridge_socket, ..
-                } => {
                     connect_to_vsock(port, bridge_socket, system_task).await.unwrap_or_else(|e| {
                         log_error!("failed to connect to vsock {:?}", e);
                     });

@@ -1,6 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=18)
 library fuchsia.starnix.container;
 
 using zx;
@@ -20,12 +21,10 @@ open protocol Controller {
         2: bridge_socket zx.Handle:SOCKET;
     });
 
-    // TODO(https://fxbug.dev/319871624) delete
-    flexible VsockConnect2(resource struct {
-        port uint32;
-        bridge_socket zx.Handle:SOCKET;
-    });
-
+    /// Spawn a console for debugging in the container. For testing, prefer launching Linux programs
+    /// as components with the `starnix_container` runner.
+    ///
+    /// Returns when the console exits.
     flexible SpawnConsole(resource table {
         1: console_in zx.Handle:SOCKET;
         2: console_out zx.Handle:SOCKET;
@@ -35,5 +34,13 @@ open protocol Controller {
         6: window_size ConsoleWindowSize;
     }) -> (struct {
         exit_code uint8;
-    }) error zx.Status;
+    }) error SpawnConsoleError;
+};
+
+type SpawnConsoleError = flexible enum {
+    /// A required table field was missing or otherwise invalid.
+    INVALID_ARGS = 1;
+
+    /// The console process exited without a normal return code.
+    CANCELED = 2;
 };
