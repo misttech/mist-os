@@ -33,10 +33,6 @@ namespace boot_shim {
 using DevicetreeBootShimAllocator =
     fit::inline_function<void*(size_t, size_t, fbl::AllocChecker&), 32>;
 
-// Temporary for migration.
-// TODO(fxbug.dev/320541301): Remove.
-using DevicetreeBootShimAllocatorDeprecated = fit::inline_function<void*(size_t, size_t), 16>;
-
 struct DevicetreeMmioRange {
   static DevicetreeMmioRange From(const devicetree::RegPropertyElement& reg) {
     return {.address = reg.address().value_or(0),
@@ -96,17 +92,6 @@ class DevicetreeBootShim : public BootShim<Items...> {
   }
 
   void set_allocator(DevicetreeBootShimAllocator&& allocator) { allocator_ = std::move(allocator); }
-
-  // Temporary for migration.
-  // TODO(fxbug.dev/320541301): Remove.
-  void set_allocator(DevicetreeBootShimAllocatorDeprecated&& allocator) {
-    set_allocator(
-        [allocator = std::move(allocator)](size_t size, size_t alignment, fbl::AllocChecker& ac) {
-          void* alloc = allocator(size, alignment);
-          ac.arm(size + alignment, alloc != nullptr);
-          return alloc;
-        });
-  }
 
   // Optional: Set a callback for MMIO Ranges of interest for each |Item|
   // of the shim.
