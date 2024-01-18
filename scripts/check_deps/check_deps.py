@@ -16,6 +16,7 @@ HOST_PLATFORM = "%s-%s" % (
     {
         "x86_64": "x64",
         "aarch64": "arm64",
+        "arm64": "arm64",
     }[platform.machine()],
 )
 

@@ -88,6 +88,7 @@ def main():
         {
             "x86_64": "x64",
             "aarch64": "arm64",
+            "arm64": "arm64",
         }[platform.machine()],
     )
     buildtools_dir = os.path.join(ROOT_PATH, "prebuilt", "third_party")
