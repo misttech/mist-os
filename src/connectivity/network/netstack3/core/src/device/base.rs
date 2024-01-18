@@ -15,7 +15,7 @@ use net_types::{
     ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6, Ipv6Addr},
     BroadcastAddr, MulticastAddr, NonMappedAddr, SpecifiedAddr, Witness as _,
 };
-use packet::{Buf, BufferMut};
+use packet::Buf;
 use smallvec::SmallVec;
 use tracing::trace;
 
@@ -53,7 +53,6 @@ use crate::{
         types::RawMetric,
     },
     sync::RwLock,
-    trace_duration,
     work_queue::WorkQueueReport,
     BindingsContext, CoreCtx, StackState, SyncCtx,
 };
@@ -485,6 +484,16 @@ pub trait DeviceCollectionContext<D: Device + DeviceStateSpec, BT: DeviceLayerTy
     fn remove(&mut self, device: &BaseDeviceId<D, BT>) -> Option<BasePrimaryDeviceId<D, BT>>;
 }
 
+/// Provides abstractions over the frame metadata received from bindings for
+/// implementers of [`Device`].
+///
+/// This trait allows [`api::DeviceApi`] to provide a single entrypoint for
+/// frames from bindings.
+pub trait DeviceReceiveFrameSpec {
+    /// The frame metadata for ingress frames, where `D` is a device identifier.
+    type FrameMetadata<D>;
+}
+
 impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
     DeviceLayerState<BC>
 {
@@ -637,23 +646,6 @@ pub fn handle_queued_rx_packets<BC: BindingsContext>(
         &mut CoreCtx::new_deprecated(core_ctx),
         bindings_ctx,
         device,
-    )
-}
-
-/// Receive a device layer frame from the network.
-pub fn receive_frame<B: BufferMut, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &EthernetDeviceId<BC>,
-    buffer: B,
-) {
-    trace_duration!(bindings_ctx, "device::receive_frame");
-    core_ctx.state.device_counters().ethernet.common.recv_frame.increment();
-    self::ethernet::receive_frame(
-        &mut CoreCtx::new_deprecated(core_ctx),
-        bindings_ctx,
-        device,
-        buffer,
     )
 }
 
@@ -918,12 +910,14 @@ pub(crate) mod testutil {
 
     /// Calls [`receive_frame`], with a [`Ctx`].
     #[cfg(test)]
-    pub(crate) fn receive_frame<B: BufferMut, BC: BindingsContext>(
-        Ctx { core_ctx, bindings_ctx }: &mut Ctx<BC>,
-        device: EthernetDeviceId<BC>,
+    pub(crate) fn receive_frame<B: packet::BufferMut, BC: BindingsContext>(
+        ctx: &mut Ctx<BC>,
+        device_id: EthernetDeviceId<BC>,
         buffer: B,
     ) {
-        crate::device::receive_frame(core_ctx, bindings_ctx, &device, buffer)
+        ctx.core_api()
+            .device::<crate::device::ethernet::EthernetLinkDevice>()
+            .receive_frame(crate::device::ethernet::RecvEthernetFrameMeta { device_id }, buffer)
     }
 
     pub fn enable_device<BC: BindingsContext>(

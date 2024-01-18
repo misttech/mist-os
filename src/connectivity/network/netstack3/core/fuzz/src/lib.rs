@@ -19,7 +19,7 @@ use net_types::{
     UnicastAddr,
 };
 use netstack3_core::{
-    device::EthernetDeviceId,
+    device::{EthernetDeviceId, EthernetLinkDevice, RecvEthernetFrameMeta},
     testutil::context::FakeTimerCtxExt as _,
     testutil::{Ctx, FakeBindingsCtx, FakeCtx},
     TimerId,
@@ -400,17 +400,16 @@ fn arbitrary_packet<P: FuzzablePacket + std::fmt::Debug>(
     Ok((bytes, description))
 }
 
-fn dispatch(
-    Ctx { core_ctx, bindings_ctx }: &mut FakeCtx,
-    device_id: &EthernetDeviceId<FakeBindingsCtx>,
-    action: FuzzAction,
-) {
+fn dispatch(ctx: &mut FakeCtx, device_id: &EthernetDeviceId<FakeBindingsCtx>, action: FuzzAction) {
     use FuzzAction::*;
     match action {
         ReceiveFrame(ArbitraryFrame { frame_type: _, buf, description: _ }) => {
-            netstack3_core::device::receive_frame(core_ctx, bindings_ctx, device_id, buf)
+            ctx.core_api()
+                .device::<EthernetLinkDevice>()
+                .receive_frame(RecvEthernetFrameMeta { device_id: device_id.clone() }, buf);
         }
         AdvanceTime(SmallDuration(duration)) => {
+            let Ctx { core_ctx, bindings_ctx } = ctx;
             let _: Vec<TimerId<_>> = bindings_ctx
                 .trigger_timers_for(duration, |bindings_ctx, id| {
                     netstack3_core::handle_timer(core_ctx, bindings_ctx, id)

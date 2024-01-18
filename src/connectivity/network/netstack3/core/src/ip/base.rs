@@ -3488,7 +3488,7 @@ mod tests {
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
         device::{
             self,
-            ethernet::{EthernetCreationProperties, EthernetLinkDevice},
+            ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::{set_forwarding_enabled, update_ipv6_configuration},
             DeviceId, FrameDestination,
@@ -4742,9 +4742,7 @@ mod tests {
         // multicast MAC).
 
         let config = I::FAKE_CONFIG;
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(config.clone()).build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let eth_device = &device_ids[0];
         let device: DeviceId<_> = eth_device.clone().into();
         let multi_addr = I::get_multicast_addr(3).get();
@@ -4770,8 +4768,13 @@ mod tests {
         let multi_addr = MulticastAddr::new(multi_addr).unwrap();
         // Should not have dispatched the packet since we are not in the
         // multicast group `multi_addr`.
-        assert!(!is_in_ip_multicast(&core_ctx, &device, multi_addr));
-        device::receive_frame(&core_ctx, &mut bindings_ctx, &eth_device, buf.clone());
+
+        assert!(!is_in_ip_multicast(&ctx.core_ctx, &device, multi_addr));
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Join the multicast group and receive the packet, we should dispatch
@@ -4779,19 +4782,23 @@ mod tests {
         match multi_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &device,
                 multicast_addr,
             ),
         }
-        assert!(is_in_ip_multicast(&core_ctx, &device, multi_addr));
-        device::receive_frame(&core_ctx, &mut bindings_ctx, &eth_device, buf.clone());
+        assert!(is_in_ip_multicast(core_ctx, &device, multi_addr));
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Leave the multicast group and receive the packet, we should not
@@ -4799,20 +4806,22 @@ mod tests {
         match multi_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv4, _, _>(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &device,
                 multicast_addr,
             ),
         }
-        assert!(!is_in_ip_multicast(&core_ctx, &device, multi_addr));
-        device::receive_frame(&core_ctx, &mut bindings_ctx, &eth_device, buf);
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert!(!is_in_ip_multicast(core_ctx, &device, multi_addr));
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[test]

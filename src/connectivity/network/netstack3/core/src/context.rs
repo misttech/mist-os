@@ -35,7 +35,7 @@
 //! just a matter of providing a different implementation of the transport layer
 //! context traits (this isn't what we do today, but we may in the future).
 
-use core::{ffi::CStr, fmt::Debug, time::Duration};
+use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug, time::Duration};
 
 use lock_order::Unlocked;
 
@@ -198,6 +198,13 @@ pub trait RecvFrameContext<BC, Meta> {
     ///
     /// `receive_frame` receives a frame with the given metadata.
     fn receive_frame<B: BufferMut>(&mut self, bindings_ctx: &mut BC, metadata: Meta, frame: B);
+}
+
+/// Any type can implement a receive frame context with uninstantiable metadata.
+impl<T, BC> RecvFrameContext<BC, Never> for T {
+    fn receive_frame<B: BufferMut>(&mut self, _bindings_ctx: &mut BC, metadata: Never, _frame: B) {
+        match metadata {}
+    }
 }
 
 /// A context for sending frames.

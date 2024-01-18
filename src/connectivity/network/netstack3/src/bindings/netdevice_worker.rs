@@ -20,6 +20,7 @@ use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
     device::{
         EthernetCreationProperties, EthernetLinkDevice, EthernetWeakDeviceId, MaxEthernetFrameSize,
+        RecvEthernetFrameMeta,
     },
     ip::{
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
@@ -128,8 +129,6 @@ impl NetdeviceWorker {
                 Error::Client(e)
             })?;
 
-            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
             let Some(id) = id.upgrade() else {
                 // This is okay because we hold a weak reference; the device may
                 // be removed under us. Note that when the device removal has
@@ -164,12 +163,10 @@ impl NetdeviceWorker {
                 FilterResult::Accept => (),
             }
 
-            netstack3_core::device::receive_frame(
-                core_ctx,
-                bindings_ctx,
-                &id,
+            ctx.api().device::<EthernetLinkDevice>().receive_frame(
+                RecvEthernetFrameMeta { device_id: id.clone() },
                 packet::Buf::new(&mut buff[..frame_length], ..),
-            )
+            );
         }
     }
 }

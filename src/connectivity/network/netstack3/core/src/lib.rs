@@ -72,8 +72,7 @@ pub mod device {
         add_ip_addr_subnet, del_ip_addr, get_all_ip_addr_subnets, get_ipv4_configuration_and_flags,
         get_ipv6_configuration_and_flags, get_routing_metric, handle_queued_rx_packets,
         inspect_devices, new_ipv4_configuration_update, new_ipv6_configuration_update,
-        receive_frame, set_ip_addr_properties, set_tx_queue_configuration,
-        transmit_queued_tx_frames,
+        set_ip_addr_properties, set_tx_queue_configuration, transmit_queued_tx_frames,
     };
     pub use config::{get_device_configuration, new_device_configuration_update};
 
@@ -87,7 +86,9 @@ pub mod device {
         ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
         DeviceConfigurationUpdateError, NdpConfiguration, NdpConfigurationUpdate,
     };
-    pub use ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize};
+    pub use ethernet::{
+        EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize, RecvEthernetFrameMeta,
+    };
     pub use id::{DeviceId, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId};
     pub use loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
     pub use queue::tx::TransmitQueueConfiguration;

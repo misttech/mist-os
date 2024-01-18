@@ -17,7 +17,7 @@ use net_types::{
     SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr,
 };
 use netstack3_core::{
-    device::EthernetLinkDevice,
+    device::{EthernetLinkDevice, RecvEthernetFrameMeta},
     device_socket::{Protocol, TargetDevice},
     routes::{AddableEntry, AddableMetric, RawMetric},
     sync::Mutex,
@@ -25,7 +25,6 @@ use netstack3_core::{
         ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
         ContextPair, FakeBindingsCtx, FakeCtx, FakeEventDispatcherBuilder,
     },
-    CoreApi,
 };
 use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
 use packet_formats::{
@@ -72,17 +71,16 @@ fn packet_socket_change_device_and_protocol_atomic() {
 
         let thread_vars = (ctx.clone(), devs.clone());
         let deliver = loom::thread::spawn(move || {
-            let (ContextPair { core_ctx, mut bindings_ctx }, devs) = thread_vars;
-            for (device, ethertype) in [
-                (&devs[0], first_proto.get().into()),
-                (&devs[0], second_proto.get().into()),
-                (&devs[1], first_proto.get().into()),
-                (&devs[1], second_proto.get().into()),
+            let (mut ctx, devs) = thread_vars;
+            let [dev_a, dev_b] = devs;
+            for (device_id, ethertype) in [
+                (dev_a.clone(), first_proto.get().into()),
+                (dev_a, second_proto.get().into()),
+                (dev_b.clone(), first_proto.get().into()),
+                (dev_b, second_proto.get().into()),
             ] {
-                netstack3_core::device::receive_frame(
-                    &*core_ctx,
-                    &mut bindings_ctx,
-                    &device,
+                ctx.core_api().device::<EthernetLinkDevice>().receive_frame(
+                    RecvEthernetFrameMeta { device_id },
                     make_ethernet_frame(ethertype),
                 );
             }
@@ -257,12 +255,13 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
             I::DEVICE_ADDR,
             I::DEVICE_SUBNET,
         );
-        let (FakeCtx { core_ctx, mut bindings_ctx }, indexes_to_device_ids) = builder.build();
+        let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
+        let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
 
         netstack3_core::testutil::add_route(
-            &core_ctx,
-            &mut bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             AddableEntry::with_gateway(
                 I::DEVICE_GATEWAY,
                 device.clone().into(),
@@ -278,7 +277,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 
         // Bind a UDP socket to the device we added so we can trigger link
         // resolution by sending IP packets.
-        let mut udp_api = CoreApi::with_contexts(&core_ctx, &mut bindings_ctx).udp::<I>();
+        let mut udp_api = ctx.core_api().udp::<I>();
         let socket = udp_api.create();
         udp_api
             .listen(
@@ -302,34 +301,29 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 
         // Expect the netstack to send a neighbor probe to resolve the link
         // address of the neighbor.
-        let frames = bindings_ctx.take_frames();
+        let frames = ctx.bindings_ctx.take_frames();
         let (sent_device, frame) = assert_matches!(&frames[..], [frame] => frame);
         assert_eq!(sent_device, &device.downgrade());
         assert_eq!(frame, &I::make_neighbor_solicitation().into_inner());
-
-        let core_ctx = Arc::new(core_ctx);
 
         // Race the following:
         //  - Receipt of a neighbor confirmation for the INCOMPLETE neighbor
         //    entry, which causes it to move into COMPLETE.
         //  - Queueing of another packet to that neighbor.
 
-        let thread_vars = (core_ctx.clone(), bindings_ctx.clone(), device.clone());
+        let thread_vars = (ctx.clone(), device.clone());
         let resolve_neighbor = loom::thread::spawn(move || {
-            let (core_ctx, mut bindings_ctx, device) = thread_vars;
-
-            netstack3_core::device::receive_frame(
-                &core_ctx,
-                &mut bindings_ctx,
-                &device,
+            let (mut ctx, device_id) = thread_vars;
+            ctx.core_api().device::<EthernetLinkDevice>().receive_frame(
+                RecvEthernetFrameMeta { device_id },
                 I::make_neighbor_confirmation(),
             );
         });
 
-        let thread_vars = (core_ctx.clone(), bindings_ctx.clone(), socket.clone());
+        let thread_vars = (ctx.clone(), socket.clone());
         let queue_packet = loom::thread::spawn(move || {
-            let (core_ctx, mut bindings_ctx, socket) = thread_vars;
-            CoreApi::with_contexts(&core_ctx, &mut bindings_ctx)
+            let (mut ctx, socket) = thread_vars;
+            ctx.core_api()
                 .udp()
                 .send_to(
                     &socket,
@@ -343,7 +337,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         resolve_neighbor.join().unwrap();
         queue_packet.join().unwrap();
 
-        for (i, (sent_device, frame)) in bindings_ctx.take_frames().into_iter().enumerate() {
+        for (i, (sent_device, frame)) in ctx.bindings_ctx.take_frames().into_iter().enumerate() {
             assert_eq!(device, sent_device);
 
             let (mut body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
@@ -367,8 +361,8 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         // otherwise, they would hold dangling references to the device when the
         // core context is dropped at the end of the test.
         netstack3_core::testutil::clear_routes_and_remove_ethernet_device(
-            &core_ctx,
-            &mut bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             device,
         );
     })

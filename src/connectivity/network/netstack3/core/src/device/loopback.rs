@@ -5,6 +5,7 @@
 //! The loopback device.
 
 use alloc::vec::Vec;
+use core::convert::Infallible as Never;
 
 use lock_order::{
     lock::{LockFor, RwLockFor},
@@ -46,7 +47,7 @@ use crate::{
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
-        DeviceSendFrameError, FrameDestination,
+        DeviceReceiveFrameSpec, DeviceSendFrameError, FrameDestination,
     },
     BindingsContext, BindingsTypes, CoreCtx,
 };
@@ -325,6 +326,12 @@ pub(super) fn get_mtu<BC: BindingsContext, L>(
     device::integration::with_device_state(core_ctx, device_id, |mut state| {
         state.cast_with(|s| &s.link.mtu).copied()
     })
+}
+
+impl DeviceReceiveFrameSpec for LoopbackDevice {
+    // Loopback never receives frames from bindings, so make it impossible to
+    // instantiate it.
+    type FrameMetadata<D> = Never;
 }
 
 impl<BC: BindingsContext> ReceiveQueueBindingsContext<LoopbackDevice, LoopbackDeviceId<BC>> for BC {

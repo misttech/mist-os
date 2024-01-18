@@ -7,14 +7,16 @@
 use core::{convert::Infallible as Never, marker::PhantomData};
 
 use net_types::ip::{Ipv4, Ipv6};
+use packet::BufferMut;
 use tracing::debug;
 
 use crate::{
-    context::{ContextPair, ReferenceNotifiers},
+    context::{ContextPair, RecvFrameContext, ReferenceNotifiers},
     device::{
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
         AnyDevice, BaseDeviceId, BasePrimaryDeviceId, Device, DeviceCollectionContext, DeviceId,
-        DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes, OriginTrackerContext,
+        DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes, DeviceReceiveFrameSpec,
+        OriginTrackerContext,
     },
     ip::{
         device::{
@@ -63,11 +65,12 @@ impl<D, C> DeviceApi<D, C> {
 
 impl<D, C> DeviceApi<D, C>
 where
-    D: Device + DeviceStateSpec,
+    D: Device + DeviceStateSpec + DeviceReceiveFrameSpec,
     C: ContextPair,
     C::CoreContext: DeviceIdContext<D, DeviceId = BaseDeviceId<D, C::BindingsContext>>
         + OriginTrackerContext
-        + DeviceCollectionContext<D, C::BindingsContext>,
+        + DeviceCollectionContext<D, C::BindingsContext>
+        + RecvFrameContext<C::BindingsContext, D::FrameMetadata<BaseDeviceId<D, C::BindingsContext>>>,
     C::BindingsContext: DeviceLayerTypes + ReferenceNotifiers,
     // Required to call into IP layer for cleanup on removal:
     BaseDeviceId<D, C::BindingsContext>: Into<DeviceId<C::BindingsContext>>,
@@ -175,5 +178,15 @@ where
             Ok(s) => RemoveDeviceResult::Removed(s.external_state),
             Err(receiver) => RemoveDeviceResult::Deferred(receiver),
         }
+    }
+
+    /// Receive a device layer frame from the network.
+    pub fn receive_frame<B: BufferMut>(
+        &mut self,
+        meta: D::FrameMetadata<BaseDeviceId<D, C::BindingsContext>>,
+        frame: B,
+    ) {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.receive_frame(bindings_ctx, meta, frame)
     }
 }

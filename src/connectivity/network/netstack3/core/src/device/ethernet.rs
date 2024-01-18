@@ -60,7 +60,8 @@ use crate::{
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
-        DeviceSendFrameError, EthernetDeviceId, FrameDestination, RecvIpFrameMeta,
+        DeviceReceiveFrameSpec, DeviceSendFrameError, EthernetDeviceId, FrameDestination,
+        RecvIpFrameMeta,
     },
     ip::{
         device::nud::{
@@ -70,7 +71,7 @@ use crate::{
         icmp::NdpCounters,
     },
     sync::{Mutex, RwLock},
-    BindingsContext, CoreCtx, Instant,
+    trace_duration, BindingsContext, CoreCtx, Instant, TracingContext,
 };
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
@@ -893,124 +894,137 @@ where
     .map_err(Nested::into_inner)
 }
 
-/// Receive an Ethernet frame from the network.
-pub(super) fn receive_frame<
-    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId> + DeviceSocketBindingsContext<CC::DeviceId>,
-    B: BufferMut,
+/// Metadata for received ethernet frames.
+pub struct RecvEthernetFrameMeta<D> {
+    /// The device a frame was received on.
+    pub device_id: D,
+}
+
+impl DeviceReceiveFrameSpec for EthernetLinkDevice {
+    type FrameMetadata<D> = RecvEthernetFrameMeta<D>;
+}
+
+impl<CC, BC> RecvFrameContext<BC, RecvEthernetFrameMeta<CC::DeviceId>> for CC
+where
+    BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
+        + DeviceSocketBindingsContext<CC::DeviceId>
+        + TracingContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
         + ArpPacketHandler<EthernetLinkDevice, BC>
         + DeviceSocketHandler<EthernetLinkDevice, BC>
         + CounterContext<DeviceCounters>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    mut buffer: B,
-) {
-    core_ctx.with_counters(|counters| {
-        counters.ethernet.common.recv_frame.increment();
-    });
-    trace!("ethernet::receive_frame: device_id = {:?}", device_id);
-    // NOTE(joshlf): We do not currently validate that the Ethernet frame
-    // satisfies the minimum length requirement. We expect that if this
-    // requirement is necessary (due to requirements of the physical medium),
-    // the driver or hardware will have checked it, and that if this requirement
-    // is not necessary, it is acceptable for us to operate on a smaller
-    // Ethernet frame. If this becomes insufficient in the future, we may want
-    // to consider making this behavior configurable (at compile time, at
-    // runtime on a global basis, or at runtime on a per-device basis).
-    let (ethernet, whole_frame) = if let Ok(frame) =
-        buffer.parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
-    {
-        frame
-    } else {
-        core_ctx.with_counters(|counters| {
-            counters.ethernet.common.recv_parse_error.increment();
+{
+    fn receive_frame<B: BufferMut>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        metadata: RecvEthernetFrameMeta<CC::DeviceId>,
+        mut buffer: B,
+    ) {
+        trace_duration!(bindings_ctx, "device::ethernet::receive_frame");
+        let RecvEthernetFrameMeta { device_id } = metadata;
+        trace!("ethernet::receive_frame: device_id = {:?}", device_id);
+        self.with_counters(|counters| {
+            counters.ethernet.common.recv_frame.increment();
         });
-        trace!("ethernet::receive_frame: failed to parse ethernet frame");
-        // TODO(joshlf): Do something else?
-        return;
-    };
-
-    let dst = ethernet.dst_mac();
-
-    let frame_dest = core_ctx.with_ethernet_state(device_id, |static_state, dynamic_state| {
-        deliver_as(static_state, dynamic_state, &dst)
-    });
-
-    let frame_dst = match frame_dest {
-        None => {
-            core_ctx.with_counters(|counters| {
-                counters.ethernet.recv_other_dest.increment();
+        // NOTE(joshlf): We do not currently validate that the Ethernet frame
+        // satisfies the minimum length requirement. We expect that if this
+        // requirement is necessary (due to requirements of the physical medium),
+        // the driver or hardware will have checked it, and that if this requirement
+        // is not necessary, it is acceptable for us to operate on a smaller
+        // Ethernet frame. If this becomes insufficient in the future, we may want
+        // to consider making this behavior configurable (at compile time, at
+        // runtime on a global basis, or at runtime on a per-device basis).
+        let (ethernet, whole_frame) = if let Ok(frame) =
+            buffer.parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
+        {
+            frame
+        } else {
+            self.with_counters(|counters| {
+                counters.ethernet.common.recv_parse_error.increment();
             });
-            trace!(
-                "ethernet::receive_frame: destination mac {:?} not for device {:?}",
-                dst,
-                device_id
-            );
+            trace!("ethernet::receive_frame: failed to parse ethernet frame");
             return;
-        }
-        Some(frame_dest) => frame_dest,
-    };
-    let ethertype = ethernet.ethertype();
+        };
 
-    core_ctx.handle_frame(
-        bindings_ctx,
-        device_id,
-        ReceivedFrame::from_ethernet(ethernet, frame_dst).into(),
-        whole_frame,
-    );
+        let dst = ethernet.dst_mac();
 
-    match ethertype {
-        Some(EtherType::Arp) => {
-            let types = if let Ok(types) = peek_arp_types(buffer.as_ref()) {
-                types
-            } else {
-                // TODO(joshlf): Do something else here?
+        let frame_dest = self.with_ethernet_state(&device_id, |static_state, dynamic_state| {
+            deliver_as(static_state, dynamic_state, &dst)
+        });
+
+        let frame_dst = match frame_dest {
+            None => {
+                self.with_counters(|counters| {
+                    counters.ethernet.recv_other_dest.increment();
+                });
+                trace!(
+                    "ethernet::receive_frame: destination mac {:?} not for device {:?}",
+                    dst,
+                    device_id
+                );
                 return;
-            };
-            match types {
-                (ArpHardwareType::Ethernet, ArpNetworkType::Ipv4) => {
-                    core_ctx.with_counters(|counters| {
-                        counters.ethernet.recv_arp_delivered.increment();
-                    });
-                    ArpPacketHandler::handle_packet(
-                        core_ctx,
-                        bindings_ctx,
-                        device_id.clone(),
-                        frame_dst,
-                        buffer,
-                    )
+            }
+            Some(frame_dest) => frame_dest,
+        };
+        let ethertype = ethernet.ethertype();
+
+        self.handle_frame(
+            bindings_ctx,
+            &device_id,
+            ReceivedFrame::from_ethernet(ethernet, frame_dst).into(),
+            whole_frame,
+        );
+
+        match ethertype {
+            Some(EtherType::Arp) => {
+                let types = if let Ok(types) = peek_arp_types(buffer.as_ref()) {
+                    types
+                } else {
+                    return;
+                };
+                match types {
+                    (ArpHardwareType::Ethernet, ArpNetworkType::Ipv4) => {
+                        self.with_counters(|counters| {
+                            counters.ethernet.recv_arp_delivered.increment();
+                        });
+                        ArpPacketHandler::handle_packet(
+                            self,
+                            bindings_ctx,
+                            device_id,
+                            frame_dst,
+                            buffer,
+                        )
+                    }
                 }
             }
+            Some(EtherType::Ipv4) => {
+                self.with_counters(|counters| {
+                    counters.ethernet.common.recv_ip_delivered.increment();
+                });
+                self.receive_frame(
+                    bindings_ctx,
+                    RecvIpFrameMeta::<_, Ipv4>::new(device_id, frame_dst),
+                    buffer,
+                )
+            }
+            Some(EtherType::Ipv6) => {
+                self.with_counters(|counters| {
+                    counters.ethernet.common.recv_ip_delivered.increment();
+                });
+                self.receive_frame(
+                    bindings_ctx,
+                    RecvIpFrameMeta::<_, Ipv6>::new(device_id, frame_dst),
+                    buffer,
+                )
+            }
+            Some(EtherType::Other(_)) | None => {
+                self.with_counters(|counters| {
+                    counters.ethernet.common.recv_unsupported_ethertype.increment();
+                });
+            }
         }
-        Some(EtherType::Ipv4) => {
-            core_ctx.with_counters(|counters| {
-                counters.ethernet.common.recv_ip_delivered.increment();
-            });
-            core_ctx.receive_frame(
-                bindings_ctx,
-                RecvIpFrameMeta::<_, Ipv4>::new(device_id.clone(), frame_dst),
-                buffer,
-            )
-        }
-        Some(EtherType::Ipv6) => {
-            core_ctx.with_counters(|counters| {
-                counters.ethernet.common.recv_ip_delivered.increment();
-            });
-            core_ctx.receive_frame(
-                bindings_ctx,
-                RecvIpFrameMeta::<_, Ipv6>::new(device_id.clone(), frame_dst),
-                buffer,
-            )
-        }
-        Some(EtherType::Other(_)) | None => {
-            core_ctx.with_counters(|counters| {
-                counters.ethernet.common.recv_unsupported_ethertype.increment();
-            });
-        } // TODO(joshlf)
     }
 }
 
@@ -1946,9 +1960,14 @@ mod tests {
             0
         };
 
-        crate::device::receive_frame(core_ctx, bindings_ctx, &eth_device, Buf::new(bytes, ..));
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id: eth_device }, Buf::new(bytes, ..));
 
-        assert_eq!(core_ctx.state.ip_counters::<I>().receive_ip_packet.get(), expected_received);
+        assert_eq!(
+            ctx.core_ctx.state.ip_counters::<I>().receive_ip_packet.get(),
+            expected_received
+        );
     }
 
     #[test]
@@ -2129,9 +2148,7 @@ mod tests {
         // that are destined for a device must always be accepted.
 
         let config = I::FAKE_CONFIG;
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(config.clone()).build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let eth_device = &device_ids[0];
         let device = eth_device.clone().into();
 
@@ -2154,9 +2171,14 @@ mod tests {
             .unwrap_b();
 
         // Accept packet destined for this device if promiscuous mode is off.
-        crate::device::set_promiscuous_mode(&core_ctx, &mut bindings_ctx, &device, false)
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::set_promiscuous_mode(core_ctx, bindings_ctx, &device, false)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&core_ctx, &mut bindings_ctx, &eth_device, buf.clone());
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
         assert_eq!(
             core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
@@ -2164,9 +2186,13 @@ mod tests {
         );
 
         // Accept packet destined for this device if promiscuous mode is on.
-        crate::device::set_promiscuous_mode(&core_ctx, &mut bindings_ctx, &device, true)
+        crate::device::set_promiscuous_mode(core_ctx, bindings_ctx, &device, true)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&core_ctx, &mut bindings_ctx, &eth_device, buf);
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
         assert_eq!(
             core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
@@ -2193,9 +2219,13 @@ mod tests {
 
         // Reject packet not destined for this device if promiscuous mode is
         // off.
-        crate::device::set_promiscuous_mode(&core_ctx, &mut bindings_ctx, &device, false)
+        crate::device::set_promiscuous_mode(core_ctx, bindings_ctx, &device, false)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&core_ctx, &mut bindings_ctx, &eth_device, buf.clone());
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
         assert_eq!(
             core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
@@ -2203,12 +2233,15 @@ mod tests {
         );
 
         // Accept packet not destined for this device if promiscuous mode is on.
-        crate::device::set_promiscuous_mode(&core_ctx, &mut bindings_ctx, &device, true)
+        crate::device::set_promiscuous_mode(core_ctx, bindings_ctx, &device, true)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&core_ctx, &mut bindings_ctx, &eth_device, buf);
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
+
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
         assert_eq!(
-            core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             u64::from(is_other_host)
         );
     }

@@ -30,7 +30,10 @@ use packet_formats::{
 };
 
 use crate::{
-    device::{receive_frame, DeviceId},
+    device::{
+        ethernet::{EthernetLinkDevice, RecvEthernetFrameMeta},
+        DeviceId,
+    },
     state::StackStateBuilder,
     testutil::{
         benchmarks::{black_box, Bencher},
@@ -49,15 +52,15 @@ use crate::{
 // IPv4 packet frame which we expect will be parsed and forwarded without
 // requiring any new buffers to be allocated.
 fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
-    let (Ctx { core_ctx, mut bindings_ctx }, idx_to_device_id) =
-        FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4)
-            .build_with(StackStateBuilder::default());
-    let core_ctx = &core_ctx;
+    let (mut ctx, idx_to_device_id) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4)
+        .build_with(StackStateBuilder::default());
+
+    let Ctx { core_ctx, bindings_ctx } = &mut ctx;
     let eth_device = idx_to_device_id[0].clone();
     let device: DeviceId<_> = eth_device.clone().into();
     crate::device::testutil::set_forwarding_enabled::<_, Ipv4>(
-        &core_ctx,
-        &mut bindings_ctx,
+        core_ctx,
+        bindings_ctx,
         &device,
         true,
     )
@@ -105,16 +108,14 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
         {
             iters += 1;
         }
-        black_box(receive_frame(
-            black_box(&core_ctx),
-            black_box(&mut bindings_ctx),
-            black_box(&eth_device),
+        black_box(ctx.core_api().device::<EthernetLinkDevice>().receive_frame(
+            black_box(RecvEthernetFrameMeta { device_id: eth_device.clone() }),
             black_box(Buf::new(&mut buf[..], range.clone())),
         ));
 
         #[cfg(debug_assertions)]
         {
-            assert_eq!(bindings_ctx.frames_sent().len(), iters);
+            assert_eq!(ctx.bindings_ctx.frames_sent().len(), iters);
         }
 
         // Since we modified the buffer in-place, it now has the wrong source
