@@ -9,7 +9,6 @@ group("core") {
     "bt-host:bt-host-component",  # TODO(https://fxbug.dev/135650): Rename to
                                   # bt-host
     "bt-init",
-    "//src/connectivity/bluetooth/profiles/bt-rfcomm",
   ]
 }
 

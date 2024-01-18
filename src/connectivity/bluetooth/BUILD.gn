@@ -43,7 +43,6 @@ group("core") {
   deps = [
     "core/bt-gap",
     "core/bt-init",
-    "profiles/bt-rfcomm",
     "tools/bt-snoop",
   ]
 }
