@@ -27,6 +27,7 @@
 #include <ddktl/device.h>
 #include <fbl/ref_ptr.h>
 #include <wlan/common/macaddr.h>
+#include <wlan/drivers/log.h>
 
 #include "buffer_allocator.h"
 #include "device_interface.h"
@@ -79,30 +80,51 @@ class SoftmacBinding : public DeviceInterface {
 
   const zx_protocol_device_t eth_device_ops_ = {
       .version = DEVICE_OPS_VERSION,
-      .init = [](void* ctx) { SoftmacBinding::from(ctx)->Init(); },
-      .unbind = [](void* ctx) { SoftmacBinding::from(ctx)->Unbind(); },
-      .release = [](void* ctx) { SoftmacBinding::from(ctx)->Release(); },
+      .init =
+          [](void* ctx) {
+            WLAN_LAMBDA_TRACE_DURATION("eth_device_ops_t.init");
+            SoftmacBinding::from(ctx)->Init();
+          },
+      .unbind =
+          [](void* ctx) {
+            WLAN_LAMBDA_TRACE_DURATION("eth_device_ops_t.unbind");
+            SoftmacBinding::from(ctx)->Unbind();
+          },
+      .release =
+          [](void* ctx) {
+            WLAN_LAMBDA_TRACE_DURATION("eth_device_ops_t.release");
+            SoftmacBinding::from(ctx)->Release();
+          },
   };
 
   const ethernet_impl_protocol_ops_t ethernet_impl_ops_ = {
       .query = [](void* ctx, uint32_t options, ethernet_info_t* info) -> zx_status_t {
+        WLAN_LAMBDA_TRACE_DURATION("eth_impl_protocol_ops_t.query");
         return SoftmacBinding::from(ctx)->EthernetImplQuery(options, info);
       },
-      .stop = [](void* ctx) { SoftmacBinding::from(ctx)->EthernetImplStop(); },
+      .stop =
+          [](void* ctx) {
+            WLAN_LAMBDA_TRACE_DURATION("eth_impl_protocol_ops_t.stop");
+            SoftmacBinding::from(ctx)->EthernetImplStop();
+          },
       .start = [](void* ctx, const ethernet_ifc_protocol_t* ifc) -> zx_status_t {
+        WLAN_LAMBDA_TRACE_DURATION("eth_impl_protocol_ops_t.start");
         return SoftmacBinding::from(ctx)->EthernetImplStart(ifc);
       },
       .queue_tx =
           [](void* ctx, uint32_t options, ethernet_netbuf_t* netbuf,
              ethernet_impl_queue_tx_callback callback, void* cookie) {
+            WLAN_LAMBDA_TRACE_DURATION("eth_impl_protocol_ops_t.queue_tx");
             SoftmacBinding::from(ctx)->EthernetImplQueueTx(options, netbuf, callback, cookie);
           },
       .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data_buffer,
                       size_t data_size) -> zx_status_t {
+        WLAN_LAMBDA_TRACE_DURATION("eth_impl_protocol_ops_t.set_param");
         return SoftmacBinding::EthernetImplSetParam(param, value, data_buffer, data_size);
       },
       .get_bti =
           [](void* ctx, zx_handle_t* out_bti) {
+            WLAN_LAMBDA_TRACE_DURATION("eth_impl_protocol_ops_t.get_bti");
             SoftmacBinding::from(ctx)->EthernetImplGetBti(out_bti);
           },
   };

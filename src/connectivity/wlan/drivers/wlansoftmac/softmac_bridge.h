@@ -14,6 +14,8 @@
 #include <lib/operation/ethernet.h>
 #include <lib/zx/result.h>
 
+#include <wlan/drivers/log.h>
+
 #include "device_interface.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
@@ -91,6 +93,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   static wlansoftmac_in_buf_t IntoRustInBuf(std::unique_ptr<Buffer> owned_buffer);
   wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
       .get_buffer = [](size_t min_len) -> wlansoftmac_in_buf_t {
+        WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_buffer_provider_ops_t.get_buffer");
         // Note: Once Rust MLME supports more than sending WLAN frames this needs
         // to change.
         auto buffer = GetBuffer(min_len);

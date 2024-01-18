@@ -18,6 +18,7 @@ namespace wlan::drivers::wlansoftmac {
 static constexpr zx_driver_ops_t driver_ops = {
     .version = DRIVER_OPS_VERSION,
     .bind = [](void* ctx, zx_device_t* device) -> zx_status_t {
+      WLAN_LAMBDA_TRACE_DURATION("zx_drivers_ops_t.bind");
       wlan::drivers::log::Instance::Init(0);
       linfo("Binding wlansoftmac driver.");
 

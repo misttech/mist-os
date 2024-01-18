@@ -56,11 +56,13 @@ SoftmacBinding::SoftmacBinding() : unbind_called_(std::make_shared<bool>(false))
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
 
-  // Create a dispatcher to server the WlanSoftmacBridge protocol.
+  // Create a dispatcher to serve the WlanSoftmacBridge protocol.
   {
-    auto dispatcher =
-        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-                                            "wlansoftmacbridge_server", [](fdf_dispatcher_t*) {});
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacbridge_server",
+        [](fdf_dispatcher_t*) {
+          WLAN_LAMBDA_TRACE_DURATION("wlansoftmacbridge_server shutdown_handler");
+        });
 
     if (dispatcher.is_error()) {
       ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
@@ -72,9 +74,11 @@ SoftmacBinding::SoftmacBinding() : unbind_called_(std::make_shared<bool>(false))
 
   // Create a dispatcher to serve the WlanSoftmacIfc protocol.
   {
-    auto dispatcher =
-        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-                                            "wlansoftmacifc_server", [](fdf_dispatcher_t*) {});
+    auto dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifc_server",
+        [](fdf_dispatcher_t*) {
+          WLAN_LAMBDA_TRACE_DURATION("wlansoftmacifc_server shutdown_handler");
+        });
 
     if (dispatcher.is_error()) {
       ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
@@ -84,11 +88,13 @@ SoftmacBinding::SoftmacBinding() : unbind_called_(std::make_shared<bool>(false))
     softmac_ifc_server_dispatcher_ = *std::move(dispatcher);
   }
 
-  // Create a dispatcher to serve the WlanSoftmacIfc protocol.
+  // Create a dispatcher for WlanSoftmacIfcBridge method calls to the Rust MLME.
   {
     auto dispatcher = fdf::SynchronizedDispatcher::Create(
         fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifcbridge_client",
-        [](fdf_dispatcher_t*) {});
+        [](fdf_dispatcher_t*) {
+          WLAN_LAMBDA_TRACE_DURATION("wlansoftmacifcbridge_client shutdown_handler");
+        });
 
     if (dispatcher.is_error()) {
       ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
@@ -112,9 +118,11 @@ SoftmacBinding::SoftmacBinding() : unbind_called_(std::make_shared<bool>(false))
     auto dispatcher = fdf::SynchronizedDispatcher::Create(
         fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac_client",
         [&](fdf_dispatcher_t* client_dispatcher) {
+          WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_client shutdown_handler");
           // Every fidl::ServerBinding must be destroyed on the
           // dispatcher its bound too.
           async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(), [&]() {
+            WLAN_LAMBDA_TRACE_DURATION("softmac_ifc_bridge reset + device_unbind_reply");
             softmac_ifc_bridge_.reset();
             device_unbind_reply(device_);
           });
@@ -189,6 +197,7 @@ void SoftmacBinding::Init() {
   auto completer = std::make_unique<fit::callback<void(zx_status_t status)>>(
       [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(),
        device = device_](zx_status_t status) {
+        WLAN_LAMBDA_TRACE_DURATION("start_sta_completer");
         if (status == ZX_OK) {
           linfo("Initialized Rust WlanSoftmac.");
         } else {
@@ -198,6 +207,7 @@ void SoftmacBinding::Init() {
         // device_init_reply() must be called on a driver framework managed
         // dispatcher
         async::PostTask(main_device_dispatcher, [device, status]() {
+          WLAN_LAMBDA_TRACE_DURATION("device_init_reply");
           // Specify empty device_init_reply_args_t since SoftmacBinding
           // does not currently support power or performance state
           // information.
@@ -208,7 +218,9 @@ void SoftmacBinding::Init() {
   fit::callback<void(zx_status_t)> sta_shutdown_handler =
       [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(),
        unbind_called = unbind_called_, device = device_](zx_status_t status) {
+        WLAN_LAMBDA_TRACE_DURATION("sta_shutdown_handler on Rust dispatcher");
         async::PostTask(main_device_dispatcher, [status, unbind_called, device]() mutable {
+          WLAN_LAMBDA_TRACE_DURATION("sta_shutdown_handler on main_device_dispatcher");
           if (status == ZX_OK) {
             return;
           }
@@ -244,9 +256,11 @@ void SoftmacBinding::Unbind() {
       [softmac_bridge_server_dispatcher = softmac_bridge_server_dispatcher_.async_dispatcher(),
        softmac_bridge, client_dispatcher = client_dispatcher_.release(),
        stop_sta_returned = std::move(stop_sta_returned)]() mutable {
+        WLAN_LAMBDA_TRACE_DURATION("StopStaCompleter");
         async::PostTask(softmac_bridge_server_dispatcher,
                         [softmac_bridge, client_dispatcher,
                          stop_sta_returned = std::move(stop_sta_returned)]() {
+                          WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge destruction");
                           stop_sta_returned->Wait();
                           delete softmac_bridge;
                           fdf_dispatcher_shutdown_async(client_dispatcher);

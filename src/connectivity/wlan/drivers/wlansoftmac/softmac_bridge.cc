@@ -28,7 +28,10 @@ SoftmacBridge::SoftmacBridge(
   WLAN_TRACE_DURATION();
   auto rust_dispatcher = fdf::SynchronizedDispatcher::Create(
       fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac-mlme",
-      [](fdf_dispatcher_t* rust_dispatcher) { fdf_dispatcher_destroy(rust_dispatcher); });
+      [](fdf_dispatcher_t* rust_dispatcher) {
+        WLAN_LAMBDA_TRACE_DURATION("rust_dispatcher shutdown_handler");
+        fdf_dispatcher_destroy(rust_dispatcher);
+      });
   if (rust_dispatcher.is_error()) {
     ZX_ASSERT_MSG(false, "Failed to create dispatcher for MLME: %s",
                   zx_status_get_string(rust_dispatcher.status_value()));
@@ -58,6 +61,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
       .start = [](void* device_interface, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                   zx_handle_t softmac_ifc_bridge_client_handle,
                   zx_handle_t* out_sme_channel) -> zx_status_t {
+        WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.start");
         zx::channel channel;
         zx_status_t result = DeviceInterface::from(device_interface)
                                  ->Start(ifc, softmac_ifc_bridge_client_handle, &channel);
@@ -66,14 +70,17 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
       },
       .deliver_eth_frame = [](void* device_interface, const uint8_t* data,
                               size_t len) -> zx_status_t {
+        WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.deliver_eth_frame");
         return DeviceInterface::from(device_interface)->DeliverEthernet({data, len});
       },
       .queue_tx = [](void* device_interface, uint32_t options, wlansoftmac_out_buf_t buf,
                      wlan_tx_info_t tx_info) -> zx_status_t {
+        WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.queue_tx");
         return DeviceInterface::from(device_interface)
             ->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
       },
       .set_ethernet_status = [](void* device_interface, uint32_t status) -> zx_status_t {
+        WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.set_ethernet_status");
         return DeviceInterface::from(device_interface)->SetEthernetStatus(status);
       },
   };
@@ -92,10 +99,12 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
       softmac_bridge_server_dispatcher.async_dispatcher(),
       [softmac_bridge = softmac_bridge.get(), server_endpoint = std::move(endpoints->server),
        &server_binding_task_complete]() mutable {
+        WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacBridge server binding");
         softmac_bridge->softmac_bridge_server_ =
             std::make_unique<fidl::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacBridge>>(
                 fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server_endpoint),
                 softmac_bridge, [](fidl::UnbindInfo info) {
+                  WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacBridge close_handler");
                   if (info.is_user_initiated()) {
                     linfo("WlanSoftmacBridge server closed.");
                   } else {
@@ -108,6 +117,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   auto start_sta_completer = std::make_unique<StartStaCompleter>(
       [softmac_bridge = softmac_bridge.get(), completer = std::move(completer)](
           zx_status_t status, wlansoftmac_handle_t* rust_handle) mutable {
+        WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge start_sta_completer");
         softmac_bridge->rust_handle_ = rust_handle;
         (*completer)(status);
       });
@@ -118,9 +128,11 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
                    wlansoftmac_rust_ops = wlansoftmac_rust_ops,
                    rust_buffer_provider = softmac_bridge->rust_buffer_provider,
                    client_end = endpoints->client.TakeHandle().release()]() mutable {
+                    WLAN_LAMBDA_TRACE_DURATION("Rust MLME dispatcher");
                     sta_shutdown_handler(start_sta(
                         start_sta_completer.release(),
                         [](void* ctx, zx_status_t status, wlansoftmac_handle_t* rust_handle) {
+                          WLAN_LAMBDA_TRACE_DURATION("run StartStaCompleter");
                           auto start_sta_completer = static_cast<StartStaCompleter*>(ctx);
                           if (start_sta_completer == nullptr) {
                             lerror("Received NULL StartStaCompleter pointer!");
@@ -152,6 +164,7 @@ zx_status_t SoftmacBridge::StopSta(std::unique_ptr<StopStaCompleter> completer) 
   stop_sta(
       completer.release(),
       [](void* ctx) {
+        WLAN_LAMBDA_TRACE_DURATION("run StopStaCompleter");
         auto completer = static_cast<StopStaCompleter*>(ctx);
         if (completer == nullptr) {
           lerror("Received NULL StopStaCompleter pointer!");
@@ -372,7 +385,11 @@ wlansoftmac_in_buf_t SoftmacBridge::IntoRustInBuf(std::unique_ptr<Buffer> owned_
   WLAN_TRACE_DURATION();
   auto* buffer = owned_buffer.release();
   return wlansoftmac_in_buf_t{
-      .free_buffer = [](void* raw) { std::unique_ptr<Buffer>(static_cast<Buffer*>(raw)).reset(); },
+      .free_buffer =
+          [](void* raw) {
+            WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_in_buf_t.free_buffer");
+            std::unique_ptr<Buffer>(static_cast<Buffer*>(raw)).reset();
+          },
       .raw = buffer,
       .data = buffer->data(),
       .len = buffer->capacity(),

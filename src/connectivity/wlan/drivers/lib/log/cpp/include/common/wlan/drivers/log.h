@@ -60,11 +60,19 @@
     }                                                       \
   } while (0)
 
-#define WLAN_TRACE_DURATION(...)                                                                   \
-  auto function_name = cpp20::source_location::current().function_name();                          \
-  auto file_name = cpp20::source_location::current().file_name();                                  \
-  auto line = cpp20::source_location::current().line();                                            \
-  TRACE_DURATION("wlan", function_name, "line", TA_UINT64(line), "filename", TA_STRING(file_name), \
+#define WLAN_TRACE_DURATION(...)                                          \
+  auto function_name = cpp20::source_location::current().function_name(); \
+  auto file_name = cpp20::source_location::current().file_name();         \
+  auto line = cpp20::source_location::current().line();                   \
+  WLAN_TRACE_DURATION_(function_name);
+
+#define WLAN_LAMBDA_TRACE_DURATION(name, ...)                     \
+  auto file_name = cpp20::source_location::current().file_name(); \
+  auto line = cpp20::source_location::current().line();           \
+  WLAN_TRACE_DURATION_(("λ " name));
+
+#define WLAN_TRACE_DURATION_(name, ...)                                                   \
+  TRACE_DURATION("wlan", name, "line", TA_UINT64(line), "filename", TA_STRING(file_name), \
                  ##__VA_ARGS__);
 
 #define FMT_MAC "%02x:%02x:%02x:%02x:%02x:%02x"
