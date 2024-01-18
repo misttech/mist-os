@@ -3441,7 +3441,15 @@ impl MemoryManager {
         if let Some(usercopy) = usercopy() {
             usercopy.atomic_load_u32_relaxed(addr.ptr()).map_err(|_| errno!(EFAULT))
         } else {
-            let buf = self.read_memory_to_array(addr)?;
+            // SAFETY: `self.state.read().read_memory` only returns `Ok` if all
+            // bytes were read to.
+            let buf = unsafe {
+                read_to_array(|buf| {
+                    self.state.read().read_memory(addr, buf).map(|bytes_read| {
+                        debug_assert_eq!(bytes_read.len(), std::mem::size_of::<u32>())
+                    })
+                })
+            }?;
             Ok(u32::from_ne_bytes(buf))
         }
     }
@@ -3450,8 +3458,7 @@ impl MemoryManager {
         if let Some(usercopy) = usercopy() {
             usercopy.atomic_store_u32_relaxed(addr.ptr(), value).map_err(|_| errno!(EFAULT))
         } else {
-            let value_ref = UserRef::<u32>::new(addr);
-            self.write_object(value_ref, &value)?;
+            self.state.read().write_memory(addr, value.as_bytes())?;
             Ok(())
         }
     }
