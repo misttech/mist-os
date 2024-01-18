@@ -1647,8 +1647,9 @@ declare_args() {
     {
       configs = [ "//build/config/profile:coverage" ]
       tags = [
-        "instrumented",
         "coverage",
+        "debugdata",
+        "instrumented",
         "llvm-profdata",
         "needs-writable-globals",
       ]
@@ -1657,8 +1658,9 @@ declare_args() {
     {
       configs = [ "//build/config/profile:coverage-rust" ]
       tags = [
-        "instrumented",
         "coverage",
+        "debugdata",
+        "instrumented",
         "llvm-profdata",
         "needs-writable-globals",
       ]
@@ -1667,18 +1669,20 @@ declare_args() {
     {
       configs = [ "//build/config/profile" ]
       tags = [
+        "debugdata",
         "instrumented",
-        "profile",
         "llvm-profdata",
         "needs-writable-globals",
+        "profile",
       ]
     },
 
     {
       configs = [ "//build/config/profile:coverage-cts" ]
       tags = [
-        "instrumented",
         "coverage",
+        "debugdata",
+        "instrumented",
         "llvm-profdata",
       ]
     },

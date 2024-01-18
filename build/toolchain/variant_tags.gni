@@ -77,6 +77,10 @@ all_variant_tags = [
   # The `coverage` tag is used for coverage instrumentation.
   "coverage",
 
+  # The `debugdata` tag is used for all instrumentation that publishes data via
+  # the fuchsia.debugdata protocols.
+  "debugdata",
+
   # The `llvm-profdata` tag is used for all instrumentation that emits the
   # `llvm-profdata` format.
   "llvm-profdata",

@@ -41,9 +41,9 @@ executable("publish-data-helper") {
     "//zircon/system/ulib/zxtest",
   ]
 
-  # TODO: Don't instrument the helper until we have a way to route sinks
-  # from the inner runtests instance to the outer one so they make it
-  # into summary.json.
+  # Don't use build configurations that implicitly publish debugdata, since
+  # that interferes with the helper's expected use of the protocol.
+  exclude_toolchain_tags = [ "debugdata" ]
 }
 
 executable("profile-helper") {
@@ -57,6 +57,10 @@ executable("profile-helper") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+
+  # Don't use build configurations that implicitly publish debugdata, since
+  # that interferes with the helper's expected use of the protocol.
+  exclude_toolchain_tags = [ "debugdata" ]
 }
 
 renamed_binary("packaged-publish-data-helper") {
