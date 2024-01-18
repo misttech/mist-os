@@ -30,7 +30,6 @@ fuchsia_driver("aml-thermal-s905d2g-legacy-driver") {
   public_deps = [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp" ]
   deps = [
     ":aml-thermal-s905d2g-legacy-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
@@ -75,7 +74,6 @@ test("aml-thermal-s905d2g-legacy-test-bin") {
   ]
   deps = [
     ":aml-thermal-s905d2g-legacy-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp_mock",
     "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
