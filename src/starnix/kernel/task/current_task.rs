@@ -972,14 +972,25 @@ impl CurrentTask {
     /// This function creates an underlying Zircon process to host the new task.
     pub fn create_init_child_process(
         kernel: &Arc<Kernel>,
-        binary_path: &CString,
+        initial_name: &CString,
     ) -> Result<TaskBuilder, Errno> {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
-        let task = Self::create_process_without_parent(
+        let initial_name_bytes = initial_name.as_bytes().to_owned();
+        let task = Self::create_task(
             kernel,
-            binary_path.clone(),
+            initial_name.clone(),
             init_task.fs().fork(),
+            |pid, process_group| {
+                create_zircon_process(
+                    kernel,
+                    None,
+                    pid,
+                    process_group,
+                    SignalActions::default(),
+                    &initial_name_bytes,
+                )
+            },
         )?;
         {
             let mut init_writer = init_task.thread_group.write();
@@ -992,37 +1003,6 @@ impl CurrentTask {
         let limits = init_task.thread_group.limits.lock().clone();
         *task.thread_group.limits.lock() = limits;
         Ok(task)
-    }
-
-    /// Create a process that does not have a parent.
-    ///
-    /// The created process will be a task that is the leader of a new thread group.
-    ///
-    /// The processes with this function are strange because following their `parent` chain
-    /// does not lead to `init`, unlike every task created by userspace. When these tasks die,
-    /// there might not be any other process that is responsible for waiting on them, which can
-    /// leak zombie processes.  (Normally `init` waits on dead processes in its task tree.)
-    ///
-    /// Instead of calling this function, consider calling `create_init_child_process`, which
-    /// creates a more normal process.
-    ///
-    /// This function creates an underlying Zircon process to host the new task.
-    pub fn create_process_without_parent(
-        kernel: &Arc<Kernel>,
-        initial_name: CString,
-        fs: Arc<FsContext>,
-    ) -> Result<TaskBuilder, Errno> {
-        let initial_name_bytes = initial_name.as_bytes().to_owned();
-        Self::create_task(kernel, initial_name, fs, |pid, process_group| {
-            create_zircon_process(
-                kernel,
-                None,
-                pid,
-                process_group,
-                SignalActions::default(),
-                &initial_name_bytes,
-            )
-        })
     }
 
     /// Creates the initial process for a kernel.

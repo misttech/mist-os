@@ -75,9 +75,12 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
         Kernel::new(b"".into(), None, None, None, fuchsia_inspect::Node::default(), None, None)
             .expect("failed to create kernel");
 
+    let init_pid = kernel.pids.write().allocate_pid();
+    assert_eq!(init_pid, 1);
     let fs = FsContext::new(create_fs(&kernel));
-    let init_task = CurrentTask::create_process_without_parent(
+    let init_task = CurrentTask::create_init_process(
         &kernel,
+        init_pid,
         CString::new("test-task").unwrap(),
         fs.clone(),
     )
@@ -101,12 +104,8 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
 ///
 /// The `Task` is backed by a real process, and can be used to test syscalls.
 pub fn create_task(kernel: &Arc<Kernel>, task_name: &str) -> AutoReleasableTask {
-    let task = CurrentTask::create_process_without_parent(
-        kernel,
-        CString::new(task_name).unwrap(),
-        FsContext::new(create_pkgfs(kernel)),
-    )
-    .expect("failed to create second task");
+    let task = CurrentTask::create_init_child_process(kernel, &CString::new(task_name).unwrap())
+        .expect("failed to create second task");
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
