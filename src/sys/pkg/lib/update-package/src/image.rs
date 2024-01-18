@@ -5,7 +5,7 @@
 use {fuchsia_zircon_status::Status, thiserror::Error};
 
 #[cfg(target_os = "fuchsia")]
-use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_zircon::VmoChildOptions};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_mem::Buffer, fuchsia_zircon::VmoChildOptions};
 
 /// An error encountered while opening an image.
 #[derive(Debug, Error)]
@@ -40,6 +40,9 @@ pub enum ImageType {
     /// Kernel image.
     Zbi,
 
+    /// Kernel image.
+    ZbiSigned,
+
     /// Metadata for the kernel image.
     FuchsiaVbmeta,
 
@@ -61,6 +64,7 @@ impl ImageType {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Zbi => "zbi",
+            Self::ZbiSigned => "zbi.signed",
             Self::FuchsiaVbmeta => "fuchsia.vbmeta",
             Self::Recovery => "recovery",
             Self::RecoveryVbmeta => "recovery.vbmeta",
@@ -95,7 +99,7 @@ impl Image {
     /// The name of this image as understood by the system updater.
     pub fn classify(&self) -> ImageClass {
         match self.imagetype() {
-            ImageType::Zbi => ImageClass::Zbi,
+            ImageType::Zbi | ImageType::ZbiSigned => ImageClass::Zbi,
             ImageType::FuchsiaVbmeta => ImageClass::ZbiVbmeta,
             ImageType::Recovery => ImageClass::Recovery,
             ImageType::RecoveryVbmeta => ImageClass::RecoveryVbmeta,
@@ -147,7 +151,7 @@ impl ImageClass {
 pub(crate) async fn open_from_path(
     proxy: &fio::DirectoryProxy,
     path: &str,
-) -> Result<fmem::Buffer, OpenImageError> {
+) -> Result<Buffer, OpenImageError> {
     let file = fuchsia_fs::directory::open_file(proxy, path, fio::OpenFlags::RIGHT_READABLE)
         .await
         .map_err(|err| OpenImageError::OpenPath { path: path.to_string(), err })?;
@@ -173,7 +177,7 @@ pub(crate) async fn open_from_path(
         )
         .map_err(|status| OpenImageError::CloneBuffer { path: path.to_string(), status })?;
 
-    Ok(fmem::Buffer { vmo, size })
+    Ok(Buffer { vmo, size })
 }
 
 #[cfg(test)]
@@ -205,6 +209,10 @@ mod tests {
         assert!(
             !Image::new(ImageType::Zbi, None).classify().targets_recovery(),
             "image zbi should not target recovery",
+        );
+        assert!(
+            !Image::new(ImageType::ZbiSigned, None).classify().targets_recovery(),
+            "image zbi.signed not should target recovery",
         );
         assert!(
             !Image::new(ImageType::FuchsiaVbmeta, None).classify().targets_recovery(),

@@ -28,10 +28,10 @@ pub enum ResolveImagesError {
 #[derive(Debug, Error, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum VerifyError {
-    #[error("images list did not contain an entry for 'zbi'")]
+    #[error("images list did not contain an entry for 'zbi' or 'zbi.signed'")]
     MissingZbi,
 
-    #[error("images list unexpectedly contained an entry for 'zbi'")]
+    #[error("images list unexpectedly contained an entry for 'zbi' or 'zbi.signed'")]
     UnexpectedZbi,
 }
 
@@ -291,9 +291,9 @@ impl ImageMetadata {
         url: PinnedAbsolutePackageUrl,
         resource: String,
     ) -> Result<Self, ImageMetadataError> {
-        use sha2::Digest as _;
+        use sha2::{Digest, Sha256};
 
-        let mut hasher = sha2::Sha256::new();
+        let mut hasher = Sha256::new();
         let mut file = std::fs::File::open(path).map_err(ImageMetadataError::Io)?;
         let size = std::io::copy(&mut file, &mut hasher).map_err(ImageMetadataError::Io)?;
         let hash = Hash::from(*AsRef::<[u8; 32]>::as_ref(&hasher.finalize()));
