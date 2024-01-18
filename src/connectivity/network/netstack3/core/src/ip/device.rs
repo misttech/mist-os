@@ -746,9 +746,8 @@ pub trait IpDeviceConfigurationContext<
 
 /// The context provided to the callback passed to
 /// [`Ipv6DeviceConfigurationContext::with_ipv6_device_configuration_mut`].
-pub(crate) trait WithIpv6DeviceConfigurationMutInner<
-    BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>,
->: WithIpDeviceConfigurationMutInner<Ipv6, BC>
+pub trait WithIpv6DeviceConfigurationMutInner<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
+    WithIpDeviceConfigurationMutInner<Ipv6, BC>
 {
     type Ipv6DeviceStateCtx<'s>: Ipv6DeviceContext<BC, DeviceId = Self::DeviceId>
         + GmpHandler<Ipv6, BC>
@@ -768,7 +767,7 @@ pub(crate) trait WithIpv6DeviceConfigurationMutInner<
     ) -> (&Ipv6DeviceConfiguration, Self::Ipv6DeviceStateCtx<'_>);
 }
 
-pub(crate) trait Ipv6DeviceConfigurationContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
+pub trait Ipv6DeviceConfigurationContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
     IpDeviceConfigurationContext<Ipv6, BC>
 {
     type Ipv6DeviceStateCtx<'s>: Ipv6DeviceContext<BC, DeviceId = Self::DeviceId, AddressId = Self::AddressId>
@@ -806,7 +805,7 @@ pub(crate) trait Ipv6DeviceConfigurationContext<BC: IpDeviceBindingsContext<Ipv6
 }
 
 /// The execution context for an IPv6 device.
-pub(crate) trait Ipv6DeviceContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
+pub trait Ipv6DeviceContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
     IpDeviceStateContext<Ipv6, BC>
 {
     /// A link-layer address.
@@ -2418,7 +2417,8 @@ mod tests {
     use crate::{
         context::testutil::FakeInstant,
         device::{
-            ethernet::{EthernetLinkDevice, MaxEthernetFrameSize},
+            ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
+            loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::{update_ipv4_configuration, update_ipv6_configuration},
             DeviceId,
         },
@@ -2443,12 +2443,14 @@ mod tests {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
         let local_mac = Ipv4::FAKE_CONFIG.local_mac;
-        let ethernet_device_id = crate::device::add_ethernet_device(
-            &ctx.core_ctx,
-            local_mac,
-            MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let ethernet_device_id =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
         let device_id = ethernet_device_id.clone().into();
 
         assert_eq!(ctx.bindings_ctx.take_events()[..], []);
@@ -2641,12 +2643,14 @@ mod tests {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
-        let ethernet_device_id = crate::device::add_ethernet_device(
-            &ctx.core_ctx,
-            local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let ethernet_device_id =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
         let device_id = ethernet_device_id.clone().into();
         let ll_addr = local_mac.to_ipv6_link_local();
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
@@ -2969,16 +2973,20 @@ mod tests {
     fn notify_on_dad_failure_ipv6() {
         let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
-        let device_id = crate::device::add_ethernet_device(
-            core_ctx,
-            local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        let device_id = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             core_ctx,
             bindings_ctx,
@@ -3080,22 +3088,23 @@ mod tests {
 
     #[ip_test]
     fn update_ip_device_configuration_err<I: Ip + UpdateIpDeviceConfigurationAndFlagsTestIpExt>() {
-        let FakeCtx { core_ctx, mut bindings_ctx } = FakeCtx::default();
-        let core_ctx = &core_ctx;
+        let mut ctx = FakeCtx::default();
 
-        let loopback_device_id = crate::device::add_loopback_device(
-            core_ctx,
-            Mtu::new(u16::MAX as u32),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .expect("create the loopback interface")
-        .into();
+        let loopback_device_id = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: Mtu::new(u16::MAX as u32) },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let original_state = I::get_ip_configuration_and_flags(core_ctx, &loopback_device_id);
         assert_eq!(
             I::update_ip_configuration(
                 core_ctx,
-                &mut bindings_ctx,
+                bindings_ctx,
                 &loopback_device_id,
                 IpDeviceConfigurationUpdate {
                     ip_enabled: Some(!AsRef::<IpDeviceFlags>::as_ref(&original_state).ip_enabled),
@@ -3115,23 +3124,26 @@ mod tests {
 
     #[test]
     fn update_ipv4_configuration_return() {
-        let FakeCtx { core_ctx, mut bindings_ctx } =
-            Ctx::new_with_builder(StackStateBuilder::default());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv4::FAKE_CONFIG.local_mac;
-        let device_id = crate::device::add_ethernet_device(
-            &core_ctx,
-            local_mac,
-            MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-
+        let device_id = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Perform no update.
         assert_eq!(
             update_ipv4_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv4DeviceConfigurationUpdate::default()
             ),
@@ -3141,8 +3153,8 @@ mod tests {
         // Enable all but forwarding. All features are initially disabled.
         assert_eq!(
             update_ipv4_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv4DeviceConfigurationUpdate {
                     ip_config: Some(IpDeviceConfigurationUpdate {
@@ -3164,8 +3176,8 @@ mod tests {
         // Change forwarding config.
         assert_eq!(
             update_ipv4_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv4DeviceConfigurationUpdate {
                     ip_config: Some(IpDeviceConfigurationUpdate {
@@ -3188,8 +3200,8 @@ mod tests {
         // value).
         assert_eq!(
             update_ipv4_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv4DeviceConfigurationUpdate {
                     ip_config: Some(IpDeviceConfigurationUpdate {
@@ -3211,8 +3223,8 @@ mod tests {
         // Disable/change everything.
         assert_eq!(
             update_ipv4_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv4DeviceConfigurationUpdate {
                     ip_config: Some(IpDeviceConfigurationUpdate {
@@ -3234,23 +3246,27 @@ mod tests {
 
     #[test]
     fn update_ipv6_configuration_return() {
-        let FakeCtx { core_ctx, mut bindings_ctx } =
-            Ctx::new_with_builder(StackStateBuilder::default());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
-        let device_id = crate::device::add_ethernet_device(
-            &core_ctx,
-            local_mac,
-            MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        let device_id = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Perform no update.
         assert_eq!(
             update_ipv6_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv6DeviceConfigurationUpdate::default()
             ),
@@ -3260,8 +3276,8 @@ mod tests {
         // Enable all but forwarding. All features are initially disabled.
         assert_eq!(
             update_ipv6_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(NonZeroU8::new(1)),
@@ -3292,8 +3308,8 @@ mod tests {
         // Change forwarding config.
         assert_eq!(
             update_ipv6_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: None,
@@ -3322,8 +3338,8 @@ mod tests {
         // value).
         assert_eq!(
             update_ipv6_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: None,
@@ -3351,8 +3367,8 @@ mod tests {
         // Disable/change everything.
         assert_eq!(
             update_ipv6_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(None),
@@ -3384,17 +3400,21 @@ mod tests {
     #[test_case(false; "stable addresses enabled generates link local")]
     #[test_case(true; "stable addresses disabled does not generate link local")]
     fn configure_link_local_address_generation(enable_stable_addresses: bool) {
-        let FakeCtx { core_ctx, mut bindings_ctx } =
-            Ctx::new_with_builder(StackStateBuilder::default());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
         let local_mac = Ipv6::FAKE_CONFIG.local_mac;
-        let device_id = crate::device::add_ethernet_device(
-            &core_ctx,
-            local_mac,
-            MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        let device_id = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let new_config = Ipv6DeviceConfigurationUpdate {
             slaac_config: Some(SlaacConfiguration {
@@ -3403,8 +3423,8 @@ mod tests {
             }),
             ..Default::default()
         };
-        let _prev = update_ipv6_configuration(&core_ctx, &mut bindings_ctx, &device_id, new_config);
-        Ipv6::set_ip_device_enabled(&core_ctx, &mut bindings_ctx, &device_id, true, false);
+        let _prev = update_ipv6_configuration(core_ctx, bindings_ctx, &device_id, new_config);
+        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, true, false);
 
         let expected_addrs = if enable_stable_addresses {
             HashSet::from([local_mac.to_ipv6_link_local().ipv6_unicast_addr()])
@@ -3413,7 +3433,7 @@ mod tests {
         };
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(&core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()

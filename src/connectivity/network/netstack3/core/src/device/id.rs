@@ -226,6 +226,11 @@ impl<BT: DeviceLayerTypes> DeviceId<BT> {
             DeviceId::Loopback(id) => id.bindings_id(),
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn unwrap_ethernet(self) -> EthernetDeviceId<BT> {
+        assert_matches::assert_matches!(self, DeviceId::Ethernet(e) => e)
+    }
 }
 
 impl<BT: DeviceLayerTypes> Id for DeviceId<BT> {
@@ -412,7 +417,7 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BaseDeviceId<T, BT> {
 }
 
 /// The primary reference to a device.
-pub(crate) struct BasePrimaryDeviceId<T: DeviceStateSpec, BT: DeviceLayerTypes> {
+pub struct BasePrimaryDeviceId<T: DeviceStateSpec, BT: DeviceLayerTypes> {
     // NB: This is not a tuple struct because regular structs play nicer with
     // type aliases, which is how we use BaseDeviceId.
     rc: PrimaryRc<BaseDeviceState<T, BT>>,
@@ -426,6 +431,7 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> Debug for BasePrimaryDeviceId<T, 
 }
 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BasePrimaryDeviceId<T, BT> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
     pub(crate) fn clone_strong(&self) -> BaseDeviceId<T, BT> {
         let Self { rc } = self;
         BaseDeviceId { rc: PrimaryRc::clone_strong(rc) }

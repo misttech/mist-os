@@ -18,7 +18,9 @@ use fuchsia_zircon as zx;
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
-    device::{EthernetWeakDeviceId, MaxEthernetFrameSize},
+    device::{
+        EthernetCreationProperties, EthernetLinkDevice, EthernetWeakDeviceId, MaxEthernetFrameSize,
+    },
     ip::{
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
@@ -371,13 +373,12 @@ impl DeviceHandler {
             netdevice_client::port_slab::Entry::Vacant(e) => e,
         };
         let Netstack { interfaces_event_sink, neighbor_event_sink, ctx } = ns;
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
         // Check if there already exists an interface with this name.
         // Interface names are unique.
         let name = name
             .map(|name| {
-                if let Some(_device_info) = bindings_ctx.devices.get_device_by_name(&name) {
+                if let Some(_device_info) = ctx.bindings_ctx().devices.get_device_by_name(&name) {
                     return Err(Error::DuplicateName(name));
                 };
                 Ok(name)
@@ -386,54 +387,51 @@ impl DeviceHandler {
 
         let max_frame_size = MaxEthernetFrameSize::new(max_eth_frame_size)
             .ok_or(Error::ConfigurationNotSupported)?;
-        let core_id = netstack3_core::device::add_ethernet_device_with_state(
-            core_ctx,
-            mac_addr,
-            max_frame_size,
-            RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
-            || {
-                let binding_id = bindings_ctx.devices.alloc_new_id();
 
-                let name = name.unwrap_or_else(|| format!("eth{}", binding_id));
-                let info = devices::NetdeviceInfo {
-                    handler: PortHandler {
-                        id: binding_id,
-                        port_id: port,
-                        inner: self.inner.clone(),
-                        _mac_proxy: mac_proxy,
-                        device_class: device_class.clone(),
-                    },
-                    mac: mac_addr,
-                    dynamic: devices::DynamicNetdeviceInfo {
-                        phy_up,
-                        common_info: devices::DynamicCommonInfo {
-                            mtu: max_frame_size.as_mtu(),
-                            admin_enabled: false,
-                            events: crate::bindings::create_interface_event_producer(
-                                interfaces_event_sink,
-                                binding_id,
-                                crate::bindings::InterfaceProperties {
-                                    name: name.clone(),
-                                    device_class: fnet_interfaces::DeviceClass::Device(
-                                        device_class,
-                                    ),
-                                },
-                            ),
-                            control_hook: control_hook,
-                            addresses: HashMap::new(),
-                        },
-                        neighbor_event_sink: neighbor_event_sink.clone(),
-                    }
-                    .into(),
-                    static_common_info: devices::StaticCommonInfo {
-                        tx_notifier: Default::default(),
-                        authorization_token: zx::Event::create(),
-                    },
-                }
-                .into();
+        let binding_id = ctx.bindings_ctx().devices.alloc_new_id();
 
-                (info, devices::DeviceIdAndName { id: binding_id, name })
+        let name = name.unwrap_or_else(|| format!("eth{}", binding_id));
+
+        let info = devices::NetdeviceInfo {
+            handler: PortHandler {
+                id: binding_id,
+                port_id: port,
+                inner: self.inner.clone(),
+                _mac_proxy: mac_proxy,
+                device_class: device_class.clone(),
             },
+            mac: mac_addr,
+            dynamic: devices::DynamicNetdeviceInfo {
+                phy_up,
+                common_info: devices::DynamicCommonInfo {
+                    mtu: max_frame_size.as_mtu(),
+                    admin_enabled: false,
+                    events: crate::bindings::create_interface_event_producer(
+                        interfaces_event_sink,
+                        binding_id,
+                        crate::bindings::InterfaceProperties {
+                            name: name.clone(),
+                            device_class: fnet_interfaces::DeviceClass::Device(device_class),
+                        },
+                    ),
+                    control_hook: control_hook,
+                    addresses: HashMap::new(),
+                },
+                neighbor_event_sink: neighbor_event_sink.clone(),
+            }
+            .into(),
+            static_common_info: devices::StaticCommonInfo {
+                tx_notifier: Default::default(),
+                authorization_token: zx::Event::create(),
+            },
+        }
+        .into();
+
+        let core_id = ctx.api().device::<EthernetLinkDevice>().add_device(
+            devices::DeviceIdAndName { id: binding_id, name },
+            EthernetCreationProperties { mac: mac_addr, max_frame_size },
+            RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
+            info,
         );
 
         state_entry.insert(core_id.downgrade());

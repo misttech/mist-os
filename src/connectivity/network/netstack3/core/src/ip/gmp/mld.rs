@@ -109,7 +109,7 @@ pub(crate) trait MldContext<BC: MldBindingsContext<Self::DeviceId>>:
 /// A handler for incoming MLD packets.
 ///
 /// A blanket implementation is provided for all `C: MldContext`.
-pub(crate) trait MldPacketHandler<BC, DeviceId> {
+pub trait MldPacketHandler<BC, DeviceId> {
     /// Receive an MLD packet.
     fn receive_mld_packet<B: ByteSlice>(
         &mut self,
@@ -473,7 +473,11 @@ mod tests {
             testutil::{FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
-        device::{testutil::FakeDeviceId, DeviceId},
+        device::{
+            ethernet::{EthernetCreationProperties, EthernetLinkDevice},
+            testutil::FakeDeviceId,
+            DeviceId,
+        },
         ip::{
             device::{
                 slaac::SlaacConfiguration, IpDeviceConfigurationUpdate,
@@ -1246,17 +1250,19 @@ mod tests {
             subnet: _,
         } = Ipv6::FAKE_CONFIG;
 
-        let crate::testutil::FakeCtx { core_ctx, mut bindings_ctx } =
-            Ctx::new_with_builder(StackStateBuilder::default());
-        let mut core_ctx = &core_ctx;
-        let eth_device_id = crate::device::add_ethernet_device(
-            core_ctx,
-            local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let mut ctx = crate::testutil::FakeCtx::new_with_builder(StackStateBuilder::default());
+
+        let eth_device_id =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
 
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let now = bindings_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();
         let snmc_addr = ll_addr.to_solicited_node_address();
@@ -1272,7 +1278,7 @@ mod tests {
             ip_enabled: bool,
             gmp_enabled: bool,
         }
-        let set_config = |core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        let set_config = |core_ctx: &mut crate::testutil::FakeCoreCtx,
                           bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
             let _: Ipv6DeviceConfigurationUpdate =
@@ -1358,70 +1364,46 @@ mod tests {
         //
         // MLD should be performed for the auto-generated link-local address's
         // solicited-node multicast address.
-        set_config(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            TestConfig { ip_enabled: true, gmp_enabled: true },
-        );
+        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
         bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
-        check_sent_report(&mut bindings_ctx, false);
+        check_sent_report(bindings_ctx, false);
 
         // Disable MLD.
-        set_config(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            TestConfig { ip_enabled: true, gmp_enabled: false },
-        );
+        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
         bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_done(&mut bindings_ctx, true);
+        check_sent_done(bindings_ctx, true);
 
         // Enable MLD but disable IPv6.
         //
         // Should do nothing.
-        set_config(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            TestConfig { ip_enabled: false, gmp_enabled: true },
-        );
+        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
         bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(&bindings_ctx.take_frames()[..], []);
+        assert_matches!(bindings_ctx.take_frames()[..], []);
 
         // Disable MLD but enable IPv6.
         //
         // Should do nothing.
-        set_config(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            TestConfig { ip_enabled: true, gmp_enabled: false },
-        );
+        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
         bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(&bindings_ctx.take_frames()[..], []);
+        assert_matches!(bindings_ctx.take_frames()[..], []);
 
         // Enable MLD.
-        set_config(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            TestConfig { ip_enabled: true, gmp_enabled: true },
-        );
+        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
         bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
-        check_sent_report(&mut bindings_ctx, true);
+        check_sent_report(bindings_ctx, true);
 
         // Disable IPv6.
-        set_config(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            TestConfig { ip_enabled: false, gmp_enabled: true },
-        );
+        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
         bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_done(&mut bindings_ctx, false);
+        check_sent_done(bindings_ctx, false);
 
         // Enable IPv6.
-        set_config(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            TestConfig { ip_enabled: true, gmp_enabled: true },
-        );
+        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
         bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id, range)]);
-        check_sent_report(&mut bindings_ctx, false);
+        check_sent_report(bindings_ctx, false);
+
+        // Remove the device to cleanup all dangling references.
+        core::mem::drop(device_id);
+        ctx.core_api().device().remove_device(eth_device_id).into_removed();
     }
 }

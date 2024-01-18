@@ -260,7 +260,7 @@ impl<DeviceId, BC: RngContext + TimerContext<SlaacTimerId<DeviceId>>> SlaacBindi
 }
 
 /// An implementation of SLAAC.
-pub(crate) trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
+pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
     /// Executes the algorithm in [RFC 4862 Section 5.5.3], with the extensions
     /// from [RFC 8981 Section 3.4] for temporary addresses, for a given prefix
     /// advertised by a router.
@@ -1682,6 +1682,7 @@ mod tests {
             FakeTimerCtxExt as _,
         },
         device::{
+            ethernet::{EthernetCreationProperties, EthernetLinkDevice},
             testutil::{update_ipv6_configuration, FakeDeviceId},
             FrameDestination,
         },
@@ -2771,18 +2772,22 @@ mod tests {
         const TWO_HOURS: NonZeroDuration =
             const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(TWO_HOURS_AS_SECS as u64));
 
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let mut core_ctx = &core_ctx;
-        let device_id = crate::device::add_ethernet_device(
-            core_ctx,
-            local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device_id = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             core_ctx,
-            &mut bindings_ctx,
+            bindings_ctx,
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: Some(SlaacConfiguration {
@@ -2799,7 +2804,7 @@ mod tests {
         )
         .unwrap();
 
-        let set_ip_enabled = |core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        let set_ip_enabled = |core_ctx: &mut crate::testutil::FakeCoreCtx,
                               bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                               enabled| {
             let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
@@ -2816,13 +2821,13 @@ mod tests {
             )
             .unwrap();
         };
-        set_ip_enabled(&mut core_ctx, &mut bindings_ctx, true /* enabled */);
+        set_ip_enabled(core_ctx, bindings_ctx, true /* enabled */);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         // Generate stable and temporary SLAAC addresses.
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             FrameDestination::Multicast,
             build_slaac_ra_packet(
@@ -2923,7 +2928,7 @@ mod tests {
         ]);
 
         // Disabling IP should remove all the SLAAC addresses.
-        set_ip_enabled(&mut core_ctx, &mut bindings_ctx, false /* enabled */);
+        set_ip_enabled(core_ctx, bindings_ctx, false /* enabled */);
         let addrs = with_assigned_ipv6_addr_subnets(
             &mut CoreCtx::new_deprecated(core_ctx),
             &device_id,

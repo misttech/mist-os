@@ -4,7 +4,6 @@
 
 use alloc::{collections::HashMap, vec::Vec};
 use core::{
-    convert::Infallible as Never,
     fmt::{Debug, Display},
     marker::PhantomData,
 };
@@ -13,35 +12,30 @@ use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6, Ipv6Addr, Mtu},
-    BroadcastAddr, MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness as _,
+    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6, Ipv6Addr},
+    BroadcastAddr, MulticastAddr, NonMappedAddr, SpecifiedAddr, Witness as _,
 };
 use packet::{Buf, BufferMut};
 use smallvec::SmallVec;
-use tracing::{debug, trace};
+use tracing::trace;
 
 use crate::{
     context::{CounterContext, InstantContext},
     counters::Counter,
     device::{
         arp::ArpCounters,
-        ethernet::{
-            self, EthernetDeviceStateBuilder, EthernetLinkDevice, EthernetTimerId,
-            MaxEthernetFrameSize,
-        },
+        ethernet::{self, EthernetLinkDevice, EthernetTimerId},
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
             StrongId, WeakId,
         },
-        loopback::{
-            LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackPrimaryDeviceId,
-        },
+        loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
         queue::{
             rx::ReceiveQueueApi,
             tx::{TransmitQueueApi, TransmitQueueConfiguration},
         },
         socket::{self, HeldSockets},
-        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
+        state::DeviceStateSpec,
     },
     error::{self, ExistsError, NotSupportedError, SetIpAddressPropertiesError},
     ip::{
@@ -58,7 +52,7 @@ use crate::{
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
     },
-    sync::{PrimaryRc, RwLock},
+    sync::RwLock,
     trace_duration,
     work_queue::WorkQueueReport,
     BindingsContext, CoreCtx, StackState, SyncCtx,
@@ -221,7 +215,7 @@ pub fn inspect_devices<BC: BindingsContext, V: DevicesVisitor<BC>>(
     visitor.visit_devices(devices)
 }
 
-pub(crate) enum Ipv6DeviceLinkLayerAddr {
+pub enum Ipv6DeviceLinkLayerAddr {
     Mac(Mac),
     // Add other link-layer address types as needed.
 }
@@ -444,6 +438,8 @@ impl<BC: BindingsContext, L> CounterContext<DeviceCounters> for CoreCtx<'_, BC, 
 ///
 /// This is only enabled in debug builds; in non-debug builds, all
 /// `OriginTracker` instances are identical so all operations are no-ops.
+// TODO(https://fxbug.dev/320078167): Move this and OriginTrackerContext out of
+// the device module and apply to more places.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OriginTracker(#[cfg(debug_assertions)] u64);
 
@@ -467,6 +463,28 @@ impl OriginTracker {
     }
 }
 
+/// A trait abstracting a context containing an [`OriginTracker`].
+///
+/// This allows API structs to extract origin from contexts when creating
+/// resources.
+pub trait OriginTrackerContext {
+    /// Gets the origin tracker for this context.
+    fn origin_tracker(&mut self) -> OriginTracker;
+}
+
+/// A context providing facilities to store and remove primary device IDs.
+///
+/// This allows the device layer APIs to be written generically on `D`.
+pub trait DeviceCollectionContext<D: Device + DeviceStateSpec, BT: DeviceLayerTypes>:
+    DeviceIdContext<D>
+{
+    /// Adds `device` to the device collection.
+    fn insert(&mut self, device: BasePrimaryDeviceId<D, BT>);
+
+    /// Removes `device` from the collection, if it exists.
+    fn remove(&mut self, device: &BaseDeviceId<D, BT>) -> Option<BasePrimaryDeviceId<D, BT>>;
+}
+
 impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
     DeviceLayerState<BC>
 {
@@ -479,70 +497,6 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
             counters: Default::default(),
             arp_counters: Default::default(),
         }
-    }
-
-    /// Add a new ethernet device to the device layer.
-    ///
-    /// `add` adds a new `EthernetDeviceState` with the given MAC address and
-    /// maximum frame size. The frame size is the limit on the size of the data
-    /// payload and the header but not the FCS.
-    pub(crate) fn add_ethernet_device<
-        F: FnOnce() -> (BC::EthernetDeviceState, BC::DeviceIdentifier),
-    >(
-        &self,
-        mac: UnicastAddr<Mac>,
-        max_frame_size: MaxEthernetFrameSize,
-        metric: RawMetric,
-        bindings_state: F,
-    ) -> EthernetDeviceId<BC> {
-        let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
-
-        let (external_state, bindings_id) = bindings_state();
-        let primary = EthernetPrimaryDeviceId::new(
-            IpLinkDeviceStateInner::new(
-                EthernetDeviceStateBuilder::new(mac, max_frame_size).build(),
-                metric,
-                self.origin.clone(),
-            ),
-            external_state,
-            bindings_id,
-        );
-        let id = primary.clone_strong();
-
-        assert!(ethernet.insert(id.clone(), primary).is_none());
-        debug!("adding Ethernet device {:?} with MTU {:?}", id, max_frame_size);
-        id
-    }
-
-    /// Adds a new loopback device to the device layer.
-    pub(crate) fn add_loopback_device<
-        F: FnOnce() -> (BC::LoopbackDeviceState, BC::DeviceIdentifier),
-    >(
-        &self,
-        mtu: Mtu,
-        metric: RawMetric,
-        bindings_state: F,
-    ) -> Result<LoopbackDeviceId<BC>, ExistsError> {
-        let Devices { ethernet: _, loopback } = &mut *self.devices.write();
-
-        if let Some(_) = loopback {
-            return Err(ExistsError);
-        }
-
-        let (external_state, bindings_id) = bindings_state();
-        let primary = LoopbackPrimaryDeviceId::new(
-            IpLinkDeviceStateInner::new(LoopbackDeviceState::new(mtu), metric, self.origin.clone()),
-            external_state,
-            bindings_id,
-        );
-
-        let id = primary.clone_strong();
-
-        *loopback = Some(primary);
-
-        debug!("added loopback device");
-
-        Ok(id)
     }
 }
 
@@ -684,178 +638,6 @@ pub fn handle_queued_rx_packets<BC: BindingsContext>(
         bindings_ctx,
         device,
     )
-}
-
-/// The result of removing a device from core.
-#[derive(Debug)]
-pub enum RemoveDeviceResult<R, D> {
-    /// The device was synchronously removed and no more references to it exist.
-    Removed(R),
-    /// The device was marked for destruction but there are still references to
-    /// it in existence. The provided receiver can be polled on to observe
-    /// device destruction completion.
-    Deferred(D),
-}
-
-impl<R> RemoveDeviceResult<R, Never> {
-    /// A helper function to unwrap a [`RemovedDeviceResult`] that can never be
-    /// [`RemovedDeviceResult::Deferred`].
-    pub fn into_removed(self) -> R {
-        match self {
-            Self::Removed(r) => r,
-            Self::Deferred(never) => match never {},
-        }
-    }
-}
-
-/// An alias for [`RemoveDeviceResult`] that extracts the receiver type from the
-/// bindings context.
-pub type RemoveDeviceResultWithContext<S, BT> =
-    RemoveDeviceResult<S, <BT as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
-
-fn remove_device<T: DeviceStateSpec, BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: BaseDeviceId<T, BC>,
-    remove: impl FnOnce(
-        &mut Devices<BC>,
-        BaseDeviceId<T, BC>,
-    ) -> (BasePrimaryDeviceId<T, BC>, BaseDeviceId<T, BC>),
-) -> RemoveDeviceResultWithContext<T::External<BC>, BC>
-where
-    BaseDeviceId<T, BC>: Into<DeviceId<BC>>,
-{
-    // Start cleaning up the device by disabling IP state. This removes timers
-    // for the device that would otherwise hold references to defunct device
-    // state.
-    let debug_references = {
-        let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-
-        let device = device.clone().into();
-
-        crate::ip::device::clear_ipv4_device_state(&mut core_ctx, bindings_ctx, &device);
-        crate::ip::device::clear_ipv6_device_state(&mut core_ctx, bindings_ctx, &device);
-        device.downgrade().debug_references()
-    };
-
-    tracing::debug!("removing {device:?}");
-    let (primary, strong) = {
-        let mut devices = core_ctx.state.device.devices.write();
-        remove(&mut *devices, device)
-    };
-    assert_eq!(strong, primary);
-    core::mem::drop(strong);
-    match PrimaryRc::unwrap_or_notify_with(primary.into_inner(), || {
-        let (notifier, receiver) =
-            BC::new_reference_notifier::<T::External<BC>, _>(debug_references);
-        let notifier = crate::sync::MapRcNotifier::new(notifier, |state: BaseDeviceState<_, _>| {
-            state.external_state
-        });
-        (notifier, receiver)
-    }) {
-        Ok(s) => RemoveDeviceResult::Removed(s.external_state),
-        Err(receiver) => RemoveDeviceResult::Deferred(receiver),
-    }
-}
-
-/// Removes an Ethernet device from the device layer.
-///
-/// # Panics
-///
-/// Panics if the caller holds strong device IDs for `device`.
-pub fn remove_ethernet_device<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: EthernetDeviceId<BC>,
-) -> RemoveDeviceResultWithContext<BC::EthernetDeviceState, BC> {
-    remove_device(core_ctx, bindings_ctx, device, |devices, id| {
-        let removed = devices
-            .ethernet
-            .remove(&id)
-            .unwrap_or_else(|| panic!("no such Ethernet device: {id:?}"));
-
-        (removed, id)
-    })
-}
-
-/// Removes the Loopback device from the device layer.
-///
-/// # Panics
-///
-/// Panics if the caller holds strong device IDs for `device`.
-pub fn remove_loopback_device<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: LoopbackDeviceId<BC>,
-) -> RemoveDeviceResultWithContext<BC::LoopbackDeviceState, BC> {
-    remove_device(core_ctx, bindings_ctx, device, |devices, id| {
-        let removed = devices.loopback.take().expect("loopback device not installed");
-        (removed, id)
-    })
-}
-
-/// Adds a new Ethernet device to the stack.
-pub fn add_ethernet_device_with_state<
-    BC: BindingsContext,
-    F: FnOnce() -> (BC::EthernetDeviceState, BC::DeviceIdentifier),
->(
-    core_ctx: &SyncCtx<BC>,
-    mac: UnicastAddr<Mac>,
-    max_frame_size: MaxEthernetFrameSize,
-    metric: RawMetric,
-    bindings_state: F,
-) -> EthernetDeviceId<BC> {
-    core_ctx.state.device.add_ethernet_device(mac, max_frame_size, metric, bindings_state)
-}
-
-/// Adds a new Ethernet device to the stack.
-#[cfg(any(test, feature = "testutils"))]
-pub(crate) fn add_ethernet_device<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    mac: UnicastAddr<Mac>,
-    max_frame_size: MaxEthernetFrameSize,
-    metric: RawMetric,
-) -> EthernetDeviceId<BC>
-where
-    BC::EthernetDeviceState: Default,
-    BC::DeviceIdentifier: Default,
-{
-    add_ethernet_device_with_state(core_ctx, mac, max_frame_size, metric, Default::default)
-}
-
-/// Adds a new loopback device to the stack.
-///
-/// Adds a new loopback device to the stack. Only one loopback device may be
-/// installed at any point in time, so if there is one already, an error is
-/// returned.
-pub fn add_loopback_device_with_state<
-    BC: BindingsContext,
-    F: FnOnce() -> (BC::LoopbackDeviceState, BC::DeviceIdentifier),
->(
-    core_ctx: &SyncCtx<BC>,
-    mtu: Mtu,
-    metric: RawMetric,
-    bindings_state: F,
-) -> Result<LoopbackDeviceId<BC>, crate::error::ExistsError> {
-    core_ctx.state.device.add_loopback_device(mtu, metric, bindings_state)
-}
-
-/// Adds a new loopback device to the stack.
-///
-/// Adds a new loopback device to the stack. Only one loopback device may be
-/// installed at any point in time, so if there is one already, an error is
-/// returned.
-#[cfg(test)]
-pub(crate) fn add_loopback_device<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    mtu: Mtu,
-    metric: RawMetric,
-) -> Result<LoopbackDeviceId<BC>, crate::error::ExistsError>
-where
-    BC::LoopbackDeviceState: Default,
-    BC::DeviceIdentifier: Default,
-{
-    add_loopback_device_with_state(core_ctx, mtu, metric, Default::default)
 }
 
 /// Receive a device layer frame from the network.
@@ -1281,19 +1063,26 @@ mod tests {
 
     use const_unwrap::const_unwrap_option;
     use net_declare::net_mac;
-    use net_types::ip::{AddrSubnet, AddrSubnetEither};
+    use net_types::{
+        ip::{AddrSubnet, AddrSubnetEither, Mtu},
+        UnicastAddr,
+    };
     use test_case::test_case;
 
     use super::*;
     use crate::{
         context::testutil::FakeInstant,
+        device::{
+            ethernet::{EthernetCreationProperties, MaxEthernetFrameSize},
+            loopback::LoopbackCreationProperties,
+        },
         error,
         ip::device::{
             slaac::SlaacConfiguration,
             state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
             IpDeviceConfigurationUpdate,
         },
-        testutil::{Ctx, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
+        testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
     };
 
     #[test]
@@ -1338,34 +1127,36 @@ mod tests {
     #[test]
     fn test_no_default_routes() {
         let mut ctx = crate::testutil::FakeCtx::default();
-
-        let _loopback_device: LoopbackDeviceId<_> = crate::device::add_loopback_device(
-            &ctx.core_ctx,
-            Mtu::new(55),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .expect("error adding loopback device");
+        let _loopback_device: LoopbackDeviceId<_> =
+            ctx.core_api().device::<LoopbackDevice>().add_device_with_default_state(
+                LoopbackCreationProperties { mtu: Mtu::new(55) },
+                DEFAULT_INTERFACE_METRIC,
+            );
 
         assert_eq!(ctx.core_api().routes_any().get_all_routes(), []);
-        let _ethernet_device: EthernetDeviceId<_> = crate::device::add_ethernet_device(
-            &ctx.core_ctx,
-            UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
-            MaxEthernetFrameSize::MIN,
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let _ethernet_device: EthernetDeviceId<_> =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
+                    max_frame_size: MaxEthernetFrameSize::MIN,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
         assert_eq!(ctx.core_api().routes_any().get_all_routes(), []);
     }
 
     #[test]
     fn remove_ethernet_device_disables_timers() {
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
+        let mut ctx = crate::testutil::FakeCtx::default();
 
-        let ethernet_device = crate::device::add_ethernet_device(
-            &core_ctx,
-            UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
-            MaxEthernetFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let ethernet_device =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
+                    max_frame_size: MaxEthernetFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
 
         {
             let device = ethernet_device.clone().into();
@@ -1378,16 +1169,16 @@ mod tests {
             });
             let _: Ipv4DeviceConfigurationUpdate =
                 crate::device::testutil::update_ipv4_configuration(
-                    &core_ctx,
-                    &mut bindings_ctx,
+                    &ctx.core_ctx,
+                    &mut ctx.bindings_ctx,
                     &device,
                     Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
                 )
                 .unwrap();
             let _: Ipv6DeviceConfigurationUpdate =
                 crate::device::testutil::update_ipv6_configuration(
-                    &core_ctx,
-                    &mut bindings_ctx,
+                    &ctx.core_ctx,
+                    &mut ctx.bindings_ctx,
                     &device,
                     Ipv6DeviceConfigurationUpdate {
                         max_router_solicitations: Some(Some(const_unwrap_option(NonZeroU8::new(
@@ -1404,38 +1195,39 @@ mod tests {
                 .unwrap();
         }
 
-        crate::device::remove_ethernet_device(&core_ctx, &mut bindings_ctx, ethernet_device)
-            .into_removed();
-        assert_eq!(bindings_ctx.timer_ctx().timers(), &[]);
+        ctx.core_api().device().remove_device(ethernet_device).into_removed();
+        assert_eq!(ctx.bindings_ctx.timer_ctx().timers(), &[]);
     }
 
     fn add_ethernet(
-        core_ctx: &mut &crate::testutil::FakeCoreCtx,
-        _bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        ctx: &mut crate::testutil::FakeCtx,
     ) -> DeviceId<crate::testutil::FakeBindingsCtx> {
-        crate::device::add_ethernet_device(
-            core_ctx,
-            Ipv6::FAKE_CONFIG.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into()
+        ctx.core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: Ipv6::FAKE_CONFIG.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into()
     }
 
     fn add_loopback(
-        core_ctx: &mut &crate::testutil::FakeCoreCtx,
-        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        ctx: &mut crate::testutil::FakeCtx,
     ) -> DeviceId<crate::testutil::FakeBindingsCtx> {
-        let device = crate::device::add_loopback_device(
-            core_ctx,
-            Ipv6::MINIMUM_LINK_MTU,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .unwrap()
-        .into();
+        let device = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: Ipv6::MINIMUM_LINK_MTU },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
         crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &device,
             AddrSubnet::from_witness(Ipv6::LOOPBACK_ADDRESS, Ipv6::LOOPBACK_SUBNET.prefix())
                 .unwrap(),
@@ -1475,10 +1267,7 @@ mod tests {
     #[test_case(add_loopback, check_transmitted_loopback, true; "loopback with queue")]
     #[test_case(add_loopback, check_transmitted_loopback, false; "loopback without queue")]
     fn tx_queue(
-        add_device: fn(
-            &mut &crate::testutil::FakeCoreCtx,
-            &mut crate::testutil::FakeBindingsCtx,
-        ) -> DeviceId<crate::testutil::FakeBindingsCtx>,
+        add_device: fn(&mut crate::testutil::FakeCtx) -> DeviceId<crate::testutil::FakeBindingsCtx>,
         check_transmitted: fn(
             &mut crate::testutil::FakeBindingsCtx,
             &DeviceId<crate::testutil::FakeBindingsCtx>,
@@ -1486,22 +1275,22 @@ mod tests {
         ),
         with_tx_queue: bool,
     ) {
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let mut core_ctx = &core_ctx;
-        let device = add_device(&mut core_ctx, &mut bindings_ctx);
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = add_device(&mut ctx);
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
         if with_tx_queue {
             crate::device::set_tx_queue_configuration(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device,
                 TransmitQueueConfiguration::Fifo,
             );
         }
 
         let _: Ipv6DeviceConfigurationUpdate = crate::device::testutil::update_ipv6_configuration(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             Ipv6DeviceConfigurationUpdate {
                 // Enable DAD so that the auto-generated address triggers a DAD
@@ -1523,34 +1312,44 @@ mod tests {
         .unwrap();
 
         if with_tx_queue {
-            check_transmitted(&mut bindings_ctx, &device, 0);
+            check_transmitted(bindings_ctx, &device, 0);
             assert_eq!(
                 core::mem::take(&mut bindings_ctx.state_mut().tx_available),
                 [device.clone()]
             );
             assert_eq!(
-                crate::device::transmit_queued_tx_frames(&core_ctx, &mut bindings_ctx, &device),
+                crate::device::transmit_queued_tx_frames(core_ctx, bindings_ctx, &device),
                 Ok(WorkQueueReport::AllDone)
             );
         }
 
-        check_transmitted(&mut bindings_ctx, &device, 1);
+        check_transmitted(bindings_ctx, &device, 1);
         assert_eq!(bindings_ctx.state_mut().tx_available, <[DeviceId::<_>; 0]>::default());
+        match device {
+            DeviceId::Ethernet(eth) => ctx.core_api().device().remove_device(eth).into_removed(),
+            DeviceId::Loopback(lo) => ctx.core_api().device().remove_device(lo).into_removed(),
+        }
     }
 
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt>(
         addr_config: Option<I::ManualAddressConfig<FakeInstant>>,
     ) {
         let config = I::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let ip = I::get_other_ip_address(1).get();
         let prefix = config.subnet.prefix();
@@ -1558,15 +1357,15 @@ mod tests {
 
         // IP doesn't exist initially.
         assert_eq!(
-            get_all_ip_addr_subnets(&core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             None
         );
 
         // Add IP (OK).
         if let Some(addr_config) = addr_config {
             add_ip_addr_subnet(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device,
                 AddrSubnetAndManualConfigEither::new::<I>(
                     AddrSubnet::new(ip, prefix).unwrap(),
@@ -1575,51 +1374,49 @@ mod tests {
             )
             .unwrap();
         } else {
-            let () =
-                add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, addr_subnet).unwrap();
+            let () = add_ip_addr_subnet(core_ctx, bindings_ctx, &device, addr_subnet).unwrap();
         }
         assert_eq!(
-            get_all_ip_addr_subnets(&core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             Some(addr_subnet)
         );
 
         // Add IP again (already exists).
         assert_eq!(
-            add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, addr_subnet).unwrap_err(),
+            add_ip_addr_subnet(core_ctx, bindings_ctx, &device, addr_subnet).unwrap_err(),
             AddIpAddrSubnetError::Exists,
         );
         assert_eq!(
-            get_all_ip_addr_subnets(&core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             Some(addr_subnet)
         );
 
         // Add IP with different subnet (already exists).
         let wrong_addr_subnet = AddrSubnetEither::new(ip.into(), prefix - 1).unwrap();
         assert_eq!(
-            add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, wrong_addr_subnet)
-                .unwrap_err(),
+            add_ip_addr_subnet(core_ctx, bindings_ctx, &device, wrong_addr_subnet).unwrap_err(),
             AddIpAddrSubnetError::Exists,
         );
         assert_eq!(
-            get_all_ip_addr_subnets(&core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             Some(addr_subnet)
         );
 
         let ip: SpecifiedAddr<IpAddr> = SpecifiedAddr::new(ip.into()).unwrap();
         // Del IP (ok).
-        let () = del_ip_addr(&core_ctx, &mut bindings_ctx, &device, ip).unwrap();
+        let () = del_ip_addr(core_ctx, bindings_ctx, &device, ip).unwrap();
         assert_eq!(
-            get_all_ip_addr_subnets(&core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             None
         );
 
         // Del IP again (not found).
         assert_eq!(
-            del_ip_addr(&core_ctx, &mut bindings_ctx, &device, ip).unwrap_err(),
+            del_ip_addr(core_ctx, bindings_ctx, &device, ip).unwrap_err(),
             error::NotFoundError
         );
         assert_eq!(
-            get_all_ip_addr_subnets(&core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
             None
         );
     }

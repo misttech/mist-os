@@ -140,9 +140,7 @@ impl<DeviceId, BC: TimerContext<DadTimerId<DeviceId>> + EventContext<DadEvent<De
 }
 
 /// An implementation for Duplicate Address Detection.
-pub(crate) trait DadHandler<BC>:
-    DeviceIdContext<AnyDevice> + IpDeviceAddressIdContext<Ipv6>
-{
+pub trait DadHandler<BC>: DeviceIdContext<AnyDevice> + IpDeviceAddressIdContext<Ipv6> {
     /// Starts duplicate address detection.
     ///
     /// # Panics

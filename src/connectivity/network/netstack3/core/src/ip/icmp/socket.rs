@@ -782,6 +782,7 @@ mod tests {
     use super::*;
     use crate::{
         api::CoreApi,
+        device::loopback::{LoopbackCreationProperties, LoopbackDevice},
         ip::icmp::tests::FakeIcmpCtx,
         testutil::{handle_queued_rx_packets, Ctx, TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
@@ -844,16 +845,15 @@ mod tests {
             IcmpConnectionType::Remote => (config.remote_ip, REMOTE_CTX_NAME),
         };
 
-        let loopback_device_id =
-            net.with_context(LOCAL_CTX_NAME, |Ctx { core_ctx, bindings_ctx: _ }| {
-                crate::device::add_loopback_device(
-                    &&*core_ctx,
-                    Mtu::new(u16::MAX as u32),
+        let loopback_device_id = net.with_context(LOCAL_CTX_NAME, |ctx| {
+            ctx.core_api()
+                .device::<LoopbackDevice>()
+                .add_device_with_default_state(
+                    LoopbackCreationProperties { mtu: Mtu::new(u16::MAX as u32) },
                     DEFAULT_INTERFACE_METRIC,
                 )
-                .expect("create the loopback interface")
                 .into()
-            });
+        });
 
         let echo_body = vec![1, 2, 3, 4];
         let buf = Buf::new(echo_body.clone(), ..)

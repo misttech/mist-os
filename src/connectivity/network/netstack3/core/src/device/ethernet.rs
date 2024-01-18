@@ -490,47 +490,22 @@ impl MaxEthernetFrameSize {
     }
 }
 
-/// Builder for [`EthernetDeviceState`].
-pub(crate) struct EthernetDeviceStateBuilder {
-    mac: UnicastAddr<Mac>,
-    max_frame_size: MaxEthernetFrameSize,
-}
-
-impl EthernetDeviceStateBuilder {
-    /// Create a new `EthernetDeviceStateBuilder`.
-    pub(crate) fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxEthernetFrameSize) -> Self {
-        // TODO(https://fxbug.dev/121480): Add a minimum frame size for all
-        // Ethernet devices such that you can't create an `EthernetDeviceState`
-        // with a `MaxEthernetFrameSize` smaller than the minimum. The absolute minimum
-        // needs to be at least the minimum body size of an Ethernet frame. For
-        // IPv6-capable devices, the minimum needs to be higher - the frame size
-        // implied by the IPv6 minimum MTU. The easy path is to simply use that
-        // frame size as the minimum in all cases, although we may at some point
-        // want to figure out how to configure devices which don't support IPv6,
-        // and allow smaller frame sizes for those devices.
-        //
-        // A few questions:
-        // - How do we wire error information back up the call stack? Should
-        //   this just return a Result or something?
-        Self { mac, max_frame_size }
-    }
-
-    /// Build the `EthernetDeviceState` from this builder.
-    pub(super) fn build<I: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>>(
-        self,
-    ) -> EthernetDeviceState<I, N> {
-        let Self { mac, max_frame_size } = self;
-
-        EthernetDeviceState {
-            ipv4_arp: Default::default(),
-            ipv6_nud: Default::default(),
-            ipv4_nud_config: Default::default(),
-            ipv6_nud_config: Default::default(),
-            static_state: StaticEthernetDeviceState { mac, max_frame_size },
-            dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
-            tx_queue: Default::default(),
-        }
-    }
+/// Base properties to create a new Ethernet device.
+#[derive(Debug)]
+pub struct EthernetCreationProperties {
+    /// The device's MAC address.
+    pub mac: UnicastAddr<Mac>,
+    /// The maximum frame size this device supports.
+    // TODO(https://fxbug.dev/121480): Add a minimum frame size for all
+    // Ethernet devices such that you can't create an `EthernetDeviceState`
+    // with a `MaxEthernetFrameSize` smaller than the minimum. The absolute minimum
+    // needs to be at least the minimum body size of an Ethernet frame. For
+    // IPv6-capable devices, the minimum needs to be higher - the frame size
+    // implied by the IPv6 minimum MTU. The easy path is to simply use that
+    // frame size as the minimum in all cases, although we may at some point
+    // want to figure out how to configure devices which don't support IPv6,
+    // and allow smaller frame sizes for those devices.
+    pub max_frame_size: MaxEthernetFrameSize,
 }
 
 pub(crate) struct DynamicEthernetDeviceState {
@@ -1411,6 +1386,21 @@ impl DeviceStateSpec for EthernetLinkDevice {
         <BT as LinkResolutionContext<EthernetLinkDevice>>::Notifier,
     >;
     type External<BT: DeviceLayerTypes> = BT::EthernetDeviceState;
+    type CreationProperties = EthernetCreationProperties;
+
+    fn new_link_state<BT: DeviceLayerTypes>(
+        EthernetCreationProperties { mac, max_frame_size }: Self::CreationProperties,
+    ) -> Self::Link<BT> {
+        EthernetDeviceState {
+            ipv4_arp: Default::default(),
+            ipv6_nud: Default::default(),
+            ipv4_nud_config: Default::default(),
+            ipv6_nud_config: Default::default(),
+            static_state: StaticEthernetDeviceState { mac, max_frame_size },
+            dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
+            tx_queue: Default::default(),
+        }
+    }
     const IS_LOOPBACK: bool = false;
     const DEBUG_TYPE: &'static str = "Ethernet";
 }
@@ -1928,14 +1918,16 @@ mod tests {
         // Should only receive a frame if the device is enabled.
 
         let config = I::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let eth_device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let eth_device =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         let device = eth_device.clone().into();
         let mut bytes = match I::VERSION {
             IpVersion::V4 => dns_request_v4::ETHERNET_FRAME,
@@ -1948,34 +1940,32 @@ mod tests {
         bytes[0..6].copy_from_slice(&mac_bytes);
 
         let expected_received = if enable {
-            crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+            crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
             1
         } else {
             0
         };
 
-        crate::device::receive_frame(
-            &core_ctx,
-            &mut bindings_ctx,
-            &eth_device,
-            Buf::new(bytes, ..),
-        );
+        crate::device::receive_frame(core_ctx, bindings_ctx, &eth_device, Buf::new(bytes, ..));
 
         assert_eq!(core_ctx.state.ip_counters::<I>().receive_ip_packet.get(), expected_received);
     }
 
     #[test]
     fn initialize_once() {
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            FAKE_CONFIG_V4.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: FAKE_CONFIG_V4.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &device);
     }
 
     fn is_forwarding_enabled<I: Ip>(
@@ -2226,16 +2216,22 @@ mod tests {
     #[ip_test]
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt>() {
         let config = I::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let mut ctx = crate::testutil::FakeCtx::default();
+
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let ip1 = I::get_other_ip_address(1);
         let ip2 = I::get_other_ip_address(2);
@@ -2245,65 +2241,64 @@ mod tests {
         let as1 = AddrSubnet::new(ip1.get(), prefix).unwrap();
         let as2 = AddrSubnet::new(ip2.get(), prefix).unwrap();
 
-        assert!(!contains_addr(&core_ctx, &device, ip1));
-        assert!(!contains_addr(&core_ctx, &device, ip2));
-        assert!(!contains_addr(&core_ctx, &device, ip3));
+        assert!(!contains_addr(core_ctx, &device, ip1));
+        assert!(!contains_addr(core_ctx, &device, ip2));
+        assert!(!contains_addr(core_ctx, &device, ip3));
 
         // Add ip1 (ok)
-        crate::device::add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, as1).unwrap();
-        assert!(contains_addr(&core_ctx, &device, ip1));
-        assert!(!contains_addr(&core_ctx, &device, ip2));
-        assert!(!contains_addr(&core_ctx, &device, ip3));
+        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, as1).unwrap();
+        assert!(contains_addr(core_ctx, &device, ip1));
+        assert!(!contains_addr(core_ctx, &device, ip2));
+        assert!(!contains_addr(core_ctx, &device, ip3));
 
         // Add ip2 (ok)
-        crate::device::add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, as2).unwrap();
-        assert!(contains_addr(&core_ctx, &device, ip1));
-        assert!(contains_addr(&core_ctx, &device, ip2));
-        assert!(!contains_addr(&core_ctx, &device, ip3));
+        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, as2).unwrap();
+        assert!(contains_addr(core_ctx, &device, ip1));
+        assert!(contains_addr(core_ctx, &device, ip2));
+        assert!(!contains_addr(core_ctx, &device, ip3));
 
         // Del ip1 (ok)
-        crate::device::del_ip_addr(&core_ctx, &mut bindings_ctx, &device, ip1).unwrap();
-        assert!(!contains_addr(&core_ctx, &device, ip1));
-        assert!(contains_addr(&core_ctx, &device, ip2));
-        assert!(!contains_addr(&core_ctx, &device, ip3));
+        crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, ip1).unwrap();
+        assert!(!contains_addr(core_ctx, &device, ip1));
+        assert!(contains_addr(core_ctx, &device, ip2));
+        assert!(!contains_addr(core_ctx, &device, ip3));
 
         // Del ip1 again (ip1 not found)
         assert_eq!(
-            crate::device::del_ip_addr(&core_ctx, &mut bindings_ctx, &device, ip1),
+            crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, ip1),
             Err(NotFoundError)
         );
-        assert!(!contains_addr(&core_ctx, &device, ip1));
-        assert!(contains_addr(&core_ctx, &device, ip2));
-        assert!(!contains_addr(&core_ctx, &device, ip3));
+        assert!(!contains_addr(core_ctx, &device, ip1));
+        assert!(contains_addr(core_ctx, &device, ip2));
+        assert!(!contains_addr(core_ctx, &device, ip3));
 
         // Add ip2 again (ip2 already exists)
         assert_eq!(
-            crate::device::add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, as2)
-                .unwrap_err(),
+            crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, as2).unwrap_err(),
             AddIpAddrSubnetError::Exists,
         );
-        assert!(!contains_addr(&core_ctx, &device, ip1));
-        assert!(contains_addr(&core_ctx, &device, ip2));
-        assert!(!contains_addr(&core_ctx, &device, ip3));
+        assert!(!contains_addr(core_ctx, &device, ip1));
+        assert!(contains_addr(core_ctx, &device, ip2));
+        assert!(!contains_addr(core_ctx, &device, ip3));
 
         // Add ip2 with different subnet (ip2 already exists)
         assert_eq!(
             crate::device::add_ip_addr_subnet(
-                &core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &device,
                 AddrSubnet::new(ip2.get(), prefix - 1).unwrap()
             )
             .unwrap_err(),
             AddIpAddrSubnetError::Exists,
         );
-        assert!(!contains_addr(&core_ctx, &device, ip1));
-        assert!(contains_addr(&core_ctx, &device, ip2));
-        assert!(!contains_addr(&core_ctx, &device, ip3));
+        assert!(!contains_addr(core_ctx, &device, ip1));
+        assert!(contains_addr(core_ctx, &device, ip2));
+        assert!(!contains_addr(core_ctx, &device, ip3));
     }
 
     fn receive_simple_ip_packet_test<A: IpAddress>(
-        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        core_ctx: &mut crate::testutil::FakeCoreCtx,
         bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         src_ip: A,
@@ -2340,122 +2335,70 @@ mod tests {
     #[ip_test]
     fn test_multiple_ip_addresses<I: Ip + TestIpExt>() {
         let config = I::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let mut core_ctx = &core_ctx;
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let ip1 = I::get_other_ip_address(1);
         let ip2 = I::get_other_ip_address(2);
         let from_ip = I::get_other_ip_address(3).get();
 
-        assert!(!contains_addr(&core_ctx, &device, ip1));
-        assert!(!contains_addr(&core_ctx, &device, ip2));
+        assert!(!contains_addr(core_ctx, &device, ip1));
+        assert!(!contains_addr(core_ctx, &device, ip2));
 
         // Should not receive packets on any IP.
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip1.get(),
-            0,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip2.get(),
-            0,
-        );
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 0);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 0);
 
         // Add ip1 to device.
         crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             AddrSubnet::new(ip1.get(), I::Addr::BYTES * 8).unwrap(),
         )
         .unwrap();
-        assert!(contains_addr(&core_ctx, &device, ip1));
-        assert!(!contains_addr(&core_ctx, &device, ip2));
+        assert!(contains_addr(core_ctx, &device, ip1));
+        assert!(!contains_addr(core_ctx, &device, ip2));
 
         // Should receive packets on ip1 but not ip2
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip1.get(),
-            1,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip2.get(),
-            1,
-        );
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 1);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 1);
 
         // Add ip2 to device.
         crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             AddrSubnet::new(ip2.get(), I::Addr::BYTES * 8).unwrap(),
         )
         .unwrap();
-        assert!(contains_addr(&core_ctx, &device, ip1));
-        assert!(contains_addr(&core_ctx, &device, ip2));
+        assert!(contains_addr(core_ctx, &device, ip1));
+        assert!(contains_addr(core_ctx, &device, ip2));
 
         // Should receive packets on both ips
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip1.get(),
-            2,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip2.get(),
-            3,
-        );
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 2);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 3);
 
         // Remove ip1
-        crate::device::del_ip_addr(&core_ctx, &mut bindings_ctx, &device, ip1).unwrap();
-        assert!(!contains_addr(&core_ctx, &device, ip1));
-        assert!(contains_addr(&core_ctx, &device, ip2));
+        crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, ip1).unwrap();
+        assert!(!contains_addr(core_ctx, &device, ip1));
+        assert!(contains_addr(core_ctx, &device, ip2));
 
         // Should receive packets on ip2
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip1.get(),
-            3,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip2.get(),
-            4,
-        );
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 3);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 4);
     }
 
     fn join_ip_multicast<A: IpAddress, BC: BindingsContext>(
@@ -2508,45 +2451,50 @@ mod tests {
     #[ip_test]
     fn test_ip_join_leave_multicast_addr_ref_count<I: Ip + TestIpExt>() {
         let config = I::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let mut ctx = crate::testutil::FakeCtx::default();
+
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let multicast_addr = I::get_multicast_addr(3);
 
         // Should not be in the multicast group yet.
-        assert!(!is_in_ip_multicast(&core_ctx, &device, multicast_addr));
+        assert!(!is_in_ip_multicast(core_ctx, &device, multicast_addr));
 
         // Join the multicast group.
-        join_ip_multicast(&core_ctx, &mut bindings_ctx, &device, multicast_addr);
-        assert!(is_in_ip_multicast(&core_ctx, &device, multicast_addr));
+        join_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
+        assert!(is_in_ip_multicast(core_ctx, &device, multicast_addr));
 
         // Leave the multicast group.
-        leave_ip_multicast(&core_ctx, &mut bindings_ctx, &device, multicast_addr);
-        assert!(!is_in_ip_multicast(&core_ctx, &device, multicast_addr));
+        leave_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
+        assert!(!is_in_ip_multicast(core_ctx, &device, multicast_addr));
 
         // Join the multicst group.
-        join_ip_multicast(&core_ctx, &mut bindings_ctx, &device, multicast_addr);
-        assert!(is_in_ip_multicast(&core_ctx, &device, multicast_addr));
+        join_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
+        assert!(is_in_ip_multicast(core_ctx, &device, multicast_addr));
 
         // Join it again...
-        join_ip_multicast(&core_ctx, &mut bindings_ctx, &device, multicast_addr);
-        assert!(is_in_ip_multicast(&core_ctx, &device, multicast_addr));
+        join_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
+        assert!(is_in_ip_multicast(core_ctx, &device, multicast_addr));
 
         // Leave it (still in it because we joined twice).
-        leave_ip_multicast(&core_ctx, &mut bindings_ctx, &device, multicast_addr);
-        assert!(is_in_ip_multicast(&core_ctx, &device, multicast_addr));
+        leave_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
+        assert!(is_in_ip_multicast(core_ctx, &device, multicast_addr));
 
         // Leave it again... (actually left now).
-        leave_ip_multicast(&core_ctx, &mut bindings_ctx, &device, multicast_addr);
-        assert!(!is_in_ip_multicast(&core_ctx, &device, multicast_addr));
+        leave_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
+        assert!(!is_in_ip_multicast(core_ctx, &device, multicast_addr));
     }
 
     /// Test leaving a multicast group a device has not yet joined.
@@ -2559,24 +2507,28 @@ mod tests {
     #[should_panic(expected = "attempted to leave IP multicast group we were not a member of:")]
     fn test_ip_leave_unjoined_multicast<I: Ip + TestIpExt>() {
         let config = I::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let multicast_addr = I::get_multicast_addr(3);
 
         // Should not be in the multicast group yet.
-        assert!(!is_in_ip_multicast(&core_ctx, &device, multicast_addr));
+        assert!(!is_in_ip_multicast(core_ctx, &device, multicast_addr));
 
         // Leave it (this should panic).
-        leave_ip_multicast(&core_ctx, &mut bindings_ctx, &device, multicast_addr);
+        leave_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
     }
 
     #[test]
@@ -2587,16 +2539,20 @@ mod tests {
         // solicited-node multicast address.
 
         let config = Ipv6::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let mut core_ctx = &core_ctx;
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let ip1 = SpecifiedAddr::new(Ipv6Addr::new([0, 0, 0, 1, 0, 0, 0, 1])).unwrap();
         let ip2 = SpecifiedAddr::new(Ipv6Addr::new([0, 0, 0, 2, 0, 0, 0, 1])).unwrap();
@@ -2616,92 +2572,27 @@ mod tests {
         // Add ip1 to the device.
         //
         // Should get packets destined for the solicited node address and ip1.
-        crate::device::add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, addr_sub1)
-            .unwrap();
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip1.get(),
-            1,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip2.get(),
-            1,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            sn_addr,
-            2,
-        );
+        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, addr_sub1).unwrap();
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 1);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 1);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, sn_addr, 2);
 
         // Add ip2 to the device.
         //
         // Should get packets destined for the solicited node address, ip1 and
         // ip2.
-        crate::device::add_ip_addr_subnet(&core_ctx, &mut bindings_ctx, &device, addr_sub2)
-            .unwrap();
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip1.get(),
-            3,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip2.get(),
-            4,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            sn_addr,
-            5,
-        );
+        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, addr_sub2).unwrap();
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 3);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 4);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, sn_addr, 5);
 
         // Remove ip1 from the device.
         //
         // Should get packets destined for the solicited node address and ip2.
-        crate::device::del_ip_addr(&core_ctx, &mut bindings_ctx, &device, ip1).unwrap();
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip1.get(),
-            5,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            ip2.get(),
-            6,
-        );
-        receive_simple_ip_packet_test(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &device,
-            from_ip,
-            sn_addr,
-            7,
-        );
+        crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, ip1).unwrap();
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 5);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 6);
+        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, sn_addr, 7);
     }
 
     #[test]
@@ -2709,22 +2600,24 @@ mod tests {
         // Test that `add_ip_addr_subnet` allows link-local addresses.
 
         let config = Ipv6::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
+        let mut ctx = crate::testutil::FakeCtx::default();
 
-        let eth_device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let eth_device =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
         let device = eth_device.clone().into();
         let eth_device = eth_device.device_state();
 
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         // Enable the device and configure it to generate a link-local address.
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             core_ctx,
-            &mut bindings_ctx,
+            bindings_ctx,
             &device,
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: Some(SlaacConfiguration {
@@ -2753,8 +2646,8 @@ mod tests {
             [config.local_mac.to_ipv6_link_local().addr().get()]
         );
         crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             AddrSubnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), 128).unwrap(),
         )

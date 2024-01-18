@@ -48,7 +48,7 @@ use crate::{
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
         DeviceSendFrameError, FrameDestination,
     },
-    BindingsContext, CoreCtx,
+    BindingsContext, BindingsTypes, CoreCtx,
 };
 
 /// The MAC address corresponding to the loopback interface.
@@ -81,13 +81,21 @@ impl Device for LoopbackDevice {}
 impl DeviceStateSpec for LoopbackDevice {
     type Link<BT: DeviceLayerTypes> = LoopbackDeviceState;
     type External<BT: DeviceLayerTypes> = BT::LoopbackDeviceState;
+    type CreationProperties = LoopbackCreationProperties;
+
+    fn new_link_state<BT: DeviceLayerTypes>(
+        LoopbackCreationProperties { mtu }: Self::CreationProperties,
+    ) -> Self::Link<BT> {
+        LoopbackDeviceState { mtu, rx_queue: Default::default(), tx_queue: Default::default() }
+    }
+
     const IS_LOOPBACK: bool = true;
     const DEBUG_TYPE: &'static str = "Loopback";
 }
 
-impl<BC: BindingsContext, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BC, L> {
-    type DeviceId = LoopbackDeviceId<BC>;
-    type WeakDeviceId = LoopbackWeakDeviceId<BC>;
+impl<BT: BindingsTypes, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BT, L> {
+    type DeviceId = LoopbackDeviceId<BT>;
+    type WeakDeviceId = LoopbackWeakDeviceId<BT>;
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
         device_id.downgrade()
     }
@@ -99,17 +107,18 @@ impl<BC: BindingsContext, L> DeviceIdContext<LoopbackDevice> for CoreCtx<'_, BC,
     }
 }
 
+/// Properties used to create a loopback device.
+#[derive(Debug)]
+pub struct LoopbackCreationProperties {
+    /// The device's MTU.
+    pub mtu: Mtu,
+}
+
 /// State for a loopback device.
 pub struct LoopbackDeviceState {
     mtu: Mtu,
     rx_queue: ReceiveQueue<(), Buf<Vec<u8>>>,
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
-}
-
-impl LoopbackDeviceState {
-    pub(super) fn new(mtu: Mtu) -> LoopbackDeviceState {
-        LoopbackDeviceState { mtu, rx_queue: Default::default(), tx_queue: Default::default() }
-    }
 }
 
 impl<BC: BindingsContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
@@ -562,7 +571,7 @@ mod tests {
         error::NotFoundError,
         ip::device::{IpAddressId as _, IpDeviceIpExt, IpDeviceStateContext},
         testutil::{
-            Ctx, FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
         CoreCtx, UnlockedCoreCtx,
     };
@@ -573,12 +582,17 @@ mod tests {
 
     #[test]
     fn loopback_mtu() {
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_loopback_device(&core_ctx, MTU, DEFAULT_INTERFACE_METRIC)
-            .expect("error adding loopback device")
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: MTU },
+                DEFAULT_INTERFACE_METRIC,
+            )
             .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(
@@ -602,12 +616,17 @@ mod tests {
         for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
             IpDeviceStateContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
     {
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_loopback_device(&core_ctx, MTU, DEFAULT_INTERFACE_METRIC)
-            .expect("error adding loopback device")
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: MTU },
+                DEFAULT_INTERFACE_METRIC,
+            )
             .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let get_addrs = || {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
@@ -632,7 +651,7 @@ mod tests {
         assert_eq!(
             crate::device::add_ip_addr_subnet(
                 core_ctx,
-                &mut bindings_ctx,
+                bindings_ctx,
                 &device,
                 AddrSubnetEither::from(addr)
             ),
@@ -641,26 +660,24 @@ mod tests {
         let addr = addr.addr();
         assert_eq!(&get_addrs()[..], [addr]);
 
-        assert_eq!(crate::device::del_ip_addr(core_ctx, &mut bindings_ctx, &device, addr), Ok(()));
+        assert_eq!(crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, addr), Ok(()));
         assert_eq!(get_addrs(), []);
 
         assert_eq!(
-            crate::device::del_ip_addr(core_ctx, &mut bindings_ctx, &device, addr),
+            crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, addr),
             Err(NotFoundError)
         );
     }
 
     #[ip_test]
     fn loopback_sends_ethernet<I: Ip + TestIpExt>() {
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_loopback_device(&core_ctx, MTU, DEFAULT_INTERFACE_METRIC)
-            .expect("error adding loopback device");
-        crate::device::testutil::enable_device(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device.clone().into(),
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx.core_api().device::<LoopbackDevice>().add_device_with_default_state(
+            LoopbackCreationProperties { mtu: MTU },
+            DEFAULT_INTERFACE_METRIC,
         );
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device.clone().into());
 
         let local_addr = I::FAKE_CONFIG.local_ip;
         const BODY: &[u8] = b"IP body".as_slice();
@@ -668,7 +685,7 @@ mod tests {
         let body = Buf::new(Vec::from(BODY), ..);
         send_ip_frame(
             &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            bindings_ctx,
             &device,
             local_addr,
             body,
@@ -694,5 +711,9 @@ mod tests {
 
         // Trim the body to account for ethernet padding.
         assert_eq!(&frame.as_ref()[..BODY.len()], BODY);
+
+        // Clear all device references.
+        ctx.bindings_ctx.state_mut().rx_available.clear();
+        ctx.core_api().device().remove_device(device).into_removed();
     }
 }

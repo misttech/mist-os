@@ -3488,6 +3488,8 @@ mod tests {
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
         device::{
             self,
+            ethernet::{EthernetCreationProperties, EthernetLinkDevice},
+            loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::{set_forwarding_enabled, update_ipv6_configuration},
             DeviceId, FrameDestination,
         },
@@ -4820,18 +4822,22 @@ mod tests {
         // Detection (DAD)) -- IPv6 only.
 
         let config = Ipv6::FAKE_CONFIG;
-        let Ctx { core_ctx, mut bindings_ctx } = crate::testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            config.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: config.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             core_ctx,
-            &mut bindings_ctx,
+            bindings_ctx,
             &device,
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as DAD is enabled.
@@ -4861,13 +4867,7 @@ mod tests {
             .into_inner();
 
         // Received packet should not have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            frame_dst,
-            buf.clone(),
-        );
+        receive_ip_packet::<_, _, Ipv6>(core_ctx, bindings_ctx, &device, frame_dst, buf.clone());
         assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
 
         // Wait until DAD is complete. Arbitrarily choose a year in the future
@@ -4884,14 +4884,14 @@ mod tests {
         );
 
         // Received packet should have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(&core_ctx, &mut bindings_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(core_ctx, bindings_ctx, &device, frame_dst, buf);
         assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Set the new IP (this should trigger DAD).
         let ip = config.local_ip.get();
         crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             AddrSubnet::new(ip, 128).unwrap(),
         )
@@ -4904,13 +4904,7 @@ mod tests {
             .into_inner();
 
         // Received packet should not have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            frame_dst,
-            buf.clone(),
-        );
+        receive_ip_packet::<_, _, Ipv6>(core_ctx, bindings_ctx, &device, frame_dst, buf.clone());
         assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Make sure all timers are done (DAD to complete on the interface due
@@ -4924,7 +4918,7 @@ mod tests {
         );
 
         // Received packet should have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(&core_ctx, &mut bindings_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(core_ctx, bindings_ctx, &device, frame_dst, buf);
         assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 2);
     }
 
@@ -4933,17 +4927,20 @@ mod tests {
         // Test that an inbound IPv6 packet with a non-unicast source address is
         // dropped.
         let cfg = FAKE_CONFIG_V6;
-        let (Ctx { core_ctx, mut bindings_ctx }, _device_ids) =
-            FakeEventDispatcherBuilder::from_config(cfg.clone()).build();
-        let core_ctx = &core_ctx;
-        let device = crate::device::add_ethernet_device(
-            &core_ctx,
-            cfg.local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
+        let (mut ctx, _device_ids) = FakeEventDispatcherBuilder::from_config(cfg.clone()).build();
+        let device = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: cfg.local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let ip: Ipv6Addr = cfg.local_mac.to_ipv6_link_local().addr().get();
         let buf = Buf::new(vec![0; 10], ..)
@@ -4958,8 +4955,8 @@ mod tests {
             .into_inner();
 
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             FrameDestination::Individual { local: true },
             buf,
@@ -4992,16 +4989,17 @@ mod tests {
                 ..Default::default()
             },
         );
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = builder.clone().build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = builder.clone().build();
         let v4_dev: DeviceId<_> = device_ids[dev_idx0].clone().into();
         let v6_dev: DeviceId<_> = device_ids[dev_idx1].clone().into();
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Receive packet addressed to us.
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v4_dev,
                 v4_config.local_ip
             ),
@@ -5010,7 +5008,7 @@ mod tests {
         assert_eq!(
             receive_ipv6_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v6_dev,
                 v6_config.local_ip
             ),
@@ -5021,7 +5019,7 @@ mod tests {
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v4_dev,
                 SpecifiedAddr::new(v4_subnet.broadcast()).unwrap()
             ),
@@ -5032,7 +5030,7 @@ mod tests {
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v4_dev,
                 Ipv4::LIMITED_BROADCAST_ADDRESS
             ),
@@ -5042,14 +5040,14 @@ mod tests {
         // Receive packet addressed to a multicast address we're subscribed to.
         crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
             &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            bindings_ctx,
             &v4_dev,
             Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
         );
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v4_dev,
                 Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.into_specified()
             ),
@@ -5060,7 +5058,7 @@ mod tests {
         assert_eq!(
             receive_ipv6_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v6_dev,
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified()
             ),
@@ -5071,7 +5069,7 @@ mod tests {
         assert_eq!(
             receive_ipv6_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v6_dev,
                 v6_config.local_ip.to_solicited_node_address().into_specified(),
             ),
@@ -5083,19 +5081,21 @@ mod tests {
             // Construct a one-off context that has DAD enabled. The context
             // built above has DAD disabled, and so addresses start off in the
             // assigned state rather than the tentative state.
-            let Ctx { core_ctx, mut bindings_ctx } = FakeCtx::default();
-            let core_ctx = &core_ctx;
+            let mut ctx = FakeCtx::default();
             let local_mac = v6_config.local_mac;
-            let device = crate::device::add_ethernet_device(
-                &core_ctx,
-                local_mac,
-                IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-                DEFAULT_INTERFACE_METRIC,
-            )
-            .into();
+            let eth_device =
+                ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                    EthernetCreationProperties {
+                        mac: local_mac,
+                        max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                    },
+                    DEFAULT_INTERFACE_METRIC,
+                );
+            let device = eth_device.clone().into();
+            let Ctx { core_ctx, bindings_ctx } = &mut ctx;
             let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
                 core_ctx,
-                &mut bindings_ctx,
+                bindings_ctx,
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     // Doesn't matter as long as DAD is enabled.
@@ -5117,12 +5117,15 @@ mod tests {
             assert_eq!(
                 receive_ipv6_packet_action(
                     &mut CoreCtx::new_deprecated(core_ctx),
-                    &mut bindings_ctx,
+                    bindings_ctx,
                     &device,
                     tentative.into_specified()
                 ),
                 ReceivePacketAction::Drop { reason: DropReason::Tentative }
             );
+            // Clean up secondary context.
+            core::mem::drop(device);
+            ctx.core_api().device().remove_device(eth_device).into_removed();
         }
 
         // Receive packet destined to a remote address when forwarding is
@@ -5130,7 +5133,7 @@ mod tests {
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
             ),
@@ -5139,7 +5142,7 @@ mod tests {
         assert_eq!(
             receive_ipv6_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip
             ),
@@ -5148,14 +5151,14 @@ mod tests {
 
         // Receive packet destined to a remote address when forwarding is
         // enabled both globally and on the inbound device.
-        set_forwarding_enabled::<_, Ipv4>(core_ctx, &mut bindings_ctx, &v4_dev, true)
+        set_forwarding_enabled::<_, Ipv4>(core_ctx, bindings_ctx, &v4_dev, true)
             .expect("error setting routing enabled");
-        set_forwarding_enabled::<_, Ipv6>(core_ctx, &mut bindings_ctx, &v6_dev, true)
+        set_forwarding_enabled::<_, Ipv6>(core_ctx, bindings_ctx, &v6_dev, true)
             .expect("error setting routing enabled");
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
             ),
@@ -5166,7 +5169,7 @@ mod tests {
         assert_eq!(
             receive_ipv6_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip
             ),
@@ -5182,7 +5185,7 @@ mod tests {
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
             ),
@@ -5191,12 +5194,18 @@ mod tests {
         assert_eq!(
             receive_ipv6_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip
             ),
             ReceivePacketAction::SendNoRouteToDest
         );
+
+        // Cleanup all device references.
+        core::mem::drop((v4_dev, v6_dev));
+        for device in device_ids {
+            ctx.core_api().device().remove_device(device).into_removed();
+        }
     }
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -5259,14 +5268,16 @@ mod tests {
         }
         let (mut ctx, device_ids) = builder.build();
         let mut device_ids = device_ids.into_iter().map(Into::into).collect::<Vec<_>>();
+
+        let loopback_id = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: Ipv6::MINIMUM_LINK_MTU },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let loopback_id = crate::device::add_loopback_device(
-            core_ctx,
-            Ipv6::MINIMUM_LINK_MTU,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .unwrap()
-        .into();
         crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_id);
         crate::device::add_ip_addr_subnet(
             core_ctx,

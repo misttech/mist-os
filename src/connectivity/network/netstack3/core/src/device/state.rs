@@ -5,6 +5,7 @@
 //! State maintained by the device layer.
 
 use alloc::sync::Arc;
+use core::fmt::Debug;
 
 use crate::{
     device::{socket::HeldDeviceSockets, DeviceLayerTypes, OriginTracker},
@@ -20,6 +21,13 @@ pub trait DeviceStateSpec: Send + Sync + 'static {
     type Link<BT: DeviceLayerTypes>: Send + Sync;
     /// The external (bindings) state.
     type External<BT: DeviceLayerTypes>: Send + Sync;
+    /// Properties given to device creation.
+    type CreationProperties: Debug;
+
+    /// Creates a new link state from the given properties.
+    fn new_link_state<BT: DeviceLayerTypes>(properties: Self::CreationProperties)
+        -> Self::Link<BT>;
+
     /// Marker for loopback devices.
     const IS_LOOPBACK: bool;
     /// Marker used to print debug information for device identifiers.

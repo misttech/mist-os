@@ -26,14 +26,15 @@ use crate::{
         ethernet::{
             self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
         },
-        loopback::{self, LoopbackDeviceId},
+        loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
         queue::tx::TransmitQueueHandler,
         socket,
         state::{DeviceStateSpec, IpLinkDeviceState},
-        AnyDevice, BaseDeviceId, DeviceCounters, DeviceId, DeviceIdContext,
-        DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices, DevicesIter,
-        EthernetDeviceId, EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr, OriginTracker,
-        RecvIpFrameMeta, WeakDeviceId,
+        AnyDevice, BaseDeviceId, DeviceCollectionContext, DeviceCounters, DeviceId,
+        DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices,
+        DevicesIter, EthernetDeviceId, EthernetPrimaryDeviceId, EthernetWeakDeviceId,
+        Ipv6DeviceLinkLayerAddr, OriginTracker, OriginTrackerContext, RecvIpFrameMeta,
+        WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     ip::device::{
@@ -49,10 +50,10 @@ use crate::{
         IpDeviceStateContext, Ipv6DeviceAddr, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
     },
     sync::{PrimaryRc, StrongRc},
-    BindingsContext, CoreCtx, StackState,
+    BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
+impl<BC: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
     for StackState<BC>
 {
     type Data = OriginTracker;
@@ -764,9 +765,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     }
 }
 
-impl<BC: BindingsContext, L> DeviceIdContext<EthernetLinkDevice> for CoreCtx<'_, BC, L> {
-    type DeviceId = EthernetDeviceId<BC>;
-    type WeakDeviceId = EthernetWeakDeviceId<BC>;
+impl<BT: BindingsTypes, L> DeviceIdContext<EthernetLinkDevice> for CoreCtx<'_, BT, L> {
+    type DeviceId = EthernetDeviceId<BT>;
+    type WeakDeviceId = EthernetWeakDeviceId<BT>;
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
         device_id.downgrade()
     }
@@ -846,12 +847,12 @@ where
     }
 }
 
-impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::DeviceLayerState> for StackState<BC> {
-    type Data = Devices<BC>;
-    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Devices<BC>>
+impl<BT: BindingsTypes> RwLockFor<crate::lock_ordering::DeviceLayerState> for StackState<BT> {
+    type Data = Devices<BT>;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, Devices<BT>>
         where
             Self: 'l ;
-    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Devices<BC>>
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, Devices<BT>>
         where
             Self: 'l ;
     fn read_lock(&self) -> Self::ReadGuard<'_> {
@@ -1102,5 +1103,55 @@ where
         DeviceId::Loopback(id) => {
             loopback::send_ip_frame::<_, A, _, _>(core_ctx, bindings_ctx, id, local_addr, body)
         }
+    }
+}
+
+impl<'a, BT, L> DeviceCollectionContext<EthernetLinkDevice, BT> for CoreCtx<'a, BT, L>
+where
+    BT: BindingsTypes,
+    L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+{
+    fn insert(&mut self, device: EthernetPrimaryDeviceId<BT>) {
+        let mut devices = self.write_lock::<crate::lock_ordering::DeviceLayerState>();
+        let strong = device.clone_strong();
+        assert!(devices.ethernet.insert(strong, device).is_none());
+    }
+
+    fn remove(&mut self, device: &EthernetDeviceId<BT>) -> Option<EthernetPrimaryDeviceId<BT>> {
+        let mut devices = self.write_lock::<crate::lock_ordering::DeviceLayerState>();
+        devices.ethernet.remove(device)
+    }
+}
+
+impl<'a, BT, L> DeviceCollectionContext<LoopbackDevice, BT> for CoreCtx<'a, BT, L>
+where
+    BT: BindingsTypes,
+    L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+{
+    fn insert(&mut self, device: LoopbackPrimaryDeviceId<BT>) {
+        let mut devices = self.write_lock::<crate::lock_ordering::DeviceLayerState>();
+        let prev = devices.loopback.replace(device);
+        // NB: At a previous version we returned an error when bindings tried to
+        // install the loopback device twice. Turns out that all callers
+        // panicked on that error so might as well panic here and simplify the
+        // API code.
+        assert!(prev.is_none(), "can't install loopback device more than once");
+    }
+
+    fn remove(&mut self, device: &LoopbackDeviceId<BT>) -> Option<LoopbackPrimaryDeviceId<BT>> {
+        // We assert here because there's an invariant that only one loopback
+        // device exists. So if we're calling this function with a loopback
+        // device ID then it *must* exist and it *must* be the same as the
+        // currently installed device.
+        let mut devices = self.write_lock::<crate::lock_ordering::DeviceLayerState>();
+        let primary = devices.loopback.take().expect("loopback device not installed");
+        assert_eq!(device, &primary);
+        Some(primary)
+    }
+}
+
+impl<'a, BT: BindingsTypes, L> OriginTrackerContext for CoreCtx<'a, BT, L> {
+    fn origin_tracker(&mut self) -> OriginTracker {
+        self.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>().clone()
     }
 }

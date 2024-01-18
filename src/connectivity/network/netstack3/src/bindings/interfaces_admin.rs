@@ -708,9 +708,11 @@ async fn wait_for_device_removal<T: 'static>(
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
     let (devices::NetdeviceInfo { handler, mac: _, static_common_info: _, dynamic: _ }, weak_id) = {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let core_id =
-            bindings_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
+        let core_id = ctx
+            .bindings_ctx()
+            .devices
+            .remove_device(id)
+            .expect("device was not removed since retrieval");
         // Keep a weak ID around to debug pending destruction.
         let weak_id = core_id.downgrade();
         match core_id {
@@ -719,9 +721,8 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // the device for deletion (by calling `remove_..._device`) so
                 // that we don't race with any new routes being added through
                 // that device.
-                let result =
-                    netstack3_core::device::remove_ethernet_device(core_ctx, bindings_ctx, core_id);
-                bindings_ctx.remove_routes_on_device(&weak_id).await;
+                let result = ctx.api().device().remove_device(core_id);
+                ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
                 let info = wait_for_device_removal(id, result, &weak_id).await;
                 (info, weak_id)
             }
@@ -730,9 +731,8 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // the device for deletion (by calling `remove_..._device`) so
                 // that we don't race with any new routes being added through
                 // that device.
-                let result =
-                    netstack3_core::device::remove_loopback_device(core_ctx, bindings_ctx, core_id);
-                bindings_ctx.remove_routes_on_device(&weak_id).await;
+                let result = ctx.api().device().remove_device(core_id);
+                ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
                 let devices::LoopbackInfo {
                     static_common_info: _,
                     dynamic_common_info: _,

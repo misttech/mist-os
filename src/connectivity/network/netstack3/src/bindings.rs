@@ -68,7 +68,7 @@ use net_types::{
 use netstack3_core::{
     device::{
         DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
-        EthernetDeviceId, LoopbackDeviceId,
+        EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
     },
     error::NetstackError,
     handle_timer,
@@ -908,46 +908,40 @@ impl Netstack {
             interfaces_admin::OwnedControlHandle::new_channel();
         let loopback_rx_notifier = Default::default();
 
-        let loopback = netstack3_core::device::add_loopback_device_with_state(
-            self.ctx.core_ctx(),
-            DEFAULT_LOOPBACK_MTU,
-            RawMetric(DEFAULT_INTERFACE_METRIC),
-            || {
-                let binding_id = devices.alloc_new_id();
-
-                let events = self.create_interface_event_producer(
-                    binding_id,
-                    InterfaceProperties {
-                        name: LOOPBACK_NAME.to_string(),
-                        device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                            fidl_fuchsia_net_interfaces::Empty {},
-                        ),
-                    },
-                );
-                events
-                    .notify(InterfaceUpdate::OnlineChanged(true))
-                    .expect("interfaces worker not running");
-
-                let loopback_info = LoopbackInfo {
-                    static_common_info: StaticCommonInfo {
-                        tx_notifier: Default::default(),
-                        authorization_token: zx::Event::create(),
-                    },
-                    dynamic_common_info: DynamicCommonInfo {
-                        mtu: DEFAULT_LOOPBACK_MTU,
-                        admin_enabled: true,
-                        events,
-                        control_hook: control_sender,
-                        addresses: HashMap::new(),
-                    }
-                    .into(),
-                    rx_notifier: loopback_rx_notifier,
-                };
-
-                (loopback_info, DeviceIdAndName { id: binding_id, name: LOOPBACK_NAME.to_string() })
+        let binding_id = devices.alloc_new_id();
+        let events = self.create_interface_event_producer(
+            binding_id,
+            InterfaceProperties {
+                name: LOOPBACK_NAME.to_string(),
+                device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
+                    fidl_fuchsia_net_interfaces::Empty {},
+                ),
             },
-        )
-        .expect("error adding loopback device");
+        );
+        events.notify(InterfaceUpdate::OnlineChanged(true)).expect("interfaces worker not running");
+
+        let loopback_info = LoopbackInfo {
+            static_common_info: StaticCommonInfo {
+                tx_notifier: Default::default(),
+                authorization_token: zx::Event::create(),
+            },
+            dynamic_common_info: DynamicCommonInfo {
+                mtu: DEFAULT_LOOPBACK_MTU,
+                admin_enabled: true,
+                events,
+                control_hook: control_sender,
+                addresses: HashMap::new(),
+            }
+            .into(),
+            rx_notifier: loopback_rx_notifier,
+        };
+
+        let loopback = self.ctx.api().device::<LoopbackDevice>().add_device(
+            DeviceIdAndName { id: binding_id, name: LOOPBACK_NAME.to_string() },
+            LoopbackCreationProperties { mtu: DEFAULT_LOOPBACK_MTU },
+            RawMetric(DEFAULT_INTERFACE_METRIC),
+            loopback_info,
+        );
 
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             loopback.external_state();
@@ -958,7 +952,7 @@ impl Netstack {
         let external_state = loopback.external_state();
         let StaticCommonInfo { tx_notifier, authorization_token: _ } =
             external_state.static_common_info();
-        devices.add_device(binding_id, loopback.clone());
+        self.ctx.bindings_ctx().devices.add_device(binding_id, loopback.clone());
         let tx_task = crate::bindings::devices::spawn_tx_task(
             tx_notifier,
             self.ctx.clone(),

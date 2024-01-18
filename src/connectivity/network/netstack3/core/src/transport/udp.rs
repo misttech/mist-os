@@ -2429,6 +2429,7 @@ mod tests {
             WrappedFakeCoreCtx,
         },
         device::{
+            loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             DeviceId,
         },
@@ -6492,15 +6493,16 @@ mod tests {
         set_logger_for_test();
         const HELLO: &'static [u8] = b"Hello";
         let (mut ctx, local_device_ids) = I::FAKE_CONFIG.into_builder().build();
-        let crate::testutil::Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let loopback_device_id: DeviceId<crate::testutil::FakeBindingsCtx> =
-            crate::device::add_loopback_device(
-                core_ctx,
-                net_types::ip::Mtu::new(u16::MAX as u32),
+
+        let loopback_device_id: DeviceId<crate::testutil::FakeBindingsCtx> = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: net_types::ip::Mtu::new(u16::MAX as u32) },
                 crate::testutil::DEFAULT_INTERFACE_METRIC,
             )
-            .expect("create the loopback interface")
             .into();
+        let crate::testutil::Ctx { core_ctx, bindings_ctx } = &mut ctx;
         crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
         let mut api = CoreApi::with_contexts(core_ctx, bindings_ctx).udp::<I>();
         let socket = api.create();

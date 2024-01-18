@@ -8,7 +8,7 @@ use net_types::ip::Ip;
 
 use crate::{
     context::{ContextProvider, CoreCtx, CtxPair},
-    device::socket::DeviceSocketApi,
+    device::{api::DeviceApi, socket::DeviceSocketApi},
     ip::{
         api::{RoutesAnyApi, RoutesApi},
         device::nud::api::NeighborApi,
@@ -75,6 +75,12 @@ where
     pub fn neighbor<I: Ip, D>(self) -> NeighborApi<I, D, CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         NeighborApi::new(ctx)
+    }
+
+    /// Gets access to the device API for device type `D`.
+    pub fn device<D>(self) -> DeviceApi<D, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        DeviceApi::new(ctx)
     }
 }
 

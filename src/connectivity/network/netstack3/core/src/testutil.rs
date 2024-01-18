@@ -61,9 +61,12 @@ use crate::{
         TracingContext,
     },
     device::{
-        ethernet::EthernetLinkDevice, ethernet::MaxEthernetFrameSize, link::LinkDevice,
-        loopback::LoopbackDeviceId, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
-        DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
+        ethernet::MaxEthernetFrameSize,
+        ethernet::{EthernetCreationProperties, EthernetLinkDevice},
+        link::LinkDevice,
+        loopback::LoopbackDeviceId,
+        DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
+        EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
     },
     ip::{
         device::{
@@ -1070,7 +1073,6 @@ impl FakeEventDispatcherBuilder {
         state_builder: StackStateBuilder,
     ) -> (FakeCtx, Vec<EthernetDeviceId<FakeBindingsCtx>>) {
         let mut ctx = Ctx::new_with_builder(state_builder);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let FakeEventDispatcherBuilder {
             devices,
@@ -1081,12 +1083,15 @@ impl FakeEventDispatcherBuilder {
         let idx_to_device_id: Vec<_> = devices
             .into_iter()
             .map(|DeviceConfig { mac, addr_subnet: ip_and_subnet, ipv4_config, ipv6_config }| {
-                let eth_id = crate::device::add_ethernet_device(
-                    core_ctx,
-                    mac,
-                    IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-                    DEFAULT_INTERFACE_METRIC,
-                );
+                let eth_id =
+                    ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                        EthernetCreationProperties {
+                            mac: mac,
+                            max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                        },
+                        DEFAULT_INTERFACE_METRIC,
+                    );
+                let Ctx { core_ctx, bindings_ctx } = &mut ctx;
                 let id = eth_id.clone().into();
                 if let Some(ipv4_config) = ipv4_config {
                     let _previous = crate::device::testutil::update_ipv4_configuration(
@@ -1484,7 +1489,10 @@ pub fn clear_routes_and_remove_ethernet_device<BC: crate::BindingsContext>(
         crate::device::DeviceId::Ethernet(ethernet_device) => ethernet_device,
         crate::device::DeviceId::Loopback(_) => unreachable!(),
     };
-    match crate::device::remove_ethernet_device(core_ctx, bindings_ctx, ethernet_device) {
+    match crate::CoreApi::with_contexts(core_ctx, bindings_ctx)
+        .device()
+        .remove_device(ethernet_device)
+    {
         crate::device::RemoveDeviceResult::Removed(_external_state) => {}
         crate::device::RemoveDeviceResult::Deferred(_reference_receiver) => {
             panic!("failed to remove ethernet device")

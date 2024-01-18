@@ -1785,7 +1785,11 @@ mod tests {
     use super::*;
     use crate::{
         context::{testutil::FakeInstant, EventContext, TimerContext},
-        device::{testutil::FakeDeviceId, DeviceId},
+        device::{
+            loopback::{LoopbackCreationProperties, LoopbackDevice},
+            testutil::FakeDeviceId,
+            DeviceId,
+        },
         ip::{
             device::{
                 IpDeviceBindingsContext,
@@ -1979,17 +1983,18 @@ mod tests {
 
         let FakeEventDispatcherConfig { local_ip, remote_ip, subnet, local_mac: _, remote_mac: _ } =
             cfg;
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(cfg).build();
-        let core_ctx = &core_ctx;
-        let loopback_device_id = crate::device::add_loopback_device(
-            &core_ctx,
-            Mtu::new(u16::MAX as u32),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .expect("create the loopback interface")
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &loopback_device_id);
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(cfg).build();
+        let loopback_device_id = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: Mtu::new(u16::MAX as u32) },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
 
         let NewSocketTestCase { local_ip_type, remote_ip_type, expected_result, device_type } =
             test_case;
@@ -2005,12 +2010,12 @@ mod tests {
             AddressType::Remote => (remote_ip, Some(remote_ip)),
             AddressType::Unspecified { can_select } => {
                 if !can_select {
-                    remove_all_local_addrs::<I>(&core_ctx, &mut bindings_ctx);
+                    remove_all_local_addrs::<I>(core_ctx, bindings_ctx);
                 }
                 (local_ip, None)
             }
             AddressType::Unroutable => {
-                remove_all_local_addrs::<I>(&core_ctx, &mut bindings_ctx);
+                remove_all_local_addrs::<I>(core_ctx, bindings_ctx);
                 (local_ip, Some(local_ip))
             }
         };
@@ -2022,7 +2027,7 @@ mod tests {
                 panic!("remote_ip_type cannot be unspecified")
             }
             AddressType::Unroutable => {
-                crate::testutil::del_routes_to_subnet(&core_ctx, &mut bindings_ctx, subnet.into())
+                crate::testutil::del_routes_to_subnet(core_ctx, bindings_ctx, subnet.into())
                     .unwrap();
                 remote_ip
             }
@@ -2044,7 +2049,7 @@ mod tests {
 
         let res = IpSocketHandler::<I, _>::new_ip_socket(
             &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            bindings_ctx,
             weak_local_device.as_ref().map(EitherDeviceId::Weak),
             from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
             SocketIpAddr::try_from(to_ip).unwrap(),
@@ -2059,7 +2064,7 @@ mod tests {
         assert_eq!(
             IpSocketHandler::new_ip_socket(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 weak_local_device.as_ref().map(EitherDeviceId::Weak),
                 from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
                 SocketIpAddr::try_from(to_ip).unwrap(),
@@ -2103,26 +2108,26 @@ mod tests {
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = builder.build();
+        let (mut ctx, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
-        let core_ctx = &core_ctx;
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             AddrSubnet::new(remote_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::testutil::add_route(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             AddableEntryEither::without_gateway(
                 subnet.into(),
                 device_id.clone(),
@@ -2131,14 +2136,16 @@ mod tests {
         )
         .unwrap();
 
-        let loopback_device_id = crate::device::add_loopback_device(
-            &core_ctx,
-            Mtu::new(u16::MAX as u32),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .expect("create the loopback interface")
-        .into();
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &loopback_device_id);
+        let loopback_device_id = ctx
+            .core_api()
+            .device::<LoopbackDevice>()
+            .add_device_with_default_state(
+                LoopbackCreationProperties { mtu: Mtu::new(u16::MAX as u32) },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
 
         let (expected_from_ip, from_ip) = match from_addr_type {
             AddressType::LocallyOwned => (local_ip, Some(local_ip)),
@@ -2158,7 +2165,7 @@ mod tests {
 
         let sock = IpSocketHandler::<I, _>::new_ip_socket(
             &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            bindings_ctx,
             None,
             from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
             SocketIpAddr::try_from(to_ip).unwrap(),
@@ -2183,14 +2190,14 @@ mod tests {
         // delivered locally.
         IpSocketHandler::<I, _>::send_ip_packet(
             &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            bindings_ctx,
             &sock,
             buffer.into_inner().buffer_view().as_ref().into_serializer(),
             None,
         )
         .unwrap();
 
-        handle_queued_rx_packets(core_ctx, &mut bindings_ctx);
+        handle_queued_rx_packets(core_ctx, bindings_ctx);
 
         assert_eq!(bindings_ctx.frames_sent().len(), 0);
 
@@ -2475,12 +2482,11 @@ mod tests {
     #[ip_test]
     #[test_case(true; "remove device")]
     #[test_case(false; "dont remove device")]
-    fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpLayerIpExt>(remove_device: bool)
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn get_mms_device_removed<I: Ip + IpSocketIpExt + crate::IpExt>(remove_device: bool)
     where
-        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
-            + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>
-            + IpStateContext<I, FakeBindingsCtx>
-            + DeviceIpSocketHandler<I, FakeBindingsCtx>,
+        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
+            IpSocketHandler<I, FakeBindingsCtx> + DeviceIpSocketHandler<I, FakeBindingsCtx>,
     {
         set_logger_for_test();
 
@@ -2494,21 +2500,23 @@ mod tests {
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = builder.build();
+        let (mut ctx, device_ids) = builder.build();
         let eth_device_id = device_ids[device_idx].clone();
         core::mem::drop(device_ids);
         let device_id: DeviceId<_> = eth_device_id.clone().into();
-        let core_ctx = &core_ctx;
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+
         crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             AddrSubnet::new(local_ip.get(), 16).unwrap(),
         )
         .unwrap();
         crate::testutil::add_route(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             AddableEntryEither::without_gateway(
                 I::MULTICAST_SUBNET.into(),
                 device_id.clone(),
@@ -2519,7 +2527,7 @@ mod tests {
 
         let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
             &mut CoreCtx::new_deprecated(core_ctx),
-            &mut bindings_ctx,
+            bindings_ctx,
             None,
             None,
             SocketIpAddr::try_from(I::multicast_addr(1)).unwrap(),
@@ -2530,12 +2538,11 @@ mod tests {
 
         let expected = if remove_device {
             // Clear routes on the device before removing it.
-            crate::testutil::del_device_routes(&core_ctx, &mut bindings_ctx, &device_id);
+            crate::testutil::del_device_routes(core_ctx, bindings_ctx, &device_id);
 
             // Don't keep any strong device IDs to the device before removing.
             core::mem::drop(device_id);
-            crate::device::remove_ethernet_device(&core_ctx, &mut bindings_ctx, eth_device_id)
-                .into_removed();
+            ctx.core_api().device().remove_device(eth_device_id).into_removed();
             Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
         } else {
             Ok(Mms::from_mtu::<I>(
@@ -2547,11 +2554,11 @@ mod tests {
             )
             .unwrap())
         };
-
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
             DeviceIpSocketHandler::get_mms(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &ip_sock
             ),
             expected,

@@ -112,7 +112,7 @@ impl<DeviceId, BC: RngContext + TimerContext<RsTimerId<DeviceId>>> RsBindingsCon
 }
 
 /// An implementation of Router Solicitation.
-pub(crate) trait RsHandler<BC>:
+pub trait RsHandler<BC>:
     DeviceIdContext<AnyDevice> + TimerHandler<BC, RsTimerId<Self::DeviceId>>
 {
     /// Starts router solicitation.

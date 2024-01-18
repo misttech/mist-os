@@ -104,7 +104,7 @@ impl<DeviceId, BC: TimerContext<Ipv6DiscoveredRouteTimerId<DeviceId>>>
 }
 
 /// An implementation of IPv6 route discovery.
-pub(crate) trait RouteDiscoveryHandler<BC>: DeviceIdContext<AnyDevice> {
+pub trait RouteDiscoveryHandler<BC>: DeviceIdContext<AnyDevice> {
     /// Handles an update affecting discovered routes.
     ///
     /// A `None` value for `lifetime` indicates that the route is not valid and
@@ -274,6 +274,7 @@ mod tests {
             FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _,
         },
         device::{
+            ethernet::{EthernetCreationProperties, EthernetLinkDevice},
             testutil::{update_ipv6_configuration, FakeDeviceId, FakeWeakDeviceId},
             DeviceId, FrameDestination,
         },
@@ -729,14 +730,18 @@ mod tests {
         } = Ipv6::FAKE_CONFIG;
 
         let mut ctx = crate::testutil::FakeCtx::default();
+        let device_id = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let device_id = crate::device::add_ethernet_device(
-            core_ctx,
-            local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             core_ctx,
             bindings_ctx,

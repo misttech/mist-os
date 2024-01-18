@@ -2478,7 +2478,7 @@ mod tests {
             CtxPair, InstantContext, SendFrameContext as _,
         },
         device::{
-            ethernet::EthernetLinkDevice,
+            ethernet::{EthernetCreationProperties, EthernetLinkDevice},
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
             ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
             testutil::{update_ipv6_configuration, FakeWeakDeviceId},
@@ -4941,16 +4941,21 @@ mod tests {
             subnet: _,
         } = Ipv6::FAKE_CONFIG;
 
-        let testutil::FakeCtx { core_ctx, mut bindings_ctx } = testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let device_id = crate::device::add_ethernet_device(
-            core_ctx,
-            local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        Ipv6::set_ip_device_enabled(core_ctx, &mut bindings_ctx, &device_id, true, false);
+        let mut ctx = testutil::FakeCtx::default();
+        let device_id = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+
+        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, true, false);
 
         let remote_mac_bytes = remote_mac.bytes();
         let options = vec![NdpOptionBuilder::SourceLinkLayerAddress(&remote_mac_bytes[..])];
@@ -4980,25 +4985,25 @@ mod tests {
         // First receive a Router Advertisement without the source link layer
         // and make sure no new neighbor gets added.
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             FrameDestination::Multicast,
             ra_packet_buf(&[][..]),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
-        assert_neighbors::<Ipv6, _>(&core_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, Default::default());
 
         // RA with a source link layer option should create a new entry.
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             FrameDestination::Multicast,
             ra_packet_buf(&options[..]),
         );
         assert_neighbors::<Ipv6, _>(
-            &core_ctx,
+            core_ctx,
             &link_device_id,
             HashMap::from([(
                 {
@@ -5029,22 +5034,24 @@ mod tests {
             subnet: _,
         } = Ipv6::FAKE_CONFIG;
 
-        let testutil::FakeCtx { core_ctx, mut bindings_ctx } = testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let link_device_id = crate::device::add_ethernet_device(
-            core_ctx,
-            local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let mut ctx = testutil::FakeCtx::default();
+        let link_device_id =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
         let device_id = link_device_id.clone().into();
-        Ipv6::set_ip_device_enabled(core_ctx, &mut bindings_ctx, &device_id, true, false);
+        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, true, false);
 
         // Set DAD config after enabling the device so that the default address
         // does not perform DAD.
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             core_ctx,
-            &mut bindings_ctx,
+            bindings_ctx,
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 dad_transmits: Some(dad_transmits),
@@ -5053,8 +5060,8 @@ mod tests {
         )
         .unwrap();
         crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             AddrSubnet::new(LOCAL_IP, Ipv6Addr::BYTES * 8).unwrap(),
         )
@@ -5092,8 +5099,8 @@ mod tests {
         let snmc = target_addr.to_solicited_node_address();
         let dst_ip = snmc.get();
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             FrameDestination::Multicast,
             neighbor_solicitation_ip_packet(**src_ip, dst_ip, target_addr, *remote_mac),
@@ -5141,7 +5148,10 @@ mod tests {
             HashMap::default()
         };
 
-        assert_neighbors::<Ipv6, _>(&core_ctx, &link_device_id, expected_neighbors);
+        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, expected_neighbors);
+        // Remove device to clear all dangling references.
+        core::mem::drop(device_id);
+        ctx.core_api().device().remove_device(link_device_id).into_removed();
     }
 
     #[test]
@@ -5154,19 +5164,21 @@ mod tests {
             subnet: _,
         } = Ipv6::FAKE_CONFIG;
 
-        let testutil::FakeCtx { core_ctx, mut bindings_ctx } = testutil::FakeCtx::default();
-        let core_ctx = &core_ctx;
-        let eth_device_id = crate::device::add_ethernet_device(
-            core_ctx,
-            local_mac,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-            DEFAULT_INTERFACE_METRIC,
-        );
+        let mut ctx = testutil::FakeCtx::default();
+        let eth_device_id =
+            ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: local_mac,
+                    max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                },
+                DEFAULT_INTERFACE_METRIC,
+            );
         let device_id = eth_device_id.clone().into();
+        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         // Configure the device to generate a link-local address.
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
             core_ctx,
-            &mut bindings_ctx,
+            bindings_ctx,
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: Some(SlaacConfiguration {
@@ -5177,7 +5189,7 @@ mod tests {
             },
         )
         .unwrap();
-        Ipv6::set_ip_device_enabled(core_ctx, &mut bindings_ctx, &device_id, true, false);
+        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, true, false);
 
         let neighbor_ip = remote_mac.to_ipv6_link_local().addr();
         let neighbor_ip: UnicastAddr<_> = neighbor_ip.into_addr();
@@ -5196,22 +5208,22 @@ mod tests {
         // NeighborAdvertisements should not create a new entry even if
         // the advertisement has both the solicited and override flag set.
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             FrameDestination::Multicast,
             na_packet_buf(false, false),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
-        assert_neighbors::<Ipv6, _>(&core_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, Default::default());
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             FrameDestination::Multicast,
             na_packet_buf(true, true),
         );
-        assert_neighbors::<Ipv6, _>(&core_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, Default::default());
 
         assert_eq!(bindings_ctx.take_frames(), []);
 
@@ -5221,7 +5233,7 @@ mod tests {
         assert_matches!(
             NudHandler::<Ipv6, EthernetLinkDevice, _>::send_ip_packet_to_neighbor(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &eth_device_id,
                 neighbor_ip.into_specified(),
                 Buf::new(body, ..),
@@ -5264,7 +5276,7 @@ mod tests {
         );
 
         assert_neighbors::<Ipv6, _>(
-            &core_ctx,
+            core_ctx,
             &link_device_id,
             HashMap::from([(
                 neighbor_ip.into_specified(),
@@ -5279,14 +5291,14 @@ mod tests {
 
         // A Neighbor advertisement should now update the entry.
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             FrameDestination::Multicast,
             na_packet_buf(true, true),
         );
         assert_neighbors::<Ipv6, _>(
-            &core_ctx,
+            core_ctx,
             &link_device_id,
             HashMap::from([(
                 neighbor_ip.into_specified(),
@@ -5308,8 +5320,8 @@ mod tests {
         assert_eq!(payload, body);
 
         // Disabling the device should clear the neighbor table.
-        Ipv6::set_ip_device_enabled(core_ctx, &mut bindings_ctx, &device_id, false, true);
-        assert_neighbors::<Ipv6, _>(&core_ctx, &link_device_id, HashMap::new());
+        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, false, true);
+        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, HashMap::new());
         bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
