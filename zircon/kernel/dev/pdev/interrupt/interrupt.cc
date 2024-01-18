@@ -95,6 +95,10 @@ static zx_status_t default_get_config(unsigned int vector, enum interrupt_trigge
   return ZX_ERR_NOT_SUPPORTED;
 }
 
+static zx_status_t default_set_affinity(unsigned int vector, cpu_mask_t mask) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 static bool default_is_valid(unsigned int vector, uint32_t flags) { return false; }
 static unsigned int default_remap(unsigned int vector) { return 0; }
 
@@ -139,6 +143,7 @@ static const struct pdev_interrupt_ops default_ops = {
     .deactivate = default_deactivate,
     .configure = default_configure,
     .get_config = default_get_config,
+    .set_affinity = default_set_affinity,
     .is_valid = default_is_valid,
     .get_base_vector = default_get_base_vector,
     .get_max_vector = default_get_max_vector,
@@ -175,6 +180,10 @@ zx_status_t get_interrupt_config(unsigned int vector, enum interrupt_trigger_mod
   return intr_ops->get_config(vector, tm, pol);
 }
 
+zx_status_t set_interrupt_affinity(unsigned int vector, cpu_mask_t mask) {
+  return intr_ops->set_affinity(vector, mask);
+}
+
 uint32_t interrupt_get_base_vector() { return intr_ops->get_base_vector(); }
 
 uint32_t interrupt_get_max_vector() { return intr_ops->get_max_vector(); }
@@ -192,11 +201,33 @@ void interrupt_init_percpu() { intr_ops->init_percpu(); }
 void platform_irq(iframe_t* frame) { intr_ops->handle_irq(frame); }
 
 void pdev_register_interrupts(const struct pdev_interrupt_ops* ops) {
+  // Assert that all of the ops are fulled in with at least a default hook.
+  DEBUG_ASSERT(ops->mask);
+  DEBUG_ASSERT(ops->unmask);
+  DEBUG_ASSERT(ops->deactivate);
+  DEBUG_ASSERT(ops->configure);
+  DEBUG_ASSERT(ops->get_config);
+  DEBUG_ASSERT(ops->set_affinity);
+  DEBUG_ASSERT(ops->is_valid);
+  DEBUG_ASSERT(ops->get_base_vector);
+  DEBUG_ASSERT(ops->get_max_vector);
+  DEBUG_ASSERT(ops->remap);
+  DEBUG_ASSERT(ops->send_ipi);
+  DEBUG_ASSERT(ops->init_percpu_early);
+  DEBUG_ASSERT(ops->init_percpu);
+  DEBUG_ASSERT(ops->handle_irq);
+  DEBUG_ASSERT(ops->shutdown);
+  DEBUG_ASSERT(ops->shutdown_cpu);
+  DEBUG_ASSERT(ops->msi_is_supported);
+  DEBUG_ASSERT(ops->msi_supports_masking);
+  DEBUG_ASSERT(ops->msi_mask_unmask);
+  DEBUG_ASSERT(ops->msi_alloc_block);
+  DEBUG_ASSERT(ops->msi_free_block);
+  DEBUG_ASSERT(ops->msi_register_handler);
+
   intr_ops = ops;
   arch::ThreadMemoryBarrier();
 }
-
-static void interrupt_init_percpu_early(uint level) { intr_ops->init_percpu_early(); }
 
 void shutdown_interrupts() { intr_ops->shutdown(); }
 
@@ -220,6 +251,8 @@ void msi_free_block(msi_block_t* block) { intr_ops->msi_free_block(block); }
 void msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler, void* ctx) {
   intr_ops->msi_register_handler(block, msi_id, handler, ctx);
 }
+
+static void interrupt_init_percpu_early(uint level) { intr_ops->init_percpu_early(); }
 
 LK_INIT_HOOK_FLAGS(interrupt_init_percpu_early, interrupt_init_percpu_early,
                    LK_INIT_LEVEL_PLATFORM_EARLY, LK_INIT_FLAG_SECONDARY_CPUS)

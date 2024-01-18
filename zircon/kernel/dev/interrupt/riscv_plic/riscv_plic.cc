@@ -149,6 +149,11 @@ zx_status_t plic_get_interrupt_config(unsigned int vector, enum interrupt_trigge
   return ZX_OK;
 }
 
+static zx_status_t plic_set_affinity(unsigned int vector, cpu_mask_t mask) {
+  LTRACEF("vector %u, mask %#x\n", vector, mask);
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 unsigned int plic_remap_interrupt(unsigned int vector) {
   LTRACEF("vector %u\n", vector);
   return vector;
@@ -230,6 +235,7 @@ const struct pdev_interrupt_ops plic_ops = {
     .deactivate = plic_deactivate_interrupt,
     .configure = plic_configure_interrupt,
     .get_config = plic_get_interrupt_config,
+    .set_affinity = plic_set_affinity,
     .is_valid = plic_is_valid_interrupt,
     .get_base_vector = plic_get_base_vector,
     .get_max_vector = plic_get_max_vector,

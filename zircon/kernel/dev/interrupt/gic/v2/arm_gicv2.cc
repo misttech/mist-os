@@ -260,6 +260,31 @@ static zx_status_t gic_get_interrupt_config(unsigned int vector, enum interrupt_
   return ZX_OK;
 }
 
+static zx_status_t gic_set_affinity(unsigned int vector, cpu_mask_t mask) {
+  LTRACEF("vector %u, mask %#x\n", vector, mask);
+
+  if (vector >= max_irqs) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // make sure the cpu mask is within range
+  if (highest_cpu_set(mask) > 7) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // set the 4 bit field in the corresponding targetsr register with the
+  // 8 bit cpu mask.
+  uint32_t targetsr = arm_gicv2_read32(GICD_ITARGETSR(vector / 4));
+  uint32_t old_targetsr = targetsr;
+  targetsr &= ~(0xff << ((vector % 4) * 8));
+  targetsr |= mask << ((vector % 4) * 8);
+  arm_gicv2_write32(GICD_ITARGETSR(vector / 4), targetsr);
+
+  LTRACEF("setting TARGETSR old %#x new %#x\n", old_targetsr, targetsr);
+
+  return ZX_OK;
+}
+
 static unsigned int gic_remap_interrupt(unsigned int vector) { return vector; }
 
 static void gic_handle_irq(iframe_t* frame) {
@@ -351,8 +376,8 @@ static void gic_init_percpu() {
         "Successful operation is unlikely!",
         assigned_gic_mask, gic_mask);
   }
-  LTRACEF("logical_cpu_mask: %u programmatic_gic_mask: %u assigned_gic_mask: %u\n",
-          cpu_num_to_mask(arch_curr_cpu_num()), gic_mask, assigned_gic_mask);
+  TRACEF("logical_cpu_mask: %u programmatic_gic_mask: %u assigned_gic_mask: %u\n",
+         cpu_num_to_mask(arch_curr_cpu_num()), gic_mask, assigned_gic_mask);
 }
 
 static void gic_shutdown() {
@@ -415,6 +440,7 @@ static const struct pdev_interrupt_ops gic_ops = {
     .deactivate = gic_deactivate_interrupt,
     .configure = gic_configure_interrupt,
     .get_config = gic_get_interrupt_config,
+    .set_affinity = gic_set_affinity,
     .is_valid = gic_is_valid_interrupt,
     .get_base_vector = gic_get_base_vector,
     .get_max_vector = gic_get_max_vector,

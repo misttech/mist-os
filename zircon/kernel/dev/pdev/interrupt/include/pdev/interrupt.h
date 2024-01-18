@@ -11,8 +11,7 @@
 #include <zircon/types.h>
 
 #include <dev/interrupt.h>
-
-__BEGIN_CDECLS
+#include <kernel/cpu.h>
 
 // Invokes the handler for the given vector if one is registered. If true is
 // returned a handler was present, otherwise false is returned.
@@ -27,18 +26,20 @@ struct pdev_interrupt_ops {
                            enum interrupt_polarity pol);
   zx_status_t (*get_config)(unsigned int vector, enum interrupt_trigger_mode* tm,
                             enum interrupt_polarity* pol);
+  zx_status_t (*set_affinity)(unsigned int vector, cpu_mask_t mask);
   bool (*is_valid)(unsigned int vector, uint32_t flags);
-  uint32_t (*get_base_vector)(void);
-  uint32_t (*get_max_vector)(void);
+  uint32_t (*get_base_vector)();
+  uint32_t (*get_max_vector)();
   unsigned int (*remap)(unsigned int vector);
   void (*send_ipi)(cpu_mask_t target, mp_ipi_t ipi);
-  void (*init_percpu_early)(void);
-  void (*init_percpu)(void);
+  void (*init_percpu_early)();
+  void (*init_percpu)();
   void (*handle_irq)(iframe_t* frame);
-  void (*shutdown)(void);
-  void (*shutdown_cpu)(void);
-  bool (*msi_is_supported)(void);
-  bool (*msi_supports_masking)(void);
+  void (*shutdown)();
+  void (*shutdown_cpu)();
+
+  bool (*msi_is_supported)();
+  bool (*msi_supports_masking)();
   void (*msi_mask_unmask)(const msi_block_t* block, uint msi_id, bool mask);
   zx_status_t (*msi_alloc_block)(uint requested_irqs, bool can_target_64bit, bool is_msix,
                                  msi_block_t* out_block);
@@ -48,7 +49,5 @@ struct pdev_interrupt_ops {
 };
 
 void pdev_register_interrupts(const struct pdev_interrupt_ops* ops);
-
-__END_CDECLS
 
 #endif  // ZIRCON_KERNEL_DEV_PDEV_INTERRUPT_INCLUDE_PDEV_INTERRUPT_H_

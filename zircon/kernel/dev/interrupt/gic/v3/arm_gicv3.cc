@@ -316,6 +316,11 @@ static zx_status_t gic_get_interrupt_config(unsigned int vector, enum interrupt_
   return ZX_OK;
 }
 
+static zx_status_t gic_set_affinity(unsigned int vector, cpu_mask_t mask) {
+  LTRACEF("vector %u, mask %#x\n", vector, mask);
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 static unsigned int gic_remap_interrupt(unsigned int vector) {
   LTRACEF("vector %u\n", vector);
   return vector;
@@ -467,6 +472,7 @@ static const struct pdev_interrupt_ops gic_ops = {
     .deactivate = gic_deactivate_interrupt,
     .configure = gic_configure_interrupt,
     .get_config = gic_get_interrupt_config,
+    .set_affinity = gic_set_affinity,
     .is_valid = gic_is_valid_interrupt,
     .get_base_vector = gic_get_base_vector,
     .get_max_vector = gic_get_max_vector,

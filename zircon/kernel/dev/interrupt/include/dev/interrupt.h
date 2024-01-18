@@ -11,9 +11,8 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <kernel/cpu.h>
 #include <kernel/mp.h>
-
-__BEGIN_CDECLS
 
 #define MAX_MSI_IRQS 32u
 
@@ -37,12 +36,12 @@ zx_status_t mask_interrupt(unsigned int vector);
 zx_status_t unmask_interrupt(unsigned int vector);
 zx_status_t deactivate_interrupt(unsigned int vector);
 
-void shutdown_interrupts(void);
+void shutdown_interrupts();
 
 // Shutdown interrupts for the calling CPU.
 //
 // Should be called before powering off the calling CPU.
-void shutdown_interrupts_curr_cpu(void);
+void shutdown_interrupts_curr_cpu();
 
 // Configure the specified interrupt vector.  If it is invoked, it muust be
 // invoked prior to interrupt registration
@@ -51,6 +50,9 @@ zx_status_t configure_interrupt(unsigned int vector, enum interrupt_trigger_mode
 
 zx_status_t get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
                                  enum interrupt_polarity* pol);
+
+// Set the affinity for an interrupt. Intrinsically set to cpu 0 by default.
+zx_status_t set_interrupt_affinity(unsigned int vector, cpu_mask_t mask);
 
 typedef void (*int_handler)(void* arg);
 
@@ -69,8 +71,8 @@ zx_status_t register_permanent_int_handler(unsigned int vector, int_handler hand
 
 // These return the [base, max] range of vectors that can be used with zx_interrupt syscalls
 // This api will need to evolve if valid vector ranges later are not contiguous
-uint32_t interrupt_get_base_vector(void);
-uint32_t interrupt_get_max_vector(void);
+uint32_t interrupt_get_base_vector();
+uint32_t interrupt_get_max_vector();
 
 bool is_valid_interrupt(unsigned int vector, uint32_t flags);
 
@@ -80,7 +82,7 @@ unsigned int remap_interrupt(unsigned int vector);
 void interrupt_send_ipi(cpu_mask_t target, mp_ipi_t ipi);
 
 // performs per-cpu initialization for the interrupt controller
-void interrupt_init_percpu(void);
+void interrupt_init_percpu();
 
 // A structure which holds the state of a block of IRQs allocated by the
 // platform to be used for delivering MSI or MSI-X interrupts.
@@ -105,8 +107,8 @@ typedef struct msi_block {
 //
 // If the platform supports MSI masking, it must supply a valid
 // implementation of MaskUnmaskMsi.
-bool msi_is_supported(void);
-bool msi_supports_masking(void);
+bool msi_is_supported();
+bool msi_supports_masking();
 void msi_mask_unmask(const msi_block_t* block, uint msi_id, bool mask);
 
 // Method used for platform allocation of blocks of MSI and MSI-X compatible
@@ -135,6 +137,5 @@ void msi_free_block(msi_block_t* block);
 // NULL handler will effectively unregister a handler for a given msi_id within the
 // block.
 void msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler, void* ctx);
-__END_CDECLS
 
 #endif  // ZIRCON_KERNEL_DEV_INTERRUPT_INCLUDE_DEV_INTERRUPT_H_
