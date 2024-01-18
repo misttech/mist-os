@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2090
+From //build/config/BUILDCONFIG.gn:2094
 
 ### allowed_test_device_types
 
@@ -3139,7 +3139,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1825
+From //build/config/BUILDCONFIG.gn:1829
 
 ### extra_vbmeta_descriptors
 
@@ -4182,16 +4182,16 @@ Each element of the list is one variant, which is a scope defining:
   name = "novariant"
 }, {
   configs = ["//build/config/profile:coverage"]
-  tags = ["instrumented", "coverage", "llvm-profdata", "needs-writable-globals"]
+  tags = ["coverage", "debugdata", "instrumented", "llvm-profdata", "needs-writable-globals"]
 }, {
   configs = ["//build/config/profile:coverage-rust"]
-  tags = ["instrumented", "coverage", "llvm-profdata", "needs-writable-globals"]
+  tags = ["coverage", "debugdata", "instrumented", "llvm-profdata", "needs-writable-globals"]
 }, {
   configs = ["//build/config/profile"]
-  tags = ["instrumented", "profile", "llvm-profdata", "needs-writable-globals"]
+  tags = ["debugdata", "instrumented", "llvm-profdata", "needs-writable-globals", "profile"]
 }, {
   configs = ["//build/config/profile:coverage-cts"]
-  tags = ["instrumented", "coverage", "llvm-profdata"]
+  tags = ["coverage", "debugdata", "instrumented", "llvm-profdata"]
 }, {
   configs = ["//build/config/sanitizers:tsan"]
   tags = ["tsan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "uses-shadow", "kernel-excluded"]
@@ -7721,7 +7721,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2080
+From //build/config/BUILDCONFIG.gn:2084
 
 ### select_variant_canonical
 
@@ -7731,7 +7731,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2085
+From //build/config/BUILDCONFIG.gn:2089
 
 ### select_variant_shortcuts
 
@@ -7789,7 +7789,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1871
+From //build/config/BUILDCONFIG.gn:1875
 
 ### size_checker_input
 
@@ -8309,7 +8309,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1855
+From //build/config/BUILDCONFIG.gn:1859
 
 ### universe_package_labels
 
