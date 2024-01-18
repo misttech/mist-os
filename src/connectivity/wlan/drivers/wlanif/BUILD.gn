@@ -36,7 +36,6 @@ all_deps = [
   "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
   "//src/connectivity/wlan/lib/common/cpp:common",
   "//src/connectivity/wlan/lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c",
-  "//src/devices/lib/driver",
   "//src/devices/lib/driver:driver_runtime",
   "//zircon/system/ulib/sync",
   "//zircon/system/ulib/sync:sync-cpp",

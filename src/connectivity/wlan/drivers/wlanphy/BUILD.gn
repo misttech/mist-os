@@ -10,22 +10,18 @@ import("//build/test.gni")
 wlanphy_sources = [
   "device.cc",
   "device.h",
-  "driver.cc",
-  "driver.h",
 ]
 
 wlanphy_deps = [
   ":wlanphy_bind",
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_cpp",
   "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
-  "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
+  "//sdk/lib/driver/component/cpp",
+  "//sdk/lib/driver/devfs/cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
-  "//src/connectivity/wlan/drivers/lib/log/cpp",
+  "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
   "//src/connectivity/wlan/lib/common/cpp:common",
-  "//src/devices/lib/driver",
   "//src/devices/lib/driver:driver_runtime",
-  "//src/lib/ddk",
-  "//src/lib/ddktl",
   "//zircon/system/ulib/async:async-cpp",
   "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/async-loop:async-loop-default",
@@ -64,13 +60,18 @@ fuchsia_driver_package("wlanphy") {
 
 executable("wlanphy_device_test") {
   testonly = true
-  output_name = "wlanphy_device_test"
   sources = wlanphy_sources + [ "tests/wlanphy_device_test.cc" ]
 
   deps = wlanphy_deps + [
-           "//src/devices/testing/mock-ddk",
+           "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+           "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+           "//sdk/lib/async_patterns/testing/cpp:cpp",
+           "//sdk/lib/driver/testing/cpp:cpp",
+           "//sdk/lib/sys/cpp/testing:cpp",
+           "//src/lib/fxl/test:gtest_main",
+           "//zircon/system/ulib/sync",
            "//zircon/system/ulib/sync:sync-cpp",
-           "//zircon/system/ulib/zxtest",
+           "//zircon/system/ulib/zx",
          ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
@@ -79,10 +80,16 @@ executable("wlanphy_device_test") {
 
 fuchsia_unittest_component("wlanphy_device_test_component") {
   deps = [ ":wlanphy_device_test" ]
+  manifest = "meta/wlanphy-test.cml"
 }
 
 fuchsia_test_package("wlanphy-unittests") {
   test_components = [ ":wlanphy_device_test_component" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {

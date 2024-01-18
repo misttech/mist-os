@@ -7,116 +7,139 @@
 #include <fidl/fuchsia.wlan.device/cpp/wire.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <fuchsia/wlan/internal/cpp/fidl.h>
-#include <lib/ddk/device.h>
+#include <lib/ddk/binding_driver.h>
+#include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <net/ethernet.h>
 #include <zircon/status.h>
 
 #include <iterator>
 
+#include <sdk/lib/driver/logging/cpp/logger.h>
 #include <wlan/common/band.h>
 #include <wlan/common/channel.h>
 #include <wlan/common/element.h>
 #include <wlan/common/phy.h>
 
 #include "debug.h"
-#include "driver.h"
+#include "wlan/drivers/log_instance.h"
 
 namespace wlanphy {
 
 namespace wlan_common = ::fuchsia::wlan::common;
 namespace wlan_internal = ::fuchsia::wlan::internal;
 
-Device::Device(zx_device_t* parent)
-    : ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
-                    ::ddk::Unbindable>(parent),
-      server_dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {
-  ltrace_fn();
-  ZX_ASSERT_MSG(parent != nullptr, "No parent device assigned for wlanphy device.");
+Device::Device(fdf::DriverStartArgs start_args,
+               fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : DriverBase("wlanphy", std::move(start_args), std::move(driver_dispatcher)),
+      devfs_connector_(fit::bind_member<&Device::Serve>(this)) {
+  wlan::drivers::log::Instance::Init(0);
 
   auto client_dispatcher =
-      fdf::SynchronizedDispatcher::Create({}, "wlanphy", [&](fdf_dispatcher_t*) {
-        if (unbind_txn_)
-          unbind_txn_->Reply();
-      });
+      fdf::SynchronizedDispatcher::Create({}, "wlanphy", [&](fdf_dispatcher_t*) {});
 
   ZX_ASSERT_MSG(!client_dispatcher.is_error(), "Creating dispatcher error: %s",
                 zx_status_get_string(client_dispatcher.status_value()));
-
   client_dispatcher_ = std::move(*client_dispatcher);
 }
 
-// Reserve this version of constructor for testing purpose.
-Device::Device(zx_device_t* parent, fdf::ClientEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> client)
-    : ::ddk::Device<Device, ::ddk::Messageable<fuchsia_wlan_device::Connector>::Mixin,
-                    ::ddk::Unbindable>(parent),
-      server_dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {
-  ltrace_fn();
-  ZX_ASSERT_MSG(parent != nullptr, "No parent device assigned for wlanphy device.");
-
-  auto client_dispatcher =
-      fdf::SynchronizedDispatcher::Create({}, "wlanphy", [&](fdf_dispatcher_t*) {
-        if (unbind_txn_)
-          unbind_txn_->Reply();
-      });
-
-  ZX_ASSERT_MSG(!client_dispatcher.is_error(), "Creating dispatcher error: %s",
-                zx_status_get_string(client_dispatcher.status_value()));
-
-  client_dispatcher_ = std::move(*client_dispatcher);
-
-  client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(client),
-                                                                     client_dispatcher_.get());
+void Device::Start(fdf::StartCompleter completer) {
+  compat_server_.emplace(dispatcher(), incoming(), outgoing(), node_name(), name(), std::nullopt,
+                         compat::ForwardMetadata::None());
+  start_completer_.emplace(std::move(completer));
+  compat_server_->OnInitialized(fit::bind_member<&Device::CompatServerInitialized>(this));
 }
 
-Device::~Device() { ltrace_fn(); }
+void Device::CompleteStart(zx::result<> result) {
+  ZX_ASSERT(start_completer_.has_value());
+  start_completer_.value()(result);
+  start_completer_.reset();
+}
 
-zx_status_t Device::DeviceAdd() {
-  zx_status_t status;
-
-  if ((status = DdkAdd(::ddk::DeviceAddArgs("wlanphy").set_proto_id(ZX_PROTOCOL_WLANPHY))) !=
-      ZX_OK) {
-    lerror("failed adding wlanphy device add: %s", zx_status_get_string(status));
-    return status;
+void Device::CompatServerInitialized(zx::result<> compat_result) {
+  if (compat_result.is_error()) {
+    return CompleteStart(compat_result.take_error());
   }
+  zx_status_t status;
+  if ((status = ConnectToWlanPhyImpl()) != ZX_OK) {
+    lerror("Connect to WlanPhyImpl failed: %s", zx_status_get_string(status));
+    return CompleteStart(zx::error(status));
+  }
+  if ((status = AddWlanDeviceConnector()) != ZX_OK) {
+    lerror("Adding WlanPhy service failed: %s", zx_status_get_string(status));
+    return CompleteStart(zx::error(status));
+  }
+  return CompleteStart(zx::ok());
+}
 
-  return ZX_OK;
+void Device::PrepareStop(fdf::PrepareStopCompleter completer) {
+  client_.AsyncTeardown();
+  completer(zx::ok());
 }
 
 void Device::Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) {
-  Connect(std::move(request->request));
+  ConnectPhyServerEnd(std::move(request->request));
 }
 
-void Device::Connect(fidl::ServerEnd<fuchsia_wlan_device::Phy> server_end) {
+void Device::ConnectPhyServerEnd(fidl::ServerEnd<fuchsia_wlan_device::Phy> server_end) {
   ltrace_fn();
-  fidl::BindServer<fuchsia_wlan_device::Phy>(server_dispatcher_, std::move(server_end), this);
+  phy_bindings_.AddBinding(dispatcher(), std::move(server_end), this, fidl::kIgnoreBindingClosure);
 }
 
 zx_status_t Device::ConnectToWlanPhyImpl() {
-  auto client_end = DdkConnectRuntimeProtocol<fuchsia_wlan_phyimpl::Service::WlanPhyImpl>();
+  auto client_end = incoming()->Connect<fuchsia_wlan_phyimpl::Service::WlanPhyImpl>();
   if (client_end.is_error()) {
-    lerror("DdkConnectRuntimeProtocol to wlanphyimpl device Failed =: %s",
-           client_end.status_string());
+    lerror("Connect to wlanphyimpl service Failed = %s", client_end.status_string());
     return client_end.status_value();
   }
   client_.Bind(std::move(*client_end), client_dispatcher_.get());
+  if (!client_.is_valid()) {
+    lerror("WlanPhyImpl Client is not valid");
+    return ZX_ERR_BAD_HANDLE;
+  }
   return ZX_OK;
 }
 
-// Implement DdkRelease for satisfying Ddk's requirement, but this function is not called now.
-// Though this device inherites Ddk:Device, DdkAdd() is not called, device_add() is called instead.
-void Device::DdkRelease() {
-  ltrace_fn();
-  delete this;
-}
+zx_status_t Device::AddWlanDeviceConnector() {
+  fidl::Arena arena;
+  zx::result connector = devfs_connector_.Bind(dispatcher());
+  if (connector.is_error()) {
+    return connector.status_value();
+  }
 
-void Device::DdkUnbind(::ddk::UnbindTxn txn) {
-  ltrace_fn();
-  // Saving the input UnbindTxn to the device, ::ddk::UnbindTxn::Reply() will be called with this
-  // UnbindTxn in the shutdown callback of the dispatcher, so that we can make sure DdkUnbind()
-  // won't end before the dispatcher shutdown.
-  unbind_txn_ = std::move(txn);
-  client_dispatcher_.ShutdownAsync();
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                   .connector(std::move(connector.value()))
+                   .class_name("wlanphy");
+
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, "wlanphy")
+                  .devfs_args(devfs.Build())
+                  .Build();
+  // Create endpoints of the `NodeController` for the node.
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    lerror("Failed to create endpoints: %s", controller_endpoints.status_string());
+    return controller_endpoints.status_value();
+  }
+
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  if (!node_endpoints.is_ok()) {
+    lerror("Failed to create endpoints: %s", node_endpoints.status_string());
+    return node_endpoints.status_value();
+  }
+
+  fidl::WireResult result = fidl::WireCall(node())->AddChild(
+      args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+  if (!result.ok()) {
+    lerror("Failed to add child, status: %s", result.status_string());
+    return result.status();
+  }
+  controller_node_.Bind(std::move(controller_endpoints->client));
+  node_.Bind(std::move(node_endpoints->client));
+  return ZX_OK;
 }
 
 void Device::GetSupportedMacRoles(GetSupportedMacRolesCompleter::Sync& completer) {
@@ -377,3 +400,4 @@ void Device::GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) {
       });
 }
 }  // namespace wlanphy
+FUCHSIA_DRIVER_EXPORT(::wlanphy::Device);
