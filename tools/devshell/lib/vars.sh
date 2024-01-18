@@ -970,6 +970,9 @@ function fx-run-ninja {
       "USER=${USER}"
       # Honor environment variable to disable RBE build metrics.
       "FX_REMOTE_BUILD_METRICS=${FX_REMOTE_BUILD_METRICS}"
+      # re-client will ask user to increase timeout in some error paths, so
+      # ensure this gets passed through.
+      "RBE_gcert_refresh_timeout=${RBE_gcert_refresh_timeout}"
     )
   fi
 
