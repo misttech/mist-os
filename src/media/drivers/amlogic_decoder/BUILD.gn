@@ -231,7 +231,6 @@ if (target_cpu == "arm64") {
       "//sdk/lib/fdio",
       "//sdk/lib/fidl/cpp",
       "//src/lib/ddktl",
-      "//src/lib/fsl",
       "//src/lib/metrics_buffer",
       "//src/media/lib/codec_impl",
     ]
@@ -245,7 +244,6 @@ if (target_cpu == "arm64") {
       ":sources",
       ":test_support",
       "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
-      "//sdk/lib/syslog/cpp",
       "//src/devices/lib/mmio:test_helper",
       "//src/media/lib/codec_impl",
       "//third_party/boringssl:crypto",
