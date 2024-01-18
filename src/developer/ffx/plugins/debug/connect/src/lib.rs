@@ -82,13 +82,17 @@ async fn connect_tool_impl(
     cmd: ConnectCommand,
     launcher_proxy: fdebugger::LauncherProxy,
 ) -> Result<()> {
-    let socket = choose_debug_agent(&launcher_proxy).await?.map_or_else(
-        || DebugAgentSocket::create(DebuggerProxy::LauncherProxy(launcher_proxy)),
-        |agent| {
-            println!("Connecting to {}", agent.name);
-            DebugAgentSocket::create(DebuggerProxy::DebugAgentProxy(agent.debug_agent_proxy))
-        },
-    )?;
+    let socket = if cmd.new_agent {
+        DebugAgentSocket::create(DebuggerProxy::LauncherProxy(launcher_proxy))?
+    } else {
+        choose_debug_agent(&launcher_proxy).await?.map_or_else(
+            || DebugAgentSocket::create(DebuggerProxy::LauncherProxy(launcher_proxy)),
+            |agent| {
+                println!("Connecting to {}", agent.name);
+                DebugAgentSocket::create(DebuggerProxy::DebugAgentProxy(agent.debug_agent_proxy))
+            },
+        )?
+    };
 
     if cmd.agent_only {
         println!("{}", socket.unix_socket_path().display());

@@ -28,6 +28,10 @@ pub struct ConnectCommand {
     #[argh(option, short = 'e')]
     pub execute: Vec<String>,
 
+    /// always spawn a new DebugAgent instance for this zxdb invocation.
+    #[argh(switch)]
+    pub new_agent: bool,
+
     /// extra arguments passed to zxdb. Any arguments starting with "-" must be after a "--" separator.
     #[argh(positional)]
     pub zxdb_args: Vec<String>,

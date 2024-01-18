@@ -54,6 +54,14 @@
       "short": "e",
       "description": "execute one zxdb command. Multiple commands will be executed sequentially.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--new-agent",
+      "short": null,
+      "description": "always spawn a new DebugAgent instance for this zxdb invocation.",
+      "hidden": false
     }
   ],
   "notes": [],
