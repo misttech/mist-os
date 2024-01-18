@@ -20,38 +20,43 @@
 
 namespace ui_conformance_testing {
 
+namespace futi = fuchsia::ui::test::input;
+namespace futc = fuchsia::ui::test::conformance;
+
 const std::string PUPPET_UNDER_TEST_FACTORY_SERVICE = "puppet-under-test-factory-service";
 
-bool CompareDouble(double f0, double f1, double epsilon) { return std::abs(f0 - f1) <= epsilon; }
+// Two physical pixel coordinates are considered equivalent if their distance is less than 1 unit.
+constexpr double kPixelEpsilon = 0.5f;
 
-class MouseListener : public fuchsia::ui::test::input::MouseInputListener {
+// Epsilon for floating error.
+constexpr double kEpsilon = 0.0001f;
+
+class MouseListener : public futi::MouseInputListener {
  public:
   MouseListener() : binding_(this) {}
 
   // |fuchsia::ui::test::input::MouseInputListener|
-  void ReportMouseInput(
-      fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest request) override {
+  void ReportMouseInput(futi::MouseInputListenerReportMouseInputRequest request) override {
     events_received_.push_back(std::move(request));
   }
 
   // Returns a client end bound to this object.
-  fidl::InterfaceHandle<fuchsia::ui::test::input::MouseInputListener> NewBinding() {
-    return binding_.NewBinding();
-  }
+  fidl::InterfaceHandle<futi::MouseInputListener> NewBinding() { return binding_.NewBinding(); }
 
-  const std::vector<fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest>&
-  events_received() const {
+  const std::vector<futi::MouseInputListenerReportMouseInputRequest>& events_received() const {
     return events_received_;
   }
 
+  void clear_events() { events_received_.clear(); }
+
  private:
-  fidl::Binding<fuchsia::ui::test::input::MouseInputListener> binding_;
-  std::vector<fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest> events_received_;
+  fidl::Binding<futi::MouseInputListener> binding_;
+  std::vector<futi::MouseInputListenerReportMouseInputRequest> events_received_;
 };
 
 // Holds resources associated with a single puppet instance.
 struct MousePuppet {
-  fuchsia::ui::test::conformance::PuppetSyncPtr puppet_ptr;
+  futc::PuppetSyncPtr puppet_ptr;
   MouseListener mouse_listener;
 };
 
@@ -62,16 +67,18 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
  public:
   ~MouseConformanceTest() override = default;
 
+  float DevicePixelRatio() const override { return GetParam(); }
+
   void SetUp() override {
     ui_conformance_test_base::ConformanceTest::SetUp();
 
     // Register fake mouse.
     {
       FX_LOGS(INFO) << "Connecting to input registry";
-      auto input_registry = ConnectSyncIntoRealm<fuchsia::ui::test::input::Registry>();
+      auto input_registry = ConnectSyncIntoRealm<futi::Registry>();
 
       FX_LOGS(INFO) << "Registering fake mouse";
-      fuchsia::ui::test::input::RegistryRegisterMouseRequest request;
+      futi::RegistryRegisterMouseRequest request;
       request.set_device(fake_mouse_.NewRequest());
       ASSERT_EQ(input_registry->RegisterMouse(std::move(request)), ZX_OK);
     }
@@ -108,34 +115,34 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
 
     {
       FX_LOGS(INFO) << "Create puppet under test";
-      fuchsia::ui::test::conformance::PuppetFactorySyncPtr puppet_factory;
+      futc::PuppetFactorySyncPtr puppet_factory;
 
       ASSERT_EQ(LocalServiceDirectory()->Connect(puppet_factory.NewRequest(),
                                                  PUPPET_UNDER_TEST_FACTORY_SERVICE),
                 ZX_OK);
 
-      fuchsia::ui::test::conformance::PuppetFactoryCreateResponse resp;
+      futc::PuppetFactoryCreateResponse resp;
 
       auto flatland = ConnectSyncIntoRealm<fuchsia::ui::composition::Flatland>();
       auto keyboard = ConnectSyncIntoRealm<fuchsia::ui::input3::Keyboard>();
 
-      fuchsia::ui::test::conformance::PuppetCreationArgs creation_args;
+      futc::PuppetCreationArgs creation_args;
       creation_args.set_server_end(puppet_.puppet_ptr.NewRequest());
       creation_args.set_view_token(std::move(root_view_token));
       creation_args.set_mouse_listener(puppet_.mouse_listener.NewBinding());
       creation_args.set_flatland_client(std::move(flatland));
       creation_args.set_keyboard_client(std::move(keyboard));
-      creation_args.set_device_pixel_ratio(GetParam());
+      creation_args.set_device_pixel_ratio(DevicePixelRatio());
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
-      ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
+      ASSERT_EQ(resp.result(), futc::Result::SUCCESS);
     }
   }
 
-  void SimulateMouseEvent(std::vector<fuchsia::ui::test::input::MouseButton> pressed_buttons,
-                          int movement_x, int movement_y) {
+  void SimulateMouseEvent(std::vector<futi::MouseButton> pressed_buttons, int movement_x,
+                          int movement_y) {
     FX_LOGS(INFO) << "Requesting mouse event";
-    fuchsia::ui::test::input::MouseSimulateMouseEventRequest request;
+    futi::MouseSimulateMouseEventRequest request;
     request.set_pressed_buttons(std::move(pressed_buttons));
     request.set_movement_x(movement_x);
     request.set_movement_y(movement_y);
@@ -144,37 +151,30 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
     FX_LOGS(INFO) << "Mouse event injected";
   }
 
-  void WaitForEvent(const MousePuppet& puppet, double expected_x, double expected_y,
-                    std::vector<fuchsia::ui::test::input::MouseButton> expected_buttons) {
-    RunLoopUntil([&puppet, expected_x, expected_y, &expected_buttons] {
-      const auto& events_received = puppet.mouse_listener.events_received();
-      for (const auto& event : events_received) {
-        const auto dpr = event.device_pixel_ratio();
-        // Check position of event against expectation.
-        if (!CompareDouble(event.local_x() * dpr, expected_x, dpr) ||
-            !CompareDouble(event.local_y() * dpr, expected_y, dpr)) {
-          continue;
-        }
-
-        // Check the reported buttons against expectations.
-        //
-        // For client ergonomics, we accept `buttons` as unset or set to the
-        // empty vector if no buttons are pressed.
-        if ((event.has_buttons() && event.buttons() == expected_buttons) ||
-            (!event.has_buttons() && expected_buttons.empty())) {
-          return true;
-        }
-      }
-
-      return false;
-    });
+  void ExpectEvent(const std::string& scoped_message,
+                   const futi::MouseInputListenerReportMouseInputRequest& e, double expected_x,
+                   double expected_y,
+                   const std::vector<futi::MouseButton>& expected_buttons) const {
+    SCOPED_TRACE(scoped_message);
+    auto pixel_scale = e.has_device_pixel_ratio() ? e.device_pixel_ratio() : 1;
+    EXPECT_NEAR(static_cast<double>(DevicePixelRatio()), pixel_scale, kEpsilon);
+    auto actual_x = pixel_scale * e.local_x();
+    auto actual_y = pixel_scale * e.local_y();
+    EXPECT_NEAR(expected_x, actual_x, kPixelEpsilon);
+    EXPECT_NEAR(expected_y, actual_y, kPixelEpsilon);
+    if (expected_buttons.empty()) {
+      EXPECT_FALSE(e.has_buttons());
+    } else {
+      ASSERT_TRUE(e.has_buttons());
+      EXPECT_EQ(expected_buttons, e.buttons());
+    }
   }
 
  protected:
-  int32_t display_width_as_int() { return static_cast<int32_t>(display_width_); }
-  int32_t display_height_as_int() { return static_cast<int32_t>(display_height_); }
+  int32_t display_width_as_int() const { return static_cast<int32_t>(display_width_); }
+  int32_t display_height_as_int() const { return static_cast<int32_t>(display_height_); }
 
-  fuchsia::ui::test::input::MouseSyncPtr fake_mouse_;
+  futi::MouseSyncPtr fake_mouse_;
   MousePuppet puppet_;
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
@@ -185,20 +185,31 @@ INSTANTIATE_TEST_SUITE_P(/*no prefix*/, MouseConformanceTest, ::testing::Values(
 TEST_P(MouseConformanceTest, SimpleClick) {
   // Inject click with no mouse movement.
   // Left button down.
-  SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},
+  SimulateMouseEvent(/* pressed_buttons = */ {futi::MouseButton::FIRST},
                      /* movement_x = */ 0, /* movement_y = */ 0);
   FX_LOGS(INFO) << "Waiting for puppet to report DOWN event";
-  WaitForEvent(puppet_, /* expected_x = */ static_cast<double>(display_width_) / 2.f,
-               /* expected_y = */ static_cast<double>(display_height_) / 2.f,
-               /* expected_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST});
+  RunLoopUntil([this]() { return this->puppet_.mouse_listener.events_received().size() >= 1; });
+
+  ASSERT_EQ(puppet_.mouse_listener.events_received().size(), 1u);
+
+  ExpectEvent("Down", puppet_.mouse_listener.events_received()[0],
+              /* expected_x = */ static_cast<double>(display_width_) / 2.f,
+              /* expected_y = */ static_cast<double>(display_height_) / 2.f,
+              /* expected_buttons = */ {futi::MouseButton::FIRST});
+
+  puppet_.mouse_listener.clear_events();
 
   // Left button up.
   SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 0, /* movement_y = */ 0);
 
   FX_LOGS(INFO) << "Waiting for puppet to report UP";
-  WaitForEvent(puppet_, /* expected_x = */ static_cast<double>(display_width_) / 2.f,
-               /* expected_y = */ static_cast<double>(display_height_) / 2.f,
-               /* expected_buttons = */ {});
+  RunLoopUntil([this]() { return this->puppet_.mouse_listener.events_received().size() >= 1; });
+  ASSERT_EQ(puppet_.mouse_listener.events_received().size(), 1u);
+
+  ExpectEvent("Up", puppet_.mouse_listener.events_received()[0],
+              /* expected_x = */ static_cast<double>(display_width_) / 2.f,
+              /* expected_y = */ static_cast<double>(display_height_) / 2.f,
+              /* expected_buttons = */ {});
 }
 
 }  //  namespace ui_conformance_testing

@@ -672,10 +672,20 @@ impl View {
                         }),
                     ..
                 } => return,
+                &MouseEvent {
+                    stream_info:
+                        Some(ui_pointer::MouseEventStreamInfo {
+                            status: ui_pointer::MouseViewStatus::Entered,
+                            ..
+                        }),
+                    ..
+                } => {
+                    let view_parameters =
+                        mouse_event.view_parameters.expect("entered event missing view_parameters");
+                    self.view_parameters = Some(view_parameters);
+                    continue;
+                }
                 _ => {}
-            }
-            if let Some(view_parameters) = mouse_event.view_parameters {
-                self.view_parameters = Some(view_parameters);
             }
             let event = self.get_mouse_report(&mouse_event);
             match &self.mouse_input_listener {
