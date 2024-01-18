@@ -12,6 +12,7 @@
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/channel.h>
 
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 
@@ -29,6 +30,14 @@ class ConformanceTest : public gtest::RealLoopFixture {
   void SetUp() override;
 
   const std::shared_ptr<sys::ServiceDirectory>& LocalServiceDirectory() const;
+
+  /// Override DisplayRotation() to provide display_rotation to test realm.
+  /// By default, it returns 0.
+  virtual uint32_t DisplayRotation() const;
+
+  /// Override DevicePixelRatio() to provide device_pixel_ratio to test realm.
+  /// By default, it returns 1.0.
+  virtual float DevicePixelRatio() const;
 
   /// Connect to the FIDL protocol which served from the realm proxy use default served path if no
   /// name passed in.

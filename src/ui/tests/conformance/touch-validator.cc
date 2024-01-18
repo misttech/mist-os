@@ -30,22 +30,26 @@ namespace ui_conformance_testing {
 const std::string PUPPET_UNDER_TEST_FACTORY_SERVICE = "puppet-under-test-factory-service";
 const std::string AUXILIARY_PUPPET_FACTORY_SERVICE = "auxiliary-puppet-factory-service";
 
-// Maximum distance between two physical pixel coordinates so that they are considered equal.
-constexpr double kEpsilon = 0.5f;
+// Two physical pixel coordinates are considered equivalent if their distance is less than 1 unit.
+constexpr double kPixelEpsilon = 0.5f;
+
+// Epsilon for floating error.
+constexpr double kEpsilon = 0.0001f;
 
 // TODO(https://fxbug.dev/125831): Two coordinates (x/y) systems can differ in scale (size of
 // pixels).
 void ExpectLocationAndPhase(
     const std::string& scoped_message,
-    const fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest& e, double expected_x,
-    double expected_y, fuchsia::ui::pointer::EventPhase expected_phase,
-    const uint32_t expected_pointer_id) {
+    const fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest& e,
+    float expected_pixel_ratio, double expected_x, double expected_y,
+    fuchsia::ui::pointer::EventPhase expected_phase, const uint32_t expected_pointer_id) {
   SCOPED_TRACE(scoped_message);
   auto pixel_scale = e.has_device_pixel_ratio() ? e.device_pixel_ratio() : 1;
+  EXPECT_NEAR(static_cast<double>(expected_pixel_ratio), pixel_scale, kEpsilon);
   auto actual_x = pixel_scale * e.local_x();
   auto actual_y = pixel_scale * e.local_y();
-  EXPECT_NEAR(expected_x, actual_x, kEpsilon);
-  EXPECT_NEAR(expected_y, actual_y, kEpsilon);
+  EXPECT_NEAR(expected_x, actual_x, kPixelEpsilon);
+  EXPECT_NEAR(expected_y, actual_y, kPixelEpsilon);
   EXPECT_EQ(expected_phase, e.phase());
   EXPECT_EQ(expected_pointer_id, e.pointer_id());
 }
@@ -127,6 +131,8 @@ class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest,
  public:
   ~TouchConformanceTest() override = default;
 
+  float DevicePixelRatio() const override { return GetParam(); }
+
   void SetUp() override {
     ui_conformance_test_base::ConformanceTest::SetUp();
 
@@ -159,8 +165,8 @@ class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest,
   }
 
  protected:
-  int32_t display_width_as_int() { return static_cast<int32_t>(display_width_); }
-  int32_t display_height_as_int() { return static_cast<int32_t>(display_height_); }
+  int32_t display_width_as_int() const { return static_cast<int32_t>(display_width_); }
+  int32_t display_height_as_int() const { return static_cast<int32_t>(display_height_); }
 
   fuchsia::ui::test::input::TouchScreenSyncPtr fake_touch_screen_;
   uint32_t display_width_ = 0;
@@ -209,7 +215,7 @@ class SingleViewTouchConformanceTest : public TouchConformanceTest {
       creation_args.set_touch_listener(puppet_->touch_listener.NewBinding());
       creation_args.set_flatland_client(std::move(flatland));
       creation_args.set_keyboard_client(std::move(keyboard));
-      creation_args.set_device_pixel_ratio(GetParam());
+      creation_args.set_device_pixel_ratio(DevicePixelRatio());
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
@@ -246,9 +252,9 @@ TEST_P(SingleViewTouchConformanceTest, SimpleTap) {
   // pixel ratio is 1. Therefore, the puppet's logical coordinate space will
   // match the physical coordinate space, so we expect the puppet to report
   // the event at (kTapX, kTapY).
-  ExpectLocationAndPhase("[0]", events_received[0], kTapX, kTapY,
+  ExpectLocationAndPhase("[0]", events_received[0], DevicePixelRatio(), kTapX, kTapY,
                          fuchsia::ui::pointer::EventPhase::ADD, 1);
-  ExpectLocationAndPhase("[1]", events_received[1], kTapX, kTapY,
+  ExpectLocationAndPhase("[1]", events_received[1], DevicePixelRatio(), kTapX, kTapY,
                          fuchsia::ui::pointer::EventPhase::REMOVE, 1);
 }
 
@@ -282,18 +288,18 @@ TEST_P(SingleViewTouchConformanceTest, MultiTap) {
 
   SortTouchInputRequestByTimeAndTimestampAndPointerId(events_received);
 
-  ExpectLocationAndPhase("add [0]", events_received[0], kTap0X, kTapY,
+  ExpectLocationAndPhase("add [0]", events_received[0], DevicePixelRatio(), kTap0X, kTapY,
                          fuchsia::ui::pointer::EventPhase::ADD, 0);
-  ExpectLocationAndPhase("add [1]", events_received[1], kTap1X, kTapY,
+  ExpectLocationAndPhase("add [1]", events_received[1], DevicePixelRatio(), kTap1X, kTapY,
                          fuchsia::ui::pointer::EventPhase::ADD, 1);
-  ExpectLocationAndPhase("add [2]", events_received[2], kTap2X, kTapY,
+  ExpectLocationAndPhase("add [2]", events_received[2], DevicePixelRatio(), kTap2X, kTapY,
                          fuchsia::ui::pointer::EventPhase::ADD, 2);
 
-  ExpectLocationAndPhase("remove [0]", events_received[3], kTap0X, kTapY,
+  ExpectLocationAndPhase("remove [0]", events_received[3], DevicePixelRatio(), kTap0X, kTapY,
                          fuchsia::ui::pointer::EventPhase::REMOVE, 0);
-  ExpectLocationAndPhase("remove [1]", events_received[4], kTap1X, kTapY,
+  ExpectLocationAndPhase("remove [1]", events_received[4], DevicePixelRatio(), kTap1X, kTapY,
                          fuchsia::ui::pointer::EventPhase::REMOVE, 1);
-  ExpectLocationAndPhase("remove [2]", events_received[5], kTap2X, kTapY,
+  ExpectLocationAndPhase("remove [2]", events_received[5], DevicePixelRatio(), kTap2X, kTapY,
                          fuchsia::ui::pointer::EventPhase::REMOVE, 2);
 }
 
@@ -333,24 +339,24 @@ TEST_P(SingleViewTouchConformanceTest, Pinch) {
 
   SortTouchInputRequestByTimeAndTimestampAndPointerId(events_received);
 
-  ExpectLocationAndPhase("add [0]", events_received[0], kTapX - 5, kTapY,
+  ExpectLocationAndPhase("add [0]", events_received[0], DevicePixelRatio(), kTapX - 5, kTapY,
                          fuchsia::ui::pointer::EventPhase::ADD, 0);
-  ExpectLocationAndPhase("add [1]", events_received[1], kTapX + 5, kTapY,
+  ExpectLocationAndPhase("add [1]", events_received[1], DevicePixelRatio(), kTapX + 5, kTapY,
                          fuchsia::ui::pointer::EventPhase::ADD, 1);
 
-  ExpectLocationAndPhase("change [0] 1", events_received[2], kTapX - 10, kTapY,
+  ExpectLocationAndPhase("change [0] 1", events_received[2], DevicePixelRatio(), kTapX - 10, kTapY,
                          fuchsia::ui::pointer::EventPhase::CHANGE, 0);
-  ExpectLocationAndPhase("change [1] 1", events_received[3], kTapX + 10, kTapY,
+  ExpectLocationAndPhase("change [1] 1", events_received[3], DevicePixelRatio(), kTapX + 10, kTapY,
                          fuchsia::ui::pointer::EventPhase::CHANGE, 1);
 
-  ExpectLocationAndPhase("change [0] 2", events_received[4], kTapX - 15, kTapY,
+  ExpectLocationAndPhase("change [0] 2", events_received[4], DevicePixelRatio(), kTapX - 15, kTapY,
                          fuchsia::ui::pointer::EventPhase::CHANGE, 0);
-  ExpectLocationAndPhase("change [1] 2", events_received[5], kTapX + 15, kTapY,
+  ExpectLocationAndPhase("change [1] 2", events_received[5], DevicePixelRatio(), kTapX + 15, kTapY,
                          fuchsia::ui::pointer::EventPhase::CHANGE, 1);
 
-  ExpectLocationAndPhase("remove [1]", events_received[6], kTapX - 15, kTapY,
+  ExpectLocationAndPhase("remove [1]", events_received[6], DevicePixelRatio(), kTapX - 15, kTapY,
                          fuchsia::ui::pointer::EventPhase::REMOVE, 0);
-  ExpectLocationAndPhase("remove [2]", events_received[7], kTapX + 15, kTapY,
+  ExpectLocationAndPhase("remove [2]", events_received[7], DevicePixelRatio(), kTapX + 15, kTapY,
                          fuchsia::ui::pointer::EventPhase::REMOVE, 1);
 }
 
@@ -397,7 +403,7 @@ class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
       creation_args.set_touch_listener(parent_puppet_->touch_listener.NewBinding());
       creation_args.set_flatland_client(std::move(flatland));
       creation_args.set_keyboard_client(std::move(keyboard));
-      creation_args.set_device_pixel_ratio(GetParam());
+      creation_args.set_device_pixel_ratio(DevicePixelRatio());
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
@@ -410,10 +416,18 @@ class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
       const uint64_t kChildViewportId = 1u;
       fuchsia::ui::test::conformance::PuppetEmbedRemoteViewRequest embed_remote_view_request;
       embed_remote_view_request.set_id(kChildViewportId);
-      embed_remote_view_request.mutable_properties()->mutable_bounds()->set_size(
-          {.width = display_width_ / 2, .height = display_height_ / 2});
+      // set_size needs logical coordinators.
+      embed_remote_view_request.mutable_properties()->mutable_bounds()->set_size({
+          .width =
+              static_cast<uint32_t>(static_cast<float>(display_width_) / DevicePixelRatio() / 2.0),
+          .height =
+              static_cast<uint32_t>(static_cast<float>(display_height_) / DevicePixelRatio() / 2.0),
+      });
+      // set_origin needs logical coordinators.
       embed_remote_view_request.mutable_properties()->mutable_bounds()->set_origin(
-          {.x = display_width_as_int() / 2, .y = display_height_as_int() / 2});
+          {.x = static_cast<int32_t>(static_cast<float>(display_width_) / DevicePixelRatio() / 2.0),
+           .y = static_cast<int32_t>(static_cast<float>(display_height_) / DevicePixelRatio() /
+                                     2.0)});
       this->parent_puppet_->puppet_ptr->EmbedRemoteView(std::move(embed_remote_view_request),
                                                         &embed_remote_view_response);
     }
@@ -441,7 +455,7 @@ class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
       creation_args.set_touch_listener(child_puppet_->touch_listener.NewBinding());
       creation_args.set_flatland_client(std::move(flatland));
       creation_args.set_keyboard_client(std::move(keyboard));
-      creation_args.set_device_pixel_ratio(GetParam());
+      creation_args.set_device_pixel_ratio(DevicePixelRatio());
 
       ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
       ASSERT_EQ(resp.result(), fuchsia::ui::test::conformance::Result::SUCCESS);
@@ -482,10 +496,10 @@ TEST_P(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
   // in the child's local coordinate space.
   const double quarter_display_width = static_cast<double>(display_width_) / 4.f;
   const double quarter_display_height = static_cast<double>(display_height_) / 4.f;
-  ExpectLocationAndPhase("[0]", events_received[0], quarter_display_width, quarter_display_height,
-                         fuchsia::ui::pointer::EventPhase::ADD, 1);
-  ExpectLocationAndPhase("[1]", events_received[1], quarter_display_width, quarter_display_height,
-                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+  ExpectLocationAndPhase("[0]", events_received[0], DevicePixelRatio(), quarter_display_width,
+                         quarter_display_height, fuchsia::ui::pointer::EventPhase::ADD, 1);
+  ExpectLocationAndPhase("[1]", events_received[1], DevicePixelRatio(), quarter_display_width,
+                         quarter_display_height, fuchsia::ui::pointer::EventPhase::REMOVE, 1);
 
   // The parent should not have received any pointer events.
   EXPECT_TRUE(this->parent_puppet_->touch_listener.events_received().empty());
@@ -526,19 +540,19 @@ TEST_P(EmbeddedViewTouchConformanceTest, EmbeddedViewMultiTap) {
 
   SortTouchInputRequestByTimeAndTimestampAndPointerId(events_received);
 
-  ExpectLocationAndPhase("add [0]", events_received[0], kTap0XChildView, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::ADD, 0);
-  ExpectLocationAndPhase("add [1]", events_received[1], kTap1XChildView, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::ADD, 1);
-  ExpectLocationAndPhase("add [2]", events_received[2], kTap2XChildView, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::ADD, 2);
+  ExpectLocationAndPhase("add [0]", events_received[0], DevicePixelRatio(), kTap0XChildView,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::ADD, 0);
+  ExpectLocationAndPhase("add [1]", events_received[1], DevicePixelRatio(), kTap1XChildView,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::ADD, 1);
+  ExpectLocationAndPhase("add [2]", events_received[2], DevicePixelRatio(), kTap2XChildView,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::ADD, 2);
 
-  ExpectLocationAndPhase("remove [1]", events_received[3], kTap0XChildView, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::REMOVE, 0);
-  ExpectLocationAndPhase("remove [2]", events_received[4], kTap1XChildView, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
-  ExpectLocationAndPhase("remove [3]", events_received[5], kTap2XChildView, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::REMOVE, 2);
+  ExpectLocationAndPhase("remove [1]", events_received[3], DevicePixelRatio(), kTap0XChildView,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::REMOVE, 0);
+  ExpectLocationAndPhase("remove [2]", events_received[4], DevicePixelRatio(), kTap1XChildView,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+  ExpectLocationAndPhase("remove [3]", events_received[5], DevicePixelRatio(), kTap2XChildView,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::REMOVE, 2);
 
   // The parent should not have received any pointer events.
   EXPECT_TRUE(this->parent_puppet_->touch_listener.events_received().empty());
@@ -584,25 +598,29 @@ TEST_P(EmbeddedViewTouchConformanceTest, Pinch) {
 
   SortTouchInputRequestByTimeAndTimestampAndPointerId(events_received);
 
-  ExpectLocationAndPhase("add [0]", events_received[0], kTapXChildView - 5, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::ADD, 0);
-  ExpectLocationAndPhase("add [1]", events_received[1], kTapXChildView + 5, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::ADD, 1);
+  ExpectLocationAndPhase("add [0]", events_received[0], DevicePixelRatio(), kTapXChildView - 5,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::ADD, 0);
+  ExpectLocationAndPhase("add [1]", events_received[1], DevicePixelRatio(), kTapXChildView + 5,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::ADD, 1);
 
-  ExpectLocationAndPhase("change [0] 1", events_received[2], kTapXChildView - 10, kTapYChildView,
+  ExpectLocationAndPhase("change [0] 1", events_received[2], DevicePixelRatio(),
+                         kTapXChildView - 10, kTapYChildView,
                          fuchsia::ui::pointer::EventPhase::CHANGE, 0);
-  ExpectLocationAndPhase("change [1] 1", events_received[3], kTapXChildView + 10, kTapYChildView,
+  ExpectLocationAndPhase("change [1] 1", events_received[3], DevicePixelRatio(),
+                         kTapXChildView + 10, kTapYChildView,
                          fuchsia::ui::pointer::EventPhase::CHANGE, 1);
 
-  ExpectLocationAndPhase("change [0] 2", events_received[4], kTapXChildView - 15, kTapYChildView,
+  ExpectLocationAndPhase("change [0] 2", events_received[4], DevicePixelRatio(),
+                         kTapXChildView - 15, kTapYChildView,
                          fuchsia::ui::pointer::EventPhase::CHANGE, 0);
-  ExpectLocationAndPhase("change [1] 2", events_received[5], kTapXChildView + 15, kTapYChildView,
+  ExpectLocationAndPhase("change [1] 2", events_received[5], DevicePixelRatio(),
+                         kTapXChildView + 15, kTapYChildView,
                          fuchsia::ui::pointer::EventPhase::CHANGE, 1);
 
-  ExpectLocationAndPhase("remove [0]", events_received[6], kTapXChildView - 15, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::REMOVE, 0);
-  ExpectLocationAndPhase("remove [1]", events_received[7], kTapXChildView + 15, kTapYChildView,
-                         fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+  ExpectLocationAndPhase("remove [0]", events_received[6], DevicePixelRatio(), kTapXChildView - 15,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::REMOVE, 0);
+  ExpectLocationAndPhase("remove [1]", events_received[7], DevicePixelRatio(), kTapXChildView + 15,
+                         kTapYChildView, fuchsia::ui::pointer::EventPhase::REMOVE, 1);
 
   // The parent should not have received any pointer events.
   EXPECT_TRUE(this->parent_puppet_->touch_listener.events_received().empty());

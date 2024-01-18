@@ -56,7 +56,9 @@ async fn run_realm_factory_server(stream: ui_test_context::RealmFactoryRequestSt
                     let realm_server = payload.realm_server.expect("missing realm_server");
 
                     // Create the puppet + ui stack for this test context.
-                    let realm = assemble_puppet_realm().await;
+                    let realm =
+                        assemble_puppet_realm(payload.display_rotation, payload.device_pixel_ratio)
+                            .await;
 
                     let request_stream = realm_server.into_stream().expect("into stream");
                     task_group.spawn(async move {
@@ -80,14 +82,46 @@ async fn run_realm_factory_server(stream: ui_test_context::RealmFactoryRequestSt
         .expect("failed to serve test realm factory request stream");
 }
 
-async fn assemble_puppet_realm() -> RealmInstance {
+async fn assemble_puppet_realm(
+    display_rotation: Option<u32>,
+    device_pixel_ratio: Option<f32>,
+) -> RealmInstance {
     let builder = RealmBuilder::new().await.expect("Failed to create RealmBuilder.");
 
     // Add test UI stack component.
-    builder
+    let ui_stack = builder
         .add_child(TEST_UI_STACK, TEST_UI_STACK_URL, ChildOptions::new())
         .await
         .expect("Failed to add UI realm.");
+
+    builder
+        .init_mutable_config_from_package(&ui_stack)
+        .await
+        .expect("Failed to init config for ui_stack");
+
+    match display_rotation {
+        Some(display_rotation) => {
+            builder
+                .set_config_value_uint32(&ui_stack, "display_rotation", display_rotation)
+                .await
+                .expect("Failed to set display_rotation.");
+        }
+        None => {}
+    }
+
+    match device_pixel_ratio {
+        Some(device_pixel_ratio) => {
+            builder
+                .set_config_value_string(
+                    &ui_stack,
+                    "device_pixel_ratio",
+                    device_pixel_ratio.to_string(),
+                )
+                .await
+                .expect("Failed to set device_pixel_ratio.");
+        }
+        None => {}
+    }
 
     // Route capabilities to the test UI stack.
     builder

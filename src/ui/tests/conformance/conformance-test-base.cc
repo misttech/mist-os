@@ -6,8 +6,6 @@
 
 #include <fuchsia/ui/test/context/cpp/fidl.h>
 
-#include "lib/zx/channel.h"
-
 namespace ui_conformance_test_base {
 
 void ConformanceTest::SetUp() {
@@ -20,6 +18,8 @@ void ConformanceTest::SetUp() {
     fuchsia::ui::test::context::RealmFactory_CreateRealm_Result res;
 
     req.set_realm_server(realm_proxy_.NewRequest());
+    req.set_display_rotation(DisplayRotation());
+    req.set_device_pixel_ratio(DevicePixelRatio());
 
     ASSERT_EQ(realm_factory->CreateRealm(std::move(req), &res), ZX_OK);
   }
@@ -28,5 +28,9 @@ void ConformanceTest::SetUp() {
 const std::shared_ptr<sys::ServiceDirectory>& ConformanceTest::LocalServiceDirectory() const {
   return context_->svc();
 }
+
+uint32_t ConformanceTest::DisplayRotation() const { return 0; }
+
+float ConformanceTest::DevicePixelRatio() const { return 1.f; }
 
 }  // namespace ui_conformance_test_base
