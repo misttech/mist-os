@@ -21,7 +21,7 @@ static constexpr zx_driver_ops_t driver_ops = {
       wlan::drivers::log::Instance::Init(0);
       linfo("Binding wlansoftmac driver.");
 
-      auto result = SoftmacBinding::New(device, fdf::Dispatcher::GetCurrent());
+      auto result = SoftmacBinding::New(device);
       if (result.is_error()) {
         auto status = result.error_value();
         lerror("Failed to bind: %d\n", status);

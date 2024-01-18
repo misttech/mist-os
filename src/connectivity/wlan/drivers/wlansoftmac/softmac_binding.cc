@@ -51,9 +51,7 @@
 
 namespace wlan::drivers::wlansoftmac {
 
-SoftmacBinding::SoftmacBinding(fdf::UnownedDispatcher&& main_driver_dispatcher)
-    : main_driver_dispatcher_(std::move(main_driver_dispatcher)),
-      unbind_called_(std::make_shared<bool>(false)) {
+SoftmacBinding::SoftmacBinding() : unbind_called_(std::make_shared<bool>(false)) {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
@@ -137,14 +135,12 @@ SoftmacBinding::SoftmacBinding(fdf::UnownedDispatcher&& main_driver_dispatcher)
 // All thread-unsafe work should occur before multiple threads are possible
 // (e.g., before MainLoop is started and before DdkAdd() is called), or locks
 // should be held.
-zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(
-    zx_device_t* parent_device,
-    fdf::UnownedDispatcher&& main_driver_dispatcher) __TA_NO_THREAD_SAFETY_ANALYSIS {
+zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(zx_device_t* parent_device)
+    __TA_NO_THREAD_SAFETY_ANALYSIS {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Binding...");
-  auto softmac_binding =
-      std::unique_ptr<SoftmacBinding>(new SoftmacBinding(std::move(main_driver_dispatcher)));
+  auto softmac_binding = std::unique_ptr<SoftmacBinding>(new SoftmacBinding());
 
   device_add_args_t args = {
       .version = DEVICE_ADD_ARGS_VERSION,
@@ -169,6 +165,7 @@ void SoftmacBinding::Init() {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Initializing...");
+  main_device_dispatcher_ = fdf::Dispatcher::GetCurrent();
 
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::Service::WlanSoftmac::ProtocolType>();
   if (endpoints.is_error()) {
@@ -190,7 +187,7 @@ void SoftmacBinding::Init() {
 
   linfo("Initializing Rust WlanSoftmac...");
   auto completer = std::make_unique<fit::callback<void(zx_status_t status)>>(
-      [dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+      [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(),
        device = device_](zx_status_t status) {
         if (status == ZX_OK) {
           linfo("Initialized Rust WlanSoftmac.");
@@ -200,7 +197,7 @@ void SoftmacBinding::Init() {
 
         // device_init_reply() must be called on a driver framework managed
         // dispatcher
-        async::PostTask(dispatcher, [device, status]() {
+        async::PostTask(main_device_dispatcher, [device, status]() {
           // Specify empty device_init_reply_args_t since SoftmacBinding
           // does not currently support power or performance state
           // information.
@@ -209,9 +206,9 @@ void SoftmacBinding::Init() {
       });
 
   fit::callback<void(zx_status_t)> sta_shutdown_handler =
-      [main_driver_dispatcher = main_driver_dispatcher_->async_dispatcher(),
+      [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(),
        unbind_called = unbind_called_, device = device_](zx_status_t status) {
-        async::PostTask(main_driver_dispatcher, [status, unbind_called, device]() mutable {
+        async::PostTask(main_device_dispatcher, [status, unbind_called, device]() mutable {
           if (status == ZX_OK) {
             return;
           }
