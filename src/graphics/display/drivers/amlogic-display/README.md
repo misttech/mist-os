@@ -195,8 +195,8 @@ The code contains references to the following documents.
 
 ### Panel references
 
-The code also contains references to the following documents, which will likely
-move to different drivers in the future.
+The code also contains references to the following documents covering display
+panels. These documents will likely move to different drivers in the future.
 
 * BOE Technology TV070WSM-TG1 Product Specification - Revision P4,
   issued 2020.07.10, referenced as "BOE TV070WSM-TG1 spec"
@@ -209,6 +209,25 @@ move to different drivers in the future.
 * [Microtech MTF050FHDI-03 Specification Sheet][ts050-panel-spec] - Version 1.0,
   dated July 7, 2015, distributed by icbanq.com
 
+The code also contains references to the following documents covering DDICs
+(Display Driver ICs). These documents will likely move to different drivers in
+the future.
+
+* Fitipower Jadard JD9364 Data Sheet - Version 1.07, dated 2021/2/26,
+  referenced as "JD9364 datasheet"
+* Fitipower Jadard JD9364 User Guide - Version 1.00, dated 2017/12/22,
+  referenced as "JD9364 user guide"
+* [Fitipower Jadard JD9365D Data Sheet][jd9365-datasheet] - Version 0.01,
+  dated 2017/4/27, distributed by PINE64, referenced as "JD9365 datasheet"
+* Fitipower Jadard JD9365 User Guide - Version 0.11, dated 2015/10/28,
+  referenced as "JD9365 user guide"
+* [Novatek NT35596 Data Sheet][nt35596-datasheet] - Version 0.05,
+  dated 2012/06/22, distributed by Khadas for TS-050, referenced as
+  "NT35596 datasheet"
+* [Sitronix ST7703I Data Sheet][st7703i-datasheet] - Version 1.03,
+  dated August 2018, distributed by Newhaven Display International, referenced
+  as "ST7701I datasheet"
+
 [a311d-datasheet]: https://dl.khadas.com/products/vim3/datasheet/a311d_datasheet_08_wesion.pdf
 [a311d2-datasheet]: https://dl.khadas.com/products/vim4/datasheet/amlogic_a311d2_datasheet_v06.pdf
 [s905d3-datasheet]: https://dl.khadas.com/products/vim3l/datasheet/s905d3_datasheet_0.2_wesion.pdf
@@ -218,7 +237,10 @@ move to different drivers in the future.
 [dw-dsi-databook]: https://www.synopsys.com/dw/doc.php/iip/DWC_mipi_dsi_host/1.51a/doc/DWC_mipi_dsi_host_databook.pdf
 [hdmi1-spec]: https://www.hdmi.org/spec/hdmi1_4b
 [hdmi2-spec]: https://www.hdmi.org/spec/hdmi2_1
+[jd9365-datasheet]: https://files.pine64.org/doc/datasheet/pinephone/JD9365D_DS_Preliminary_V0.01_20170427.pdf
 [mipi-dsi2-spec]: https://www.mipi.org/specifications/dsi-2
 [mipi-dphy-spec]: https://www.mipi.org/specifications/d-phy
 [mipi-dcs-spec]: https://www.mipi.org/specifications/display-command-set
+[nt35596-datasheet]: https://dl.khadas.com/products/add-ons/ts050/nt35596_datasheet_v0.0511.pdf
+[st7703i-datasheet]: https://support.newhavendisplay.com/hc/en-us/articles/13398995909655-ST7703I
 [ts050-panel-spec]: https://www.icbanq.com/icdownload/data/ICBShop/Board/MTF050FHDI-03-spec(350%20nits).pdf
