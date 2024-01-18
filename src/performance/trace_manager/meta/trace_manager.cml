@@ -27,6 +27,12 @@
             startup: "eager",
         },
     ],
+    collections: [
+        {
+            name: "workloads",
+            durability: "single_run",
+        },
+    ],
     capabilities: [
         {
             protocol: [
@@ -43,6 +49,7 @@
                 "#cpuperf_provider",
                 "#ktrace_provider",
                 "#perfetto-bridge",
+                "#workloads",
             ],
         },
         {
@@ -52,6 +59,7 @@
                 "#cpuperf_provider",
                 "#ktrace_provider",
                 "#perfetto-bridge",
+                "#workloads",
             ],
         },
         {
