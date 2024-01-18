@@ -340,11 +340,6 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
 
   zxlogf(DEBUG, "usb_device_function_registered functions_registered = true");
   functions_registered_ = true;
-  if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
-    // If you expected a call here, the listener_ might have been closed before it got called. This
-    // shouldn't crash the driver though.
-    zxlogf(DEBUG, "FunctionRegistered failed %s", status.error().FormatDescription().c_str());
-  }
 
   auto status = DeviceStateChanged();
   if (status != ZX_OK) {
@@ -353,7 +348,19 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
   }
 
   lock.release();
-  return dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
+
+  status = dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "SetInterface failed %d", status);
+    return status;
+  }
+
+  if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
+    // If you expected a call here, the listener_ might have been closed before it got called. This
+    // shouldn't crash the driver though.
+    zxlogf(DEBUG, "FunctionRegistered failed %s", status.error().FormatDescription().c_str());
+  }
+  return ZX_OK;
 }
 
 void UsbPeripheral::FunctionCleared() {
