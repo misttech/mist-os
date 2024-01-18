@@ -3707,7 +3707,7 @@ mod tests {
         MAP_ANONYMOUS, MAP_FIXED, MAP_GROWSDOWN, MAP_PRIVATE, PROT_NONE, PR_SET_VMA,
         PR_SET_VMA_ANON_NAME,
     };
-    use std::ffi::CString;
+    use std::{ffi::CString, ops::Deref as _};
     use zerocopy::FromZeros;
 
     #[::fuchsia::test]
@@ -3978,6 +3978,7 @@ mod tests {
     async fn test_read_write_crossing_mappings() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = current_task.mm();
+        let ma = current_task.deref();
 
         // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
         let page_size = *PAGE_SIZE;
@@ -3992,18 +3993,18 @@ mod tests {
         // Write a pattern crossing our two mappings.
         let test_addr = addr + page_size / 2;
         let data: Vec<u8> = (0..page_size).map(|i| (i % 256) as u8).collect();
-        mm.write_memory(test_addr, &data).expect("failed to write test data");
+        ma.write_memory(test_addr, &data).expect("failed to write test data");
 
         // Read it back.
         let data_readback =
-            mm.read_memory_to_vec(test_addr, data.len()).expect("failed to read test data");
+            ma.read_memory_to_vec(test_addr, data.len()).expect("failed to read test data");
         assert_eq!(&data, &data_readback);
     }
 
     #[::fuchsia::test]
     async fn test_read_write_errors() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = current_task.mm();
+        let ma = current_task.deref();
 
         let page_size = *PAGE_SIZE;
         let addr = map_memory(&current_task, UserAddress::default(), page_size);
@@ -4011,26 +4012,27 @@ mod tests {
 
         // Verify that accessing data that is only partially mapped is an error.
         let partial_addr_before = addr - page_size / 2;
-        assert_eq!(mm.write_memory(partial_addr_before, &buf), error!(EFAULT));
-        assert_eq!(mm.read_memory_to_vec(partial_addr_before, buf.len()), error!(EFAULT));
+        assert_eq!(ma.write_memory(partial_addr_before, &buf), error!(EFAULT));
+        assert_eq!(ma.read_memory_to_vec(partial_addr_before, buf.len()), error!(EFAULT));
         let partial_addr_after = addr + page_size / 2;
-        assert_eq!(mm.write_memory(partial_addr_after, &buf), error!(EFAULT));
-        assert_eq!(mm.read_memory_to_vec(partial_addr_after, buf.len()), error!(EFAULT));
+        assert_eq!(ma.write_memory(partial_addr_after, &buf), error!(EFAULT));
+        assert_eq!(ma.read_memory_to_vec(partial_addr_after, buf.len()), error!(EFAULT));
 
         // Verify that accessing unmapped memory is an error.
         let unmapped_addr = addr + 10 * page_size;
-        assert_eq!(mm.write_memory(unmapped_addr, &buf), error!(EFAULT));
-        assert_eq!(mm.read_memory_to_vec(unmapped_addr, buf.len()), error!(EFAULT));
+        assert_eq!(ma.write_memory(unmapped_addr, &buf), error!(EFAULT));
+        assert_eq!(ma.read_memory_to_vec(unmapped_addr, buf.len()), error!(EFAULT));
 
         // However, accessing zero bytes in unmapped memory is not an error.
-        mm.write_memory(unmapped_addr, &[]).expect("failed to write no data");
-        mm.read_memory_to_vec(unmapped_addr, 0).expect("failed to read no data");
+        ma.write_memory(unmapped_addr, &[]).expect("failed to write no data");
+        ma.read_memory_to_vec(unmapped_addr, 0).expect("failed to read no data");
     }
 
     #[::fuchsia::test]
     async fn test_read_c_string_to_vec_large() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = current_task.mm();
+        let ma = current_task.deref();
 
         let page_size = *PAGE_SIZE;
         let max_size = 4 * page_size as usize;
@@ -4048,10 +4050,10 @@ mod tests {
         }
         random_data[max_size - 1] = 0;
 
-        mm.write_memory(addr, &random_data).expect("failed to write test string");
+        ma.write_memory(addr, &random_data).expect("failed to write test string");
         // We should read the same value minus the last byte (NUL char).
         assert_eq!(
-            mm.read_c_string_to_vec(UserCString::new(addr), max_size).unwrap(),
+            ma.read_c_string_to_vec(UserCString::new(addr), max_size).unwrap(),
             random_data[..max_size - 1]
         );
     }
@@ -4060,6 +4062,7 @@ mod tests {
     async fn test_read_c_string_to_vec() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = current_task.mm();
+        let ma = current_task.deref();
 
         let page_size = *PAGE_SIZE;
         let max_size = 2 * page_size as usize;
@@ -4069,40 +4072,40 @@ mod tests {
         assert_eq!(map_memory(&current_task, addr, page_size), addr);
         let test_str = b"foo!";
         let test_addr = addr + page_size - test_str.len();
-        mm.write_memory(test_addr, test_str).expect("failed to write test string");
+        ma.write_memory(test_addr, test_str).expect("failed to write test string");
 
         // Expect error if the string is not terminated.
         assert_eq!(
-            mm.read_c_string_to_vec(UserCString::new(test_addr), max_size),
+            ma.read_c_string_to_vec(UserCString::new(test_addr), max_size),
             error!(ENAMETOOLONG)
         );
 
         // Expect success if the string is terminated.
-        mm.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(mm.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(), "foo");
+        ma.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
+        assert_eq!(ma.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(), "foo");
 
         // Expect success if the string spans over two mappings.
         assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
         // TODO: Adjacent private anonymous mappings are collapsed. To test this case this test needs to
         // provide a backing for the second mapping.
         // assert_eq!(mm.get_mapping_count(), 2);
-        mm.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
+        ma.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
         assert_eq!(
-            mm.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(),
+            ma.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(),
             "foobar",
         );
 
         // Expect error if the string exceeds max limit
-        assert_eq!(mm.read_c_string_to_vec(UserCString::new(test_addr), 2), error!(ENAMETOOLONG));
+        assert_eq!(ma.read_c_string_to_vec(UserCString::new(test_addr), 2), error!(ENAMETOOLONG));
 
         // Expect error if the address is invalid.
-        assert_eq!(mm.read_c_string_to_vec(UserCString::default(), max_size), error!(EFAULT));
+        assert_eq!(ma.read_c_string_to_vec(UserCString::default(), max_size), error!(EFAULT));
     }
 
     #[::fuchsia::test]
     async fn can_read_argv_like_regions() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = current_task.mm();
+        let ma = current_task.deref();
 
         // Map a page.
         let page_size = *PAGE_SIZE;
@@ -4112,17 +4115,17 @@ mod tests {
         // Write an unterminated string.
         let mut payload = "first".as_bytes().to_vec();
         let mut expected_parses = vec![];
-        mm.write_memory(addr, &payload).unwrap();
+        ma.write_memory(addr, &payload).unwrap();
 
         // Expect error if the string is not terminated.
-        assert_eq!(mm.read_nul_delimited_c_string_list(addr, payload.len()), error!(EINVAL));
+        assert_eq!(ma.read_nul_delimited_c_string_list(addr, payload.len()), error!(EINVAL));
 
         // Expect success if the string is terminated.
         expected_parses.push(payload.clone());
         payload.push(0);
-        mm.write_memory(addr, &payload).unwrap();
+        ma.write_memory(addr, &payload).unwrap();
         assert_eq!(
-            mm.read_nul_delimited_c_string_list(addr, payload.len()).unwrap(),
+            ma.read_nul_delimited_c_string_list(addr, payload.len()).unwrap(),
             expected_parses,
         );
 
@@ -4137,9 +4140,9 @@ mod tests {
         payload.push(0);
         expected_parses.push(third.to_vec());
 
-        mm.write_memory(addr, &payload).unwrap();
+        ma.write_memory(addr, &payload).unwrap();
         assert_eq!(
-            mm.read_nul_delimited_c_string_list(addr, payload.len()).unwrap(),
+            ma.read_nul_delimited_c_string_list(addr, payload.len()).unwrap(),
             expected_parses,
         );
     }
@@ -4148,6 +4151,7 @@ mod tests {
     async fn test_read_c_string() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = current_task.mm();
+        let ma = current_task.deref();
 
         let page_size = *PAGE_SIZE;
         let buf_cap = 2 * page_size as usize;
@@ -4161,31 +4165,31 @@ mod tests {
         assert_eq!(map_memory(&current_task, addr, page_size), addr);
         let test_str = b"foo!";
         let test_addr = addr + page_size - test_str.len();
-        mm.write_memory(test_addr, test_str).expect("failed to write test string");
+        ma.write_memory(test_addr, test_str).expect("failed to write test string");
 
         // Expect error if the string is not terminated.
-        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf), error!(ENAMETOOLONG));
+        assert_eq!(ma.read_c_string(UserCString::new(test_addr), buf), error!(ENAMETOOLONG));
 
         // Expect success if the string is terminated.
-        mm.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foo");
+        ma.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
+        assert_eq!(ma.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foo");
 
         // Expect success if the string spans over two mappings.
         assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
         // TODO: To be multiple mappings we need to provide a file backing for the next page or the
         // mappings will be collapsed.
         //assert_eq!(mm.get_mapping_count(), 2);
-        mm.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
-        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foobar");
+        ma.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
+        assert_eq!(ma.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foobar");
 
         // Expect error if the string does not fit in the provided buffer.
         assert_eq!(
-            mm.read_c_string(UserCString::new(test_addr), &mut [MaybeUninit::uninit(); 2]),
+            ma.read_c_string(UserCString::new(test_addr), &mut [MaybeUninit::uninit(); 2]),
             error!(ENAMETOOLONG)
         );
 
         // Expect error if the address is invalid.
-        assert_eq!(mm.read_c_string(UserCString::default(), buf), error!(EFAULT));
+        assert_eq!(ma.read_c_string(UserCString::default(), buf), error!(EFAULT));
     }
 
     #[::fuchsia::test]
@@ -4399,14 +4403,14 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_objects() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = current_task.mm();
+        let ma = current_task.deref();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let items_ref = UserRef::<i32>::new(addr);
 
         let items_written = vec![0, 2, 3, 7, 1];
-        mm.write_objects(items_ref, &items_written).expect("Failed to write object array.");
+        ma.write_objects(items_ref, &items_written).expect("Failed to write object array.");
 
-        let items_read = mm
+        let items_read = ma
             .read_objects_to_vec(items_ref, items_written.len())
             .expect("Failed to read object array.");
 
@@ -4416,13 +4420,13 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_objects_null() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = current_task.mm();
+        let ma = current_task.deref();
         let items_ref = UserRef::<i32>::new(UserAddress::default());
 
         let items_written = vec![];
-        mm.write_objects(items_ref, &items_written).expect("Failed to write empty object array.");
+        ma.write_objects(items_ref, &items_written).expect("Failed to write empty object array.");
 
-        let items_read = mm
+        let items_read = ma
             .read_objects_to_vec(items_ref, items_written.len())
             .expect("Failed to read empty object array.");
 
@@ -4437,39 +4441,39 @@ mod tests {
         }
 
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = current_task.mm();
+        let ma = current_task.deref();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let items_array_ref = UserRef::<i32>::new(addr);
 
         // Populate some values.
         let items_written = vec![75, 23, 51, 98];
-        mm.write_objects(items_array_ref, &items_written).expect("Failed to write object array.");
+        ma.write_objects(items_array_ref, &items_written).expect("Failed to write object array.");
 
         // Full read of all 4 values.
         let items_ref = UserRef::<Items>::new(addr);
-        let items_read = mm
+        let items_read = ma
             .read_object_partial(items_ref, std::mem::size_of::<Items>())
             .expect("Failed to read object");
         assert_eq!(items_written, items_read.val);
 
         // Partial read of the first two.
-        let items_read = mm.read_object_partial(items_ref, 8).expect("Failed to read object");
+        let items_read = ma.read_object_partial(items_ref, 8).expect("Failed to read object");
         assert_eq!(vec![75, 23, 0, 0], items_read.val);
 
         // The API currently allows reading 0 bytes (this could be re-evaluated) so test that does
         // the right thing.
-        let items_read = mm.read_object_partial(items_ref, 0).expect("Failed to read object");
+        let items_read = ma.read_object_partial(items_ref, 0).expect("Failed to read object");
         assert_eq!(vec![0, 0, 0, 0], items_read.val);
 
         // Size bigger than the object.
         assert_eq!(
-            mm.read_object_partial(items_ref, std::mem::size_of::<Items>() + 8),
+            ma.read_object_partial(items_ref, std::mem::size_of::<Items>() + 8),
             error!(EINVAL)
         );
 
         // Bad pointer.
         assert_eq!(
-            mm.read_object_partial(UserRef::<Items>::new(UserAddress::from(1)), 16),
+            ma.read_object_partial(UserRef::<Items>::new(UserAddress::from(1)), 16),
             error!(EFAULT)
         );
     }
@@ -4478,18 +4482,19 @@ mod tests {
     async fn test_partial_read() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = current_task.mm();
+        let ma = current_task.deref();
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let second_map = map_memory(&current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
 
         let bytes = vec![0xf; (*PAGE_SIZE * 2) as usize];
-        assert!(mm.write_memory(addr, &bytes).is_ok());
+        assert!(ma.write_memory(addr, &bytes).is_ok());
         mm.state
             .write()
             .protect(second_map, *PAGE_SIZE as usize, ProtectionFlags::empty())
             .unwrap();
         assert_eq!(
-            mm.read_memory_partial_to_vec(addr, bytes.len()).unwrap().len(),
+            ma.read_memory_partial_to_vec(addr, bytes.len()).unwrap().len(),
             *PAGE_SIZE as usize,
         );
     }
@@ -4609,6 +4614,7 @@ mod tests {
 
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
+        let ma = current_task.deref();
 
         let port = Arc::new(zx::Port::create());
         let port_clone = port.clone();
@@ -4667,20 +4673,20 @@ mod tests {
         mm.snapshot_to(&mut locked, target.mm()).expect("snapshot_to failed");
 
         // Make sure it has what we wrote.
-        let buf = target.mm().read_memory_to_vec(addr, 3).expect("read_memory failed");
+        let buf = target.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"foo");
 
         // Write something to both source and target and make sure they are forked.
-        mm.write_memory(addr, b"bar").expect("write_memory failed");
+        ma.write_memory(addr, b"bar").expect("write_memory failed");
 
-        let buf = target.mm().read_memory_to_vec(addr, 3).expect("read_memory failed");
+        let buf = target.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"foo");
 
-        target.mm().write_memory(addr, b"baz").expect("write_memory failed");
-        let buf = mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
+        target.write_memory(addr, b"baz").expect("write_memory failed");
+        let buf = ma.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"bar");
 
-        let buf = target.mm().read_memory_to_vec(addr, 3).expect("read_memory failed");
+        let buf = target.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"baz");
 
         port.queue(&zx::Packet::from_user_packet(0, 0, zx::UserPacket::from_u8_array([0; 32])))
@@ -4719,7 +4725,6 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
@@ -4762,7 +4767,6 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
@@ -4800,7 +4804,6 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
@@ -4839,7 +4842,6 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
@@ -4879,7 +4881,6 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 

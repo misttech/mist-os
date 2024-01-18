@@ -348,7 +348,7 @@ pub fn dispatch_signal_handler(
     }
 
     // Write the signal stack frame at the updated stack pointer.
-    task.mm().write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;
+    task.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;
     signal_state.set_mask(action.sa_mask);
 
     registers.set_stack_pointer_register(stack_pointer);
@@ -371,7 +371,6 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
     let signal_frame_address =
         align_stack_pointer(current_task.thread_state.registers.stack_pointer_register());
     let signal_stack_bytes = current_task
-        .mm()
         .read_memory_to_array::<SIG_STACK_SIZE>(UserAddress::from(signal_frame_address))?;
 
     // Grab the registers state from the stack frame.

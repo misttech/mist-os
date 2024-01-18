@@ -688,10 +688,7 @@ mod tests {
 
         // Verify that the second page is still readable.
         assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
-        assert!(current_task
-            .mm()
-            .read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64)
-            .is_ok());
+        assert!(current_task.read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64).is_ok());
     }
 
     /// Unmap the middle page of a mapping.

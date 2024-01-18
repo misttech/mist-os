@@ -672,45 +672,43 @@ impl SocketOps for UnixSocket {
         match level {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
-                    let requested_capacity: socklen_t =
-                        task.mm().read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = task.read_object(user_opt.try_into()?)?;
                     // See StreamUnixSocketPairTest.SetSocketSendBuf for why we multiply by 2 here.
                     self.set_send_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
-                    let requested_capacity: socklen_t =
-                        task.mm().read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t = task.read_object(user_opt.try_into()?)?;
                     self.set_receive_capacity(requested_capacity as usize);
                 }
                 SO_LINGER => {
-                    let mut linger: uapi::linger = task.mm().read_object(user_opt.try_into()?)?;
+                    let mut linger: uapi::linger = task.read_object(user_opt.try_into()?)?;
                     if linger.l_onoff != 0 {
                         linger.l_onoff = 1;
                     }
                     self.set_linger(linger);
                 }
                 SO_PASSCRED => {
-                    let passcred: u32 = task.mm().read_object(user_opt.try_into()?)?;
+                    let passcred: u32 = task.read_object(user_opt.try_into()?)?;
                     self.set_passcred(passcred != 0);
                 }
                 SO_BROADCAST => {
-                    let broadcast: u32 = task.mm().read_object(user_opt.try_into()?)?;
+                    let broadcast: u32 = task.read_object(user_opt.try_into()?)?;
                     self.set_broadcast(broadcast != 0);
                 }
                 SO_NO_CHECK => {
-                    let no_check: u32 = task.mm().read_object(user_opt.try_into()?)?;
+                    let no_check: u32 = task.read_object(user_opt.try_into()?)?;
                     self.set_no_check(no_check != 0);
                 }
                 SO_REUSEADDR => {
-                    let reuseaddr: u32 = task.mm().read_object(user_opt.try_into()?)?;
+                    let reuseaddr: u32 = task.read_object(user_opt.try_into()?)?;
                     self.set_reuseaddr(reuseaddr != 0);
                 }
                 SO_REUSEPORT => {
-                    let reuseport: u32 = task.mm().read_object(user_opt.try_into()?)?;
+                    let reuseport: u32 = task.read_object(user_opt.try_into()?)?;
                     self.set_reuseport(reuseport != 0);
                 }
                 SO_KEEPALIVE => {
-                    let keepalive: u32 = task.mm().read_object(user_opt.try_into()?)?;
+                    let keepalive: u32 = task.read_object(user_opt.try_into()?)?;
                     self.set_keepalive(keepalive != 0);
                 }
                 _ => return error!(ENOPROTOOPT),

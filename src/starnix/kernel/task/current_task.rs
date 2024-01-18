@@ -751,7 +751,7 @@ impl CurrentTask {
         bpf_filter: UserAddress,
         flags: u32,
     ) -> Result<SyscallResult, Errno> {
-        let fprog: sock_fprog = self.mm().read_object(UserRef::new(bpf_filter))?;
+        let fprog: sock_fprog = self.read_object(UserRef::new(bpf_filter))?;
 
         if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
             return Err(errno!(EINVAL));
@@ -872,7 +872,7 @@ impl CurrentTask {
             // No one has called set_robust_list.
             return;
         }
-        let robust_list_res = self.mm().read_object(task_state.robust_list_head);
+        let robust_list_res = self.read_object(task_state.robust_list_head);
 
         let head = if let Ok(head) = robust_list_res {
             head
@@ -885,7 +885,7 @@ impl CurrentTask {
         let mut entries_count = 0;
         let mut curr_ptr = head.list.next;
         while curr_ptr.addr != robust_list_addr.into() && entries_count < ROBUST_LIST_LIMIT {
-            let curr_ref = self.mm().read_object(curr_ptr.into());
+            let curr_ref = self.read_object(curr_ptr.into());
 
             let curr = if let Ok(curr) = curr_ref {
                 curr
@@ -1430,7 +1430,7 @@ impl CurrentTask {
             }
 
             if flags & (CLONE_PARENT_SETTID as u64) != 0 {
-                self.mm().write_object(user_parent_tid, &child.id)?;
+                self.write_object(user_parent_tid, &child.id)?;
             }
 
             if flags & (CLONE_CHILD_CLEARTID as u64) != 0 {
@@ -1438,7 +1438,7 @@ impl CurrentTask {
             }
 
             if flags & (CLONE_CHILD_SETTID as u64) != 0 {
-                child.mm().vmo_write_object(user_child_tid, &child.id)?;
+                child.vmo_write_object(user_child_tid, &child.id)?;
             }
             child.thread_state = self.thread_state.snapshot();
             Ok(())

@@ -14,7 +14,7 @@ use crate::{
     fs::{fuchsia::RemoteFs, tmpfs::TmpFs},
     mm::{
         syscalls::{do_mmap, sys_mremap},
-        MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE,
+        MemoryAccessor, MemoryAccessorExt, PAGE_SIZE,
     },
     task::{CurrentTask, Kernel, Task},
     vfs::{
@@ -132,7 +132,7 @@ pub fn map_object_anywhere<T: AsBytes + NoCell>(
     object: &T,
 ) -> UserAddress {
     let addr = map_memory_anywhere(current_task, std::mem::size_of::<T>() as u64);
-    current_task.mm().write_object(addr.into(), object).expect("could not write object");
+    current_task.write_object(addr.into(), object).expect("could not write object");
     addr
 }
 
@@ -313,7 +313,7 @@ impl FileOps for PanickingFile {
 /// Helper to write out data to a task's memory sequentially.
 pub struct UserMemoryWriter<'a> {
     // The task's memory manager.
-    mm: &'a MemoryManager,
+    mm: &'a Task,
     // The address to which to write the next bit of data.
     current_addr: UserAddress,
 }
@@ -321,7 +321,7 @@ pub struct UserMemoryWriter<'a> {
 impl<'a> UserMemoryWriter<'a> {
     /// Constructs a new `UserMemoryWriter` to write to `task`'s memory at `addr`.
     pub fn new(task: &'a Task, addr: UserAddress) -> Self {
-        Self { mm: task.mm(), current_addr: addr }
+        Self { mm: task, current_addr: addr }
     }
 
     /// Writes all of `data` to the current address in the task's address space, incrementing the

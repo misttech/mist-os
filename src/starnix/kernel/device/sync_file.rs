@@ -143,7 +143,7 @@ impl FileOps for SyncFile {
         match ioctl_number {
             SYNC_IOC_MERGE => {
                 let user_ref = UserRef::new(user_addr);
-                let mut merge_data: sync_merge_data = current_task.mm().read_object(user_ref)?;
+                let mut merge_data: sync_merge_data = current_task.read_object(user_ref)?;
                 let file2 = current_task.files.get(FdNumber::from_raw(merge_data.fd2))?;
 
                 let mut fence = SyncFence { sync_points: vec![] };
@@ -184,12 +184,12 @@ impl FileOps for SyncFile {
                 let fd = current_task.add_file(file, FdFlags::empty())?;
                 merge_data.fence = fd.raw();
 
-                current_task.mm().write_object(user_ref, &merge_data)?;
+                current_task.write_object(user_ref, &merge_data)?;
                 Ok(SUCCESS)
             }
             SYNC_IOC_FILE_INFO => {
                 let user_ref = UserRef::new(user_addr);
-                let mut info: sync_file_info = current_task.mm().read_object(user_ref)?;
+                let mut info: sync_file_info = current_task.read_object(user_ref)?;
 
                 for i in 0..self.name.len() {
                     info.name[i] = self.name[i] as c_char;
@@ -228,14 +228,14 @@ impl FileOps for SyncFile {
                             let fence_user_ref = UserRef::new(UserAddress::from(user_addr));
                             user_addr += std::mem::size_of::<sync_fence_info>() as u64;
 
-                            current_task.mm().write_object(fence_user_ref, &fence_info)?;
+                            current_task.write_object(fence_user_ref, &fence_info)?;
                         }
                     }
 
                     info.status = sync_file_status;
                 }
 
-                current_task.mm().write_object(user_ref, &info)?;
+                current_task.write_object(user_ref, &info)?;
                 Ok(SUCCESS)
             }
             _ => {

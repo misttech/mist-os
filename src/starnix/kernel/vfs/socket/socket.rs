@@ -344,7 +344,7 @@ impl Socket {
     ) -> Result<(), Errno> {
         let read_timeval = || {
             let timeval_ref = user_opt.try_into()?;
-            let duration = duration_from_timeval(task.mm().read_object(timeval_ref)?)?;
+            let duration = duration_from_timeval(task.read_object(timeval_ref)?)?;
             Ok(if duration == zx::Duration::default() { None } else { Some(duration) })
         };
 
@@ -353,7 +353,7 @@ impl Socket {
                 SO_RCVTIMEO => self.state.lock().receive_timeout = read_timeval()?,
                 SO_SNDTIMEO => self.state.lock().send_timeout = read_timeval()?,
                 SO_MARK => {
-                    self.state.lock().mark = task.mm().read_object(user_opt.try_into()?)?;
+                    self.state.lock().mark = task.read_object(user_opt.try_into()?)?;
                 }
                 _ => self.ops.setsockopt(self, task, level, optname, user_opt)?,
             },
@@ -631,7 +631,7 @@ impl Socket {
                 Ok(SUCCESS)
             }
             SIOCGIFFLAGS => {
-                let in_ifreq: ifreq = current_task.mm().read_object(UserRef::new(user_addr))?;
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
                     get_netlink_interface_info(current_task, &in_ifreq, &mut read_buf)?;
@@ -647,12 +647,12 @@ impl Socket {
                         link_msg.header.flags as i16
                     },
                 });
-                current_task.mm().write_object(UserRef::new(user_addr), &out_ifreq)?;
+                current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)
             }
             SIOCSIFFLAGS => {
                 let user_addr = UserAddress::from(arg);
-                let in_ifreq: ifreq = current_task.mm().read_object(UserRef::new(user_addr))?;
+                let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 set_netlink_interface_flags(current_task, &in_ifreq).map(|()| SUCCESS)
             }
             _ => self.ops.ioctl(self, file, current_task, request, arg),

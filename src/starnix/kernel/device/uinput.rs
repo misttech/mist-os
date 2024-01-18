@@ -124,7 +124,7 @@ impl UinputDevice {
             return error!(EFAULT);
         }
         let response: u32 = UINPUT_VERSION;
-        match current_task.mm().write_object(UserRef::new(user_arg), &response) {
+        match current_task.write_object(UserRef::new(user_arg), &response) {
             Ok(_) => Ok(SUCCESS),
             Err(e) => Err(e),
         }
@@ -142,7 +142,6 @@ impl UinputDevice {
             return error!(EFAULT);
         }
         let uinput_setup = current_task
-            .mm()
             .read_object::<uapi::uinput_setup>(UserRef::new(user_arg))
             .expect("read object");
         self.inner.lock().input_id = Some(uinput_setup.id);
@@ -385,8 +384,7 @@ mod test {
         let r =
             dev.ioctl(&file_object, &current_task, uapi::UI_GET_VERSION, version_address.into());
         assert_eq!(r, Ok(SUCCESS));
-        let version: u32 =
-            current_task.mm().read_object(version_address.into()).expect("read object");
+        let version: u32 = current_task.read_object(version_address.into()).expect("read object");
         assert_eq!(version, UINPUT_VERSION);
 
         // call with invalid buffer.
@@ -513,7 +511,7 @@ mod test {
         let phys_name = b"mouse0\0";
         let phys_name_address =
             map_memory(&current_task, UserAddress::default(), phys_name.len() as u64);
-        current_task.mm().write_memory(phys_name_address, phys_name).expect("write_memory");
+        current_task.write_memory(phys_name_address, phys_name).expect("write_memory");
         let r = dev.ioctl(&file_object, &current_task, uapi::UI_SET_PHYS, phys_name_address.into());
         assert_eq!(r, Ok(SUCCESS));
 
@@ -535,7 +533,7 @@ mod test {
         let want_input_id =
             uapi::input_id { vendor: 0x18d1, product: 0xabcd, ..uapi::input_id::default() };
         let setup = uapi::uinput_setup { id: want_input_id, ..uapi::uinput_setup::default() };
-        current_task.mm().write_object(address.into(), &setup).expect("write_memory");
+        current_task.write_object(address.into(), &setup).expect("write_memory");
         let r = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         assert_eq!(r, Ok(SUCCESS));
         assert_eq!(dev.inner.lock().input_id.unwrap(), want_input_id);
@@ -549,7 +547,7 @@ mod test {
         let want_input_id =
             uapi::input_id { vendor: 0x18d1, product: 0x1234, ..uapi::input_id::default() };
         let setup = uapi::uinput_setup { id: want_input_id, ..uapi::uinput_setup::default() };
-        current_task.mm().write_object(address.into(), &setup).expect("write_memory");
+        current_task.write_object(address.into(), &setup).expect("write_memory");
         let r = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         assert_eq!(r, Ok(SUCCESS));
         assert_eq!(dev.inner.lock().input_id.unwrap(), want_input_id);

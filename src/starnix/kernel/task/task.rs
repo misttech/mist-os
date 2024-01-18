@@ -1035,7 +1035,7 @@ impl Task {
         let user_tid = state.clear_child_tid;
         if !user_tid.is_null() {
             let zero: pid_t = 0;
-            self.mm().write_object(user_tid, &zero)?;
+            self.write_object(user_tid, &zero)?;
             self.kernel().shared_futexes.wake(
                 self,
                 user_tid.addr(),
@@ -1069,7 +1069,7 @@ impl Task {
             (mm_state.argv_start, mm_state.argv_end)
         };
 
-        self.mm().read_nul_delimited_c_string_list(argv_start, argv_end - argv_start)
+        self.read_nul_delimited_c_string_list(argv_start, argv_end - argv_start)
     }
 
     pub fn thread_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, Errno> {

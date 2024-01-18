@@ -232,13 +232,11 @@ pub fn sys_bpf(
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
 
             let key = current_task
-                .mm()
                 .read_memory_to_vec(UserAddress::from(elem_attr.key), map.key_size as usize)?;
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
             let value_addr = unsafe { elem_attr.__bindgen_anon_1.value };
             let value = current_task
-                .mm()
                 .read_memory_to_vec(UserAddress::from(value_addr), map.value_size as usize)?;
 
             map.entries.lock(locked).insert(key, value);
@@ -254,7 +252,6 @@ pub fn sys_bpf(
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
             let key = if elem_attr.key != 0 {
                 let key = current_task
-                    .mm()
                     .read_memory_to_vec(UserAddress::from(elem_attr.key), map.key_size as usize)?;
                 Some(key)
             } else {
@@ -392,7 +389,6 @@ pub fn sys_bpf(
             let btf_attr: bpf_attr__bindgen_ty_12 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_BTF_LOAD {:?}", btf_attr);
             let data = current_task
-                .mm()
                 .read_memory_to_vec(UserAddress::from(btf_attr.btf), btf_attr.btf_size as usize)?;
             install_bpf_fd(current_task, BpfTypeFormat { data })
         }

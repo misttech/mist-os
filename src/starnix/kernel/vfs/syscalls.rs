@@ -1007,7 +1007,6 @@ pub fn sys_fchownat(
 
 fn read_xattr_name(current_task: &CurrentTask, name_addr: UserCString) -> Result<FsString, Errno> {
     let name = current_task
-        .mm()
         .read_c_string_to_vec(name_addr, XATTR_NAME_MAX as usize + 1)
         .map_err(|e| if e == ENAMETOOLONG { errno!(ERANGE) } else { e })?;
     if name.is_empty() {
@@ -1416,10 +1415,13 @@ pub fn sys_memfd_create(
         not_implemented!("memfd_create", flags);
     }
 
-    let name = current_task
-        .mm()
-        .read_c_string_to_vec(user_name, MEMFD_NAME_MAX_LEN)
-        .map_err(|e| if e == ENAMETOOLONG { errno!(EINVAL) } else { e })?;
+    let name = current_task.read_c_string_to_vec(user_name, MEMFD_NAME_MAX_LEN).map_err(|e| {
+        if e == ENAMETOOLONG {
+            errno!(EINVAL)
+        } else {
+            e
+        }
+    })?;
 
     let seals = if flags & MFD_ALLOW_SEALING != 0 {
         SealFlags::empty()
@@ -2628,10 +2630,7 @@ mod tests {
         current_task.write_memory(path_addr, file_path.as_bytes()).expect("failed to clear struct");
 
         let user_stat = UserRef::new(path_addr + file_path.len());
-        current_task
-            .mm()
-            .write_object(user_stat, &statfs::default(0))
-            .expect("failed to clear struct");
+        current_task.write_object(user_stat, &statfs::default(0)).expect("failed to clear struct");
 
         let user_path = UserCString::new(path_addr);
 
@@ -2648,10 +2647,7 @@ mod tests {
         // Create the dir that we will attempt to unlink later.
         let no_slash_path = b"testdir";
         let no_slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        current_task
-            .mm()
-            .write_memory(no_slash_path_addr, no_slash_path)
-            .expect("failed to write path");
+        current_task.write_memory(no_slash_path_addr, no_slash_path).expect("failed to write path");
         let no_slash_user_path = UserCString::new(no_slash_path_addr);
         sys_mkdirat(
             &mut locked,

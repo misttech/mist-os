@@ -611,16 +611,16 @@ pub fn ptrace_dispatch(
             // NB: The behavior of the syscall is different from the behavior in ptrace(2),
             // which is provided by libc.
             let src: UserRef<usize> = UserRef::from(addr);
-            let val = tracee.mm().vmo_read_object(src)?;
+            let val = tracee.vmo_read_object(src)?;
 
             let dst: UserRef<usize> = UserRef::from(data);
-            current_task.mm().write_object(dst, &val)?;
+            current_task.write_object(dst, &val)?;
             Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_POKEDATA | PTRACE_POKETEXT => {
             let ptr: UserRef<usize> = UserRef::from(addr);
             let val = data.ptr() as usize;
-            tracee.mm().vmo_write_object(ptr, &val)?;
+            tracee.vmo_write_object(ptr, &val)?;
             Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_PEEKUSR => {
@@ -628,7 +628,7 @@ pub fn ptrace_dispatch(
                 if let Some(ref thread_state) = ptrace.tracee_thread_state {
                     let val = ptrace_peekuser(thread_state, addr.ptr() as usize)?;
                     let dst: UserRef<usize> = UserRef::from(data);
-                    current_task.mm().write_object(dst, &val)?;
+                    current_task.write_object(dst, &val)?;
                     return Ok(starnix_syscalls::SUCCESS);
                 }
             }
@@ -638,7 +638,7 @@ pub fn ptrace_dispatch(
             if let Some(ptrace) = &state.ptrace {
                 if let Some(ref thread_state) = ptrace.tracee_thread_state {
                     let uiv: UserRef<iovec> = UserRef::from(data);
-                    let iv = current_task.mm().vmo_read_object(uiv)?;
+                    let iv = current_task.vmo_read_object(uiv)?;
                     let base = iv.iov_base.addr;
                     let len = iv.iov_len;
                     ptrace_getregset(
@@ -684,7 +684,7 @@ pub fn ptrace_dispatch(
             }
             // sigset comes from *data.
             let src: UserRef<SigSet> = UserRef::from(data);
-            let val = current_task.mm().read_object(src)?;
+            let val = current_task.read_object(src)?;
             state.signals.set_mask(val);
 
             Ok(starnix_syscalls::SUCCESS)
@@ -698,14 +698,14 @@ pub fn ptrace_dispatch(
             // sigset goes in *data.
             let dst: UserRef<SigSet> = UserRef::from(data);
             let val = state.signals.mask();
-            current_task.mm().write_object(dst, &val)?;
+            current_task.write_object(dst, &val)?;
             Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_GETSIGINFO => {
             let dst: UserRef<u8> = UserRef::from(data);
             if let Some(ptrace) = &state.ptrace {
                 if let Some(signal) = ptrace.last_signal.as_ref() {
-                    current_task.mm().write_objects(dst, &signal.as_siginfo_bytes())?;
+                    current_task.write_objects(dst, &signal.as_siginfo_bytes())?;
                 } else {
                     return error!(EINVAL);
                 }
@@ -751,7 +751,7 @@ pub fn ptrace_dispatch(
                         len as usize,
                     )
                 };
-                current_task.mm().write_memory(dst.addr(), src)?;
+                current_task.write_memory(dst.addr(), src)?;
                 Ok(size.into())
             } else {
                 error!(ESRCH)
@@ -779,7 +779,7 @@ pub fn ptrace_dispatch(
             if let Some(ptrace) = &state.ptrace {
                 if let Some(event_data) = &ptrace.event_data {
                     let dst: UserRef<u32> = UserRef::from(data);
-                    current_task.mm().write_object(dst, &event_data.msg)?;
+                    current_task.write_object(dst, &event_data.msg)?;
                     return Ok(starnix_syscalls::SUCCESS);
                 }
             }

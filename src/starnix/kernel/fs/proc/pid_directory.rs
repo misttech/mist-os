@@ -548,7 +548,7 @@ fn fill_buf_from_addr_range(
     // NB: If this is exercised in a hot-path, we can plumb the reading task
     // here to perform a copy without going through the VMO when unified
     // aspaces is enabled.
-    let buf = task.mm().vmo_read_memory_partial_to_vec(range_start, len)?;
+    let buf = task.vmo_read_memory_partial_to_vec(range_start, len)?;
     sink.write(&buf[..]);
     Ok(())
 }
@@ -770,9 +770,9 @@ impl FileOps for MemFile {
                 let mut addr = UserAddress::default() + offset;
                 data.write_each(&mut |bytes| {
                     let read_bytes = if current_task.has_same_address_space(&task) {
-                        task.mm().read_memory_partial(addr, bytes)
+                        current_task.read_memory_partial(addr, bytes)
                     } else {
-                        task.mm().vmo_read_memory_partial(addr, bytes)
+                        task.vmo_read_memory_partial(addr, bytes)
                     }
                     .map_err(|_| errno!(EIO))?;
                     let actual = read_bytes.len();
@@ -798,9 +798,9 @@ impl FileOps for MemFile {
                 let mut written = 0;
                 let result = data.peek_each(&mut |bytes| {
                     let actual = if current_task.has_same_address_space(&task) {
-                        task.mm().write_memory_partial(addr + written, bytes)
+                        current_task.write_memory_partial(addr + written, bytes)
                     } else {
-                        task.mm().vmo_write_memory_partial(addr + written, bytes)
+                        task.vmo_write_memory_partial(addr + written, bytes)
                     }
                     .map_err(|_| errno!(EIO))?;
                     written += actual;

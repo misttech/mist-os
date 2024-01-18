@@ -11,7 +11,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 use crate::{
     execution::execute_task,
-    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
+    mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE},
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
@@ -132,7 +132,7 @@ pub fn sys_clone3(
 }
 
 fn read_c_string_vector(
-    mm: &MemoryManager,
+    mm: &CurrentTask,
     user_vector: UserRef<UserCString>,
     elem_limit: usize,
     vec_limit: usize,
@@ -199,14 +199,14 @@ pub fn sys_execveat(
     let (argv, argv_size) = if user_argv.is_null() {
         (Vec::new(), 0)
     } else {
-        read_c_string_vector(current_task.mm(), user_argv, page_limit_size, argv_env_limit)?
+        read_c_string_vector(current_task, user_argv, page_limit_size, argv_env_limit)?
     };
 
     let (environ, _) = if user_environ.is_null() {
         (Vec::new(), 0)
     } else {
         read_c_string_vector(
-            current_task.mm(),
+            current_task,
             user_environ,
             page_limit_size,
             argv_env_limit - argv_size,
@@ -1884,14 +1884,12 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_vma_name_misaligned() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
-
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
         let name = CString::new("name").unwrap();
-        mm.write_memory(name_addr, name.as_bytes_with_nul()).unwrap();
+        current_task.write_memory(name_addr, name.as_bytes_with_nul()).unwrap();
 
         // Passing a misaligned pointer to the start of the named region fails.
         assert_eq!(
@@ -1999,10 +1997,7 @@ mod tests {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let name = "my-task-name\0";
-        current_task
-            .mm()
-            .write_memory(mapped_address, name.as_bytes())
-            .expect("failed to write name");
+        current_task.write_memory(mapped_address, name.as_bytes()).expect("failed to write name");
 
         let result = sys_prctl(
             &mut locked,
@@ -2152,25 +2147,27 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_c_string_vector() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
 
         let arg_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let arg = b"test-arg\0";
-        mm.write_memory(arg_addr, arg).expect("failed to write test arg");
+        current_task.write_memory(arg_addr, arg).expect("failed to write test arg");
         let arg_usercstr = UserCString::new(arg_addr);
         let null_usercstr = UserCString::default();
 
         let argv_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        mm.write_object(argv_addr.into(), &arg_usercstr).expect("failed to write UserCString");
-        mm.write_object((argv_addr + mem::size_of::<UserCString>()).into(), &null_usercstr)
+        current_task
+            .write_object(argv_addr.into(), &arg_usercstr)
+            .expect("failed to write UserCString");
+        current_task
+            .write_object((argv_addr + mem::size_of::<UserCString>()).into(), &null_usercstr)
             .expect("failed to write UserCString");
         let argv_userref = UserRef::new(argv_addr);
 
         // The arguments size limit should include the null terminator.
-        assert!(read_c_string_vector(mm, argv_userref, 100, arg.len()).is_ok());
+        assert!(read_c_string_vector(&current_task, argv_userref, 100, arg.len()).is_ok());
         assert_eq!(
             read_c_string_vector(
-                mm,
+                &current_task,
                 argv_userref,
                 100,
                 std::str::from_utf8(arg).unwrap().trim_matches('\0').len()

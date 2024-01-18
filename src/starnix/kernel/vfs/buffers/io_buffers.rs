@@ -1005,7 +1005,8 @@ mod tests {
             assert_eq!(output_buffer.bytes_written(), 37);
             assert!(output_buffer.write_all(&data[37..50]).is_err());
 
-            let buffer = mm.read_memory_to_array::<128>(addr).expect("failed to write test data");
+            let buffer =
+                current_task.read_memory_to_array::<128>(addr).expect("failed to write test data");
             assert_eq!(&data[0..25], &buffer[0..25]);
             assert_eq!(&data[25..37], &buffer[64..76]);
         }

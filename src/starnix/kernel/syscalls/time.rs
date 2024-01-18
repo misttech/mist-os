@@ -606,10 +606,7 @@ mod test {
         let mut remaining_written = Default::default();
         if result.is_err() {
             assert_eq!(result, error!(ERESTART_RESTARTBLOCK));
-            remaining_written = {
-                let mm = current_task.mm();
-                mm.read_object(remaining).unwrap()
-            };
+            remaining_written = current_task.read_object(remaining).unwrap();
         }
         assert_leq!(
             duration_from_timespec(remaining_written).unwrap(),

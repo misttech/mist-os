@@ -513,9 +513,7 @@ impl FileOps for Arc<InputFile> {
                 Ok(SUCCESS)
             }
             uapi::EVIOCGBIT_EV_KEY => {
-                current_task
-                    .mm()
-                    .write_object(UserRef::new(user_addr), &self.supported_keys.bytes)?;
+                current_task.write_object(UserRef::new(user_addr), &self.supported_keys.bytes)?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGBIT_EV_ABS => {
@@ -534,25 +532,20 @@ impl FileOps for Arc<InputFile> {
             }
             uapi::EVIOCGBIT_EV_SW => {
                 current_task
-                    .mm()
                     .write_object(UserRef::new(user_addr), &self.supported_switches.bytes)?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGBIT_EV_LED => {
-                current_task
-                    .mm()
-                    .write_object(UserRef::new(user_addr), &self.supported_leds.bytes)?;
+                current_task.write_object(UserRef::new(user_addr), &self.supported_leds.bytes)?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGBIT_EV_FF => {
                 current_task
-                    .mm()
                     .write_object(UserRef::new(user_addr), &self.supported_haptics.bytes)?;
                 Ok(SUCCESS)
             }
             uapi::EVIOCGBIT_EV_MSC => {
                 current_task
-                    .mm()
                     .write_object(UserRef::new(user_addr), &self.supported_misc_features.bytes)?;
                 Ok(SUCCESS)
             }
@@ -1299,7 +1292,6 @@ mod test {
 
         // Extract minimum and maximum fields for validation.
         let axis_info = current_task
-            .mm()
             .read_object::<uapi::input_absinfo>(UserRef::new(address))
             .expect("failed to read user memory");
         (axis_info.minimum, axis_info.maximum)

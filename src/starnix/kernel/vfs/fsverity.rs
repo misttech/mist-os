@@ -51,9 +51,8 @@ fn fsverity_descriptor_from_enable_arg(
         not_implemented!(fxb@302620572, "fsverity_enable signature");
         return error!(ENOTSUP);
     }
-    let salt = current_task
-        .mm()
-        .read_memory_to_vec(UserAddress::from(src.salt_ptr), src.salt_size as usize)?;
+    let salt =
+        current_task.read_memory_to_vec(UserAddress::from(src.salt_ptr), src.salt_size as usize)?;
     let mut desc = fsverity_descriptor {
         version: 1,
         hash_algorithm: HashAlgorithm::from_u32(src.hash_algorithm).ok_or_else(|| errno!(EINVAL))?
@@ -168,7 +167,7 @@ pub mod ioctl {
         }
         let block_size = file.name.entry.node.fs().statfs(task)?.f_bsize as u32;
         // Nb: Lock order is important here.
-        let args: fsverity_enable_arg = task.mm().read_object(arg.into())?;
+        let args: fsverity_enable_arg = task.read_object(arg.into())?;
         let mut descriptor = fsverity_descriptor_from_enable_arg(task, block_size, &args)?;
         descriptor.data_size = file.node().refresh_info(task)?.size as u64;
         // The "Exec" writeguard mode means 'no writers'.
@@ -194,7 +193,7 @@ pub mod ioctl {
     ) -> Result<SyscallResult, Errno> {
         let header_ref = UserRef::<FsVerityDigestHeader>::new(arg);
         let digest_addr = header_ref.next().addr();
-        let header = task.mm().read_object(header_ref)?;
+        let header = task.read_object(header_ref)?;
         match &*file.node().fsverity.lock() {
             FsVerityState::FsVerity => {
                 // TODO(b/314182708): Remove hardcoding of blocksize
@@ -211,7 +210,7 @@ pub mod ioctl {
                 if (header.digest_size as usize) < required_size {
                     return error!(EOVERFLOW);
                 }
-                task.mm().write_memory(digest_addr, &fsverity_measurement(&descriptor)?)?;
+                task.write_memory(digest_addr, &fsverity_measurement(&descriptor)?)?;
                 Ok(SUCCESS)
             }
             _ => error!(ENODATA),
@@ -224,7 +223,7 @@ pub mod ioctl {
         arg: UserAddress,
         file: &FileObject,
     ) -> Result<SyscallResult, Errno> {
-        let arg: fsverity_read_metadata_arg = task.mm().read_object(arg.into())?;
+        let arg: fsverity_read_metadata_arg = task.read_object(arg.into())?;
         match &*file.node().fsverity.lock() {
             FsVerityState::FsVerity => {
                 match MetadataType::from_u64(arg.metadata_type).ok_or_else(|| errno!(EINVAL))? {
@@ -234,7 +233,7 @@ pub mod ioctl {
                     MetadataType::Descriptor => {
                         // TODO(b/314182708): Remove hardcoding of blocksize
                         let descriptor = file.node().ops().get_fsverity_descriptor(12)?;
-                        task.mm().write_memory(
+                        task.write_memory(
                             UserAddress::from(arg.buf_ptr).into(),
                             &descriptor.as_bytes()
                                 [arg.offset as usize..(arg.offset + arg.length) as usize],

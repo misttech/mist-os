@@ -118,7 +118,7 @@ fn parse_socket_address(
         return error!(EINVAL);
     }
 
-    let address = task.mm().read_memory_to_vec(user_socket_address, address_length)?;
+    let address = task.read_memory_to_vec(user_socket_address, address_length)?;
 
     SocketAddress::from_bytes(address)
 }

@@ -24,7 +24,7 @@ use starnix_uapi::{
 use std::{
     ffi::{CStr, CString},
     mem::size_of,
-    ops::Deref,
+    ops::Deref as _,
     sync::Arc,
 };
 
@@ -524,7 +524,7 @@ pub fn load_executable(
     let stack = stack_base + (stack_size - 8);
 
     let stack = populate_initial_stack(
-        current_task.mm().deref(),
+        current_task.deref(),
         original_path,
         &resolved_elf.argv,
         &resolved_elf.environ,

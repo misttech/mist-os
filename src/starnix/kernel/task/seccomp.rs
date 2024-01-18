@@ -923,9 +923,8 @@ impl FileOps for SeccompNotifierFileObject {
         let user_addr = UserAddress::from(arg);
         match request {
             SECCOMP_IOCTL_NOTIF_RECV => {
-                if let Ok(notif) = current_task
-                    .mm()
-                    .read_memory_to_vec(user_addr, std::mem::size_of::<seccomp_notif>())
+                if let Ok(notif) =
+                    current_task.read_memory_to_vec(user_addr, std::mem::size_of::<seccomp_notif>())
                 {
                     for value in notif.iter() {
                         if *value != 0 {
@@ -953,9 +952,8 @@ impl FileOps for SeccompNotifierFileObject {
                     waiter.wait(current_task)?;
                 }
                 if let Some(notif) = notif {
-                    if let Err(e) = current_task
-                        .mm()
-                        .write_object(UserRef::<seccomp_notif>::new(user_addr), &notif)
+                    if let Err(e) =
+                        current_task.write_object(UserRef::<seccomp_notif>::new(user_addr), &notif)
                     {
                         self.notifier.lock().unconsume(notif.id);
                         return Err(e);
@@ -966,8 +964,7 @@ impl FileOps for SeccompNotifierFileObject {
             }
             SECCOMP_IOCTL_NOTIF_SEND => {
                 // A SEND sends a response to a previously received notification.
-                let resp: seccomp_notif_resp =
-                    current_task.mm().read_object(UserRef::new(user_addr))?;
+                let resp: seccomp_notif_resp = current_task.read_object(UserRef::new(user_addr))?;
                 if resp.flags & !SECCOMP_USER_NOTIF_FLAG_CONTINUE != 0 {
                     return error!(EINVAL);
                 }
@@ -986,7 +983,7 @@ impl FileOps for SeccompNotifierFileObject {
             }
             SECCOMP_IOCTL_NOTIF_ID_VALID => {
                 // An ID_VALID indicates that the notification is still in progress.
-                let cookie: u64 = current_task.mm().read_object(UserRef::new(user_addr))?;
+                let cookie: u64 = current_task.read_object(UserRef::new(user_addr))?;
                 {
                     let notifier = self.notifier.lock();
                     if notifier.notification_pending(cookie) {
