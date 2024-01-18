@@ -26,6 +26,7 @@ class DriverFactory:
     def __init__(
         self,
         ffx_path: str,
+        transport: str,
         multi_device: bool = False,
         config_path: Optional[str] = None,
         params_path: Optional[str] = None,
@@ -33,11 +34,13 @@ class DriverFactory:
         """Initializes the instance.
         Args:
           ffx_path: absolute path to the FFX binary.
+          transport: host->target transport type to use.
           multi_device: whether the Mobly test requires 2+ devices to run.
           config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly testbed params file.
         """
         self._ffx_path = ffx_path
+        self._transport = transport
         self._multi_device = multi_device
         self._config_path = config_path
         self._params_path = params_path
@@ -55,6 +58,7 @@ class DriverFactory:
         if not botanist_config_path:
             return local_driver.LocalDriver(
                 ffx_path=self._ffx_path,
+                transport=self._transport,
                 multi_device=self._multi_device,
                 config_path=self._config_path,
                 params_path=self._params_path,
@@ -63,6 +67,7 @@ class DriverFactory:
             return infra_driver.InfraDriver(
                 tb_json_path=os.environ[api_infra.BOT_ENV_TESTBED_CONFIG],
                 ffx_path=self._ffx_path,
+                transport=self._transport,
                 params_path=self._params_path,
             )
         except KeyError as e:

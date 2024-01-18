@@ -24,6 +24,7 @@ class BaseDriver(ABC):
     def __init__(
         self,
         ffx_path: str,
+        transport: str,
         log_path: Optional[str] = None,
         params_path: Optional[str] = None,
     ) -> None:
@@ -31,6 +32,7 @@ class BaseDriver(ABC):
 
         Args:
           ffx_path: absolute path to the FFX binary.
+          transport: host->target transport type to use.
           log_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
 
@@ -38,13 +40,14 @@ class BaseDriver(ABC):
           KeyError if required environment variables not found.
         """
         self._ffx_path = ffx_path
+        self._transport = transport
         self._params_path = params_path
         self._log_path = (
             log_path if log_path is not None else os.environ[TEST_OUTDIR_ENV]
         )
 
     @abstractmethod
-    def generate_test_config(self, transport: Optional[str] = None) -> str:
+    def generate_test_config(self) -> str:
         """Returns a Mobly test config in YAML format.
         The Mobly test config is a required input file of any Mobly tests.
         It includes information on the DUT(s) and specifies test parameters.

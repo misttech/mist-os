@@ -25,6 +25,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra_driver.InfraDriver(
             tb_json_path="tb/json/path",
             ffx_path="ffx/path",
+            transport="transport",
             params_path="params/path",
             log_path="",
         )
@@ -44,7 +45,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for successful config without params generation"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="tb/json/path", ffx_path="ffx/path", log_path=""
+            tb_json_path="tb/json/path",
+            ffx_path="ffx/path",
+            transport="transport",
+            log_path="",
         )
         ret = driver.generate_test_config()
 
@@ -52,23 +56,6 @@ class InfraMoblyDriverTest(unittest.TestCase):
         mock_read_yaml.assert_not_called()
         mock_read_json.assert_called_once()
         self.assertEqual(ret, "yaml_str")
-
-    @patch("yaml.dump", return_value="yaml_str")
-    @patch("common.read_json_from_file")
-    @patch("common.read_yaml_from_file")
-    @patch("api_mobly.new_testbed_config")
-    @patch("api_mobly.set_transport")
-    def test_generate_test_config_with_transport_success(
-        self, mock_set_transport, *unused_args
-    ):
-        """Test case for successful config without params generation"""
-        transport_name = "transport"
-        driver = infra_driver.InfraDriver(
-            tb_json_path="tb/json/path", ffx_path="ffx/path", log_path=""
-        )
-        ret = driver.generate_test_config(transport=transport_name)
-
-        mock_set_transport.assert_called_with(ANY, transport_name)
 
     @patch(
         "common.read_json_from_file", side_effect=common.InvalidFormatException
@@ -78,7 +65,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised on invalid JSON content"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="tb/json/path", ffx_path="ffx/path", log_path=""
+            tb_json_path="tb/json/path",
+            ffx_path="ffx/path",
+            transport="transport",
+            log_path="",
         )
         with self.assertRaises(common.InvalidFormatException):
             driver.generate_test_config()
@@ -94,6 +84,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra_driver.InfraDriver(
             tb_json_path="tb/json/path",
             ffx_path="ffx/path",
+            transport="transport",
             params_path="params/path",
             log_path="",
         )
@@ -106,7 +97,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for exception being raised on invalid testbed JSON path"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="/does/not/exist", ffx_path="ffx/path", log_path=""
+            tb_json_path="/does/not/exist",
+            ffx_path="ffx/path",
+            transport="transport",
+            log_path="",
         )
         with self.assertRaises(common.DriverException):
             driver.generate_test_config()
@@ -119,6 +113,7 @@ class InfraMoblyDriverTest(unittest.TestCase):
         driver = infra_driver.InfraDriver(
             tb_json_path="/does/not/exist",
             ffx_path="ffx/path",
+            transport="transport",
             params_path="params/path",
             log_path="",
         )
@@ -137,7 +132,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     def test_teardown_success(self, mock_print, mock_rm, *unused_args):
         """Test case for teardown"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="", ffx_path="ffx/path", log_path=""
+            tb_json_path="",
+            ffx_path="ffx/path",
+            transport="transport",
+            log_path="",
         )
         driver.teardown()
 
@@ -160,7 +158,10 @@ class InfraMoblyDriverTest(unittest.TestCase):
     ):
         """Test case for teardown succeeding despite missing results"""
         driver = infra_driver.InfraDriver(
-            tb_json_path="", ffx_path="ffx/path", log_path=""
+            tb_json_path="",
+            ffx_path="ffx/path",
+            transport="transport",
+            log_path="",
         )
         driver.teardown()
 

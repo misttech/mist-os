@@ -79,6 +79,7 @@ def new_testbed_config(
     testbed_name: str,
     log_path: str,
     ffx_path: str,
+    transport: str,
     mobly_controllers: List[Dict[str, Any]],
     test_params_dict: MoblyConfigComponent,
     botanist_honeydew_map: Dict[str, str],
@@ -115,6 +116,7 @@ def new_testbed_config(
                     "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
                     "ssh_private_key":"/etc/botanist/keys/pkey_infra",
                     "ffx_path":"/path/to/ffx",
+                    "transport":"fuchsia-controller"
                   }
                 ],
                 "AccessPoint": [
@@ -134,6 +136,7 @@ def new_testbed_config(
         testbed_name: Mobly testbed name to use.
         log_path: absolute path to Mobly's top-level output directory.
         ffx_path: absolute path to the FFX binary.
+        transport: host->device transport type to use.
         mobly_controllers: List of Mobly controller objects.
         test_params_dict: Mobly testbed params dictionary.
         botanist_honeydew_map: Dictionary that maps Botanist config names to
@@ -148,6 +151,8 @@ def new_testbed_config(
         if api_infra.FUCHSIA_DEVICE == controller_type:
             # Add the "ffx_path" field for every Fuchsia device.
             controller[FFX_PATH_KEY] = ffx_path
+            # Add the "transport" field for every Fuchsia device.
+            controller[TRANSPORT_KEY] = transport
             # Convert botanist key names to relative Honeydew key names for
             # fuchsia devices. This is done here so that Honeydew does not have
             # to do the conversions itself.

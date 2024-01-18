@@ -106,6 +106,7 @@ class ApiMoblyTest(unittest.TestCase):
             "tb_name",
             "log_path",
             "ffx_path",
+            "transport",
             controllers,
             params_dict,
             botanist_honeydew_map,

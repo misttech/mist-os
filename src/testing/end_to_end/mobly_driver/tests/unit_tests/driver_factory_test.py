@@ -44,14 +44,18 @@ class DriverFactoryTest(unittest.TestCase):
         self, unused_name, test_env, expected_driver_type
     ):
         """Test case to ensure driver resolution success"""
-        factory = driver_factory.DriverFactory(ffx_path="ffx/path")
+        factory = driver_factory.DriverFactory(
+            ffx_path="ffx/path", transport="transport"
+        )
         with mock.patch.dict(os.environ, test_env, clear=True):
             driver = factory.get_driver()
         self.assertEqual(type(driver), expected_driver_type)
 
     def test_get_driver_unexpected_env_raises_exception(self):
         """Test case to ensure exception is raised on unexpected env"""
-        factory = driver_factory.DriverFactory(ffx_path="ffx/path")
+        factory = driver_factory.DriverFactory(
+            ffx_path="ffx/path", transport="transport"
+        )
 
         # Undefined "api_infra.BOT_ENV_TEST_OUTDIR".
         invalid_infra_env = {api_infra.BOT_ENV_TESTBED_CONFIG: "botanist.json"}

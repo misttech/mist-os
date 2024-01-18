@@ -68,6 +68,7 @@ def main():
     """
     factory = driver_factory.DriverFactory(
         ffx_path=os.path.abspath(args.ffx_path),
+        transport=args.transport,
         multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
@@ -85,6 +86,5 @@ def main():
         test_path=args.mobly_test_path,
         timeout_sec=args.test_timeout_sec,
         test_data_path=args.test_data_path,
-        transport=args.transport,
         verbose=args.v,
     )

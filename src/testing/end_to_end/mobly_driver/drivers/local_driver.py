@@ -27,6 +27,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
     def __init__(
         self,
         ffx_path: str,
+        transport: str,
         multi_device: bool = False,
         log_path: Optional[str] = None,
         config_path: Optional[str] = None,
@@ -36,6 +37,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
 
         Args:
           ffx_path: absolute path to the FFX binary.
+          transport: host->target transport type to use.
           multi_device: whether the Mobly test requires 2+ devices to run.
           log_path: absolute path to directory for storing Mobly test output.
           config_path: absolute path to the Mobly test config file.
@@ -45,7 +47,10 @@ class LocalDriver(base_mobly_driver.BaseDriver):
           KeyError if required environment variables not found.
         """
         super().__init__(
-            ffx_path=ffx_path, log_path=log_path, params_path=params_path
+            ffx_path=ffx_path,
+            transport=transport,
+            log_path=log_path,
+            params_path=params_path,
         )
         self._multi_device = multi_device
         self._config_path = config_path
@@ -125,12 +130,13 @@ class LocalDriver(base_mobly_driver.BaseDriver):
             testbed_name="GeneratedLocalTestbed",
             log_path=self._log_path,
             ffx_path=self._ffx_path,
+            transport=self._transport,
             mobly_controllers=mobly_controllers,
             test_params_dict={},
             botanist_honeydew_map={},
         )
 
-    def generate_test_config(self, transport: Optional[str] = None) -> str:
+    def generate_test_config(self) -> str:
         """Returns a Mobly test config in YAML format.
 
         The Mobly test config is a required input file of any Mobly tests.
@@ -150,9 +156,6 @@ class LocalDriver(base_mobly_driver.BaseDriver):
         If |params_path| is specified in LocalDriver(), then its content is
         added to the Mobly test config; otherwise, the test config is returned
         as-is but in YAML form.
-
-        Args:
-          transport: host->device transport type to use.
 
         Returns:
           A YAML string that represents a Mobly test config.
@@ -179,13 +182,11 @@ class LocalDriver(base_mobly_driver.BaseDriver):
             except (IOError, OSError) as e:
                 raise common.DriverException(f"Local config parse failed: {e}")
             api_mobly.set_ffx_path(config, self._ffx_path)
+            api_mobly.set_transport(config, self._transport)
 
         if self._params_path:
             test_params = common.read_yaml_from_file(self._params_path)
             config = api_mobly.get_config_with_test_params(config, test_params)
-
-        if transport:
-            api_mobly.set_transport(config, transport)
 
         return yaml.dump(config)
 
