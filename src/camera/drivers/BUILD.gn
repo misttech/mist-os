@@ -7,7 +7,6 @@ group("drivers") {
   deps = [
     ":prod_drivers",
     ":tests",
-    "test_utils",
   ]
 }
 
