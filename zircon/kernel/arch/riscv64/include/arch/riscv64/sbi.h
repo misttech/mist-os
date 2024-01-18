@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include <arch/riscv64.h>
+#include <dev/power.h>
 
 // Init functions
 void riscv64_sbi_early_init();
@@ -31,6 +32,7 @@ arch::RiscvSbiRet sbi_remote_fencei(cpu_mask_t cpu_mask);
 arch::RiscvSbiRet sbi_remote_sfence_vma(cpu_mask_t cpu_mask, uintptr_t start, uintptr_t size);
 arch::RiscvSbiRet sbi_remote_sfence_vma_asid(cpu_mask_t cpu_mask, uintptr_t start, uintptr_t size,
                                              uint64_t asid);
+zx::result<power_cpu_state> sbi_get_cpu_state(uint64_t hart_id);
 
 // Attempt to shut down the system via the system reset extension.
 zx_status_t sbi_shutdown();
