@@ -185,10 +185,51 @@ zx::result<> Fusb302Device::Start() {
     return result.take_error();
   }
 
+  if (zx::result result = CreateDevfsNode(); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to export to devfs %s", result.status_string());
+    return result.take_error();
+  }
+
   return zx::ok();
 }
 
 void Fusb302Device::Stop() { device_.reset(); }
+
+zx::result<> Fusb302Device::CreateDevfsNode() {
+  fidl::Arena arena;
+  zx::result connector = devfs_connector_.Bind(dispatcher());
+  if (connector.is_error()) {
+    return connector.take_error();
+  }
+
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                   .connector(std::move(connector.value()))
+                   .class_name("power");
+
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, kDeviceName)
+                  .devfs_args(devfs.Build())
+                  .Build();
+
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create endpoints: %s",
+                controller_endpoints.status_string());
+
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed to create endpoints: %s",
+                node_endpoints.status_string());
+
+  fidl::WireResult result = fidl::WireCall(node())->AddChild(
+      args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child %s", result.status_string());
+    return zx::error(result.status());
+  }
+  controller_.Bind(std::move(controller_endpoints->client));
+  node_.Bind(std::move(node_endpoints->client));
+  return zx::ok();
+}
 
 }  // namespace fusb302
 

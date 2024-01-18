@@ -10,6 +10,7 @@
 #include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -71,7 +72,10 @@ class Fusb302 : public fidl::WireServer<fuchsia_hardware_powersource::Source> {
 
   // TODO(rdzhuang): change power FIDL to supply required values in SourceInfo
   void GetPowerInfo(GetPowerInfoCompleter::Sync& completer) override {
-    completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
+    // For now, we hardcode this value. When we support other power types in the future, this will
+    // need to vary depending on selected source capability.
+    completer.Reply(ZX_OK, {.type = fuchsia_hardware_powersource::PowerType::kAc,
+                            .state = fuchsia_hardware_powersource::wire::kPowerStateCharging});
   }
   void GetStateChangeEvent(GetStateChangeEventCompleter::Sync& completer) override {
     completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
@@ -130,12 +134,14 @@ class Fusb302Device : public fdf::DriverBase {
  public:
   Fusb302Device(fdf::DriverStartArgs start_args,
                 fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)) {}
+      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)),
+        devfs_connector_(fit::bind_member<&Fusb302Device::Serve>(this)) {}
 
   zx::result<> Start() override;
   void Stop() override;
 
  private:
+  zx::result<> CreateDevfsNode();
   void Serve(fidl::ServerEnd<fuchsia_hardware_powersource::Source> server) {
     source_bindings_.AddBinding(dispatcher(), std::move(server), device_.get(),
                                 fidl::kIgnoreBindingClosure);
@@ -143,6 +149,9 @@ class Fusb302Device : public fdf::DriverBase {
 
   std::unique_ptr<Fusb302> device_;
   fidl::ServerBindingGroup<fuchsia_hardware_powersource::Source> source_bindings_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  driver_devfs::Connector<fuchsia_hardware_powersource::Source> devfs_connector_;
 };
 
 }  // namespace fusb302
