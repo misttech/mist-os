@@ -11,6 +11,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
 #include <lib/sync/cpp/completion.h>
+#include <zircon/status.h>
 
 #include <wlan/drivers/log.h>
 
@@ -45,12 +46,12 @@ SoftmacBridge::~SoftmacBridge() {
 
 zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
     fdf::Dispatcher& softmac_bridge_server_dispatcher,
-    std::unique_ptr<fit::callback<void(zx_status_t status)>> completer, DeviceInterface* device,
+    std::unique_ptr<fit::callback<void(zx_status_t status)>> completer,
+    fit::callback<void(zx_status_t)> sta_shutdown_handler, DeviceInterface* device,
     fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client) {
   WLAN_TRACE_DURATION();
-  auto softmac_bridge = std::unique_ptr<SoftmacBridge>(new SoftmacBridge(
-      device,
-      std::move(softmac_client)));
+  auto softmac_bridge =
+      std::unique_ptr<SoftmacBridge>(new SoftmacBridge(device, std::move(softmac_client)));
 
   rust_device_interface_t wlansoftmac_rust_ops = {
       .device = static_cast<void*>(softmac_bridge->device_interface_),
@@ -113,10 +114,11 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
 
   async::PostTask(softmac_bridge->rust_dispatcher_.async_dispatcher(),
                   [start_sta_completer = std::move(start_sta_completer),
+                   sta_shutdown_handler = std::move(sta_shutdown_handler),
                    wlansoftmac_rust_ops = wlansoftmac_rust_ops,
                    rust_buffer_provider = softmac_bridge->rust_buffer_provider,
                    client_end = endpoints->client.TakeHandle().release()]() mutable {
-                    start_sta(
+                    sta_shutdown_handler(start_sta(
                         start_sta_completer.release(),
                         [](void* ctx, zx_status_t status, wlansoftmac_handle_t* rust_handle) {
                           auto start_sta_completer = static_cast<StartStaCompleter*>(ctx);
@@ -131,7 +133,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
                           (*start_sta_completer)(status, rust_handle);
                           delete start_sta_completer;
                         },
-                        wlansoftmac_rust_ops, rust_buffer_provider, client_end);
+                        wlansoftmac_rust_ops, rust_buffer_provider, client_end));
                   });
 
   // Wait for the task posted to softmac_bridge_server_dispatcher to complete before returning.

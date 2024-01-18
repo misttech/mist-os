@@ -126,12 +126,12 @@ typedef struct {
  * The caller of this function should provide raw pointers that will be valid in the address space
  * where the Rust portion of wlansoftmac will run.
  */
-extern "C" void start_sta(void *completer,
-                          void (*run_completer)(void *completer, zx_status_t status,
-                                                wlansoftmac_handle_t *wlan_softmac_handle),
-                          rust_device_interface_t device,
-                          wlansoftmac_buffer_provider_ops_t buf_provider,
-                          zx_handle_t wlan_softmac_bridge_client_handle);
+extern "C" zx_status_t start_sta(void *completer,
+                                 void (*run_completer)(void *completer, zx_status_t status,
+                                                       wlansoftmac_handle_t *wlan_softmac_handle),
+                                 rust_device_interface_t device,
+                                 wlansoftmac_buffer_provider_ops_t buf_provider,
+                                 zx_handle_t wlan_softmac_bridge_client_handle);
 
 /**
  * FFI interface: Stop a WlanSoftmac via the WlanSoftmacHandle. Takes ownership and invalidates

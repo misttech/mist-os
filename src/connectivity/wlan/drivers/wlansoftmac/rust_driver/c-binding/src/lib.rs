@@ -58,11 +58,11 @@ pub unsafe extern "C" fn start_sta(
     device: DeviceInterface,
     buf_provider: BufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
-) {
+) -> zx::sys::zx_status_t {
     // SAFETY: Cast *mut c_void to usize so the constructed lambda will be Send. This is safe since
     // StartStaCompleter will not move to a thread in a different address space.
     let completer = unsafe { ptr_as_usize(completer) };
-    start_wlansoftmac(
+    zx::Status::from(start_wlansoftmac(
         move |result: Result<WlanSoftmacHandle, zx::Status>| match result {
             Ok(handle) => {
                 run_completer(
@@ -78,7 +78,8 @@ pub unsafe extern "C" fn start_sta(
         device,
         buf_provider,
         wlan_softmac_bridge_client_handle,
-    )
+    ))
+    .into_raw()
 }
 
 /// FFI interface: Stop a WlanSoftmac via the WlanSoftmacHandle. Takes ownership and invalidates

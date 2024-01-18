@@ -37,7 +37,7 @@ use {
     fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::{channel::mpsc, select, StreamExt},
     std::{cmp, sync::Arc, time::Duration},
-    tracing::{error, info},
+    tracing::info,
     wlan_sme,
 };
 pub use {ddk_converter::*, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
@@ -188,7 +188,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     buf_provider: buffer::BufferProvider,
     mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
-) {
+) -> Result<(), Error> {
     let (minstrel_timer, minstrel_time_stream) = common::timer::create_timer();
     let minstrel = device.mac_sublayer_support().ok().filter(should_enable_minstrel).map(
         |mac_sublayer_support| {
@@ -214,7 +214,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     // Signal the main driver dispatcher that startup is complete.
     start_sta_completer.complete(Ok(()));
 
-    let result = main_loop_impl(
+    main_loop_impl(
         mlme_impl,
         minstrel,
         mlme_request_stream,
@@ -222,11 +222,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
         time_stream,
         minstrel_time_stream,
     )
-    .await;
-    match result {
-        Ok(()) => info!("MLME event loop exited gracefully."),
-        Err(e) => error!("MLME event loop exited with error: {:?}", e),
-    }
+    .await
 }
 
 /// Begin processing MLME events.
@@ -469,7 +465,7 @@ mod tests {
                 shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
             }))))
             .expect("Failed to send stop event");
-        assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Ready(Ok(())));
         assert_eq!(exec.run_until_stalled(&mut shutdown_receiver), Poll::Ready(Ok(())));
         assert!(device_sink.is_closed());
     }

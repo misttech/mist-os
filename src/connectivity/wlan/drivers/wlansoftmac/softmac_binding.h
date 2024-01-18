@@ -127,6 +127,13 @@ class SoftmacBinding : public DeviceInterface {
   fdf::Dispatcher softmac_ifc_bridge_client_dispatcher_;
   std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
+  // Record when the framework calls the unbind hook to prevent sta_shutdown_handler() from calling
+  // device_async_remove() when an unbind is already in progress.
+  //
+  // The bool is behind a std::shared_ptr so sta_shutdown_handler() can reference
+  // unbind_called_ even if SoftmacBinding drops its reference to unbind_called_.
+  std::shared_ptr<bool> unbind_called_;
+
   // Dispatcher for being a FIDL client firing requests on WlanSoftmac protocol.
   fdf::Dispatcher client_dispatcher_;
 };

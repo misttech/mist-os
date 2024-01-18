@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    anyhow::Error,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_async as fasync,
     fuchsia_inspect::{self, Inspector},
@@ -60,7 +61,7 @@ pub fn start_wlansoftmac(
     device: DeviceInterface,
     buf_provider: BufferProvider,
     wlan_softmac_bridge_proxy_raw_handle: fuchsia_zircon::sys::zx_handle_t,
-) {
+) -> Result<(), zx::Status> {
     let wlan_softmac_bridge_proxy = {
         let handle = unsafe { fidl::Handle::from_raw(wlan_softmac_bridge_proxy_raw_handle) };
         let channel = fidl::Channel::from(handle);
@@ -85,7 +86,7 @@ async fn start_wlansoftmac_async<D: DeviceOps + Send + 'static>(
     start_sta_completer: impl FnOnce(Result<WlanSoftmacHandle, zx::Status>) + Send + 'static,
     device: D,
     buf_provider: BufferProvider,
-) {
+) -> Result<(), zx::Status> {
     let (driver_event_sink, driver_event_stream) = mpsc::unbounded();
     let inspector =
         Inspector::new(fuchsia_inspect::InspectorConfig::default().size(INSPECT_VMO_SIZE_BYTES));
@@ -105,7 +106,7 @@ async fn start_wlansoftmac_async<D: DeviceOps + Send + 'static>(
         inspector,
         inspect_usme_node,
     )
-    .await;
+    .await
 }
 
 async fn wlansoftmac_thread<D: DeviceOps>(
@@ -116,7 +117,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     inspector: Inspector,
     inspect_usme_node: fuchsia_inspect::Node,
-) {
+) -> Result<(), zx::Status> {
     let mut driver_event_sink = wlan_mlme::DriverEventSink(driver_event_sink);
 
     let ifc = WlanSoftmacIfcProtocol::new(&mut driver_event_sink);
@@ -134,11 +135,11 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         .start(&ifc, zx::Handle::from(softmac_ifc_bridge_client.into_channel()).into_raw())
     {
         Ok(handle) => handle,
-        Err(e) => {
+        Err(status) => {
             // Failure to unwrap indicates a critical failure in the driver init thread.
-            error!("device.start failed: {}", e);
-            start_sta_completer.complete(Err(e));
-            return;
+            error!("device.start failed: {}", status);
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
     let channel = zx::Channel::from(usme_bootstrap_handle_via_iface_creation);
@@ -149,8 +150,9 @@ async fn wlansoftmac_thread<D: DeviceOps>(
             Err(e) => {
                 // Failure to unwrap indicates a critical failure in the driver init thread.
                 error!("Failed to get usme bootstrap stream: {}", e);
-                start_sta_completer.complete(Err(zx::Status::INTERNAL));
-                return;
+                let status = zx::Status::INTERNAL;
+                start_sta_completer.complete(Err(status));
+                return Err(status);
             }
         };
 
@@ -164,34 +166,39 @@ async fn wlansoftmac_thread<D: DeviceOps>(
             })) => (generic_sme_server, legacy_privacy_support, responder),
             Some(Err(e)) => {
                 error!("USME bootstrap stream failed: {}", e);
-                start_sta_completer.complete(Err(zx::Status::INTERNAL));
-                return;
+                let status = zx::Status::INTERNAL;
+                start_sta_completer.complete(Err(status));
+                return Err(status);
             }
             None => {
                 error!("USME bootstrap stream terminated");
-                start_sta_completer.complete(Err(zx::Status::INTERNAL));
-                return;
+                let status = zx::Status::INTERNAL;
+                start_sta_completer.complete(Err(status));
+                return Err(status);
             }
         };
     let inspect_vmo = match inspector.duplicate_vmo() {
         Some(vmo) => vmo,
         None => {
             error!("Failed to duplicate inspect VMO");
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
     if let Err(e) = responder.send(inspect_vmo).into() {
         error!("Failed to respond to USME bootstrap: {}", e);
-        start_sta_completer.complete(Err(zx::Status::INTERNAL));
-        return;
+        let status = zx::Status::INTERNAL;
+        start_sta_completer.complete(Err(status));
+        return Err(status);
     }
     let generic_sme_stream = match generic_sme_server.into_stream() {
         Ok(stream) => stream,
         Err(e) => {
             error!("Failed to get generic SME stream: {}", e);
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
 
@@ -201,8 +208,9 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         Ok(info) => info,
         Err(e) => {
             error!("Failed to get MLME device info: {}", e);
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
 
@@ -210,31 +218,34 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         Ok(s) => {
             if s.device.mac_implementation_type != fidl_common::MacImplementationType::Softmac {
                 error!("Wrong MAC implementation type: {:?}", s.device.mac_implementation_type);
-                start_sta_completer.complete(Err(zx::Status::INTERNAL));
-                return;
+                let status = zx::Status::INTERNAL;
+                start_sta_completer.complete(Err(status));
+                return Err(status);
             }
             s
         }
         Err(e) => {
             error!("Failed to parse device mac sublayer support: {}", e);
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
     let security_support = match device::try_query_security_support(&mut device) {
         Ok(s) => s,
         Err(e) => {
             error!("Failed to parse device security support: {}", e);
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
     let spectrum_management_support = match device.spectrum_management_support() {
         Ok(s) => s,
-        Err(e) => {
-            error!("Failed to parse device spectrum management support: {}", e);
-            start_sta_completer.complete(Err(e));
-            return;
+        Err(status) => {
+            error!("Failed to parse device spectrum management support: {}", status);
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
 
@@ -246,8 +257,9 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         Ok(r) => r,
         Err(e) => {
             error!("Failed to create persistence proxy: {}", e);
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
     let (persistence_req_sender, _persistence_req_forwarder_fut) =
@@ -264,8 +276,9 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         Some(mlme_event_stream) => mlme_event_stream,
         None => {
             error!("Failed to take MLME event stream.");
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
     let (mlme_request_stream, sme_fut) = match create_sme(
@@ -282,12 +295,13 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         Ok((mlme_request_stream, sme_fut)) => (mlme_request_stream, sme_fut),
         Err(e) => {
             error!("Failed to create sme: {}", e);
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
 
-    let mlme_fut: Pin<Box<dyn Future<Output = ()>>> = match device_info.role {
+    let mlme_fut: Pin<Box<dyn Future<Output = Result<(), Error>>>> = match device_info.role {
         fidl_common::WlanMacRole::Client => {
             info!("Running wlansoftmac with client role");
             let config = wlan_mlme::client::ClientConfig {
@@ -308,8 +322,9 @@ async fn wlansoftmac_thread<D: DeviceOps>(
                 Some(sta_addr) => sta_addr,
                 None => {
                     error!("Driver provided no STA address.");
-                    start_sta_completer.complete(Err(zx::Status::INTERNAL));
-                    return;
+                    let status = zx::Status::INTERNAL;
+                    start_sta_completer.complete(Err(status));
+                    return Err(status);
                 }
             };
             let config = ieee80211::Bssid::from(sta_addr);
@@ -324,25 +339,39 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
         unsupported => {
             error!("Unsupported mac role: {:?}", unsupported);
-            return;
+            let status = zx::Status::INTERNAL;
+            start_sta_completer.complete(Err(status));
+            return Err(status);
         }
     };
 
     let mut mlme_fut = mlme_fut.fuse();
     let mut sme_fut = sme_fut.fuse();
-    loop {
-        futures::select! {
-            () = mlme_fut => info!("MLME future complete"),
-            sme_result = sme_fut =>
-                match sme_result {
-                    Ok(()) => {
-                        info!("SME future complete");
-                    }
-                    Err(e) => {
-                        error!("SME shut down with error: {}", e);
-                    }
+    futures::select! {
+        mlme_result = mlme_fut => {
+            match mlme_result {
+                Ok(()) => {
+                    info!("MLME shut down gracefully.");
                 },
-            complete => return,
+                Err(e) => {
+                    error!("MLME shut down with error: {}", e);
+                    return Err(zx::Status::BAD_STATE);
+                }
+            }
+        }
+        sme_result = sme_fut => {
+            error!("SME shut down before MLME: {:?}", sme_result);
+            return Err(zx::Status::BAD_STATE);
+        }
+    }
+    match sme_fut.await {
+        Ok(()) => {
+            info!("SME shut down gracefully");
+            return Ok(());
+        }
+        Err(e) => {
+            error!("SME shut down with error: {}", e);
+            return Err(zx::Status::BAD_STATE);
         }
     }
 }
@@ -362,7 +391,10 @@ mod tests {
         exec: &mut fasync::TestExecutor,
         handle_sender: oneshot::Sender<Result<WlanSoftmacHandle, zx::Status>>,
     ) -> Result<
-        (Option<Pin<Box<impl Future<Output = ()>>>>, fidl_sme::GenericSmeProxy),
+        (
+            Result<Pin<Box<impl Future<Output = Result<(), zx::Status>>>>, Result<(), zx::Status>>,
+            fidl_sme::GenericSmeProxy,
+        ),
         anyhow::Error,
     > {
         run_wlansoftmac_setup_with_device(exec, handle_sender, FakeDevice::new(exec).0)
@@ -373,7 +405,10 @@ mod tests {
         handle_sender: oneshot::Sender<Result<WlanSoftmacHandle, zx::Status>>,
         fake_device: FakeDevice,
     ) -> Result<
-        (Option<Pin<Box<impl Future<Output = ()>>>>, fidl_sme::GenericSmeProxy),
+        (
+            Result<Pin<Box<impl Future<Output = Result<(), zx::Status>>>>, Result<(), zx::Status>>,
+            fidl_sme::GenericSmeProxy,
+        ),
         anyhow::Error,
     > {
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
@@ -401,8 +436,8 @@ mod tests {
 
         let inspect_vmo_fut = usme_client_proxy.start(generic_sme_server, &legacy_privacy_support);
         let main_fut = match exec.run_until_stalled(&mut main_fut) {
-            Poll::Pending => Some(main_fut),
-            Poll::Ready(()) => None,
+            Poll::Pending => Ok(main_fut),
+            Poll::Ready(result) => Err(result),
         };
         let inspect_vmo = exec.run_singlethreaded(inspect_vmo_fut);
         inspect_vmo.expect("Failed to bootstrap USME.");
@@ -450,7 +485,7 @@ mod tests {
         })));
         assert_variant!(
             exec.run_singlethreaded(async { futures::join!(main_fut, shutdown_receiver) }),
-            ((), Ok(()))
+            (Ok(()), Ok(()))
         );
 
         // All SME proxies should shutdown.
@@ -473,7 +508,7 @@ mod tests {
                 .expect("Failed to initiate wlansoftmac setup.");
         assert_variant!(
             main_fut,
-            None,
+            Err(Err(zx::Status::INTERNAL)),
             "Main future did not immediately terminate upon failed setup."
         );
 
@@ -499,7 +534,7 @@ mod tests {
         fake_device_state.lock().unwrap().usme_bootstrap_client_end = None; // Drop the client end.
         assert_variant!(
             exec.run_singlethreaded(async { futures::join!(main_fut, handle_receiver,) }),
-            ((), Ok(Err(zx::Status::INTERNAL)))
+            (Err(zx::Status::INTERNAL), Ok(Err(zx::Status::INTERNAL)))
         )
     }
 }

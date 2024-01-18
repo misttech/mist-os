@@ -27,7 +27,8 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
  public:
   static zx::result<std::unique_ptr<SoftmacBridge>> New(
       fdf::Dispatcher& softmac_bridge_server_dispatcher,
-      std::unique_ptr<fit::callback<void(zx_status_t status)>> completer, DeviceInterface* device,
+      std::unique_ptr<fit::callback<void(zx_status_t status)>> completer,
+      fit::callback<void(zx_status_t)> sta_shutdown_handler, DeviceInterface* device,
       fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client);
   zx_status_t StopSta(std::unique_ptr<StopStaCompleter> completer);
   ~SoftmacBridge() override;

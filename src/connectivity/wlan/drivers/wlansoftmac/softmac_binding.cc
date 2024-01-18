@@ -37,6 +37,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <fbl/ref_ptr.h>
@@ -51,7 +52,9 @@
 namespace wlan::drivers::wlansoftmac {
 
 SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher)
-    : device_(device), main_driver_dispatcher_(std::move(main_driver_dispatcher)) {
+    : device_(device),
+      main_driver_dispatcher_(std::move(main_driver_dispatcher)),
+      unbind_called_(std::make_shared<bool>(false)) {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
@@ -205,8 +208,25 @@ void SoftmacBinding::Init() {
           device_init_reply(child_device, status, nullptr);
         });
       });
+
+  fit::callback<void(zx_status_t)> sta_shutdown_handler =
+      [main_driver_dispatcher = main_driver_dispatcher_->async_dispatcher(),
+       unbind_called = unbind_called_, child_device = child_device_](zx_status_t status) {
+        async::PostTask(main_driver_dispatcher, [status, unbind_called, child_device]() mutable {
+          if (status == ZX_OK) {
+            return;
+          }
+          lerror("Rust thread had an abnormal shutdown: %s", zx_status_get_string(status));
+          if (*unbind_called) {
+            linfo("Skipping device_async_remove() since Release() already called.");
+            return;
+          }
+          device_async_remove(child_device);
+        });
+      };
+
   auto softmac_bridge = SoftmacBridge::New(softmac_bridge_server_dispatcher_, std::move(completer),
-                                           this, client_.Clone());
+                                           std::move(sta_shutdown_handler), this, client_.Clone());
   if (softmac_bridge.is_error()) {
     lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
     device_init_reply(child_device_, softmac_bridge.error_value(), nullptr);
@@ -218,6 +238,8 @@ void SoftmacBinding::Init() {
 // See lib/ddk/device.h for documentation on when this method is called.
 void SoftmacBinding::Unbind() {
   WLAN_TRACE_DURATION();
+  *unbind_called_ = true;
+
   ldebug(0, nullptr, "Entering.");
   auto softmac_bridge = softmac_bridge_.release();
   auto stop_sta_returned = std::make_unique<libsync::Completion>();
