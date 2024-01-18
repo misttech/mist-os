@@ -45,6 +45,10 @@ group("argh") {
   public_deps = [ ":argh-v0_1_12" ]
 }
 
+group("arrayref") {
+  public_deps = [ ":arrayref-v0_3_5" ]
+}
+
 group("arrayvec") {
   public_deps = [ ":arrayvec-v0_7_1" ]
 }
@@ -1629,6 +1633,33 @@ rust_library("argh_shared-v0_1_12") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":argh_shared-v0_1_12.license" ]
+}
+
+license("arrayref-v0_3_5.license") {
+  public_package_name = "arrayref"
+  license_files = [ "//third_party/rust_crates/vendor/arrayref-0.3.5/LICENSE" ]
+}
+
+rust_library("arrayref-v0_3_5") {
+  crate_name = "arrayref"
+  crate_root = "//third_party/rust_crates/vendor/arrayref-0.3.5/src/lib.rs"
+  output_name = "arrayref-1f394a4894f5a098"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=1f394a4894f5a098",
+    "-Cextra-filename=-1f394a4894f5a098",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":arrayref-v0_3_5.license" ]
 }
 
 license("arrayvec-v0_7_1.license") {

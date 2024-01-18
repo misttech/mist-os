@@ -1287,6 +1287,7 @@ dependencies = [
  "anyhow",
  "arbitrary",
  "argh",
+ "arrayref",
  "arrayvec",
  "ash",
  "assert_matches",
