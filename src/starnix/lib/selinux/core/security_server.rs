@@ -41,6 +41,15 @@ struct SecurityServerState {
     enforcing: bool,
 }
 
+impl SecurityServerState {
+    fn deny_unknown(&self) -> bool {
+        self.policy.as_ref().map_or(true, |p| *p.parsed.handle_unknown() != HandleUnknown::Allow)
+    }
+    fn reject_unknown(&self) -> bool {
+        self.policy.as_ref().map_or(false, |p| *p.parsed.handle_unknown() == HandleUnknown::Reject)
+    }
+}
+
 pub struct SecurityServer {
     /// Determines whether the security server is enabled, or only provides
     /// a hard-coded set of fake responses.
@@ -130,16 +139,23 @@ impl SecurityServer {
         self.state.lock().policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
     }
 
-    /// Returns the behaviour of unknown object class / permissions, according
-    /// to the loaded policy. If no policy is loaded then unknown interactions
-    /// are allowed.
-    pub fn handle_unknown(&self) -> HandleUnknown {
+    /// Returns true if the policy requires unknown class / permissions to be
+    /// denied. Defaults to true until a policy is loaded.
+    pub fn deny_unknown(&self) -> bool {
         if self.is_fake() {
-            return HandleUnknown::Allow;
+            false
+        } else {
+            self.state.lock().deny_unknown()
         }
-        match self.state.lock().policy.as_ref() {
-            Some(policy) => policy.parsed.handle_unknown().clone(),
-            None => HandleUnknown::Allow,
+    }
+
+    /// Returns true if the policy requires unknown class / permissions to be
+    /// rejected. Defaults to false until a policy is loaded.
+    pub fn reject_unknown(&self) -> bool {
+        if self.is_fake() {
+            false
+        } else {
+            self.state.lock().reject_unknown()
         }
     }
 

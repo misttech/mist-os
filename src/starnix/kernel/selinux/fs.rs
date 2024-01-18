@@ -7,15 +7,15 @@ use crate::{
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-        parse_unsigned_file, serialize_u32_file, BytesFile, BytesFileOps, CacheMode,
-        DirectoryEntryType, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
-        StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry, VmoFileNode,
+        parse_unsigned_file, BytesFile, BytesFileOps, CacheMode, DirectoryEntryType, FileObject,
+        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode,
+        FsNodeHandle, FsNodeOps, FsStr, FsString, StaticDirectoryBuilder, VecDirectory,
+        VecDirectoryEntry, VmoFileNode,
     },
 };
 
 use selinux::{security_context::SecurityContext, security_server::SecurityServer};
-use selinux_policy::{metadata::HandleUnknown, SUPPORTED_POLICY_VERSION};
+use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_error, log_info, not_implemented};
 use starnix_sync::Mutex;
 use starnix_uapi::{
@@ -79,6 +79,12 @@ impl SeLinuxFs {
             SeDenyUnknown::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
+        dir.entry(
+            current_task,
+            "reject_unknown".into(),
+            SeRejectUnknown::new_node(security_server.clone()),
+            mode!(IFREG, 0o444),
+        );
         dir.subdir(current_task, "initial_contexts".into(), 0o555, |dir| {
             dir.entry(
                 current_task,
@@ -102,7 +108,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "policyvers".into(),
-            BytesFile::new_node(serialize_u32_file(SUPPORTED_POLICY_VERSION)),
+            BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).as_bytes().to_vec()),
             mode!(IFREG, 0o444),
         );
         dir.entry(
@@ -236,7 +242,7 @@ impl BytesFileOps for SeEnforce {
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(serialize_u32_file(self.security_server.enforcing() as u32).into())
+        Ok(format!("{}", self.security_server.enforcing() as u32).as_bytes().to_vec().into())
     }
 }
 
@@ -252,15 +258,23 @@ impl SeDenyUnknown {
 
 impl BytesFileOps for SeDenyUnknown {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        // "deny_unknown" contains two boolean values, expressing whether the
-        // policy denies and/or rejects unknown object classes / permissions.
-        let result = match self.security_server.handle_unknown() {
-            HandleUnknown::Allow => b"0:0\n",
-            HandleUnknown::Deny => b"1:0\n",
-            HandleUnknown::Reject => b"1:1\n",
-        };
+        Ok(format!("{}", self.security_server.deny_unknown() as u32).as_bytes().to_vec().into())
+    }
+}
 
-        Ok(result.to_vec().into())
+struct SeRejectUnknown {
+    security_server: Arc<SecurityServer>,
+}
+
+impl SeRejectUnknown {
+    fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
+        BytesFile::new_node(Self { security_server })
+    }
+}
+
+impl BytesFileOps for SeRejectUnknown {
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(format!("{}", self.security_server.reject_unknown() as u32).as_bytes().to_vec().into())
     }
 }
 
