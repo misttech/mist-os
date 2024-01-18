@@ -20,6 +20,12 @@ open protocol Controller {
         bridge_socket zx.Handle:SOCKET;
     });
 
+    // TODO(https://fxbug.dev/319871624) delete
+    flexible VsockConnect2(resource struct {
+        port uint32;
+        bridge_socket zx.Handle:SOCKET;
+    });
+
     flexible SpawnConsole(resource table {
         1: console_in zx.Handle:SOCKET;
         2: console_out zx.Handle:SOCKET;

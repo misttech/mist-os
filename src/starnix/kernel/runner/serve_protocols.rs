@@ -130,7 +130,10 @@ pub async fn serve_container_controller(
         .map_err(Error::from)
         .try_for_each_concurrent(None, |event| async {
             match event {
-                fstarcontainer::ControllerRequest::VsockConnect { port, bridge_socket, .. } => {
+                fstarcontainer::ControllerRequest::VsockConnect { port, bridge_socket, .. }
+                | fstarcontainer::ControllerRequest::VsockConnect2 {
+                    port, bridge_socket, ..
+                } => {
                     connect_to_vsock(port, bridge_socket, system_task).await.unwrap_or_else(|e| {
                         log_error!("failed to connect to vsock {:?}", e);
                     });
