@@ -155,8 +155,8 @@ pub fn validate(decl: &fdecl::Component) -> Result<(), ErrorList> {
     ctx.validate(decl, None).map_err(|errs| ErrorList::new(errs))
 }
 
-/// Validates a list of Capabilities independently.
-pub fn validate_capabilities(
+/// Validates a list of namespace or builtin Capabilities.
+fn validate_capabilities(
     capabilities: &[fdecl::Capability],
     as_builtin: bool,
 ) -> Result<(), ErrorList> {
@@ -169,6 +169,20 @@ pub fn validate_capabilities(
     } else {
         Err(ErrorList::new(ctx.errors))
     }
+}
+
+// Validate builtin capabilities.
+pub fn validate_builtin_capabilities(
+    capabilities: &Vec<fdecl::Capability>,
+) -> Result<(), ErrorList> {
+    validate_capabilities(capabilities, true)
+}
+
+// Validate namespace capabilities.
+pub fn validate_namespace_capabilities(
+    capabilities: &Vec<fdecl::Capability>,
+) -> Result<(), ErrorList> {
+    validate_capabilities(capabilities, false)
 }
 
 /// An interface to call into either `check_dynamic_name()` or `check_name()`, depending on the context

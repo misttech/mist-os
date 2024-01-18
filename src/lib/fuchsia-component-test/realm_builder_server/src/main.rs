@@ -1161,7 +1161,7 @@ impl RealmNode2 {
             .map(|c| c.native_into_fidl())
             .collect();
         capabilities.push(capability.clone());
-        cm_fidl_validator::validate_capabilities(&capabilities, false)
+        cm_fidl_validator::validate_namespace_capabilities(&capabilities)
             .map_err(|e| RealmBuilderError::CapabilityInvalid(anyhow::anyhow!(e)))?;
         push_if_not_present(&mut state_guard.decl.capabilities, capability.fidl_into_native());
         Ok(())
