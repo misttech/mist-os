@@ -10,6 +10,7 @@
     capabilities: [
         { protocol: "fuchsia.fxfs.Crypt" },
         { protocol: "fuchsia.fxfs.CryptManagement" },
+        { service: "fuchsia.fxfs.CryptService" },
     ],
     expose: [
         {
@@ -18,6 +19,13 @@
         },
         {
             protocol: "fuchsia.fxfs.CryptManagement",
+            from: "self",
+        },
+
+        // Expose an unimplemented service, to be routed to fxfs, so the component manager shutdown
+        // logic shuts down fxfs before the crypt service.
+        {
+            service: "fuchsia.fxfs.CryptService",
             from: "self",
         },
     ],

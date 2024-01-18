@@ -84,6 +84,11 @@
             to: "#fxfs",
             availability: "optional",
         },
+        {
+            service: "fuchsia.fxfs.CryptService",
+            from: "#fxfs-crypt",
+            to: "#fxfs",
+        },
     ],
     expose: [
         {

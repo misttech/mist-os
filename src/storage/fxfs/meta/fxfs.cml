@@ -47,6 +47,10 @@
             ],
             availability: "optional",
         },
+
+        // Use this otherwise unimplemented service to create an edge in the dependency graph, so
+        // the fxfs component is shut down before the crypt service.
+        { service: "fuchsia.fxfs.CryptService" },
     ],
     expose: [
         {
