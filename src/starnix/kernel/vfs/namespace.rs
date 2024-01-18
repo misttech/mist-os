@@ -685,7 +685,9 @@ impl FileSystemCreator for Arc<Kernel> {
             )?,
             b"tmpfs" => {
                 let fs = TmpFs::new_fs_with_options(self, options)?;
-                if self.has_fake_selinux() {
+                // TODO(http://b/320436714): use hard-coded security context only for SELinux Fake
+                // mode once SELinux is implemented for the file subsystem.
+                if self.security_server.is_some() {
                     let label = b"u:object_r:tmpfs:s0";
                     fs.selinux_context.set(label.into()).unwrap();
                 }
