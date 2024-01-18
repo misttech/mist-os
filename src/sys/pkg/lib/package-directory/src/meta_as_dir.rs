@@ -17,7 +17,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path as VfsPath,
-        ToObjectRequest,
+        ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
     },
 };
 
@@ -98,6 +98,86 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsD
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: VfsPath,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        if path.is_empty() {
+            match protocols.open_mode() {
+                fio::OpenMode::OpenExisting => {}
+                fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
+            }
+
+            if let Some(rights) = protocols.rights() {
+                if rights.intersects(fio::Operations::WRITE_BYTES)
+                    | rights.intersects(fio::Operations::EXECUTE)
+                {
+                    return Err(zx::Status::NOT_SUPPORTED);
+                }
+            }
+
+            // Only MetaAsDir can be obtained from Open calls to MetaAsDir. To obtain MetaAsFile,
+            // the Open call must be made on RootDir. This is consistent with pkgfs behavior and is
+            // needed so that Clone'ing MetaAsDir results in MetaAsDir, because VFS handles Clone
+            // by calling Open with a path of ".", a mode of 0, and mostly unmodified flags and
+            // that combination of arguments would normally result in MetaAsFile being used.
+            //
+            // Note that `ImmutableConnection::create` will check that protocols contain
+            // directory-only protocols.
+            return object_request.spawn_connection(
+                scope,
+                self,
+                protocols,
+                ImmutableConnection::create,
+            );
+        }
+
+        // <path as vfs::path::Path>::as_str() is an object relative path expression [1], except
+        // that it may:
+        //   1. have a trailing "/"
+        //   2. be exactly "."
+        //   3. be longer than 4,095 bytes
+        // The .is_empty() check above rules out "." and the following line removes the possible
+        // trailing "/".
+        // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
+        let file_path =
+            format!("meta/{}", path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref()));
+
+        if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
+            object_request.take().handle(|object_request| {
+                Arc::new(MetaFile::new(Arc::clone(&self.root_dir), location)).open2(
+                    scope,
+                    VfsPath::dot(),
+                    protocols,
+                    object_request,
+                )
+            });
+            return Ok(());
+        }
+
+        let directory_path = file_path + "/";
+        for k in self.root_dir.meta_files.keys() {
+            if k.starts_with(&directory_path) {
+                object_request.take().handle(|object_request| {
+                    Arc::new(MetaSubdir::new(Arc::clone(&self.root_dir), directory_path)).open2(
+                        scope,
+                        VfsPath::dot(),
+                        protocols,
+                        object_request,
+                    )
+                });
+                return Ok(());
+            }
+        }
+
+        Err(zx::Status::NOT_FOUND)
+    }
+
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
@@ -122,6 +202,7 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
         })
     }
 
+    // TODO(b/293947862): include new io2 attributes, e.g. change_time and access_time
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -180,7 +261,7 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::stream::StreamExt as _,
+        futures::{stream::StreamExt as _, TryStreamExt as _},
         std::convert::TryInto as _,
         vfs::{
             directory::{entry::DirectoryEntry, entry_container::Directory},
@@ -429,5 +510,196 @@ mod tests {
                 }
             )
         );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_self() {
+        let (_env, meta_as_dir) = TestEnv::new().await;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|req| {
+            DirectoryEntry::open2(
+                Arc::new(meta_as_dir),
+                ExecutionScope::new(),
+                VfsPath::dot(),
+                protocols,
+                req,
+            )
+        });
+
+        assert_eq!(
+            fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
+            vec![
+                fuchsia_fs::directory::DirEntry {
+                    name: "contents".to_string(),
+                    kind: fuchsia_fs::directory::DirentKind::File
+                },
+                fuchsia_fs::directory::DirEntry {
+                    name: "dir".to_string(),
+                    kind: fuchsia_fs::directory::DirentKind::Directory
+                },
+                fuchsia_fs::directory::DirEntry {
+                    name: "fuchsia.abi".to_string(),
+                    kind: fuchsia_fs::directory::DirentKind::Directory
+                },
+                fuchsia_fs::directory::DirEntry {
+                    name: "package".to_string(),
+                    kind: fuchsia_fs::directory::DirentKind::File
+                }
+            ]
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_file() {
+        let (_env, meta_as_dir) = TestEnv::new().await;
+        let meta_as_dir = Arc::new(meta_as_dir);
+
+        for path in ["dir/file", "dir/file/"] {
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(
+                    Arc::clone(&meta_as_dir),
+                    ExecutionScope::new(),
+                    VfsPath::validate_and_split(path).unwrap(),
+                    protocols,
+                    req,
+                )
+            });
+
+            assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"contents".to_vec());
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_directory() {
+        let (_env, meta_as_dir) = TestEnv::new().await;
+        let meta_as_dir = Arc::new(meta_as_dir);
+
+        for path in ["dir", "dir/"] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(
+                    Arc::clone(&meta_as_dir),
+                    ExecutionScope::new(),
+                    VfsPath::validate_and_split(path).unwrap(),
+                    protocols,
+                    req,
+                )
+            });
+
+            assert_eq!(
+                fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
+                vec![fuchsia_fs::directory::DirEntry {
+                    name: "file".to_string(),
+                    kind: fuchsia_fs::directory::DirentKind::File
+                }]
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_open_modes() {
+        let (_env, meta_as_dir) = TestEnv::new().await;
+        let meta_as_dir = Arc::new(meta_as_dir);
+
+        for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                mode: Some(forbidden_open_mode),
+                rights: Some(fio::Operations::READ_BYTES),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(
+                    Arc::clone(&meta_as_dir),
+                    ExecutionScope::new(),
+                    VfsPath::dot(),
+                    protocols,
+                    req,
+                )
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_rights() {
+        let (_env, meta_as_dir) = TestEnv::new().await;
+        let meta_as_dir = Arc::new(meta_as_dir);
+
+        for forbidden_rights in [fio::Operations::WRITE_BYTES, fio::Operations::EXECUTE] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(forbidden_rights),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(
+                    Arc::clone(&meta_as_dir),
+                    ExecutionScope::new(),
+                    VfsPath::dot(),
+                    protocols,
+                    req,
+                )
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_file_protocols() {
+        let (_env, meta_as_dir) = TestEnv::new().await;
+        let meta_as_dir = Arc::new(meta_as_dir);
+
+        for file_protocols in [fio::FileProtocolFlags::APPEND, fio::FileProtocolFlags::TRUNCATE] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(file_protocols),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(
+                    Arc::clone(&meta_as_dir),
+                    ExecutionScope::new(),
+                    VfsPath::dot(),
+                    protocols,
+                    req,
+                )
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })
+            );
+        }
     }
 }
