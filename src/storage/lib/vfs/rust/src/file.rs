@@ -27,6 +27,8 @@ pub use connection::{FidlIoConnection, RawIoConnection};
 #[cfg(target_os = "fuchsia")]
 pub use connection::{GetVmo, StreamIoConnection};
 
+/// FileOptions include options that are relevant after the file has been opened. Flags like
+/// `TRUNCATE`, which only applies during open time, are not included.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct FileOptions {
     pub rights: fio::Operations,

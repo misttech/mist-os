@@ -64,7 +64,7 @@ pub trait DirectoryEntry: IntoAny + Sync + Send {
     /// It is the responsibility of the implementation to strip POSIX flags if the path crosses
     /// a boundary that does not have the required permissions.
     ///
-    /// It is the responsibility of the implementation to send an `OnOpen` even on the channel
+    /// It is the responsibility of the implementation to send an `OnOpen` event on the channel
     /// contained by `server_end` in case `OPEN_FLAG_STATUS` was present in `flags`, and to
     /// populate the `info` part of the event if `OPEN_FLAG_DESCRIBE` was set.  This also applies
     /// to the error cases.
@@ -82,7 +82,24 @@ pub trait DirectoryEntry: IntoAny + Sync + Send {
         server_end: ServerEnd<fio::NodeMarker>,
     );
 
-    /// See fuchsia.io's Open2 method.
+    /// Opens a connection to this item if the `path` is "." or a connection to an item inside
+    /// this one otherwise.  `path` will not contain any "." or ".." components.
+    ///
+    /// `protocols` holds representations accepted by the caller, for example, it holds `node` that
+    /// is the underlying `Node` protocol to be served on the connection. `node` holds information
+    /// like the open mode (`mode`), node protocols (`protocols`), rights (`rights`) and create
+    /// attributes (`create_attributes`).
+    ///
+    /// If this method was initiated by a FIDL Open2 call, hierarchical rights are enforced at the
+    /// connection layer. The connection layer also checks that when creating a new object,
+    /// no more than one protocol is specified and `create_attributes` is some value.
+    ///
+    /// If the implementation takes `object_request`, it is then responsible for sending an
+    /// `OnRepresentation` event if `protocols` has `NodeFlags.GET_REPRESENTATION` set. Although
+    /// not enforced, the implementation should shutdown with an epitaph if any error occurred
+    /// during this process.
+    ///
+    /// See fuchsia.io's Open2 method for more details.
     fn open2(
         self: Arc<Self>,
         _scope: ExecutionScope,
