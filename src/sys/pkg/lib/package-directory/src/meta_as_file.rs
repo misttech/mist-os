@@ -10,7 +10,8 @@ use {
     std::sync::Arc,
     vfs::{
         attributes, directory::entry::EntryInfo, execution_scope::ExecutionScope,
-        file::FidlIoConnection, path::Path as VfsPath, ToObjectRequest,
+        file::FidlIoConnection, path::Path as VfsPath, ObjectRequestRef, ProtocolsExt as _,
+        ToObjectRequest,
     },
 };
 
@@ -56,6 +57,39 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaAsF
         });
     }
 
+    fn open2(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: VfsPath,
+        protocols: fio::ConnectionProtocols,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        if !path.is_empty() {
+            return Err(zx::Status::NOT_DIR);
+        }
+
+        match protocols.open_mode() {
+            fio::OpenMode::OpenExisting => {}
+            fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
+        }
+
+        if let Some(rights) = protocols.rights() {
+            if rights.intersects(fio::Operations::WRITE_BYTES)
+                | rights.intersects(fio::Operations::EXECUTE)
+            {
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
+        }
+
+        if protocols.to_file_options()?.is_append || object_request.truncate {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
+
+        object_request.spawn_connection(scope, self, protocols, FidlIoConnection::create)
+    }
+
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
     }
@@ -80,6 +114,7 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsFile<S> {
         })
     }
 
+    // TODO(b/293947862): include new io2 attributes, e.g. change_time and access_time
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -162,7 +197,7 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
-        futures::stream::StreamExt as _,
+        futures::{stream::StreamExt as _, TryStreamExt as _},
         std::convert::TryInto as _,
         vfs::{
             directory::entry::DirectoryEntry,
@@ -450,6 +485,189 @@ mod tests {
                     id: 1,
                 }
             )
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_non_empty_path() {
+        let (_env, meta_as_file) = TestEnv::new().await;
+
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            protocols: Some(fio::NodeProtocols {
+                file: Some(fio::FileProtocolFlags::default()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|req| {
+            DirectoryEntry::open2(
+                Arc::new(meta_as_file),
+                ExecutionScope::new(),
+                VfsPath::validate_and_split("non-empty").unwrap(),
+                protocols,
+                req,
+            )
+        });
+
+        assert_matches!(
+            proxy.take_event_stream().try_next().await,
+            Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. })
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_succeeds() {
+        let (_env, meta_as_file) = TestEnv::new().await;
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let hash = meta_as_file.root_dir.hash.to_string();
+
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|req| {
+            DirectoryEntry::open2(
+                Arc::new(meta_as_file),
+                ExecutionScope::new(),
+                VfsPath::dot(),
+                protocols,
+                req,
+            )
+        });
+
+        assert_matches!(proxy.get_connection_info().await, Ok(_));
+
+        assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), hash.as_bytes());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_open_modes() {
+        let (_env, meta_as_file) = TestEnv::new().await;
+        let meta_as_file = Arc::new(meta_as_file);
+
+        for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                mode: Some(forbidden_open_mode),
+                rights: Some(fio::Operations::READ_BYTES),
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(
+                    Arc::clone(&meta_as_file),
+                    ExecutionScope::new(),
+                    VfsPath::dot(),
+                    protocols,
+                    req,
+                )
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_rights() {
+        let (_env, meta_as_file) = TestEnv::new().await;
+        let meta_as_file = Arc::new(meta_as_file);
+
+        for forbidden_rights in [fio::Operations::WRITE_BYTES, fio::Operations::EXECUTE] {
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(forbidden_rights),
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(fio::FileProtocolFlags::default()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(
+                    Arc::clone(&meta_as_file),
+                    ExecutionScope::new(),
+                    VfsPath::dot(),
+                    protocols,
+                    req,
+                )
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_forbidden_file_protocols() {
+        let (_env, meta_as_file) = TestEnv::new().await;
+        let meta_as_file = Arc::new(meta_as_file);
+
+        for forbidden_file_protocols in
+            [fio::FileProtocolFlags::APPEND, fio::FileProtocolFlags::TRUNCATE]
+        {
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+
+            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+                rights: Some(fio::Operations::READ_BYTES),
+                protocols: Some(fio::NodeProtocols {
+                    file: Some(forbidden_file_protocols),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            protocols.to_object_request(server_end).handle(|req| {
+                DirectoryEntry::open2(
+                    Arc::clone(&meta_as_file),
+                    ExecutionScope::new(),
+                    VfsPath::dot(),
+                    protocols,
+                    req,
+                )
+            });
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open2_rejects_non_file() {
+        let (_env, meta_as_file) = TestEnv::new().await;
+        let meta_as_file = Arc::new(meta_as_file);
+
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            rights: Some(fio::Operations::READ_BYTES),
+            protocols: Some(fio::NodeProtocols {
+                directory: Some(fio::DirectoryProtocolOptions::default()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        protocols.to_object_request(server_end).handle(|req| {
+            DirectoryEntry::open2(
+                Arc::clone(&meta_as_file),
+                ExecutionScope::new(),
+                VfsPath::dot(),
+                protocols,
+                req,
+            )
+        });
+        assert_matches!(
+            proxy.take_event_stream().try_next().await,
+            Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. })
         );
     }
 }
