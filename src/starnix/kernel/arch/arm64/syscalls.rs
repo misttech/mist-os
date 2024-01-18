@@ -18,7 +18,7 @@ use starnix_uapi::{
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
     flags: u64,
     user_stack: UserAddress,
     user_parent_tid: UserRef<pid_t>,

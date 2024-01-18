@@ -12,9 +12,9 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor},
     signals::{send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
-        Kernel, PidTable, ProcessGroup, SeccompFilter, SeccompFilterContainer,
-        SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState, Task, TaskFlags,
-        ThreadGroup, Waiter,
+        Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
+        PtraceOptions, SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState,
+        SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, Waiter,
     },
     vfs::{
         FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode, SymlinkMode,
@@ -34,6 +34,7 @@ use starnix_sync::{
 use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN},
+    clone_args,
     device_type::DeviceType,
     errno, error,
     errors::Errno,
@@ -46,9 +47,9 @@ use starnix_uapi::{
     sock_filter, sock_fprog,
     user_address::{UserAddress, UserRef},
     BPF_MAXINSNS, CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS,
-    CLONE_INTO_CGROUP, CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_SETTLS, CLONE_SIGHAND,
-    CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK,
-    ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
+    CLONE_INTO_CGROUP, CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS,
+    CLONE_SIGHAND, CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED,
+    FUTEX_TID_MASK, ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
     SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
 use std::{ffi::CString, fmt, marker::PhantomData, mem::MaybeUninit, sync::Arc};
@@ -243,7 +244,7 @@ impl CurrentTask {
                 group_stop_state.finalize()
             };
             if let Ok(new_state) = new_state {
-                task_state.set_stopped(new_state, None, Some(self));
+                task_state.set_stopped(new_state, None, Some(self), None);
                 drop(group_state);
                 drop(task_state);
                 // It is possible for the stop state to be changed by another
@@ -271,6 +272,7 @@ impl CurrentTask {
             // ptracer, but otherwise remain blocked.
             if let Some(ref mut ptrace) = &mut task_state.ptrace {
                 ptrace.set_last_signal(Some(SignalInfo::default(SIGTRAP)));
+                ptrace.set_last_event(Some(PtraceEventData::new_from_event(PtraceEvent::Stop, 0)));
             }
             task_state.wait_on_ptracer(&waiter);
             task_state.notify_ptracers();
@@ -1238,7 +1240,8 @@ impl CurrentTask {
             | CLONE_PARENT_SETTID
             | CLONE_CHILD_CLEARTID
             | CLONE_CHILD_SETTID
-            | CLONE_VFORK) as u64;
+            | CLONE_VFORK
+            | CLONE_PTRACE) as u64;
         // A mask with all valid flags set, because we want to return a different error code for an
         // invalid flag vs an unimplemented flag. Subtracting 1 from the largest valid flag gives a
         // mask with all flags below it set. Shift up by one to make sure the largest flag is also
@@ -1459,7 +1462,7 @@ impl CurrentTask {
             if let Some(ref mut ptrace) = &mut state.ptrace {
                 ptrace.copy_state_from(self);
             }
-            state.set_stopped(stopped, siginfo, Some(self));
+            state.set_stopped(stopped, siginfo, Some(self), None);
         }
 
         if !stopped.is_in_progress() {
@@ -1480,7 +1483,8 @@ impl CurrentTask {
         {
             let signal = self.thread_group.read().last_signal.clone();
             // stopping because the thread group has stopped
-            self.write().set_stopped(StopState::GroupStopped, signal, Some(self));
+            let event = Some(PtraceEventData::new_from_event(PtraceEvent::Stop, 0));
+            self.write().set_stopped(StopState::GroupStopped, signal, Some(self), event);
             return true;
         }
 
@@ -1511,7 +1515,7 @@ impl CurrentTask {
             // waiters.
             if self.is_exitted() {
                 self.thread_group.set_stopped(StopState::ForceAwake, None, false);
-                self.write().set_stopped(StopState::ForceAwake, None, Some(self));
+                self.write().set_stopped(StopState::ForceAwake, None, Some(self), None);
                 return;
             }
 
@@ -1525,6 +1529,41 @@ impl CurrentTask {
             // Maybe go from stopping to stopped, if we are currently stopping
             // again.
             self.finalize_stop_state();
+        }
+    }
+
+    /// For traced tasks, this will return the data neceessary for a cloned task
+    /// to attach to the same tracer.
+    pub fn get_ptrace_core_state_for_clone(
+        &mut self,
+        clone_args: &clone_args,
+    ) -> (PtraceOptions, Option<PtraceCoreState>) {
+        let state = self.write();
+        if let Some(ref ptrace) = &state.ptrace {
+            ptrace.get_core_state_for_clone(clone_args)
+        } else {
+            (PtraceOptions::empty(), None)
+        }
+    }
+
+    /// If currently being ptraced with the given option, emit the appropriate
+    /// event.  PTRACE_EVENTMSG will return the given message.
+    pub fn ptrace_event(&mut self, trace_kind: PtraceOptions, msg: u32) {
+        if !trace_kind.is_empty() {
+            {
+                let mut state = self.write();
+
+                if state.ptrace.as_ref().map_or(true, |ptrace| !ptrace.has_option(trace_kind)) {
+                    return;
+                }
+                state.set_stopped(
+                    StopState::PtraceEventStopping,
+                    Some(SignalInfo::default(starnix_uapi::signals::SIGTRAP)),
+                    None,
+                    Some(PtraceEventData::new(trace_kind, msg)),
+                );
+            }
+            self.block_while_stopped();
         }
     }
 

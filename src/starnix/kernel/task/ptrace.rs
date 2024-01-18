@@ -21,6 +21,7 @@ use starnix_sync::{LockBefore, Locked, MmDumpable};
 use starnix_syscalls::{decls::SyscallDecl, SyscallResult};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
+    clone_args,
     elf::ElfNoteType,
     errno, error,
     errors::Errno,
@@ -29,12 +30,14 @@ use starnix_uapi::{
     pid_t, ptrace_syscall_info,
     signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP, SIGTRAP},
     user_address::{UserAddress, UserRef},
-    user_regs_struct, PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_STOP, PTRACE_GETREGSET,
+    user_regs_struct, PTRACE_CONT, PTRACE_DETACH, PTRACE_EVENT_CLONE, PTRACE_EVENT_EXEC,
+    PTRACE_EVENT_EXIT, PTRACE_EVENT_FORK, PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP,
+    PTRACE_EVENT_VFORK, PTRACE_EVENT_VFORK_DONE, PTRACE_GETEVENTMSG, PTRACE_GETREGSET,
     PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL,
-    PTRACE_LISTEN, PTRACE_O_TRACESYSGOOD, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR,
-    PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK,
-    PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE,
-    SI_MAX_SIZE,
+    PTRACE_LISTEN, PTRACE_O_TRACECLONE, PTRACE_O_TRACEFORK, PTRACE_O_TRACESYSGOOD,
+    PTRACE_O_TRACEVFORK, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA,
+    PTRACE_POKETEXT, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL,
+    PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
 };
 
 use std::sync::{atomic::Ordering, Arc};
@@ -81,23 +84,87 @@ bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[repr(transparent)]
     pub struct PtraceOptions: u32 {
-        const EXITKILL =starnix_uapi::PTRACE_O_EXITKILL;
-        const TRACECLONE =starnix_uapi::PTRACE_O_TRACECLONE;
-        const TRACEEXEC =starnix_uapi::PTRACE_O_TRACEEXEC;
-        const TRACEEXIT =starnix_uapi::PTRACE_O_TRACEEXIT;
-        const TRACEFORK =starnix_uapi::PTRACE_O_TRACEFORK;
-        const TRACESYSGOOD =starnix_uapi::PTRACE_O_TRACESYSGOOD;
-        const TRACEVFORK =starnix_uapi::PTRACE_O_TRACEVFORK;
-        const TRACEVFORKDONE =starnix_uapi::PTRACE_O_TRACEVFORKDONE;
-        const TRACESECCOMP =starnix_uapi::PTRACE_O_TRACESECCOMP;
-        const SUSPEND_SECCOMP =starnix_uapi::PTRACE_O_SUSPEND_SECCOMP;
+        const EXITKILL = starnix_uapi::PTRACE_O_EXITKILL;
+        const TRACECLONE = starnix_uapi::PTRACE_O_TRACECLONE;
+        const TRACEEXEC = starnix_uapi::PTRACE_O_TRACEEXEC;
+        const TRACEEXIT = starnix_uapi::PTRACE_O_TRACEEXIT;
+        const TRACEFORK = starnix_uapi::PTRACE_O_TRACEFORK;
+        const TRACESYSGOOD = starnix_uapi::PTRACE_O_TRACESYSGOOD;
+        const TRACEVFORK = starnix_uapi::PTRACE_O_TRACEVFORK;
+        const TRACEVFORKDONE = starnix_uapi::PTRACE_O_TRACEVFORKDONE;
+        const TRACESECCOMP = starnix_uapi::PTRACE_O_TRACESECCOMP;
+        const SUSPEND_SECCOMP = starnix_uapi::PTRACE_O_SUSPEND_SECCOMP;
+    }
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PtraceEvent {
+    #[default]
+    None = 0,
+    Stop = PTRACE_EVENT_STOP,
+    Clone = PTRACE_EVENT_CLONE,
+    Fork = PTRACE_EVENT_FORK,
+    Vfork = PTRACE_EVENT_VFORK,
+    VforkDone = PTRACE_EVENT_VFORK_DONE,
+    Exec = PTRACE_EVENT_EXEC,
+    Exit = PTRACE_EVENT_EXIT,
+    Seccomp = PTRACE_EVENT_SECCOMP,
+}
+
+/// Information about what caused a ptrace-event-stop.
+pub struct PtraceEventData {
+    /// The event that caused the task to stop (e.g., PTRACE_EVENT_TRACEFORK or PTRACE_EVENT_EXIT).
+    pub event: PtraceEvent,
+
+    /// The message associated with the event (e.g., tid, exit status)..
+    pub msg: u32,
+}
+
+impl PtraceEventData {
+    pub fn new(option: PtraceOptions, msg: u32) -> Self {
+        let event = match option {
+            PtraceOptions::TRACECLONE => PtraceEvent::Clone,
+            PtraceOptions::TRACEFORK => PtraceEvent::Fork,
+            PtraceOptions::TRACEVFORK => PtraceEvent::Vfork,
+            PtraceOptions::TRACEVFORKDONE => PtraceEvent::VforkDone,
+            PtraceOptions::TRACEEXEC => PtraceEvent::Exec,
+            PtraceOptions::TRACEEXIT => PtraceEvent::Exit,
+            PtraceOptions::TRACESECCOMP => PtraceEvent::Seccomp,
+            _ => unreachable!("Bad ptrace event specified"),
+        };
+        Self { event, msg }
+    }
+    pub fn new_from_event(event: PtraceEvent, msg: u32) -> Self {
+        Self { event, msg }
+    }
+}
+
+/// The ptrace state that a new task needs to connect to the same tracer as the
+/// task that clones it.
+#[derive(Copy, Clone, PartialEq)]
+pub struct PtraceCoreState {
+    /// The pid of the tracer
+    pub pid: pid_t,
+
+    /// Whether the attach was a seize or an attach.  There are a few subtle
+    /// differences in behavior of the different attach types - see ptrace(2).
+    pub attach_type: PtraceAttachType,
+
+    /// The options set by PTRACE_SETOPTIONS
+    pub options: PtraceOptions,
+}
+
+impl PtraceCoreState {
+    pub fn has_option(&self, option: PtraceOptions) -> bool {
+        self.options.contains(option)
     }
 }
 
 /// Per-task ptrace-related state
 pub struct PtraceState {
-    /// The pid of the tracer
-    pub pid: pid_t,
+    /// The core state of the tracer, which can be shared between processes
+    pub core_state: PtraceCoreState,
 
     /// The tracee waits on this WaitQueue to find out when it should stop or wake
     /// for ptrace-related shenanigans.
@@ -115,9 +182,8 @@ pub struct PtraceState {
     /// can't be used for that, because that needs to be saved for GETSIGINFO.
     pub last_signal_waitable: bool,
 
-    /// Whether the attach was a seize or an attach.  There are a few subtle
-    /// differences in behavior of the different attach types - see ptrace(2).
-    pub attach_type: PtraceAttachType,
+    /// Data about the PTRACE_EVENT that caused the most recent stop (if any).
+    pub event_data: Option<PtraceEventData>,
 
     /// Indicates whether the last ptrace call put this thread into a state with
     /// special semantics for stopping behavior.
@@ -127,31 +193,39 @@ pub struct PtraceState {
     /// stops; if the thread is not fully stopped, it is None.
     tracee_thread_state: Option<ThreadState>,
 
-    /// The options set by PTRACE_SETOPTIONS
-    pub options: PtraceOptions,
-
     /// For SYSCALL_INFO_EXIT
     pub last_syscall_was_error: bool,
 }
 
 impl PtraceState {
-    pub fn new(pid: pid_t, attach_type: PtraceAttachType) -> Self {
+    pub fn new(pid: pid_t, attach_type: PtraceAttachType, options: PtraceOptions) -> Self {
         PtraceState {
-            pid,
+            core_state: PtraceCoreState { pid, attach_type, options },
             tracee_waiters: WaitQueue::default(),
             tracer_waiters: WaitQueue::default(),
             last_signal: None,
             last_signal_waitable: false,
-            attach_type,
+            event_data: None,
             stop_status: PtraceStatus::default(),
             tracee_thread_state: None,
-            options: PtraceOptions::empty(),
             last_syscall_was_error: false,
         }
     }
 
+    pub fn get_pid(&self) -> pid_t {
+        self.core_state.pid
+    }
+
+    pub fn set_pid(&mut self, pid: pid_t) {
+        self.core_state.pid = pid;
+    }
+
     pub fn is_seized(&self) -> bool {
-        self.attach_type == PtraceAttachType::Seize
+        self.core_state.attach_type == PtraceAttachType::Seize
+    }
+
+    pub fn get_attach_type(&self) -> PtraceAttachType {
+        self.core_state.attach_type
     }
 
     pub fn is_waitable(&self, stop: StopState, options: &WaitingOptions) -> bool {
@@ -173,14 +247,18 @@ impl PtraceState {
             if siginfo.signal == SIGKILL {
                 return;
             }
-            if self.is_seized() {
-                siginfo.code |= (PTRACE_EVENT_STOP << 8) as i32;
-            }
             self.last_signal_waitable = true;
             self.last_signal = signal;
         }
     }
 
+    pub fn set_last_event(&mut self, event: Option<PtraceEventData>) {
+        if event.is_some() {
+            self.event_data = event;
+        }
+    }
+
+    // Gets the last signal, and optionally clears the wait state of the ptrace.
     pub fn get_last_signal(&mut self, keep_signal_waitable: bool) -> Option<SignalInfo> {
         self.last_signal_waitable = keep_signal_waitable;
         self.last_signal.clone()
@@ -195,7 +273,25 @@ impl PtraceState {
     }
 
     pub fn has_option(&self, option: PtraceOptions) -> bool {
-        self.options.contains(option)
+        self.core_state.has_option(option)
+    }
+
+    pub fn set_options_from_bits(&mut self, option: u32) -> Result<(), Errno> {
+        if let Some(options) = PtraceOptions::from_bits(option) {
+            self.core_state.options = options;
+            Ok(())
+        } else {
+            error!(EINVAL)
+        }
+    }
+
+    pub fn get_options(&self) -> PtraceOptions {
+        self.core_state.options
+    }
+
+    /// Returns enough of the ptrace state to propagate it to a fork / clone / vforked task.
+    pub fn get_core_state(&self) -> PtraceCoreState {
+        self.core_state.clone()
     }
 
     /// Returns an (i32, ptrace_syscall_info) pair.  The ptrace_syscall_info is
@@ -271,6 +367,40 @@ impl PtraceState {
         }
         Ok((info_len as i32, info))
     }
+
+    /// Gets the core state for this ptrace if the options set on this ptrace
+    /// match |trace_kind|.  Returns a pair: the trace option you *should* use
+    /// (sometimes this is different from the one that the caller thinks it
+    /// should use), and the core state.
+    pub fn get_core_state_for_clone(
+        &self,
+        clone_args: &clone_args,
+    ) -> (PtraceOptions, Option<PtraceCoreState>) {
+        // ptrace(2): If the tracee calls clone(2) with the CLONE_VFORK flag,
+        // PTRACE_EVENT_VFORK will be delivered instead if PTRACE_O_TRACEVFORK
+        // is set, otherwise if the tracee calls clone(2) with the exit signal
+        // set to SIGCHLD, PTRACE_EVENT_FORK will be delivered if
+        // PTRACE_O_TRACEFORK is set.
+        let trace_type = if clone_args.flags & (starnix_uapi::CLONE_UNTRACED as u64) != 0 {
+            PtraceOptions::empty()
+        } else {
+            if clone_args.flags & (starnix_uapi::CLONE_VFORK as u64) != 0 {
+                PtraceOptions::TRACEVFORK
+            } else if clone_args.exit_signal != (starnix_uapi::SIGCHLD as u64) {
+                PtraceOptions::TRACECLONE
+            } else {
+                PtraceOptions::TRACEFORK
+            }
+        };
+
+        if !self.has_option(trace_type)
+            && clone_args.flags & (starnix_uapi::CLONE_PTRACE as u64) == 0
+        {
+            return (PtraceOptions::empty(), None);
+        }
+
+        (trace_type, Some(self.get_core_state()))
+    }
 }
 
 /// Scope definitions for Yama.  For full details, see ptrace(2).
@@ -337,6 +467,7 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         } else {
             new_state = PtraceStatus::Default;
             ptrace.last_signal = None;
+            ptrace.event_data = None;
         }
         ptrace.stop_status = new_state;
 
@@ -349,7 +480,7 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
         // This will wake up the task for us.
         send_signal_first(&tracee, state, siginfo);
     } else {
-        state.set_stopped(StopState::Waking, None, None);
+        state.set_stopped(StopState::Waking, None, None, None);
         drop(state);
         tracee.thread_group.set_stopped(StopState::Waking, None, false);
     }
@@ -367,17 +498,19 @@ fn ptrace_interrupt(tracee: &Task) -> Result<(), Errno> {
         }
         let status = ptrace.stop_status.clone();
         ptrace.stop_status = PtraceStatus::Default;
+        let event_data = Some(PtraceEventData::new_from_event(PtraceEvent::Stop, 0));
         if status == PtraceStatus::Listening {
             let signal = ptrace.last_signal.clone();
             // "If the tracee was already stopped by a signal and PTRACE_LISTEN
             // was sent to it, the tracee stops with PTRACE_EVENT_STOP and
             // WSTOPSIG(status) returns the stop signal"
-            state.set_stopped(StopState::PtraceEventStopped, signal, None);
+            state.set_stopped(StopState::PtraceEventStopped, signal, None, event_data);
         } else {
             state.set_stopped(
                 StopState::PtraceEventStopping,
                 Some(SignalInfo::default(SIGTRAP)),
                 None,
+                event_data,
             );
             drop(state);
             tracee.interrupt();
@@ -392,9 +525,9 @@ fn ptrace_listen(tracee: &Task) -> Result<(), Errno> {
         if !ptrace.is_seized()
             || (ptrace.last_signal_waitable
                 && ptrace
-                    .last_signal
+                    .event_data
                     .as_ref()
-                    .is_some_and(|ls| ls.code >> 8 != PTRACE_EVENT_STOP as i32))
+                    .is_some_and(|event_data| event_data.event != PtraceEvent::Stop))
         {
             return error!(EIO);
         }
@@ -429,7 +562,7 @@ pub fn ptrace_dispatch(
     let tracee = weak_init.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
     if let Some(ptrace) = &tracee.read().ptrace {
-        if ptrace.pid != current_task.get_tid() {
+        if ptrace.get_pid() != current_task.get_tid() {
             return error!(ESRCH);
         }
     }
@@ -627,17 +760,30 @@ pub fn ptrace_dispatch(
         PTRACE_SETOPTIONS => {
             let mask = data.ptr() as u32;
             // This is what we currently support.
-            if mask != 0 && mask != PTRACE_O_TRACESYSGOOD {
+            if mask != 0
+                && (mask
+                    & !(PTRACE_O_TRACESYSGOOD
+                        | PTRACE_O_TRACECLONE
+                        | PTRACE_O_TRACEFORK
+                        | PTRACE_O_TRACEVFORK)
+                    != 0)
+            {
                 return error!(ENOSYS);
             }
             if let Some(ref mut ptrace) = &mut state.ptrace {
-                if let Some(options) = PtraceOptions::from_bits(data.ptr() as u32) {
-                    ptrace.options = options;
-                } else {
-                    return error!(EINVAL);
-                }
+                ptrace.set_options_from_bits(data.ptr() as u32)?;
             }
             Ok(starnix_syscalls::SUCCESS)
+        }
+        PTRACE_GETEVENTMSG => {
+            if let Some(ptrace) = &state.ptrace {
+                if let Some(event_data) = &ptrace.event_data {
+                    let dst: UserRef<u32> = UserRef::from(data);
+                    current_task.mm().write_object(dst, &event_data.msg)?;
+                    return Ok(starnix_syscalls::SUCCESS);
+                }
+            }
+            error!(EIO)
         }
         _ => {
             not_implemented!("ptrace", request);
@@ -646,17 +792,19 @@ pub fn ptrace_dispatch(
     }
 }
 
+/// Makes the given thread group trace the given task.
 fn do_attach(
     thread_group: &ThreadGroup,
     task: WeakRef<Task>,
     attach_type: PtraceAttachType,
+    options: PtraceOptions,
 ) -> Result<(), Errno> {
     if let Some(task_ref) = task.upgrade() {
         thread_group.ptracees.lock().insert(task_ref.get_tid(), (&task_ref).into());
         {
             let process_state = &mut task_ref.thread_group.write();
             let mut state = task_ref.write();
-            state.set_ptrace(Some(PtraceState::new(thread_group.leader, attach_type)))?;
+            state.set_ptrace(Some(PtraceState::new(thread_group.leader, attach_type, options)))?;
             // If the tracee is already stopped, make sure that the tracer can
             // identify that right away.
             if process_state.is_waitable()
@@ -687,6 +835,38 @@ fn check_caps_for_attach(ptrace_scope: u8, current_task: &CurrentTask) -> Result
     Ok(())
 }
 
+/// Uses the given core ptrace state (including tracer, attach type, etc) to
+/// attach to another pid.  Also sends a signal to stop |current_task|.  Typical
+/// for when inheriting ptrace state from another task.
+pub fn ptrace_attach_from_state(
+    tracee_task: &OwnedRef<Task>,
+    ptrace_state: PtraceCoreState,
+) -> Result<(), Errno> {
+    {
+        let weak_init = tracee_task.thread_group.kernel.pids.read().get_task(ptrace_state.pid);
+        let tracer_task = weak_init.upgrade().ok_or_else(|| errno!(ESRCH))?;
+        do_attach(
+            &tracer_task.thread_group,
+            WeakRef::from(tracee_task),
+            ptrace_state.attach_type,
+            ptrace_state.options,
+        )?;
+    }
+    let mut state = tracee_task.write();
+    // The newly started tracee starts with a signal that depends on the attach type.
+    let signal = if ptrace_state.attach_type == PtraceAttachType::Seize {
+        if let Some(ref mut ptrace) = &mut state.ptrace {
+            ptrace.set_last_event(Some(PtraceEventData::new_from_event(PtraceEvent::Stop, 0)));
+        }
+        SignalInfo::default(SIGTRAP)
+    } else {
+        SignalInfo::default(SIGSTOP)
+    };
+    send_signal_first(tracee_task, state, signal);
+
+    Ok(())
+}
+
 pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, Errno> {
     let ptrace_scope = current_task.kernel().ptrace_scope.load(Ordering::Relaxed);
     check_caps_for_attach(ptrace_scope, current_task)?;
@@ -694,7 +874,7 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, E
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
         let task_ref = OwnedRef::temp(&current_task.task);
-        do_attach(&parent, (&task_ref).into(), PtraceAttachType::Attach)?;
+        do_attach(&parent, (&task_ref).into(), PtraceAttachType::Attach, PtraceOptions::empty())?;
         Ok(starnix_syscalls::SUCCESS)
     } else {
         error!(EPERM)
@@ -706,6 +886,7 @@ pub fn ptrace_attach<L>(
     current_task: &mut CurrentTask,
     pid: pid_t,
     attach_type: PtraceAttachType,
+    data: UserAddress,
 ) -> Result<SyscallResult, Errno>
 where
     L: LockBefore<MmDumpable>,
@@ -751,9 +932,17 @@ where
     }
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &tracee)?;
-    do_attach(&current_task.thread_group, weak_task.clone(), attach_type)?;
+    do_attach(&current_task.thread_group, weak_task.clone(), attach_type, PtraceOptions::empty())?;
     if attach_type == PtraceAttachType::Attach {
         send_standard_signal(&tracee, SignalInfo::default(SIGSTOP));
+    } else if attach_type == PtraceAttachType::Seize {
+        // When seizing, |data| should be used as the options bitmask.
+        if let Some(task_ref) = weak_task.upgrade() {
+            let mut state = task_ref.write();
+            if let Some(ref mut ptrace) = &mut state.ptrace {
+                ptrace.set_options_from_bits(data.ptr() as u32)?;
+            }
+        }
     }
     Ok(starnix_syscalls::SUCCESS)
 }
@@ -844,7 +1033,7 @@ pub fn ptrace_syscall_enter(current_task: &mut CurrentTask) {
             {
                 sig.signal.set_ptrace_syscall_bit();
             }
-            state.set_stopped(StopState::SyscallEnterStopping, Some(sig), None);
+            state.set_stopped(StopState::SyscallEnterStopping, Some(sig), None, None);
             true
         } else {
             false
@@ -870,7 +1059,7 @@ pub fn ptrace_syscall_exit(current_task: &mut CurrentTask, is_error: bool) {
                 sig.signal.set_ptrace_syscall_bit();
             }
 
-            state.set_stopped(StopState::SyscallExitStopping, Some(sig), None);
+            state.set_stopped(StopState::SyscallExitStopping, Some(sig), None, None);
             if let Some(ref mut ptrace) = &mut state.ptrace {
                 ptrace.last_syscall_was_error = is_error;
             }
@@ -891,7 +1080,7 @@ mod tests {
         task::syscalls::sys_prctl,
         testing::{create_kernel_task_and_unlocked, create_task},
     };
-    use starnix_uapi::PR_SET_PTRACER;
+    use starnix_uapi::{user_address::UserAddress, PR_SET_PTRACER};
 
     #[::fuchsia::test]
     async fn test_set_ptracer() {
@@ -908,7 +1097,8 @@ mod tests {
                 &mut locked,
                 &mut tracer,
                 tracee.as_ref().task.id,
-                PtraceAttachType::Attach
+                PtraceAttachType::Attach,
+                UserAddress::NULL,
             ),
             error!(EPERM)
         );
@@ -930,7 +1120,8 @@ mod tests {
                 &mut locked,
                 &mut not_tracer,
                 tracee.as_ref().task.id,
-                PtraceAttachType::Attach
+                PtraceAttachType::Attach,
+                UserAddress::NULL,
             ),
             error!(EPERM)
         );
@@ -939,7 +1130,8 @@ mod tests {
             &mut locked,
             &mut tracer,
             tracee.as_ref().task.id,
-            PtraceAttachType::Attach
+            PtraceAttachType::Attach,
+            UserAddress::NULL,
         )
         .is_ok());
     }
@@ -959,7 +1151,8 @@ mod tests {
                 &mut locked,
                 &mut tracer,
                 tracee.as_ref().task.id,
-                PtraceAttachType::Attach
+                PtraceAttachType::Attach,
+                UserAddress::NULL,
             ),
             error!(EPERM)
         );
@@ -979,7 +1172,8 @@ mod tests {
             &mut locked,
             &mut tracer,
             tracee.as_ref().task.id,
-            PtraceAttachType::Attach
+            PtraceAttachType::Attach,
+            UserAddress::NULL,
         )
         .is_ok());
     }

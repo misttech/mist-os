@@ -407,6 +407,7 @@ async fn create_container(
             log_info!("Finished running init process: {:?}", result);
             let _ = task_complete.send(result);
         },
+        None,
     )?;
 
     if !config.startup_file_path.is_empty() {

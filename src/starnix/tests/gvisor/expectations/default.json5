@@ -557,7 +557,6 @@
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.ExitWhenParentIsNotTracer_Syscall_TraceVfork_TraceVforkDone",
                 "PtraceTest.Int3",
-                "PtraceTest.SeizeSetOptions",
                 "PtraceTest.Sysemu_PokeUser",
                 "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/0",
                 "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/1",

@@ -219,6 +219,7 @@ pub async fn start_component(
             // Unmount all the directories for this component.
             std::mem::drop(mount_record);
         },
+        None,
     )?;
     let controller = controller.into_stream()?;
     fasync::Task::local(serve_component_controller(controller, weak_task, task_complete)).detach();

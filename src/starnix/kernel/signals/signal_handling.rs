@@ -44,7 +44,7 @@ enum SignalPriority {
 }
 
 // `send_signal*()` calls below may fail only for real-time signals (with EAGAIN). They are
-// expected to succeed for all othe rsignals.
+// expected to succeed for all other signals.
 pub fn send_signal_first(task: &Task, task_state: TaskWriteGuard<'_>, siginfo: SignalInfo) {
     send_signal_prio(task, task_state, siginfo, SignalPriority::First, true)
         .expect("send_signal(SignalPriority::First) is not expected to fail")
@@ -108,10 +108,10 @@ fn send_signal_prio(
     // a stopped process.
     if siginfo.signal == SIGKILL {
         task.thread_group.set_stopped(StopState::ForceWaking, Some(siginfo), false);
-        task.write().set_stopped(StopState::ForceWaking, None, None);
+        task.write().set_stopped(StopState::ForceWaking, None, None, None);
     } else if siginfo.signal == SIGCONT || force_wake {
         task.thread_group.set_stopped(StopState::Waking, Some(siginfo), false);
-        task.write().set_stopped(StopState::Waking, None, None);
+        task.write().set_stopped(StopState::Waking, None, None, None);
     }
 
     Ok(())
@@ -204,7 +204,12 @@ pub fn dequeue_signal(
             // Indicate we will be stopping for ptrace at the next opportunity.
             // Whether you actually deliver the signal is now up to ptrace, so
             // we can return.
-            task_state.set_stopped(StopState::SignalDeliveryStopping, Some(siginfo.clone()), None);
+            task_state.set_stopped(
+                StopState::SignalDeliveryStopping,
+                Some(siginfo.clone()),
+                None,
+                None,
+            );
             return;
         }
     }

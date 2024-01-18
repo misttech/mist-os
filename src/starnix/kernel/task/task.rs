@@ -8,9 +8,9 @@ use crate::{
     signals::{SignalInfo, SignalState},
     task::{
         set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
-        Kernel, ProcessEntryRef, ProcessExitInfo, PtraceState, PtraceStatus, SchedulerPolicy,
-        SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup, ThreadState,
-        UtsNamespaceHandle, Waiter, ZombieProcess,
+        Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState,
+        PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue,
+        ThreadGroup, ThreadState, UtsNamespaceHandle, Waiter, ZombieProcess,
     },
     vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
 };
@@ -40,7 +40,6 @@ use starnix_uapi::{
     ucred,
     user_address::{UserAddress, UserRef},
     CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
-    PTRACE_EVENT_STOP,
 };
 use std::{
     cmp,
@@ -59,32 +58,30 @@ pub enum ExitStatus {
     Exit(u8),
     Kill(SignalInfo),
     CoreDump(SignalInfo),
-    Stop(SignalInfo),
-    Continue(SignalInfo),
+    // The second field for Stop and Continue contains the type of ptrace stop
+    // event that made it stop / continue, if applicable (PTRACE_EVENT_STOP,
+    // PTRACE_EVENT_FORK, etc)
+    Stop(SignalInfo, PtraceEvent),
+    Continue(SignalInfo, PtraceEvent),
 }
 impl ExitStatus {
     /// Converts the given exit status to a status code suitable for returning from wait syscalls.
     pub fn wait_status(&self) -> i32 {
-        let maybe_ptrace = |siginfo: &SignalInfo| {
-            if ((siginfo.code >> 8) as u32) == PTRACE_EVENT_STOP {
-                (PTRACE_EVENT_STOP << 16) as i32
-            } else {
-                0
-            }
-        };
         match self {
             ExitStatus::Exit(status) => (*status as i32) << 8,
             ExitStatus::Kill(siginfo) => siginfo.signal.number() as i32,
             ExitStatus::CoreDump(siginfo) => (siginfo.signal.number() as i32) | 0x80,
-            ExitStatus::Continue(siginfo) => {
-                if maybe_ptrace(siginfo) != 0 {
-                    (siginfo.signal.number() as i32) | maybe_ptrace(siginfo)
+            ExitStatus::Continue(siginfo, trace_event) => {
+                let trace_event_val = *trace_event as u32;
+                if trace_event_val != 0 {
+                    (siginfo.signal.number() as i32) | (trace_event_val << 16) as i32
                 } else {
                     0xffff
                 }
             }
-            ExitStatus::Stop(siginfo) => {
-                (0x7f + ((siginfo.signal.number() as i32) << 8)) | maybe_ptrace(siginfo)
+            ExitStatus::Stop(siginfo, trace_event) => {
+                let trace_event_val = *trace_event as u32;
+                (0x7f + ((siginfo.signal.number() as i32) << 8)) | (trace_event_val << 16) as i32
             }
         }
     }
@@ -94,8 +91,8 @@ impl ExitStatus {
             ExitStatus::Exit(_) => CLD_EXITED as i32,
             ExitStatus::Kill(_) => CLD_KILLED as i32,
             ExitStatus::CoreDump(_) => CLD_DUMPED as i32,
-            ExitStatus::Stop(_) => CLD_STOPPED as i32,
-            ExitStatus::Continue(_) => CLD_CONTINUED as i32,
+            ExitStatus::Stop(_, _) => CLD_STOPPED as i32,
+            ExitStatus::Continue(_, _) => CLD_CONTINUED as i32,
         }
     }
 
@@ -104,8 +101,8 @@ impl ExitStatus {
             ExitStatus::Exit(status) => *status as i32,
             ExitStatus::Kill(siginfo)
             | ExitStatus::CoreDump(siginfo)
-            | ExitStatus::Continue(siginfo)
-            | ExitStatus::Stop(siginfo) => siginfo.signal.number() as i32,
+            | ExitStatus::Continue(siginfo, _)
+            | ExitStatus::Stop(siginfo, _) => siginfo.signal.number() as i32,
         }
     }
 }
@@ -441,6 +438,7 @@ impl TaskMutableState<Base = Task> {
         stopped: StopState,
         siginfo: Option<SignalInfo>,
         current_task: Option<&CurrentTask>,
+        event: Option<PtraceEventData>,
     ) {
         if stopped.ptrace_only() && self.ptrace.is_none() {
             return;
@@ -463,6 +461,7 @@ impl TaskMutableState<Base = Task> {
                 ptrace.clear_state();
             }
             ptrace.set_last_signal(siginfo);
+            ptrace.set_last_event(event);
         }
         if stopped == StopState::Waking || stopped == StopState::ForceWaking {
             self.notify_ptracees();
@@ -729,11 +728,11 @@ impl Task {
             )
         };
         let mut state = self.write();
-        state.set_stopped(StopState::ForceAwake, None, None);
+        state.set_stopped(StopState::ForceAwake, None, None, None);
         if let Some(ref mut ptrace) = &mut state.ptrace {
             // Add a zombie that the ptracer will notice.
             ptrace.last_signal_waitable = true;
-            let tracer_pid = ptrace.pid;
+            let tracer_pid = ptrace.get_pid();
             if tracer_pid == ppid {
                 // The tracer is the parent, and will get notified of this
                 // task's exit without this extra work.
@@ -1212,12 +1211,13 @@ impl Releasable for Task {
         self.thread_group.remove(&self);
 
         // Disconnect from tracer, if one is present.
-        let ptracer_pid = self.mutable_state.get_mut().ptrace.as_ref().map(|ptrace| ptrace.pid);
+        let ptracer_pid =
+            self.mutable_state.get_mut().ptrace.as_ref().map(|ptrace| ptrace.get_pid());
         if let Some(ptracer_pid) = ptracer_pid {
             if let Some(ProcessEntryRef::Process(tg)) =
                 self.kernel().pids.read().get_process(ptracer_pid)
             {
-                let pid = self.id;
+                let pid = self.get_pid();
                 tg.ptracees.lock().remove(&pid);
             }
             let _ = self.mutable_state.get_mut().set_ptrace(None);

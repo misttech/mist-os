@@ -12,8 +12,9 @@ use crate::{
     task::{
         interval_timer::IntervalTimerHandle, ptrace_detach, AtomicStopState, ClockId,
         ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable, ProcessGroup,
-        PtraceAllowedPtracers, PtraceStatus, Session, StopState, Task, TaskMutableState,
-        TaskPersistentInfo, TaskPersistentInfoState, TimerId, TimerTable, WaitQueue,
+        PtraceAllowedPtracers, PtraceEvent, PtraceStatus, Session, StopState, Task,
+        TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState, TimerId, TimerTable,
+        WaitQueue,
     },
     time::utc,
 };
@@ -39,7 +40,7 @@ use starnix_uapi::{
     time::{duration_from_timeval, timeval_from_duration},
     uid_t,
     user_address::UserAddress,
-    CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, PTRACE_EVENT_STOP, SIG_IGN,
+    CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, SIG_IGN,
 };
 use std::{
     collections::BTreeMap,
@@ -1016,6 +1017,12 @@ impl ThreadGroup {
                     if process_stopped == StopState::Awake && options.wait_for_continued {
                         fn_type = ExitType::Cont;
                     }
+                    let mut event = ptrace
+                        .as_ref()
+                        .map_or(PtraceEvent::None, |ptrace| {
+                            ptrace.event_data.as_ref().map_or(PtraceEvent::None, |data| data.event)
+                        })
+                        .clone();
                     // Tasks that are ptrace'd always get stop notifications.
                     if process_stopped == StopState::GroupStopped
                         && (options.wait_for_stopped || ptrace.is_some())
@@ -1032,14 +1039,17 @@ impl ThreadGroup {
                             if task_ref.thread_group.load_stopped() == StopState::GroupStopped
                                 && ptrace.as_ref().is_some_and(|ptrace| ptrace.is_seized())
                             {
-                                siginfo.code |= (PTRACE_EVENT_STOP as i32) << 8;
+                                if event == PtraceEvent::None {
+                                    event = PtraceEvent::Stop;
+                                }
+                                siginfo.code |= (PtraceEvent::Stop as i32) << 8;
                             }
                             if siginfo.signal == SIGKILL {
                                 fn_type = ExitType::Kill;
                             }
                             exit_status = match fn_type {
-                                ExitType::Stop => Some(ExitStatus::Stop(siginfo)),
-                                ExitType::Cont => Some(ExitStatus::Continue(siginfo)),
+                                ExitType::Stop => Some(ExitStatus::Stop(siginfo, event)),
+                                ExitType::Cont => Some(ExitStatus::Continue(siginfo, event)),
                                 ExitType::Kill => Some(ExitStatus::Kill(siginfo)),
                                 _ => None,
                             };
@@ -1056,6 +1066,10 @@ impl ThreadGroup {
                     if let Some(ptrace) = task_state.ptrace.as_mut() {
                         // The information for the task, if we were in a non-group stop.
                         let mut fn_type = ExitType::None;
+                        let event = ptrace
+                            .event_data
+                            .as_ref()
+                            .map_or(PtraceEvent::None, |event| event.event);
                         if task_stopped == StopState::Awake {
                             fn_type = ExitType::Cont;
                         }
@@ -1072,8 +1086,8 @@ impl ThreadGroup {
                                     fn_type = ExitType::Kill;
                                 }
                                 exit_status = match fn_type {
-                                    ExitType::Stop => Some(ExitStatus::Stop(siginfo)),
-                                    ExitType::Cont => Some(ExitStatus::Continue(siginfo)),
+                                    ExitType::Stop => Some(ExitStatus::Stop(siginfo, event)),
+                                    ExitType::Cont => Some(ExitStatus::Continue(siginfo, event)),
                                     ExitType::Kill => Some(ExitStatus::Kill(siginfo)),
                                     _ => None,
                                 };
@@ -1298,12 +1312,12 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                 let child_stopped = child.base.load_stopped();
                 if child_stopped == StopState::Awake && options.wait_for_continued {
                     return Ok(Some(build_wait_result(child, &|siginfo| {
-                        ExitStatus::Continue(siginfo)
+                        ExitStatus::Continue(siginfo, PtraceEvent::None)
                     })));
                 }
                 if child_stopped == StopState::GroupStopped && options.wait_for_stopped {
                     return Ok(Some(build_wait_result(child, &|siginfo| {
-                        ExitStatus::Stop(siginfo)
+                        ExitStatus::Stop(siginfo, PtraceEvent::None)
                     })));
                 }
             }

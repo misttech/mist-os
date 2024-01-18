@@ -10,8 +10,9 @@ use crate::{
     mm::MemoryManager,
     signals::{deliver_signal, SignalActions, SignalInfo},
     task::{
-        ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExceptionResult, ExitStatus,
-        Kernel, ProcessGroup, Task, TaskBuilder, TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
+        ptrace_attach_from_state, ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask,
+        ExceptionResult, ExitStatus, Kernel, ProcessGroup, PtraceCoreState, Task, TaskBuilder,
+        TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
     },
 };
 use anyhow::{format_err, Error};
@@ -425,6 +426,7 @@ pub fn execute_task_with_prerun_result<F, R, G>(
     task_builder: TaskBuilder,
     pre_run: F,
     task_complete: G,
+    ptrace_state: Option<PtraceCoreState>,
 ) -> Result<R, Errno>
 where
     F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<R, Errno>
@@ -448,6 +450,7 @@ where
             }),
         },
         task_complete,
+        ptrace_state,
     );
     receiver.recv().map_err(|e| {
         log_error!("Unable to retrieve result from `pre_run`: {e:?}");
@@ -455,8 +458,12 @@ where
     })?
 }
 
-pub fn execute_task<F, G>(task_builder: TaskBuilder, pre_run: F, task_complete: G)
-where
+pub fn execute_task<F, G>(
+    task_builder: TaskBuilder,
+    pre_run: F,
+    task_complete: G,
+    ptrace_state: Option<PtraceCoreState>,
+) where
     F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<(), Errno>
         + Send
         + Sync
@@ -470,6 +477,10 @@ where
 
     let weak_task = WeakRef::from(&task_builder.task);
     let ref_task = weak_task.upgrade().unwrap();
+    if let Some(ptrace_state) = ptrace_state {
+        let _ = ptrace_attach_from_state(&task_builder.task, ptrace_state);
+    }
+
     // Hold a lock on the task's thread slot until we have a chance to initialize it.
     let mut task_thread_guard = ref_task.thread.write();
 

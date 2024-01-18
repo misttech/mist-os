@@ -61,7 +61,7 @@ use starnix_uapi::{
 
 pub fn do_clone<L>(
     locked: &mut Locked<'_, L>,
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
     args: &clone_args,
 ) -> Result<pid_t, Errno>
 where
@@ -83,6 +83,7 @@ where
     // Set the result register to 0 for the return value from clone in the
     // cloned process.
     new_task.thread_state.registers.set_return_register(0);
+    let (trace_kind, ptrace_state) = current_task.get_ptrace_core_state_for_clone(args);
 
     if args.stack != 0 {
         // In clone() the `stack` argument points to the top of the stack, while in clone3()
@@ -99,7 +100,9 @@ where
 
     let tid = new_task.task.id;
     let task_ref = WeakRef::from(&new_task.task);
-    execute_task(new_task, |_, _| Ok(()), |_| {});
+    execute_task(new_task, |_, _| Ok(()), |_| {}, ptrace_state);
+
+    current_task.ptrace_event(trace_kind, tid as u32);
 
     if args.flags & (CLONE_VFORK as u64) != 0 {
         current_task.wait_for_execve(task_ref)?;
@@ -109,7 +112,7 @@ where
 
 pub fn sys_clone3(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
     user_clone_args: UserRef<clone_args>,
     user_clone_args_size: usize,
 ) -> Result<pid_t, Errno> {
@@ -1101,8 +1104,8 @@ pub fn sys_ptrace(
 ) -> Result<SyscallResult, Errno> {
     match request {
         PTRACE_TRACEME => ptrace_traceme(current_task),
-        PTRACE_ATTACH => ptrace_attach(locked, current_task, pid, PtraceAttachType::Attach),
-        PTRACE_SEIZE => ptrace_attach(locked, current_task, pid, PtraceAttachType::Seize),
+        PTRACE_ATTACH => ptrace_attach(locked, current_task, pid, PtraceAttachType::Attach, data),
+        PTRACE_SEIZE => ptrace_attach(locked, current_task, pid, PtraceAttachType::Seize, data),
         _ => ptrace_dispatch(current_task, request, pid, addr, data),
     }
 }

@@ -115,7 +115,7 @@ pub fn sys_chown(
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
     flags: u64,
     user_stack: UserAddress,
     user_parent_tid: UserRef<pid_t>,
@@ -141,7 +141,7 @@ pub fn sys_clone(
 
 pub fn sys_fork(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
 ) -> Result<pid_t, Errno> {
     do_clone(
         locked,
@@ -457,7 +457,7 @@ pub fn sys_signalfd(
 
 pub fn sys_vfork(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
 ) -> Result<pid_t, Errno> {
     do_clone(
         locked,

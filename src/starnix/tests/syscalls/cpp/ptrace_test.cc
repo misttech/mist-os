@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <elf.h>
+#include <sched.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/ptrace.h>
@@ -10,6 +11,8 @@
 #include <sys/user.h>
 #include <syscall.h>
 #include <time.h>
+
+#include <linux/sched.h>
 
 #ifdef __riscv
 #include <asm/ptrace.h>
@@ -106,6 +109,10 @@ TEST(PtraceTest, InterruptAfterListen) {
   // Move out of signal-delivery-stop and deliver the SIGSTOP.
   ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, SIGSTOP), 0);
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
+      << " WSTOPSIG = " << WSTOPSIG(status);
+
   EXPECT_EQ(SIGSTOP | (PTRACE_EVENT_STOP << 8), status >> 8);
 
   // Restart the child, but don't let it execute. Child continues to deliver
@@ -301,3 +308,141 @@ TEST(PtraceTest, GetGeneralRegs) {
   // Let's see that process exited normally.
   EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0) << " status " << status;
 }
+
+namespace {
+// As of this writing, our sysroot's syscall.h lacks the SYS_clone3 definition.
+#ifndef SYS_clone3
+#if defined(__aarch64__) || defined(__x86_64__) || defined(__riscv)
+constexpr int SYS_clone3 = 435;
+#else
+#error SYS_clone3 needs a definition for this architecture.
+#endif
+#endif
+
+// Generate a child process that will spawn a grandchild process,both of which
+// will be traced.  We use SYS_clone3 directly here, as it removes libc
+// discretion about whether this is fork/clone/vfork.
+pid_t ForkUsingClone3(bool is_seized, uint64_t addl_clone_args) {
+  struct clone_args ca;
+  memset(&ca, 0, sizeof(ca));
+
+  ca.flags = addl_clone_args;
+  ca.exit_signal = SIGCHLD;  // Needed in order to wait on the child.
+
+  pid_t child_pid = static_cast<pid_t>(syscall(SYS_clone3, &ca, sizeof(ca)));
+  if (child_pid == 0) {
+    if (!is_seized) {
+      EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    }
+    raise(SIGSTOP);
+    pid_t grandchild_pid = static_cast<pid_t>(syscall(SYS_clone3, &ca, sizeof(ca)));
+    if (grandchild_pid == 0) {
+      // Automatically does a SIGSTOP if started traced
+      exit(0);
+    }
+    int status;
+    EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0));
+    EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
+        << "Failure: WIFEXITED(status) =" << WIFEXITED(status)
+        << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
+    exit(0);
+  }
+  EXPECT_GT(child_pid, 0) << strerror(errno);
+  return child_pid;
+}
+
+void DetectForkAndContinue(pid_t child_pid, bool is_seized, bool child_stops_on_clone) {
+  int status;
+  pid_t grandchild_pid = 0;
+  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  if (child_stops_on_clone) {
+    // Continue until we hit a fork.
+    ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+
+    EXPECT_TRUE(WIFSTOPPED(status) && (status >> 8) == (SIGTRAP | (PTRACE_EVENT_FORK << 8)))
+        << "status = " << status;
+
+    // Get the grandchild's pid as reported by ptrace
+    EXPECT_EQ(0, ptrace(PTRACE_GETEVENTMSG, child_pid, 0, &grandchild_pid)) << strerror(errno);
+    EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+    // A grandchild started with TRACEFORK will start with a SIGSTOP or a PTRACE_EVENT_STOP
+    // (depending on whether we used PTRACE_SEIZE to attach).
+    EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
+  } else {
+    grandchild_pid = waitpid(0, &status, 0);
+    EXPECT_NE(0, grandchild_pid) << strerror(errno);
+  }
+
+  if (is_seized) {
+    EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
+        << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
+        << " WSTOPSIG = " << WSTOPSIG(status);
+    int shifted_status = status >> 8;
+    EXPECT_TRUE(((PTRACE_EVENT_STOP << 8) | SIGTRAP) == shifted_status)
+        << "shifted_status = " << shifted_status;
+  } else {
+    EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  }
+
+  EXPECT_EQ(0, ptrace(PTRACE_CONT, grandchild_pid, 0, SIGCONT));
+
+  // The grandchild should now exit.
+  EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
+  EXPECT_TRUE(WIFEXITED(status)) << "WIFEXITED(status) = " << WIFEXITED(status);
+
+  // When the grandchild exits, the child receives a SIGCHLD.
+  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGCHLD);
+  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGCHLD));
+
+  // The child should now exit
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
+      << "WIFEXITED(status) == " << WIFEXITED(status)
+      << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
+}
+}  // namespace
+
+TEST(PtraceTest, PtraceEventStopWithFork) {
+  pid_t child_pid = ForkUsingClone3(false, 0);
+  if (HasFatalFailure()) {
+    return;
+  }
+
+  int status;
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEFORK))
+      << "error " << strerror(errno);
+
+  DetectForkAndContinue(child_pid, false, true);
+}
+
+TEST(PtraceTest, PtraceEventStopWithForkAndSeize) {
+  pid_t child_pid = ForkUsingClone3(true, 0);
+  if (HasFatalFailure()) {
+    return;
+  }
+
+  EXPECT_EQ(ptrace(PTRACE_SEIZE, child_pid, 0, PTRACE_O_TRACEFORK), 0) << strerror(errno);
+  int status;
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+
+  DetectForkAndContinue(child_pid, true, true);
+}
+
+#if 0
+// To be fixed
+TEST(PtraceTest, PtraceEventStopWithForkClonePtrace) {
+  pid_t child_pid = ForkUsingClone3(false, CLONE_PTRACE);
+  if (HasFatalFailure()) {
+    return;
+  }
+  int status;
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+
+  DetectForkAndContinue(child_pid, false, false);
+}
+#endif
