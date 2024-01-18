@@ -7,12 +7,13 @@
 #include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 TEST(ParsingTests, BadUnexpectedToken) {
   TestLibrary library;
   library.AddFile("bad/fi-0007.test.fidl");
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedToken);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -28,10 +29,9 @@ type Bits = bits {
     CONSTANT = ;  // Second error
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual));
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kEqual));
+  library.ExpectFail(ErrUnexpectedToken);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -53,12 +53,10 @@ type Struct = struct {
     value string;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kNumericLiteral),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kColon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kNumericLiteral),
+                     Token::KindAndSubkind(Token::Kind::kEqual));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kColon));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -99,22 +97,17 @@ type TimeZone = struct {
     region vector<string>;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kNumericLiteral),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kColon));
-  library.ExpectFail(fidlc::ErrMissingOrdinalBeforeMember);
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kLeftCurly),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kDot),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kLeftAngle),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kNumericLiteral),
+                     Token::KindAndSubkind(Token::Kind::kEqual));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kColon));
+  library.ExpectFail(ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kLeftCurly),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kDot),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kLeftAngle),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -129,9 +122,8 @@ type NameCollision = struct {};       // This name collision error will not be
                                       // reported, because if parsing fails
                                       // compilation is skipped
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kDot),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kDot),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -146,12 +138,10 @@ type Bits = bits {
     EIGHT = 0x8;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kNumericLiteral),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kNumericLiteral),
+                     Token::KindAndSubkind(Token::Kind::kEqual));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -166,12 +156,10 @@ type Enum = enum {
     FOUR = 4;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kNumericLiteral),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kNumericLiteral),
+                     Token::KindAndSubkind(Token::Kind::kEqual));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -193,26 +181,20 @@ protocol P {
   // NOTE(https://fxbug.dev/72924): the difference in errors is due to the change in
   // test input (for the TypeWithoutParams and MissingParen cases) rather than
   // any real behavior change
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrInvalidProtocolMember);
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrInvalidProtocolMember);
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightCurly),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightParen));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrInvalidProtocolMember);
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrInvalidProtocolMember);
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightCurly),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kRightParen));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -227,8 +209,8 @@ protocol Example {
 };
 )FIDL");
 
-  library.ExpectFail(fidlc::ErrDocCommentOnParameters);
-  library.ExpectFail(fidlc::ErrDocCommentOnParameters);
+  library.ExpectFail(ErrDocCommentOnParameters);
+  library.ExpectFail(ErrDocCommentOnParameters);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -240,11 +222,10 @@ protocol Example {
   Method() -> (vector<);
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightParen),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightParen),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedToken);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -262,12 +243,10 @@ service Service {
   r R;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -282,15 +261,12 @@ type Struct = struct {
     int_value int32;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -305,15 +281,13 @@ type Table = table {
     4: int_value int32;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kNumericLiteral),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kVector),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kNumericLiteral),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Subkind::kVector),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
   // NOTE(https://fxbug.dev/72924): the difference here is just due to the type/member
   // reordering, not a behavior change
-  library.ExpectFail(fidlc::ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(ErrMissingOrdinalBeforeMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -328,12 +302,10 @@ type Union = union {
     5: int_value int16;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kColon));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kNumericLiteral),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kColon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kNumericLiteral),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -351,10 +323,9 @@ type Good = struct {};
 
 extra_token // Second error
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightCurly),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrExpectedDeclaration, "extra_token");
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightCurly),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrExpectedDeclaration, "extra_token");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -374,10 +345,9 @@ type Good = struct {};
 
 extra_token // Second error
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightCurly),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrExpectedDeclaration, "extra_token");
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightCurly),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrExpectedDeclaration, "extra_token");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -409,39 +379,35 @@ type TypeDecl = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightAngle));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightAngle),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightAngle));
-  library.ExpectFail(fidlc::ErrInvalidCharacter, "~");
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kRightAngle));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightAngle),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kRightAngle));
+  library.ExpectFail(ErrInvalidCharacter, "~");
+  library.ExpectFail(ErrUnexpectedToken);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, UnexpectedLineBreakInLiteral) {
   TestLibrary library;
   library.AddFile("bad/fi-0002.test.fidl");
-  library.ExpectFail(fidlc::ErrUnexpectedLineBreak);
+  library.ExpectFail(ErrUnexpectedLineBreak);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, UnexpectedControlCharacter) {
   TestLibrary library;
   library.AddFile("bad/fi-0184.test.fidl");
-  library.ExpectFail(fidlc::ErrUnexpectedControlCharacter, "9");
+  library.ExpectFail(ErrUnexpectedControlCharacter, "9");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -449,22 +415,22 @@ TEST(RecoverableParsingTests, InvalidEscapeSequenceInLiteral) {
   TestLibrary library;
   library.AddFile("bad/fi-0003.test.fidl");
   // TODO(https://fxbug.dev/111982): fidlc should recover from all three failures
-  library.ExpectFail(fidlc::ErrInvalidEscapeSequence, "\\ ");
-  library.ExpectFail(fidlc::ErrInvalidEscapeSequence, "\\i");
+  library.ExpectFail(ErrInvalidEscapeSequence, "\\ ");
+  library.ExpectFail(ErrInvalidEscapeSequence, "\\i");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, InvalidHexDigit) {
   TestLibrary library;
   library.AddFile("bad/fi-0004.test.fidl");
-  library.ExpectFail(fidlc::ErrInvalidHexDigit, 'G');
+  library.ExpectFail(ErrInvalidHexDigit, 'G');
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, UnicodeEscapeMissingBraces) {
   TestLibrary library;
   library.AddFile("bad/fi-0185.test.fidl");
-  library.ExpectFail(fidlc::ErrUnicodeEscapeMissingBraces);
+  library.ExpectFail(ErrUnicodeEscapeMissingBraces);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u");
 }
@@ -472,7 +438,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeMissingBraces) {
 TEST(RecoverableParsingTests, UnicodeEscapeUnterminated) {
   TestLibrary library;
   library.AddFile("bad/fi-0186.test.fidl");
-  library.ExpectFail(fidlc::ErrUnicodeEscapeUnterminated);
+  library.ExpectFail(ErrUnicodeEscapeUnterminated);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u{1F600");
 }
@@ -480,7 +446,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeUnterminated) {
 TEST(RecoverableParsingTests, UnicodeEscapeEmpty) {
   TestLibrary library;
   library.AddFile("bad/fi-0187.test.fidl");
-  library.ExpectFail(fidlc::ErrUnicodeEscapeEmpty);
+  library.ExpectFail(ErrUnicodeEscapeEmpty);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "\\u{}");
 }
@@ -488,7 +454,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeEmpty) {
 TEST(RecoverableParsingTests, UnicodeEscapeTooLong) {
   TestLibrary library;
   library.AddFile("bad/fi-0188.test.fidl");
-  library.ExpectFail(fidlc::ErrUnicodeEscapeTooLong);
+  library.ExpectFail(ErrUnicodeEscapeTooLong);
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "001F600");
 }
@@ -496,7 +462,7 @@ TEST(RecoverableParsingTests, UnicodeEscapeTooLong) {
 TEST(RecoverableParsingTests, UnicodeEscapeTooLarge) {
   TestLibrary library;
   library.AddFile("bad/fi-0189.test.fidl");
-  library.ExpectFail(fidlc::ErrUnicodeEscapeTooLarge, "110000");
+  library.ExpectFail(ErrUnicodeEscapeTooLarge, "110000");
   ASSERT_COMPILER_DIAGNOSTICS(library);
   EXPECT_EQ(library.errors()[0]->span.data(), "110000");
 }
@@ -504,8 +470,9 @@ TEST(RecoverableParsingTests, UnicodeEscapeTooLarge) {
 TEST(RecoverableParsingTests, ExpectedDeclaration) {
   TestLibrary library;
   library.AddFile("bad/fi-0006.test.fidl");
-  library.ExpectFail(fidlc::ErrExpectedDeclaration, "cosnt");
+  library.ExpectFail(ErrExpectedDeclaration, "cosnt");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace
+}  // namespace fidlc

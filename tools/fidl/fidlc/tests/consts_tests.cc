@@ -9,18 +9,19 @@
 #include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 template <class PrimitiveType>
 void CheckConstEq(TestLibrary& library, std::string_view name, PrimitiveType expected_value,
-                  fidlc::Constant::Kind expected_constant_kind,
-                  fidlc::ConstantValue::Kind expected_constant_value_kind) {
+                  Constant::Kind expected_constant_kind,
+                  ConstantValue::Kind expected_constant_value_kind) {
   auto const_decl = library.LookupConstant(name);
   ASSERT_NE(const_decl, nullptr);
   ASSERT_EQ(expected_constant_kind, const_decl->value->kind);
   ASSERT_EQ(expected_constant_value_kind, const_decl->value->Value().kind);
   auto& numeric_const_value =
-      static_cast<const fidlc::NumericConstantValue<PrimitiveType>&>(const_decl->value->Value());
+      static_cast<const NumericConstantValue<PrimitiveType>&>(const_decl->value->Value());
   EXPECT_EQ(expected_value, static_cast<PrimitiveType>(numeric_const_value));
 }
 
@@ -36,8 +37,8 @@ const C_BINARY_L uint32 = 0B101010111100110111101111;
   ASSERT_COMPILED(library);
 
   auto check_const_eq = [](TestLibrary& library, std::string_view name, uint32_t expected_value) {
-    CheckConstEq<uint32_t>(library, name, expected_value, fidlc::Constant::Kind::kLiteral,
-                           fidlc::ConstantValue::Kind::kUint32);
+    CheckConstEq<uint32_t>(library, name, expected_value, Constant::Kind::kLiteral,
+                           ConstantValue::Kind::kUint32);
   };
 
   check_const_eq(library, "C_SIMPLE", 11259375);
@@ -58,8 +59,8 @@ const c bool = false;
 TEST(ConstsTests, BadConstTestBoolWithString) {
   TestLibrary library;
   library.AddFile("bad/fi-0065-a.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"foo\"", "string:3", "bool");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "\"foo\"", "string:3", "bool");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -69,8 +70,8 @@ library example;
 
 const c bool = 6;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "6", "untyped numeric", "bool");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "6", "untyped numeric", "bool");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -97,8 +98,8 @@ library example;
 
 const c int32 = "foo";
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"foo\"", "string:3", "int32");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "\"foo\"", "string:3", "int32");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -108,8 +109,8 @@ library example;
 
 const c int32 = true;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "true", "bool", "int32");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "true", "bool", "int32");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -137,8 +138,8 @@ const b uint64 = a;
 TEST(ConstsTests, BadConstTestUint64Negative) {
   TestLibrary library;
   library.AddFile("bad/fi-0066.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrConstantOverflowsType, "-42", "uint64");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrConstantOverflowsType, "-42", "uint64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -148,8 +149,8 @@ library example;
 
 const a uint64 = 18446744073709551616;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrConstantOverflowsType, "18446744073709551616", "uint64");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrConstantOverflowsType, "18446744073709551616", "uint64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -184,8 +185,8 @@ library example;
 
 const hi float32 = 3.41e38;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrConstantOverflowsType, "3.41e38", "float32");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrConstantOverflowsType, "3.41e38", "float32");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -195,8 +196,8 @@ library example;
 
 const b float32 = -3.41e38;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrConstantOverflowsType, "-3.41e38", "float32");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrConstantOverflowsType, "-3.41e38", "float32");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -221,8 +222,8 @@ library example;
 
 const c string = 4;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "4", "untyped numeric", "string");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "4", "untyped numeric", "string");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -232,8 +233,8 @@ library example;
 
 const c string = true;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "true", "bool", "string");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "true", "bool", "string");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -243,8 +244,8 @@ library example;
 
 const c string:4 = "hello";
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"hello\"", "string:5", "string:4");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "\"hello\"", "string:5", "string:4");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -264,15 +265,15 @@ library example;
 alias foo = int32;
 const c foo = "nope";
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "\"nope\"", "string:4", "int32");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "\"nope\"", "string:4", "int32");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ConstsTests, BadConstTestNullableString) {
   TestLibrary library;
   library.AddFile("bad/fi-0059.test.fidl");
-  library.ExpectFail(fidlc::ErrInvalidConstantType, "string?");
+  library.ExpectFail(ErrInvalidConstantType, "string?");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -282,7 +283,7 @@ library example;
 
 const c array<int32,2> = -1;
 )FIDL");
-  library.ExpectFail(fidlc::ErrInvalidConstantType, "array<int32, 2>");
+  library.ExpectFail(ErrInvalidConstantType, "array<int32, 2>");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -292,7 +293,7 @@ library example;
 
 const c vector<int32>:2 = -1;
 )FIDL");
-  library.ExpectFail(fidlc::ErrInvalidConstantType, "vector<int32>:2");
+  library.ExpectFail(ErrInvalidConstantType, "vector<int32>:2");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -313,7 +314,7 @@ resource_definition handle : uint32 {
 
 const c handle:THREAD = -1;
 )FIDL");
-  library.ExpectFail(fidlc::ErrInvalidConstantType, "example/handle:thread");
+  library.ExpectFail(ErrInvalidConstantType, "example/handle:thread");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -364,8 +365,8 @@ const c MyBits = MyBits.A;
 TEST(ConstsTests, BadConstDifferentEnumMemberReference) {
   TestLibrary library;
   library.AddFile("bad/fi-0064.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrMismatchedNameTypeAssignment, "MyEnum", "OtherEnum");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrMismatchedNameTypeAssignment, "MyEnum", "OtherEnum");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -377,8 +378,8 @@ type MyBits = bits : uint32 { VALUE = 0x00000001; };
 type OtherBits = bits : uint32 { VALUE = 0x00000004; };
 const c MyBits = OtherBits.VALUE;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrMismatchedNameTypeAssignment, "MyBits", "OtherBits");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrMismatchedNameTypeAssignment, "MyBits", "OtherBits");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -389,9 +390,8 @@ library example;
 type MyEnum = enum : int32 { VALUE = 1; };
 const c MyEnum = 5;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "5", "untyped numeric",
-                     "example/MyEnum");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "5", "untyped numeric", "example/MyEnum");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -402,9 +402,8 @@ library example;
 type MyBits = bits : uint32 { VALUE = 0x00000001; };
 const c MyBits = 5;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "5", "untyped numeric",
-                     "example/MyBits");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "5", "untyped numeric", "example/MyBits");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -445,7 +444,7 @@ library example;
 
 const FOO uint32 = MAX;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrCannotResolveConstantValue);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -465,7 +464,7 @@ using dependency;
 
 type Example = struct { s string:dependency.MAX; };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameNotFound, "MAX", "dependency");
+  library.ExpectFail(ErrNameNotFound, "MAX", "dependency");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -475,15 +474,15 @@ library example;
 
 const u uint8<string> = 0;
 )FIDL");
-  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "uint8", 0, 1);
+  library.ExpectFail(ErrWrongNumberOfLayoutParameters, "uint8", 0, 1);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ConstsTests, BadConstTestAssignTypeSimple) {
   TestLibrary library;
   library.AddFile("bad/fi-0063.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrExpectedValueButGotType, "MyType");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrExpectedValueButGotType, "MyType");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -503,8 +502,8 @@ TEST(ConstsTests, BadConstTestAssignTypeName) {
     auto fidl = s.str();
     SCOPED_TRACE(fidl);
     TestLibrary library(fidl);
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-    library.ExpectFail(fidlc::ErrExpectedValueButGotType, "Example");
+    library.ExpectFail(ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrExpectedValueButGotType, "Example");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -512,7 +511,7 @@ TEST(ConstsTests, BadConstTestAssignTypeName) {
 TEST(ConstsTests, BadConstTestAssignBuiltinSimple) {
   TestLibrary library;
   library.AddFile("bad/fi-0060.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrCannotResolveConstantValue);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -524,7 +523,7 @@ TEST(ConstsTests, BadConstTestAssignBuiltinType) {
 
     TestLibrary library(ss.str());
     // TODO(https://fxbug.dev/99665): Should have a better error message.
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrCannotResolveConstantValue);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -537,7 +536,7 @@ TEST(ConstsTests, BadConstTestAssignBuiltinNonType) {
 
     TestLibrary library(ss.str());
     // TODO(https://fxbug.dev/99665): Should have a better error message.
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrCannotResolveConstantValue);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -545,8 +544,8 @@ TEST(ConstsTests, BadConstTestAssignBuiltinNonType) {
 TEST(ConstsTests, BadNameCollision) {
   TestLibrary library;
   library.AddFile("bad/fi-0034.test.fidl");
-  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kConst, "COLOR",
-                     fidlc::Element::Kind::kConst, "bad/fi-0034.test.fidl:6:7");
+  library.ExpectFail(ErrNameCollision, Element::Kind::kConst, "COLOR", Element::Kind::kConst,
+                     "bad/fi-0034.test.fidl:6:7");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -592,7 +591,7 @@ type EnumType = enum : int32 {
 
 const dee EnumType = EnumType.D;
 )FIDL");
-  library.ExpectFail(fidlc::ErrMemberNotFound, "enum 'EnumType'", "D");
+  library.ExpectFail(ErrMemberNotFound, "enum 'EnumType'", "D");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -608,7 +607,7 @@ type BitsType = bits {
 
 const dee BitsType = BitsType.D;
 )FIDL");
-  library.ExpectFail(fidlc::ErrMemberNotFound, "bits 'BitsType'", "D");
+  library.ExpectFail(ErrMemberNotFound, "bits 'BitsType'", "D");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -626,16 +625,16 @@ const Result uint16 = MyBits.A | MyBits.B | MyBits.D;
 )FIDL");
   ASSERT_COMPILED(library);
 
-  CheckConstEq<uint16_t>(library, "Result", 11, fidlc::Constant::Kind::kBinaryOperator,
-                         fidlc::ConstantValue::Kind::kUint16);
+  CheckConstEq<uint16_t>(library, "Result", 11, Constant::Kind::kBinaryOperator,
+                         ConstantValue::Kind::kUint16);
 }
 
 TEST(ConstsTests, BadOrOperatorDifferentTypesTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0065-b.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "test.bad.fi0065b/TWO_FIFTY_SIX",
-                     "uint16", "uint8");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrTypeCannotBeConvertedToType, "test.bad.fi0065b/TWO_FIFTY_SIX", "uint16",
+                     "uint8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -648,15 +647,15 @@ const two_fifty_seven uint16 = one | two_fifty_six;
 )FIDL");
   ASSERT_COMPILED(library);
 
-  CheckConstEq<uint16_t>(library, "two_fifty_seven", 257, fidlc::Constant::Kind::kBinaryOperator,
-                         fidlc::ConstantValue::Kind::kUint16);
+  CheckConstEq<uint16_t>(library, "two_fifty_seven", 257, Constant::Kind::kBinaryOperator,
+                         ConstantValue::Kind::kUint16);
 }
 
 TEST(ConstsTests, BadOrOperatorNonPrimitiveTypesTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0061.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrOrOperatorOnNonPrimitiveValue);
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrOrOperatorOnNonPrimitiveValue);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -676,14 +675,14 @@ const bitsValue MyBits = MyBits.A | ( ( (MyBits.A | MyBits.B) | MyBits.D) | MyBi
 )FIDL");
   ASSERT_COMPILED(library);
 
-  CheckConstEq<uint8_t>(library, "three", 3, fidlc::Constant::Kind::kBinaryOperator,
-                        fidlc::ConstantValue::Kind::kUint8);
-  CheckConstEq<uint8_t>(library, "seven", 7, fidlc::Constant::Kind::kBinaryOperator,
-                        fidlc::ConstantValue::Kind::kUint8);
-  CheckConstEq<uint8_t>(library, "fifteen", 15, fidlc::Constant::Kind::kBinaryOperator,
-                        fidlc::ConstantValue::Kind::kUint8);
-  CheckConstEq<uint8_t>(library, "bitsValue", 15, fidlc::Constant::Kind::kBinaryOperator,
-                        fidlc::ConstantValue::Kind::kUint8);
+  CheckConstEq<uint8_t>(library, "three", 3, Constant::Kind::kBinaryOperator,
+                        ConstantValue::Kind::kUint8);
+  CheckConstEq<uint8_t>(library, "seven", 7, Constant::Kind::kBinaryOperator,
+                        ConstantValue::Kind::kUint8);
+  CheckConstEq<uint8_t>(library, "fifteen", 15, Constant::Kind::kBinaryOperator,
+                        ConstantValue::Kind::kUint8);
+  CheckConstEq<uint8_t>(library, "bitsValue", 15, Constant::Kind::kBinaryOperator,
+                        ConstantValue::Kind::kUint8);
 }
 
 TEST(ConstsTests, BadOrOperatorMissingRightParenTest) {
@@ -695,9 +694,8 @@ const seven uint16 = 7;
 const eight uint16 = 8;
 const fifteen uint16 = ( three | seven | eight;
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightParen));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kRightParen));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -710,10 +708,9 @@ const seven uint16 = 7;
 const eight uint16 = 8;
 const fifteen uint16 = three | seven | eight );
 )FIDL");
-  library.ExpectFail(fidlc::ErrExpectedDeclaration, ")");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightParen),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
+  library.ExpectFail(ErrExpectedDeclaration, ")");
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightParen),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -726,7 +723,7 @@ const seven uint16 = 7;
 const eight uint16 = 8;
 const fifteen uint16 = ( three | seven | ) eight;
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedToken);
+  library.ExpectFail(ErrUnexpectedToken);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -743,8 +740,8 @@ type AnotherEnum = enum {
 const a OneEnum = OneEnum.A;
 const b AnotherEnum = a;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrMismatchedNameTypeAssignment, "AnotherEnum", "OneEnum");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrMismatchedNameTypeAssignment, "AnotherEnum", "OneEnum");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -760,8 +757,8 @@ type AnotherEnum = enum {
 };
 const a OneEnum = AnotherEnum.B;
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-  library.ExpectFail(fidlc::ErrMismatchedNameTypeAssignment, "OneEnum", "AnotherEnum");
+  library.ExpectFail(ErrCannotResolveConstantValue);
+  library.ExpectFail(ErrMismatchedNameTypeAssignment, "OneEnum", "AnotherEnum");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -774,9 +771,9 @@ library example;
 const A string = Z;
 const Z string = 1;
 )FIDL");
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-    library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
+    library.ExpectFail(ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
   {
@@ -785,9 +782,9 @@ library example;
 const A string = 1;
 const Z string = A;
 )FIDL");
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-    library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
+    library.ExpectFail(ErrCannotResolveConstantValue);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
   {
@@ -796,9 +793,9 @@ library example;
 const Z string = A;
 const A string = 1;
 )FIDL");
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-    library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
+    library.ExpectFail(ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
   {
@@ -807,9 +804,9 @@ library example;
 const Z string = 1;
 const A string = Z;
 )FIDL");
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
-    library.ExpectFail(fidlc::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
-    library.ExpectFail(fidlc::ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrCannotResolveConstantValue);
+    library.ExpectFail(ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
+    library.ExpectFail(ErrCannotResolveConstantValue);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -821,3 +818,4 @@ TEST(ConstsTests, GoodDeclaration) {
 }
 
 }  // namespace
+}  // namespace fidlc

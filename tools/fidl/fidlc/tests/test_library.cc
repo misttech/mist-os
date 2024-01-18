@@ -6,6 +6,8 @@
 
 #include <zircon/assert.h>
 
+namespace fidlc {
+
 void SharedAmongstLibraries::AddLibraryZx() {
   TestLibrary zx_lib(this, "zx.fidl", R"FIDL(
 library zx;
@@ -51,3 +53,5 @@ resource_definition handle : uint32 {
 )FIDL");
   ZX_ASSERT_MSG(fdf_lib.Compile(), "failed to compile library fdf");
 }
+
+}  // namespace fidlc

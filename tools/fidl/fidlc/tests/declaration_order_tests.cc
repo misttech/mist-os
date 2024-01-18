@@ -16,6 +16,7 @@
 #include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 using ::testing::HasSubstr;
@@ -386,15 +387,14 @@ protocol ExampleDecl1 {
 
     auto dependency_decl_order = dependency.declaration_order();
     ASSERT_EQ(1u, dependency_decl_order.size());
-    ASSERT_EQ(fidlc::NameFlatName(dependency_decl_order[0]->name), "dependency/ExampleDecl1");
+    ASSERT_EQ(NameFlatName(dependency_decl_order[0]->name), "dependency/ExampleDecl1");
 
     auto library_decl_order = library.declaration_order();
     ASSERT_EQ(4u, library_decl_order.size());
-    ASSERT_EQ(fidlc::NameFlatName(library_decl_order[0]->name), "example/ExampleDecl2");
-    ASSERT_EQ(fidlc::NameFlatName(library_decl_order[1]->name),
-              "example/ExampleDecl1MethodRequest");
-    ASSERT_EQ(fidlc::NameFlatName(library_decl_order[2]->name), "example/ExampleDecl1");
-    ASSERT_EQ(fidlc::NameFlatName(library_decl_order[3]->name), "example/ExampleDecl0");
+    ASSERT_EQ(NameFlatName(library_decl_order[0]->name), "example/ExampleDecl2");
+    ASSERT_EQ(NameFlatName(library_decl_order[1]->name), "example/ExampleDecl1MethodRequest");
+    ASSERT_EQ(NameFlatName(library_decl_order[2]->name), "example/ExampleDecl1");
+    ASSERT_EQ(NameFlatName(library_decl_order[3]->name), "example/ExampleDecl0");
   }
 }
 
@@ -459,3 +459,4 @@ alias #Alias# = uint32;
 }
 
 }  // namespace
+}  // namespace fidlc

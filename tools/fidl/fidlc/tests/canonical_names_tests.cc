@@ -10,13 +10,14 @@
 #include "tools/fidl/fidlc/src/utils.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 TEST(CanonicalNamesTests, BadCollision) {
   TestLibrary library;
   library.AddFile("bad/fi-0035.test.fidl");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kProtocol, "Color",
-                     fidlc::Element::Kind::kConst, "COLOR", "bad/fi-0035.test.fidl:6:7", "color");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kProtocol, "Color",
+                     Element::Kind::kConst, "COLOR", "bad/fi-0035.test.fidl:6:7", "color");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -243,7 +244,7 @@ service FOoBAR {};
 }
 
 TEST(CanonicalNamesTests, BadTopLevel) {
-  using Kind = fidlc::Element::Kind;
+  using Kind = Element::Kind;
   const std::pair<Kind, std::string_view> lower[] = {
       {Kind::kAlias, "alias fooBar = bool;"},
       {Kind::kConst, "const fooBar bool = true;"},
@@ -276,7 +277,7 @@ TEST(CanonicalNamesTests, BadTopLevel) {
       TestLibrary library(fidl);
       char location[20];
       snprintf(location, sizeof location, "example.fidl:3:%zu", 1 + upperLine.find("FooBar"));
-      library.ExpectFail(fidlc::ErrNameCollisionCanonical, lowerKind, "fooBar", upperKind, "FooBar",
+      library.ExpectFail(ErrNameCollisionCanonical, lowerKind, "fooBar", upperKind, "FooBar",
                          location, "foo_bar");
       ASSERT_COMPILER_DIAGNOSTICS(library);
     }
@@ -291,7 +292,7 @@ library example;
 @FooBar
 type Example = struct {};
 )FIDL");
-  library.ExpectFail(fidlc::ErrDuplicateAttributeCanonical, "FooBar", "fooBar", "example.fidl:4:2",
+  library.ExpectFail(ErrDuplicateAttributeCanonical, "FooBar", "fooBar", "example.fidl:4:2",
                      "foo_bar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -303,7 +304,7 @@ library example;
 @some_attribute(fooBar="", FooBar="")
 type Example = struct {};
 )FIDL");
-  library.ExpectFail(fidlc::ErrDuplicateAttributeArgCanonical, "some_attribute", "FooBar", "fooBar",
+  library.ExpectFail(ErrDuplicateAttributeArgCanonical, "some_attribute", "FooBar", "fooBar",
                      "example.fidl:4:17", "foo_bar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -317,9 +318,9 @@ type MyStruct = struct {
     MyStructMember uint64;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kStructMember,
-                     "MyStructMember", fidlc::Element::Kind::kStructMember, "myStructMember",
-                     "example.fidl:5:5", "my_struct_member");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStructMember, "MyStructMember",
+                     Element::Kind::kStructMember, "myStructMember", "example.fidl:5:5",
+                     "my_struct_member");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -332,9 +333,8 @@ type MyTable = table {
     2: MyField bool;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kTableMember,
-                     "MyField", fidlc::Element::Kind::kTableMember, "myField", "example.fidl:5:8",
-                     "my_field");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kTableMember, "MyField",
+                     Element::Kind::kTableMember, "myField", "example.fidl:5:8", "my_field");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -347,9 +347,8 @@ type MyUnion = union {
     2: MyVariant bool;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kUnionMember,
-                     "MyVariant", fidlc::Element::Kind::kUnionMember, "myVariant",
-                     "example.fidl:5:8", "my_variant");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kUnionMember, "MyVariant",
+                     Element::Kind::kUnionMember, "myVariant", "example.fidl:5:8", "my_variant");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -362,8 +361,8 @@ type Example = enum {
   FooBar = 2;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kEnumMember, "FooBar",
-                     fidlc::Element::Kind::kEnumMember, "fooBar", "example.fidl:5:3", "foo_bar");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kEnumMember, "FooBar",
+                     Element::Kind::kEnumMember, "fooBar", "example.fidl:5:3", "foo_bar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -376,8 +375,8 @@ type MyBits = bits {
     FooBar = 2;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kBitsMember, "FooBar",
-                     fidlc::Element::Kind::kBitsMember, "fooBar", "example.fidl:5:5", "foo_bar");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kBitsMember, "FooBar",
+                     Element::Kind::kBitsMember, "fooBar", "example.fidl:5:5", "foo_bar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -390,8 +389,8 @@ protocol MyProtocol {
     strict MyMethod() -> ();
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kProtocolMethod,
-                     "MyMethod", fidlc::Element::Kind::kProtocolMethod, "myMethod",
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kProtocolMethod, "MyMethod",
+                     Element::Kind::kProtocolMethod, "myMethod",
                      library.find_source_span("myMethod"), "my_method");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -404,9 +403,8 @@ protocol Example {
   example(struct { fooBar bool; FooBar bool; }) -> ();
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kStructMember,
-                     "FooBar", fidlc::Element::Kind::kStructMember, "fooBar", "example.fidl:5:20",
-                     "foo_bar");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStructMember, "FooBar",
+                     Element::Kind::kStructMember, "fooBar", "example.fidl:5:20", "foo_bar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -418,9 +416,8 @@ protocol Example {
   example() -> (struct { fooBar bool; FooBar bool; });
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kStructMember,
-                     "FooBar", fidlc::Element::Kind::kStructMember, "fooBar", "example.fidl:5:26",
-                     "foo_bar");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStructMember, "FooBar",
+                     Element::Kind::kStructMember, "fooBar", "example.fidl:5:26", "foo_bar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -435,9 +432,9 @@ service MyService {
     MyServiceMember client_end:MyProtocol;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kServiceMember,
-                     "MyServiceMember", fidlc::Element::Kind::kServiceMember, "myServiceMember",
-                     "example.fidl:7:5", "my_service_member");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kServiceMember, "MyServiceMember",
+                     Element::Kind::kServiceMember, "myServiceMember", "example.fidl:7:5",
+                     "my_service_member");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -453,16 +450,15 @@ resource_definition MyResource : uint32 {
     };
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kResourceProperty,
-                     "Rights", fidlc::Element::Kind::kResourceProperty, "rights",
-                     "example.fidl:7:9", "rights");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kResourceProperty, "Rights",
+                     Element::Kind::kResourceProperty, "rights", "example.fidl:7:9", "rights");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadMemberValues) {
   TestLibrary library;
   library.AddFile("bad/fi-0054.test.fidl");
-  library.ExpectFail(fidlc::ErrMemberNotFound, "enum 'Enum'", "FOO_BAR");
+  library.ExpectFail(ErrMemberNotFound, "enum 'Enum'", "FOO_BAR");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -473,9 +469,8 @@ library example;
 type HTTPServer = struct {};
 type HttpServer = struct {};
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kStruct, "HttpServer",
-                     fidlc::Element::Kind::kStruct, "HTTPServer", "example.fidl:4:6",
-                     "http_server");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStruct, "HttpServer",
+                     Element::Kind::kStruct, "HTTPServer", "example.fidl:4:6", "http_server");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -494,7 +489,7 @@ using foobar;
 
 alias FOOBAR = foobar.Something;
 )FIDL");
-  library.ExpectFail(fidlc::ErrDeclNameConflictsWithLibraryImportCanonical, "FOOBAR", "foobar");
+  library.ExpectFail(ErrDeclNameConflictsWithLibraryImportCanonical, "FOOBAR", "foobar");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -503,10 +498,10 @@ TEST(CanonicalNamesTests, BadVariousCollisions) {
       "a", "a1", "x_single_start", "single_end_x", "x_single_both_x", "single_x_middle",
   };
   const auto functions = {
-      fidlc::to_lower_snake_case,
-      fidlc::to_upper_snake_case,
-      fidlc::to_lower_camel_case,
-      fidlc::to_upper_camel_case,
+      to_lower_snake_case,
+      to_upper_snake_case,
+      to_lower_camel_case,
+      to_upper_camel_case,
   };
 
   for (const auto base_name : base_names) {
@@ -521,18 +516,18 @@ TEST(CanonicalNamesTests, BadVariousCollisions) {
         SCOPED_TRACE(fidl);
         TestLibrary library(fidl);
         if (name1 == name2) {
-          library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kStruct, name1,
-                             fidlc::Element::Kind::kStruct, "example.fidl:2:6");
+          library.ExpectFail(ErrNameCollision, Element::Kind::kStruct, name1,
+                             Element::Kind::kStruct, "example.fidl:2:6");
         } else if (name1 < name2) {
           // We compile name1 first, and see that name2 collides with it.
-          library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kStruct, name2,
-                             fidlc::Element::Kind::kStruct, name1, "example.fidl:2:6",
-                             fidlc::canonicalize(name1));
+          library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStruct, name2,
+                             Element::Kind::kStruct, name1, "example.fidl:2:6",
+                             canonicalize(name1));
         } else {
           // We compile name2 first, and see that name1 collides with it.
-          library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kStruct, name1,
-                             fidlc::Element::Kind::kStruct, name2, "example.fidl:3:6",
-                             fidlc::canonicalize(name1));
+          library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStruct, name1,
+                             Element::Kind::kStruct, name2, "example.fidl:3:6",
+                             canonicalize(name1));
         }
         ASSERT_COMPILER_DIAGNOSTICS(library);
       }
@@ -547,9 +542,9 @@ library example;
 type it_is_the_same = struct {};
 type it__is___the____same = struct {};
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollisionCanonical, fidlc::Element::Kind::kStruct,
-                     "it_is_the_same", fidlc::Element::Kind::kStruct, "it__is___the____same",
-                     "example.fidl:5:6", "it_is_the_same");
+  library.ExpectFail(ErrNameCollisionCanonical, Element::Kind::kStruct, "it_is_the_same",
+                     Element::Kind::kStruct, "it__is___the____same", "example.fidl:5:6",
+                     "it_is_the_same");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -581,7 +576,7 @@ TEST(CanonicalNamesTests, BadInconsistentTypeSpelling) {
       auto fidl = s.str();
       SCOPED_TRACE(fidl);
       TestLibrary library(fidl);
-      library.ExpectFail(fidlc::ErrNameNotFound, use_name, "example");
+      library.ExpectFail(ErrNameNotFound, use_name, "example");
       ASSERT_COMPILER_DIAGNOSTICS(library);
     }
   }
@@ -601,7 +596,7 @@ TEST(CanonicalNamesTests, BadInconsistentConstSpelling) {
       << "const EXAMPLE bool = " << use_name << ";";
     auto fidl = s.str();
     TestLibrary library(fidl);
-    library.ExpectFail(fidlc::ErrNameNotFound, use_name, "example");
+    library.ExpectFail(ErrNameNotFound, use_name, "example");
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -621,7 +616,7 @@ TEST(CanonicalNamesTests, BadInconsistentEnumMemberSpelling) {
     auto fidl = s.str();
     SCOPED_TRACE(fidl);
     TestLibrary library(fidl);
-    library.ExpectFail(fidlc::ErrMemberNotFound, "enum 'Enum'", use_name);
+    library.ExpectFail(ErrMemberNotFound, "enum 'Enum'", use_name);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
@@ -641,9 +636,10 @@ TEST(CanonicalNamesTests, BadInconsistentBitsMemberSpelling) {
     auto fidl = s.str();
     SCOPED_TRACE(fidl);
     TestLibrary library(fidl);
-    library.ExpectFail(fidlc::ErrMemberNotFound, "bits 'Bits'", use_name);
+    library.ExpectFail(ErrMemberNotFound, "bits 'Bits'", use_name);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
 }  // namespace
+}  // namespace fidlc

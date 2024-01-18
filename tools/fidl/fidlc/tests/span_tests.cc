@@ -30,6 +30,7 @@
 // - then the expected values are compared against the actual values via set
 //   arithmetic.
 
+namespace fidlc {
 namespace {
 
 #define FOR_ENUM_VARIANTS(DO)   \
@@ -89,191 +90,184 @@ const char* element_type_str(ElementType type) { return kElementTypeNames[type];
 const std::string kMarkerLeft = "«";
 const std::string kMarkerRight = "»";
 
-class SourceSpanVisitor : public fidlc::TreeVisitor {
+class SourceSpanVisitor : public TreeVisitor {
  public:
   explicit SourceSpanVisitor(ElementType test_case_type_) : test_case_type_(test_case_type_) {}
 
   const std::multiset<std::string>& spans() { return spans_; }
 
-  void OnAliasDeclaration(const std::unique_ptr<fidlc::RawAliasDeclaration>& element) override {
+  void OnAliasDeclaration(const std::unique_ptr<RawAliasDeclaration>& element) override {
     CheckSpanOfType(ElementType::kAliasDeclaration, *element);
     TreeVisitor::OnAliasDeclaration(element);
   }
-  void OnAttribute(const std::unique_ptr<fidlc::RawAttribute>& element) override {
+  void OnAttribute(const std::unique_ptr<RawAttribute>& element) override {
     CheckSpanOfType(ElementType::kAttribute, *element);
     TreeVisitor::OnAttribute(element);
   }
-  void OnAttributeArg(const std::unique_ptr<fidlc::RawAttributeArg>& element) override {
+  void OnAttributeArg(const std::unique_ptr<RawAttributeArg>& element) override {
     CheckSpanOfType(ElementType::kAttributeArg, *element);
     TreeVisitor::OnAttributeArg(element);
   }
-  void OnAttributeList(const std::unique_ptr<fidlc::RawAttributeList>& element) override {
+  void OnAttributeList(const std::unique_ptr<RawAttributeList>& element) override {
     CheckSpanOfType(ElementType::kAttributeList, *element);
     TreeVisitor::OnAttributeList(element);
   }
   void OnBinaryOperatorConstant(
-      const std::unique_ptr<fidlc::RawBinaryOperatorConstant>& element) override {
+      const std::unique_ptr<RawBinaryOperatorConstant>& element) override {
     CheckSpanOfType(ElementType::kBinaryOperatorConstant, *element);
     TreeVisitor::OnBinaryOperatorConstant(element);
   }
-  void OnBoolLiteral(fidlc::RawBoolLiteral& element) override {
+  void OnBoolLiteral(RawBoolLiteral& element) override {
     CheckSpanOfType(ElementType::kBoolLiteral, element);
     TreeVisitor::OnBoolLiteral(element);
   }
-  void OnCompoundIdentifier(const std::unique_ptr<fidlc::RawCompoundIdentifier>& element) override {
+  void OnCompoundIdentifier(const std::unique_ptr<RawCompoundIdentifier>& element) override {
     CheckSpanOfType(ElementType::kCompoundIdentifier, *element);
     TreeVisitor::OnCompoundIdentifier(element);
   }
-  void OnConstDeclaration(const std::unique_ptr<fidlc::RawConstDeclaration>& element) override {
+  void OnConstDeclaration(const std::unique_ptr<RawConstDeclaration>& element) override {
     CheckSpanOfType(ElementType::kConstDeclaration, *element);
     TreeVisitor::OnConstDeclaration(element);
   }
-  void OnDocCommentLiteral(fidlc::RawDocCommentLiteral& element) override {
+  void OnDocCommentLiteral(RawDocCommentLiteral& element) override {
     CheckSpanOfType(ElementType::kDocCommentLiteral, element);
     TreeVisitor::OnDocCommentLiteral(element);
   }
-  void OnFile(const std::unique_ptr<fidlc::File>& element) override {
+  void OnFile(const std::unique_ptr<File>& element) override {
     CheckSpanOfType(ElementType::kFile, *element);
     TreeVisitor::OnFile(element);
   }
-  void OnIdentifier(const std::unique_ptr<fidlc::RawIdentifier>& element) override {
+  void OnIdentifier(const std::unique_ptr<RawIdentifier>& element) override {
     CheckSpanOfType(ElementType::kIdentifier, *element);
   }
-  void OnIdentifierConstant(const std::unique_ptr<fidlc::RawIdentifierConstant>& element) override {
+  void OnIdentifierConstant(const std::unique_ptr<RawIdentifierConstant>& element) override {
     CheckSpanOfType(ElementType::kIdentifierConstant, *element);
     TreeVisitor::OnIdentifierConstant(element);
   }
   void OnIdentifierLayoutParameter(
-      const std::unique_ptr<fidlc::RawIdentifierLayoutParameter>& element) override {
+      const std::unique_ptr<RawIdentifierLayoutParameter>& element) override {
     CheckSpanOfType(ElementType::kIdentifierLayoutParameter, *element);
     TreeVisitor::OnIdentifierLayoutParameter(element);
   }
-  void OnInlineLayoutReference(
-      const std::unique_ptr<fidlc::RawInlineLayoutReference>& element) override {
+  void OnInlineLayoutReference(const std::unique_ptr<RawInlineLayoutReference>& element) override {
     CheckSpanOfType(ElementType::kInlineLayoutReference, *element);
     TreeVisitor::OnInlineLayoutReference(element);
   }
-  void OnLayout(const std::unique_ptr<fidlc::RawLayout>& element) override {
+  void OnLayout(const std::unique_ptr<RawLayout>& element) override {
     switch (element->kind) {
-      case fidlc::RawLayout::Kind::kBits:
-      case fidlc::RawLayout::Kind::kEnum:
+      case RawLayout::Kind::kBits:
+      case RawLayout::Kind::kEnum:
         CheckSpanOfType(ElementType::kValueLayout, *element);
         break;
-      case fidlc::RawLayout::Kind::kStruct:
+      case RawLayout::Kind::kStruct:
         CheckSpanOfType(ElementType::kStructLayout, *element);
         break;
-      case fidlc::RawLayout::Kind::kTable:
-      case fidlc::RawLayout::Kind::kOverlay:
-      case fidlc::RawLayout::Kind::kUnion:
+      case RawLayout::Kind::kTable:
+      case RawLayout::Kind::kOverlay:
+      case RawLayout::Kind::kUnion:
         CheckSpanOfType(ElementType::kOrdinaledLayout, *element);
         break;
     }
     TreeVisitor::OnLayout(element);
   }
-  void OnLayoutParameterList(
-      const std::unique_ptr<fidlc::RawLayoutParameterList>& element) override {
+  void OnLayoutParameterList(const std::unique_ptr<RawLayoutParameterList>& element) override {
     CheckSpanOfType(ElementType::kLayoutParameterList, *element);
     TreeVisitor::OnLayoutParameterList(element);
   }
-  void OnLibraryDeclaration(const std::unique_ptr<fidlc::RawLibraryDeclaration>& element) override {
+  void OnLibraryDeclaration(const std::unique_ptr<RawLibraryDeclaration>& element) override {
     CheckSpanOfType(ElementType::kLibraryDeclaration, *element);
     TreeVisitor::OnLibraryDeclaration(element);
   }
-  void OnLiteralConstant(const std::unique_ptr<fidlc::RawLiteralConstant>& element) override {
+  void OnLiteralConstant(const std::unique_ptr<RawLiteralConstant>& element) override {
     CheckSpanOfType(ElementType::kLiteralConstant, *element);
     TreeVisitor::OnLiteralConstant(element);
   }
   void OnLiteralLayoutParameter(
-      const std::unique_ptr<fidlc::RawLiteralLayoutParameter>& element) override {
+      const std::unique_ptr<RawLiteralLayoutParameter>& element) override {
     CheckSpanOfType(ElementType::kLiteralLayoutParameter, *element);
     TreeVisitor::OnLiteralLayoutParameter(element);
   }
-  void OnModifiers(const std::unique_ptr<fidlc::RawModifiers>& element) override {
+  void OnModifiers(const std::unique_ptr<RawModifiers>& element) override {
     CheckSpanOfType(ElementType::kModifiers, *element);
     TreeVisitor::OnModifiers(element);
   }
-  void OnNamedLayoutReference(
-      const std::unique_ptr<fidlc::RawNamedLayoutReference>& element) override {
+  void OnNamedLayoutReference(const std::unique_ptr<RawNamedLayoutReference>& element) override {
     CheckSpanOfType(ElementType::kNamedLayoutReference, *element);
     TreeVisitor::OnNamedLayoutReference(element);
   }
-  void OnNumericLiteral(fidlc::RawNumericLiteral& element) override {
+  void OnNumericLiteral(RawNumericLiteral& element) override {
     CheckSpanOfType(ElementType::kNumericLiteral, element);
     TreeVisitor::OnNumericLiteral(element);
   }
-  void OnOrdinal64(fidlc::RawOrdinal64& element) override {
+  void OnOrdinal64(RawOrdinal64& element) override {
     CheckSpanOfType(ElementType::kOrdinal64, element);
     TreeVisitor::OnOrdinal64(element);
   }
-  void OnOrdinaledLayoutMember(
-      const std::unique_ptr<fidlc::RawOrdinaledLayoutMember>& element) override {
+  void OnOrdinaledLayoutMember(const std::unique_ptr<RawOrdinaledLayoutMember>& element) override {
     CheckSpanOfType(ElementType::kOrdinaledLayoutMember, *element);
     TreeVisitor::OnOrdinaledLayoutMember(element);
   }
-  void OnParameterList(const std::unique_ptr<fidlc::RawParameterList>& element) override {
+  void OnParameterList(const std::unique_ptr<RawParameterList>& element) override {
     CheckSpanOfType(ElementType::kParameterList, *element);
     TreeVisitor::OnParameterList(element);
   }
-  void OnProtocolCompose(const std::unique_ptr<fidlc::RawProtocolCompose>& element) override {
+  void OnProtocolCompose(const std::unique_ptr<RawProtocolCompose>& element) override {
     CheckSpanOfType(ElementType::kProtocolCompose, *element);
     TreeVisitor::OnProtocolCompose(element);
   }
-  void OnProtocolDeclaration(
-      const std::unique_ptr<fidlc::RawProtocolDeclaration>& element) override {
+  void OnProtocolDeclaration(const std::unique_ptr<RawProtocolDeclaration>& element) override {
     CheckSpanOfType(ElementType::kProtocolDeclaration, *element);
     TreeVisitor::OnProtocolDeclaration(element);
   }
-  void OnProtocolMethod(const std::unique_ptr<fidlc::RawProtocolMethod>& element) override {
+  void OnProtocolMethod(const std::unique_ptr<RawProtocolMethod>& element) override {
     CheckSpanOfType(ElementType::kProtocolMethod, *element);
     TreeVisitor::OnProtocolMethod(element);
   }
-  void OnResourceDeclaration(
-      const std::unique_ptr<fidlc::RawResourceDeclaration>& element) override {
+  void OnResourceDeclaration(const std::unique_ptr<RawResourceDeclaration>& element) override {
     CheckSpanOfType(ElementType::kResourceDeclaration, *element);
     TreeVisitor::OnResourceDeclaration(element);
   }
-  void OnResourceProperty(const std::unique_ptr<fidlc::RawResourceProperty>& element) override {
+  void OnResourceProperty(const std::unique_ptr<RawResourceProperty>& element) override {
     CheckSpanOfType(ElementType::kResourceProperty, *element);
     TreeVisitor::OnResourceProperty(element);
   }
-  void OnServiceDeclaration(const std::unique_ptr<fidlc::RawServiceDeclaration>& element) override {
+  void OnServiceDeclaration(const std::unique_ptr<RawServiceDeclaration>& element) override {
     CheckSpanOfType(ElementType::kServiceDeclaration, *element);
     TreeVisitor::OnServiceDeclaration(element);
   }
-  void OnServiceMember(const std::unique_ptr<fidlc::RawServiceMember>& element) override {
+  void OnServiceMember(const std::unique_ptr<RawServiceMember>& element) override {
     CheckSpanOfType(ElementType::kServiceMember, *element);
     TreeVisitor::OnServiceMember(element);
   }
-  void OnStringLiteral(fidlc::RawStringLiteral& element) override {
+  void OnStringLiteral(RawStringLiteral& element) override {
     CheckSpanOfType(ElementType::kStringLiteral, element);
     TreeVisitor::OnStringLiteral(element);
   }
-  void OnStructLayoutMember(const std::unique_ptr<fidlc::RawStructLayoutMember>& element) override {
+  void OnStructLayoutMember(const std::unique_ptr<RawStructLayoutMember>& element) override {
     CheckSpanOfType(ElementType::kStructLayoutMember, *element);
     TreeVisitor::OnStructLayoutMember(element);
   }
-  void OnTypeConstraints(const std::unique_ptr<fidlc::RawTypeConstraints>& element) override {
+  void OnTypeConstraints(const std::unique_ptr<RawTypeConstraints>& element) override {
     CheckSpanOfType(ElementType::kTypeConstraints, *element);
     TreeVisitor::OnTypeConstraints(element);
   }
-  void OnTypeConstructor(const std::unique_ptr<fidlc::RawTypeConstructor>& element) override {
+  void OnTypeConstructor(const std::unique_ptr<RawTypeConstructor>& element) override {
     CheckSpanOfType(ElementType::kTypeConstructor, *element);
     TreeVisitor::OnTypeConstructor(element);
   }
-  void OnTypeDeclaration(const std::unique_ptr<fidlc::RawTypeDeclaration>& element) override {
+  void OnTypeDeclaration(const std::unique_ptr<RawTypeDeclaration>& element) override {
     CheckSpanOfType(ElementType::kTypeDeclaration, *element);
     TreeVisitor::OnTypeDeclaration(element);
   }
-  void OnTypeLayoutParameter(
-      const std::unique_ptr<fidlc::RawTypeLayoutParameter>& element) override {
+  void OnTypeLayoutParameter(const std::unique_ptr<RawTypeLayoutParameter>& element) override {
     CheckSpanOfType(ElementType::kTypeLayoutParameter, *element);
     TreeVisitor::OnTypeLayoutParameter(element);
   }
-  void OnUsing(const std::unique_ptr<fidlc::RawUsing>& element) override {
+  void OnUsing(const std::unique_ptr<RawUsing>& element) override {
     CheckSpanOfType(ElementType::kUsing, *element);
     TreeVisitor::OnUsing(element);
   }
-  void OnValueLayoutMember(const std::unique_ptr<fidlc::RawValueLayoutMember>& element) override {
+  void OnValueLayoutMember(const std::unique_ptr<RawValueLayoutMember>& element) override {
     CheckSpanOfType(ElementType::kValueLayoutMember, *element);
     TreeVisitor::OnValueLayoutMember(element);
   }
@@ -281,7 +275,7 @@ class SourceSpanVisitor : public fidlc::TreeVisitor {
  private:
   // Called on every node of the AST that we visit. We collect spans of the |ElementType| we are
   // looking for as we traverse the tree, and store them in a multiset.
-  void CheckSpanOfType(const ElementType element_type, const fidlc::SourceElement& element) {
+  void CheckSpanOfType(const ElementType element_type, const SourceElement& element) {
     if (element_type != test_case_type_) {
       return;
     }
@@ -832,7 +826,7 @@ class SpanTest : public testing::TestWithParam<TestCase> {
 
       // Parse the source with markers removed
       TestLibrary library(clean_source);
-      std::unique_ptr<fidlc::File> ast;
+      std::unique_ptr<File> ast;
       if (!library.Parse(&ast)) {
         FAIL() << "Failed to parse fidl:\n\n" << clean_source;
       }
@@ -894,3 +888,4 @@ INSTANTIATE_TEST_SUITE_P(SpanTests, SpanTest, testing::ValuesIn(kTestCases),
                          });
 
 }  // namespace
+}  // namespace fidlc

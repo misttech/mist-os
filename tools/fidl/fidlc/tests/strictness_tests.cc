@@ -8,6 +8,7 @@
 #include "tools/fidl/fidlc/src/source_file.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 TEST(StrictnessTests, BadDuplicateModifier) {
@@ -18,32 +19,26 @@ type One = strict union { 1: b bool; };
 type Two = strict strict union { 1: b bool; };
 type Three = strict strict strict union { 1: b bool; };
 )FIDL");
-  library.ExpectFail(fidlc::ErrDuplicateModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict));
-  library.ExpectFail(fidlc::ErrDuplicateModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict));
-  library.ExpectFail(fidlc::ErrDuplicateModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict));
+  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
+  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
+  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, BadDuplicateModifierNonConsecutive) {
   TestLibrary library;
   library.AddFile("bad/fi-0032.test.fidl");
-  library.ExpectFail(fidlc::ErrDuplicateModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict));
+  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, BadConflictingModifiers) {
   TestLibrary library;
   library.AddFile("bad/fi-0033.test.fidl");
-  library.ExpectFail(fidlc::ErrConflictingModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kFlexible),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict));
-  library.ExpectFail(fidlc::ErrConflictingModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kFlexible));
+  library.ExpectFail(ErrConflictingModifier, Token::KindAndSubkind(Token::Subkind::kFlexible),
+                     Token::KindAndSubkind(Token::Subkind::kStrict));
+  library.ExpectFail(ErrConflictingModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
+                     Token::KindAndSubkind(Token::Subkind::kFlexible));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -64,9 +59,9 @@ type FlexibleFoo = flexible bits {
 };
 )FIDL");
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.LookupBits("FlexibleFoo")->strictness, fidlc::Strictness::kFlexible);
-  EXPECT_EQ(library.LookupBits("StrictFoo")->strictness, fidlc::Strictness::kStrict);
-  EXPECT_EQ(library.LookupBits("DefaultStrictFoo")->strictness, fidlc::Strictness::kStrict);
+  EXPECT_EQ(library.LookupBits("FlexibleFoo")->strictness, Strictness::kFlexible);
+  EXPECT_EQ(library.LookupBits("StrictFoo")->strictness, Strictness::kStrict);
+  EXPECT_EQ(library.LookupBits("DefaultStrictFoo")->strictness, Strictness::kStrict);
 }
 
 TEST(StrictnessTests, GoodEnumStrictness) {
@@ -86,9 +81,9 @@ type FlexibleFoo = flexible enum {
 };
 )FIDL");
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.LookupEnum("FlexibleFoo")->strictness, fidlc::Strictness::kFlexible);
-  EXPECT_EQ(library.LookupEnum("StrictFoo")->strictness, fidlc::Strictness::kStrict);
-  EXPECT_EQ(library.LookupEnum("DefaultStrictFoo")->strictness, fidlc::Strictness::kStrict);
+  EXPECT_EQ(library.LookupEnum("FlexibleFoo")->strictness, Strictness::kFlexible);
+  EXPECT_EQ(library.LookupEnum("StrictFoo")->strictness, Strictness::kStrict);
+  EXPECT_EQ(library.LookupEnum("DefaultStrictFoo")->strictness, Strictness::kStrict);
 }
 
 TEST(StrictnessTests, GoodFlexibleEnum) {
@@ -114,9 +109,8 @@ type Foo = flexible bits {
 TEST(StrictnessTests, BadStrictnessStruct) {
   TestLibrary library;
   library.AddFile("bad/fi-0030.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotSpecifyModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStruct));
+  library.ExpectFail(ErrCannotSpecifyModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
+                     Token::KindAndSubkind(Token::Subkind::kStruct));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -126,9 +120,8 @@ library example;
 
 type StrictFoo = strict table {};
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotSpecifyModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kTable));
+  library.ExpectFail(ErrCannotSpecifyModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
+                     Token::KindAndSubkind(Token::Subkind::kTable));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -137,8 +130,8 @@ TEST(StrictnessTests, GoodUnionStrictness) {
   library.AddFile("good/fi-0033.test.fidl");
 
   ASSERT_COMPILED(library);
-  EXPECT_EQ(library.LookupUnion("FlexibleFoo")->strictness, fidlc::Strictness::kFlexible);
-  EXPECT_EQ(library.LookupUnion("StrictBar")->strictness, fidlc::Strictness::kStrict);
+  EXPECT_EQ(library.LookupUnion("FlexibleFoo")->strictness, Strictness::kFlexible);
+  EXPECT_EQ(library.LookupUnion("StrictBar")->strictness, Strictness::kStrict);
 }
 
 TEST(StrictnessTests, GoodStrictUnionRedundant) {
@@ -149,7 +142,8 @@ type Foo = strict union {
 };
 )FIDL");
   ASSERT_COMPILED(library);
-  ASSERT_EQ(library.LookupUnion("Foo")->strictness, fidlc::Strictness::kStrict);
+  ASSERT_EQ(library.LookupUnion("Foo")->strictness, Strictness::kStrict);
 }
 
 }  // namespace
+}  // namespace fidlc

@@ -10,21 +10,15 @@
 #include "tools/fidl/fidlc/src/source_span.h"
 #include "tools/fidl/fidlc/src/virtual_source_file.h"
 
+namespace fidlc {
 namespace {
-
-using fidlc::Diagnostic;
-using fidlc::ErrorDef;
-using fidlc::Reporter;
-using fidlc::SourceSpan;
-using fidlc::VirtualSourceFile;
-using fidlc::WarningDef;
 
 using ::testing::HasSubstr;
 using ::testing::Not;
 
-const fidlc::ErrorId kTestErrorId = 123;
+const ErrorId kTestErrorId = 123;
 const std::string kTestErrorIdStr = "fi-0123";
-const fidlc::ErrorId kTestWarningId = 124;
+const ErrorId kTestWarningId = 124;
 const std::string kTestWarningIdStr = "fi-0124";
 
 constexpr ErrorDef<kTestErrorId, std::string_view, std::string_view> ErrTest(
@@ -114,3 +108,4 @@ TEST(ReporterTests, ReportErrorWithReusedFormatParams) {
 }
 
 }  // namespace
+}  // namespace fidlc

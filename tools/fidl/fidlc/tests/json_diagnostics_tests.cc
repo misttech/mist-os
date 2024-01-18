@@ -10,7 +10,6 @@
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {
-
 namespace {
 
 void ExpectJson(std::vector<Diagnostic*> diagnostics, std::string_view expected_json) {
@@ -146,5 +145,4 @@ type Table = table {
 }
 
 }  // namespace
-
 }  // namespace fidlc

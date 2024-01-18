@@ -6,6 +6,7 @@
 
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 TEST(BitsTests, GoodSimple) {
@@ -17,9 +18,9 @@ TEST(BitsTests, GoodSimple) {
   ASSERT_NE(type_decl, nullptr);
   EXPECT_EQ(type_decl->members.size(), 3u);
   auto underlying = type_decl->subtype_ctor->type;
-  ASSERT_EQ(underlying->kind, fidlc::Type::Kind::kPrimitive);
-  auto underlying_primitive = static_cast<const fidlc::PrimitiveType*>(underlying);
-  EXPECT_EQ(underlying_primitive->subtype, fidlc::PrimitiveSubtype::kUint64);
+  ASSERT_EQ(underlying->kind, Type::Kind::kPrimitive);
+  auto underlying_primitive = static_cast<const PrimitiveType*>(underlying);
+  EXPECT_EQ(underlying_primitive->subtype, PrimitiveSubtype::kUint64);
 }
 
 TEST(BitsTests, GoodDefaultUint32) {
@@ -33,15 +34,15 @@ type Fruit = bits {
   auto type_decl = library.LookupBits("Fruit");
   ASSERT_NE(type_decl, nullptr);
   auto underlying = type_decl->subtype_ctor->type;
-  ASSERT_EQ(underlying->kind, fidlc::Type::Kind::kPrimitive);
-  auto underlying_primitive = static_cast<const fidlc::PrimitiveType*>(underlying);
-  EXPECT_EQ(underlying_primitive->subtype, fidlc::PrimitiveSubtype::kUint32);
+  ASSERT_EQ(underlying->kind, Type::Kind::kPrimitive);
+  auto underlying_primitive = static_cast<const PrimitiveType*>(underlying);
+  EXPECT_EQ(underlying_primitive->subtype, PrimitiveSubtype::kUint32);
 }
 
 TEST(BitsTests, BadSigned) {
   TestLibrary library;
   library.AddFile("bad/fi-0069.test.fidl");
-  library.ExpectFail(fidlc::ErrBitsTypeMustBeUnsignedIntegralPrimitive, "int64");
+  library.ExpectFail(ErrBitsTypeMustBeUnsignedIntegralPrimitive, "int64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -54,7 +55,7 @@ type Fruit = bits : uint64 {
     APPLE = 1;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrDuplicateMemberValue, fidlc::Decl::Kind::kBits, "APPLE", "ORANGE",
+  library.ExpectFail(ErrDuplicateMemberValue, Decl::Kind::kBits, "APPLE", "ORANGE",
                      "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -71,7 +72,7 @@ type Fruit = bits {
 const FOUR uint32 = 4;
 const TWO_SQUARED uint32 = 4;
 )FIDL");
-  library.ExpectFail(fidlc::ErrDuplicateMemberValue, fidlc::Decl::Kind::kBits, "APPLE", "ORANGE",
+  library.ExpectFail(ErrDuplicateMemberValue, Decl::Kind::kBits, "APPLE", "ORANGE",
                      "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -79,8 +80,8 @@ const TWO_SQUARED uint32 = 4;
 TEST(BitsTests, BadUnsignedWithNegativeMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0102.test.fidl");
-  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kBits);
-  library.ExpectFail(fidlc::ErrConstantOverflowsType, "-4", "uint64");
+  library.ExpectFail(ErrCouldNotResolveMember, Decl::Kind::kBits);
+  library.ExpectFail(ErrConstantOverflowsType, "-4", "uint64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -93,8 +94,8 @@ type Fruit = bits : uint8 {
     APPLE = 256;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrCouldNotResolveMember, fidlc::Decl::Kind::kBits);
-  library.ExpectFail(fidlc::ErrConstantOverflowsType, "256", "uint8");
+  library.ExpectFail(ErrCouldNotResolveMember, Decl::Kind::kBits);
+  library.ExpectFail(ErrConstantOverflowsType, "256", "uint8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -108,8 +109,8 @@ type Fruit = bits : uint64 {
     ORANGE = 4;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kBitsMember, "ORANGE",
-                     fidlc::Element::Kind::kBitsMember, "example.fidl:5:5");
+  library.ExpectFail(ErrNameCollision, Element::Kind::kBitsMember, "ORANGE",
+                     Element::Kind::kBitsMember, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -119,7 +120,7 @@ library example;
 
 type B = strict bits {};
 )FIDL");
-  library.ExpectFail(fidlc::ErrMustHaveOneMember);
+  library.ExpectFail(ErrMustHaveOneMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -157,7 +158,7 @@ TEST(BitsTests, BadNonPowerOfTwo) {
   TestLibrary library;
   library.AddFile("bad/fi-0067.test.fidl");
 
-  library.ExpectFail(fidlc::ErrBitsMemberMustBePowerOfTwo);
+  library.ExpectFail(ErrBitsMemberMustBePowerOfTwo);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -184,7 +185,7 @@ type Struct = struct {
     not_nullable NotNullable:optional;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotBeOptional, "NotNullable");
+  library.ExpectFail(ErrCannotBeOptional, "NotNullable");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -200,8 +201,9 @@ type Struct = struct {
     not_nullable NotNullable:<1, 2, 3>;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrTooManyConstraints, "NotNullable", 1, 3);
+  library.ExpectFail(ErrTooManyConstraints, "NotNullable", 1, 3);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace
+}  // namespace fidlc

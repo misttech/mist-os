@@ -7,6 +7,7 @@
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 TEST(TableTests, GoodPopulatedFields) {
@@ -75,14 +76,14 @@ type Foo = table {};
 TEST(TableTests, BadMissingOrdinals) {
   TestLibrary library;
   library.AddFile("bad/fi-0016-a.test.fidl");
-  library.ExpectFail(fidlc::ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(ErrMissingOrdinalBeforeMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TableTests, BadOrdinalOutOfBoundsNegative) {
   TestLibrary library;
   library.AddFile("bad/fi-0017-a.test.fidl");
-  library.ExpectFail(fidlc::ErrOrdinalOutOfBound);
+  library.ExpectFail(ErrOrdinalOutOfBound);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -94,7 +95,7 @@ type Foo = union {
   4294967296: foo string;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrOrdinalOutOfBound);
+  library.ExpectFail(ErrOrdinalOutOfBound);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -107,15 +108,15 @@ type MyTable = table {
     2: my_field uint32;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kTableMember, "my_field",
-                     fidlc::Element::Kind::kTableMember, "example.fidl:5:8");
+  library.ExpectFail(ErrNameCollision, Element::Kind::kTableMember, "my_field",
+                     Element::Kind::kTableMember, "example.fidl:5:8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TableTests, BadDuplicateOrdinals) {
   TestLibrary library;
   library.AddFile("bad/fi-0094.test.fidl");
-  library.ExpectFail(fidlc::ErrDuplicateTableFieldOrdinal, "bad/fi-0094.test.fidl:7:5");
+  library.ExpectFail(ErrDuplicateTableFieldOrdinal, "bad/fi-0094.test.fidl:7:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -174,7 +175,7 @@ type OptionalTableContainer = struct {
     foo Foo:optional;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotBeOptional, "Foo");
+  library.ExpectFail(ErrCannotBeOptional, "Foo");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -190,7 +191,7 @@ type OptionalTableContainer = struct {
     foo Foo:<1, 2, 3>;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrTooManyConstraints, "Foo", 1, 3);
+  library.ExpectFail(ErrTooManyConstraints, "Foo", 1, 3);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -206,7 +207,7 @@ type OptionalTableContainer = union {
     1: foo Foo:optional;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotBeOptional, "Foo");
+  library.ExpectFail(ErrCannotBeOptional, "Foo");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -241,7 +242,7 @@ type OptionalTableContainer = flexible union {
 TEST(TableTests, BadOptionalTableMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0048.test.fidl");
-  library.ExpectFail(fidlc::ErrOptionalTableMember);
+  library.ExpectFail(ErrOptionalTableMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -254,7 +255,7 @@ type Foo = table {
     1: t int64:optional;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotBeOptional, "int64");
+  library.ExpectFail(ErrCannotBeOptional, "int64");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -267,17 +268,16 @@ type Foo = table {
 };
 
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kEqual),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrMissingOrdinalBeforeMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TableTests, BadMustBeDense) {
   TestLibrary library;
   library.AddFile("bad/fi-0100.test.fidl");
-  library.ExpectFail(fidlc::ErrNonDenseOrdinal, 2);
+  library.ExpectFail(ErrNonDenseOrdinal, 2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -290,7 +290,7 @@ TEST(TableTests, Good64OrdinalsMaxIsTable) {
 TEST(TableTests, BadMaxOrdinalNotTable) {
   TestLibrary library;
   library.AddFile("bad/fi-0093.test.fidl");
-  library.ExpectFail(fidlc::ErrMaxOrdinalNotTable);
+  library.ExpectFail(ErrMaxOrdinalNotTable);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -368,14 +368,14 @@ type Example = table {
 };
 
 )FIDL");
-  library.ExpectFail(fidlc::ErrMaxOrdinalNotTable);
+  library.ExpectFail(ErrMaxOrdinalNotTable);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(TableTests, BadTooManyOrdinals) {
   TestLibrary library;
   library.AddFile("bad/fi-0092.test.fidl");
-  library.ExpectFail(fidlc::ErrTooManyTableOrdinals);
+  library.ExpectFail(ErrTooManyTableOrdinals);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -384,8 +384,9 @@ TEST(TableTests, BadRecursionDisallowed) {
   TestLibrary library;
   library.AddFile("bad/fi-0057-d.test.fidl");
 
-  library.ExpectFail(fidlc::ErrIncludeCycle, "table 'MySelf' -> table 'MySelf'");
+  library.ExpectFail(ErrIncludeCycle, "table 'MySelf' -> table 'MySelf'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace
+}  // namespace fidlc

@@ -9,7 +9,6 @@
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {
-
 namespace {
 
 TEST(NewTypeTests, GoodNewTypes) {
@@ -57,7 +56,7 @@ type C = struct { b B; };
 )FIDL");
 
   library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
-  library.ExpectFail(fidlc::ErrTypeMustBeResource, "C", "b", "struct");
+  library.ExpectFail(ErrTypeMustBeResource, "C", "b", "struct");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -141,10 +140,9 @@ TEST(NewTypeTests, BadNewTypesConstraints) {
   TestLibrary library;
   library.AddFile("bad/fi-0179.test.fidl");
   library.EnableFlag(ExperimentalFlags::Flag::kAllowNewTypes);
-  library.ExpectFail(fidlc::ErrNewTypeCannotHaveConstraint, "Name");
+  library.ExpectFail(ErrNewTypeCannotHaveConstraint, "Name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace
-
 }  // namespace fidlc

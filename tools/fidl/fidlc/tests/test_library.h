@@ -52,6 +52,8 @@
     }                                        \
   }
 
+namespace fidlc {
+
 struct LintArgs {
  public:
   const std::set<std::string>& included_check_ids = {};
@@ -64,23 +66,20 @@ struct LintArgs {
 // TestLibrary for convenience in single-library tests.
 class SharedInterface {
  public:
-  virtual fidlc::Reporter* reporter() = 0;
-  virtual fidlc::Libraries* all_libraries() = 0;
-  virtual fidlc::VersionSelection* version_selection() = 0;
-  virtual fidlc::ExperimentalFlags& experimental_flags() = 0;
+  virtual Reporter* reporter() = 0;
+  virtual Libraries* all_libraries() = 0;
+  virtual VersionSelection* version_selection() = 0;
+  virtual ExperimentalFlags& experimental_flags() = 0;
 
-  const std::vector<std::unique_ptr<fidlc::Diagnostic>>& errors() { return reporter()->errors(); }
-  const std::vector<std::unique_ptr<fidlc::Diagnostic>>& warnings() {
-    return reporter()->warnings();
-  }
-  std::vector<fidlc::Diagnostic*> Diagnostics() { return reporter()->Diagnostics(); }
+  const std::vector<std::unique_ptr<Diagnostic>>& errors() { return reporter()->errors(); }
+  const std::vector<std::unique_ptr<Diagnostic>>& warnings() { return reporter()->warnings(); }
+  std::vector<Diagnostic*> Diagnostics() { return reporter()->Diagnostics(); }
   void set_warnings_as_errors(bool value) { reporter()->set_warnings_as_errors(value); }
   void PrintReports() { reporter()->PrintReports(/*enable_color=*/false); }
   void SelectVersion(const std::string& platform, std::string_view version) {
-    version_selection()->Insert(fidlc::Platform::Parse(platform).value(),
-                                fidlc::Version::Parse(version).value());
+    version_selection()->Insert(Platform::Parse(platform).value(), Version::Parse(version).value());
   }
-  void EnableFlag(fidlc::ExperimentalFlags::Flag flag) { experimental_flags().EnableFlag(flag); }
+  void EnableFlag(ExperimentalFlags::Flag flag) { experimental_flags().EnableFlag(flag); }
 };
 
 // Stores data structures that are shared amongst all libraries being compiled
@@ -99,30 +98,30 @@ class SharedAmongstLibraries final : public SharedInterface {
   // Adds and compiles a library defining fdf.handle and fdf.obj_type.
   void AddLibraryFdf();
 
-  fidlc::Reporter* reporter() override { return &reporter_; }
-  fidlc::Libraries* all_libraries() override { return &all_libraries_; }
-  fidlc::VersionSelection* version_selection() override { return &version_selection_; }
-  fidlc::ExperimentalFlags& experimental_flags() override { return experimental_flags_; }
+  Reporter* reporter() override { return &reporter_; }
+  Libraries* all_libraries() override { return &all_libraries_; }
+  VersionSelection* version_selection() override { return &version_selection_; }
+  ExperimentalFlags& experimental_flags() override { return experimental_flags_; }
 
-  std::vector<std::unique_ptr<fidlc::SourceFile>>& all_sources_of_all_libraries() {
+  std::vector<std::unique_ptr<SourceFile>>& all_sources_of_all_libraries() {
     return all_sources_of_all_libraries_;
   }
 
  private:
-  fidlc::Reporter reporter_;
-  fidlc::VirtualSourceFile virtual_file_{"generated"};
-  fidlc::Libraries all_libraries_;
-  std::vector<std::unique_ptr<fidlc::SourceFile>> all_sources_of_all_libraries_;
-  fidlc::VersionSelection version_selection_;
-  fidlc::ExperimentalFlags experimental_flags_;
+  Reporter reporter_;
+  VirtualSourceFile virtual_file_{"generated"};
+  Libraries all_libraries_;
+  std::vector<std::unique_ptr<SourceFile>> all_sources_of_all_libraries_;
+  VersionSelection version_selection_;
+  ExperimentalFlags experimental_flags_;
 };
 
 namespace internal {
 
 // See ordinals_test.cc
-inline fidlc::RawOrdinal64 GetGeneratedOrdinal64ForTesting(
+inline RawOrdinal64 GetGeneratedOrdinal64ForTesting(
     const std::vector<std::string_view>& library_name, const std::string_view& protocol_name,
-    const std::string_view& selector_name, const fidlc::SourceElement& source_element) {
+    const std::string_view& selector_name, const SourceElement& source_element) {
   static std::map<std::string, uint64_t> special_selectors = {
       {"ThisOneHashesToZero", 0},
       {"ClashOne", 456789},
@@ -133,9 +132,9 @@ inline fidlc::RawOrdinal64 GetGeneratedOrdinal64ForTesting(
       (protocol_name == "Special" || protocol_name == "SpecialComposed")) {
     auto it = special_selectors.find(std::string(selector_name));
     ZX_ASSERT_MSG(it != special_selectors.end(), "only special selectors allowed");
-    return fidlc::RawOrdinal64(source_element, it->second);
+    return RawOrdinal64(source_element, it->second);
   }
-  return fidlc::GetGeneratedOrdinal64(library_name, protocol_name, selector_name, source_element);
+  return GetGeneratedOrdinal64(library_name, protocol_name, selector_name, source_element);
 }
 
 }  // namespace internal
@@ -147,7 +146,7 @@ struct StringOrArg {
   StringOrArg(const char* string) : string(string) {}
   template <typename From, typename = std::enable_if_t<std::is_convertible_v<From, Arg>>>
   // NOLINTNEXTLINE(google-explicit-constructor)
-  StringOrArg(const From& arg) : string(fidlc::internal::Display(static_cast<const Arg&>(arg))) {}
+  StringOrArg(const From& arg) : string(internal::Display(static_cast<const Arg&>(arg))) {}
   std::string string;
 };
 
@@ -199,21 +198,21 @@ class TestLibrary final : public SharedInterface {
     owned_shared_.value().AddLibraryFdf();
   }
 
-  fidlc::Reporter* reporter() override { return shared_->reporter(); }
-  fidlc::Libraries* all_libraries() override { return shared_->all_libraries(); }
-  fidlc::VersionSelection* version_selection() override { return shared_->version_selection(); }
-  fidlc::ExperimentalFlags& experimental_flags() override { return shared_->experimental_flags(); }
+  Reporter* reporter() override { return shared_->reporter(); }
+  Libraries* all_libraries() override { return shared_->all_libraries(); }
+  VersionSelection* version_selection() override { return shared_->version_selection(); }
+  ExperimentalFlags& experimental_flags() override { return shared_->experimental_flags(); }
 
   void AddSource(const std::string& filename, const std::string& raw_source_code) {
     std::string source_code(raw_source_code);
     // NUL terminate the string.
     source_code.resize(source_code.size() + 1);
-    auto file = std::make_unique<fidlc::SourceFile>(filename, source_code);
+    auto file = std::make_unique<SourceFile>(filename, source_code);
     all_sources_.push_back(file.get());
     shared_->all_sources_of_all_libraries().push_back(std::move(file));
   }
 
-  fidlc::AttributeSchema& AddAttributeSchema(std::string name) {
+  AttributeSchema& AddAttributeSchema(std::string name) {
     return all_libraries()->AddAttributeSchema(std::move(name));
   }
 
@@ -241,18 +240,16 @@ class TestLibrary final : public SharedInterface {
 
   // Record that a particular error is expected during the compile.
   // The args can either match the ErrorDef's argument types, or they can be string literals.
-  template <fidlc::ErrorId Id, typename... Args>
-  void ExpectFail(const fidlc::ErrorDef<Id, Args...>& def,
-                  fidlc::identity_t<StringOrArg<Args>>... args) {
-    expected_diagnostics_.push_back(fidlc::internal::FormatDiagnostic(def.msg, args.string...));
+  template <ErrorId Id, typename... Args>
+  void ExpectFail(const ErrorDef<Id, Args...>& def, identity_t<StringOrArg<Args>>... args) {
+    expected_diagnostics_.push_back(internal::FormatDiagnostic(def.msg, args.string...));
   }
 
   // Record that a particular warning is expected during the compile.
   // The args can either match the WarningDef's argument types, or they can be string literals.
-  template <fidlc::ErrorId Id, typename... Args>
-  void ExpectWarn(const fidlc::WarningDef<Id, Args...>& def,
-                  fidlc::identity_t<StringOrArg<Args>>... args) {
-    expected_diagnostics_.push_back(fidlc::internal::FormatDiagnostic(def.msg, args.string...));
+  template <ErrorId Id, typename... Args>
+  void ExpectWarn(const WarningDef<Id, Args...>& def, identity_t<StringOrArg<Args>>... args) {
+    expected_diagnostics_.push_back(internal::FormatDiagnostic(def.msg, args.string...));
   }
 
   // Check that the diagnostics expected with ExpectFail and ExpectWarn were recorded, in that order
@@ -298,12 +295,12 @@ class TestLibrary final : public SharedInterface {
 
   // TODO(https://fxbug.dev/118282): remove (or rename this class to be more general), as this does
   // not use a library.
-  bool Parse(std::unique_ptr<fidlc::File>* out_ast_ptr) {
+  bool Parse(std::unique_ptr<File>* out_ast_ptr) {
     ZX_ASSERT_MSG(all_sources_.size() == 1, "parse can only be used with one source");
     used_ = true;
     auto source_file = all_sources_.at(0);
-    fidlc::Lexer lexer(*source_file, reporter());
-    fidlc::Parser parser(&lexer, reporter(), experimental_flags());
+    Lexer lexer(*source_file, reporter());
+    Parser parser(&lexer, reporter(), experimental_flags());
     out_ast_ptr->reset(parser.Parse().release());
     return parser.Success();
   }
@@ -312,11 +309,11 @@ class TestLibrary final : public SharedInterface {
   // same SharedAmongstLibraries object for all of them.
   bool Compile() {
     used_ = true;
-    fidlc::Compiler compiler(all_libraries(), version_selection(),
-                             internal::GetGeneratedOrdinal64ForTesting, experimental_flags());
+    Compiler compiler(all_libraries(), version_selection(),
+                      internal::GetGeneratedOrdinal64ForTesting, experimental_flags());
     for (auto source_file : all_sources_) {
-      fidlc::Lexer lexer(*source_file, reporter());
-      fidlc::Parser parser(&lexer, reporter(), experimental_flags());
+      Lexer lexer(*source_file, reporter());
+      Parser parser(&lexer, reporter(), experimental_flags());
       auto ast = parser.Parse();
       if (!parser.Success())
         return false;
@@ -340,24 +337,23 @@ class TestLibrary final : public SharedInterface {
 
   bool Lint(LintArgs args = {}) {
     used_ = true;
-    findings_ = fidlc::Findings();
+    findings_ = Findings();
 
     bool passed = [&]() {
       ZX_ASSERT_MSG(all_sources_.size() == 1, "lint can only be used with one source");
       auto source_file = all_sources_.at(0);
-      fidlc::Lexer lexer(*source_file, reporter());
-      fidlc::Parser parser(&lexer, reporter(), experimental_flags());
+      Lexer lexer(*source_file, reporter());
+      Parser parser(&lexer, reporter(), experimental_flags());
       auto ast = parser.Parse();
       if (!parser.Success()) {
         std::string_view beginning(source_file->data().data(), 0);
-        fidlc::SourceSpan span(beginning, *source_file);
+        SourceSpan span(beginning, *source_file);
         const auto& error = errors().at(0);
-        auto error_msg =
-            fidlc::Reporter::Format("error", error->span, error->Format(), /*color=*/false);
+        auto error_msg = Reporter::Format("error", error->span, error->Format(), /*color=*/false);
         findings_.emplace_back(span, "parser-error", error_msg + "\n");
         return false;
       }
-      fidlc::Linter linter;
+      Linter linter;
       if (!args.included_check_ids.empty()) {
         linter.set_included_checks(args.included_check_ids);
       }
@@ -368,12 +364,12 @@ class TestLibrary final : public SharedInterface {
       return linter.Lint(ast, &findings_, args.excluded_checks_not_found);
     }();
 
-    lints_ = fidlc::FormatFindings(findings_, false);
+    lints_ = FormatFindings(findings_, false);
     return passed;
   }
 
   std::string GenerateJSON() {
-    auto json_generator = fidlc::JSONGenerator(compilation_.get(), experimental_flags());
+    auto json_generator = JSONGenerator(compilation_.get(), experimental_flags());
     auto out = json_generator.Produce();
     return out.str();
   }
@@ -383,7 +379,7 @@ class TestLibrary final : public SharedInterface {
   // the Compilation, for which we provide compilation() and helpers like
   // LookupStruct() etc. However, sometimes tests really need to get a Library*
   // (e.g. to construct Name::Key), hence this method.
-  const fidlc::Library* LookupLibrary(std::string_view name) {
+  const Library* LookupLibrary(std::string_view name) {
     std::vector<std::string_view> parts;
     size_t dot_idx = 0;
     for (size_t i = 0; dot_idx != std::string::npos; i = dot_idx + 1) {
@@ -395,7 +391,7 @@ class TestLibrary final : public SharedInterface {
     return library;
   }
 
-  const fidlc::Bits* LookupBits(std::string_view name) {
+  const Bits* LookupBits(std::string_view name) {
     for (const auto& bits_decl : compilation_->declarations.bits) {
       if (bits_decl->name.decl_name() == name) {
         return bits_decl;
@@ -404,7 +400,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Const* LookupConstant(std::string_view name) {
+  const Const* LookupConstant(std::string_view name) {
     for (const auto& const_decl : compilation_->declarations.consts) {
       if (const_decl->name.decl_name() == name) {
         return const_decl;
@@ -413,7 +409,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Enum* LookupEnum(std::string_view name) {
+  const Enum* LookupEnum(std::string_view name) {
     for (const auto& enum_decl : compilation_->declarations.enums) {
       if (enum_decl->name.decl_name() == name) {
         return enum_decl;
@@ -422,7 +418,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Resource* LookupResource(std::string_view name) {
+  const Resource* LookupResource(std::string_view name) {
     for (const auto& resource_decl : compilation_->declarations.resources) {
       if (resource_decl->name.decl_name() == name) {
         return resource_decl;
@@ -431,7 +427,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Service* LookupService(std::string_view name) {
+  const Service* LookupService(std::string_view name) {
     for (const auto& service_decl : compilation_->declarations.services) {
       if (service_decl->name.decl_name() == name) {
         return service_decl;
@@ -440,7 +436,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Struct* LookupStruct(std::string_view name) {
+  const Struct* LookupStruct(std::string_view name) {
     for (const auto& struct_decl : compilation_->declarations.structs) {
       if (struct_decl->name.decl_name() == name) {
         return struct_decl;
@@ -449,7 +445,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::NewType* LookupNewType(std::string_view name) {
+  const NewType* LookupNewType(std::string_view name) {
     for (const auto& new_type_decl : compilation_->declarations.new_types) {
       if (new_type_decl->name.decl_name() == name) {
         return new_type_decl;
@@ -458,7 +454,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Table* LookupTable(std::string_view name) {
+  const Table* LookupTable(std::string_view name) {
     for (const auto& table_decl : compilation_->declarations.tables) {
       if (table_decl->name.decl_name() == name) {
         return table_decl;
@@ -467,7 +463,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Alias* LookupAlias(std::string_view name) {
+  const Alias* LookupAlias(std::string_view name) {
     for (const auto& alias_decl : compilation_->declarations.aliases) {
       if (alias_decl->name.decl_name() == name) {
         return alias_decl;
@@ -476,7 +472,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Union* LookupUnion(std::string_view name) {
+  const Union* LookupUnion(std::string_view name) {
     for (const auto& union_decl : compilation_->declarations.unions) {
       if (union_decl->name.decl_name() == name) {
         return union_decl;
@@ -484,7 +480,7 @@ class TestLibrary final : public SharedInterface {
     }
     return nullptr;
   }
-  const fidlc::Overlay* LookupOverlay(std::string_view name) {
+  const Overlay* LookupOverlay(std::string_view name) {
     for (const auto& overlay_decl : compilation_->declarations.overlays) {
       if (overlay_decl->name.decl_name() == name) {
         return overlay_decl;
@@ -493,7 +489,7 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::Protocol* LookupProtocol(std::string_view name) {
+  const Protocol* LookupProtocol(std::string_view name) {
     for (const auto& protocol_decl : compilation_->declarations.protocols) {
       if (protocol_decl->name.decl_name() == name) {
         return protocol_decl;
@@ -502,13 +498,13 @@ class TestLibrary final : public SharedInterface {
     return nullptr;
   }
 
-  const fidlc::SourceFile& source_file() const {
+  const SourceFile& source_file() const {
     ZX_ASSERT_MSG(all_sources_.size() == 1, "convenience method only possible with single source");
     return *all_sources_.at(0);
   }
 
-  std::vector<const fidlc::SourceFile*> source_files() const {
-    std::vector<const fidlc::SourceFile*> out;
+  std::vector<const SourceFile*> source_files() const {
+    std::vector<const SourceFile*> out;
     out.reserve(all_sources_.size());
     for (const auto& source : all_sources_) {
       out.push_back(source);
@@ -516,15 +512,15 @@ class TestLibrary final : public SharedInterface {
     return out;
   }
 
-  fidlc::SourceSpan source_span(size_t start, size_t size) const {
+  SourceSpan source_span(size_t start, size_t size) const {
     ZX_ASSERT_MSG(all_sources_.size() == 1, "convenience method only possible with single source");
     std::string_view data = all_sources_.at(0)->data();
     data.remove_prefix(start);
     data.remove_suffix(data.size() - size);
-    return fidlc::SourceSpan(data, *all_sources_.at(0));
+    return SourceSpan(data, *all_sources_.at(0));
   }
 
-  fidlc::SourceSpan find_source_span(std::string_view span_text) {
+  SourceSpan find_source_span(std::string_view span_text) {
     ZX_ASSERT_MSG(all_sources_.size() == 1, "convenience method only possible with single source");
     std::string_view data = all_sources_.at(0)->data();
     size_t pos = data.find(span_text);
@@ -532,38 +528,40 @@ class TestLibrary final : public SharedInterface {
     return source_span(pos, span_text.size());
   }
 
-  const fidlc::Findings& findings() const { return findings_; }
+  const Findings& findings() const { return findings_; }
 
   const std::vector<std::string>& lints() const { return lints_; }
 
-  const fidlc::Compilation* compilation() const {
+  const Compilation* compilation() const {
     ZX_ASSERT_MSG(compilation_, "must compile successfully before accessing compilation");
     return compilation_.get();
   }
 
-  const fidlc::AttributeList* attributes() { return compilation_->library_attributes; }
+  const AttributeList* attributes() { return compilation_->library_attributes; }
 
-  const std::vector<const fidlc::Struct*>& external_structs() const {
+  const std::vector<const Struct*>& external_structs() const {
     return compilation_->external_structs;
   }
 
-  const std::vector<const fidlc::Decl*>& declaration_order() const {
+  const std::vector<const Decl*>& declaration_order() const {
     return compilation_->declaration_order;
   }
 
-  const std::vector<fidlc::Compilation::Dependency>& direct_and_composed_dependencies() const {
+  const std::vector<Compilation::Dependency>& direct_and_composed_dependencies() const {
     return compilation_->direct_and_composed_dependencies;
   }
 
  private:
   std::optional<SharedAmongstLibraries> owned_shared_;
   SharedAmongstLibraries* shared_;
-  fidlc::Findings findings_;
+  Findings findings_;
   std::vector<std::string> lints_;
-  std::vector<fidlc::SourceFile*> all_sources_;
-  std::unique_ptr<fidlc::Compilation> compilation_;
+  std::vector<SourceFile*> all_sources_;
+  std::unique_ptr<Compilation> compilation_;
   std::vector<std::string> expected_diagnostics_;
   bool used_ = false;
 };
+
+}  // namespace fidlc
 
 #endif  // TOOLS_FIDL_FIDLC_TESTS_TEST_LIBRARY_H_

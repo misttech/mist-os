@@ -7,6 +7,7 @@
 #include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 TEST(DirectDependenciesTests, GoodDirectDepsSimple) {
@@ -57,8 +58,8 @@ protocol CapturesDependencyThroughCompose {
     auto deps = lib.direct_and_composed_dependencies();
     ASSERT_EQ(deps.size(), 2u);
     auto iter = deps.cbegin();
-    EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep1");
-    EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep2");
+    EXPECT_EQ(NameLibrary((*iter++).library->name), "dep1");
+    EXPECT_EQ(NameLibrary((*iter++).library->name), "dep2");
   }
 }
 
@@ -100,7 +101,7 @@ protocol CapturesDependencyThroughCompose {
   auto deps = lib.direct_and_composed_dependencies();
   ASSERT_EQ(deps.size(), 1u);
   auto iter = deps.cbegin();
-  EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep1");
+  EXPECT_EQ(NameLibrary((*iter++).library->name), "dep1");
 }
 
 TEST(DirectDependenciesTests, GoodDoesNotFollowNestedStruct) {
@@ -141,7 +142,7 @@ protocol CapturesDependencyThroughCompose {
   auto deps = lib.direct_and_composed_dependencies();
   ASSERT_EQ(deps.size(), 1u);
   auto iter = deps.cbegin();
-  EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep1");
+  EXPECT_EQ(NameLibrary((*iter++).library->name), "dep1");
 }
 
 TEST(DirectDependenciesTests, GoodErrorSyntaxSuccessType) {
@@ -178,8 +179,8 @@ protocol CapturesDependencyThroughCompose {
   auto deps = lib.direct_and_composed_dependencies();
   ASSERT_EQ(deps.size(), 2u);
   auto iter = deps.cbegin();
-  EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep1");
-  EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep2");
+  EXPECT_EQ(NameLibrary((*iter++).library->name), "dep1");
+  EXPECT_EQ(NameLibrary((*iter++).library->name), "dep2");
 }
 
 TEST(DirectDependenciesTests, GoodErrorSyntaxErrorType) {
@@ -216,8 +217,8 @@ protocol CapturesDependencyThroughCompose {
   auto deps = lib.direct_and_composed_dependencies();
   ASSERT_EQ(deps.size(), 2u);
   auto iter = deps.cbegin();
-  EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep1");
-  EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep2");
+  EXPECT_EQ(NameLibrary((*iter++).library->name), "dep1");
+  EXPECT_EQ(NameLibrary((*iter++).library->name), "dep2");
 }
 
 TEST(DirectDependenciesTests, GoodFlexibleResponse) {
@@ -254,8 +255,9 @@ open protocol CapturesDependencyThroughCompose {
   auto deps = lib.direct_and_composed_dependencies();
   ASSERT_EQ(deps.size(), 2u);
   auto iter = deps.cbegin();
-  EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep1");
-  EXPECT_EQ(fidlc::NameLibrary((*iter++).library->name), "dep2");
+  EXPECT_EQ(NameLibrary((*iter++).library->name), "dep1");
+  EXPECT_EQ(NameLibrary((*iter++).library->name), "dep2");
 }
 
 }  // namespace
+}  // namespace fidlc

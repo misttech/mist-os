@@ -7,14 +7,15 @@
 #include "tools/fidl/fidlc/src/source_span.h"
 #include "tools/fidl/fidlc/src/virtual_source_file.h"
 
+namespace fidlc {
 namespace {
 
 TEST(VirtualSourceTests, AddLine) {
-  fidlc::VirtualSourceFile file("imaginary-test-file");
+  VirtualSourceFile file("imaginary-test-file");
 
-  fidlc::SourceSpan one = file.AddLine("one");
-  fidlc::SourceSpan two = file.AddLine("two");
-  fidlc::SourceSpan three = file.AddLine("three");
+  SourceSpan one = file.AddLine("one");
+  SourceSpan two = file.AddLine("two");
+  SourceSpan three = file.AddLine("three");
 
   EXPECT_EQ(one.data(), "one");
   EXPECT_EQ(two.data(), "two");
@@ -22,16 +23,17 @@ TEST(VirtualSourceTests, AddLine) {
 }
 
 TEST(VirtualSourceTests, LineContaining) {
-  fidlc::VirtualSourceFile file("imaginary-test-file");
+  VirtualSourceFile file("imaginary-test-file");
 
   file.AddLine("one");
-  fidlc::SourceSpan two = file.AddLine("two");
+  SourceSpan two = file.AddLine("two");
   file.AddLine("three");
 
-  fidlc::SourceFile::Position pos{};
+  SourceFile::Position pos{};
   file.LineContaining(two.data(), &pos);
   EXPECT_EQ(pos.line, 2);
   EXPECT_EQ(pos.column, 1);
 }
 
 }  // namespace
+}  // namespace fidlc

@@ -13,7 +13,6 @@
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {
-
 namespace {
 
 #define ASSERT_FINDINGS(TEST)               \
@@ -1962,5 +1961,4 @@ type ${STRUCT_NAME} = struct {
 }
 
 }  // namespace
-
 }  // namespace fidlc

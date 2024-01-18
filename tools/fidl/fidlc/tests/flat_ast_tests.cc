@@ -14,20 +14,8 @@
 #include "tools/fidl/fidlc/src/source_span.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
-
-using fidlc::HandleRightsValue;
-using fidlc::HandleSubtype;
-using fidlc::HandleType;
-using fidlc::LiteralConstant;
-using fidlc::Name;
-using fidlc::Nullability;
-using fidlc::RawLiteral;
-using fidlc::RightsWrappedType;
-using fidlc::SourceElement;
-using fidlc::SourceFile;
-using fidlc::SourceSpan;
-using fidlc::Token;
 
 TEST(FlatAstTests, GoodImplicitAssumptions) {
   // Preconditions to unit test cases: if these change, we need to rewrite the tests themselves.
@@ -48,25 +36,22 @@ TEST(FlatAstTests, GoodCompareHandles) {
   auto rights2Constant = std::make_unique<LiteralConstant>(&fake_literal);
   rights2Constant->ResolveTo(std::make_unique<HandleRightsValue>(2), nullptr);
   auto rights2Value = static_cast<const HandleRightsValue*>(&rights2Constant->Value());
-  fidlc::Resource* resource_decl_not_needed = nullptr;
+  Resource* resource_decl_not_needed = nullptr;
   HandleType nonnullable_channel_rights1(
       name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(fidlc::HandleSubtype::kChannel, rights1Value,
-                              Nullability::kNonnullable));
+      HandleType::Constraints(HandleSubtype::kChannel, rights1Value, Nullability::kNonnullable));
   HandleType nullable_channel_rights1(
       name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(fidlc::HandleSubtype::kChannel, rights1Value,
-                              Nullability::kNullable));
+      HandleType::Constraints(HandleSubtype::kChannel, rights1Value, Nullability::kNullable));
   HandleType nonnullable_event_rights1(
       name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(fidlc::HandleSubtype::kEvent, rights1Value,
-                              Nullability::kNonnullable));
+      HandleType::Constraints(HandleSubtype::kEvent, rights1Value, Nullability::kNonnullable));
   HandleType nullable_event_rights1(
       name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(fidlc::HandleSubtype::kEvent, rights1Value, Nullability::kNullable));
+      HandleType::Constraints(HandleSubtype::kEvent, rights1Value, Nullability::kNullable));
   HandleType nullable_event_rights2(
       name_not_important, resource_decl_not_needed,
-      HandleType::Constraints(fidlc::HandleSubtype::kEvent, rights2Value, Nullability::kNullable));
+      HandleType::Constraints(HandleSubtype::kEvent, rights2Value, Nullability::kNullable));
 
   // Comparison is nullability, then type.
   EXPECT_TRUE(nullable_channel_rights1 < nonnullable_channel_rights1);
@@ -80,13 +65,13 @@ TEST(FlatAstTests, BadCannotReferenceAnonymousName) {
   TestLibrary library;
   library.AddFile("bad/fi-0058.test.fidl");
 
-  library.ExpectFail(fidlc::ErrAnonymousNameReference, "MyProtocolMyInfallibleRequest");
-  library.ExpectFail(fidlc::ErrAnonymousNameReference, "MyProtocolMyInfallibleResponse");
-  library.ExpectFail(fidlc::ErrAnonymousNameReference, "MyProtocolMyFallibleRequest");
-  library.ExpectFail(fidlc::ErrAnonymousNameReference, "MyProtocol_MyFallible_Result");
-  library.ExpectFail(fidlc::ErrAnonymousNameReference, "MyProtocol_MyFallible_Response");
-  library.ExpectFail(fidlc::ErrAnonymousNameReference, "MyProtocol_MyFallible_Error");
-  library.ExpectFail(fidlc::ErrAnonymousNameReference, "MyProtocolMyEventRequest");
+  library.ExpectFail(ErrAnonymousNameReference, "MyProtocolMyInfallibleRequest");
+  library.ExpectFail(ErrAnonymousNameReference, "MyProtocolMyInfallibleResponse");
+  library.ExpectFail(ErrAnonymousNameReference, "MyProtocolMyFallibleRequest");
+  library.ExpectFail(ErrAnonymousNameReference, "MyProtocol_MyFallible_Result");
+  library.ExpectFail(ErrAnonymousNameReference, "MyProtocol_MyFallible_Response");
+  library.ExpectFail(ErrAnonymousNameReference, "MyProtocol_MyFallible_Error");
+  library.ExpectFail(ErrAnonymousNameReference, "MyProtocolMyEventRequest");
 
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
@@ -101,8 +86,8 @@ protocol Foo {
 
 type FooSomeMethodRequest = struct {};
 )FIDL");
-  library.ExpectFail(fidlc::ErrNameCollision, fidlc::Element::Kind::kStruct, "FooSomeMethodRequest",
-                     fidlc::Element::Kind::kStruct, "example.fidl:5:14");
+  library.ExpectFail(ErrNameCollision, Element::Kind::kStruct, "FooSomeMethodRequest",
+                     Element::Kind::kStruct, "example.fidl:5:14");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -125,8 +110,9 @@ TEST(FlatAstTests, BadMultipleLibrariesSameName) {
   ASSERT_COMPILED(library1);
   TestLibrary library2(&shared);
   library2.AddFile("bad/fi-0041-b.test.fidl");
-  library2.ExpectFail(fidlc::ErrMultipleLibrariesWithSameName, "test.bad.fi0041");
+  library2.ExpectFail(ErrMultipleLibrariesWithSameName, "test.bad.fi0041");
   ASSERT_COMPILER_DIAGNOSTICS(library2);
 }
 
 }  // namespace
+}  // namespace fidlc

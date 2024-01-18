@@ -10,6 +10,7 @@
 #include "tools/fidl/fidlc/src/raw_ast.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 // Test that an invalid compound identifier fails parsing. Regression
@@ -20,9 +21,8 @@ TEST(ParsingTests, BadCompoundIdentifierTest) {
   TestLibrary library(R"FIDL(
 library 0fidl.test.badcompoundidentifier;
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kNumericLiteral),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kNumericLiteral),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -30,7 +30,7 @@ library 0fidl.test.badcompoundidentifier;
 TEST(ParsingTests, BadLibraryNameTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0011.test.fidl");
-  library.ExpectFail(fidlc::ErrInvalidLibraryNameComponent, "name_with_underscores");
+  library.ExpectFail(ErrInvalidLibraryNameComponent, "name_with_underscores");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -410,7 +410,7 @@ type Test = struct {
     #uint8 uint8;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrInvalidCharacter, "#");
+  library.ExpectFail(ErrInvalidCharacter, "#");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -422,14 +422,14 @@ type Test = struct / {
     uint8 uint8;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrInvalidCharacter, "/");
+  library.ExpectFail(ErrInvalidCharacter, "/");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadIdentifierTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0010-a.test.fidl");
-  library.ExpectFail(fidlc::ErrInvalidIdentifier, "Foo_");
+  library.ExpectFail(ErrInvalidIdentifier, "Foo_");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -451,8 +451,8 @@ TEST(ParsingTests, BadInvalidCharacterTest) {
   // This is all alphanumeric in the appropriate locale, but not a valid
   // identifier.
   library.AddFile("bad/fi-0001.test.fidl");
-  library.ExpectFail(fidlc::ErrInvalidCharacter, std::string_view("ß", 1));
-  library.ExpectFail(fidlc::ErrInvalidCharacter, "ß");
+  library.ExpectFail(ErrInvalidCharacter, std::string_view("ß", 1));
+  library.ExpectFail(ErrInvalidCharacter, "ß");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -474,7 +474,7 @@ type Something = struct {};
 
   TestLibrary library;
   library.AddFile("bad/fi-0025.test.fidl");
-  library.ExpectFail(fidlc::ErrLibraryImportsMustBeGroupedAtTopOfFile);
+  library.ExpectFail(ErrLibraryImportsMustBeGroupedAtTopOfFile);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -486,23 +486,23 @@ TEST(ParsingTests, GoodAttributeValueHasCorrectContents) {
   type Empty = struct{};
 )FIDL");
 
-  std::unique_ptr<fidlc::File> ast;
+  std::unique_ptr<File> ast;
   ASSERT_TRUE(library.Parse(&ast));
 
-  std::unique_ptr<fidlc::RawAttribute> attribute =
+  std::unique_ptr<RawAttribute> attribute =
       std::move(ast->type_decls.front()->attributes->attributes.front());
   ASSERT_EQ(attribute->maybe_name->span().data(), "foo");
   ASSERT_TRUE(attribute->args.size() == 1);
 
-  std::unique_ptr<fidlc::RawAttributeArg> arg = std::move(attribute->args[0]);
-  auto arg_value = static_cast<fidlc::RawLiteralConstant*>(arg->value.get());
-  ASSERT_EQ(static_cast<fidlc::RawStringLiteral*>(arg_value->literal.get())->MakeContents(), "Bar");
+  std::unique_ptr<RawAttributeArg> arg = std::move(attribute->args[0]);
+  auto arg_value = static_cast<RawLiteralConstant*>(arg->value.get());
+  ASSERT_EQ(static_cast<RawStringLiteral*>(arg_value->literal.get())->MakeContents(), "Bar");
 }
 
 TEST(ParsingTests, BadAttributeWithDottedIdentifier) {
   TestLibrary library;
   library.AddFile("bad/fi-0010-b.test.fidl");
-  library.ExpectFail(fidlc::ErrInvalidIdentifier, "bar.baz");
+  library.ExpectFail(ErrInvalidIdentifier, "bar.baz");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -510,45 +510,43 @@ TEST(ParsingTests, GoodAttributeWithMultipleParameters) {
   TestLibrary library;
   library.AddFile("good/fi-0010-b.test.fidl");
 
-  std::unique_ptr<fidlc::File> ast;
+  std::unique_ptr<File> ast;
   ASSERT_TRUE(library.Parse(&ast));
 
-  std::unique_ptr<fidlc::RawAttribute> attribute =
+  std::unique_ptr<RawAttribute> attribute =
       std::move(ast->type_decls.front()->attributes->attributes.front());
   ASSERT_EQ(attribute->maybe_name->span().data(), "foo");
   ASSERT_TRUE(attribute->args.size() == 2);
 
-  std::unique_ptr<fidlc::RawAttributeArg> arg1 = std::move(attribute->args[0]);
+  std::unique_ptr<RawAttributeArg> arg1 = std::move(attribute->args[0]);
   ASSERT_EQ(arg1->maybe_name->span().data(), "bar");
-  auto arg1_value = static_cast<fidlc::RawLiteralConstant*>(arg1->value.get());
-  ASSERT_EQ(static_cast<fidlc::RawStringLiteral*>(arg1_value->literal.get())->MakeContents(),
-            "Bar");
+  auto arg1_value = static_cast<RawLiteralConstant*>(arg1->value.get());
+  ASSERT_EQ(static_cast<RawStringLiteral*>(arg1_value->literal.get())->MakeContents(), "Bar");
 
-  std::unique_ptr<fidlc::RawAttributeArg> arg2 = std::move(attribute->args[1]);
+  std::unique_ptr<RawAttributeArg> arg2 = std::move(attribute->args[1]);
   ASSERT_EQ(arg2->maybe_name->span().data(), "zork");
-  auto arg2_value = static_cast<fidlc::RawLiteralConstant*>(arg2->value.get());
-  ASSERT_EQ(static_cast<fidlc::RawStringLiteral*>(arg2_value->literal.get())->MakeContents(),
-            "Zoom");
+  auto arg2_value = static_cast<RawLiteralConstant*>(arg2->value.get());
+  ASSERT_EQ(static_cast<RawStringLiteral*>(arg2_value->literal.get())->MakeContents(), "Zoom");
 }
 
 TEST(ParsingTests, GoodSimpleDocComment) {
   TestLibrary library;
   library.AddFile("good/fi-0027-a.test.fidl");
 
-  std::unique_ptr<fidlc::File> ast;
+  std::unique_ptr<File> ast;
   ASSERT_TRUE(library.Parse(&ast));
 
-  std::unique_ptr<fidlc::RawAttribute> attribute =
+  std::unique_ptr<RawAttribute> attribute =
       std::move(ast->type_decls.front()->attributes->attributes.front());
-  ASSERT_EQ(attribute->provenance, fidlc::RawAttribute::Provenance::kDocComment);
+  ASSERT_EQ(attribute->provenance, RawAttribute::Provenance::kDocComment);
 
   // We set the name to "doc" in the flat AST.
   ASSERT_EQ(attribute->maybe_name, nullptr);
   ASSERT_TRUE(attribute->args.size() == 1);
 
-  std::unique_ptr<fidlc::RawAttributeArg> arg = std::move(attribute->args[0]);
-  auto arg_value = static_cast<fidlc::RawLiteralConstant*>(arg->value.get());
-  ASSERT_EQ(static_cast<fidlc::RawDocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
+  std::unique_ptr<RawAttributeArg> arg = std::move(attribute->args[0]);
+  auto arg_value = static_cast<RawLiteralConstant*>(arg->value.get());
+  ASSERT_EQ(static_cast<RawDocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
             " A doc comment\n");
 }
 
@@ -562,19 +560,19 @@ TEST(ParsingTests, GoodMultilineDocCommentHasCorrectContents) {
   type Empty = struct {};
 )FIDL");
 
-  std::unique_ptr<fidlc::File> ast;
+  std::unique_ptr<File> ast;
   ASSERT_TRUE(library.Parse(&ast));
 
-  std::unique_ptr<fidlc::RawAttribute> attribute =
+  std::unique_ptr<RawAttribute> attribute =
       std::move(ast->type_decls.front()->attributes->attributes.front());
-  ASSERT_EQ(attribute->provenance, fidlc::RawAttribute::Provenance::kDocComment);
+  ASSERT_EQ(attribute->provenance, RawAttribute::Provenance::kDocComment);
   // We set the name to "doc" in the flat AST.
   ASSERT_EQ(attribute->maybe_name, nullptr);
   ASSERT_TRUE(attribute->args.size() == 1);
 
-  std::unique_ptr<fidlc::RawAttributeArg> arg = std::move(attribute->args[0]);
-  auto arg_value = static_cast<fidlc::RawLiteralConstant*>(arg->value.get());
-  ASSERT_EQ(static_cast<fidlc::RawDocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
+  std::unique_ptr<RawAttributeArg> arg = std::move(attribute->args[0]);
+  auto arg_value = static_cast<RawLiteralConstant*>(arg->value.get());
+  ASSERT_EQ(static_cast<RawDocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
             " A\n multiline\n comment!\n");
 }
 
@@ -582,7 +580,7 @@ TEST(ParsingTests, WarnDocCommentBlankLineTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0027.test.fidl");
 
-  library.ExpectWarn(fidlc::WarnBlankLinesWithinDocCommentBlock);
+  library.ExpectWarn(WarnBlankLinesWithinDocCommentBlock);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -590,7 +588,7 @@ TEST(ParsingTests, WarnCommentInsideDocCommentTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0026.test.fidl");
 
-  library.ExpectWarn(fidlc::WarnCommentWithinDocCommentBlock);
+  library.ExpectWarn(WarnCommentWithinDocCommentBlock);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -605,8 +603,8 @@ library example;
 type Empty = struct {};
 )FIDL");
 
-  library.ExpectWarn(fidlc::WarnCommentWithinDocCommentBlock);
-  library.ExpectWarn(fidlc::WarnBlankLinesWithinDocCommentBlock);
+  library.ExpectWarn(WarnCommentWithinDocCommentBlock);
+  library.ExpectWarn(WarnBlankLinesWithinDocCommentBlock);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -614,7 +612,7 @@ TEST(ParsingTests, BadDocCommentNotAllowedOnParams) {
   TestLibrary library;
   library.AddFile("bad/fi-0024.test.fidl");
 
-  library.ExpectFail(fidlc::ErrDocCommentOnParameters);
+  library.ExpectFail(ErrDocCommentOnParameters);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -653,7 +651,7 @@ TEST(ParsingTests, WarnTrailingDocCommentTest) {
   TestLibrary library;
   library.AddFile("bad/fi-0028.test.fidl");
 
-  library.ExpectWarn(fidlc::WarnDocCommentMustBeFollowedByDeclaration);
+  library.ExpectWarn(WarnDocCommentMustBeFollowedByDeclaration);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -667,15 +665,12 @@ type Empty = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightCurly),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEndOfFile),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kEqual),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightCurly),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kEndOfFile),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -689,9 +684,8 @@ type Struct = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightCurly),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightCurly),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -706,12 +700,10 @@ type Struct = struct {
    // error: want "}", got EOF
 )FIDL");
 
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightCurly),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEndOfFile),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightCurly),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kEndOfFile),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -723,19 +715,17 @@ type Foo = struct {
     bad_no_brackets vector<uint8>:10,optional;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kComma),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon));
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kComma),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kComma),
+                     Token::KindAndSubkind(Token::Kind::kSemicolon));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kComma),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadMultipleConstraintDefinitionDoubleColon) {
   TestLibrary library;
   library.AddFile("bad/fi-0163.test.fidl");
-  library.ExpectFail(fidlc::ErrMultipleConstraintDefinitions);
+  library.ExpectFail(ErrMultipleConstraintDefinitions);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -750,8 +740,8 @@ type Foo = struct {
   bad_double_colon_bracketed string:LENGTH:<LENGTH,optional>;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrMultipleConstraintDefinitions);
-  library.ExpectFail(fidlc::ErrMultipleConstraintDefinitions);
+  library.ExpectFail(ErrMultipleConstraintDefinitions);
+  library.ExpectFail(ErrMultipleConstraintDefinitions);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -770,15 +760,14 @@ type Foo = struct {
 TEST(ParsingTests, BadSubtypeConstructor) {
   TestLibrary library;
   library.AddFile("bad/fi-0031.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotSpecifySubtype,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kUnion));
+  library.ExpectFail(ErrCannotSpecifySubtype, Token::KindAndSubkind(Token::Subkind::kUnion));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadLayoutClass) {
   TestLibrary library;
   library.AddFile("bad/fi-0012.test.fidl");
-  library.ExpectFail(fidlc::ErrInvalidLayoutClass);
+  library.ExpectFail(ErrInvalidLayoutClass);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -790,9 +779,8 @@ type Foo = struct {
   data strict uint32;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotSpecifyModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrCannotSpecifyModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -806,9 +794,8 @@ type Foo = struct {
   data strict Bar:optional;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotSpecifyModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrCannotSpecifyModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -820,16 +807,15 @@ type t1 = union { 1: foo uint8; };
 type t2 = strict t1;
 )FIDL");
 
-  library.ExpectFail(fidlc::ErrCannotSpecifyModifier,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Subkind::kStrict),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kIdentifier));
+  library.ExpectFail(ErrCannotSpecifyModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
+                     Token::KindAndSubkind(Token::Kind::kIdentifier));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadIdentifierAttributes) {
   TestLibrary library;
   library.AddFile("bad/fi-0022.test.fidl");
-  library.ExpectFail(fidlc::ErrCannotAttachAttributeToIdentifier);
+  library.ExpectFail(ErrCannotAttachAttributeToIdentifier);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -843,14 +829,14 @@ type Foo = struct {
   data @foo Bar:optional;
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrCannotAttachAttributeToIdentifier);
+  library.ExpectFail(ErrCannotAttachAttributeToIdentifier);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadTypeDeclarationOfEnumLayoutWithInvalidSubtype) {
   TestLibrary library;
   library.AddFile("bad/fi-0013.test.fidl");
-  library.ExpectFail(fidlc::ErrInvalidWrappedType);
+  library.ExpectFail(ErrInvalidWrappedType);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -863,19 +849,18 @@ type Foo = struct {
 };
 )FIDL");
 
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kNumericLiteral),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kRightAngle));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kNumericLiteral),
+                     Token::KindAndSubkind(Token::Kind::kRightAngle));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadMissingEqualsValueEnum) {
   TestLibrary library;
   library.AddFile("bad/fi-0008.test.fidl");
-  library.ExpectFail(fidlc::ErrUnexpectedTokenOfKind,
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kSemicolon),
-                     fidlc::Token::KindAndSubkind(fidlc::Token::Kind::kEqual));
+  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kSemicolon),
+                     Token::KindAndSubkind(Token::Kind::kEqual));
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace
+}  // namespace fidlc

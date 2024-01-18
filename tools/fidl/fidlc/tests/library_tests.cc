@@ -9,6 +9,7 @@
 #include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 TEST(LibraryTests, GoodLibraryMultipleFiles) {
@@ -24,8 +25,9 @@ TEST(LibraryTests, BadFilesDisagreeOnLibraryName) {
   library.AddFile("bad/fi-0040-a.test.fidl");
   library.AddFile("bad/fi-0040-b.test.fidl");
 
-  library.ExpectFail(fidlc::ErrFilesDisagreeOnLibraryName);
+  library.ExpectFail(ErrFilesDisagreeOnLibraryName);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace
+}  // namespace fidlc

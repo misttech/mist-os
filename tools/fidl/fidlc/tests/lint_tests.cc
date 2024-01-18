@@ -8,6 +8,7 @@
 #include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 using ::testing::HasSubstr;
@@ -278,7 +279,7 @@ closed protocol Example {
   Foo();
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrFlexibleOneWayMethodInClosedProtocol, "one-way method");
+  library.ExpectFail(ErrFlexibleOneWayMethodInClosedProtocol, "one-way method");
   ASSERT_COMPILER_DIAGNOSTICS(library);
   ASSERT_FALSE(library.Lint({.included_check_ids = {"explicit-flexible-method-modifier"}}));
   ASSERT_WARNINGS(1, library, "Foo must have an explicit 'flexible' modifier");
@@ -294,9 +295,10 @@ closed protocol Example {
   -> OnFoo();
 };
 )FIDL");
-  library.ExpectFail(fidlc::ErrFlexibleOneWayMethodInClosedProtocol, "event");
+  library.ExpectFail(ErrFlexibleOneWayMethodInClosedProtocol, "event");
   ASSERT_COMPILER_DIAGNOSTICS(library);
   ASSERT_FALSE(library.Lint({.included_check_ids = {"explicit-flexible-method-modifier"}}));
   ASSERT_WARNINGS(1, library, "OnFoo must have an explicit 'flexible' modifier");
 }
 }  // namespace
+}  // namespace fidlc

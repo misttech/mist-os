@@ -10,6 +10,7 @@
 // resulting from a versioned library and its manually decomposed equivalents.
 // See also versioning_tests.cc and availability_interleaving_tests.cc.
 
+namespace fidlc {
 namespace {
 
 // Returns true if str starts with prefix.
@@ -1819,3 +1820,4 @@ type Bar = struct {};
 }
 
 }  // namespace
+}  // namespace fidlc

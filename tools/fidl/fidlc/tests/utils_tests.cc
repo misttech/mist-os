@@ -11,7 +11,6 @@
 #include "tools/fidl/fidlc/src/utils.h"
 
 namespace fidlc {
-
 namespace {
 
 void compare_id_to_words(std::string_view id, std::string_view expected_lowercase_words) {
@@ -759,5 +758,4 @@ TEST(UtilsTests, StringLiteralLength) {
 }
 
 }  // namespace
-
 }  // namespace fidlc

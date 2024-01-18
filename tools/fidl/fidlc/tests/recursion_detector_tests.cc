@@ -6,14 +6,13 @@
 
 #include "tools/fidl/fidlc/src/recursion_detector.h"
 
+namespace fidlc {
 namespace {
 
 // These objects exist solely so that the test code below can get a pointer to their address,
 // which is passed into RecursionDetector.Enter().
 int object;
 int object2;
-
-}  // namespace
 
 TEST(RecursionDetector, EnterSameObjectTwiceResultsInNoGuard) {
   RecursionDetector rd;
@@ -44,3 +43,6 @@ TEST(RecursionDetector, GuardObjectPopsSeenObjectsOnScopeExit) {
     ASSERT_TRUE(new_guard2.has_value());
   }
 }
+
+}  // namespace
+}  // namespace fidlc

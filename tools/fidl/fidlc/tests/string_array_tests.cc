@@ -6,6 +6,7 @@
 
 #include "tools/fidl/fidlc/tests/test_library.h"
 
+namespace fidlc {
 namespace {
 
 const char* good_library_source = R"FIDL(library example;
@@ -17,13 +18,13 @@ type S = struct {
 
 TEST(StringArrayTests, GoodNonzeroSizeArray) {
   TestLibrary library(good_library_source);
-  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
+  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
   ASSERT_COMPILED(library);
 }
 
 TEST(StringArrayTests, BadNoExperimentalFlag) {
   TestLibrary library(good_library_source);
-  library.ExpectFail(fidlc::ErrExperimentalZxCTypesDisallowed, "string_array");
+  library.ExpectFail(ErrExperimentalZxCTypesDisallowed, "string_array");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -34,8 +35,8 @@ type S = struct {
     arr string_array<0>;
 };
 )FIDL");
-  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
-  library.ExpectFail(fidlc::ErrMustHaveNonZeroSize, "string_array");
+  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.ExpectFail(ErrMustHaveNonZeroSize, "string_array");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -47,8 +48,8 @@ type S = struct {
     arr string_array;
 };
 )FIDL");
-  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
-  library.ExpectFail(fidlc::ErrWrongNumberOfLayoutParameters, "string_array", 1, 0);
+  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.ExpectFail(ErrWrongNumberOfLayoutParameters, "string_array", 1, 0);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -60,9 +61,10 @@ type S = struct {
     arr string_array<10>:optional;
 };
 )FIDL");
-  library.EnableFlag(fidlc::ExperimentalFlags::Flag::kZxCTypes);
-  library.ExpectFail(fidlc::ErrCannotBeOptional, "string_array");
+  library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
+  library.ExpectFail(ErrCannotBeOptional, "string_array");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace
+}  // namespace fidlc
