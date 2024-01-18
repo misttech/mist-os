@@ -361,6 +361,9 @@ fxl::RefPtr<VulkanDeviceQueues> VulkanDeviceQueues::New(VulkanInstancePtr instan
   // vma_gpu_allocator to function.
   params.required_extension_names.insert(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
 
+  // Required for use of image barrier queue family index VK_QUEUE_FAMILY_FOREIGN_EXT
+  params.required_extension_names.insert(VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME);
+
   // If the params contain a surface, then ensure that the swapchain extension
   // is supported so that we can render to that surface.
   if (params.surface) {
