@@ -112,9 +112,6 @@ arch::HartMask riscv64_cpu_mask_to_hart_mask(cpu_mask_t cmask) {
 void arch_mp_send_ipi(const mp_ipi_target_t target, cpu_mask_t cpu_mask, const mp_ipi_t ipi) {
   LTRACEF("target %d mask %#x, ipi %d\n", target, cpu_mask, ipi);
 
-  arch::HartMask hart_mask = 0;
-  arch::HartMaskBase hart_mask_base = 0;
-
   // translate the high level target + mask mechanism into just a mask
   switch (target) {
     case MP_IPI_TARGET_ALL:
@@ -129,8 +126,20 @@ void arch_mp_send_ipi(const mp_ipi_target_t target, cpu_mask_t cpu_mask, const m
       DEBUG_ASSERT(0);
   }
 
+  // no need to continue if the computed mask is 0
+  if (cpu_mask == 0) {
+    return;
+  }
+
+  // try to use the pdev based interrupt method first, otherwise fall back to SBI
+  if (interrupt_send_ipi(cpu_mask, ipi) == ZX_OK) {
+    return;
+  }
+
   // translate the cpu mask to a list of harts and set the hart mask and set the
   // pending ipi bit in the per cpu struct
+  arch::HartMask hart_mask = 0;
+  arch::HartMaskBase hart_mask_base = 0;
   for_every_hart_in_cpu_mask(cpu_mask, [&hart_mask, ipi](arch::HartId hart, cpu_num_t cpu) {
     // record a pending hart to notify
     hart_mask |= (1UL << hart);

@@ -102,7 +102,9 @@ static zx_status_t default_set_affinity(unsigned int vector, cpu_mask_t mask) {
 static bool default_is_valid(unsigned int vector, uint32_t flags) { return false; }
 static unsigned int default_remap(unsigned int vector) { return 0; }
 
-static void default_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {}
+static zx_status_t default_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
 
 static void default_init_percpu_early() {}
 
@@ -194,7 +196,9 @@ bool is_valid_interrupt(unsigned int vector, uint32_t flags) {
 
 unsigned int remap_interrupt(unsigned int vector) { return intr_ops->remap(vector); }
 
-void interrupt_send_ipi(cpu_mask_t target, mp_ipi_t ipi) { intr_ops->send_ipi(target, ipi); }
+zx_status_t interrupt_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {
+  return intr_ops->send_ipi(target, ipi);
+}
 
 void interrupt_init_percpu() { intr_ops->init_percpu(); }
 

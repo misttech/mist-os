@@ -313,7 +313,7 @@ static void gic_handle_irq(iframe_t* frame) {
   LTRACEF_LEVEL(2, "cpu %u exit\n", arch_curr_cpu_num());
 }
 
-static void gic_send_ipi(cpu_mask_t logical_target, mp_ipi_t ipi) {
+static zx_status_t gic_send_ipi(cpu_mask_t logical_target, mp_ipi_t ipi) {
   const cpu_mask_t target = mask_translator.LogicalMaskToGic(logical_target);
 
   uint gic_ipi_num = ipi + ipi_base;
@@ -322,6 +322,8 @@ static void gic_send_ipi(cpu_mask_t logical_target, mp_ipi_t ipi) {
     LTRACEF("target 0x%x, gic_ipi %u\n", target, gic_ipi_num);
     arm_gic_sgi(gic_ipi_num, ARM_GIC_SGI_FLAG_NS, target);
   }
+
+  return ZX_OK;
 }
 
 static void arm_ipi_halt_handler(void*) {

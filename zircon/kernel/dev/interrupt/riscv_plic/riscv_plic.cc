@@ -192,7 +192,7 @@ void plic_handle_irq(iframe_t* frame) {
   // ktrace_tiny(TAG_IRQ_EXIT, (vector << 8) | cpu);
 }
 
-void plic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) { PANIC_UNIMPLEMENTED; }
+zx_status_t plic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) { return ZX_ERR_NOT_SUPPORTED; }
 
 void plic_init_percpu() {
   const uint32_t curr_hart = riscv64_curr_hart_id();
