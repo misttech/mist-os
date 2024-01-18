@@ -2,7 +2,7 @@
 
 This directory contains the source code for a rewrite of `fx test`.
 
-This tool is ready for early use, but many features are still missing.
+This tool is ready for general use.
 
 For the current status, see [b/293917801](http://b/293917801) and its dependencies.
 
@@ -24,7 +24,7 @@ fx --disable=legacy_fxtest test
 
 ## Roadmap
 
-Current Status: **Fishfood release (2)**.
+Current Status: **General Adoption (3)**.
 
 1. Work in progress
 
@@ -35,14 +35,14 @@ Current Status: **Fishfood release (2)**.
    It is **not** feature complete and does not meet the requirements
    of Fuchsia testing.
 
-1. **"Fishfood" release**
+1. "Early Adoption" release
 
    The new implementation roughly has the features necessary to
    do testing for Fuchsia. It is still missing critical features,
    but we want an initial set of users trying it for more of their
    testing workflows.
 
-1. "Dogfood" release
+1. **"General Adoption" release**
 
    The new implementation meets or exceeds feature parity with the
    old implementation, and we encourage all developers to disable
@@ -90,7 +90,7 @@ For example:
 ```bash
 fx set core.x64 --with //scripts/fxtest/rewrite:tests
 
-# This, ironically, does not yet work with the new implementation!
+# This should work with the new implementation!
 fx test --host
 ```
 

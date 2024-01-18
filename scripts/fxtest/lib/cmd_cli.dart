@@ -76,7 +76,7 @@ class FuchsiaTestCommandCli {
 
   Future<void> run() async {
     print('Want to try something new? 🤔\n' +
-        'The rewrite of `fx test` is in Fishfood. 🐟\n' +
+        'The rewrite of `fx test` is ready for general use. 🎉\n' +
         'Learn more: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/scripts/fxtest/rewrite');
 
     _cmd = createCommand();
