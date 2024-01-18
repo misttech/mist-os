@@ -4,20 +4,8 @@
 """Abstract base class for Screenshot affordance."""
 
 import abc
-from dataclasses import dataclass
 
-from honeydew.interfaces.affordances.ui import custom_types
-
-
-@dataclass
-class ScreenshotImage:
-    """Image from screenshot and the size of image
-
-    The format is 32bit BGRA pixels in sRGB color space.
-    """
-
-    size: custom_types.Size
-    data: bytes
+from honeydew.typing.screenshot_image import ScreenshotImage
 
 
 class Screenshot(abc.ABC):

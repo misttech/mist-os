@@ -13,7 +13,9 @@ from typing import Any, Callable
 
 from honeydew import custom_types, errors
 from honeydew.affordances.ffx import session as session_ffx
+from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.interfaces.affordances import session
+from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -33,6 +35,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 class BaseFuchsiaDevice(
     fuchsia_device.FuchsiaDevice,
     affordances_capable.RebootCapableDevice,
+    affordances_capable.ScreenshotCapableDevice,
     affordances_capable.SessionCapableDevice,
     transports_capable.FastbootCapableDevice,
     transports_capable.FFXCapableDevice,
@@ -180,6 +183,15 @@ class BaseFuchsiaDevice(
             target_ip_port=self._ip_address_port,
         )
         return ffx_obj
+
+    @properties.Affordance
+    def screenshot(self) -> screenshot.Screenshot:
+        """Returns a screenshot affordance object.
+
+        Returns:
+            screenshot.Screenshot object
+        """
+        return screenshot_ffx.Screenshot(self.ffx)
 
     @properties.Transport
     def ssh(self) -> ssh_transport.SSH:

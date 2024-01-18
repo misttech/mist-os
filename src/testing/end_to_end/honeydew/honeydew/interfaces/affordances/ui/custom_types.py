@@ -5,14 +5,16 @@
 
 from dataclasses import dataclass
 
+# TODO(b/320551643): Move to honeydew.typing.ui
 
-@dataclass
+
+@dataclass(frozen=True)
 class Coordinate:
     x: int
     y: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class Size:
     width: int
     height: int

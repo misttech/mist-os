@@ -53,6 +53,8 @@ if (is_host) {
   #         NUC
   #             That require SL4F transport
   #             That does not require SL4F transport
+  # See https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/functional_tests/#cq-vs-ci-vs-fyi
+  # for test distribution rules.
   group("stable_emulator_sl4f_tests") {
     testonly = true
     public_deps = [
@@ -105,7 +107,10 @@ if (is_host) {
 
   group("unstable_emulator_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [
+      # TODO(b/296163699): Promote to stable after 200 runs.
+      "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
+    ]
   }
 
   group("unstable_vim3_sl4f_tests") {

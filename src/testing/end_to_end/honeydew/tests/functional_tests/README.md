@@ -274,6 +274,12 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_te
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_ui:user_input_test_sl4f --e2e --output
 ```
 
+```shell
+$ fx set workbench_eng.x64 --with //src/testing/end_to_end/honeydew/tests/functional_tests
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_ui:screenshot_test_ffx --e2e --output
+```
+
 ### Session tests
 ```shell
 $ fx set workbench_eng.qemu-x64 --with //src/testing/end_to_end/honeydew/tests/functional_tests

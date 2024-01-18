@@ -17,7 +17,6 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_sl4f,
 )
-from honeydew.affordances.sl4f.ui import screenshot as screenshot_sl4f
 from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
 from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
@@ -28,9 +27,6 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
 )
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_interface,
-)
-from honeydew.interfaces.affordances.ui import (
-    screenshot as screenshot_interface,
 )
 from honeydew.interfaces.affordances.ui import (
     user_input as user_input_interface,
@@ -68,7 +64,6 @@ class FuchsiaDevice(
     base_fuchsia_device.BaseFuchsiaDevice,
     affordances_capable.BluetoothAvrcpCapableDevice,
     affordances_capable.BluetoothGapCapableDevice,
-    affordances_capable.ScreenshotCapableDevice,
     affordances_capable.TracingCapableDevice,
     affordances_capable.WlanPolicyCapableDevice,
     affordances_capable.WlanCapableDevice,
@@ -144,15 +139,6 @@ class FuchsiaDevice(
         return bluetooth_gap_sl4f.BluetoothGap(
             device_name=self.device_name, sl4f=self.sl4f, reboot_affordance=self
         )
-
-    @properties.Affordance
-    def screenshot(self) -> screenshot_interface.Screenshot:
-        """Returns a screenshot affordance object.
-
-        Returns:
-            screenshot.Screenshot object
-        """
-        return screenshot_sl4f.Screenshot(sl4f=self.sl4f)
 
     @properties.Affordance
     def tracing(self) -> tracing_interface.Tracing:

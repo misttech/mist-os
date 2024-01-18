@@ -11,9 +11,19 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
+
+  python_host_test("screenshot_ffx_test") {
+    main_source = "screenshot_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
 }
 
 group("tests") {
   testonly = true
-  public_deps = [ ":session_ffx_test($host_toolchain)" ]
+  public_deps = [
+    ":screenshot_ffx_test($host_toolchain)",
+    ":session_ffx_test($host_toolchain)",
+  ]
 }

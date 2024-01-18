@@ -27,7 +27,7 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_interface,
 )
-from honeydew.interfaces.affordances.ui import screenshot, user_input
+from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import (
@@ -69,7 +69,6 @@ class FuchsiaDevice(
     base_fuchsia_device.BaseFuchsiaDevice,
     affordances_capable.BluetoothAvrcpCapableDevice,
     affordances_capable.BluetoothGapCapableDevice,
-    affordances_capable.ScreenshotCapableDevice,
     affordances_capable.TracingCapableDevice,
     affordances_capable.UserInputCapableDevice,
     affordances_capable.WlanPolicyCapableDevice,
@@ -143,15 +142,6 @@ class FuchsiaDevice(
 
         Returns:
             bluetooth_gap.BluetoothGap object
-        """
-        raise NotImplementedError
-
-    @properties.Affordance
-    def screenshot(self) -> screenshot.Screenshot:
-        """Returns a screenshot affordance object.
-
-        Returns:
-            screenshot.Screenshot object
         """
         raise NotImplementedError
 
