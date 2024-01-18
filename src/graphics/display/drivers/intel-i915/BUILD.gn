@@ -108,7 +108,7 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//src/lib/fsl",
+    "//src/lib/fxl",
     "//src/lib/zbitl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
@@ -125,10 +125,7 @@ source_set("common_srcs") {
 
 fuchsia_driver("intel-i915-driver") {
   output_name = "intel-i915"
-  deps = [
-    ":common_srcs",
-    "//sdk/lib/syslog/cpp:backend",
-  ]
+  deps = [ ":common_srcs" ]
 }
 
 fuchsia_driver_component("intel-i915") {
@@ -196,6 +193,7 @@ test("intel-i915-test") {
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-range",
+    "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",

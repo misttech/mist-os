@@ -20,7 +20,6 @@ fuchsia_driver("coordinator-driver") {
   ]
   deps = [
     ":shared",
-    "//sdk/lib/syslog/cpp:backend",
     "//src/devices/lib/driver",
   ]
 }
@@ -90,7 +89,6 @@ source_set("shared") {
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/lib/eld",
-    "//src/lib/fsl",
     "//src/media/audio/drivers/lib/audio-proto-utils",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

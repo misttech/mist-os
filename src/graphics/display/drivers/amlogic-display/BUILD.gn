@@ -101,7 +101,7 @@ source_set("common_srcs") {
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
-    "//src/lib/fsl",
+    "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/bitmap",
@@ -126,10 +126,7 @@ source_set("common_srcs") {
 
 fuchsia_driver("amlogic-display-driver") {
   output_name = "amlogic-display"
-  deps = [
-    ":common_srcs",
-    "//sdk/lib/syslog/cpp:backend",
-  ]
+  deps = [ ":common_srcs" ]
 }
 
 fuchsia_driver_component("amlogic-display") {
@@ -167,6 +164,7 @@ test("amlogic-display-test") {
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-mmio-range",
     "//src/devices/testing/no_ddk",
+    "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/lib/testing/predicates",

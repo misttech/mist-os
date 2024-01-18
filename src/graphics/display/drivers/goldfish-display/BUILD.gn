@@ -26,7 +26,6 @@ fuchsia_driver("goldfish-display-driver") {
   deps = [
     ":common",
     ":goldfish-display-bind",
-    "//sdk/lib/syslog/cpp:backend",
     "//src/devices/lib/driver",
   ]
 
@@ -89,7 +88,6 @@ test("goldfish-unittests") {
     ":goldfish-display-bind",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
     "//sdk/lib/fdio",
-    "//sdk/lib/syslog/cpp:backend",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",

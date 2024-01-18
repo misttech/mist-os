@@ -43,7 +43,7 @@ source_set("common_srcs") {
     "//sdk/lib/driver/devfs/cpp",
     "//src/devices/bus/lib/virtio",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/fsl",
+    "//src/lib/fxl",
     "//zircon/system/ulib/sysmem-version",
   ]
 }
@@ -57,7 +57,6 @@ fuchsia_driver("virtio_gpu-driver") {
   deps = [
     ":common_srcs",
     ":virtio_gpu_bind",
-    "//sdk/lib/syslog/cpp:backend",
   ]
 }
 
@@ -91,6 +90,7 @@ test("virtio-gpu-test") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/component/cpp:cpp_test",
     "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/devices/testing/fake-bti",
     "//src/graphics/display/lib/api-types-cpp:api-types-cpp",
     "//src/lib/fxl/test:gtest_main",
