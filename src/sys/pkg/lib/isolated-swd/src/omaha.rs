@@ -143,7 +143,7 @@ mod tests {
         super::*,
         crate::updater::for_tests::{UpdaterBuilder, UpdaterForTest, UpdaterResult},
         anyhow::Context,
-        fuchsia_pkg_testing::PackageBuilder,
+        fuchsia_pkg_testing::{make_current_epoch_json, PackageBuilder},
         fuchsia_zircon as zx,
         mock_paver::{hooks as mphooks, PaverEvent},
         omaha_client::http_request::mock::MockHttpRequest,
@@ -285,9 +285,13 @@ mod tests {
             .paver(|p| p.insert_hook(mphooks::return_error(hook)))
             .repo_url(TEST_REPO_URL)
             .add_package(test_package)
-            .fuchsia_image(data.to_vec(), Some(data.to_vec()))
-            .recovery_image(data.to_vec(), Some(data.to_vec()));
-        Ok(updater.build().await)
+            .add_image("zbi.signed", data)
+            .add_image("fuchsia.vbmeta", data)
+            .add_image("recovery", data)
+            .add_image("epoch.json", make_current_epoch_json().as_bytes())
+            .add_image("recovery.vbmeta", data);
+        let updater = updater.build().await;
+        Ok(updater)
     }
 
     #[fuchsia::test]
@@ -319,6 +323,8 @@ mod tests {
     }
 
     async fn build_updater_with_broken_paver() -> UpdaterForTest {
+        let data = "hello world!".as_bytes();
+
         // Simulate the paver being completely broken, which means that installation should fail.
         let hook = |_p: &PaverEvent| zx::Status::INTERNAL;
 
@@ -326,7 +332,7 @@ mod tests {
             .await
             .paver(|p| p.insert_hook(mphooks::return_error(hook)))
             .repo_url(TEST_REPO_URL)
-            .fuchsia_image(b"zbi-contents".to_vec(), None);
+            .add_image("zbi.signed", data);
 
         updater.build().await
     }

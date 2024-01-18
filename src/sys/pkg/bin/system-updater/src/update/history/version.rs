@@ -13,7 +13,7 @@ use {
     serde::{Deserialize, Serialize},
     std::{convert::TryInto as _, str::FromStr},
     tracing::{error, info, warn},
-    update_package::{ImagePackagesSlots, SystemVersion, UpdatePackage},
+    update_package::{ImagePackagesSlots, ImageType, SystemVersion, UpdatePackage},
 };
 
 /// The version of the OS.
@@ -84,26 +84,49 @@ impl Version {
                 "".to_string()
             });
 
-        let (vbmeta_hash, zbi_hash) = match update_package.image_packages().await {
+        let mut vbmeta_hash = "".to_string();
+        let mut zbi_hash = "".to_string();
+
+        match update_package.image_packages().await {
             Ok(image_package_manifest) => {
                 let manifest: ImagePackagesSlots = image_package_manifest.into();
                 if let Some(fuchsia) = manifest.fuchsia() {
-                    (
-                        fuchsia.vbmeta().map(|v| v.hash().to_string()).unwrap_or_else(|| "".into()),
-                        fuchsia.zbi().hash().to_string(),
-                    )
-                } else {
-                    ("".into(), "".into())
+                    zbi_hash = fuchsia.zbi().hash().to_string();
+                    if let Some(vbmeta) = fuchsia.vbmeta() {
+                        vbmeta_hash = vbmeta.hash().to_string();
+                    }
                 }
             }
-            Err(e) => {
-                error!(
-                    "Failed to parse images manifest while obtaining hashes for version: {:#}",
-                    anyhow!(e)
-                );
-                ("".into(), "".into())
+            Err(err) => {
+                if !matches!(err, update_package::ImagePackagesError::NotFound) {
+                    error!(
+                        "Failed to parse images manifest, trying to use inline images: {:#}",
+                        anyhow!(err)
+                    );
+                }
+
+                vbmeta_hash =
+                    get_image_hash_from_update_package(update_package, ImageType::FuchsiaVbmeta)
+                        .await
+                        .unwrap_or_else(|e| {
+                            error!("Failed to read vbmeta hash: {:#}", anyhow!(e));
+                            "".to_string()
+                        });
+                zbi_hash = match get_image_hash_from_update_package(update_package, ImageType::Zbi)
+                    .await
+                {
+                    Ok(v) => v,
+                    Err(_) => {
+                        get_image_hash_from_update_package(update_package, ImageType::ZbiSigned)
+                            .await
+                            .unwrap_or_else(|e| {
+                                error!("Failed to read zbi hash: {:#}", anyhow!(e));
+                                "".to_string()
+                            })
+                    }
+                };
             }
-        };
+        }
 
         let build_version = update_package.version().await.unwrap_or_else(|e| {
             error!("Failed to read build version: {:#}", anyhow!(e));
@@ -217,6 +240,14 @@ async fn get_system_image_hash_from_update_package(
     Ok(system_image.hash().to_string())
 }
 
+async fn get_image_hash_from_update_package(
+    update_package: &UpdatePackage,
+    image: ImageType,
+) -> Result<String, anyhow::Error> {
+    let buffer = update_package.open_image(&update_package::Image::new(image, None)).await?;
+    sha256_hash_with_no_trailing_zeros(buffer)
+}
+
 async fn get_vbmeta_and_zbi_hash_from_environment(
     data_sink: &DataSinkProxy,
     boot_manager: &BootManagerProxy,
@@ -268,6 +299,39 @@ mod tests {
         assert_eq!(
             Version::for_update_package(&update_pkg).await,
             Version { epoch: "0".to_string(), ..Version::default() }
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn version_for_valid_update_package_v1() {
+        let update_pkg = FakeUpdatePackage::new()
+            .hash("2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4")
+            .await
+            .add_package("fuchsia-pkg://fuchsia.test/system_image/0?hash=838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67")
+            .await
+            .add_file("fuchsia.vbmeta", "vbmeta")
+            .await
+            .add_file("zbi", "zbi")
+            .await
+            .add_file("version", "1.2.3.4")
+            .await
+            .add_file("epoch.json", make_epoch_json(42)).await;
+        assert_eq!(
+            Version::for_update_package(&update_pkg).await,
+            Version {
+                update_hash: "2937013f2181810606b2a799b05bda2849f3e369a20982a4138f0e0a55984ce4"
+                    .to_string(),
+                system_image_hash:
+                    "838b5199d12c8ff4ef92bfd9771d2f8781b7b8fd739dd59bcf63f353a1a93f67".to_string(),
+                vbmeta_hash: "a0c6f07a4b3a17fb9348db981de3c5602e2685d626599be1bd909195c694a57b"
+                    .to_string(),
+                // Should be "a7124150e065aa234710ab3875230f17deb36a9249938e11f2f3656954412ab8"
+                // See comment in sha256_hash_removed_trailing_zeros test.
+                zbi_hash: "a7124150e065aa234710ab387523f17deb36a9249938e11f2f3656954412ab8"
+                    .to_string(),
+                build_version: SystemVersion::Semantic(SemanticVersion::from([1, 2, 3, 4])),
+                epoch: "42".to_string(),
+            }
         );
     }
 

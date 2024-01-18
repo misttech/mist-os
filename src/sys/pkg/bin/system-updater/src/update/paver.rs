@@ -12,7 +12,7 @@ use {
     fuchsia_zircon::{Status, VmoChildOptions},
     thiserror::Error,
     tracing::{info, warn},
-    update_package::{Image, ImageClass},
+    update_package::{Image, ImageClass, UpdatePackage},
 };
 
 mod configuration;
@@ -123,12 +123,12 @@ fn classify_image(
     Ok(target)
 }
 
-struct Payload {
-    display_name: String,
+struct Payload<'a> {
+    display_name: &'a str,
     buffer: Buffer,
 }
 
-impl Payload {
+impl Payload<'_> {
     fn clone_buffer(&self) -> Result<Buffer, Status> {
         Ok(Buffer {
             vmo: self.buffer.vmo.create_child(
@@ -147,7 +147,7 @@ async fn write_asset_to_configurations(
     data_sink: &DataSinkProxy,
     configuration: TargetConfiguration,
     asset: Asset,
-    payload: Payload,
+    payload: Payload<'_>,
 ) -> Result<(), Error> {
     match configuration {
         TargetConfiguration::Single(configuration) => {
@@ -179,7 +179,7 @@ async fn write_firmware_to_configurations(
     data_sink: &DataSinkProxy,
     configuration: TargetConfiguration,
     subtype: &str,
-    payload: Payload,
+    payload: Payload<'_>,
 ) -> Result<(), Error> {
     match configuration {
         TargetConfiguration::Single(configuration) => {
@@ -209,10 +209,7 @@ pub async fn write_image_buffer(
     desired_config: NonCurrentConfiguration,
 ) -> Result<(), Error> {
     let target = classify_image(image, desired_config)?;
-    let payload = Payload {
-        display_name: format!("{}: {:?}", image.imagetype().name(), image.subtype()),
-        buffer,
-    };
+    let payload = Payload { display_name: image.name(), buffer };
 
     match target {
         ImageTarget::Firmware { subtype, configuration } => {
@@ -439,6 +436,31 @@ pub async fn set_recovery_configuration_active(
         .await
         .context("while marking Configuration::B unbootable")?;
     Ok(())
+}
+
+/// Write the given `image` from the update package through the paver to the appropriate
+/// partitions.
+pub async fn write_image(
+    data_sink: &DataSinkProxy,
+    update_pkg: &UpdatePackage,
+    image: &Image,
+    desired_config: NonCurrentConfiguration,
+) -> Result<(), Error> {
+    let buffer = update_pkg
+        .open_image(image)
+        .await
+        .with_context(|| format!("error opening {}", image.name()))?;
+
+    info!("writing {} from update package", image.name());
+
+    let res = write_image_buffer(data_sink, buffer, image, desired_config)
+        .await
+        .with_context(|| format!("error writing {}", image.name()));
+
+    if let Ok(()) = &res {
+        info!("wrote {} successfully", image.name());
+    }
+    res
 }
 
 pub async fn paver_flush_boot_manager(boot_manager: &BootManagerProxy) -> Result<(), Error> {
