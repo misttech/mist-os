@@ -51,7 +51,6 @@ source_set("codec_impl") {
     "//sdk/lib/fit",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/stdcompat",
-    "//src/lib/fsl",
     "//src/lib/metrics_buffer",
     "//src/media/lib/metrics",
     "//src/media/lib/mpsc_queue",

@@ -67,6 +67,7 @@ executable("decryptor_adapter_tests_bin") {
     "//sdk/lib/fit",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp",
+    "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
     "//src/media/lib/codec_impl",
