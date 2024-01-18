@@ -52,6 +52,14 @@ type Config = struct {
     baud_rate uint32;
 };
 
+type SerialPortInfo = struct {
+    serial_class Class;
+    /// Vendor and product ID of hardware attached to this serial port,
+    /// or zero if not applicable.
+    serial_vid uint32;
+    serial_pid uint32;
+};
+
 /// A serial device.
 closed protocol Device {
     /// Lookup what type of serial device this is.

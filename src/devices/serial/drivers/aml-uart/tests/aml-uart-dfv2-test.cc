@@ -50,7 +50,13 @@ class Environment {
     zx_status_t status = compat_server_.Serve(dispatcher, &test_environment_.incoming_directory());
     ZX_ASSERT(status == ZX_OK);
 
+    outgoing_client_ = std::move(start_args_result->outgoing_directory_client);
+
     return std::move(start_args_result.value().start_args);
+  }
+
+  fidl::ClientEnd<fuchsia_io::Directory> TakeOutgoingClient() {
+    return std::move(outgoing_client_);
   }
 
  private:
@@ -58,6 +64,7 @@ class Environment {
   fake_pdev::FakePDevFidl pdev_server_;
   fdf_testing::TestEnvironment test_environment_;
   compat::DeviceServer compat_server_;
+  fidl::ClientEnd<fuchsia_io::Directory> outgoing_client_;
 };
 
 class AmlUartHarness : public zxtest::Test {
@@ -83,9 +90,23 @@ class AmlUartHarness : public zxtest::Test {
 
   serial::AmlUart& Device() { return dut_->aml_uart_for_testing(); }
 
+  fidl::ClientEnd<fuchsia_io::Directory> CreateDriverSvcClient() {
+    auto driver_outgoing = env_.SyncCall(&Environment::TakeOutgoingClient);
+    // Open the svc directory in the driver's outgoing, and store a client to it.
+    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
+    zx_status_t status = fdio_open_at(driver_outgoing.handle()->get(), "/svc",
+                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                      svc_endpoints->server.TakeChannel().release());
+    EXPECT_EQ(ZX_OK, status);
+    return std::move(svc_endpoints->client);
+  }
+
   DeviceState& device_state() { return state_; }
 
   async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
+
+  fdf_testing::DriverRuntime& runtime() { return runtime_; }
 
  private:
   fdf_testing::DriverRuntime runtime_;
@@ -102,6 +123,31 @@ TEST_F(AmlUartHarness, SerialImplAsyncGetInfo) {
   ASSERT_EQ(info.serial_class, fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci));
   ASSERT_EQ(info.serial_pid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458);
   ASSERT_EQ(info.serial_vid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM);
+}
+
+TEST_F(AmlUartHarness, SerialImplAsyncGetInfoFromDriverService) {
+  zx::result driver_connect_result =
+      fdf::internal::DriverTransportConnect<fuchsia_hardware_serialimpl::Service::Device>(
+          CreateDriverSvcClient(), "aml-uart");
+  ASSERT_EQ(ZX_OK, driver_connect_result.status_value());
+  fdf::Arena arena('INFO');
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> device_client(
+      std::move(driver_connect_result.value()), fdf::Dispatcher::GetCurrent()->get());
+  device_client.buffer(arena)->GetInfo().Then(
+      [quit = runtime().QuitClosure()](
+          fdf::WireUnownedResult<fuchsia_hardware_serialimpl::Device::GetInfo>& result) {
+        ASSERT_EQ(ZX_OK, result.status());
+        ASSERT_TRUE(result.value().is_ok());
+
+        auto res = result.value().value();
+        ASSERT_EQ(res->info.serial_class, fuchsia_hardware_serial::Class::kBluetoothHci);
+        ASSERT_EQ(res->info.serial_pid,
+                  bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458);
+        ASSERT_EQ(res->info.serial_vid,
+                  bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM);
+        quit();
+      });
+  runtime().Run();
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncConfig) {
@@ -173,6 +219,39 @@ TEST_F(AmlUartHarness, SerialImplReadAsync) {
   sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
 }
 
+TEST_F(AmlUartHarness, SerialImplReadDriverService) {
+  uint8_t data[kDataLen];
+  for (size_t i = 0; i < kDataLen; i++) {
+    data[i] = static_cast<uint8_t>(i);
+  }
+
+  zx::result driver_connect_result =
+      fdf::internal::DriverTransportConnect<fuchsia_hardware_serialimpl::Service::Device>(
+          CreateDriverSvcClient(), "aml-uart");
+  ASSERT_EQ(ZX_OK, driver_connect_result.status_value());
+  fdf::Arena arena('READ');
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> device_client(
+      std::move(driver_connect_result.value()), fdf::Dispatcher::GetCurrent()->get());
+
+  device_client.buffer(arena)->Enable(true).Then(
+      [quit = runtime().QuitClosure()](auto& res) { quit(); });
+  runtime().Run();
+
+  device_client.buffer(arena)->Read().Then(
+      [quit = runtime().QuitClosure(),
+       data](fdf::WireUnownedResult<fuchsia_hardware_serialimpl::Device::Read>& result) {
+        ASSERT_EQ(ZX_OK, result.status());
+        ASSERT_TRUE(result.value().is_ok());
+
+        auto res = result.value().value();
+        EXPECT_EQ(res->data.count(), kDataLen);
+        EXPECT_EQ(memcmp(data, res->data.data(), res->data.count()), 0);
+        quit();
+      });
+  device_state().Inject(data, kDataLen);
+  runtime().Run();
+}
+
 TEST_F(AmlUartHarness, SerialImplWriteAsync) {
   ASSERT_OK(Device().SerialImplAsyncEnable(true));
   struct Context {
@@ -191,6 +270,38 @@ TEST_F(AmlUartHarness, SerialImplWriteAsync) {
   auto buf = device_state().TxBuf();
   ASSERT_EQ(buf.size(), kDataLen);
   ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
+}
+
+TEST_F(AmlUartHarness, SerialImplWriteDriverService) {
+  uint8_t data[kDataLen];
+  for (size_t i = 0; i < kDataLen; i++) {
+    data[i] = static_cast<uint8_t>(i);
+  }
+
+  zx::result driver_connect_result =
+      fdf::internal::DriverTransportConnect<fuchsia_hardware_serialimpl::Service::Device>(
+          CreateDriverSvcClient(), "aml-uart");
+  ASSERT_EQ(ZX_OK, driver_connect_result.status_value());
+  fdf::Arena arena('WRIT');
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> device_client(
+      std::move(driver_connect_result.value()), fdf::Dispatcher::GetCurrent()->get());
+
+  device_client.buffer(arena)->Enable(true).Then(
+      [quit = runtime().QuitClosure()](auto& res) { quit(); });
+  runtime().Run();
+
+  device_client.buffer(arena)
+      ->Write(fidl::VectorView<uint8_t>::FromExternal(data, kDataLen))
+      .Then([quit = runtime().QuitClosure()](
+                fdf::WireUnownedResult<fuchsia_hardware_serialimpl::Device::Write>& result) {
+        ASSERT_EQ(ZX_OK, result.status());
+        ASSERT_TRUE(result.value().is_ok());
+        quit();
+      });
+  runtime().Run();
+  auto buf = device_state().TxBuf();
+  ASSERT_EQ(buf.size(), kDataLen);
+  ASSERT_EQ(memcmp(buf.data(), data, buf.size()), 0);
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncWriteDoubleCallback) {

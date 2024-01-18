@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_DFV2_H_
 #define SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_DFV2_H_
 
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 
@@ -45,6 +46,7 @@ class AmlUartV2 : public fdf::DriverBase {
   std::optional<AmlUart> aml_uart_;
   std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
   compat::DeviceServer device_server_;
+  fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_impl_bindings_;
 };
 
 }  // namespace serial

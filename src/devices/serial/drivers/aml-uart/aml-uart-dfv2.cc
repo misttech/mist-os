@@ -8,6 +8,8 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/hardware/serialimpl/cpp/bind.h>
+
 namespace serial {
 
 namespace {
@@ -164,14 +166,35 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
     return;
   }
 
+  fuchsia_hardware_serialimpl::Service::InstanceHandler handler({
+      .device =
+          [this](fdf::ServerEnd<fuchsia_hardware_serialimpl::Device> server_end) {
+            serial_impl_bindings_.AddBinding(driver_dispatcher()->get(), std::move(server_end),
+                                             &aml_uart_.value(), fidl::kIgnoreBindingClosure);
+          },
+  });
+  zx::result<> add_result =
+      outgoing()->AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler), child_name);
+  if (add_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add fuchsia_hardware_serialimpl::Service %s",
+            add_result.status_string());
+    CompleteStart(add_result.take_error());
+    return;
+  }
+
+  auto offers = device_server_.CreateOffers();
+  offers.push_back(fdf::MakeOffer<fuchsia_hardware_serialimpl::Service>(child_name));
+
   fuchsia_driver_framework::NodeAddArgs args{
       {
           .name = std::string(child_name),
-          .offers = device_server_.CreateOffers(),
+          .offers = std::move(offers),
           .properties = {{
               fdf::MakeProperty(0x0001 /*BIND_PROTOCOL*/, ZX_PROTOCOL_SERIAL_IMPL_ASYNC),
               fdf::MakeProperty(0x0600 /*BIND_SERIAL_CLASS*/,
                                 aml_uart_->serial_port_info().serial_class),
+              fdf::MakeProperty(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
           }},
       },
   };

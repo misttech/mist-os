@@ -17,7 +17,46 @@
 
 #include "src/devices/serial/drivers/aml-uart/registers.h"
 
+namespace fhs = fuchsia_hardware_serial;
+namespace fhsi = fuchsia_hardware_serialimpl;
+
 namespace serial {
+namespace internal {
+
+fit::closure DriverTransportReadOperation::MakeCallback(zx_status_t status, void* buf, size_t len) {
+  return fit::closure(
+      [arena = std::move(arena_), completer = std::move(completer_), status, buf, len]() mutable {
+        if (status == ZX_OK) {
+          completer.buffer(arena).ReplySuccess(
+              fidl::VectorView<uint8_t>::FromExternal(static_cast<uint8_t*>(buf), len));
+        } else {
+          completer.buffer(arena).ReplyError(status);
+        }
+      });
+}
+
+fit::closure BanjoReadOperation::MakeCallback(zx_status_t status, void* buf, size_t len) {
+  return fit::closure([cb = callback_, cookie = cookie_, status, buf, len]() {
+    cb(cookie, status, reinterpret_cast<uint8_t*>(buf), len);
+  });
+}
+
+fit::closure DriverTransportWriteOperation::MakeCallback(zx_status_t status) {
+  return fit::closure(
+      [arena = std::move(arena_), completer = std::move(completer_), status]() mutable {
+        if (status == ZX_OK) {
+          completer.buffer(arena).ReplySuccess();
+        } else {
+          completer.buffer(arena).ReplyError(status);
+        }
+      });
+}
+
+fit::closure BanjoWriteOperation::MakeCallback(zx_status_t status) {
+  return fit::closure([cb = callback_, cookie = cookie_, status]() { cb(cookie, status); });
+}
+
+}  // namespace internal
 
 constexpr auto kMinBaudRate = 2;
 
@@ -229,14 +268,12 @@ zx_status_t AmlUart::SerialImplAsyncEnable(bool enable) {
 void AmlUart::SerialImplAsyncReadAsync(serial_impl_async_read_async_callback callback,
                                        void* cookie) {
   fbl::AutoLock lock(&read_lock_);
-  if (read_pending_) {
+  if (read_operation_ || banjo_read_operation_) {
     lock.release();
     callback(cookie, ZX_ERR_NOT_SUPPORTED, nullptr, 0);
     return;
   }
-  read_callback_ = callback;
-  read_cookie_ = cookie;
-  read_pending_ = true;
+  banjo_read_operation_.emplace(callback, cookie);
   lock.release();
   HandleRX();
 }
@@ -244,16 +281,14 @@ void AmlUart::SerialImplAsyncReadAsync(serial_impl_async_read_async_callback cal
 void AmlUart::SerialImplAsyncCancelAll() {
   {
     fbl::AutoLock read_lock(&read_lock_);
-    if (read_pending_) {
-      read_pending_ = false;
+    if (read_operation_ || banjo_read_operation_) {
       auto cb = MakeReadCallbackLocked(ZX_ERR_CANCELED, nullptr, 0);
       read_lock.release();
       cb();
     }
   }
   fbl::AutoLock write_lock(&write_lock_);
-  if (write_pending_) {
-    write_pending_ = false;
+  if (write_operation_ || banjo_write_operation_) {
     auto cb = MakeWriteCallbackLocked(ZX_ERR_CANCELED);
     write_lock.release();
     cb();
@@ -264,7 +299,7 @@ void AmlUart::SerialImplAsyncCancelAll() {
 // Does nothing if read_pending_ is false.
 void AmlUart::HandleRX() {
   fbl::AutoLock lock(&read_lock_);
-  if (!read_pending_) {
+  if (!read_operation_ && !banjo_read_operation_) {
     return;
   }
   unsigned char buf[128];
@@ -281,7 +316,6 @@ void AmlUart::HandleRX() {
     return;
   }
   // Some bytes were read.  The client must queue another read to get any data.
-  read_pending_ = false;
   auto cb = MakeReadCallbackLocked(ZX_OK, buf, read);
   lock.release();
   cb();
@@ -291,7 +325,7 @@ void AmlUart::HandleRX() {
 // Does nothing if write_pending_ is not true.
 void AmlUart::HandleTX() {
   fbl::AutoLock lock(&write_lock_);
-  if (!write_pending_) {
+  if (!write_operation_ && !banjo_write_operation_) {
     return;
   }
   const auto* bufptr = static_cast<const uint8_t*>(write_buffer_);
@@ -306,7 +340,6 @@ void AmlUart::HandleTX() {
   write_buffer_ += written;
   if (!write_size_) {
     // The write has completed, notify the client.
-    write_pending_ = false;
     auto cb = MakeWriteCallbackLocked(ZX_OK);
     lock.release();
     cb();
@@ -314,43 +347,116 @@ void AmlUart::HandleTX() {
 }
 
 fit::closure AmlUart::MakeReadCallbackLocked(zx_status_t status, void* buf, size_t len) {
-  if (read_callback_ == nullptr) {
-    return []() {};
+  if (read_operation_) {
+    auto callback = read_operation_->MakeCallback(status, buf, len);
+    read_operation_.reset();
+    return callback;
   }
-  auto callback = [cb = read_callback_, cookie = read_cookie_, status, buf, len]() {
-    cb(cookie, status, reinterpret_cast<uint8_t*>(buf), len);
-  };
-  read_callback_ = nullptr;
-  read_cookie_ = nullptr;
-  return callback;
+
+  if (banjo_read_operation_) {
+    auto callback = banjo_read_operation_->MakeCallback(status, buf, len);
+    banjo_read_operation_.reset();
+    return callback;
+  }
+
+  ZX_PANIC("AmlUart::MakeReadCallbackLocked invalid state. No active Read operation.");
 }
 
 fit::closure AmlUart::MakeWriteCallbackLocked(zx_status_t status) {
-  if (write_callback_ == nullptr) {
-    return []() {};
+  if (write_operation_) {
+    auto callback = write_operation_->MakeCallback(status);
+    write_operation_.reset();
+    return callback;
   }
-  auto callback = [cb = write_callback_, cookie = write_cookie_, status]() { cb(cookie, status); };
-  write_callback_ = nullptr;
-  write_cookie_ = nullptr;
-  return callback;
+
+  if (banjo_write_operation_) {
+    auto callback = banjo_write_operation_->MakeCallback(status);
+    banjo_write_operation_.reset();
+    return callback;
+  }
+
+  ZX_PANIC("AmlUart::MakeWriteCallbackLocked invalid state. No active Write operation.");
 }
 
 void AmlUart::SerialImplAsyncWriteAsync(const uint8_t* buf, size_t length,
                                         serial_impl_async_write_async_callback callback,
                                         void* cookie) {
   fbl::AutoLock lock(&write_lock_);
-  if (write_pending_) {
+  if (write_operation_ || banjo_write_operation_) {
     lock.release();
     callback(cookie, ZX_ERR_NOT_SUPPORTED);
     return;
   }
   write_buffer_ = buf;
   write_size_ = length;
-  write_callback_ = callback;
-  write_cookie_ = cookie;
-  write_pending_ = true;
+  banjo_write_operation_.emplace(callback, cookie);
   lock.release();
   HandleTX();
+}
+
+void AmlUart::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
+  fhs::wire::SerialPortInfo info{
+      .serial_class = static_cast<fhs::Class>(serial_port_info_.serial_class),
+      .serial_vid = serial_port_info_.serial_vid,
+      .serial_pid = serial_port_info_.serial_pid,
+  };
+  completer.buffer(arena).ReplySuccess(info);
+}
+
+void AmlUart::Config(ConfigRequestView request, fdf::Arena& arena,
+                     ConfigCompleter::Sync& completer) {
+  zx_status_t status = SerialImplAsyncConfig(request->baud_rate, request->flags);
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess();
+  } else {
+    completer.buffer(arena).ReplyError(status);
+  }
+}
+
+void AmlUart::Enable(EnableRequestView request, fdf::Arena& arena,
+                     EnableCompleter::Sync& completer) {
+  zx_status_t status = SerialImplAsyncEnable(request->enable);
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess();
+  } else {
+    completer.buffer(arena).ReplyError(status);
+  }
+}
+
+void AmlUart::Read(fdf::Arena& arena, ReadCompleter::Sync& completer) {
+  fbl::AutoLock lock(&read_lock_);
+  if (read_operation_ || banjo_read_operation_) {
+    lock.release();
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+  read_operation_.emplace(std::move(arena), completer.ToAsync());
+  lock.release();
+  HandleRX();
+}
+
+void AmlUart::Write(WriteRequestView request, fdf::Arena& arena, WriteCompleter::Sync& completer) {
+  fbl::AutoLock lock(&write_lock_);
+  if (write_operation_ || banjo_write_operation_) {
+    lock.release();
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+  write_buffer_ = request->data.data();
+  write_size_ = request->data.count();
+  write_operation_.emplace(std::move(arena), completer.ToAsync());
+  lock.release();
+  HandleTX();
+}
+
+void AmlUart::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) {
+  SerialImplAsyncCancelAll();
+}
+
+void AmlUart::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(WARNING, "handle_unknown_method in fuchsia_hardware_serialimpl::Device server.");
 }
 
 void AmlUart::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
