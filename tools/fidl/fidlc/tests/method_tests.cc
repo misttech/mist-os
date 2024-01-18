@@ -13,7 +13,8 @@ namespace fidlc {
 namespace {
 
 TEST(MethodTests, GoodValidComposeMethod) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol HasComposeMethod1 {
     compose();
@@ -39,7 +40,8 @@ open protocol HasComposeMethod2 {
 }
 
 TEST(MethodTests, GoodValidStrictComposeMethod) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol HasComposeMethod1 {
     strict compose();
@@ -65,7 +67,8 @@ open protocol HasComposeMethod2 {
 }
 
 TEST(MethodTests, GoodValidFlexibleComposeMethod) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol HasComposeMethod1 {
     flexible compose();
@@ -91,7 +94,8 @@ open protocol HasComposeMethod2 {
 }
 
 TEST(MethodTests, GoodValidStrictMethod) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol HasStrictMethod1 {
     strict();
@@ -157,7 +161,8 @@ open protocol HasStrictMethod6 {
 }
 
 TEST(MethodTests, GoodValidFlexibleTwoWayMethod) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol HasFlexibleTwoWayMethod1 {
     flexible();
@@ -223,7 +228,8 @@ open protocol HasFlexibleTwoWayMethod6 {
 }
 
 TEST(MethodTests, GoodValidNormalMethod) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol HasNormalMethod1 {
     MyMethod();
@@ -249,7 +255,8 @@ open protocol HasNormalMethod2 {
 }
 
 TEST(MethodTests, GoodValidStrictNormalMethod) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol HasNormalMethod1 {
     strict MyMethod();
@@ -275,7 +282,8 @@ open protocol HasNormalMethod2 {
 }
 
 TEST(MethodTests, GoodValidFlexibleNormalMethod) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol HasNormalMethod1 {
     flexible MyMethod();
@@ -301,7 +309,8 @@ open protocol HasNormalMethod2 {
 }
 
 TEST(MethodTests, GoodValidEvent) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol HasEvent {
     -> MyEvent();
@@ -317,7 +326,8 @@ protocol HasEvent {
 }
 
 TEST(MethodTests, GoodValidStrictEvent) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol HasEvent {
     strict -> MyMethod();
@@ -333,7 +343,8 @@ protocol HasEvent {
 }
 
 TEST(MethodTests, GoodValidFlexibleEvent) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol HasEvent {
     flexible -> MyMethod();
@@ -350,7 +361,8 @@ protocol HasEvent {
 }
 
 TEST(MethodTests, GoodValidStrictnessModifiers) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 closed protocol Closed {
   strict StrictOneWay();
@@ -395,7 +407,8 @@ open protocol Open {
 }
 
 TEST(MethodTests, BadInvalidStrictnessFlexibleEventInClosed) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 closed protocol Closed {
   flexible -> Event();
@@ -413,7 +426,8 @@ TEST(MethodTests, BadInvalidStrictnessFlexibleOneWayMethodInClosed) {
 }
 
 TEST(MethodTests, BadInvalidStrictnessFlexibleTwoWayMethodInClosed) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 closed protocol Closed {
   flexible Method() -> ();
@@ -437,14 +451,14 @@ library example;
 protocol BadMethod {
     open Method();
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(MethodTests, GoodValidEmptyPayloads) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Test {
   strict MethodA() -> ();
@@ -461,7 +475,8 @@ open protocol Test {
 }
 
 TEST(MethodTests, BadInvalidEmptyStructPayloadStrictNoError) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Test {
   strict Method() -> (struct {});
@@ -472,7 +487,8 @@ open protocol Test {
 }
 
 TEST(MethodTests, BadEmptyStructPayloadFlexibleNoError) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Test {
   flexible Method() -> (struct {});
@@ -483,7 +499,8 @@ open protocol Test {
 }
 
 TEST(MethodTests, BadEmptyStructPayloadStrictError) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Test {
   strict Method() -> (struct {}) error int32;
@@ -494,7 +511,8 @@ open protocol Test {
 }
 
 TEST(MethodTests, BadEmptyStructPayloadFlexibleError) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Test {
   flexible Method() -> (struct {}) error int32;
@@ -505,7 +523,8 @@ open protocol Test {
 }
 
 TEST(MethodTests, GoodAbsentPayloadFlexibleNoError) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Test {
   flexible Method() -> ();
@@ -515,7 +534,8 @@ open protocol Test {
 }
 
 TEST(MethodTests, GoodAbsentPayloadStrictError) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Test {
   strict Method() -> () error int32;
@@ -525,7 +545,8 @@ open protocol Test {
 }
 
 TEST(MethodTests, GoodAbsentPayloadFlexibleError) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Test {
   flexible Method() -> () error int32;
@@ -535,7 +556,8 @@ open protocol Test {
 }
 
 TEST(MethodTests, GoodFlexibleNoErrorResponseUnion) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Example {
     flexible Method() -> (struct {
@@ -582,7 +604,8 @@ open protocol Example {
 }
 
 TEST(MethodTests, GoodFlexibleErrorResponseUnion) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Example {
     flexible Method() -> (struct {

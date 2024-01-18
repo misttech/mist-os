@@ -593,7 +593,6 @@ alias MyVmo = zx.Handle:VMO;
 type Foo = struct {
     foo MyVmo:zx.ObjType.CHANNEL;
 };
-
 )FIDL");
   library.UseLibraryZx();
 
@@ -615,7 +614,6 @@ alias MyVmo = zx.Handle:<VMO, zx.Rights.TRANSFER>;
 type Foo = resource struct {
     foo MyVmo:optional;
 };
-
 )FIDL");
   library.UseLibraryZx();
 

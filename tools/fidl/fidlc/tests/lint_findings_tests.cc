@@ -1520,7 +1520,6 @@ type SomeStruct = struct {
 library fidl.a;
 
 const TEST_STRING ${TEST} = "A const str";
-
 )FIDL");
 
   test.substitute("TEST", "string");

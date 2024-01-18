@@ -18,7 +18,8 @@ TEST(StructsTests, GoodSimpleStruct) {
 }
 
 TEST(StructsTests, GoodPrimitiveDefaultValueLiteral) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyStruct = struct {
     @allow_deprecated_struct_defaults
@@ -39,7 +40,8 @@ TEST(StructsTests, BadPrimitiveDefaultValueNoAnnotation) {
 }
 
 TEST(StructsTests, GoodPrimitiveDefaultValueConstReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const A int32 = 20;
 
@@ -65,7 +67,8 @@ type MyStruct = struct {
 }
 
 TEST(StructsTests, GoodEnumDefaultValueEnumMemberReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyEnum = strict enum : int32 {
     A = 5;
@@ -80,7 +83,8 @@ type MyStruct = struct {
 }
 
 TEST(StructsTests, GoodPrimitiveDefaultValueEnumMemberReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyEnum = strict enum : int32 {
     A = 5;
@@ -121,7 +125,8 @@ TEST(StructsTests, BadDefaultValuePrimitiveInEnum) {
 }
 
 TEST(StructsTests, GoodEnumDefaultValueBitsMemberReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyBits = strict bits : uint32 {
     A = 0x00000001;
@@ -136,7 +141,8 @@ type MyStruct = struct {
 }
 
 TEST(StructsTests, GoodPrimitiveDefaultValueBitsMemberReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyBits = strict bits : uint32 {
     A = 0x00000001;
@@ -221,7 +227,8 @@ type MyStruct = struct {
 }
 
 TEST(StructsTests, GoodMaxInlineSize) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyStruct = struct {
     arr array<uint8, 65535>;

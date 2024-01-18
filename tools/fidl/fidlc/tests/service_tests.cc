@@ -13,7 +13,8 @@ namespace fidlc {
 namespace {
 
 TEST(ServiceTests, GoodEmptyService) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 service SomeService {};
 )FIDL");
@@ -26,7 +27,8 @@ service SomeService {};
 }
 
 TEST(ServiceTests, GoodService) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol SomeProtocol1 {};
 protocol SomeProtocol2 {};
@@ -90,7 +92,6 @@ type NotAProtocol = struct {};
 service SomeService {
     not_a_protocol NotAProtocol;
 };
-
 )FIDL");
   library.ExpectFail(ErrOnlyClientEndsInServices);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -112,7 +113,6 @@ service SomeService {};
 type CannotUseService = struct {
     svc SomeService;
 };
-
 )FIDL");
   library.ExpectFail(ErrExpectedType);
   ASSERT_COMPILER_DIAGNOSTICS(library);

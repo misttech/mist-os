@@ -14,7 +14,7 @@ namespace {
 int object;
 int object2;
 
-TEST(RecursionDetector, EnterSameObjectTwiceResultsInNoGuard) {
+TEST(RecursionDetectorTests, EnterSameObjectTwiceResultsInNoGuard) {
   RecursionDetector rd;
 
   auto guard = rd.Enter(&object);
@@ -27,7 +27,7 @@ TEST(RecursionDetector, EnterSameObjectTwiceResultsInNoGuard) {
   ASSERT_FALSE(no_guard.has_value());
 }
 
-TEST(RecursionDetector, GuardObjectPopsSeenObjectsOnScopeExit) {
+TEST(RecursionDetectorTests, GuardObjectPopsSeenObjectsOnScopeExit) {
   RecursionDetector rd;
 
   auto guard = rd.Enter(&object);

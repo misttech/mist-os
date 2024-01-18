@@ -4766,7 +4766,8 @@ service MyService { // C32
 
 TEST(FormatterTests, NewlinesAbsent) {
   // ---------------40---------------- |
-  std::string unformatted = R"FIDL(library foo.bar;
+  std::string unformatted = R"FIDL(
+library foo.bar;
 // comment
 using imported.abcdefhijklmnopqrstubwxy;
 /// doc comment

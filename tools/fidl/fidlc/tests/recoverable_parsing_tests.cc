@@ -10,7 +10,7 @@
 namespace fidlc {
 namespace {
 
-TEST(ParsingTests, BadUnexpectedToken) {
+TEST(RecoverableParsingTests, BadUnexpectedToken) {
   TestLibrary library;
   library.AddFile("bad/fi-0007.test.fidl");
   library.ExpectFail(ErrUnexpectedToken);
@@ -198,7 +198,7 @@ protocol P {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(ParsingTests, BadRecoverableParamListParsing) {
+TEST(RecoverableParsingTests, BadRecoverableParamListParsing) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -214,7 +214,7 @@ protocol Example {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(ParsingTests, BadRecoverableUnmatchedDelimiterInParamList) {
+TEST(RecoverableParsingTests, BadRecoverableUnmatchedDelimiterInParamList) {
   TestLibrary library(R"FIDL(
 library example;
 

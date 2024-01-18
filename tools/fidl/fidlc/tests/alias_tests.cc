@@ -44,7 +44,8 @@ alias AliasOfDecl = TypeDecl;
 }
 
 TEST(AliasTests, GoodPrimitive) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Message = struct {
     f alias_of_int16;
@@ -73,7 +74,8 @@ alias alias_of_int16 = int16;
 }
 
 TEST(AliasTests, GoodPrimitiveAliasBeforeUse) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 alias alias_of_int16 = int16;
 
@@ -129,7 +131,6 @@ library test.optionals;
 type Bad = struct {
     opt_num int64:<1, 2, 3>;
 };
-
 )FIDL");
   library.ExpectFail(ErrTooManyConstraints, "int64", 0, 3);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -159,14 +160,14 @@ alias alias = int64;
 type Bad = struct {
     opt_num alias:optional;
 };
-
 )FIDL");
   library.ExpectFail(ErrCannotBeOptional, "alias");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AliasTests, GoodVectorParameterizedOnDecl) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Message = struct {
     f alias_of_vector_of_string;
@@ -226,7 +227,8 @@ alias alias_of_vector_max_8 = vector:8;
 }
 
 TEST(AliasTests, GoodVectorBoundedOnUse) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Message = struct {
     f alias_of_vector_of_string:8;
@@ -264,7 +266,8 @@ TEST(AliasTests, GoodUnboundedVectorBoundTwice) {
 }
 
 TEST(AliasTests, GoodVectorNullableOnDecl) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Message = struct {
     f alias_of_vector_of_string_nullable;
@@ -295,7 +298,8 @@ alias alias_of_vector_of_string_nullable = vector<string>:optional;
 }
 
 TEST(AliasTests, GoodVectorNullableOnUse) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Message = struct {
     f alias_of_vector_of_string:optional;
@@ -434,7 +438,6 @@ library example;
 using dependent;
 
 alias Bar2 = dependent.Bar;
-
 )FIDL");
   ASSERT_COMPILED(library);
 }

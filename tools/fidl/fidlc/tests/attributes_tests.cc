@@ -85,7 +85,6 @@ type ExampleUnion = union {
     @on_reserved_member
     2: reserved;
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -317,7 +316,6 @@ library fidl.test.dupattributes;
 protocol A {
     MethodA();
 };
-
 )FIDL");
   library.ExpectFail(ErrDuplicateAttribute, "dup", "example.fidl:4:2");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -349,7 +347,6 @@ library fidl.test.dupattributes;
 protocol A {
     MethodA();
 };
-
 )FIDL");
   library.ExpectFail(ErrDuplicateAttribute, "doc", "generated:1:1");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -360,12 +357,10 @@ TEST(AttributesTests, BadNoTwoSameAttributeOnLibrary) {
   library.AddSource("first.fidl", R"FIDL(
 @dup("first")
 library fidl.test.dupattributes;
-
 )FIDL");
   library.AddSource("second.fidl", R"FIDL(
 @dup("second")
 library fidl.test.dupattributes;
-
 )FIDL");
   library.ExpectFail(ErrDuplicateAttribute, "dup", "first.fidl:2:2");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -406,7 +401,6 @@ type Foo = struct {};
 // This actually gets added at 1 because we misspelled "available".
 @availabe(added=2)
 type Foo = resource struct {};
-
 )FIDL");
   library.SelectVersion("foo", "1");
   library.ExpectWarn(WarnAttributeTypo, "availabe", "available");
@@ -427,7 +421,6 @@ library fidl.test;
 protocol A {
     MethodA();
 };
-
 )FIDL");
   library.set_warnings_as_errors(true);
   ASSERT_FALSE(library.Compile());
@@ -460,7 +453,8 @@ TEST(AttributesTests, BadUnrecognizedTransport) {
 }
 
 TEST(AttributesTests, GoodChannelTransport) {
-  TestLibrary library(R"FIDL(library fidl.test.transportattributes;
+  TestLibrary library(R"FIDL(
+library fidl.test.transportattributes;
 
 @transport("Channel")
 protocol A {
@@ -471,7 +465,8 @@ protocol A {
 }
 
 TEST(AttributesTests, GoodSyscallTransport) {
-  TestLibrary library(R"FIDL(library fidl.test.transportattributes;
+  TestLibrary library(R"FIDL(
+library fidl.test.transportattributes;
 
 @transport("Syscall")
 protocol A {
@@ -482,7 +477,8 @@ protocol A {
 }
 
 TEST(AttributesTests, BadMultipleTransports) {
-  TestLibrary library(R"FIDL(library fidl.test.transportattributes;
+  TestLibrary library(R"FIDL(
+library fidl.test.transportattributes;
 
 @transport("Channel, Syscall")
 protocol A {
@@ -556,7 +552,8 @@ TEST(AttributesTests, BadUnknownInvalidOnStrictEnumMember) {
 }
 
 TEST(AttributesTests, BadTransitionalOnEnum) {
-  TestLibrary library(R"FIDL(library fidl.test;
+  TestLibrary library(R"FIDL(
+library fidl.test;
 
 @transitional
 type E = strict enum : uint32 {
@@ -605,7 +602,6 @@ protocol MyProtocol {
     @selector("test") // no error, this placement is allowed
     MyMethod();
 };
-
 )FIDL");
   for (int i = 0; i < 11; i++) {
     library.ExpectFail(ErrInvalidAttributePlacement, "selector");
@@ -671,7 +667,6 @@ type MyStruct = struct {
     three int64;
     oh_no_four int64;
 };
-
 )FIDL");
   library.AddAttributeSchema("must_have_three_members").Constrain(MustHaveThreeMembers);
   library.ExpectFail(TestErrIncorrectNumberOfMembers);
@@ -685,7 +680,6 @@ library fidl.test;
 protocol MyProtocol {
     @must_have_three_members MyMethod();
 };
-
 )FIDL");
   library.AddAttributeSchema("must_have_three_members").Constrain(MustHaveThreeMembers);
   library.ExpectFail(ErrInvalidAttributePlacement, "must_have_three_members");
@@ -701,7 +695,6 @@ protocol MyProtocol {
     MyMethod();
     MySecondMethod();
 };
-
 )FIDL");
   library.AddAttributeSchema("must_have_three_members").Constrain(MustHaveThreeMembers);
   library.ExpectFail(ErrInvalidAttributePlacement, "must_have_three_members");
@@ -729,7 +722,6 @@ library fidl.test;
 protocol ExampleProtocol {
     Method(struct { arg exampleusing.Empty; } @on_parameter);
 };
-
 )FIDL");
   library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kAt),
                      Token::KindAndSubkind(Token::Kind::kRightParen));
@@ -757,7 +749,6 @@ protocol MyProtocol {
     inner_layout @qux struct {};
   });
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -791,7 +782,6 @@ library example;
 
 @foo(bar="abc", baz="def")
 type MyStruct = struct {};
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -817,7 +807,6 @@ library example;
 
 @foo("abc", bar="def")
 type MyStruct = struct {};
-
 )FIDL");
 
   library.ExpectFail(ErrAttributeArgsMustAllBeNamed);
@@ -830,7 +819,6 @@ library example;
 
 @foo(bar="abc", "def")
 type MyStruct = struct {};
-
 )FIDL");
   // TODO(https://fxbug.dev/112219): If an unnamed string argument follows a named
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind instead of
@@ -846,7 +834,6 @@ library example;
 
 @foo("abc", bar=def)
 type MyStruct = struct {};
-
 )FIDL");
   library.ExpectFail(ErrAttributeArgsMustAllBeNamed);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -858,7 +845,6 @@ library example;
 
 @foo(bar="abc", def)
 type MyStruct = struct {};
-
 )FIDL");
   // TODO(https://fxbug.dev/112219): If an unnamed identifier argument follows a named
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind and
@@ -891,7 +877,6 @@ library example;
 
 @foo("bar")
 type MyStruct = struct {};
-
 )FIDL");
   ASSERT_COMPILED(library);
 }
@@ -902,7 +887,6 @@ library example;
 
 @foo(a="bar")
 type MyStruct = struct {};
-
 )FIDL");
   ASSERT_COMPILED(library);
 }
@@ -913,7 +897,6 @@ library example;
 
 @foo("bar")
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("foo").AddArg(
       "value",
@@ -927,7 +910,6 @@ library example;
 
 @foo("bar")
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("foo").AddArg(
       "inferrable",
@@ -951,7 +933,6 @@ type MyStruct = struct {};
 
 @foo
 type MyOtherStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("foo").AddArg(
       "value",
@@ -992,7 +973,6 @@ type MyStruct = struct {};
 // Order independent.
 @multiple_args(second="bar", first="foo")
 type MyOtherStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("multiple_args")
       .AddArg("first", AttributeArgSchema(ConstantValue::Kind::kString,
@@ -1022,7 +1002,6 @@ type MyStruct4 = struct {};
 // No arguments at all.
 @multiple_args
 type MyStruct5 = struct {};
-
 )FIDL");
   library.AddAttributeSchema("multiple_args")
       .AddArg("first", AttributeArgSchema(ConstantValue::Kind::kString,
@@ -1046,7 +1025,6 @@ type MyStruct2 = struct {};
 // Only 1 argument present.
 @multiple_args(first="foo")
 type MyStruct3 = struct {};
-
 )FIDL");
   library.AddAttributeSchema("multiple_args")
       .AddArg("first", AttributeArgSchema(ConstantValue::Kind::kString,
@@ -1074,7 +1052,6 @@ library example;
 
 @attr(foo="abc", bar=true, baz=false)
 type MyStruct = struct {};
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -1119,7 +1096,6 @@ const baz bool = false;
 
 @attr(foo=foo, bar=bar, baz=baz)
 type MyStruct = struct {};
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -1167,7 +1143,6 @@ const bar float32 = -2.3;
 
 @attr(foo=foo, bar=bar)
 type MyStruct = struct {};
-
 )FIDL");
   library.ExpectFail(ErrCanOnlyUseStringOrBool, "foo", "attr");
   library.ExpectFail(ErrCanOnlyUseStringOrBool, "bar", "attr");
@@ -1195,7 +1170,6 @@ library fidl.test;
         float32=1.2,
         float64=-3.4)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr")
       .AddArg("string", AttributeArgSchema(ConstantValue::Kind::kString))
@@ -1378,7 +1352,6 @@ library example;
 
 @attr(true)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr").AddArg("string",
                                             AttributeArgSchema(ConstantValue::Kind::kString));
@@ -1393,7 +1366,6 @@ library example;
 
 @attr("foo")
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr").AddArg("bool", AttributeArgSchema(ConstantValue::Kind::kBool));
   library.ExpectFail(ErrTypeCannotBeConvertedToType, "\"foo\"", "string:3", "bool");
@@ -1407,7 +1379,6 @@ library example;
 
 @attr(-1)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr").AddArg("uint8",
                                             AttributeArgSchema(ConstantValue::Kind::kUint8));
@@ -1466,7 +1437,6 @@ const float64 fidl.float64 = -3.4;
         float32=float32,
         float64=float64)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr")
       .AddArg("string", AttributeArgSchema(ConstantValue::Kind::kString))
@@ -1655,7 +1625,6 @@ const foo bool = true;
 
 @attr(foo)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr").AddArg("string",
                                             AttributeArgSchema(ConstantValue::Kind::kString));
@@ -1672,7 +1641,6 @@ const foo string:3 = "foo";
 
 @attr(foo)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr").AddArg("bool", AttributeArgSchema(ConstantValue::Kind::kBool));
   library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/foo", "string:3", "bool");
@@ -1688,7 +1656,6 @@ const foo uint16 = 259;
 
 @attr(foo)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr").AddArg("int8", AttributeArgSchema(ConstantValue::Kind::kInt8));
   library.ExpectFail(ErrTypeCannotBeConvertedToType, "example/foo", "uint16", "int8");
@@ -1702,7 +1669,6 @@ library example;
 
 @attr(1)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("attr")
       .AddArg("int8", AttributeArgSchema(ConstantValue::Kind::kUint8))
@@ -1718,7 +1684,6 @@ library example;
 type MyStruct = struct {};
 
 const BAD uint8 = 1;
-
 )FIDL");
   library.AddAttributeSchema("attr")
       .AddArg("int8", AttributeArgSchema(ConstantValue::Kind::kUint8))
@@ -1733,7 +1698,6 @@ library example;
 
 @attr("abc")
 type MyStruct = struct {};
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -1750,7 +1714,6 @@ library example;
 
 @attr(foo="abc")
 type MyStruct = struct {};
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -1767,7 +1730,6 @@ library example;
 
 @foo(nonexistent)
 type MyStruct = struct {};
-
 )FIDL");
   library.ExpectFail(ErrNameNotFound, "nonexistent", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -1779,7 +1741,6 @@ library example;
 
 @foo(nonexistent)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("foo").AddArg("value", AttributeArgSchema(ConstantValue::Kind::kBool));
   library.ExpectFail(ErrNameNotFound, "nonexistent", "example");
@@ -1792,7 +1753,6 @@ library example;
 
 @foo(nonexistent)
 type MyStruct = struct {};
-
 )FIDL");
   library.AddAttributeSchema("foo")
       .AddArg("first", AttributeArgSchema(ConstantValue::Kind::kBool))
@@ -1809,7 +1769,6 @@ library example;
 type MyStruct = struct {};
 
 const BAD bool = "not a bool";
-
 )FIDL");
   library.ExpectFail(ErrCouldNotResolveAttributeArg);
   library.ExpectFail(ErrCannotResolveConstantValue);
@@ -1825,7 +1784,6 @@ library example;
 type MyStruct = struct {};
 
 const BAD bool = "not a bool";
-
 )FIDL");
   library.AddAttributeSchema("foo").AddArg("value", AttributeArgSchema(ConstantValue::Kind::kBool));
   library.ExpectFail(ErrCouldNotResolveAttributeArg);
@@ -1842,7 +1800,6 @@ library example;
 type MyStruct = struct {};
 
 const BAD bool = "not a bool";
-
 )FIDL");
   library.AddAttributeSchema("foo")
       .AddArg("first", AttributeArgSchema(ConstantValue::Kind::kBool))
@@ -1859,7 +1816,6 @@ library example;
 
 @foo(BAR)
 const BAR bool = true;
-
 )FIDL");
   library.ExpectFail(ErrCouldNotResolveAttributeArg);
   library.ExpectFail(ErrIncludeCycle, "const 'BAR' -> const 'BAR'");
@@ -1872,7 +1828,6 @@ library example;
 
 @foo(BAR)
 const BAR string = "bar";
-
 )FIDL");
   library.ExpectFail(ErrCouldNotResolveAttributeArg);
   library.ExpectFail(ErrIncludeCycle, "const 'BAR' -> const 'BAR'");
@@ -1885,7 +1840,6 @@ library example;
 
 @foo(BAR)
 const BAR bool = true;
-
 )FIDL");
   library.AddAttributeSchema("foo").AddArg("value", AttributeArgSchema(ConstantValue::Kind::kBool));
   library.ExpectFail(ErrCouldNotResolveAttributeArg);
@@ -1901,7 +1855,6 @@ library example;
 const FIRST bool = true;
 @foo(FIRST)
 const SECOND bool = false;
-
 )FIDL");
   library.ExpectFail(ErrIncludeCycle, "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
   library.ExpectFail(ErrCouldNotResolveAttributeArg);
@@ -1916,7 +1869,6 @@ library example;
 const FIRST string = "first";
 @foo(FIRST)
 const SECOND string = "second";
-
 )FIDL");
   library.ExpectFail(ErrIncludeCycle, "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
   library.ExpectFail(ErrCouldNotResolveAttributeArg);
@@ -1931,7 +1883,6 @@ library example;
 const FIRST bool = true;
 @foo(FIRST)
 const SECOND bool = false;
-
 )FIDL");
   library.AddAttributeSchema("foo").AddArg("value", AttributeArgSchema(ConstantValue::Kind::kBool));
   library.ExpectFail(ErrIncludeCycle, "const 'FIRST' -> const 'SECOND' -> const 'FIRST'");
@@ -1954,7 +1905,6 @@ TEST(AttributesTests, BadLibraryReferencesConst) {
 library example;
 
 const BAR bool = true;
-
 )FIDL");
   library.ExpectFail(ErrReferenceInLibraryAttribute);
   ASSERT_COMPILER_DIAGNOSTICS(library);

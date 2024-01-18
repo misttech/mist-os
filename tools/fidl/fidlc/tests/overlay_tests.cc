@@ -11,7 +11,8 @@ namespace fidlc {
 namespace {
 
 TEST(OverlayTests, GoodOverlayInOtherLayouts) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Overlay = strict overlay {
     1: member string:32;
@@ -35,7 +36,8 @@ type Union = strict union {
 }
 
 TEST(OverlayTests, GoodOtherLayoutsInOverlay) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Struct = struct {
     member int32;
@@ -56,7 +58,6 @@ type Overlay = strict overlay {
     4: u Union;
 };
 
-
 )FIDL");
   library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -64,7 +65,8 @@ type Overlay = strict overlay {
 }
 
 TEST(OverlayTests, GoodOverlayInOverlay) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Inner = strict overlay {
     1: i int32;
@@ -79,7 +81,6 @@ type Outer = strict overlay {
     4: o Inner;
 };
 
-
 )FIDL");
   library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -87,7 +88,8 @@ type Outer = strict overlay {
 }
 
 TEST(OverlayTests, GoodKeywordsAsFieldNames) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type struct = struct {
     field bool;
@@ -110,13 +112,13 @@ type Foo = strict overlay {
 }
 
 TEST(OverlayTests, BadFlexible) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = flexible overlay {
     1: flippity int64;
     2: floppity bool;
 };
-
 )FIDL");
   library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -125,13 +127,13 @@ type Foo = flexible overlay {
 }
 
 TEST(OverlayTests, BadResource) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = strict resource overlay {
     1: flippity int64;
     2: floppity bool;
 };
-
 )FIDL");
   library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -141,14 +143,14 @@ type Foo = strict resource overlay {
 }
 
 TEST(OverlayTests, BadResourceMember) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 protocol Bar{};
 
 type Foo = strict overlay {
     1: flippity int64;
     2: floppity client_end:Bar;
 };
-
 )FIDL");
   library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -157,14 +159,14 @@ type Foo = strict overlay {
 }
 
 TEST(OverlayTests, BadReserved) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = strict overlay {
     1: flippity int64;
     2: floppity float64;
     3: reserved;
 };
-
 )FIDL");
   library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -173,20 +175,21 @@ type Foo = strict overlay {
 }
 
 TEST(OverlayTests, BadNoExperimentalFlag) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = strict overlay {
     1: bar int64;
     2: baz string:42;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidLayoutClass);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(OverlayTests, BadOptionalOverlay) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Biff = strict overlay {
     1: foo bool;
@@ -204,7 +207,8 @@ type Baff = struct {
 }
 
 TEST(OverlayTests, GoodRecursiveOverlay) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = strict union {
     1: bar Bar;
@@ -217,7 +221,6 @@ type Bar = strict overlay {
     2: s string:32;
     3: i int32;
 };
-
 )FIDL");
   library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -225,7 +228,8 @@ type Bar = strict overlay {
 }
 
 TEST(OverlayTests, BadDirectlyRecursiveOverlay) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Value = strict overlay {
     1: bool_value bool;
@@ -239,7 +243,8 @@ type Value = strict overlay {
 }
 
 TEST(OverlayTests, BadInlineRecursiveOverlay) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Product = struct {
     i int32;
@@ -268,7 +273,6 @@ library example;
 type Foo = strict overlay {
   @selector("v2") 1: v string;
 };
-
 )FIDL");
   library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 

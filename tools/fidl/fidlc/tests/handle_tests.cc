@@ -184,7 +184,8 @@ type MyStruct = struct {
 }
 
 TEST(HandleTests, GoodResourceDefinitionOnlySubtypeNoRightsTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type ObjType = strict enum : uint32 {
     NONE = 0;

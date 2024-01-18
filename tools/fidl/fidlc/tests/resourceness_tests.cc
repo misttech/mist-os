@@ -316,7 +316,8 @@ type ResourceStruct = resource struct {};
 }
 
 TEST(ResourcenessTests, GoodTransitiveResourceMember) {
-  std::string fidl_library = R"FIDL(library example;
+  std::string fidl_library = R"FIDL(
+library example;
 
 type Top = resource struct {
     middle Middle;
@@ -352,7 +353,8 @@ type Bottom = resource struct {};
 }
 
 TEST(ResourcenessTests, GoodRecursiveValueTypes) {
-  std::string fidl_library = R"FIDL(library example;
+  std::string fidl_library = R"FIDL(
+library example;
 
 type Ouro = struct {
     b box<Boros>;
@@ -368,7 +370,8 @@ type Boros = struct {
 }
 
 TEST(ResourcenessTests, GoodRecursiveResourceTypes) {
-  std::string fidl_library = R"FIDL(library example;
+  std::string fidl_library = R"FIDL(
+library example;
 
 type Ouro = resource struct {
     b box<Boros>;
@@ -400,7 +403,8 @@ type Boros = struct {
 }
 
 TEST(ResourcenessTests, GoodStrictResourceOrderIndependent) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type SR = strict resource union {
     1: b bool;

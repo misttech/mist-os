@@ -10,7 +10,8 @@ namespace fidlc {
 namespace {
 
 TEST(ArrayTests, GoodNonzeroSizeArray) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type S = struct {
     arr array<uint8, 1>;
@@ -62,7 +63,7 @@ type S = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(ArrayTest, BadMultipleConstraintsOnArray) {
+TEST(ArrayTests, BadMultipleConstraintsOnArray) {
   TestLibrary library(R"FIDL(
 library example;
 

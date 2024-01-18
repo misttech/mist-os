@@ -77,7 +77,8 @@ void ExpectFieldShape(const T& field, ExpectedField expected) {
 }
 
 TEST(TypeshapeTests, GoodEmptyStruct) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type Empty = struct {};
 )FIDL");
@@ -93,7 +94,8 @@ type Empty = struct {};
 }
 
 TEST(TypeshapeTests, GoodEmptyStructWithinAnotherStruct) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type Empty = struct {};
 
@@ -170,7 +172,8 @@ type EmptyWithOtherThings = struct {
 }
 
 TEST(TypeshapeTests, GoodSimpleNewTypes) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type BoolAndU32 = struct {
     b bool;
@@ -241,7 +244,8 @@ type NewUnionOfThings = UnionOfThings;
 }
 
 TEST(TypeshapeTests, GoodSimpleStructs) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type OneBool = struct {
     b bool;
@@ -372,7 +376,8 @@ type ThreeHandlesOneOptional = resource struct {
 }
 
 TEST(TypeshapeTests, GoodBits) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type Bits16 = strict bits : uint16 {
     VALUE = 1;
@@ -400,7 +405,8 @@ type BitsImplicit = strict bits {
 }
 
 TEST(TypeshapeTests, GoodSimpleTables) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type TableWithNoMembers = table {};
 
@@ -481,7 +487,8 @@ type TableWithBoolAndU64 = table {
 }
 
 TEST(TypeshapeTests, GoodTablesWithReservedFields) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type SomeReserved = table {
     1: b bool;
@@ -579,7 +586,6 @@ using zx;
 type TableWithOneHandle = resource table {
   1: h zx.Handle;
 };
-
 )FIDL");
   test_library.UseLibraryZx();
   ASSERT_COMPILED(test_library);
@@ -598,7 +604,8 @@ type TableWithOneHandle = resource table {
 }
 
 TEST(TypeshapeTests, GoodOptionalStructs) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type OneBool = struct {
     b bool;
@@ -679,7 +686,8 @@ type OptionalBoolAndU64 = struct {
 }
 
 TEST(TypeshapeTests, GoodOptionalTables) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type OneBool = struct {
     b bool;
@@ -843,7 +851,8 @@ type TableWithOptionalTableWithBoolAndU64 = table {
 }
 
 TEST(TypeshapeTests, GoodUnions) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type BoolAndU64 = struct {
     b bool;
@@ -943,7 +952,6 @@ type ManyHandleUnion = strict resource union {
   2: handle_array array<zx.Handle, 8>;
   3: handle_vector vector<zx.Handle>:8;
 };
-
 )FIDL");
   test_library.UseLibraryZx();
   ASSERT_COMPILED(test_library);
@@ -998,7 +1006,8 @@ type ManyHandleUnion = strict resource union {
 }
 
 TEST(TypeshapeTests, GoodOverlays) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type BoolOrStringOrU64 = strict overlay {
     1: b bool;
@@ -1018,7 +1027,6 @@ type U64BoolStruct = struct {
 type BoolOverlayStruct = struct {
     bo BoolOverlay;
 };
-
 )FIDL");
   test_library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -1063,7 +1071,8 @@ type BoolOverlayStruct = struct {
 }
 
 TEST(TypeshapeTests, GoodVectors) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type PaddedVector = struct {
     pv vector<int32>:3;
@@ -1217,7 +1226,6 @@ type HandleTableVector = resource struct {
 type TableWithHandleStructVector = resource table {
   1: sv vector<OneHandle>:8;
 };
-
 )FIDL");
   test_library.UseLibraryZx();
   ASSERT_COMPILED(test_library);
@@ -1307,7 +1315,8 @@ type TableWithHandleStructVector = resource table {
 }
 
 TEST(TypeshapeTests, GoodStrings) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type ShortString = struct {
     s string:5;
@@ -1372,12 +1381,12 @@ type TableWithUnboundedString = table {
 }
 
 TEST(TypeshapeTests, GoodStringArrays) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type StringArray = struct {
     s string_array<5>;
 };
-
 )FIDL");
   test_library.EnableFlag(ExperimentalFlags::Flag::kZxCTypes);
 
@@ -1395,7 +1404,8 @@ type StringArray = struct {
 }
 
 TEST(TypeshapeTests, GoodArrays) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type AnArray = struct {
     a array<int64, 5>;
@@ -1478,7 +1488,6 @@ type NullableHandleArray = resource struct {
 type TableWithNullableHandleArray = resource table {
   1: ha array<zx.Handle:optional, 8>;
 };
-
 )FIDL");
   test_library.UseLibraryZx();
   ASSERT_COMPILED(test_library);
@@ -1527,7 +1536,8 @@ type TableWithNullableHandleArray = resource table {
 // TODO(https://fxbug.dev/118282): write a "unions_with_handles" test case.
 
 TEST(TypeshapeTests, GoodFlexibleUnions) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type UnionWithOneBool = flexible union {
     1: b bool;
@@ -1648,7 +1658,8 @@ type PaddingCheck = flexible union {
 }
 
 TEST(TypeshapeTests, GoodEnvelopeStrictness) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 type StrictLeafUnion = strict union {
     1: a int64;
@@ -1770,7 +1781,8 @@ type StrictUnionOfFlexibleTable = strict union {
 }
 
 TEST(TypeshapeTests, GoodProtocolsAndRequestOfProtocols) {
-  TestLibrary test_library(R"FIDL(library example;
+  TestLibrary test_library(R"FIDL(
+library example;
 
 protocol SomeProtocol {};
 
@@ -1844,7 +1856,6 @@ type ExternalStringSizeStruct = struct {
 type ExternalVectorSizeStruct = resource struct {
     a vector<zx.Handle>:EXTERNAL_SIZE_DEF;
 };
-
 )FIDL");
   test_library.AddSource("extern_defs.fidl", R"FIDL(
 library example;
@@ -1895,7 +1906,8 @@ type ExternalSimpleStruct = struct {
 }
 
 TEST(TypeshapeTests, GoodSimpleRequest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Test {
     Method(struct { a int16; b int16; });
@@ -1928,7 +1940,8 @@ protocol Test {
 }
 
 TEST(TypeshapeTests, GoodSimpleResponse) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Test {
     strict Method() -> (struct { a int16; b int16; });
@@ -1961,7 +1974,8 @@ protocol Test {
 }
 
 TEST(TypeshapeTests, GoodRecursiveRequest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type WebMessage = resource struct {
     message_port_req server_end:MessagePort;
@@ -2010,7 +2024,8 @@ protocol MessagePort {
 }
 
 TEST(TypeshapeTests, GoodRecursiveOptRequest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type WebMessage = resource struct {
     opt_message_port_req server_end:<MessagePort, optional>;
@@ -2056,7 +2071,8 @@ protocol MessagePort {
 }
 
 TEST(TypeshapeTests, GoodRecursiveProtocol) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type WebMessage = resource struct {
     message_port client_end:MessagePort;
@@ -2102,7 +2118,8 @@ protocol MessagePort {
 }
 
 TEST(TypeshapeTests, GoodRecursiveOptProtocol) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type WebMessage = resource struct {
     opt_message_port client_end:<MessagePort, optional>;
@@ -2148,7 +2165,8 @@ protocol MessagePort {
 }
 
 TEST(TypeshapeTests, GoodRecursiveStruct) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type TheStruct = struct {
     opt_one_more box<TheStruct>;
@@ -2198,7 +2216,8 @@ type TheStruct = resource struct {
 }
 
 TEST(TypeshapeTests, GoodCoRecursiveStruct) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type A = struct {
     foo box<B>;
@@ -2273,7 +2292,8 @@ type B = resource struct {
 }
 
 TEST(TypeshapeTests, GoodCoRecursiveStruct2) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Foo = struct {
     b Bar;
@@ -2368,7 +2388,8 @@ type Priority = enum {
 
 TEST(TypeshapeTests, GoodProtocolChildAndParent) {
   SharedAmongstLibraries shared;
-  TestLibrary parent_library(&shared, "parent.fidl", R"FIDL(library parent;
+  TestLibrary parent_library(&shared, "parent.fidl", R"FIDL(
+library parent;
 
 protocol Parent {
     Sync() -> ();
@@ -2397,7 +2418,8 @@ protocol Child {
 }
 
 TEST(TypeshapeTests, GoodUnionSize8Alignment4Sandwich) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type UnionSize8Alignment4 = strict union {
     1: variant uint32;
@@ -2440,7 +2462,8 @@ type Sandwich = struct {
 }
 
 TEST(TypeshapeTests, GoodUnionSize12Alignment4Sandwich) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type UnionSize12Alignment4 = strict union {
     1: variant array<uint8, 6>;
@@ -2483,7 +2506,8 @@ type Sandwich = struct {
 }
 
 TEST(TypeshapeTests, GoodUnionSize24Alignment8Sandwich) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type StructSize16Alignment8 = struct {
     f1 uint64;
@@ -2531,7 +2555,8 @@ type Sandwich = struct {
 }
 
 TEST(TypeshapeTests, GoodUnionSize36Alignment4Sandwich) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type UnionSize36Alignment4 = strict union {
     1: variant array<uint8, 32>;
@@ -2581,7 +2606,6 @@ using zx;
 type A = resource struct {
     zero_size vector<zx.Handle>:0;
 };
-
 )FIDL");
   library.UseLibraryZx();
   ASSERT_COMPILED(library);

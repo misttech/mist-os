@@ -11,7 +11,8 @@ namespace fidlc {
 namespace {
 
 TEST(ResourceTests, GoodValidWithoutRights) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyEnum = strict enum : uint32 {
     NONE = 0;
@@ -42,7 +43,8 @@ resource_definition SomeResource : uint32 {
 }
 
 TEST(ResourceTests, GoodValidWithRights) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyEnum = strict enum : uint32 {
     NONE = 0;
@@ -80,7 +82,8 @@ resource_definition SomeResource : uint32 {
 }
 
 TEST(ResourceTests, GoodAliasedBaseTypeWithoutRights) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyEnum = strict enum : uint32 {
     NONE = 0;
@@ -113,7 +116,8 @@ resource_definition SomeResource : via {
 }
 
 TEST(ResourceTests, GoodAliasedBaseTypeWithRights) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyEnum = strict enum : uint32 {
     NONE = 0;
@@ -158,7 +162,6 @@ library example;
 
 resource_definition SomeResource : uint32 {
 };
-
 )FIDL");
   library.ExpectFail(ErrUnexpectedIdentifier, Token::KindAndSubkind(Token::Kind::kRightCurly),
                      Token::KindAndSubkind(Token::Subkind::kProperties));

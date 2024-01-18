@@ -11,7 +11,8 @@ namespace fidlc {
 namespace {
 
 TEST(EnumsTests, GoodEnumTestSimple) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Fruit = enum : uint64 {
     ORANGE = 1;
@@ -29,8 +30,9 @@ type Fruit = enum : uint64 {
   EXPECT_EQ(underlying_primitive->subtype, PrimitiveSubtype::kUint64);
 }
 
-TEST(BitsTests, GoodEnumDefaultUint32) {
-  TestLibrary library(R"FIDL(library example;
+TEST(EnumsTests, GoodEnumDefaultUint32) {
+  TestLibrary library(R"FIDL(
+library example;
 
 type Fruit = enum {
     ORANGE = 1;
@@ -163,7 +165,8 @@ TEST(EnumsTests, BadEnumTestNoMembersWhenStrict) {
 }
 
 TEST(EnumsTests, GoodEnumTestKeywordNames) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Fruit = enum : uint64 {
     library = 1;

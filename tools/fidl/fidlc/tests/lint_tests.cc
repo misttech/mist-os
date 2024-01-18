@@ -36,7 +36,8 @@ using ::testing::HasSubstr;
   } while (0)
 
 TEST(LintTests, BadConstNames) {
-  TestLibrary library(R"FIDL(library fuchsia.a;
+  TestLibrary library(R"FIDL(
+library fuchsia.a;
 
 const bad_CONST uint64 = 1234;
 )FIDL");
@@ -46,7 +47,8 @@ const bad_CONST uint64 = 1234;
 }
 
 TEST(LintTests, BadConstNamesKconst) {
-  TestLibrary library(R"FIDL(library fuchsia.a;
+  TestLibrary library(R"FIDL(
+library fuchsia.a;
 
 const kAllIsCalm uint64 = 1234;
 )FIDL");
@@ -58,7 +60,8 @@ const kAllIsCalm uint64 = 1234;
 }
 
 TEST(LintTests, GoodConstNames) {
-  TestLibrary library(R"FIDL(library fuchsia.a;
+  TestLibrary library(R"FIDL(
+library fuchsia.a;
 
 const GOOD_CONST uint64 = 1234;
 )FIDL");
@@ -68,7 +71,8 @@ const GOOD_CONST uint64 = 1234;
 }
 
 TEST(LintTests, BadProtocolNames) {
-  TestLibrary library(R"FIDL(library fuchsia.a;
+  TestLibrary library(R"FIDL(
+library fuchsia.a;
 
 protocol URLLoader {};
 )FIDL");
@@ -80,7 +84,8 @@ protocol URLLoader {};
 }
 
 TEST(LintTests, GoodProtocolNames) {
-  TestLibrary library(R"FIDL(library fuchsia.a;
+  TestLibrary library(R"FIDL(
+library fuchsia.a;
 
 protocol UrlLoader {};
 )FIDL");
@@ -90,7 +95,8 @@ protocol UrlLoader {};
 }
 
 TEST(LintTests, BadLibraryNamesBannedName) {
-  TestLibrary library(R"FIDL(library fuchsia.zxsocket;
+  TestLibrary library(R"FIDL(
+library fuchsia.zxsocket;
 )FIDL");
   ASSERT_COMPILED(library);
   ASSERT_FALSE(library.Lint());

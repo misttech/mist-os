@@ -11,7 +11,8 @@ namespace fidlc {
 namespace {
 
 TEST(ErrorsTests, GoodError) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Example {
     strict Method() -> (struct {
@@ -51,7 +52,8 @@ protocol Example {
 }
 
 TEST(ErrorsTests, GoodErrorUnsigned) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Example {
     Method() -> (struct {
@@ -93,7 +95,8 @@ protocol MyProtocol {
 }
 
 TEST(ErrorsTests, GoodErrorEnum) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type ErrorType = enum : int32 {
     GOOD = 1;
@@ -111,7 +114,8 @@ protocol Example {
 }
 
 TEST(ErrorsTests, GoodErrorEnumAfter) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Example {
     Method() -> (struct {
@@ -225,7 +229,7 @@ protocol Example {
   ASSERT_EQ(error_id->type_decl->kind, Decl::Kind::kTable);
 }
 
-TEST(ErrorsTest, TransitionalAllowList) {
+TEST(ErrorsTests, TransitionalAllowList) {
   TestLibrary library;
   library.AddFile("bad/fi-0202.test.fidl");
   library.EnableFlag(ExperimentalFlags::Flag::kTransitionalAllowList);

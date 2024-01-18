@@ -9,7 +9,8 @@
 namespace fidlc {
 namespace {
 
-const char* good_library_source = R"FIDL(library example;
+const char* good_library_source = R"FIDL(
+library example;
 
 type S = struct {
     arr string_array<10>;
@@ -29,7 +30,8 @@ TEST(StringArrayTests, BadNoExperimentalFlag) {
 }
 
 TEST(StringArrayTests, BadZeroSizeArray) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type S = struct {
     arr string_array<0>;

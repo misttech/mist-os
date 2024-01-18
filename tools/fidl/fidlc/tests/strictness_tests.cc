@@ -44,7 +44,8 @@ TEST(StrictnessTests, BadConflictingModifiers) {
 
 TEST(StrictnessTests, GoodBitsStrictness) {
   TestLibrary library(
-      R"FIDL(library example;
+      R"FIDL(
+library example;
 
 type DefaultStrictFoo = strict bits {
     BAR = 0x1;
@@ -66,7 +67,8 @@ type FlexibleFoo = flexible bits {
 
 TEST(StrictnessTests, GoodEnumStrictness) {
   TestLibrary library(
-      R"FIDL(library example;
+      R"FIDL(
+library example;
 
 type DefaultStrictFoo = strict enum {
     BAR = 1;
@@ -87,7 +89,8 @@ type FlexibleFoo = flexible enum {
 }
 
 TEST(StrictnessTests, GoodFlexibleEnum) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Foo = flexible enum {
     BAR = 1;
@@ -97,7 +100,8 @@ type Foo = flexible enum {
 }
 
 TEST(StrictnessTests, GoodFlexibleBitsRedundant) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Foo = flexible bits {
     BAR = 0x1;
@@ -135,7 +139,8 @@ TEST(StrictnessTests, GoodUnionStrictness) {
 }
 
 TEST(StrictnessTests, GoodStrictUnionRedundant) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Foo = strict union {
     1: i int32;

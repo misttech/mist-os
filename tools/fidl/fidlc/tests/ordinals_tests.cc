@@ -26,7 +26,6 @@ library methodhasher;
 protocol Special {
     ThisOneHashesToZero() -> (struct { i int64; });
 };
-
 )FIDL");
   library.ExpectFail(ErrGeneratedZeroValueOrdinal);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -42,7 +41,6 @@ protocol Special {
     ClashOne(struct { s string; b bool; }) -> (struct { i int32; });
     ClashTwo(struct { s string; }) -> (struct { r zx.Handle:CHANNEL; });
 };
-
 )FIDL");
   library.UseLibraryZx();
   library.ExpectFail(ErrDuplicateMethodOrdinal, "example.fidl:7:5");
@@ -61,7 +59,6 @@ protocol Special {
     @selector("ClashTwo")
     bar(struct { s string; }) -> (struct { r zx.Handle:CHANNEL; });
 };
-
 )FIDL");
   library.UseLibraryZx();
   library.ExpectFail(ErrDuplicateMethodOrdinal, "example.fidl:8:5");
@@ -86,14 +83,14 @@ protocol Special {
     ClashOne(struct { s string; b bool; }) -> (struct { i int32; });
     ClashTwo(struct { s string; }) -> (resource struct { r zx.Handle:CHANNEL; });
 };
-
 )FIDL");
   library.UseLibraryZx();
   ASSERT_COMPILED(library);
 }
 
 TEST(OrdinalsTests, GoodOrdinalValueIsSha256) {
-  TestLibrary library(R"FIDL(library a.b.c;
+  TestLibrary library(R"FIDL(
+library a.b.c;
 
 protocol protocol {
     selector(struct {
@@ -117,7 +114,8 @@ protocol protocol {
 }
 
 TEST(OrdinalsTests, GoodSelectorWithFullPath) {
-  TestLibrary library(R"FIDL(library not.important;
+  TestLibrary library(R"FIDL(
+library not.important;
 
 protocol at {
     @selector("a.b.c/protocol.selector")
@@ -187,7 +185,8 @@ protocol at {
 }
 
 TEST(OrdinalsTests, GoodOrdinalValueIsFirst64BitsOfSha256) {
-  TestLibrary library(R"FIDL(library a.b.c;
+  TestLibrary library(R"FIDL(
+library a.b.c;
 
 protocol protocol {
     s0();
@@ -278,7 +277,8 @@ TEST(OrdinalsTests, GoodHackToRenameFuchsiaIoToFuchsiaIoOneNoSelector) {
 }
 
 TEST(OrdinalsTests, GoodHackToRenameFuchsiaIoToFuchsiaIoOneHasSelector) {
-  TestLibrary library(R"FIDL(library fuchsia.io;
+  TestLibrary library(R"FIDL(
+library fuchsia.io;
 
 protocol SomeProtocol {
     @selector("fuchsia.io1/Node.Open")
@@ -289,7 +289,8 @@ protocol SomeProtocol {
 }
 
 TEST(OrdinalsTests, WrongComposedMethodDoesNotGetGeneratedOrdinal) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Node {
     SomeMethod(struct { id Id; });
@@ -303,7 +304,6 @@ protocol Directory {
 protocol DirectoryAdmin {
     compose Directory;
 };
-
 )FIDL");
   library.ExpectFail(ErrNameNotFound, "Id", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);

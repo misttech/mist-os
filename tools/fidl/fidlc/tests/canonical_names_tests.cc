@@ -28,7 +28,8 @@ TEST(CanonicalNamesTests, GoodCollisionFixRename) {
 }
 
 TEST(CanonicalNamesTests, GoodTopLevel) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 alias foobar = bool;
 const f_oobar bool = true;
@@ -51,7 +52,8 @@ service FOoBAR {};
 }
 
 TEST(CanonicalNamesTests, GoodAttributes) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 @foobar
 @foo_bar
@@ -62,7 +64,8 @@ type Example = struct {};
 }
 
 TEST(CanonicalNamesTests, GoodAttributeArguments) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 @some_attribute(foobar="", foo_bar="", f_o_o_b_a_r="")
 type Example = struct {};
@@ -71,7 +74,8 @@ type Example = struct {};
 }
 
 TEST(CanonicalNamesTests, GoodStructMembers) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Example = struct {
     foobar bool;
@@ -83,7 +87,8 @@ type Example = struct {
 }
 
 TEST(CanonicalNamesTests, GoodTableMembers) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Example = table {
     1: foobar bool;
@@ -95,7 +100,8 @@ type Example = table {
 }
 
 TEST(CanonicalNamesTests, GoodUnionMembers) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Example = strict union {
     1: foobar bool;
@@ -107,7 +113,8 @@ type Example = strict union {
 }
 
 TEST(CanonicalNamesTests, GoodEnumMembers) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Example = strict enum {
     foobar = 1;
@@ -119,7 +126,8 @@ type Example = strict enum {
 }
 
 TEST(CanonicalNamesTests, GoodBitsMembers) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Example = strict bits {
     foobar = 1;
@@ -131,7 +139,8 @@ type Example = strict bits {
 }
 
 TEST(CanonicalNamesTests, GoodProtocolMethods) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Example {
     foobar() -> ();
@@ -143,7 +152,8 @@ protocol Example {
 }
 
 TEST(CanonicalNamesTests, GoodMethodParameters) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Example {
     example(struct {
@@ -157,7 +167,8 @@ protocol Example {
 }
 
 TEST(CanonicalNamesTests, GoodMethodResults) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Example {
     example() -> (struct {
@@ -171,7 +182,8 @@ protocol Example {
 }
 
 TEST(CanonicalNamesTests, GoodServiceMembers) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol P {};
 service Example {
@@ -184,7 +196,8 @@ service Example {
 }
 
 TEST(CanonicalNamesTests, GoodResourceProperties) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 resource_definition Example {
     properties {
@@ -200,7 +213,8 @@ resource_definition Example {
 }
 
 TEST(CanonicalNamesTests, GoodUpperAcronym) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type HTTPServer = struct {};
 type httpserver = struct {};
@@ -209,7 +223,8 @@ type httpserver = struct {};
 }
 
 TEST(CanonicalNamesTests, GoodCurrentLibrary) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type example = struct {};
 )FIDL");
@@ -218,7 +233,8 @@ type example = struct {};
 
 TEST(CanonicalNamesTests, GoodDependentLibrary) {
   SharedAmongstLibraries shared;
-  TestLibrary dependency(&shared, "foobar.fidl", R"FIDL(library foobar;
+  TestLibrary dependency(&shared, "foobar.fidl", R"FIDL(
+library foobar;
 
 type Something = struct {};
 )FIDL");
@@ -476,7 +492,8 @@ type HttpServer = struct {};
 
 TEST(CanonicalNamesTests, BadDependentLibrary) {
   SharedAmongstLibraries shared;
-  TestLibrary dependency(&shared, "foobar.fidl", R"FIDL(library foobar;
+  TestLibrary dependency(&shared, "foobar.fidl", R"FIDL(
+library foobar;
 
 type Something = struct {};
 )FIDL");

@@ -92,7 +92,8 @@ type FooSomeMethodRequest = struct {};
 }
 
 TEST(FlatAstTests, GoodSingleAnonymousNameUse) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Foo {
     SomeMethod() -> (struct {

@@ -11,7 +11,8 @@ namespace fidlc {
 namespace {
 
 TEST(TableTests, GoodPopulatedFields) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {
     1: x int64;
@@ -21,7 +22,8 @@ type Foo = table {
 }
 
 TEST(TableTests, GoodReservedFields) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {
     1: reserved;
@@ -31,7 +33,8 @@ type Foo = table {
 }
 
 TEST(TableTests, GoodReservedAndPopulatedFields) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {
     1: x int64;
@@ -42,7 +45,8 @@ type Foo = table {
 }
 
 TEST(TableTests, GoodManyReservedFields) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {
     1: reserved;
@@ -54,7 +58,8 @@ type Foo = table {
 }
 
 TEST(TableTests, GoodOutOfOrderFields) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {
     3: reserved;
@@ -66,7 +71,8 @@ type Foo = table {
 }
 
 TEST(TableTests, GoodAllowEmptyTables) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {};
 )FIDL");
@@ -121,7 +127,8 @@ TEST(TableTests, BadDuplicateOrdinals) {
 }
 
 TEST(TableTests, GoodAttributesOnFields) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {
     @foo_attr("bar")
@@ -134,7 +141,8 @@ type Foo = table {
 }
 
 TEST(TableTests, GoodAttributesOnTables) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 @foo_attr("bar")
 type Foo = table {
@@ -146,7 +154,8 @@ type Foo = table {
 }
 
 TEST(TableTests, GoodKeywordsAsFieldNames) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type struct = struct {
     field bool;
@@ -212,7 +221,8 @@ type OptionalTableContainer = union {
 }
 
 TEST(TableTests, GoodTableInTable) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {
     1: t int64;
@@ -226,7 +236,8 @@ type Bar = table {
 }
 
 TEST(TableTests, GoodTablesInUnions) {
-  TestLibrary library(R"FIDL(library fidl.test.tables;
+  TestLibrary library(R"FIDL(
+library fidl.test.tables;
 
 type Foo = table {
     1: t int64;
@@ -266,7 +277,6 @@ library fidl.test.tables;
 type Foo = table {
     1: t int64 = 1;
 };
-
 )FIDL");
   library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kEqual),
                      Token::KindAndSubkind(Token::Kind::kSemicolon));
@@ -366,7 +376,6 @@ type Example = table {
     63: v63 int64;
     64: v64 MyStruct;
 };
-
 )FIDL");
   library.ExpectFail(ErrMaxOrdinalNotTable);
   ASSERT_COMPILER_DIAGNOSTICS(library);

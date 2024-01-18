@@ -17,7 +17,6 @@ library fidl.test;
 type Foo = struct {
   bar @generated_name("Good") struct {};
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
@@ -33,7 +32,6 @@ library fidl.test;
 type Foo = table {
   1: bar @generated_name("Good") struct {};
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupTable("Foo");
@@ -49,7 +47,6 @@ library fidl.test;
 type Foo = union {
   1: bar @generated_name("Good") struct {};
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupUnion("Foo");
@@ -65,7 +62,6 @@ library fidl.test;
 protocol Foo {
   Bar(@generated_name("Good") struct { x uint32; });
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupProtocol("Foo");
@@ -83,7 +79,6 @@ library fidl.test;
 protocol Foo {
   strict Bar() -> (@generated_name("Good") struct { x uint32; });
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupProtocol("Foo");
@@ -101,7 +96,6 @@ library fidl.test;
 protocol Foo {
   Bar() -> (@generated_name("Good") struct { x uint32; }) error uint32;
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupProtocol("Foo");
@@ -120,7 +114,6 @@ library fidl.test;
 protocol Foo {
   Bar() -> () error @generated_name("Good") enum { A = 1; };
 };
-
 )FIDL");
   ASSERT_COMPILED(library)
   auto foo = library.LookupProtocol("Foo");
@@ -141,7 +134,6 @@ type Foo = struct {
     A = 1;
   };
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
@@ -159,7 +151,6 @@ type Foo = struct {
     A = 1;
   };
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
@@ -177,7 +168,6 @@ type Foo = struct {
     x uint32;
   };
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
@@ -195,7 +185,6 @@ type Foo = struct {
     1: x uint32;
   };
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
@@ -213,7 +202,6 @@ type Foo = struct {
     1: x uint32;
   };
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
@@ -229,7 +217,6 @@ library fidl.test;
 type Foo = struct {
   foo @generated_name("Bar") struct {};
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
 }
@@ -240,7 +227,6 @@ library fidl.test;
 
 @generated_name("Good")
 type Bad = struct {};
-
 )FIDL");
   library.ExpectFail(ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -251,7 +237,6 @@ TEST(GeneratedNameTests, BadOnTopLevelStruct) {
 library fidl.test;
 
 type Foo = @generated_name("Bad") struct {};
-
 )FIDL");
   library.ExpectFail(ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -266,7 +251,6 @@ type Foo = struct {
 };
 
 type Bar = struct {};
-
 )FIDL");
   library.ExpectFail(ErrCannotAttachAttributeToIdentifier);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -288,7 +272,6 @@ type MetaVars = enum {
   @generated_name("BAD")
   BAR = 2;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -304,7 +287,6 @@ service Bar {
   @generated_name("One")
   bar_one client_end:Foo;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidAttributePlacement, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -317,7 +299,6 @@ library fidl.test;
 type Foo = struct {
   bad @generated_name struct {};
 };
-
 )FIDL");
   library.ExpectFail(ErrMissingRequiredAnonymousAttributeArg, "generated_name");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -339,7 +320,6 @@ type Foo = struct {
 };
 
 type Baz = struct {};
-
 )FIDL");
   library.ExpectFail(ErrNameCollision, Element::Kind::kStruct, "Baz", Element::Kind::kStruct,
                      "example.fidl:5:30");

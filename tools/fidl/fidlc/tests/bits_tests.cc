@@ -24,7 +24,8 @@ TEST(BitsTests, GoodSimple) {
 }
 
 TEST(BitsTests, GoodDefaultUint32) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Fruit = bits {
     ORANGE = 1;
@@ -143,7 +144,8 @@ type B = bits {};
 }
 
 TEST(BitsTests, GoodKeywordNames) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Fruit = bits : uint64 {
     library = 1;

@@ -13,7 +13,8 @@ namespace fidlc {
 namespace {
 
 TEST(ProtocolTests, GoodValidEmptyProtocol) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol Empty {};
 )FIDL");
@@ -28,7 +29,8 @@ protocol Empty {};
 }
 
 TEST(ProtocolTests, GoodValidEmptyOpenProtocol) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 open protocol Empty {};
 )FIDL");
@@ -43,7 +45,8 @@ open protocol Empty {};
 }
 
 TEST(ProtocolTests, GoodValidEmptyAjarProtocol) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 ajar protocol Empty {};
 )FIDL");
@@ -58,7 +61,8 @@ ajar protocol Empty {};
 }
 
 TEST(ProtocolTests, GoodValidEmptyClosedProtocol) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 closed protocol Empty {};
 )FIDL");
@@ -77,7 +81,6 @@ TEST(ProtocolTests, BadEmptyStrictProtocol) {
 library example;
 
 strict protocol Empty {};
-
 )FIDL");
   library.ExpectFail(ErrExpectedDeclaration, "strict");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -88,7 +91,6 @@ TEST(ProtocolTests, BadEmptyFlexibleProtocol) {
 library example;
 
 flexible protocol Empty {};
-
 )FIDL");
   library.ExpectFail(ErrExpectedDeclaration, "flexible");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -99,7 +101,6 @@ TEST(ProtocolTests, BadOpenMissingProtocolToken) {
 library example;
 
 open Empty {};
-
 )FIDL");
   library.ExpectFail(ErrUnexpectedIdentifier, Token::KindAndSubkind(Token::Kind::kIdentifier),
                      Token::KindAndSubkind(Token::Subkind::kProtocol));
@@ -111,7 +112,6 @@ TEST(ProtocolTests, BadAjarMissingProtocolToken) {
 library example;
 
 ajar Empty {};
-
 )FIDL");
   library.ExpectFail(ErrUnexpectedIdentifier, Token::KindAndSubkind(Token::Kind::kIdentifier),
                      Token::KindAndSubkind(Token::Subkind::kProtocol));
@@ -123,7 +123,6 @@ TEST(ProtocolTests, BadClosedMissingProtocolToken) {
 library example;
 
 closed Empty {};
-
 )FIDL");
   library.ExpectFail(ErrUnexpectedIdentifier, Token::KindAndSubkind(Token::Kind::kIdentifier),
                      Token::KindAndSubkind(Token::Subkind::kProtocol));
@@ -137,14 +136,14 @@ library example;
 protocol Example {
   ;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodValidProtocolComposition) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol A {
     MethodA();
@@ -211,7 +210,6 @@ open protocol ComposeInOpen {
   compose Ajar;
   compose Open;
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -237,7 +235,6 @@ open protocol Composed {};
 closed protocol Composing {
   compose Composed;
 };
-
 )FIDL");
   library.ExpectFail(ErrComposedProtocolTooOpen, Openness::kClosed, "Composing", Openness::kOpen,
                      "Composed");
@@ -253,7 +250,6 @@ ajar protocol Composed {};
 closed protocol Composing {
   compose Composed;
 };
-
 )FIDL");
   library.ExpectFail(ErrComposedProtocolTooOpen, Openness::kClosed, "Composing", Openness::kAjar,
                      "Composed");
@@ -277,7 +273,6 @@ protocol A {};
 protocol B {
   strict compose A;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -292,7 +287,6 @@ protocol A {};
 protocol B {
   flexible compose A;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -305,7 +299,6 @@ library example;
 protocol Example {
   strict;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -318,7 +311,6 @@ library example;
 protocol Example {
   flexible;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -330,7 +322,6 @@ library example;
 
 protocol Parent {};
 protocol Child : Parent {};
-
 )FIDL");
   library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kColon),
                      Token::KindAndSubkind(Token::Kind::kLeftCurly));
@@ -345,14 +336,14 @@ protocol WellDocumented {
     Method();
     /// Misplaced doc comment
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, GoodAttachAttributesToCompose) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol ParentA {
     ParentMethodA();
@@ -400,7 +391,6 @@ library example;
 protocol Narcisse {
     compose Narcisse;
 };
-
 )FIDL");
   library.ExpectFail(ErrIncludeCycle, "protocol 'Narcisse' -> protocol 'Narcisse'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -428,7 +418,6 @@ library example;
 protocol Child {
     compose MissingParent;
 };
-
 )FIDL");
   library.ExpectFail(ErrNameNotFound, "MissingParent", "example");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -448,7 +437,6 @@ library example;
 protocol NoMoreOrdinals {
     42: NiceTry();
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -468,7 +456,6 @@ library example;
 protocol Wrong {
     not_compose Something;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidProtocolMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -670,7 +657,8 @@ type Foo = resource struct {
 }
 
 TEST(ProtocolTests, GoodTypedChannels) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol MyProtocol {};
 
@@ -715,7 +703,8 @@ type Foo = resource struct {
 }
 
 TEST(ProtocolTests, GoodPartialTypedChannelConstraints) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 protocol MyProtocol {};
 

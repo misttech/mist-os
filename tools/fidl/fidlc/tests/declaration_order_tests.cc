@@ -77,7 +77,7 @@ constexpr int kRepeatTestCount = 100;
 
 // This test ensures that there are no unused anonymous structs in the
 // declaration order output.
-TEST(DeclarationOrderTest, GoodNoUnusedAnonymousNames) {
+TEST(DeclarationOrderTests, GoodNoUnusedAnonymousNames) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -86,7 +86,6 @@ library example;
 protocol #Protocol# {
     strict Method() -> ();
 };
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -96,7 +95,7 @@ protocol #Protocol# {
   }
 }
 
-TEST(DeclarationOrderTest, GoodNonnullableRef) {
+TEST(DeclarationOrderTests, GoodNonnullableRef) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -111,7 +110,6 @@ type #Element# = struct {};
 protocol #Protocol# {
   SomeMethod(struct { req #Request#; });
 };
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -124,7 +122,7 @@ protocol #Protocol# {
   }
 }
 
-TEST(DeclarationOrderTest, GoodNullableRefBreaksDependency) {
+TEST(DeclarationOrderTests, GoodNullableRefBreaksDependency) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -141,7 +139,6 @@ type #Element# = resource struct {
 protocol #Protocol# {
   SomeMethod(resource struct { req #Request#; });
 };
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -170,7 +167,7 @@ protocol #Protocol# {
   }
 }
 
-TEST(DeclarationOrderTest, GoodRequestTypeBreaksDependencyGraph) {
+TEST(DeclarationOrderTests, GoodRequestTypeBreaksDependencyGraph) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -183,7 +180,6 @@ type #Request# = resource struct {
 protocol #Protocol# {
   SomeMethod(resource struct { req #Request#; });
 };
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -195,7 +191,7 @@ protocol #Protocol# {
   }
 }
 
-TEST(DeclarationOrderTest, GoodNonnullableUnion) {
+TEST(DeclarationOrderTests, GoodNonnullableUnion) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -213,7 +209,6 @@ protocol #Protocol# {
 type #Payload# = struct {
   a int32;
 };
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -226,7 +221,7 @@ type #Payload# = struct {
   }
 }
 
-TEST(DeclarationOrderTest, GoodNullableUnion) {
+TEST(DeclarationOrderTests, GoodNullableUnion) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -244,7 +239,6 @@ protocol #Protocol# {
 type #Payload# = struct {
   a int32;
 };
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -273,7 +267,7 @@ type #Payload# = struct {
   }
 }
 
-TEST(DeclarationOrderTest, GoodNonnullableUnionInStruct) {
+TEST(DeclarationOrderTests, GoodNonnullableUnionInStruct) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -294,7 +288,6 @@ type #Request# = struct {
 type #Union# = union {
   1: foo #Payload#;
 };
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -308,7 +301,7 @@ type #Union# = union {
   }
 }
 
-TEST(DeclarationOrderTest, GoodNullableUnionInStruct) {
+TEST(DeclarationOrderTests, GoodNullableUnionInStruct) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -329,7 +322,6 @@ type #Request# = struct {
 type #Union# = union {
   1: foo #Payload#;
 };
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -360,7 +352,7 @@ type #Union# = union {
   }
 }
 
-TEST(DeclarationOrderTest, GoodMultipleLibraries) {
+TEST(DeclarationOrderTests, GoodMultipleLibraries) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     SharedAmongstLibraries shared;
     TestLibrary dependency(&shared, "dependency.fidl", R"FIDL(
@@ -381,7 +373,6 @@ type ExampleDecl2 = struct {};
 protocol ExampleDecl1 {
   Method(struct { arg dependency.ExampleDecl1; });
 };
-
 )FIDL");
     ASSERT_COMPILED(library);
 
@@ -398,7 +389,7 @@ protocol ExampleDecl1 {
   }
 }
 
-TEST(DeclarationOrderTest, GoodConstTypeComesFirst) {
+TEST(DeclarationOrderTests, GoodConstTypeComesFirst) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -407,7 +398,6 @@ library example;
 const #Constant# #Alias# = 42;
 
 alias #Alias# = uint32;
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -418,7 +408,7 @@ alias #Alias# = uint32;
   }
 }
 
-TEST(DeclarationOrderTest, GoodEnumOrdinalTypeComesFirst) {
+TEST(DeclarationOrderTests, GoodEnumOrdinalTypeComesFirst) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -427,7 +417,6 @@ library example;
 type #Enum# = enum : #Alias# { A = 1; };
 
 alias #Alias# = uint32;
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);
@@ -438,7 +427,7 @@ alias #Alias# = uint32;
   }
 }
 
-TEST(DeclarationOrderTest, GoodBitsOrdinalTypeComesFirst) {
+TEST(DeclarationOrderTests, GoodBitsOrdinalTypeComesFirst) {
   for (int i = 0; i < kRepeatTestCount; i++) {
     Namer namer;
     auto source = namer.mangle(R"FIDL(
@@ -447,7 +436,6 @@ library example;
 type #Bits# = bits : #Alias# { A = 1; };
 
 alias #Alias# = uint32;
-
 )FIDL");
     TestLibrary library(source);
     ASSERT_COMPILED(library);

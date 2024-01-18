@@ -11,7 +11,8 @@ namespace fidlc {
 namespace {
 
 TEST(UnionTests, GoodKeywordsAsFieldNames) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type struct = struct {
     field bool;
@@ -32,7 +33,8 @@ type Foo = strict union {
 }
 
 TEST(UnionTests, GoodRecursiveUnion) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Value = strict union {
     1: bool_value bool;
@@ -43,7 +45,8 @@ type Value = strict union {
 }
 
 TEST(UnionTests, GoodMutuallyRecursive) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = strict union {
     1: bar Bar;
@@ -57,7 +60,8 @@ type Bar = struct {
 }
 
 TEST(UnionTests, GoodFlexibleUnion) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = flexible union {
     1: bar string;
@@ -81,7 +85,8 @@ TEST(UnionTests, BadMustHaveExplicitOrdinals) {
 }
 
 TEST(UnionTests, GoodExplicitOrdinals) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = strict union {
     1: foo int64;
@@ -103,7 +108,8 @@ type Foo = strict union {
 }
 
 TEST(UnionTests, GoodOrdinalsWithReserved) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = strict union {
     1: reserved;
@@ -137,7 +143,8 @@ type Foo = strict union {
 }
 
 TEST(UnionTests, GoodOrdinalsOutOfOrder) {
-  TestLibrary library(R"FIDL(library test;
+  TestLibrary library(R"FIDL(
+library test;
 
 type Foo = strict union {
     5: foo int64;
@@ -224,7 +231,6 @@ library test;
 type Foo = strict union {
     1: t int64 = 1;
 };
-
 )FIDL");
   library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kEqual),
                      Token::KindAndSubkind(Token::Kind::kSemicolon));
@@ -240,7 +246,6 @@ type Example = strict union {
     1: first int64;
     3: third int64;
 };
-
 )FIDL");
   library.ExpectFail(ErrNonDenseOrdinal, 2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -260,7 +265,6 @@ library example;
 type Value = strict union {
   1: value Value;
 };
-
 )FIDL");
   library.ExpectFail(ErrIncludeCycle, "union 'Value' -> union 'Value'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -271,7 +275,6 @@ TEST(UnionTests, GoodEmptyFlexibleUnion) {
 library example;
 
 type Foo = flexible union {};
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -287,7 +290,6 @@ library example;
 type Foo = flexible union {
   1: reserved;
 };
-
 )FIDL");
   ASSERT_COMPILED(library);
 
@@ -315,7 +317,8 @@ TEST(UnionTests, BadOnlyReservedStrictUnion) {
 }
 
 TEST(UnionTests, GoodErrorSyntaxExplicitOrdinals) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 open protocol Example {
     flexible Method() -> () error int32;
 };
@@ -336,7 +339,6 @@ library example;
 type Foo = strict union {
   @selector("v2") 1: v string;
 };
-
 )FIDL");
   library.ExpectFail(ErrInvalidAttributePlacement, "selector");
   ASSERT_COMPILER_DIAGNOSTICS(library);

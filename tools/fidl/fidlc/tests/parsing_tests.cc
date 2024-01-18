@@ -37,7 +37,8 @@ TEST(ParsingTests, BadLibraryNameTest) {
 // Test that otherwise reserved words can be appropriately parsed when context
 // is clear.
 TEST(ParsingTests, GoodParsingReservedWordsInStructTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type struct = struct {
     field bool;
@@ -87,7 +88,8 @@ type InStruct = struct {
 // Test that otherwise reserved words can be appropriately parsed when context
 // is clear.
 TEST(ParsingTests, GoodParsingReservedWordsInConstraint) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 alias T = fidl.uint8;
 type S = struct {};
@@ -166,7 +168,8 @@ alias float64_constraint = vector<S>:float64;
 }
 
 TEST(ParsingTests, GoodParsingHandlesInStructTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type ObjType = strict enum : uint32 {
     NONE = 0;
@@ -240,7 +243,8 @@ type Handles = resource struct {
 }
 
 TEST(ParsingTests, GoodParsingHandleConstraintTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type ObjType = strict enum : uint32 {
     NONE = 0;
@@ -271,7 +275,8 @@ type Handles = resource struct {
 // Test that otherwise reserved words can be appropriarely parsed when context
 // is clear.
 TEST(ParsingTests, GoodParsingReservedWordsInUnionTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type struct = struct {
     field bool;
@@ -314,7 +319,8 @@ type InUnion = strict union {
 // Test that otherwise reserved words can be appropriately parsed when context
 // is clear.
 TEST(ParsingTests, GoodParsingReservedWordsInProtocolTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type struct = struct {
     field bool;
@@ -457,7 +463,8 @@ TEST(ParsingTests, BadInvalidCharacterTest) {
 }
 
 TEST(ParsingTests, GoodEmptyStructTest) {
-  TestLibrary library(R"FIDL(library fidl.test.emptystruct;
+  TestLibrary library(R"FIDL(
+library fidl.test.emptystruct;
 
 type Empty = struct {};
 )FIDL");
@@ -466,7 +473,8 @@ type Empty = struct {};
 
 TEST(ParsingTests, BadErrorOnAliasBeforeImports) {
   SharedAmongstLibraries shared;
-  TestLibrary dependency(&shared, "dependent.fidl", R"FIDL(library dependent;
+  TestLibrary dependency(&shared, "dependent.fidl", R"FIDL(
+library dependent;
 
 type Something = struct {};
 )FIDL");
@@ -633,7 +641,8 @@ TEST(ParsingTests, GoodBlankLinesAfterDocCommentTest) {
 }
 
 TEST(ParsingTests, GoodBlankLinesAfterDocCommentWithCommentTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 /// doc comment
 

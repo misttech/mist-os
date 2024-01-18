@@ -26,7 +26,8 @@ void CheckConstEq(TestLibrary& library, std::string_view name, PrimitiveType exp
 }
 
 TEST(ConstsTests, GoodLiteralsTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const C_SIMPLE uint32 = 11259375;
 const C_HEX_S uint32 = 0xABCDEF;
@@ -49,7 +50,8 @@ const C_BINARY_L uint32 = 0B101010111100110111101111;
 }
 
 TEST(ConstsTests, GoodConstTestBool) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const c bool = false;
 )FIDL");
@@ -76,7 +78,8 @@ const c bool = 6;
 }
 
 TEST(ConstsTests, GoodConstTestInt32) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const c int32 = 42;
 )FIDL");
@@ -84,7 +87,8 @@ const c int32 = 42;
 }
 
 TEST(ConstsTests, GoodConstTestInt32FromOtherConst) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const b int32 = 42;
 const c int32 = b;
@@ -127,7 +131,8 @@ TEST(ConstsTests, GoodConstTesUint64) {
 }
 
 TEST(ConstsTests, GoodConstTestUint64FromOtherUint32) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const a uint32 = 42;
 const b uint64 = a;
@@ -155,7 +160,8 @@ const a uint64 = 18446744073709551616;
 }
 
 TEST(ConstsTests, GoodConstTestFloat32) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const b float32 = 1.61803;
 const c float32 = -36.46216;
@@ -164,7 +170,8 @@ const c float32 = -36.46216;
 }
 
 TEST(ConstsTests, GoodConstTestFloat32HighLimit) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const hi float32 = 3.402823e38;
 )FIDL");
@@ -172,7 +179,8 @@ const hi float32 = 3.402823e38;
 }
 
 TEST(ConstsTests, GoodConstTestFloat32LowLimit) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const lo float32 = -3.40282e38;
 )FIDL");
@@ -208,7 +216,8 @@ TEST(ConstsTests, GoodConstTestString) {
 }
 
 TEST(ConstsTests, GoodConstTestStringFromOtherConst) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const c string:4 = "four";
 const d string:5 = c;
@@ -250,7 +259,8 @@ const c string:4 = "hello";
 }
 
 TEST(ConstsTests, GoodConstTestUsing) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 alias foo = int32;
 const c foo = 2;
@@ -319,7 +329,8 @@ const c handle:THREAD = -1;
 }
 
 TEST(ConstsTests, GoodConstEnumMemberReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyEnum = strict enum : int32 {
     A = 5;
@@ -330,7 +341,8 @@ const c int32 = MyEnum.A;
 }
 
 TEST(ConstsTests, GoodConstBitsMemberReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyBits = strict bits : uint32 {
     A = 0x00000001;
@@ -341,7 +353,8 @@ const c uint32 = MyBits.A;
 }
 
 TEST(ConstsTests, GoodEnumTypedConstEnumMemberReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyEnum = strict enum : int32 {
     A = 5;
@@ -352,7 +365,8 @@ const c MyEnum = MyEnum.A;
 }
 
 TEST(ConstsTests, GoodEnumTypedConstBitsMemberReference) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyBits = strict bits : uint32 {
     A = 0x00000001;
@@ -408,7 +422,8 @@ const c MyBits = 5;
 }
 
 TEST(ConstsTests, GoodMaxBoundTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const S string:MAX = "";
 
@@ -421,7 +436,8 @@ type Example = struct {
 }
 
 TEST(ConstsTests, GoodMaxBoundTestConvertToUnbounded) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const A string:MAX = "foo";
 const B string = A;
@@ -430,7 +446,8 @@ const B string = A;
 }
 
 TEST(ConstsTests, GoodMaxBoundTestConvertFromUnbounded) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const A string = "foo";
 const B string:MAX = A;
@@ -612,7 +629,8 @@ const dee BitsType = BitsType.D;
 }
 
 TEST(ConstsTests, GoodOrOperatorTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyBits = strict bits : uint8 {
     A = 0x00000001;
@@ -639,7 +657,8 @@ TEST(ConstsTests, BadOrOperatorDifferentTypesTest) {
 }
 
 TEST(ConstsTests, GoodOrOperatorDifferentTypesTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 const one uint8 = 0x0001;
 const two_fifty_six uint16 = 0x0100;
@@ -660,7 +679,8 @@ TEST(ConstsTests, BadOrOperatorNonPrimitiveTypesTest) {
 }
 
 TEST(ConstsTests, GoodOrOperatorParenthesesTest) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type MyBits = strict bits : uint8 {
     A = 0x00000001;

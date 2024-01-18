@@ -52,7 +52,8 @@ type Foo = flexible enum : int8 {
 }
 
 TEST(FlexibleTests, GoodEnumCanUseMaxValueIfOtherIsUnknownUnsigned) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Foo = flexible enum : uint8 {
     ZERO = 0;
@@ -71,7 +72,8 @@ type Foo = flexible enum : uint8 {
 }
 
 TEST(FlexibleTests, GoodEnumCanUseMaxValueIfOtherIsUnknownSigned) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Foo = flexible enum : int8 {
     ZERO = 0;
@@ -90,7 +92,8 @@ type Foo = flexible enum : int8 {
 }
 
 TEST(FlexibleTests, GoodEnumCanUseZeroAsUnknownValue) {
-  TestLibrary library(R"FIDL(library example;
+  TestLibrary library(R"FIDL(
+library example;
 
 type Foo = flexible enum : int8 {
     @unknown
