@@ -24,7 +24,7 @@ use starnix_core::{
         FdFlags, FileHandle,
     },
 };
-use starnix_logging::log_error;
+use starnix_logging::{log_error, log_warn};
 use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, sync::Arc};
 
@@ -131,8 +131,24 @@ pub async fn serve_container_controller(
         .map_err(Error::from)
         .try_for_each_concurrent(None, |event| async {
             match event {
-                fstarcontainer::ControllerRequest::VsockConnect { port, bridge_socket, .. }
-                | fstarcontainer::ControllerRequest::VsockConnect2 {
+                fstarcontainer::ControllerRequest::VsockConnect {
+                    payload:
+                        fstarcontainer::ControllerVsockConnectRequest { port, bridge_socket, .. },
+                    ..
+                } => {
+                    let Some(port) = port else {
+                        log_warn!("vsock connection missing port");
+                        return Ok(());
+                    };
+                    let Some(bridge_socket) = bridge_socket else {
+                        log_warn!("vsock connection missing bridge_socket");
+                        return Ok(());
+                    };
+                    connect_to_vsock(port, bridge_socket, system_task).await.unwrap_or_else(|e| {
+                        log_error!("failed to connect to vsock {:?}", e);
+                    });
+                }
+                fstarcontainer::ControllerRequest::VsockConnect2 {
                     port, bridge_socket, ..
                 } => {
                     connect_to_vsock(port, bridge_socket, system_task).await.unwrap_or_else(|e| {

@@ -15,9 +15,9 @@ type ConsoleWindowSize = struct {
 @discoverable
 open protocol Controller {
     /// Connects `bridge_socket` to a vsocket at `port` in the container.
-    flexible VsockConnect(resource struct {
-        port uint32;
-        bridge_socket zx.Handle:SOCKET;
+    flexible VsockConnect(resource table {
+        1: port uint32;
+        2: bridge_socket zx.Handle:SOCKET;
     });
 
     // TODO(https://fxbug.dev/319871624) delete

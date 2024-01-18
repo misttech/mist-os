@@ -8,6 +8,7 @@ use async_net::{Ipv4Addr, TcpListener, TcpStream};
 use fho::SimpleWriter;
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol as rc;
+use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
@@ -172,7 +173,11 @@ pub async fn starnix_adb(
 
         controller_proxy
             .0
-            .vsock_connect(ADB_DEFAULT_PORT, sbridge)
+            .vsock_connect(fstarcontainer::ControllerVsockConnectRequest {
+                port: Some(ADB_DEFAULT_PORT),
+                bridge_socket: Some(sbridge),
+                ..Default::default()
+            })
             .context("connecting to adbd")?;
 
         let reconnect_flag = Arc::clone(&controller_proxy.1);
