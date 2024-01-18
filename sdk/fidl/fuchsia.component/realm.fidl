@@ -13,6 +13,10 @@ const MAX_HANDLE_COUNT uint32 = 128;
 /// The maximum number of dynamic offers that can target a created component.
 const MAX_DYNAMIC_OFFER_COUNT uint32 = 128;
 
+// The maximum number of configuration capabilities that can target a created component.
+@available(added=HEAD)
+const MAX_CONFIG_COUNT uint32 = 128;
+
 /// The maximum number of children that the a call `ChildIterator.Next`
 /// can return.
 /// Note, this is not a limit on the number of children that can be added
@@ -142,6 +146,23 @@ type CreateChildArgs = resource table {
     /// component's lifecycle.
     @available(added=14)
     3: controller server_end:Controller;
+
+    /// Configuration Capabilities that will target the component instance.
+    ///
+    /// Including a Configuration in this list will add the Configuration Capability
+    /// as a dynamic capability in the current realm. It will also create a dynamic
+    /// offer for this capability to the child.
+    ///
+    /// The dynamic offer that is created is from `self` to the newly created child.
+    ///
+    /// If the newly created child is destroyed, both the configuration capability and
+    /// its resulting dynamic offer will be destroyed.
+    ///
+    /// In order to set this field to a non-empty value, the collection in which
+    /// the child component is being created must specify
+    /// `ComponentDecl.allowed_offers = STATIC_AND_DYNAMIC`.
+    @available(added=HEAD)
+    4: config_capabilities vector<fuchsia.component.decl.Configuration>:MAX_CONFIG_COUNT;
 };
 
 /// A protocol to iterate over the list of children in a realm.

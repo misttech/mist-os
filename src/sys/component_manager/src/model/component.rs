@@ -56,7 +56,7 @@ use {
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_rust::{
         self, CapabilityDecl, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative,
-        NativeIntoFidl, OfferDeclCommon, UseDecl,
+        NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
     },
     cm_types::Name,
     cm_util::channel,
@@ -564,11 +564,38 @@ impl ComponentInstance {
             return Err(AddDynamicChildError::NameTooLong { max_len: cm_types::MAX_NAME_LENGTH });
         }
 
-        if child_args.dynamic_offers.as_ref().map(|v| v.first()).flatten().is_some()
+        let mut dynamic_offers = child_args.dynamic_offers.unwrap_or_else(Vec::new);
+        if dynamic_offers.len() > 0
             && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
         {
             return Err(AddDynamicChildError::DynamicOffersNotAllowed { collection_name });
         }
+
+        let dynamic_capabilities = {
+            let configs = child_args.config_capabilities.unwrap_or_else(Vec::new);
+            if !configs.is_empty()
+                && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
+            {
+                return Err(AddDynamicChildError::DynamicOffersNotAllowed { collection_name });
+            }
+            let mut dynamic_capabilities = Vec::new();
+            for mut config in configs {
+                let original_name = config.name.clone();
+                if let Some(original_name) = original_name.as_ref() {
+                    config.name =
+                        Some(format!("{}.{}.{}", original_name, collection_name, child_decl.name));
+                }
+
+                dynamic_offers.push(fdecl::Offer::Config(fdecl::OfferConfiguration {
+                    source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                    source_name: config.name.clone(),
+                    target_name: original_name,
+                    ..Default::default()
+                }));
+                dynamic_capabilities.push(fdecl::Capability::Config(config));
+            }
+            dynamic_capabilities
+        };
 
         let collection_dict = state
             .collection_dicts
@@ -581,7 +608,8 @@ impl ComponentInstance {
                 self,
                 child_decl,
                 Some(&collection_decl),
-                child_args.dynamic_offers,
+                Some(dynamic_offers),
+                Some(dynamic_capabilities),
                 child_args.controller,
                 child_dict,
             )
@@ -1128,6 +1156,7 @@ fn offer_target_mut(offer: &mut fdecl::Offer) -> Option<&mut Option<fdecl::Ref>>
         | fdecl::Offer::Directory(fdecl::OfferDirectory { target, .. })
         | fdecl::Offer::Storage(fdecl::OfferStorage { target, .. })
         | fdecl::Offer::Runner(fdecl::OfferRunner { target, .. })
+        | fdecl::Offer::Config(fdecl::OfferConfiguration { target, .. })
         | fdecl::Offer::Resolver(fdecl::OfferResolver { target, .. }) => Some(target),
         fdecl::OfferUnknown!() => None,
     }
@@ -1409,6 +1438,13 @@ pub struct ResolvedInstanceState {
     /// Hosts a directory mapping the component's exposed capabilities.
     exposed_dir: ExposedDir,
 
+    /// Dynamic capabilities this component supports.
+    ///
+    /// For now, these are added in the the `AddChild` API for a realm, and we only
+    /// support configuration capabilities. In the `AddChild` API these are paired with
+    /// a dynamic offer, and are removed when that dynamic offer is removed.
+    dynamic_capabilities: Vec<cm_rust::CapabilityDecl>,
+
     /// Dynamic offers targeting this component's dynamic children.
     ///
     /// Invariant: the `target` field of all offers must refer to a live dynamic
@@ -1472,6 +1508,7 @@ impl ResolvedInstanceState {
             environments,
             namespace_dir: Once::default(),
             exposed_dir,
+            dynamic_capabilities: vec![],
             dynamic_offers: vec![],
             address,
             anonymized_services: HashMap::new(),
@@ -1790,6 +1827,8 @@ impl ResolvedInstanceState {
             return;
         }
 
+        let mut capability_names_to_remove = HashSet::new();
+
         // Delete any dynamic offers whose `source` or `target` matches the
         // component we're deleting.
         self.dynamic_offers.retain(|offer| {
@@ -1803,8 +1842,14 @@ impl ResolvedInstanceState {
                     name: moniker.name().to_string().into(),
                     collection: moniker.collection().map(|c| c.clone()),
                 });
+            if target_matches && offer.source() == &cm_rust::OfferSource::Self_ {
+                capability_names_to_remove.insert(offer.source_name().clone());
+            }
             !source_matches && !target_matches
         });
+        // Delete any dynamic capabilities whose `source` or `target` matches the
+        // component we're deleting.
+        self.dynamic_capabilities.retain(|cap| !capability_names_to_remove.contains(cap.name()))
     }
 
     /// Creates a set of Environments instantiated from their EnvironmentDecls.
@@ -1877,12 +1922,21 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
+        dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         dict: Dict,
     ) -> Result<(Arc<ComponentInstance>, BoxFuture<'static, Result<(), ActionError>>), AddChildError>
     {
         let (child, dict) = self
-            .add_child_internal(component, child, collection, dynamic_offers, controller, dict)
+            .add_child_internal(
+                component,
+                child,
+                collection,
+                dynamic_offers,
+                dynamic_capabilities,
+                controller,
+                dict,
+            )
             .await?;
         // Register a Discover action.
         let discover_fut = child
@@ -1904,7 +1958,7 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
     ) -> Result<(), AddChildError> {
-        self.add_child_internal(component, child, collection, None, None, Dict::new())
+        self.add_child_internal(component, child, collection, None, None, None, Dict::new())
             .await
             .map(|_| ())
     }
@@ -1915,6 +1969,7 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
+        dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         mut child_dict: Dict,
     ) -> Result<(Arc<ComponentInstance>, Dict), AddChildError> {
@@ -1922,8 +1977,12 @@ impl ResolvedInstanceState {
             (dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
         );
-        let dynamic_offers =
-            self.validate_and_convert_dynamic_offers(dynamic_offers, child, collection)?;
+        let (dynamic_offers, dynamic_capabilities) = self.validate_and_convert_dynamic_component(
+            dynamic_offers,
+            dynamic_capabilities,
+            child,
+            collection,
+        )?;
 
         let child_moniker =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
@@ -1976,20 +2035,19 @@ impl ResolvedInstanceState {
             }
         }
         self.children.insert(child_moniker, child.clone());
+
         self.dynamic_offers.extend(dynamic_offers.into_iter());
+        self.dynamic_capabilities.extend(dynamic_capabilities.into_iter());
+
         Ok((child, child_dict))
     }
 
-    fn validate_and_convert_dynamic_offers(
+    fn add_target_dynamic_offers(
         &self,
-        dynamic_offers: Option<Vec<fdecl::Offer>>,
+        mut dynamic_offers: Vec<fdecl::Offer>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
-    ) -> Result<Vec<cm_rust::OfferDecl>, DynamicOfferError> {
-        let mut dynamic_offers = dynamic_offers.unwrap_or_default();
-        if dynamic_offers.is_empty() {
-            return Ok(vec![]);
-        }
+    ) -> Result<Vec<fdecl::Offer>, DynamicOfferError> {
         for offer in dynamic_offers.iter_mut() {
             match offer {
                 fdecl::Offer::Service(fdecl::OfferService { target, .. })
@@ -1998,6 +2056,7 @@ impl ResolvedInstanceState {
                 | fdecl::Offer::Storage(fdecl::OfferStorage { target, .. })
                 | fdecl::Offer::Runner(fdecl::OfferRunner { target, .. })
                 | fdecl::Offer::Resolver(fdecl::OfferResolver { target, .. })
+                | fdecl::Offer::Config(fdecl::OfferConfiguration { target, .. })
                 | fdecl::Offer::EventStream(fdecl::OfferEventStream { target, .. }) => {
                     if target.is_some() {
                         return Err(DynamicOfferError::OfferInvalid {
@@ -2020,23 +2079,61 @@ impl ResolvedInstanceState {
                     collection: Some(collection.unwrap().name.clone().into()),
                 }));
         }
+        Ok(dynamic_offers)
+    }
+
+    fn validate_dynamic_component(
+        &self,
+        dynamic_offers: Vec<fdecl::Offer>,
+        dynamic_capabilities: Vec<fdecl::Capability>,
+    ) -> Result<(), AddChildError> {
+        // Combine all our dynamic offers.
         let mut all_dynamic_offers: Vec<_> =
             self.dynamic_offers.clone().into_iter().map(NativeIntoFidl::native_into_fidl).collect();
         all_dynamic_offers.append(&mut dynamic_offers.clone());
-        cm_fidl_validator::validate_dynamic_offers(
-            &all_dynamic_offers,
-            &self.resolved_component.decl.clone().native_into_fidl(),
-        )?;
+
+        // Combine all our dynamic capabilities.
+        let mut decl = self.resolved_component.decl.clone();
+        decl.capabilities.extend(self.dynamic_capabilities.clone().into_iter());
+        let mut decl = decl.native_into_fidl();
+        match &mut decl.capabilities.as_mut() {
+            Some(c) => c.extend(dynamic_capabilities.into_iter()),
+            None => decl.capabilities = Some(dynamic_capabilities),
+        }
+
+        // Validate!
+        cm_fidl_validator::validate_dynamic_offers(&all_dynamic_offers, &decl)?;
+
         // Manifest validation is not informed of the contents of collections, and is thus unable
         // to confirm the source exists if it's in a collection. Let's check that here.
         let dynamic_offers: Vec<cm_rust::OfferDecl> =
             dynamic_offers.into_iter().map(FidlIntoNative::fidl_into_native).collect();
         for offer in &dynamic_offers {
             if !self.offer_source_exists(offer.source()) {
-                return Err(DynamicOfferError::SourceNotFound { offer: offer.clone() });
+                return Err(DynamicOfferError::SourceNotFound { offer: offer.clone() }.into());
             }
         }
-        Ok(dynamic_offers)
+        Ok(())
+    }
+
+    fn validate_and_convert_dynamic_component(
+        &self,
+        dynamic_offers: Option<Vec<fdecl::Offer>>,
+        dynamic_capabilities: Option<Vec<fdecl::Capability>>,
+        child: &ChildDecl,
+        collection: Option<&CollectionDecl>,
+    ) -> Result<(Vec<cm_rust::OfferDecl>, Vec<cm_rust::CapabilityDecl>), AddChildError> {
+        let dynamic_offers = dynamic_offers.unwrap_or_default();
+        let dynamic_capabilities = dynamic_capabilities.unwrap_or_default();
+
+        let dynamic_offers = self.add_target_dynamic_offers(dynamic_offers, child, collection)?;
+        if !dynamic_offers.is_empty() || !dynamic_capabilities.is_empty() {
+            self.validate_dynamic_component(dynamic_offers.clone(), dynamic_capabilities.clone())?;
+        }
+        let dynamic_offers = dynamic_offers.into_iter().map(|o| o.fidl_into_native()).collect();
+        let dynamic_capabilities =
+            dynamic_capabilities.into_iter().map(|c| c.fidl_into_native()).collect();
+        Ok((dynamic_offers, dynamic_capabilities))
     }
 
     async fn add_static_children(
@@ -2095,7 +2192,13 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
     }
 
     fn capabilities(&self) -> Vec<cm_rust::CapabilityDecl> {
-        self.resolved_component.decl.capabilities.clone()
+        self.resolved_component
+            .decl
+            .capabilities
+            .iter()
+            .chain(self.dynamic_capabilities.iter())
+            .cloned()
+            .collect()
     }
 
     fn collections(&self) -> Vec<cm_rust::CollectionDecl> {
@@ -3245,8 +3348,9 @@ pub mod tests {
                 .lock_resolved_state()
                 .await
                 .expect("failed to get resolved state")
-                .validate_and_convert_dynamic_offers(
+                .validate_and_convert_dynamic_component(
                     Some(offers),
+                    None,
                     &ChildDecl {
                         name: "foo".to_string(),
                         url: "http://foo".to_string(),
@@ -3260,7 +3364,10 @@ pub mod tests {
         };
 
         assert_eq!(
-            validate_and_convert(vec![]).await.expect("failed to validate/convert dynamic offers"),
+            validate_and_convert(vec![])
+                .await
+                .expect("failed to validate/convert dynamic offers")
+                .0,
             vec![],
         );
 
@@ -3275,7 +3382,8 @@ pub mod tests {
                 ..Default::default()
             })])
             .await
-            .expect("failed to validate/convert dynamic offers"),
+            .expect("failed to validate/convert dynamic offers")
+            .0,
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Parent,
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -3301,7 +3409,8 @@ pub mod tests {
                 ..Default::default()
             })])
             .await
-            .expect("failed to validate/convert dynamic offers"),
+            .expect("failed to validate/convert dynamic offers")
+            .0,
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Void,
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -3334,8 +3443,9 @@ pub mod tests {
                 ])
                 .await
                 .expect_err("unexpected succeess in validate/convert dynamic offers"),
-            DynamicOfferError::SourceNotFound { offer }
-                if offer == OfferDecl::Protocol(OfferProtocolDecl {
+                AddChildError::DynamicOfferError { err }
+            if err == DynamicOfferError::SourceNotFound {
+                offer: OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
                         name: "doesnt-exist".into(),
                         collection: Some("col".parse().unwrap()),
@@ -3350,6 +3460,92 @@ pub mod tests {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Optional,
                 })
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn validate_and_convert_dynamic_capabilities() {
+        let components = vec![(
+            "root",
+            ComponentDeclBuilder::new()
+                .add_collection(CollectionDecl {
+                    name: "col".parse().unwrap(),
+                    durability: fdecl::Durability::Transient,
+                    environment: None,
+                    allowed_offers: cm_types::AllowedOffers::StaticAndDynamic,
+                    allow_long_names: false,
+                    persistent_storage: Some(false),
+                })
+                .build(),
+        )];
+        let test = ActionsTest::new("root", components, None).await;
+        let _root = test
+            .model
+            .start_instance(&Moniker::root(), &StartReason::Root)
+            .await
+            .expect("failed to start root");
+        test.runner.wait_for_urls(&["test:///root_resolved"]).await;
+
+        let root_component = test.look_up(Moniker::root()).await;
+
+        let validate_and_convert = |capabilities: Vec<fdecl::Capability>| async {
+            root_component
+                .lock_resolved_state()
+                .await
+                .expect("failed to get resolved state")
+                .validate_and_convert_dynamic_component(
+                    None,
+                    Some(capabilities),
+                    &ChildDecl {
+                        name: "foo".to_string(),
+                        url: "http://foo".to_string(),
+                        startup: fdecl::StartupMode::Lazy,
+                        on_terminate: None,
+                        environment: None,
+                        config_overrides: None,
+                    },
+                    None,
+                )
+        };
+
+        assert_eq!(validate_and_convert(vec![]).await.unwrap().1, vec![],);
+
+        assert_eq!(
+            validate_and_convert(vec![fdecl::Capability::Config(fdecl::Configuration {
+                name: Some("myConfig".to_string()),
+                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
+                ..Default::default()
+            })])
+            .await
+            .unwrap()
+            .1,
+            vec![cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "myConfig".parse().unwrap(),
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(true)),
+            })],
+        );
+
+        assert_matches!(
+            validate_and_convert(vec![
+                fdecl::Capability::Config(fdecl::Configuration {
+                name: Some("dupe".to_string()),
+                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
+                ..Default::default()
+            }),
+            fdecl::Capability::Config(fdecl::Configuration {
+                name: Some("dupe".to_string()),
+                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
+                ..Default::default()
+            }),
+        ])
+            .await.unwrap_err(),
+            AddChildError::DynamicConfigError { err}
+            if err ==
+            cm_fidl_validator::error::ErrorList {
+
+                                errs: vec![cm_fidl_validator::error::Error::duplicate_field(DeclType::Configuration, "name", "dupe")],
+             }
         );
     }
 

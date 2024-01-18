@@ -10,4 +10,17 @@
     program: {
         binary: "bin/sc_capabilities_dynamic",
     },
+    collections: [
+        {
+            name: "collection",
+            durability: "transient",
+            allowed_offers: "static_and_dynamic",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+    ],
 }

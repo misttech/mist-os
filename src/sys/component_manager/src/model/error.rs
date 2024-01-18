@@ -263,6 +263,9 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
             } => fcomponent::Error::InvalidArguments,
+            AddDynamicChildError::AddChildError {
+                err: AddChildError::DynamicConfigError { .. },
+            } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::AddChildError { err: AddChildError::ChildNameInvalid { .. } } => {
                 fcomponent::Error::InvalidArguments
             }
@@ -292,6 +295,9 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
             } => fsys::CreateError::BadDynamicOffer,
+            AddDynamicChildError::AddChildError {
+                err: AddChildError::DynamicConfigError { .. },
+            } => fsys::CreateError::BadDynamicOffer,
             AddDynamicChildError::AddChildError { err: AddChildError::ChildNameInvalid { .. } } => {
                 fsys::CreateError::BadMoniker
             }
@@ -311,6 +317,11 @@ pub enum AddChildError {
         #[from]
         err: DynamicOfferError,
     },
+    #[error("dynamic config error: {}", err)]
+    DynamicConfigError {
+        #[from]
+        err: cm_fidl_validator::error::ErrorList,
+    },
     #[error("child moniker not valid: {}", err)]
     ChildNameInvalid {
         #[from]
@@ -318,7 +329,7 @@ pub enum AddChildError {
     },
 }
 
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error, Clone, PartialEq)]
 pub enum DynamicOfferError {
     #[error("dynamic offer not valid: {}", err)]
     OfferInvalid {

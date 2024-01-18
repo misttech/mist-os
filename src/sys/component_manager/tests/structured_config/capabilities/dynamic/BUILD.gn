@@ -12,6 +12,8 @@ executable("bin") {
   deps = [
     ":config_lib",
     ":test.config_cpp",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
