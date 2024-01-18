@@ -67,10 +67,6 @@
                 "cve-2022-2590",
                 "delete_module02",
                 "epoll_wait06",
-                "eventfd02",
-                "eventfd03",
-                "eventfd04",
-                "eventfd05",
                 "fallocate04",
                 "mmap08",
                 "readlinkat01",
@@ -257,6 +253,12 @@
         {
             type: "skip",
             matchers: [
+                // These tests will pass as soon as we add CONFIG_EVENTFD to the kconfig.
+                "eventfd02",
+                "eventfd03",
+                "eventfd04",
+                "eventfd05",
+
                 // https://fxbug.dev/136331
                 "fgetxattr01",
 
