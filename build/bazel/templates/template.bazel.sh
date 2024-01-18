@@ -81,15 +81,30 @@ done
 # Propagate some build metadata from the environment.
 # Some of these values are set by infra.
 build_metadata_opts=()
-[[ "${{BUILDBUCKET_ID-NOT_SET}}" == "NOT_SET" ]] ||
-  build_metadata_opts+=( "--build_metadata=BUILDBUCKET_ID=go/bbid/$BUILDBUCKET_ID" )
+[[ "${{BUILDBUCKET_ID-NOT_SET}}" == "NOT_SET" ]] || {{
+  build_metadata_opts+=(
+    "--build_metadata=BUILDBUCKET_ID=$BUILDBUCKET_ID"
+    "--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=BUILDBUCKET_ID:$BUILDBUCKET_ID"
+  )
+  case "$BUILDBUCKET_ID" in
+    */led/*)
+      build_metadata_opts+=( "--build_metadata=PARENT_BUILD_LINK=go/lucibuild/$BUILDBUCKET_ID/+/build.proto" ) ;;
+    *)
+      build_metadata_opts+=( "--build_metadata=PARENT_BUILD_LINK=go/bbid/$BUILDBUCKET_ID" ) ;;
+  esac
+}}
+
 [[ "${{BUILDBUCKET_BUILDER-NOT_SET}}" == "NOT_SET" ]] ||
   build_metadata_opts+=( "--build_metadata=BUILDBUCKET_BUILDER=$BUILDBUCKET_BUILDER" )
 
 # Developers' builds will have one uuid per `fx build` invocation
 # that can be used to correlate multiple bazel sub-builds.
 [[ "${{FX_BUILD_UUID-NOT_SET}}" == "NOT_SET" ]] ||
-  build_metadata_opts+=( "--build_metadata=FX_BUILD_UUID=$FX_BUILD_UUID" )
+  build_metadata_opts+=(
+    "--build_metadata=FX_BUILD_UUID=$FX_BUILD_UUID"
+    "--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=FX_BUILD_UUID:$FX_BUILD_UUID"
+  )
+  # search for siblings
 
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
 # the USER is not actually used. See https://fxbug.dev/112206#c9.

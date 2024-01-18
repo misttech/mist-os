@@ -22,7 +22,7 @@ import shlex
 import sys
 import subprocess
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Iterable, Optional, Sequence, Tuple, Union
 
 _HAS_FX = None
 
@@ -536,19 +536,40 @@ def main():
 
     # Propagate some build metadata from the environment.
     # Some of these values are set by infra.
-    def forward_build_metadata_from_env(var: str, value_format: str = "%s"):
+    def forward_build_metadata_from_env(var: str) -> Optional[str]:
         env_value = os.environ.get(var)  # set by infra
-        if env_value is not None:
+        if env_value is None:
+            return None
+
+        bazel_common_args.append(f"--build_metadata={var}={env_value}")
+        return env_value
+
+    bb_id = forward_build_metadata_from_env("BUILDBUCKET_ID")
+
+    # Provide click-able/paste-able link for convenience.
+    if bb_id:
+        bazel_common_args.append(
+            f"--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=BUILDBUCKET_ID:{bb_id}"
+        )
+        if "/led/" in bb_id:
             bazel_common_args.append(
-                f"--build_metadata={var}=" + (value_format % env_value)
+                f"--build_metadata=PARENT_BUILD_LINK=go/lucibuild/{bb_id}/+/build.proto"
+            )
+        else:
+            bazel_common_args.append(
+                f"--build_metadata=PARENT_BUILD_LINK=go/bbid/{bb_id}"
             )
 
-    forward_build_metadata_from_env("BUILDBUCKET_ID", "go/bbid/%s")
-    forward_build_metadata_from_env("BUILDBUCKET_BUILDER", "%s")
+    forward_build_metadata_from_env("BUILDBUCKET_BUILDER")
 
     # Developers' builds will have one uuid per `fx build` invocation
     # that can be used to correlate multiple bazel sub-builds.
-    forward_build_metadata_from_env("FX_BUILD_UUID", "%s")
+    fx_build_id = forward_build_metadata_from_env("FX_BUILD_UUID")
+
+    if fx_build_id:
+        bazel_common_args.append(
+            f"--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=FX_BUILD_UUID:{fx_build_id}"
+        )
 
     # These argument remove verbose output from Bazel, used in queries.
     bazel_quiet_args = [
