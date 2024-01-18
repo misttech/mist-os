@@ -524,7 +524,7 @@ impl Releasable for TransactionState {
             let weak_task = self.kernel.pids.read().get_task(self.pid);
             if let Some(task) = weak_task.upgrade() {
                 let resource_accessor =
-                    get_resource_accessor(&task, &self.remote_resource_accessor);
+                    get_resource_accessor(task.deref(), &self.remote_resource_accessor);
                 for fd in &self.owned_fds {
                     if let Err(error) = resource_accessor.close_fd(*fd) {
                         log_warn!(
@@ -743,7 +743,10 @@ impl BinderProcess {
     }
 
     /// Return the `ResourceAccessor` to use to access the resources of this process.
-    fn get_resource_accessor<'a>(&'a self, task: &'a Task) -> &'a dyn ResourceAccessor {
+    fn get_resource_accessor<'a>(
+        &'a self,
+        task: &'a dyn ResourceAccessor,
+    ) -> &'a dyn ResourceAccessor {
         get_resource_accessor(task, &self.remote_resource_accessor)
     }
 
@@ -2683,7 +2686,7 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
 /// Return the `ResourceAccessor` to use to access the resources of `task`. If
 /// `remote_resource_accessor` is not empty, the task is remote, and it should be used instead.
 fn get_resource_accessor<'a>(
-    task: &'a Task,
+    task: &'a dyn ResourceAccessor,
     remote_resource_accessor: &'a Option<Arc<RemoteResourceAccessor>>,
 ) -> &'a dyn ResourceAccessor {
     if let Some(resource_accessor) = remote_resource_accessor {
@@ -3408,7 +3411,7 @@ impl BinderDriver {
                     binder_proc.get_resource_accessor(current_task),
                     binder_proc,
                     binder_thread,
-                    target_proc.get_resource_accessor(&target_task),
+                    target_proc.get_resource_accessor(target_task.deref()),
                     &target_proc,
                     &data,
                     security_context.as_ref().map(|c| c.as_ref()),
@@ -3537,7 +3540,7 @@ impl BinderDriver {
             binder_proc.get_resource_accessor(current_task),
             binder_proc,
             binder_thread,
-            target_proc.get_resource_accessor(&target_task),
+            target_proc.get_resource_accessor(target_task.deref()),
             &target_proc,
             &data,
             None,
