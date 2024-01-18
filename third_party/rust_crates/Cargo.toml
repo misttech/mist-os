@@ -288,7 +288,7 @@ indoc = "1.0.3"
 loom = "0.7.1"
 # TODO(https://fxbug.dev/106164) Remove this explicit mio dependency when it can be
 # pulled in automatically by tokio
-mio = { version = "0.8.5", features = ["net", "os-ext", "os-poll"] }
+mio = { version = "0.8.9", features = ["net", "os-ext", "os-poll"] }
 notify = { version = "5.1.0", default-features = false, features = ["macos_fsevent"] }
 # See b/42169853, not used for target-side code to avoid system-wide impact of yield in spinloops.
 parking_lot = "0.9"
@@ -353,6 +353,7 @@ winapi-util = { path = "empty/winapi-util" }
 windows = { path = "empty/windows" }
 windows-sys-0_42_0 = { package = "windows-sys", path = "empty/windows-sys-0.42.0" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
+windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0" }
 windows-targets = { path = "empty/windows-targets" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
@@ -804,7 +805,8 @@ group_visibility = { import = "//third_party/rust_crates/private_visibility.gni"
 deps = [
   ":bytes-v1_0_1",
   ":libc-v0_2_149",
-  ":mio-v0_8_5",
+  ":memchr-v2_4_0",
+  ":mio-v0_8_9",
   ":num_cpus-v1_13_0",
   ":signal-hook-registry-v1_4_1",
   ":socket2-v0_4_4",

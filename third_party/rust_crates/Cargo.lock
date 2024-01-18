@@ -1389,7 +1389,7 @@ dependencies = [
  "memchr",
  "memoffset 0.7.1",
  "miniz_oxide",
- "mio 0.8.5",
+ "mio 0.8.9",
  "mockall",
  "netlink-packet-core",
  "netlink-packet-generic",
@@ -2317,14 +2317,14 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.5"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5d732bc30207a6423068df043e3d02e0735b155ad7ce1a6f76fe2baa5b158de"
+checksum = "3dce281c5e46beae905d4de1870d8b1509a9142b62eedf18b443b011ca8343d0"
 dependencies = [
  "libc",
  "log",
  "wasi",
- "windows-sys 0.42.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -2466,7 +2466,7 @@ dependencies = [
  "inotify",
  "kqueue",
  "libc",
- "mio 0.8.5",
+ "mio 0.8.9",
  "walkdir",
  "windows-sys 0.45.0",
 ]
@@ -5087,6 +5087,10 @@ version = "0.42.0"
 [[package]]
 name = "windows-sys"
 version = "0.45.0"
+
+[[package]]
+name = "windows-sys"
+version = "0.48.0"
 
 [[package]]
 name = "windows-targets"

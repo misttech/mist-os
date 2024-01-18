@@ -502,7 +502,7 @@ group("miniz_oxide") {
 
 if (!(current_os == "fuchsia")) {
   group("mio") {
-    public_deps = [ ":mio-v0_8_5" ]
+    public_deps = [ ":mio-v0_8_9" ]
   }
 }
 
@@ -8241,15 +8241,15 @@ rust_library("mio-v0_7_14") {
   applicable_licenses = [ ":mio-v0_7_14.license" ]
 }
 
-license("mio-v0_8_5.license") {
+license("mio-v0_8_9.license") {
   public_package_name = "mio"
-  license_files = [ "//third_party/rust_crates/vendor/mio-0.8.5/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/mio-0.8.9/LICENSE" ]
 }
 
-rust_library("mio-v0_8_5") {
+rust_library("mio-v0_8_9") {
   crate_name = "mio"
-  crate_root = "//third_party/rust_crates/vendor/mio-0.8.5/src/lib.rs"
-  output_name = "mio-ccea4f015f73905"
+  crate_root = "//third_party/rust_crates/vendor/mio-0.8.9/src/lib.rs"
+  output_name = "mio-64ef654502e0fc6d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8262,7 +8262,7 @@ rust_library("mio-v0_8_5") {
     deps += [ ":libc-v0_2_149" ]
   }
   if (false) {
-    deps += [ ":windows-sys-v0_42_0" ]
+    deps += [ ":windows-sys-v0_48_0" ]
   }
 
   rustenv = []
@@ -8270,9 +8270,10 @@ rust_library("mio-v0_8_5") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=ccea4f015f73905",
-    "-Cextra-filename=-ccea4f015f73905",
+    "-Cmetadata=64ef654502e0fc6d",
+    "-Cextra-filename=-64ef654502e0fc6d",
     "--cfg=feature=\"default\"",
+    "--cfg=feature=\"log\"",
     "--cfg=feature=\"net\"",
     "--cfg=feature=\"os-ext\"",
     "--cfg=feature=\"os-poll\"",
@@ -8280,7 +8281,7 @@ rust_library("mio-v0_8_5") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":mio-v0_8_5.license" ]
+  applicable_licenses = [ ":mio-v0_8_9.license" ]
 }
 
 rust_library("miow-v0_3_7") {
@@ -8734,11 +8735,11 @@ rust_library("notify-v5_2_0") {
   deps += [ ":walkdir-v2_3_1" ]
   if (false || false || false || false) {
     deps += [ ":kqueue-v1_0_7" ]
-    deps += [ ":mio-v0_8_5" ]
+    deps += [ ":mio-v0_8_9" ]
   }
   if (current_os == "linux" || false) {
     deps += [ ":inotify-v0_9_3" ]
-    deps += [ ":mio-v0_8_5" ]
+    deps += [ ":mio-v0_8_9" ]
   }
   if (current_os == "mac") {
     deps += [ ":fsevent-sys-v4_0_0" ]
@@ -15457,7 +15458,8 @@ rust_library("tokio-v1_25_2") {
   if (!(current_os == "fuchsia")) {
     deps += [ ":bytes-v1_0_1" ]
     deps += [ ":libc-v0_2_149" ]
-    deps += [ ":mio-v0_8_5" ]
+    deps += [ ":memchr-v2_4_0" ]
+    deps += [ ":mio-v0_8_9" ]
     deps += [ ":num_cpus-v1_13_0" ]
     deps += [ ":signal-hook-registry-v1_4_1" ]
     deps += [ ":socket2-v0_4_4" ]
@@ -17759,12 +17761,7 @@ rust_library("windows-sys-v0_42_0") {
     "-Cextra-filename=-c774e6555c42216d",
     "--cfg=feature=\"Win32_Foundation\"",
     "--cfg=feature=\"Win32_Networking_WinSock\"",
-    "--cfg=feature=\"Win32_Security\"",
     "--cfg=feature=\"Win32_Security_Authorization\"",
-    "--cfg=feature=\"Win32_Storage_FileSystem\"",
-    "--cfg=feature=\"Win32_System_IO\"",
-    "--cfg=feature=\"Win32_System_Pipes\"",
-    "--cfg=feature=\"Win32_System_WindowsProgramming\"",
   ]
 
   visibility = [ ":*" ]
@@ -17792,6 +17789,35 @@ rust_library("windows-sys-v0_45_0") {
     "--cfg=feature=\"Win32_Storage_FileSystem\"",
     "--cfg=feature=\"Win32_System_IO\"",
     "--cfg=feature=\"Win32_System_Threading\"",
+    "--cfg=feature=\"Win32_System_WindowsProgramming\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+rust_library("windows-sys-v0_48_0") {
+  crate_name = "windows_sys"
+  crate_root = "//third_party/rust_crates/empty/windows-sys-0.48.0/src/lib.rs"
+  output_name = "windows_sys-4f3c5392f0473e4"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=4f3c5392f0473e4",
+    "-Cextra-filename=-4f3c5392f0473e4",
+    "--cfg=feature=\"Win32_Foundation\"",
+    "--cfg=feature=\"Win32_Networking_WinSock\"",
+    "--cfg=feature=\"Win32_Security\"",
+    "--cfg=feature=\"Win32_Storage_FileSystem\"",
+    "--cfg=feature=\"Win32_System_IO\"",
+    "--cfg=feature=\"Win32_System_Pipes\"",
     "--cfg=feature=\"Win32_System_WindowsProgramming\"",
   ]
 
