@@ -39,7 +39,7 @@ namespace wlan::drivers::wlansoftmac {
 class SoftmacBinding : public DeviceInterface {
  public:
   static zx::result<std::unique_ptr<SoftmacBinding>> New(
-      zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher);
+      zx_device_t* parent_device, fdf::UnownedDispatcher&& main_driver_dispatcher);
   ~SoftmacBinding() override = default;
 
   static constexpr inline SoftmacBinding* from(void* ctx) {
@@ -57,14 +57,13 @@ class SoftmacBinding : public DeviceInterface {
 
  private:
   // Private constructor to require use of New().
-  explicit SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher);
-  zx_device_t* device_ = nullptr;
+  explicit SoftmacBinding(fdf::UnownedDispatcher&& main_driver_dispatcher);
 
   /////////////////////////////////////
-  // Member variables and methods to implement a child device
+  // Member variables and methods to implement a device
   // supporting the ZX_PROTOCOL_ETHERNET_IMPL custom protocol.
-  zx_device_t* child_device_ = nullptr;
   fdf::UnownedDispatcher main_driver_dispatcher_;
+  zx_device_t* device_ = nullptr;
   void Init();
   void Unbind();
   void Release();

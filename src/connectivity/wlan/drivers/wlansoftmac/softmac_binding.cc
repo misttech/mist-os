@@ -51,9 +51,8 @@
 
 namespace wlan::drivers::wlansoftmac {
 
-SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& main_driver_dispatcher)
-    : device_(device),
-      main_driver_dispatcher_(std::move(main_driver_dispatcher)),
+SoftmacBinding::SoftmacBinding(fdf::UnownedDispatcher&& main_driver_dispatcher)
+    : main_driver_dispatcher_(std::move(main_driver_dispatcher)),
       unbind_called_(std::make_shared<bool>(false)) {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
@@ -119,7 +118,7 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
           // dispatcher its bound too.
           async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(), [&]() {
             softmac_ifc_bridge_.reset();
-            device_unbind_reply(child_device_);
+            device_unbind_reply(device_);
           });
           // Explicitly call destroy since Unbind() calls releases this dispatcher before
           // calling ShutdownAsync().
@@ -139,13 +138,13 @@ SoftmacBinding::SoftmacBinding(zx_device_t* device, fdf::UnownedDispatcher&& mai
 // (e.g., before MainLoop is started and before DdkAdd() is called), or locks
 // should be held.
 zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(
-    zx_device_t* device,
+    zx_device_t* parent_device,
     fdf::UnownedDispatcher&& main_driver_dispatcher) __TA_NO_THREAD_SAFETY_ANALYSIS {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   linfo("Binding...");
-  auto softmac_binding = std::unique_ptr<SoftmacBinding>(
-      new SoftmacBinding(device, std::move(main_driver_dispatcher)));
+  auto softmac_binding =
+      std::unique_ptr<SoftmacBinding>(new SoftmacBinding(std::move(main_driver_dispatcher)));
 
   device_add_args_t args = {
       .version = DEVICE_ADD_ARGS_VERSION,
@@ -155,7 +154,7 @@ zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(
       .proto_id = ZX_PROTOCOL_ETHERNET_IMPL,
       .proto_ops = &softmac_binding->ethernet_impl_ops_,
   };
-  auto status = device_add(softmac_binding->device_, &args, &softmac_binding->child_device_);
+  auto status = device_add(parent_device, &args, &softmac_binding->device_);
   if (status != ZX_OK) {
     lerror("could not add eth device: %s", zx_status_get_string(status));
     return fit::error(status);
@@ -174,7 +173,7 @@ void SoftmacBinding::Init() {
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::Service::WlanSoftmac::ProtocolType>();
   if (endpoints.is_error()) {
     lerror("Failed to create FDF endpoints: %s", endpoints.status_string());
-    device_init_reply(child_device_, endpoints.status_value(), nullptr);
+    device_init_reply(device_, endpoints.status_value(), nullptr);
     return;
   }
 
@@ -183,7 +182,7 @@ void SoftmacBinding::Init() {
       fuchsia_wlan_softmac::Service::WlanSoftmac::Name, endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     lerror("Failed to connect to WlanSoftmac service: %s", zx_status_get_string(status));
-    device_init_reply(child_device_, status, nullptr);
+    device_init_reply(device_, status, nullptr);
     return;
   }
   client_ = fdf::WireSharedClient(std::move(endpoints->client), client_dispatcher_.get());
@@ -192,7 +191,7 @@ void SoftmacBinding::Init() {
   linfo("Initializing Rust WlanSoftmac...");
   auto completer = std::make_unique<fit::callback<void(zx_status_t status)>>(
       [dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-       child_device = child_device_](zx_status_t status) {
+       device = device_](zx_status_t status) {
         if (status == ZX_OK) {
           linfo("Initialized Rust WlanSoftmac.");
         } else {
@@ -201,18 +200,18 @@ void SoftmacBinding::Init() {
 
         // device_init_reply() must be called on a driver framework managed
         // dispatcher
-        async::PostTask(dispatcher, [child_device, status]() {
+        async::PostTask(dispatcher, [device, status]() {
           // Specify empty device_init_reply_args_t since SoftmacBinding
           // does not currently support power or performance state
           // information.
-          device_init_reply(child_device, status, nullptr);
+          device_init_reply(device, status, nullptr);
         });
       });
 
   fit::callback<void(zx_status_t)> sta_shutdown_handler =
       [main_driver_dispatcher = main_driver_dispatcher_->async_dispatcher(),
-       unbind_called = unbind_called_, child_device = child_device_](zx_status_t status) {
-        async::PostTask(main_driver_dispatcher, [status, unbind_called, child_device]() mutable {
+       unbind_called = unbind_called_, device = device_](zx_status_t status) {
+        async::PostTask(main_driver_dispatcher, [status, unbind_called, device]() mutable {
           if (status == ZX_OK) {
             return;
           }
@@ -221,7 +220,7 @@ void SoftmacBinding::Init() {
             linfo("Skipping device_async_remove() since Release() already called.");
             return;
           }
-          device_async_remove(child_device);
+          device_async_remove(device);
         });
       };
 
@@ -229,7 +228,7 @@ void SoftmacBinding::Init() {
                                            std::move(sta_shutdown_handler), this, client_.Clone());
   if (softmac_bridge.is_error()) {
     lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
-    device_init_reply(child_device_, softmac_bridge.error_value(), nullptr);
+    device_init_reply(device_, softmac_bridge.error_value(), nullptr);
     return;
   }
   softmac_bridge_ = std::move(*softmac_bridge);
