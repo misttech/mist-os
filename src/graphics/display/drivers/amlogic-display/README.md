@@ -101,7 +101,7 @@ following display connectors.
 
 * CVBS - outputs the ENCI signal via a VDAC (Video DAC)
 * HDMI - can receive the signals from ENCI or ENCP
-* MIPI DSI - receives signal from ENCL
+* MIPI DSI - receives the MIPI-DPI signal from ENCL
 
 The HDMI block embeds a Synopsis DWC (DesignWare Core) HDMI Transmitter
 Controller IP, which transcodes the encoder output to TMDS signals and sends

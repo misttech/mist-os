@@ -174,14 +174,8 @@
 struct LcdTiming {
   uint32_t vid_pixel_on;
   uint32_t vid_line_on;
-  uint32_t de_hs_addr;
-  uint32_t de_he_addr;
-  uint32_t de_vs_addr;
-  uint32_t de_ve_addr;
   uint32_t hs_hs_addr;
   uint32_t hs_he_addr;
-  uint32_t hs_vs_addr;
-  uint32_t hs_ve_addr;
   uint32_t vs_hs_addr;
   uint32_t vs_he_addr;
   uint32_t vs_vs_addr;

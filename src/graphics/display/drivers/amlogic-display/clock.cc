@@ -51,18 +51,12 @@ LcdTiming Clock::CalculateLcdTiming(const display_setting_t& d) {
   const uint32_t de_vstart = d.v_period - d.v_active;
   out.vid_pixel_on = de_hstart;
   out.vid_line_on = de_vstart;
-  out.de_hs_addr = de_hstart;
-  out.de_he_addr = de_hstart + d.h_active;
-  out.de_vs_addr = de_vstart;
-  out.de_ve_addr = de_vstart + d.v_active - 1;
 
   // Calculate and Store HSync horizontal and vertical start/stop times
   const uint32_t hstart = (de_hstart + d.h_period - d.hsync_bp - d.hsync_width) % d.h_period;
   const uint32_t hend = (de_hstart + d.h_period - d.hsync_bp) % d.h_period;
   out.hs_hs_addr = hstart;
   out.hs_he_addr = hend;
-  out.hs_vs_addr = 0;
-  out.hs_ve_addr = d.v_period - 1;
 
   // Calculate and Store VSync horizontal and vertical start/stop times
   out.vs_hs_addr = (hstart + d.h_period) % d.h_period;
@@ -356,7 +350,7 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
 
   vpu_mmio_.Write32(0, ENCL_VIDEO_EN);
 
-  // connect both VIUs (Video Input Units) to LCD LVDS Encoders
+  // Connect both VIUs (Video Input Units) to the LCD Encoder.
   VideoInputUnitEncoderMuxControl::Get()
       .ReadFrom(&vpu_mmio_)
       .set_vsync_shared_by_viu_blocks(false)
@@ -389,23 +383,20 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   vpu_mmio_.Write32(0x400, L_RGB_COEFF_ADDR);
   vpu_mmio_.Write32(0x400, L_DITH_CNTL_ADDR);
 
-  // DE signal
-  vpu_mmio_.Write32(lcd_timing_.de_hs_addr, L_DE_HS_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.de_he_addr, L_DE_HE_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.de_vs_addr, L_DE_VS_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.de_ve_addr, L_DE_VE_ADDR);
-
-  // Hsync signal
-  vpu_mmio_.Write32(lcd_timing_.hs_hs_addr, L_HSYNC_HS_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.hs_he_addr, L_HSYNC_HE_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.hs_vs_addr, L_HSYNC_VS_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.hs_ve_addr, L_HSYNC_VE_ADDR);
-
-  // Vsync signal
-  vpu_mmio_.Write32(lcd_timing_.vs_hs_addr, L_VSYNC_HS_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.vs_he_addr, L_VSYNC_HE_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.vs_vs_addr, L_VSYNC_VS_ADDR);
-  vpu_mmio_.Write32(lcd_timing_.vs_ve_addr, L_VSYNC_VE_ADDR);
+  // The driver behavior here deviates from the Amlogic-provided code.
+  //
+  // The Amlogic-provided code sets up the timing controller (TCON) within the
+  // LCD Encoder to generate Display Enable (DE), Horizontal Sync (HSYNC) and
+  // Vertical Sync (VSYNC) timing signals.
+  //
+  // These signals are useful for LVDS or TTL LCD interfaces, but not for the
+  // MIPI-DSI interface. The MIPI-DSI Host Controller IP block always sets the
+  // output timings using the values from its own control registers, and it
+  // doesn't use the outputs from the timing controller.
+  //
+  // Therefore, this driver doesn't set the timing controller registers and
+  // keeps the timing controller disabled. This was tested on Nelson (S905D3)
+  // and Khadas VIM3 (A311D) boards.
 
   vpu_mmio_.Write32(vpu_mmio_.Read32(VPP_MISC) & ~(VPP_OUT_SATURATE), VPP_MISC);
 
