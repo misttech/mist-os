@@ -67,6 +67,18 @@ sdk_source_set("cpp") {
 }
 
 # TODO(b/300157652): Transitional no-op target
+# Remove once all drivers have been migrated off
+# syslog.
+group("backend") {
+  visibility = [
+    "//src/camera/drivers/hw_accel/ge2d:*",
+    "//src/media/drivers/amlogic_decoder:*",
+    "//src/storage/fvm/driver:*",
+    "//vendor/*",
+  ]
+}
+
+# TODO(b/300157652): Transitional no-op target
 group("backend_host") {
   deps = [ ":cpp" ]
 }
@@ -103,14 +115,6 @@ sdk_source_set("backend_fuchsia_lib") {
 
   data_deps = [ "//sdk/lib/syslog:client_includes" ]
   deps = [ ":cpp" ]
-}
-
-# TODO(b/300157652): Transitional no-op target
-group("backend") {
-  deps = [ ":cpp" ]
-  if (is_fuchsia) {
-    deps += [ ":backend_fuchsia_lib" ]
-  }
 }
 
 test("logging_cpp_unittests") {
