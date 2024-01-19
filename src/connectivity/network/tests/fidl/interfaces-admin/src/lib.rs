@@ -5,6 +5,7 @@
 #![cfg(test)]
 
 use assert_matches::assert_matches;
+use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_ext::IntoExt;
@@ -30,8 +31,8 @@ use net_types::ip::{IpAddress as _, IpVersion, Ipv4};
 use netemul::{InterfaceConfig, RealmUdpSocket as _};
 use netstack_testing_common::{
     devices::{
-        add_pure_ip_interface, create_ip_tun_port, create_tun_device, install_device,
-        TUN_DEFAULT_PORT_ID,
+        add_pure_ip_interface, create_ip_tun_port, create_tun_device, create_tun_port_with,
+        install_device, TUN_DEFAULT_PORT_ID,
     },
     interfaces::{self, add_address_wait_assigned, TestInterfaceExt as _},
     realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
@@ -504,6 +505,65 @@ async fn add_ipv4_mapped_ipv6_address<N: Netstack>(name: &str) {
         )
         .await,
     )
+}
+
+#[netstack_test]
+#[test_case([FrameType::Ethernet], [FrameType::Ethernet],
+    Some(fidl_mac!("02:03:04:05:06:07")), Ok(()); "ethernet")]
+#[test_case([FrameType::Ipv4], [FrameType::Ipv4], None, Err(()); "ipv4-only-fails")]
+#[test_case([FrameType::Ipv6], [FrameType::Ipv6], None, Err(()); "ipv6-only-fails")]
+#[test_case([FrameType::Ipv4, FrameType::Ipv6], [FrameType::Ipv4, FrameType::Ipv6],
+    None, Ok(()); "pure-ip")]
+#[test_case([FrameType::Ethernet, FrameType::Ipv4, FrameType::Ipv6],
+    [FrameType::Ethernet, FrameType::Ipv4, FrameType::Ipv6],
+    Some(fidl_mac!("02:03:04:05:06:07")), Err(()); "mixed-fails")]
+#[test_case([FrameType::Ethernet], [FrameType::Ipv4, FrameType::Ipv6],
+    Some(fidl_mac!("02:03:04:05:06:07")), Err(()); "asymmetric-fails")]
+async fn supported_port_frame_types<N: Netstack>(
+    name: &str,
+    rx_frame_types: impl IntoIterator<Item = FrameType>,
+    tx_frame_types: impl IntoIterator<Item = FrameType>,
+    mac: Option<fnet::MacAddress>,
+    expected_result: Result<(), ()>,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let (tun_device, network_device) = create_tun_device();
+    let admin_device_control = install_device(&realm, network_device);
+    let (tun_port, network_port) =
+        create_tun_port_with(&tun_device, TUN_DEFAULT_PORT_ID, rx_frame_types, tx_frame_types, mac)
+            .await;
+    tun_port.set_online(true).await.expect("set port online");
+    let fhardware_network::PortInfo { id, .. } = network_port.get_info().await.expect("get info");
+    let port_id = id.expect("port id");
+    let (admin_control, server_end) =
+        fidl::endpoints::create_proxy::<finterfaces_admin::ControlMarker>().expect("create proxy");
+    let admin_control = fnet_interfaces_ext::admin::Control::new(admin_control);
+
+    let () = admin_device_control
+        .create_interface(
+            &port_id,
+            server_end,
+            &finterfaces_admin::Options {
+                name: Some("tun-interface".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create interface");
+    match expected_result {
+        Ok(()) => {
+            // NB: Use get_id as a proxy metric for successful installation.
+            let _id = admin_control.get_id().await.expect("get_id");
+        }
+        Err(()) => {
+            assert_matches::assert_matches!(
+                admin_control.wait_termination().await,
+                fnet_interfaces_ext::admin::TerminalError::Terminal(
+                    finterfaces_admin::InterfaceRemovedReason::BadPort
+                )
+            );
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

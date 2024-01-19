@@ -1003,10 +1003,17 @@ func TestPortModeDetection(t *testing.T) {
 	}()
 
 	for index, testCase := range tests {
+		txFrameTypes := make([]network.FrameTypeSupport, len(testCase.frameTypes))
+		for i := range testCase.frameTypes {
+			txFrameTypes[i] = network.FrameTypeSupport{
+				Type: testCase.frameTypes[i],
+			}
+		}
 		t.Run(testCase.name, func(t *testing.T) {
 			baseId := basePortId(index)
 			portConfig := defaultPortConfig()
 			portConfig.Base.SetRxTypes(testCase.frameTypes)
+			portConfig.Base.SetTxTypes(txFrameTypes)
 			portConfig.Base.SetId(baseId)
 
 			tunPort := addPortWithConfig(t, ctx, tunDev, portConfig)
@@ -1029,7 +1036,7 @@ func TestPortModeDetection(t *testing.T) {
 				}
 				if diff := cmp.Diff(got,
 					&InvalidPortOperatingModeError{
-						rxTypes: testCase.frameTypes,
+						types: testCase.frameTypes,
 					}, cmp.AllowUnexported(*got)); diff != "" {
 					t.Fatalf("client.NewPort(_, %d) error diff (-want +got):\n%s", portId, diff)
 				}

@@ -27,6 +27,7 @@
                 // interfaces are supported.
                 "add_address_removal_ns3::tun_removing_address_via_addressstateprovider_remove",
                 "add_address_removal_ns3::tun_removing_address_via_control_remove",
+                "supported_port_frame_types_ns3::pure_ip",
             ],
         },
     ],

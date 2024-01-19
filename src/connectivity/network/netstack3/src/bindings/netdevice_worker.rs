@@ -266,6 +266,88 @@ pub(crate) struct DeviceHandler {
     inner: Inner,
 }
 
+/// The wire format for packets sent to and received on a port.
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum PortWireFormat {
+    /// The port supports sending/receiving Ethernet frames.
+    Ethernet,
+    /// The port supports sending/receiving IPv4 and IPv6 packets.
+    Ip,
+}
+
+/// Error returned for ports with unsupported wire formats.
+#[derive(Debug)]
+pub(crate) enum PortWireFormatError<'a> {
+    InvalidRxFrameTypes { _frame_types: Vec<&'a fhardware_network::FrameType> },
+    InvalidTxFrameTypes { _frame_types: Vec<&'a fhardware_network::FrameType> },
+    MismatchedRxTx { _rx: PortWireFormat, _tx: PortWireFormat },
+}
+
+impl PortWireFormat {
+    fn new_from_port_info(
+        info: &netdevice_client::client::PortBaseInfo,
+    ) -> Result<PortWireFormat, PortWireFormatError<'_>> {
+        let netdevice_client::client::PortBaseInfo { port_class: _, rx_types, tx_types } = info;
+
+        // Verify the wire format in a single direction (tx/rx).
+        fn wire_format_from_frame_types<'a>(
+            frame_types: impl Iterator<Item = &'a fhardware_network::FrameType> + Clone,
+        ) -> Result<PortWireFormat, impl Iterator<Item = &'a fhardware_network::FrameType>>
+        {
+            struct SupportedFormats {
+                ethernet: bool,
+                ipv4: bool,
+                ipv6: bool,
+            }
+            let SupportedFormats { ethernet, ipv4, ipv6 } = frame_types.clone().fold(
+                SupportedFormats { ethernet: false, ipv4: false, ipv6: false },
+                |mut sf, frame_type| {
+                    match frame_type {
+                        fhardware_network::FrameType::Ethernet => sf.ethernet = true,
+                        fhardware_network::FrameType::Ipv4 => sf.ipv4 = true,
+                        fhardware_network::FrameType::Ipv6 => sf.ipv6 = true,
+                    }
+                    sf
+                },
+            );
+            // Disallow devices with mixed frame types, and require that IP
+            // Devices support both IPv4 and IPv6.
+            if ethernet && !ipv4 && !ipv6 {
+                Ok(PortWireFormat::Ethernet)
+            } else if !ethernet && ipv4 && ipv6 {
+                Ok(PortWireFormat::Ip)
+            } else {
+                Err(frame_types)
+            }
+        }
+
+        // Ignore the superfluous information included with the tx frame types.
+        let tx_iterator = || {
+            tx_types.iter().map(
+                |fhardware_network::FrameTypeSupport {
+                     type_: frame_type,
+                     features: _,
+                     supported_flags: _,
+                 }| { frame_type },
+            )
+        };
+
+        // Verify each direction independently, and then ensure the port is
+        // symmetrical.
+        let rx_wire_format = wire_format_from_frame_types(rx_types.iter()).map_err(|rx_types| {
+            PortWireFormatError::InvalidRxFrameTypes { _frame_types: rx_types.collect() }
+        })?;
+        let tx_wire_format = wire_format_from_frame_types(tx_iterator()).map_err(|tx_types| {
+            PortWireFormatError::InvalidTxFrameTypes { _frame_types: tx_types.collect() }
+        })?;
+        if rx_wire_format == tx_wire_format {
+            Ok(rx_wire_format)
+        } else {
+            Err(PortWireFormatError::MismatchedRxTx { _rx: rx_wire_format, _tx: tx_wire_format })
+        }
+    }
+}
+
 impl DeviceHandler {
     pub(crate) async fn add_port(
         &self,
@@ -285,11 +367,7 @@ impl DeviceHandler {
 
         let DeviceHandler { inner: Inner { state, device, session: _ } } = self;
         let port_proxy = device.connect_port(port)?;
-        let netdevice_client::client::PortInfo {
-            id: _,
-            base_info:
-                netdevice_client::client::PortBaseInfo { port_class: device_class, rx_types, tx_types },
-        } = port_proxy
+        let netdevice_client::client::PortInfo { id: _, base_info } = port_proxy
             .get_info()
             .await
             .map_err(Error::CantConnectToPort)?
@@ -299,18 +377,23 @@ impl DeviceHandler {
         let mut status_stream =
             netdevice_client::client::new_port_status_stream(&port_proxy, None)?;
 
-        // TODO(https://fxbug.dev/42051633): support non-ethernet devices.
-        let supports_ethernet_on_rx =
-            rx_types.iter().any(|f| *f == fhardware_network::FrameType::Ethernet);
-        let supports_ethernet_on_tx = tx_types.iter().any(
-            |fhardware_network::FrameTypeSupport { type_, features: _, supported_flags: _ }| {
-                *type_ == fhardware_network::FrameType::Ethernet
+        let wire_format = PortWireFormat::new_from_port_info(&base_info).map_err(
+            |e: PortWireFormatError<'_>| {
+                tracing::warn!("not installing port with invalid wire format: {:?}", e);
+                Error::ConfigurationNotSupported
             },
-        );
-        if !(supports_ethernet_on_rx && supports_ethernet_on_tx) {
-            return Err(Error::ConfigurationNotSupported);
+        )?;
+        match wire_format {
+            PortWireFormat::Ethernet => {}
+            // TODO(https://fxbug.dev/42051633): support pure IP devices.
+            PortWireFormat::Ip => return Err(Error::ConfigurationNotSupported),
         }
 
+        let netdevice_client::client::PortBaseInfo {
+            port_class: device_class,
+            rx_types: _,
+            tx_types: _,
+        } = base_info;
         let netdevice_client::client::PortStatus { flags, mtu: max_eth_frame_size } =
             status_stream.try_next().await?.ok_or_else(|| Error::PortClosed)?;
         let phy_up = flags.contains(fhardware_network::StatusFlags::ONLINE);

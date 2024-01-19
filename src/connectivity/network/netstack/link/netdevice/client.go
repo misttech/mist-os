@@ -482,7 +482,7 @@ func (*Port) SupportedGSO() stack.SupportedGSO {
 }
 
 func (p *Port) Up() error {
-	result, err := p.client.session.Attach(context.Background(), p.portInfo.GetId(), p.subscriptionFrameTypes())
+	result, err := p.client.session.Attach(context.Background(), p.portInfo.GetId(), p.mode.subscriptionFrameTypes())
 	if err != nil {
 		return err
 	}
@@ -670,10 +670,21 @@ func (c *Client) NewPort(ctx context.Context, portId network.PortId) (*Port, err
 		return nil, fmt.Errorf("incomplete PortInfo: %#v", portInfo)
 	}
 
-	portMode, err := selectPortOperatingMode(portInfo.BaseInfo.GetRxTypes())
+	rxPortMode, err := selectPortOperatingMode(portInfo.BaseInfo.GetRxTypes())
 	if err != nil {
 		return nil, err
 	}
+	txPortMode, err := selectPortOperatingMode(extractFrameTypes(portInfo.BaseInfo.GetTxTypes()))
+	if err != nil {
+		return nil, err
+	}
+	if rxPortMode != txPortMode {
+		return nil, &InvalidPortOperatingModeError{
+			types: append(
+				rxPortMode.subscriptionFrameTypes(), txPortMode.subscriptionFrameTypes()...),
+		}
+	}
+	portMode := txPortMode
 
 	macRequest, mac, err := network.NewMacAddressingWithCtxInterfaceRequest()
 	if err != nil {
@@ -777,10 +788,10 @@ func (p *Port) Mode() PortMode {
 	return p.mode
 }
 
-// subscriptionFrameTypes returns the frame types to use when attaching this
-// port to a session, based on the port's operating mode.
-func (p *Port) subscriptionFrameTypes() []network.FrameType {
-	switch mode := p.mode; mode {
+// subscriptionFrameTypes returns the frame types to use when attaching a port
+// to a session, based on the port's operating mode.
+func (mode PortMode) subscriptionFrameTypes() []network.FrameType {
+	switch mode {
 	case PortModeEthernet:
 		return []network.FrameType{network.FrameTypeEthernet}
 	case PortModeIp:
@@ -939,11 +950,11 @@ func (p *Port) Class() network.DeviceClass {
 }
 
 type InvalidPortOperatingModeError struct {
-	rxTypes []network.FrameType
+	types []network.FrameType
 }
 
 func (e *InvalidPortOperatingModeError) Error() string {
-	return fmt.Sprintf("can't determine port operating mode for types '%v'", e.rxTypes)
+	return fmt.Sprintf("can't determine port operating mode for types '%v'", e.types)
 }
 
 type PortAlreadyBoundError struct {
@@ -954,13 +965,22 @@ func (e *PortAlreadyBoundError) Error() string {
 	return fmt.Sprintf("port %d(salt=%d) is already bound", e.id.Base, e.id.Salt)
 }
 
-func selectPortOperatingMode(rxTypes []network.FrameType) (PortMode, error) {
+func extractFrameTypes(types []network.FrameTypeSupport) []network.FrameType {
+	frame_types := make([]network.FrameType, len(types))
+	for i := range types {
+		frame_types[i] = types[i].Type
+	}
+	return frame_types
+}
+
+func selectPortOperatingMode(types []network.FrameType) (PortMode, error) {
 	seenIpv4 := false
 	seenIpv6 := false
-	for _, frameType := range rxTypes {
+	seenEthernet := false
+	for _, frameType := range types {
 		switch frameType {
 		case network.FrameTypeEthernet:
-			return PortModeEthernet, nil
+			seenEthernet = true
 		case network.FrameTypeIpv4:
 			seenIpv4 = true
 		case network.FrameTypeIpv6:
@@ -969,9 +989,12 @@ func selectPortOperatingMode(rxTypes []network.FrameType) (PortMode, error) {
 			panic(fmt.Sprintf("unrecognized frame type %s", frameType))
 		}
 	}
+	if seenEthernet && !seenIpv4 && !seenIpv6 {
+		return PortModeEthernet, nil
+	}
 	// We only support devices with dual IP mode for now.
-	if seenIpv4 && seenIpv6 {
+	if !seenEthernet && seenIpv4 && seenIpv6 {
 		return PortModeIp, nil
 	}
-	return 0, &InvalidPortOperatingModeError{rxTypes: rxTypes}
+	return 0, &InvalidPortOperatingModeError{types: types}
 }
