@@ -11,6 +11,8 @@
 #include <lib/async/cpp/task.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/input_report_reader/reader.h>
+#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -36,6 +38,25 @@ struct Tcs3400InputReport {
   bool is_valid() const { return event_time.get() != ZX_TIME_INFINITE_PAST; }
 };
 
+struct InspectTcs3400FeatureReport {
+  inspect::Node node;
+  inspect::UintProperty report_interval_us;
+  inspect::StringProperty reporting_state;
+  inspect::UintProperty sensitivity;
+  inspect::UintProperty threshold_high;
+  inspect::UintProperty threshold_low;
+  inspect::UintProperty integration_time_us;
+
+  explicit InspectTcs3400FeatureReport(inspect::Node n)
+      : node(std::move(n)),
+        report_interval_us(node.CreateUint("report_interval_us", 0)),
+        reporting_state(node.CreateString("reporting_state", "Unknown")),
+        sensitivity(node.CreateUint("sensitivity", 0)),
+        threshold_high(node.CreateUint("threshold_high", 0)),
+        threshold_low(node.CreateUint("threshold_low", 0)),
+        integration_time_us(node.CreateUint("integration_time_us", 0)) {}
+};
+
 struct Tcs3400FeatureReport {
   int64_t report_interval_us;
   fuchsia_input_report::wire::SensorReportingState reporting_state;
@@ -45,9 +66,8 @@ struct Tcs3400FeatureReport {
   int64_t integration_time_us;
 
   fuchsia_input_report::wire::FeatureReport ToFidlFeatureReport(fidl::AnyArena& allocator) const;
+  void UpdateInspect(InspectTcs3400FeatureReport* inspect) const;
 };
-
-class Tcs3400Device;
 
 class Tcs3400Device;
 using DeviceType =
@@ -60,7 +80,11 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
 
   Tcs3400Device(zx_device_t* device, async_dispatcher_t* dispatcher, ddk::I2cChannel i2c,
                 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio)
-      : DeviceType(device), dispatcher_(dispatcher), i2c_(std::move(i2c)), gpio_(std::move(gpio)) {}
+      : DeviceType(device),
+        dispatcher_(dispatcher),
+        i2c_(std::move(i2c)),
+        gpio_(std::move(gpio)),
+        inspect_report_(inspect_.GetRoot().CreateChild("feature_report")) {}
   ~Tcs3400Device() override = default;
 
   zx_status_t Bind();
@@ -83,6 +107,7 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
 
   // Visible for testing.
   void WaitForNextReader();
+  inspect::Inspector& inspect() { return inspect_; }
 
  private:
   static constexpr size_t kFeatureAndDescriptorBufferSize = 512;
@@ -113,6 +138,8 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
   input_report_reader::InputReportReaderManager<Tcs3400InputReport,
                                                 fuchsia_input_report::wire::kMaxDeviceReportCount>
       readers_;
+  inspect::Inspector inspect_;
+  InspectTcs3400FeatureReport inspect_report_;
 
   zx::result<Tcs3400InputReport> ReadInputRpt();
   zx_status_t InitGain(uint8_t gain);

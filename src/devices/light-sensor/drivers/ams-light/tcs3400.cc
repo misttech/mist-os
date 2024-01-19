@@ -131,6 +131,28 @@ fuchsia_input_report::wire::FeatureReport Tcs3400FeatureReport::ToFidlFeatureRep
       .Build();
 }
 
+void Tcs3400FeatureReport::UpdateInspect(InspectTcs3400FeatureReport* inspect) const {
+  inspect->threshold_low.Set(threshold_low);
+  inspect->threshold_high.Set(threshold_high);
+  inspect->sensitivity.Set(sensitivity);
+  inspect->report_interval_us.Set(report_interval_us);
+  switch (reporting_state) {
+    case fuchsia_input_report::SensorReportingState::kReportNoEvents:
+      inspect->reporting_state.Set("NoEvents");
+      break;
+    case fuchsia_input_report::SensorReportingState::kReportAllEvents:
+      inspect->reporting_state.Set("AllEvents");
+      break;
+    case fuchsia_input_report::SensorReportingState::kReportThresholdEvents:
+      inspect->reporting_state.Set("ThresholdEvents");
+      break;
+    default:
+      inspect->reporting_state.Set("Unknown");
+      break;
+  }
+  inspect->integration_time_us.Set(integration_time_us);
+}
+
 zx::result<Tcs3400InputReport> Tcs3400Device::ReadInputRpt() {
   Tcs3400InputReport report{.event_time = zx::clock::get_monotonic()};
 
@@ -436,6 +458,7 @@ void Tcs3400Device::SetFeatureReport(SetFeatureReportRequestView request,
     return;
   }
 
+  Tcs3400FeatureReport feature_report;
   {
     fbl::AutoLock lock(&feature_lock_);
     feature_rpt_.report_interval_us = report.sensor().report_interval();
@@ -444,7 +467,9 @@ void Tcs3400Device::SetFeatureReport(SetFeatureReportRequestView request,
     feature_rpt_.threshold_high = report.sensor().threshold_high()[0];
     feature_rpt_.threshold_low = report.sensor().threshold_low()[0];
     feature_rpt_.integration_time_us = atime * kIntegrationTimeStepSizeMicroseconds;
+    feature_report = feature_rpt_;
   }
+  feature_report.UpdateInspect(&inspect_report_);
 
   Configure();
   completer.ReplySuccess();
@@ -509,12 +534,6 @@ zx_status_t Tcs3400Device::Create(void* ctx, zx_device_t* parent) {
   auto status = dev->Bind();
   if (status != ZX_OK) {
     zxlogf(ERROR, "bind failed: %d", status);
-    return status;
-  }
-
-  status = dev->DdkAdd("tcs-3400");
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAdd failed: %d", status);
     return status;
   }
   // devmgr is now in charge of the memory for dev
@@ -583,6 +602,7 @@ zx_status_t Tcs3400Device::InitMetadata() {
   }
 
   // Set the default features and send a configuration packet.
+  Tcs3400FeatureReport feature_report;
   {
     fbl::AutoLock lock(&feature_lock_);
     // The device will trigger an interrupt outside the thresholds.  These default threshold
@@ -595,7 +615,10 @@ zx_status_t Tcs3400Device::InitMetadata() {
     feature_rpt_.reporting_state =
         fuchsia_input_report::wire::SensorReportingState::kReportAllEvents;
     feature_rpt_.integration_time_us = atime * kIntegrationTimeStepSizeMicroseconds;
+    feature_report = feature_rpt_;
   }
+  feature_report.UpdateInspect(&inspect_report_);
+
   Configure();
   return ZX_OK;
 }
@@ -625,6 +648,12 @@ zx_status_t Tcs3400Device::WriteReg(uint8_t reg, uint8_t value) {
 }
 
 zx_status_t Tcs3400Device::Bind() {
+  zx_status_t status =
+      DdkAdd(ddk::DeviceAddArgs("tcs-3400").set_inspect_vmo(inspect_.DuplicateVmo()));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "DdkAdd failed: %d", status);
+    return status;
+  }
   {
     fidl::WireResult result = gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
     if (!result.ok()) {
@@ -653,7 +682,7 @@ zx_status_t Tcs3400Device::Bind() {
   irq_handler_.set_object(irq_.get());
   irq_handler_.Begin(dispatcher_);
 
-  auto status = InitMetadata();
+  status = InitMetadata();
   if (status != ZX_OK) {
     return status;
   }

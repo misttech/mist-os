@@ -13,14 +13,17 @@
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <lib/zx/clock.h>
 
 #include <ddktl/metadata/light-sensor.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
+#include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <zxtest/zxtest.h>
 
+#include "lib/inspect/cpp/hierarchy.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "tcs3400-regs.h"
@@ -101,7 +104,7 @@ struct IncomingNamespace {
   component::OutgoingDirectory outgoing_{async_get_default_dispatcher()};
 };
 
-class Tcs3400Test : public zxtest::Test {
+class Tcs3400Test : public inspect::InspectTestHelper, public zxtest::Test {
  public:
   void SetUp() override {
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
@@ -757,6 +760,23 @@ TEST_F(Tcs3400Test, FeatureReport) {
   EXPECT_EQ(report.report_interval_us, 0);
   EXPECT_EQ(report.sensitivity, 16);
 
+  // Inspect report should match.
+  ASSERT_NO_FATAL_FAILURE(ReadInspect(device_->inspect().DuplicateVmo()));
+  auto* root = hierarchy().GetByPath({"feature_report"});
+  ASSERT_TRUE(root);
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "reporting_state", inspect::StringPropertyValue("AllEvents")));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "threshold_high", inspect::UintPropertyValue(0xffff)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "threshold_low", inspect::UintPropertyValue(0x0000)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "integration_time_us", inspect::UintPropertyValue(614'380)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "report_interval_us", inspect::UintPropertyValue(0)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "sensitivity", inspect::UintPropertyValue(16)));
+
   incoming_.SyncCall([&](IncomingNamespace* incoming) {
     incoming->fake_i2c_.SetRegister(TCS_I2C_ENABLE, 0);
     incoming->fake_i2c_.SetRegister(TCS_I2C_AILTL, 0);
@@ -801,6 +821,23 @@ TEST_F(Tcs3400Test, FeatureReport) {
   EXPECT_EQ(report.threshold_high, 0xabcd);
   EXPECT_EQ(report.threshold_low, 0x1234);
   EXPECT_EQ(report.integration_time_us, 278'000);
+
+  // Inspect report should match.
+  ASSERT_NO_FATAL_FAILURE(ReadInspect(device_->inspect().DuplicateVmo()));
+  root = hierarchy().GetByPath({"feature_report"});
+  ASSERT_TRUE(root);
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "report_interval_us", inspect::UintPropertyValue(1'000)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "reporting_state", inspect::StringPropertyValue("AllEvents")));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "sensitivity", inspect::UintPropertyValue(64)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "threshold_high", inspect::UintPropertyValue(0xabcd)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "threshold_low", inspect::UintPropertyValue(0x1234)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckProperty(root->node(), "integration_time_us", inspect::UintPropertyValue(278'000)));
 }
 
 TEST_F(Tcs3400Test, SetInvalidFeatureReport) {
