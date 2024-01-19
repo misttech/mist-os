@@ -206,13 +206,11 @@
                 "settimeofday01",
                 "settimeofday02",
                 "setxattr03",
-                "sgetmask01",
                 "sigaction01",
                 "sigprocmask01",
                 "sigtimedwait01",
                 "sigwaitinfo01",
                 "sockioctl01",
-                "ssetmask01",
                 "statx04",
                 "statx06",
                 "statx11",
@@ -238,6 +236,10 @@
                 "vmsplice04",
                 "waitid10",
                 "writetest01",
+
+                // Not supported for our architectures.
+                "ssetmask01",
+                "sgetmask01",
 
                 // These tests fail when an init is run in the container to set up /apex.
                 // TODO(https://fxbug.dev/129839) re-enable these tests
