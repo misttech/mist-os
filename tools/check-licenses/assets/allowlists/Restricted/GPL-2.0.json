@@ -73,6 +73,13 @@
             ],
             "bug": "",
             "notes": []
+          },
+          {
+            "projects": [
+              "third_party/github.com/pylint-dev/pylint"
+            ],
+            "bug": "fxbug.dev/42084613",
+            "notes": []
           }
         ]
       }
