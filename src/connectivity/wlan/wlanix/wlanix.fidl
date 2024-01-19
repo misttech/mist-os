@@ -138,6 +138,19 @@ open protocol SupplicantStaIfaceCallback {
         3: id uint32;
         4: ssid fuchsia.wlan.ieee80211.Ssid;
     });
+
+    flexible OnDisconnected(table {
+        1: bssid fuchsia.wlan.ieee80211.MacAddr;
+        2: locally_generated bool;
+        3: reason_code fuchsia.wlan.ieee80211.ReasonCode;
+    });
+
+    flexible OnAssociationRejected(table {
+        1: ssid fuchsia.wlan.ieee80211.Ssid;
+        2: bssid fuchsia.wlan.ieee80211.MacAddr;
+        3: status_code fuchsia.wlan.ieee80211.StatusCode;
+        4: timed_out bool;
+    });
 };
 
 type StaIfaceCallbackState = flexible enum : uint32 {

@@ -288,32 +288,140 @@ struct SupplicantStaIfaceState {
     callbacks: Vec<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
 }
 
-async fn handle_client_connect_transactions(stream: fidl_sme::ConnectTransactionEventStream) {
-    // The transaction stream will exit cleanly when the connection has fully terminated.
-    stream
-        .for_each_concurrent(None, |req| async {
-            match req {
-                Ok(fidl_sme::ConnectTransactionEvent::OnConnectResult { result: _ }) => {
-                    error!(
+struct ConnectionContext {
+    stream: fidl_sme::ConnectTransactionEventStream,
+    ssid: Vec<u8>,
+    bssid: Bssid,
+}
+
+fn send_disconnect_event(
+    source: &fidl_sme::DisconnectSource,
+    ctx: &ConnectionContext,
+    sta_iface_state: &SupplicantStaIfaceState,
+    wifi_state: &WifiState,
+    iface_id: u16,
+) {
+    // We expect both an OnDisconnected and an OnStateChanged event.
+    let (locally_generated, reason_code) = match source {
+        fidl_sme::DisconnectSource::Ap(cause) => (false, cause.reason_code),
+        fidl_sme::DisconnectSource::Mlme(cause) => (true, cause.reason_code),
+        fidl_sme::DisconnectSource::User(user_reason) => {
+            warn!("Disconnected by user with reason: {:?}", user_reason);
+            (true, fidl_fuchsia_wlan_ieee80211::ReasonCode::UnspecifiedReason)
+        }
+    };
+    let disconnected_event = fidl_wlanix::SupplicantStaIfaceCallbackOnDisconnectedRequest {
+        bssid: Some(ctx.bssid.to_array()),
+        locally_generated: Some(locally_generated),
+        reason_code: Some(reason_code),
+        ..Default::default()
+    };
+    run_callbacks(
+        |callback_proxy| callback_proxy.on_disconnected(&disconnected_event),
+        &sta_iface_state.callbacks[..],
+        "on_disconnected",
+    );
+    let state_changed_event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
+        new_state: Some(fidl_wlanix::StaIfaceCallbackState::Disconnected),
+        bssid: Some(ctx.bssid.to_array()),
+        // TODO(b/316034688): do we need to keep track of actual id?
+        id: Some(1),
+        ssid: Some(ctx.ssid.clone()),
+        ..Default::default()
+    };
+    run_callbacks(
+        |callback_proxy| callback_proxy.on_state_changed(&state_changed_event),
+        &sta_iface_state.callbacks[..],
+        "on_state_changed",
+    );
+    // Also communicate the state change via nl80211.
+    if let Some(proxy) = &wifi_state.mlme_multicast_proxy {
+        let res = proxy.message(fidl_wlanix::Nl80211MulticastMessageRequest {
+            message: Some(build_nl80211_message(
+                Nl80211Cmd::Disconnect,
+                vec![
+                    Nl80211Attr::IfaceIndex(iface_id.into()),
+                    Nl80211Attr::Mac(ctx.bssid.to_array()),
+                ],
+            )),
+            ..Default::default()
+        });
+        if let Err(e) = res {
+            error!("Failed to notify nl80211 mlme group of disconnect: {}", e);
+        }
+    }
+}
+
+async fn handle_client_connect_transactions(
+    mut ctx: ConnectionContext,
+    sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
+    wifi_state: Arc<Mutex<WifiState>>,
+    iface_id: u16,
+) {
+    // If we receive a disconnect but attempt to reconnect, we will deliver the
+    // disconnect event later if the reconnect attempt fails.
+    let mut disconnect_with_ongoing_reconnect: Option<fidl_sme::DisconnectSource> = None;
+
+    loop {
+        // The transaction stream will exit cleanly when the connection has fully terminated.
+        let req = match ctx.stream.next().await {
+            Some(req) => req,
+            None => return,
+        };
+        match req {
+            Ok(fidl_sme::ConnectTransactionEvent::OnConnectResult { result }) => {
+                match (disconnect_with_ongoing_reconnect.as_ref(), result.is_reconnect) {
+                    (Some(info), true) => {
+                        if result.code == fidl_fuchsia_wlan_ieee80211::StatusCode::Success {
+                            info!("Successfully reconnected after disconnect");
+                        } else {
+                            send_disconnect_event(
+                                info,
+                                &ctx,
+                                &sta_iface_state.lock(),
+                                &wifi_state.lock(),
+                                iface_id,
+                            );
+                        }
+                        disconnect_with_ongoing_reconnect = None;
+                    }
+                    (Some(_), false) => {
+                        error!("Received non-reconnect connect result while reconnecting")
+                    }
+
+                    (None, true) => error!("Received reconnect result while not reconnecting"),
+                    (None, false) => error!(
                         "Received unexpected connect result after connection already established."
-                    );
-                }
-                Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info }) => {
-                    // TODO(b/313994670): Notify wlanix clients on disconnect.
-                    info!("Connection terminated by disconnect: {:?}", info);
-                }
-                Ok(fidl_sme::ConnectTransactionEvent::OnSignalReport { ind: _ }) => {
-                    // TODO(b/316374668): Surface these RSSI values.
-                }
-                Ok(fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info }) => {
-                    info!("Connection switching to channel {}", info.new_channel);
-                }
-                Err(e) => {
-                    error!("Error on connect transaction event stream: {}", e);
+                    ),
                 }
             }
-        })
-        .await;
+            Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info }) => {
+                if info.is_sme_reconnecting {
+                    info!("Connection interrupted, awaiting reconnect: {:?}", info);
+                    disconnect_with_ongoing_reconnect = Some(info.disconnect_source);
+                } else {
+                    info!("Connection terminated by disconnect: {:?}", info);
+                    send_disconnect_event(
+                        &info.disconnect_source,
+                        &ctx,
+                        &sta_iface_state.lock(),
+                        &wifi_state.lock(),
+                        iface_id,
+                    );
+                    disconnect_with_ongoing_reconnect = None;
+                }
+            }
+            Ok(fidl_sme::ConnectTransactionEvent::OnSignalReport { ind: _ }) => {
+                // TODO(b/316374668): Surface these RSSI values.
+            }
+            Ok(fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info }) => {
+                info!("Connection switching to channel {}", info.new_channel);
+            }
+            Err(e) => {
+                error!("Error on connect transaction event stream: {}", e);
+            }
+        }
+    }
 }
 
 async fn handle_supplicant_sta_network_request<C: ClientIface>(
@@ -353,7 +461,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                 let state = sta_network_state.lock();
                 (state.ssid.clone(), state.passphrase.clone(), state.bssid.clone())
             };
-            let (result, connect_transaction_stream) = match ssid {
+            let (result, connection_ctx) = match ssid {
                 Some(ssid) => match iface.connect_to_network(&ssid[..], passphrase, bssid).await {
                     Ok(connected_result) => {
                         info!("Connected to requested network");
@@ -362,7 +470,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             bssid: Some(connected_result.bssid.to_array()),
                             // TODO(b/316034688): do we need to keep track of actual id?
                             id: Some(1),
-                            ssid: Some(connected_result.ssid),
+                            ssid: Some(connected_result.ssid.clone()),
                             ..Default::default()
                         };
                         run_callbacks(
@@ -370,9 +478,17 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             &sta_iface_state.lock().callbacks[..],
                             "on_state_changed",
                         );
-                        (Ok(()), Some(connected_result.transaction_stream))
+                        (
+                            Ok(()),
+                            Some(ConnectionContext {
+                                stream: connected_result.transaction_stream,
+                                ssid: connected_result.ssid,
+                                bssid: connected_result.bssid,
+                            }),
+                        )
                     }
                     Err(e) => {
+                        // TODO(b/319490009): Transmit a failed authentication event.
                         warn!("Connecting to network failed: {}", e);
                         (Err(zx::sys::ZX_ERR_INTERNAL), None)
                     }
@@ -403,11 +519,17 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                     })
                     .context("Failed to send nl80211 Connect")?;
             }
-            if let Some(stream) = connect_transaction_stream {
+            if let Some(ctx) = connection_ctx {
                 // Continue to process connection updates until the connection terminates.
                 // We can do this here because calls to this function are all executed
                 // concurrently, so it doesn't block other requests.
-                handle_client_connect_transactions(stream).await;
+                handle_client_connect_transactions(
+                    ctx,
+                    Arc::clone(&sta_iface_state),
+                    Arc::clone(&state),
+                    iface_id,
+                )
+                .await;
             }
         }
         fidl_wlanix::SupplicantStaNetworkRequest::_UnknownMethod { ordinal, .. } => {
@@ -1027,6 +1149,7 @@ mod tests {
         futures::{pin_mut, task::Poll, Future},
         ifaces::test_utils::{ClientIfaceCall, TestIfaceManager},
         std::pin::Pin,
+        test_case::test_case,
         wlan_common::assert_variant,
     };
 
@@ -1480,6 +1603,177 @@ mod tests {
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
         assert_eq!(on_state_changed.bssid, Some([42, 42, 42, 42, 42, 42]));
+    }
+
+    fn establish_open_connection(
+        test_helper: &mut SupplicantTestHelper,
+        test_fut: &mut Pin<Box<impl Future<Output = ()>>>,
+        mcast_stream: &mut fidl_wlanix::Nl80211MulticastRequestStream,
+    ) {
+        let result = test_helper.supplicant_sta_network_proxy.set_ssid(
+            &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
+                ssid: Some(vec![b'f', b'o', b'o']),
+                ..Default::default()
+            },
+        );
+        assert_variant!(result, Ok(()));
+        assert_variant!(test_helper.supplicant_sta_network_proxy.clear_bssid(), Ok(()));
+
+        let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
+        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(test_fut), Poll::Pending);
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut network_select_fut),
+            Poll::Ready(Ok(Ok(())))
+        );
+
+        {
+            let next_mcast = next_mcast_message(mcast_stream);
+            pin_mut!(next_mcast);
+            let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+            assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
+        }
+
+        let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
+        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
+    }
+
+    #[test]
+    fn test_supplicant_sta_disconnect_signal() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+        let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
+
+        establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
+
+        {
+            let client_iface =
+                test_helper.iface_manager.client_iface.as_ref().expect("No client iface found");
+            let transaction_handle = client_iface.transaction_handle.lock();
+            let control_handle = transaction_handle.as_ref().expect("No control handle found");
+            control_handle
+                .send_on_disconnect(&fidl_sme::DisconnectInfo {
+                    is_sme_reconnecting: false,
+                    disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                        mlme_event_name:
+                            fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+                        reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
+                    }),
+                })
+                .expect("Failed to send OnDisconnect");
+        }
+
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
+
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut next_callback_fut),
+            Poll::Ready(Some(Ok(
+                fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnDisconnected { .. }
+            )))
+        );
+        let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
+        let on_state_changed = assert_variant!(
+            test_helper.exec.run_until_stalled(&mut next_callback_fut),
+            Poll::Ready(Some(Ok(
+                fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }
+            ))) => payload);
+        assert_eq!(
+            on_state_changed.new_state,
+            Some(fidl_wlanix::StaIfaceCallbackState::Disconnected)
+        );
+
+        let next_mcast = next_mcast_message(&mut mcast_stream);
+        pin_mut!(next_mcast);
+        let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+        assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Disconnect);
+    }
+
+    #[test_case(fidl_sme::ConnectResult {
+        code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
+        is_credential_rejected: false,
+        is_reconnect: true,
+    }, false; "Successful reconnect")]
+    #[test_case(fidl_sme::ConnectResult {
+        code: fidl_fuchsia_wlan_ieee80211::StatusCode::RefusedReasonUnspecified,
+        is_credential_rejected: false,
+        is_reconnect: true,
+    }, true; "Failed reconnect")]
+    #[test_case(fidl_sme::ConnectResult {
+        code: fidl_fuchsia_wlan_ieee80211::StatusCode::RefusedReasonUnspecified,
+        is_credential_rejected: false,
+        is_reconnect: false,
+    }, false; "Ignore non-reconnect result")]
+    fn test_supplicant_sta_sme_reconnect(
+        reconnect_result: fidl_sme::ConnectResult,
+        expect_disconnect: bool,
+    ) {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+        let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
+
+        establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
+
+        {
+            let client_iface =
+                test_helper.iface_manager.client_iface.as_ref().expect("No client iface found");
+            let transaction_handle = client_iface.transaction_handle.lock();
+            let control_handle = transaction_handle.as_ref().expect("No control handle found");
+            control_handle
+                .send_on_disconnect(&fidl_sme::DisconnectInfo {
+                    is_sme_reconnecting: true,
+                    disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                        mlme_event_name:
+                            fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+                        reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
+                    }),
+                })
+                .expect("Failed to send OnDisconnect");
+        }
+
+        // No callbacks for disconnect, since we're awaiting a reconnect result.
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
+        assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Pending);
+        let next_mcast = next_mcast_message(&mut mcast_stream);
+        pin_mut!(next_mcast);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+
+        // Send and process the reconnect result.
+        let client_iface = test_helper.iface_manager.client_iface.as_ref().unwrap();
+        let locked_handle = client_iface.transaction_handle.lock();
+        let handle = locked_handle.as_ref().unwrap();
+        handle
+            .send_on_connect_result(&reconnect_result)
+            .expect("Failed to send ConnectResult for reconnect");
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        if expect_disconnect {
+            assert_variant!(
+                test_helper.exec.run_until_stalled(&mut next_callback_fut),
+                Poll::Ready(Some(Ok(
+                    fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnDisconnected { .. }
+                )))
+            );
+            let on_state_changed = assert_variant!(
+            test_helper.exec.run_until_stalled(&mut next_callback_fut),
+            Poll::Ready(Some(Ok(
+                fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }
+            ))) => payload);
+            assert_eq!(
+                on_state_changed.new_state,
+                Some(fidl_wlanix::StaIfaceCallbackState::Disconnected)
+            );
+
+            let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
+            assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Disconnect);
+        } else {
+            // Still no messages, since the reconnect was successful.
+            assert_variant!(
+                test_helper.exec.run_until_stalled(&mut next_callback_fut),
+                Poll::Pending
+            );
+            assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+        }
     }
 
     struct SupplicantTestHelper {
