@@ -58,7 +58,7 @@ fuchsia_test_package("pkgctl-integration-tests") {
     ":pkgctl-binary",
     "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
-    "//src/connectivity/network/http-client:component",
+    "//src/connectivity/policy/http-client:component",
   ]
 }
 
