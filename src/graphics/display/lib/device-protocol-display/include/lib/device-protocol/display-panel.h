@@ -81,7 +81,7 @@
 const display_setting_t kDisplaySettingTV070WSM_FT = {
     .lane_num = 4,
     .bit_rate_max = 360,
-    .lcd_clock = 44250000,
+    .lcd_clock = 44226000,
     .h_active = 600,
     .v_active = 1024,
     .h_period = 700,
