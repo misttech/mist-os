@@ -88,22 +88,6 @@ SoftmacBinding::SoftmacBinding() : unbind_called_(std::make_shared<bool>(false))
     softmac_ifc_server_dispatcher_ = *std::move(dispatcher);
   }
 
-  // Create a dispatcher for WlanSoftmacIfcBridge method calls to the Rust MLME.
-  {
-    auto dispatcher = fdf::SynchronizedDispatcher::Create(
-        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifcbridge_client",
-        [](fdf_dispatcher_t*) {
-          WLAN_LAMBDA_TRACE_DURATION("wlansoftmacifcbridge_client shutdown_handler");
-        });
-
-    if (dispatcher.is_error()) {
-      ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
-                    zx_status_get_string(dispatcher.status_value()));
-    }
-
-    softmac_ifc_bridge_client_dispatcher_ = *std::move(dispatcher);
-  }
-
   // Create a dispatcher for WlanSoftmac method calls to the parent device.
   //
   // The Unbind hook relies on client_dispatcher_ implementing a shutdown
@@ -399,7 +383,6 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* r
 
   auto softmac_ifc_bridge = SoftmacIfcBridge::New(softmac_ifc_server_dispatcher_, rust_softmac_ifc,
                                                   std::move(endpoints->server),
-                                                  softmac_ifc_bridge_client_dispatcher_.borrow(),
                                                   std::move(softmac_ifc_bridge_client_endpoint));
   if (softmac_ifc_bridge.is_error()) {
     lerror("Failed to create SoftmacIfcBridge: %s", softmac_ifc_bridge.status_string());

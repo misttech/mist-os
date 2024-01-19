@@ -25,10 +25,9 @@ class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftma
       fdf::Dispatcher& softmac_ifc_server_dispatcher,
       const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
       fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
-      fdf::UnownedDispatcher&& softmac_ifc_bridge_client_dispatcher,
       fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&& bridge_client_endpoint);
 
-  ~SoftmacIfcBridge() override;
+  ~SoftmacIfcBridge() override = default;
 
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
   void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
@@ -37,17 +36,13 @@ class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftma
                           NotifyScanCompleteCompleter::Sync& completer) override;
 
  private:
-  explicit SoftmacIfcBridge(fdf::UnownedDispatcher&& softmac_ifc_bridge_client_dispatcher)
-      : softmac_ifc_bridge_client_dispatcher_(std::move(softmac_ifc_bridge_client_dispatcher)) {
-    WLAN_TRACE_DURATION();
-  }
+  SoftmacIfcBridge() = default;
 
   wlan_softmac_ifc_protocol_t wlan_softmac_ifc_protocol_;
   wlan_softmac_ifc_protocol_ops_t wlan_softmac_ifc_protocol_ops_;
   std::unique_ptr<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>
       softmac_ifc_server_binding_;
 
-  fdf::UnownedDispatcher softmac_ifc_bridge_client_dispatcher_;
   std::unique_ptr<fidl::WireClient<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>>
       softmac_ifc_bridge_client_;
 

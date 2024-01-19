@@ -144,7 +144,6 @@ class SoftmacBinding : public DeviceInterface {
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
 
   fdf::Dispatcher softmac_ifc_server_dispatcher_;
-  fdf::Dispatcher softmac_ifc_bridge_client_dispatcher_;
   std::unique_ptr<SoftmacIfcBridge> softmac_ifc_bridge_;
 
   // Record when the framework calls the unbind hook to prevent sta_shutdown_handler() from calling
