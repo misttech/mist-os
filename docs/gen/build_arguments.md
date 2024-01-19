@@ -2780,12 +2780,6 @@ Enables the tracing feature of mdns, which can be turned on using
 
 From //src/connectivity/network/mdns/service/BUILD.gn:13
 
-### enable_msd_arm_mali_dfv2
-
-**Current value (from the default):** `false`
-
-From //src/graphics/drivers/msd-arm-mali/BUILD.gn:10
-
 ### enable_netboot
 
 Whether to build the netboot zbi by default.
@@ -5505,7 +5499,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:318
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:324
 
 ### pw_arduino_build_BOARD
 
@@ -7654,20 +7648,6 @@ a guess.
 **Current value (from the default):** `""`
 
 From //build/sdk/config.gni:44
-
-### sdk_with_all_supported_api_levels
-
-Set to true to build IDK atoms for all supported API levels that are listed
-in fuchsia_platform.supported_fuchsia_api_levels. This impacts the behavior
-of the idk() template.
-
-TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders are too
-slow to enable this setting, and therefore the mac IDK won't have
-per-api-level prebuilts.
-
-**Current value (from the default):** `true`
-
-From //sdk/config.gni:22
 
 ### select_variant
 
