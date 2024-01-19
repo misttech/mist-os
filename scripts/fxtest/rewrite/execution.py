@@ -139,6 +139,8 @@ class TestExecution:
                 extra_args += ["--run-disabled"]
             if self._flags.show_full_moniker_in_logs:
                 extra_args += ["--show-full-moniker-in-logs"]
+            if self._flags.break_on_failure:
+                extra_args += ["--break-on-failure"]
             if self._outdir is not None:
                 extra_args += ["--output-directory", self._outdir]
 

@@ -48,6 +48,7 @@ class Flags:
     restrict_logs: bool
     also_run_disabled_tests: bool
     show_full_moniker_in_logs: bool
+    break_on_failure: bool
     extra_args: typing.List[str]
 
     output: bool
@@ -335,6 +336,12 @@ def parse_args(
         help="""If set, show the full moniker in log output for on-device tests.
         Otherwise only the last segment of the moniker is displayed.
         Default is False.""",
+        default=False,
+    )
+    execution.add_argument(
+        "--break-on-failure",
+        action="store_true",
+        help="""Not hooked up yet, this currently does nothing. If True, any test case failures will stop test execution and launch zxdb attached to the failed test case, if the test runner supports stopping.""",
         default=False,
     )
 
