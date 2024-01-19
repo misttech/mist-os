@@ -921,6 +921,7 @@ fn get_invocation_options(options: ftest_manager::RunOptions) -> ftest::RunOptio
         include_disabled_tests: options.run_disabled_tests,
         parallel: options.parallel,
         arguments: options.arguments,
+        break_on_failure: options.break_on_failure,
         ..Default::default()
     }
 }

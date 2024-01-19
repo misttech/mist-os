@@ -80,6 +80,7 @@ pub async fn test_params_from_reader<R: Read>(
                     max_severity_logs,
                     min_severity_logs: min_severity_selectors,
                     tags,
+                    break_on_failure: false,
                 });
             }
             _ => {

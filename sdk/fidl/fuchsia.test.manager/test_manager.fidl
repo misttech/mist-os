@@ -162,6 +162,13 @@ type RunOptions = table {
     /// Configures the minimum severity for the components under test.
     7: log_interest
             vector<fuchsia.diagnostics.LogInterestSelector>:fuchsia.diagnostics.MAX_LOG_SELECTORS;
+
+    /// If true, the test runner should halt (if supported) the test suite when
+    /// a failure is encountered such that a debugger may attach to the process
+    /// in the future. Test runners may safely ignore this if they do not
+    /// support stopping running test suites.
+    @available(added=HEAD)
+    8: break_on_failure bool;
 };
 
 /// Holds the server end of an iterator over the isolated logs of a test.

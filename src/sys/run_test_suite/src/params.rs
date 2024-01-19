@@ -39,6 +39,9 @@ pub struct TestParams {
 
     /// List of tags to associate with this test's output.
     pub tags: Vec<TestTag>,
+
+    /// Stop the test suite on the first test failure so a debugger can attach.
+    pub break_on_failure: bool,
 }
 
 /// Parameters that specify how the overall test run should be executed.

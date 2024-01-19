@@ -80,6 +80,13 @@ type RunOptions = table {
 
     /// Optional arguments to pass to the test.
     3: arguments vector<string:MAX>:MAX;
+
+    /// Indicate to the test runner that the suite should be halted if a failure
+    /// is encountered if possible to allow a debugger to attach. Runners may
+    /// ignore this flag if they do not support optionally halting a running
+    /// suite.
+    @available(added=HEAD)
+    4: break_on_failure bool;
 };
 
 /// Result of invoking a single test case.

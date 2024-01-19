@@ -358,6 +358,7 @@ async fn test_params_from_args(
                 parallel: cmd.parallel,
                 test_args,
                 tags: vec![],
+                break_on_failure: false,
             };
 
             let count = cmd.count.unwrap_or(1);
@@ -588,6 +589,7 @@ mod test {
                     max_severity_logs: None,
                     min_severity_logs: vec![],
                     tags: vec![],
+                    break_on_failure: false,
                 }],
             ),
             (
@@ -622,6 +624,7 @@ mod test {
                         parallel: None,
                         test_args: vec![],
                         tags: vec![],
+                        break_on_failure: false,
                     };
                     10
                 ],
@@ -657,6 +660,7 @@ mod test {
                     parallel: Some(20),
                     test_args: vec!["--".to_string(), "arg".to_string()],
                     tags: vec![],
+                    break_on_failure: false,
                 }],
             ),
             (
@@ -693,6 +697,7 @@ mod test {
                         parallel: None,
                         test_args: vec![],
                         tags: vec![],
+                        break_on_failure: false,
                     },
                     run_test_suite_lib::TestParams {
                         test_url: "file-test-url-2".to_string(),
@@ -705,6 +710,7 @@ mod test {
                         parallel: None,
                         test_args: vec![],
                         tags: vec![],
+                        break_on_failure: false,
                     },
                     run_test_suite_lib::TestParams {
                         test_url: "file-test-url-3".to_string(),
@@ -720,6 +726,7 @@ mod test {
                             key: "hermetic".to_string(),
                             value: "true".to_string(),
                         }],
+                        break_on_failure: false,
                     },
                 ],
             ),

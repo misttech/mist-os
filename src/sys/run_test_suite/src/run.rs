@@ -136,6 +136,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             arguments: Some(params.test_args),
             run_disabled_tests: Some(params.also_run_disabled_tests),
             case_filters_to_run: params.test_filters,
+            break_on_failure: Some(params.break_on_failure),
             log_iterator: Some(run_params.log_protocol.unwrap_or_else(diagnostics::get_type)),
             log_interest: Some(combined_log_interest),
             ..Default::default()
