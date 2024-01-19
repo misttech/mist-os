@@ -108,6 +108,13 @@ idk("final_fuchsia_idk.exported") {
   sdk_collection_label = ":core"
   target_cpus = idk_target_cpus
   api_levels = platform_version.supported_fuchsia_api_levels
+
+  # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
+  # are too slow to enable this setting, and therefore the mac IDK won't have
+  # per-api-level prebuilts.
+  if (host_os == "mac") {
+    api_levels = []
+  }
 }
 
 idk_archive("final_fuchsia_idk.archive") {
