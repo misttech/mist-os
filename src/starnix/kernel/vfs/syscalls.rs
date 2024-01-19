@@ -472,10 +472,10 @@ pub fn sys_sendfile(
     current_task: &CurrentTask,
     out_fd: FdNumber,
     in_fd: FdNumber,
-    offset: UserAddress,
+    user_offset: UserRef<off_t>,
     count: i32,
 ) -> Result<usize, Errno> {
-    splice::sendfile(current_task, out_fd, in_fd, offset, count)
+    splice::sendfile(current_task, out_fd, in_fd, user_offset, count)
 }
 
 /// A convenient wrapper for Task::open_file_at.

@@ -140,8 +140,6 @@
                 "sys_ptrace.watchpoint_imprecise",
                 "sys_ptrace.watchpoint_stress",
                 "sys_sem.smoke",
-                "sys_sendfile.sendfile",
-                "sys_sendfile.sendfile64_smoke",
                 "sys_shm.smoke",
                 "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_dangling_symlink",
                 "sys_stat.fchmodat_AT_SYMLINK_NOFOLLOW_with_symlink",

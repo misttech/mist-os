@@ -11,15 +11,10 @@ use crate::{
         FdNumber, FileHandle,
     },
 };
-use starnix_logging::{log_warn, not_implemented};
+use starnix_logging::log_warn;
 use starnix_sync::{ordered_lock, MutexGuard};
 use starnix_uapi::{
-    error,
-    errors::Errno,
-    off_t,
-    open_flags::OpenFlags,
-    uapi,
-    user_address::{UserAddress, UserRef},
+    errno, error, errors::Errno, off_t, open_flags::OpenFlags, uapi, user_address::UserRef,
     user_buffer::MAX_RW_COUNT,
 };
 
@@ -27,20 +22,18 @@ pub fn sendfile(
     current_task: &CurrentTask,
     out_fd: FdNumber,
     in_fd: FdNumber,
-    offset: UserAddress,
+    user_offset: UserRef<off_t>,
     count: i32,
 ) -> Result<usize, Errno> {
-    if !offset.is_null() {
-        not_implemented!("sendfile non-null offset");
-        return error!(ENOSYS);
-    }
+    let out_file = current_task.files.get(out_fd)?;
+    let in_file = current_task.files.get(in_fd)?;
+
+    let maybe_offset =
+        if user_offset.is_null() { None } else { Some(current_task.read_object(user_offset)?) };
 
     if count < 0 {
         return error!(EINVAL);
     }
-
-    let out_file = current_task.files.get(out_fd)?;
-    let in_file = current_task.files.get(in_fd)?;
 
     if !in_file.flags().can_read() || !out_file.flags().can_write() {
         return error!(EBADF);
@@ -61,20 +54,40 @@ pub fn sendfile(
     let count = count as usize;
     let mut count = std::cmp::min(count, *MAX_RW_COUNT);
 
-    // Lock the in_file offset for the entire operation.
-    let mut in_offset = in_file.offset.lock();
+    let (mut offset, mut update_offset): (usize, Box<dyn FnMut(off_t) -> Result<(), Errno>>) =
+        if let Some(offset) = maybe_offset {
+            (
+                offset.try_into().map_err(|_| errno!(EINVAL))?,
+                Box::new(|updated_offset| -> Result<(), Errno> {
+                    current_task.write_object(user_offset, &updated_offset)?;
+                    Ok(())
+                }),
+            )
+        } else {
+            // Lock the in_file offset for the entire operation.
+            let mut in_offset = in_file.offset.lock();
+            let offset = *in_offset;
+            (
+                offset as usize,
+                Box::new(move |updated_offset| -> Result<(), Errno> {
+                    *in_offset = updated_offset;
+                    Ok(())
+                }),
+            )
+        };
     let mut total_written = 0;
 
     match (|| -> Result<(), Errno> {
         while count > 0 {
             let limit = std::cmp::min(*PAGE_SIZE as usize, count);
             let mut buffer = VecOutputBuffer::new(limit);
-            let read = in_file.read_at(current_task, *in_offset as usize, &mut buffer)?;
+            let read = in_file.read_at(current_task, offset, &mut buffer)?;
             let mut buffer = Vec::from(buffer);
             buffer.truncate(read);
             let written = out_file.write(current_task, &mut VecInputBuffer::from(buffer))?;
-            *in_offset += written as i64;
+            offset += written;
             total_written += written;
+            update_offset(offset as off_t)?;
             if read < limit || written < read {
                 break;
             }

@@ -577,9 +577,6 @@
                 "RtSignalTest.SignoMatch",
 
                 // sendfile_test
-                "SendFileTest.InvalidOffset",
-                "SendFileTest.Overflow",
-                "SendFileTest.SendAndUpdateGivenOffset",
                 "SendFileTest.SendFileToSelf",
 
                 // sigaltstack_test - https://fxbug.dev/79359
