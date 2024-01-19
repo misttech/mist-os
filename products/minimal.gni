@@ -21,15 +21,16 @@ fuchsia_product_assembly_config_label = "//products/minimal"
 zedboot_product_assembly_config_label = "//products/zedboot:zedboot_with_fvm"
 
 bazel_product_bundle_prefix = "//products/minimal:product_bundle"
-extra_bazel_assembly_targets = [ "//products/minimal:board_assembly_artifacts" ]
+extra_bazel_assembly_targets =
+    [ "//build/bazel/assembly/assembly_outputs:verifications" ]
+
+# Packages to be published to universe that do not go through assembly.
+discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
 
 # List all artifacts to upload to CIPD.
 cipd_assembly_artifact_targets = [
-  # This will collect all AIBs needed for OOT assembly.
-  "//build/images/fuchsia",
+  "//build/images:main_assembly",
   "//products/minimal:board_assembly_artifacts",
 ]
 
 fxfs_blob = false
-
-use_bazel_images_only = true
