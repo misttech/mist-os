@@ -71,7 +71,12 @@
   auto line = cpp20::source_location::current().line();           \
   WLAN_TRACE_DURATION_(("λ " name));
 
+// TODO(https://fxbug.dev/320494175): Record an instant event at the
+// beginning of this macro to guarantee an event will be logged even
+// in the case of a crash.
 #define WLAN_TRACE_DURATION_(name, ...)                                                   \
+  TRACE_INSTANT("wlan", name, TRACE_SCOPE_THREAD, "line", TA_UINT64(line), "filename",    \
+                TA_STRING(file_name), ##__VA_ARGS__);                                     \
   TRACE_DURATION("wlan", name, "line", TA_UINT64(line), "filename", TA_STRING(file_name), \
                  ##__VA_ARGS__);
 
