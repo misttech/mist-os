@@ -75,7 +75,21 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
   RemoteLoadModule(RemoteLoadModule&&) = default;
 
-  explicit RemoteLoadModule(const Soname& name) : RemoteLoadModuleBase{name} {}
+  RemoteLoadModule(const Soname& name, std::optional<uint32_t> loaded_by_modid)
+      : RemoteLoadModuleBase{name}, loaded_by_modid_{loaded_by_modid} {}
+
+  // Return the index of other module in the list (if any) that requested this
+  // one be loaded.  This means that the name() string points into that other
+  // module's DT_STRTAB image.
+  std::optional<uint32_t> loaded_by_modid() const { return loaded_by_modid_; }
+
+  // Change the module ID (i.e. List index) recording which other module (if
+  // any) first requested this module be loaded via DT_NEEDED.  This is
+  // normally set in construction at the time of that first request, but for
+  // predecoded modules it needs to be updated in place.
+  void set_loaded_by_modid(std::optional<uint32_t> loaded_by_modid) {
+    loaded_by_modid_ = loaded_by_modid;
+  }
 
   const zx::vmo& vmo() const { return vmo_; }
 
@@ -212,7 +226,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
       std::array<RemoteLoadModule, PredecodedCount> predecoded_modules) {
     // Decode the main executable first and save its decoded information to
     // include in the result returned to the caller.
-    RemoteLoadModule exec{abi::Abi<>::kExecutableName};
+    RemoteLoadModule exec{abi::Abi<>::kExecutableName, std::nullopt};
     auto exec_decode_result = exec.Decode(diag, std::move(main_executable_vmo), 0);
     if (exec_decode_result.is_error()) [[unlikely]] {
       return std::nullopt;
@@ -328,8 +342,9 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
       pos = kNpos;
     }
 
-    auto enqueue_deps = [&modules, &predecoded_modules,
-                         &predecoded_positions](const std::vector<Soname>& needed) {
+    auto enqueue_deps = [&modules, &predecoded_modules, &predecoded_positions](
+                            const std::vector<Soname>& needed,
+                            std::optional<uint32_t> loaded_by_modid) {
       // Return true if it's already in the modules list.
       auto in_modules = [&modules](const Soname& soname) -> bool {
         return std::find(modules.begin(), modules.end(), soname) != modules.end();
@@ -337,7 +352,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
       // If it's in the predecoded_modules list, then move it to the end of the
       // modules list and update predecoded_positions accordingly.
-      auto in_predecoded = [&modules, &predecoded_modules,
+      auto in_predecoded = [loaded_by_modid, &modules, &predecoded_modules,
                             &predecoded_positions](const Soname& soname) -> bool {
         for (size_t i = 0; i < PredecodedCount; ++i) {
           size_t& pos = predecoded_positions[i];
@@ -345,6 +360,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
           if (pos == kNpos && module == soname) {
             pos = modules.size();
             RemoteLoadModule& mod = modules.emplace_back(std::move(module));
+            // Record the first module to request this dependency.
+            mod.set_loaded_by_modid(loaded_by_modid);
             // Mark that the module is in the symbolic resolution set.
             mod.module().symbols_visible = true;
             // Use the exact pointer that's the dependent module's DT_NEEDED
@@ -360,7 +377,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
       for (const Soname& soname : needed) {
         if (!in_modules(soname) && !in_predecoded(soname)) {
-          modules.emplace_back(soname);
+          modules.emplace_back(soname, loaded_by_modid);
         }
       }
     };
@@ -372,7 +389,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     modules.emplace_back(std::move(main_exec));
 
     // First enqueue the executable's direct dependencies.
-    enqueue_deps(main_exec_needed);
+    enqueue_deps(main_exec_needed, 0);
 
     // Now iterate over the queue remaining after the main executable itself,
     // adding indirect dependencies onto the end of the queue until the loop
@@ -380,6 +397,9 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     // the loop terminates, every transitive dependency having been decoded.
     for (size_t idx = 1; idx < modules.size(); ++idx) {
       fit::result<bool, DecodeResult> decode_result = fit::error{false};
+
+      // List index becomes symbolizer module ID.
+      const uint32_t modid = static_cast<uint32_t>(idx);
 
       {
         // The EnqueueDeps call below will extend the List (vector) and make
@@ -403,9 +423,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
           continue;
         }
 
-        decode_result = mod.Decode(diag, std::move(vmo),
-                                   // List index becomes symbolizer module ID.
-                                   static_cast<uint32_t>(idx));
+        decode_result = mod.Decode(diag, std::move(vmo), modid);
       }
 
       if (decode_result.is_error()) [[unlikely]] {
@@ -416,7 +434,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
         return {};
       }
 
-      enqueue_deps(decode_result->needed);
+      enqueue_deps(decode_result->needed, modid);
     }
 
     // Any remaining predecoded modules that weren't reached go on the end of
@@ -454,6 +472,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   Loader loader_;
   elfldltl::MappedVmoFile mapped_vmo_;
   zx::vmo vmo_;
+  std::optional<uint32_t> loaded_by_modid_;
 };
 
 }  // namespace ld

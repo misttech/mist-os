@@ -138,6 +138,36 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   auto& modules = decode_result->modules;
   ASSERT_FALSE(modules.empty());
 
+  // Check the loaded-by pointers.
+  EXPECT_FALSE(modules.front().loaded_by_modid())
+      << "executable loaded by " << modules[*modules.front().loaded_by_modid()].name();
+  {
+    auto next_module = std::next(modules.begin());
+    auto loaded_by_name = [next_module, &modules]() -> std::string_view {
+      if (next_module->loaded_by_modid()) {
+        return modules[*next_module->loaded_by_modid()].name().str();
+      }
+      return "<none>";
+    };
+    if (next_module != modules.end() && next_module->module().symbols_visible) {
+      // The second module must be a direct dependency of the executable.
+      EXPECT_THAT(next_module->loaded_by_modid(), ::testing::Optional(0u))
+          << " second module loaded by " << loaded_by_name();
+    }
+    for (; next_module != modules.end(); ++next_module) {
+      if (next_module->module().symbols_visible) {
+        // This module wouldn't be here if it wasn't loaded by someone.
+        EXPECT_NE(next_module->loaded_by_modid(), std::nullopt)
+            << "visible module " << next_module->name().str() << " loaded by " << loaded_by_name();
+      } else {
+        // A predecoded module was not referenced, so it's loaded by no-one.
+        EXPECT_EQ(next_module->loaded_by_modid(), std::nullopt)
+            << "invisible module " << next_module->name().str() << " loaded by "
+            << loaded_by_name();
+      }
+    }
+  }
+
   RemoteModule& loaded_stub = modules[decode_result->predecoded_positions[kStub]];
   RemoteAbi<> remote_abi;
   zx::result<> abi_result = remote_abi.Init(diag, abi_stub, loaded_stub, modules);
