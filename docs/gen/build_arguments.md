@@ -2357,7 +2357,7 @@ created at "$dir_pw_third_party/chre".
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre/src"`
 
-From //.gn:111
+From //.gn:112
 
 **Overridden from the default:** `""`
 
@@ -2365,7 +2365,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/chre/src"`
 
-From //.gn:111
+From //.gn:112
 
 **Overridden from the default:** `""`
 
@@ -2378,7 +2378,7 @@ source code.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:93
+From //.gn:94
 
 **Overridden from the default:** `""`
 
@@ -2386,7 +2386,7 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:93
+From //.gn:94
 
 **Overridden from the default:** `""`
 
@@ -2399,7 +2399,7 @@ mirror of the few Fuchsia source files it uses.
 
 **Current value for `target_cpu = "arm64"`:** `"//"`
 
-From //.gn:87
+From //.gn:88
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
 
@@ -2407,7 +2407,7 @@ From //third_party/pigweed/src/third_party/fuchsia/fuchsia.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//"`
 
-From //.gn:87
+From //.gn:88
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
 
@@ -2602,6 +2602,24 @@ From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:197
 **Current value (from the default):** `"//third_party/pigweed/src/pw_work_queue"`
 
 From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:198
+
+### disable_boot_tests
+
+Default value for `disabled` parameter for generated `boot_test()`.
+TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
+
+**Current value (from the default):** `false`
+
+From //build/testing/boot_tests/boot_test.gni:11
+
+### disable_cuckoo_tests
+
+Default value for `disabled` parameter for generated `cuckoo_test()`.
+TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
+
+**Current value (from the default):** `false`
+
+From //build/testing/boot_tests/kernel_zbi_test.gni:20
 
 ### disable_elf_checks
 
@@ -5536,7 +5554,7 @@ Backend for the pw_assert module's CHECK facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:61
+From //.gn:62
 
 **Overridden from the default:** `""`
 
@@ -5544,7 +5562,7 @@ From //third_party/pigweed/src/pw_assert/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:61
+From //.gn:62
 
 **Overridden from the default:** `""`
 
@@ -5579,7 +5597,7 @@ WARNING: This is experimental and *not* guaranteed to work.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*"]`
 
-From //.gn:96
+From //.gn:97
 
 **Overridden from the default:** `[]`
 
@@ -5587,7 +5605,7 @@ From //third_party/pigweed/src/pw_async/async.gni:21
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*"]`
 
-From //.gn:96
+From //.gn:97
 
 **Overridden from the default:** `[]`
 
@@ -5599,7 +5617,7 @@ Configures the backend to use for the //pw_async:fake_dispatcher facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:104
+From //.gn:105
 
 **Overridden from the default:** `""`
 
@@ -5607,7 +5625,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:104
+From //.gn:105
 
 **Overridden from the default:** `""`
 
@@ -5619,7 +5637,7 @@ Configures the backend to use for the //pw_async:task facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:101
+From //.gn:102
 
 **Overridden from the default:** `""`
 
@@ -5627,7 +5645,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:101
+From //.gn:102
 
 **Overridden from the default:** `""`
 
@@ -5736,7 +5754,7 @@ libraries such as pw_assert.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:81
+From //.gn:82
 
 **Overridden from the default:** `[]`
 
@@ -5744,7 +5762,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:26
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:81
+From //.gn:82
 
 **Overridden from the default:** `[]`
 
@@ -5873,7 +5891,7 @@ The configuration for building CHRE.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre:chre_config"`
 
-From //.gn:112
+From //.gn:113
 
 **Overridden from the default:** `"//third_party/chre:default_chre_config"`
 
@@ -5881,7 +5899,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/chre:chre_config"`
 
-From //.gn:112
+From //.gn:113
 
 **Overridden from the default:** `"//third_party/chre:default_chre_config"`
 
@@ -5893,7 +5911,7 @@ CHRE's platform backend implementation. The default is the Pigweed backend.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend"`
 
-From //.gn:113
+From //.gn:114
 
 **Overridden from the default:** `"//pw_chre:chre_backend"`
 
@@ -5901,7 +5919,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:28
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend"`
 
-From //.gn:113
+From //.gn:114
 
 **Overridden from the default:** `"//pw_chre:chre_backend"`
 
@@ -5913,7 +5931,7 @@ CHRE's platform backend headers. The default is the Pigweed backend.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
 
-From //.gn:115
+From //.gn:116
 
 **Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
@@ -5921,7 +5939,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
 
-From //.gn:115
+From //.gn:116
 
 **Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
@@ -5933,7 +5951,7 @@ Backend for the pw_chrono module's system_clock.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:64
+From //.gn:65
 
 **Overridden from the default:** `""`
 
@@ -5941,7 +5959,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:64
+From //.gn:65
 
 **Overridden from the default:** `""`
 
@@ -5953,7 +5971,7 @@ Backend for the pw_chrono module's system_timer.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_timer"`
 
-From //.gn:72
+From //.gn:73
 
 **Overridden from the default:** `""`
 
@@ -5961,7 +5979,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_timer"`
 
-From //.gn:72
+From //.gn:73
 
 **Overridden from the default:** `""`
 
@@ -6085,7 +6103,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
-From //.gn:78
+From //.gn:79
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6093,7 +6111,7 @@ From //third_party/pigweed/src/pw_function/function.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
-From //.gn:78
+From //.gn:79
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6105,7 +6123,7 @@ Backend for the pw_log module.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:62
+From //.gn:63
 
 **Overridden from the default:** `""`
 
@@ -6113,7 +6131,7 @@ From //third_party/pigweed/src/pw_log/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:62
+From //.gn:63
 
 **Overridden from the default:** `""`
 
@@ -6258,7 +6276,7 @@ root_build_dir, to the protoc binary.
 
 **Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
 
-From //.gn:108
+From //.gn:109
 
 **Overridden from the default:** `""`
 
@@ -6266,7 +6284,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:55
 
 **Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
 
-From //.gn:108
+From //.gn:109
 
 **Overridden from the default:** `""`
 
@@ -6279,7 +6297,7 @@ the protobuf compiler.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:107
+From //.gn:108
 
 **Overridden from the default:** `""`
 
@@ -6287,7 +6305,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:107
+From //.gn:108
 
 **Overridden from the default:** `""`
 
@@ -6391,7 +6409,7 @@ Backend for the pw_sync module's binary semaphore.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_stl:binary_semaphore_backend"`
 
-From //.gn:74
+From //.gn:75
 
 **Overridden from the default:** `""`
 
@@ -6399,7 +6417,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_stl:binary_semaphore_backend"`
 
-From //.gn:74
+From //.gn:75
 
 **Overridden from the default:** `""`
 
@@ -6435,7 +6453,7 @@ Backend for the pw_sync module's mutex.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_stl:mutex_backend"`
 
-From //.gn:65
+From //.gn:66
 
 **Overridden from the default:** `""`
 
@@ -6443,7 +6461,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:26
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_stl:mutex_backend"`
 
-From //.gn:65
+From //.gn:66
 
 **Overridden from the default:** `""`
 
@@ -6473,7 +6491,7 @@ Backend for the pw_sync module's thread notification.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_thread_notification_backend"`
 
-From //.gn:69
+From //.gn:70
 
 **Overridden from the default:** `""`
 
@@ -6481,7 +6499,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_thread_notification_backend"`
 
-From //.gn:69
+From //.gn:70
 
 **Overridden from the default:** `""`
 
@@ -6501,7 +6519,7 @@ Backend for the pw_sync module's timed thread notification.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_timed_thread_notification_backend"`
 
-From //.gn:70
+From //.gn:71
 
 **Overridden from the default:** `""`
 
@@ -6509,7 +6527,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:41
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_timed_thread_notification_backend"`
 
-From //.gn:70
+From //.gn:71
 
 **Overridden from the default:** `""`
 
@@ -6521,7 +6539,7 @@ Backend for the pw_sys_io facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
 
-From //.gn:66
+From //.gn:67
 
 **Overridden from the default:** `""`
 
@@ -6529,7 +6547,7 @@ From //third_party/pigweed/src/pw_sys_io/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
 
-From //.gn:66
+From //.gn:67
 
 **Overridden from the default:** `""`
 
@@ -6544,7 +6562,7 @@ use Pigweed's boringssl exclusively.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/boringssl"`
 
-From //.gn:90
+From //.gn:91
 
 **Overridden from the default:** `""`
 
@@ -6552,7 +6570,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/boringssl"`
 
-From //.gn:90
+From //.gn:91
 
 **Overridden from the default:** `""`
 
@@ -6637,7 +6655,7 @@ Backend for the pw_thread module's pw::thread::sleep_{for,until}.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:67
+From //.gn:68
 
 **Overridden from the default:** `""`
 
@@ -6645,7 +6663,7 @@ From //third_party/pigweed/src/pw_thread/backend.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:67
+From //.gn:68
 
 **Overridden from the default:** `""`
 
@@ -6977,7 +6995,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_unit_test:googletest"`
 
-From //.gn:119
+From //.gn:120
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
@@ -6985,7 +7003,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:31
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_unit_test:googletest"`
 
-From //.gn:119
+From //.gn:120
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
@@ -7058,7 +7076,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/googletest:gmock_no_testonly"`
 
-From //.gn:118
+From //.gn:119
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
 
@@ -7066,7 +7084,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:41
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/googletest:gmock_no_testonly"`
 
-From //.gn:118
+From //.gn:119
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
 
@@ -7082,7 +7100,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//src/lib/fxl/test:gtest_main"`
 
-From //.gn:117
+From //.gn:118
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
@@ -7090,7 +7108,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:48
 
 **Current value for `target_cpu = "x64"`:** `"//src/lib/fxl/test:gtest_main"`
 
-From //.gn:117
+From //.gn:118
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
@@ -7137,7 +7155,7 @@ compatibility.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //.gn:120
+From //.gn:121
 
 **Overridden from the default:** `false`
 
@@ -7145,7 +7163,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:117
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //.gn:120
+From //.gn:121
 
 **Overridden from the default:** `false`
 
@@ -7201,7 +7219,7 @@ From //build/images/args.gni:20
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:126
+From //.gn:127
 
 **Overridden from the default:** `[]`
 
@@ -7209,7 +7227,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:36
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:126
+From //.gn:127
 
 **Overridden from the default:** `[]`
 
