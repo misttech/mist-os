@@ -108,7 +108,7 @@ async fn handle_value<F, S>(
 ) -> Result<(), JsonDeserializeError>
 where
     F: LogFormatter + BootTimeAccessor,
-    S: Symbolize,
+    S: Symbolize + ?Sized,
 {
     let boot_ts = formatter.get_boot_timestamp();
 
@@ -131,7 +131,7 @@ pub async fn dump_logs_from_socket<F, S>(
 ) -> Result<(), JsonDeserializeError>
 where
     F: LogFormatter + BootTimeAccessor,
-    S: Symbolize,
+    S: Symbolize + ?Sized,
 {
     let mut decoder = Box::pin(LogsDataStream::new(socket));
     while let Some(log) = decoder.next().await {

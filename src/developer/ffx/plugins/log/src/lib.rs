@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use async_trait::async_trait;
 use error::LogError;
 use ffx_log_args::LogCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
@@ -12,7 +13,7 @@ use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use log_command::{
     log_formatter::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
-        WriterContainer,
+        Symbolize, WriterContainer,
     },
     InstanceGetter, LogSubCommand, WatchCommand,
 };
@@ -41,6 +42,15 @@ pub struct LogTool {
     cmd: LogCommand,
 }
 
+struct NoOpSymoblizer;
+
+#[async_trait(?Send)]
+impl Symbolize for NoOpSymoblizer {
+    async fn symbolize(&self, entry: LogEntry) -> LogEntry {
+        entry
+    }
+}
+
 fho::embedded_plugin!(LogTool);
 
 #[async_trait::async_trait(?Send)]
@@ -60,9 +70,17 @@ pub async fn log_impl(
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
 ) -> Result<(), LogError> {
+    let no_symbolize = cmd.no_symbolize;
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
-    log_main(writer, rcs_proxy, target_collection_proxy, cmd, LogSymbolizer::new(), instance_getter)
-        .await
+    log_main(
+        writer,
+        rcs_proxy,
+        target_collection_proxy,
+        cmd,
+        if no_symbolize { None } else { Some(LogSymbolizer::new()) },
+        instance_getter,
+    )
+    .await
 }
 
 // Main logging event loop.
@@ -71,7 +89,7 @@ async fn log_main<W>(
     rcs_proxy: RemoteControlProxy,
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
-    symbolizer: impl Symbolizer,
+    symbolizer: Option<impl Symbolizer>,
     instance_getter: impl InstanceGetter,
 ) -> Result<(), LogError>
 where
@@ -165,13 +183,16 @@ async fn log_loop<W>(
     target_query: TargetQuery,
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
-    symbolizer: impl Symbolizer,
+    symbolizer: Option<impl Symbolizer>,
     realm_query: &impl InstanceGetter,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
 {
-    let symbolizer_channel = SymbolizerChannel::new(symbolizer).await?;
+    let symbolizer_channel: Box<dyn Symbolize> = match symbolizer {
+        Some(inner) => Box::new(SymbolizerChannel::new(inner).await?),
+        None => Box::new(NoOpSymoblizer {}),
+    };
     let mut stream_mode = get_stream_mode(cmd.clone())?;
     // TODO(https://fxbug.dev/129624): Add support for reconnect handling to Overnet.
     // This plugin needs special logic to handle reconnects as logging should tolerate
@@ -219,8 +240,12 @@ where
         )
         .await?;
         formatter.set_boot_timestamp(connection.boot_timestamp as i64);
-        let maybe_err =
-            dump_logs_from_socket(connection.log_socket, &mut formatter, &symbolizer_channel).await;
+        let maybe_err = dump_logs_from_socket(
+            connection.log_socket,
+            &mut formatter,
+            symbolizer_channel.as_ref(),
+        )
+        .await;
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
             break;
         }
@@ -361,7 +386,7 @@ mod tests {
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -404,7 +429,7 @@ mod tests {
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -463,7 +488,7 @@ mod tests {
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             getter,
         ));
 
@@ -517,7 +542,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             getter,
         ));
 
@@ -555,7 +580,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
 
@@ -589,7 +614,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -629,7 +654,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -670,7 +695,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -722,7 +747,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -797,7 +822,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -878,7 +903,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
 
@@ -954,7 +979,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
 
@@ -1072,7 +1097,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1148,7 +1173,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1200,7 +1225,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1255,7 +1280,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1307,7 +1332,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1360,7 +1385,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1413,7 +1438,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1454,7 +1479,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1509,7 +1534,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
@@ -1565,7 +1590,7 @@ ffx log --force-select.
             rcs_proxy,
             target_collection_proxy,
             cmd,
-            symbolizer,
+            Some(symbolizer),
             FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.

@@ -234,6 +234,13 @@ pub struct LogCommand {
     #[argh(switch)]
     pub raw: bool,
 
+    /// if provided, the symbolizer will not be spawned
+    /// like raw, but actually disables the symbolizer
+    /// process.
+    #[cfg(not(target_os = "fuchsia"))]
+    #[argh(switch)]
+    pub no_symbolize: bool,
+
     /// configure the log settings on the target device for components matching
     /// the given selector. This modifies the minimum log severity level emitted
     /// by components during the logging session.
@@ -287,6 +294,8 @@ impl Default for LogCommand {
             tid: None,
             #[cfg(target_os = "fuchsia")]
             json: false,
+            #[cfg(not(target_os = "fuchsia"))]
+            no_symbolize: false,
         }
     }
 }
