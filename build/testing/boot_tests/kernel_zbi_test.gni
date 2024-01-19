@@ -14,6 +14,10 @@ declare_args() {
   # When true, all instances of `kernel_zbi_tests()` will default to generating a `cuckoo_zbi_test()`
   # which is a full system image generated for exfiltrating instrumentation data from a target system.
   generate_cuckoo_tests = false
+
+  # Default value for `disabled` parameter for generated `cuckoo_test()`.
+  # TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
+  disable_cuckoo_tests = false
 }
 
 cuckoo_kernel_zbi_test_params = {
@@ -37,7 +41,8 @@ template("_cuckoo_kernel_zbi_test") {
     target_environments = invoker.environments
   }
 
-  if (defined(invoker.disabled) && invoker.disabled) {
+  if ((!defined(invoker.disabled) && disable_cuckoo_tests) ||
+      (defined(invoker.disabled) && invoker.disabled)) {
     target_environments = []
   }
 

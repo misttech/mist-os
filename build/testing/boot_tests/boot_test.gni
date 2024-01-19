@@ -5,6 +5,12 @@
 import("//build/sdk/product_bundle.gni")
 import("//build/testing/test_spec.gni")
 
+declare_args() {
+  # Default value for `disabled` parameter for generated `boot_test()`.
+  # TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
+  disable_boot_tests = false
+}
+
 # The test runners have no better way to determine that a boot test succeeded
 # than to look for an exact string in the console log output.  zbi_test()
 # targets produce metadata to drive the test runners, which tells them to
@@ -204,6 +210,13 @@ template("_boot_test") {
 #    - Type: int
 #    - Default: 600 (10 minutes)
 #
+#  * disabled
+#    - Optional: When true, the generated image is considered disabled, that
+#      is any associated test should not be run automatically. Useful for
+#      generating build artifacts.
+#    - Type: boolean
+#    - Default: `disable_boot_tests`
+#
 #  * assert_no_deps, data_deps, metadata, visibility
 #    - Optional: Usual GN meanings.
 #
@@ -214,6 +227,10 @@ template("boot_test") {
       defined(invoker.zbi) || defined(invoker.qemu_kernel) ||
           defined(invoker.vbmeta) || defined(invoker.efi_disk),
       "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`")
+  if ((!defined(invoker.disabled) && disable_boot_tests) ||
+      (defined(invoker.disabled) && invoker.disabled)) {
+    invoker.device_types = []
+  }
 
   main_target = target_name
   image_manifest_target = "_boot_test.${target_name}.image_manifest"
@@ -358,6 +375,7 @@ template("boot_test") {
                                "assert_no_deps",
                                "device_types",
                                "visibility",
+                               "disabled",
                              ])
       visibility = [ ":*" ]
       output_name = main_target
