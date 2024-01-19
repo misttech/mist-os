@@ -20,7 +20,7 @@ use {
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{Name, SeparatedPath},
     moniker::{ChildName, ChildNameBase, MonikerBase},
-    sandbox::{Dict, Receiver},
+    sandbox::{Dict, Receiver, Unit},
     std::{collections::HashMap, iter, sync::Arc},
     tracing::warn,
 };
@@ -241,7 +241,8 @@ fn extend_dict_with_use(
             ));
             new_terminating_router(sender)
         }
-        _ => return, // unsupported
+        // Unimplemented
+        cm_rust::UseSource::Debug | cm_rust::UseSource::Environment => return,
     };
     program_input_dict.insert_capability(
         use_protocol.target_path.iter_segments(),
@@ -335,7 +336,9 @@ fn extend_dict_with_offer(
                 }),
             )
         }
-        _ => return, // unsupported
+        cm_rust::OfferSource::Void => new_unit_router(),
+        // This is only relevant for services, so this arm is never reached.
+        cm_rust::OfferSource::Collection(_name) => return,
     };
     target_dict.insert_capability(
         iter::once(target_name.as_str()),
@@ -420,12 +423,18 @@ fn extend_dict_with_expose(
                 }),
             )
         }
-        _ => return, // unsupported
+        cm_rust::ExposeSource::Void => new_unit_router(),
+        // This is only relevant for services, so this arm is never reached.
+        cm_rust::ExposeSource::Collection(_name) => return,
     };
     target_dict.insert_capability(
         iter::once(target_name.as_str()),
         router.with_availability(*expose.availability()),
     );
+}
+
+fn new_unit_router() -> Router {
+    Router::new(|_: Request, completer: Completer| completer.complete(Ok(Box::new(Unit {}))))
 }
 
 fn new_router_for_cm_hosted_receiver(
