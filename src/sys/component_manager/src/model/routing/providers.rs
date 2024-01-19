@@ -86,8 +86,6 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         // No request hooks, so lets send to the outgoing directory.
         let path = self.path.to_path_buf().attach(relative_path);
         let path = path.to_str().ok_or(CapabilityProviderError::BadPath)?;
-        // Pass back the channel so the caller can set the epitaph, if necessary.
-        *server_end = channel::take_channel(server_end);
         source
             .open_outgoing(flags, path, server_end)
             .await
