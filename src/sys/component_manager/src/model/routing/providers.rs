@@ -5,7 +5,7 @@ use {
     crate::{
         capability::CapabilityProvider,
         model::{
-            component::{ComponentInstance, StartReason, WeakComponentInstance},
+            component::{StartReason, WeakComponentInstance},
             error::{CapabilityProviderError, ComponentProviderError},
             hooks::{CapabilityReceiver, Event, EventPayload},
         },
@@ -18,7 +18,7 @@ use {
     cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    sandbox::{Message, Sender},
+    sandbox::Message,
     std::{path::PathBuf, sync::Arc},
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
 };
@@ -42,51 +42,37 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), CapabilityProviderError> {
-        let (component, sender) = async {
-            // Start the source component, if necessary
-            let source = self
-                .source
-                .upgrade()
-                .map_err(|_| ComponentProviderError::SourceInstanceNotFound)?;
-            source
-                .start(
-                    &StartReason::AccessCapability {
-                        target: self.target.moniker.clone(),
-                        name: self.name.clone(),
-                    },
-                    None,
-                    vec![],
-                    vec![],
-                )
-                .await?;
-
-            let (receiver, sender) = CapabilityReceiver::new();
-            let event = Event::new(
-                &self
-                    .target
-                    .upgrade()
-                    .map_err(|_| ComponentProviderError::TargetInstanceNotFound)?,
-                EventPayload::CapabilityRequested {
-                    source_moniker: source.moniker.clone(),
-                    name: self.name.to_string(),
-                    receiver: receiver.clone(),
+        // Start the source component, if necessary.
+        let source =
+            self.source.upgrade().map_err(|_| ComponentProviderError::SourceInstanceNotFound)?;
+        source
+            .start(
+                &StartReason::AccessCapability {
+                    target: self.target.moniker.clone(),
+                    name: self.name.clone(),
                 },
-            );
-            source.hooks.dispatch(&event).await;
-            let sender = if receiver.is_taken() { Some(sender) } else { None };
-            Result::<(Arc<ComponentInstance>, Option<Sender<()>>), ComponentProviderError>::Ok((
-                source, sender,
-            ))
-        }
-        .await?;
+                None,
+                vec![],
+                vec![],
+            )
+            .await
+            .map_err(Into::<ComponentProviderError>::into)?;
 
-        let path = self.path.to_path_buf().attach(relative_path);
-        let path = path.to_str().ok_or(CapabilityProviderError::BadPath)?;
-        // If no component intercepts the capability request via hooks, then we
-        // can open the capability through the component's outgoing directory.
-        // If some hook intercepts the capability request, then we don't bother
-        // looking in the outgoing directory.
-        if let Some(sender) = sender {
+        // Send a CapabilityRequested event.
+        let (receiver, sender) = CapabilityReceiver::new();
+        let event = Event::new(
+            &self.target.upgrade().map_err(|_| ComponentProviderError::TargetInstanceNotFound)?,
+            EventPayload::CapabilityRequested {
+                source_moniker: source.moniker.clone(),
+                name: self.name.to_string(),
+                receiver: receiver.clone(),
+            },
+        );
+        source.hooks.dispatch(&event).await;
+
+        // If a component intercepts the capability request through hooks, then
+        // send them the channel.
+        if receiver.is_taken() {
             let _ = sender.send(Message {
                 payload: fsandbox::ProtocolPayload {
                     channel: channel::take_channel(server_end),
@@ -94,14 +80,18 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 },
                 target: (),
             });
-        } else {
-            // Pass back the channel so the caller can set the epitaph, if necessary.
-            *server_end = channel::take_channel(server_end);
-            component
-                .open_outgoing(flags, path, server_end)
-                .await
-                .map_err(|e| CapabilityProviderError::ComponentProviderError { err: e.into() })?;
+            return Ok(());
         }
+
+        // No request hooks, so lets send to the outgoing directory.
+        let path = self.path.to_path_buf().attach(relative_path);
+        let path = path.to_str().ok_or(CapabilityProviderError::BadPath)?;
+        // Pass back the channel so the caller can set the epitaph, if necessary.
+        *server_end = channel::take_channel(server_end);
+        source
+            .open_outgoing(flags, path, server_end)
+            .await
+            .map_err(|e| CapabilityProviderError::ComponentProviderError { err: e.into() })?;
         Ok(())
     }
 }
