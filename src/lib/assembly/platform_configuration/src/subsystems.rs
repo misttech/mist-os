@@ -290,7 +290,7 @@ fn configure_subsystems(
     media::MediaSubsystem::define_configuration(context, &config.platform.media, builder)
         .context("Configuring the 'media' subsystem")?;
 
-    power::PowerManagementSubsystem::define_configuration(context, &(), builder)
+    power::PowerManagementSubsystem::define_configuration(context, &config.platform.power, builder)
         .context("Configuring the 'power' subsystem")?;
 
     paravirtualization::ParavirtualizationSubsystem::define_configuration(

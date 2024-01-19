@@ -64,4 +64,7 @@ workbench_platform_config = {
             "touchscreen",
         ],
     },
+    "power": {
+        "suspend_enabled": True,
+    },
 }

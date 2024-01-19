@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
+use assembly_config_schema::platform_config::power_config::PowerConfig;
 use assembly_util::{BootfsDestination, FileEntry};
 
 use crate::subsystems::prelude::*;
 
 pub(crate) struct PowerManagementSubsystem;
 
-impl DefineSubsystemConfiguration<()> for PowerManagementSubsystem {
+impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        _config: &(),
+        _config: &PowerConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if let Some(power_manager_config) = &context.board_info.configuration.power_manager {

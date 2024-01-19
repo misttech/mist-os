@@ -21,6 +21,7 @@ pub mod intl_config;
 pub mod kernel_config;
 pub mod media_config;
 pub mod paravirtualization_config;
+pub mod power_config;
 pub mod recovery_config;
 pub mod session_config;
 pub mod setui_config;
@@ -162,6 +163,10 @@ pub struct PlatformConfig {
 
     #[serde(default)]
     pub kernel: kernel_config::PlatformKernelConfig,
+
+    /// Platform configuration options for the power area.
+    #[serde(default)]
+    pub power: power_config::PowerConfig,
 }
 
 // LINT.IfChange
