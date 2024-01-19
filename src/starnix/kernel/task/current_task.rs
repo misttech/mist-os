@@ -1438,7 +1438,7 @@ impl CurrentTask {
             }
 
             if flags & (CLONE_CHILD_SETTID as u64) != 0 {
-                child.vmo_write_object(user_child_tid, &child.id)?;
+                child.write_object(user_child_tid, &child.id)?;
             }
             child.thread_state = self.thread_state.snapshot();
             Ok(())

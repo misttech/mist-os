@@ -2118,38 +2118,6 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
-    /// Like `read_memory_to_vec` but always writes the memory through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
-        // SAFETY: `self.vmo_read_memory` only returns `Ok` if all bytes were read to.
-        unsafe {
-            read_to_vec(len, |buf| {
-                self.vmo_read_memory(addr, buf).map(|bytes_read| {
-                    debug_assert_eq!(bytes_read.len(), len);
-                    len
-                })
-            })
-        }
-    }
-
-    /// Read up to `max_len` bytes from `addr` through a VMO, returning them as
-    /// a Vec.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_partial_to_vec(
-        &self,
-        addr: UserAddress,
-        max_len: usize,
-    ) -> Result<Vec<u8>, Errno> {
-        // SAFETY: `self.vmo_read_memory_partial` returns the bytes read.
-        unsafe {
-            read_to_vec(max_len, |buf| {
-                self.vmo_read_memory_partial(addr, buf).map(|bytes_read| bytes_read.len())
-            })
-        }
-    }
-
     /// Read up to `max_len` bytes from `addr`, returning them as a Vec.
     fn read_memory_partial_to_vec(
         &self,
@@ -2185,17 +2153,6 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         unsafe {
             read_to_object_as_bytes(|buf| {
                 self.read_memory(user.addr(), buf)
-                    .map(|bytes_read| debug_assert_eq!(bytes_read.len(), std::mem::size_of::<T>()))
-            })
-        }
-    }
-
-    /// Read an instance of T from `user` through the VMO.
-    fn vmo_read_object<T: FromBytes>(&self, user: UserRef<T>) -> Result<T, Errno> {
-        // SAFETY: `self.read_memory` only returns `Ok` if all bytes were read to.
-        unsafe {
-            read_to_object_as_bytes(|buf| {
-                self.vmo_read_memory(user.addr(), buf)
                     .map(|bytes_read| debug_assert_eq!(bytes_read.len(), std::mem::size_of::<T>()))
             })
         }
@@ -2405,14 +2362,6 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         object: &T,
     ) -> Result<usize, Errno> {
         self.write_memory(user.addr(), object.as_bytes())
-    }
-
-    fn vmo_write_object<T: AsBytes + NoCell>(
-        &self,
-        user: UserRef<T>,
-        object: &T,
-    ) -> Result<usize, Errno> {
-        self.vmo_write_memory(user.addr(), object.as_bytes())
     }
 
     fn write_objects<T: AsBytes + NoCell>(
