@@ -21,42 +21,6 @@ namespace amlogic_display {
 namespace {
 constexpr uint32_t kKHZ = 1000;
 
-void DumpPllCfg(const PllConfig& pll_cfg) {
-  zxlogf(INFO, "#############################");
-  zxlogf(INFO, "Dumping pll_cfg structure:");
-  zxlogf(INFO, "#############################");
-  zxlogf(INFO, "fin = 0x%x (%u)", pll_cfg.fin, pll_cfg.fin);
-  zxlogf(INFO, "fout = 0x%x (%u)", pll_cfg.fout, pll_cfg.fout);
-  zxlogf(INFO, "pll_m = 0x%x (%u)", pll_cfg.pll_m, pll_cfg.pll_m);
-  zxlogf(INFO, "pll_n = 0x%x (%u)", pll_cfg.pll_n, pll_cfg.pll_n);
-  zxlogf(INFO, "pll_fvco = 0x%x (%u)", pll_cfg.pll_fvco, pll_cfg.pll_fvco);
-  zxlogf(INFO, "pll_od1_sel = 0x%x (%u)", pll_cfg.pll_od1_sel, pll_cfg.pll_od1_sel);
-  zxlogf(INFO, "pll_od2_sel = 0x%x (%u)", pll_cfg.pll_od2_sel, pll_cfg.pll_od2_sel);
-  zxlogf(INFO, "pll_od3_sel = 0x%x (%u)", pll_cfg.pll_od3_sel, pll_cfg.pll_od3_sel);
-  zxlogf(INFO, "pll_frac = 0x%x (%u)", pll_cfg.pll_frac, pll_cfg.pll_frac);
-  zxlogf(INFO, "pll_fout = 0x%x (%u)", pll_cfg.pll_fout, pll_cfg.pll_fout);
-}
-
-void DumpLcdTiming(const LcdTiming& lcd_timing) {
-  zxlogf(INFO, "#############################");
-  zxlogf(INFO, "Dumping lcd_timing structure:");
-  zxlogf(INFO, "#############################");
-  zxlogf(INFO, "vid_pixel_on = 0x%x (%u)", lcd_timing.vid_pixel_on, lcd_timing.vid_pixel_on);
-  zxlogf(INFO, "vid_line_on = 0x%x (%u)", lcd_timing.vid_line_on, lcd_timing.vid_line_on);
-  zxlogf(INFO, "de_hs_addr = 0x%x (%u)", lcd_timing.de_hs_addr, lcd_timing.de_hs_addr);
-  zxlogf(INFO, "de_he_addr = 0x%x (%u)", lcd_timing.de_he_addr, lcd_timing.de_he_addr);
-  zxlogf(INFO, "de_vs_addr = 0x%x (%u)", lcd_timing.de_vs_addr, lcd_timing.de_vs_addr);
-  zxlogf(INFO, "de_ve_addr = 0x%x (%u)", lcd_timing.de_ve_addr, lcd_timing.de_ve_addr);
-  zxlogf(INFO, "hs_hs_addr = 0x%x (%u)", lcd_timing.hs_hs_addr, lcd_timing.hs_hs_addr);
-  zxlogf(INFO, "hs_he_addr = 0x%x (%u)", lcd_timing.hs_he_addr, lcd_timing.hs_he_addr);
-  zxlogf(INFO, "hs_vs_addr = 0x%x (%u)", lcd_timing.hs_vs_addr, lcd_timing.hs_vs_addr);
-  zxlogf(INFO, "hs_ve_addr = 0x%x (%u)", lcd_timing.hs_ve_addr, lcd_timing.hs_ve_addr);
-  zxlogf(INFO, "vs_hs_addr = 0x%x (%u)", lcd_timing.vs_hs_addr, lcd_timing.vs_hs_addr);
-  zxlogf(INFO, "vs_he_addr = 0x%x (%u)", lcd_timing.vs_he_addr, lcd_timing.vs_he_addr);
-  zxlogf(INFO, "vs_vs_addr = 0x%x (%u)", lcd_timing.vs_vs_addr, lcd_timing.vs_vs_addr);
-  zxlogf(INFO, "vs_ve_addr = 0x%x (%u)", lcd_timing.vs_ve_addr, lcd_timing.vs_ve_addr);
-}
-
 void DumpDisplaySettings(const display_setting_t& settings) {
   zxlogf(INFO, "#############################");
   zxlogf(INFO, "Dumping display_setting structure:");
@@ -260,14 +224,13 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
 
   // Populate internal LCD timing structure based on predefined tables
   lcd_timing_ = CalculateLcdTiming(d);
-  auto pll_result = GenerateHPLL(d);
-  if (!pll_result.is_error()) {
-    pll_cfg_ = std::move(pll_result.value());
-    last_valid_display_settings_ = d;
-  } else {
-    zxlogf(ERROR, "PLL generation failed, using the old config");
-    Dump();
+  zx::result<PllConfig> pll_result = GenerateHPLL(d);
+  if (pll_result.is_error()) {
+    zxlogf(ERROR, "Failed to generate HDMI PLL and Video clock tree configuration: %s",
+           pll_result.status_string());
+    return pll_result.take_error();
   }
+  pll_cfg_ = std::move(pll_result).value();
 
   uint32_t regVal;
   PllConfig* pll_cfg = &pll_cfg_;
@@ -472,12 +435,6 @@ zx::result<std::unique_ptr<Clock>> Clock::Create(ddk::PDevFidl& pdev, bool alrea
   self->clock_enabled_ = already_enabled;
 
   return zx::ok(std::move(self));
-}
-
-void Clock::Dump() {
-  DumpPllCfg(pll_cfg_);
-  DumpLcdTiming(lcd_timing_);
-  DumpDisplaySettings(last_valid_display_settings_);
 }
 
 }  // namespace amlogic_display

@@ -33,7 +33,6 @@ class Clock {
 
   zx::result<> Enable(const display_setting_t& d);
   void Disable();
-  void Dump();
 
   void SetVideoOn(bool on);
 
@@ -56,7 +55,6 @@ class Clock {
 
   PllConfig pll_cfg_;
   LcdTiming lcd_timing_;
-  display_setting_t last_valid_display_settings_ = {};
 
   bool clock_enabled_ = false;
 };
