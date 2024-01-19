@@ -14,8 +14,8 @@ use {
     pretty_assertions::assert_eq,
     test_diagnostics::collect_string_from_socket,
     test_manager_test_lib::{
-        collect_suite_events, default_run_option, GroupRunEventByTestCase, RunEvent, TestBuilder,
-        TestRunEventPayload,
+        collect_suite_events, default_run_option, AttributedLog, GroupRunEventByTestCase, RunEvent,
+        TestBuilder, TestRunEventPayload,
     },
 };
 
@@ -59,7 +59,7 @@ fn default_event_offers() -> Vec<fdecl::Offer> {
 async fn run_test_in_echo_test_realm(
     test_url: &str,
     run_options: RunOptions,
-) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
+) -> Result<(Vec<RunEvent>, Vec<AttributedLog>), Error> {
     let realm = connect_realm().unwrap();
     let mut offers = default_event_offers();
     offers.push(fdecl::Offer::Protocol(fdecl::OfferProtocol {
@@ -76,7 +76,7 @@ async fn run_test_in_echo_test_realm(
 async fn run_test_in_hermetic_test_realm(
     test_url: &str,
     run_options: RunOptions,
-) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
+) -> Result<(Vec<RunEvent>, Vec<AttributedLog>), Error> {
     let realm = connect_realm().unwrap();
     let offers = default_event_offers();
     run_single_test(realm, &offers, HERMETIC_TEST_COL, test_url, run_options).await
@@ -88,7 +88,7 @@ async fn run_single_test(
     test_collection: &str,
     test_url: &str,
     run_options: RunOptions,
-) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
+) -> Result<(Vec<RunEvent>, Vec<AttributedLog>), Error> {
     let builder = TestBuilder::new(connect_run_builder!()?);
     let suite_instance = builder
         .add_suite_in_realm(realm, offers, test_collection, test_url, run_options)
@@ -115,7 +115,7 @@ async fn launch_and_test_echo_test() {
         RunEvent::suite_stopped(SuiteStatus::Passed),
     ];
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -199,7 +199,7 @@ async fn launch_and_test_hermetic_echo_test_in_hermetic_realm() {
         RunEvent::suite_stopped(SuiteStatus::Passed),
     ];
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -210,8 +210,9 @@ async fn collect_isolated_logs_using_default_log_iterator() {
         run_test_in_hermetic_test_realm(test_url, default_run_option()).await.unwrap();
 
     assert_eq!(
-        logs,
-        vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
+        vec!["Started diagnostics publisher", "Finishing through Stop"],
+        "{logs:#?}",
     );
 }
 
@@ -223,8 +224,9 @@ async fn collect_isolated_logs_using_batch() {
     let (_events, logs) = run_test_in_hermetic_test_realm(test_url, options).await.unwrap();
 
     assert_eq!(
-        logs,
-        vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
+        vec!["Started diagnostics publisher", "Finishing through Stop"],
+        "{logs:#?}",
     );
 }
 
@@ -238,8 +240,9 @@ async fn collect_isolated_logs_using_archive_iterator() {
     let (_events, logs) = run_test_in_hermetic_test_realm(test_url, options).await.unwrap();
 
     assert_eq!(
-        logs,
-        vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
+        vec!["Started diagnostics publisher", "Finishing through Stop"],
+        "{logs:#?}",
     );
 }
 
@@ -255,13 +258,14 @@ async fn update_log_severity_for_all_components() {
     };
     let (_events, logs) = run_test_in_hermetic_test_realm(test_url, options).await.unwrap();
     assert_eq!(
-        logs,
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
         vec![
-            "I'm a debug log from a test".to_owned(),
-            "Started diagnostics publisher".to_owned(),
-            "I'm a debug log from the publisher!".to_owned(),
-            "Finishing through Stop".to_owned(),
-        ]
+            "I'm a debug log from a test",
+            "Started diagnostics publisher",
+            "I'm a debug log from the publisher!",
+            "Finishing through Stop",
+        ],
+        "{logs:#?}",
     );
 }
 

@@ -13,8 +13,8 @@ use {
     pretty_assertions::assert_eq,
     test_diagnostics::collect_string_from_socket,
     test_manager_test_lib::{
-        collect_suite_events, default_run_option, GroupRunEventByTestCase, RunEvent, TestBuilder,
-        TestRunEventPayload,
+        collect_suite_events, default_run_option, AttributedLog, GroupRunEventByTestCase, RunEvent,
+        TestBuilder, TestRunEventPayload,
     },
 };
 
@@ -35,7 +35,7 @@ macro_rules! connect_query_server {
 async fn run_single_test(
     test_url: &str,
     run_options: RunOptions,
-) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
+) -> Result<(Vec<RunEvent>, Vec<AttributedLog>), Error> {
     let builder = TestBuilder::new(connect_run_builder!()?);
     let suite_instance =
         builder.add_suite(test_url, run_options).await.context("Cannot create suite instance")?;
@@ -218,7 +218,7 @@ async fn launch_and_test_subpackaged_test() {
         RunEvent::suite_stopped(SuiteStatus::Passed),
     ];
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 
     let test_url =
@@ -234,7 +234,7 @@ async fn launch_and_test_subpackaged_test() {
         RunEvent::suite_stopped(SuiteStatus::Passed),
     ];
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -252,7 +252,7 @@ async fn launch_and_test_echo_test() {
         RunEvent::suite_stopped(SuiteStatus::Passed),
     ];
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -280,7 +280,7 @@ async fn launch_and_test_no_on_finished() {
     let expected_events = expected_events.into_iter().group_by_test_case_unordered();
 
     assert_eq!(&expected_events, &events);
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
 }
 
 #[fuchsia::test]
@@ -295,7 +295,7 @@ async fn launch_and_test_gtest_runner_sample_test() {
             .into_iter()
             .group_by_test_case_unordered();
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -345,7 +345,7 @@ async fn positive_filter_test() {
     .into_iter()
     .group_by_test_case_unordered();
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -381,7 +381,7 @@ async fn negative_filter_test() {
     .into_iter()
     .group_by_test_case_unordered();
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -409,7 +409,7 @@ async fn positive_and_negative_filter_test() {
     .into_iter()
     .group_by_test_case_unordered();
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -426,7 +426,7 @@ async fn parallel_tests() {
             .into_iter()
             .group_by_test_case_unordered();
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }
 
@@ -462,8 +462,8 @@ async fn multiple_test() {
             .into_iter()
             .group_by_test_case_unordered();
 
-    assert_eq!(gtest_log1, Vec::<String>::new());
-    assert_eq!(gtest_log2, Vec::<String>::new());
+    assert_eq!(gtest_log1, Vec::new());
+    assert_eq!(gtest_log2, Vec::new());
     assert_eq!(&expected_events, &gtest_events1);
     assert_eq!(&expected_events, &gtest_events2);
 }
@@ -517,8 +517,9 @@ async fn collect_isolated_logs_using_default_log_iterator() {
     let (_events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
 
     assert_eq!(
-        logs,
-        vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
+        vec!["Started diagnostics publisher", "Finishing through Stop"],
+        "{logs:#?}",
     );
 }
 
@@ -527,7 +528,11 @@ async fn collect_isolated_logs_from_generated_component_manifest() {
     let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/logger-test-generated-manifest.cm";
     let (_events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
 
-    assert_eq!(logs, vec!["I'm a info log from a test".to_owned()]);
+    assert_eq!(
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
+        vec!["I'm a info log from a test"],
+        "{logs:#?}",
+    );
 }
 
 #[fuchsia::test]
@@ -538,8 +543,9 @@ async fn collect_isolated_logs_using_batch() {
     let (_events, logs) = run_single_test(test_url, options).await.unwrap();
 
     assert_eq!(
-        logs,
-        vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
+        vec!["Started diagnostics publisher", "Finishing through Stop"],
+        "{logs:#?}",
     );
 }
 
@@ -553,8 +559,9 @@ async fn collect_isolated_logs_using_archive_iterator() {
     let (_events, logs) = run_single_test(test_url, options).await.unwrap();
 
     assert_eq!(
-        logs,
-        vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
+        vec!["Started diagnostics publisher", "Finishing through Stop"],
+        "{logs:#?}",
     );
 }
 
@@ -568,8 +575,9 @@ async fn collect_isolated_logs_using_host_socket() {
     let (_events, logs) = run_single_test(test_url, options).await.unwrap();
 
     assert_eq!(
-        logs,
-        vec!["Started diagnostics publisher".to_owned(), "Finishing through Stop".to_owned()]
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
+        vec!["Started diagnostics publisher", "Finishing through Stop"],
+        "{logs:#?}",
     );
 }
 
@@ -585,12 +593,12 @@ async fn update_log_severity_for_all_components() {
     };
     let (_events, logs) = run_single_test(test_url, options).await.unwrap();
     assert_eq!(
-        logs,
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
         vec![
-            "I'm a debug log from a test".to_owned(),
-            "Started diagnostics publisher".to_owned(),
-            "I'm a debug log from the publisher!".to_owned(),
-            "Finishing through Stop".to_owned(),
+            "I'm a debug log from a test",
+            "Started diagnostics publisher",
+            "I'm a debug log from the publisher!",
+            "Finishing through Stop",
         ]
     );
 }
@@ -608,11 +616,11 @@ async fn update_log_severity_for_the_test() {
     };
     let (_events, logs) = run_single_test(test_url, options).await.unwrap();
     assert_eq!(
-        logs,
+        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
         vec![
-            "I'm a debug log from a test".to_owned(),
-            "Started diagnostics publisher".to_owned(),
-            "Finishing through Stop".to_owned(),
+            "I'm a debug log from a test",
+            "Started diagnostics publisher",
+            "Finishing through Stop",
         ]
     );
 }
@@ -863,6 +871,6 @@ async fn launch_chromium_test() {
         RunEvent::suite_stopped(SuiteStatus::Passed),
     ];
 
-    assert_eq!(logs, Vec::<String>::new());
+    assert_eq!(logs, Vec::new());
     assert_eq!(&expected_events, &events);
 }

@@ -31,9 +31,15 @@ pub fn default_run_option() -> ftest_manager::RunOptions {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct AttributedLog {
+    pub log: String,
+    pub moniker: String,
+}
+
 pub async fn collect_suite_events(
     suite_instance: SuiteRunInstance,
-) -> Result<(Vec<RunEvent>, Vec<String>), Error> {
+) -> Result<(Vec<RunEvent>, Vec<AttributedLog>), Error> {
     let (sender, mut recv) = mpsc::channel(1);
     let execution_task =
         fasync::Task::spawn(async move { suite_instance.collect_events(sender).await });
@@ -81,7 +87,10 @@ pub async fn collect_suite_events(
         let logs = t.await;
         for log_result in logs {
             let log = log_result?;
-            collected_logs.push(log.msg().unwrap().to_string());
+            collected_logs.push(AttributedLog {
+                log: log.msg().unwrap().to_string(),
+                moniker: log.moniker.clone(),
+            });
         }
     }
 
