@@ -695,8 +695,21 @@ fpromise::promise<void> Device::Remove() {
   fpromise::bridge<void> finished_bridge;
   remove_completers_.push_back(std::move(finished_bridge.completer));
 
+  // We purposefully do not capture a shared_ptr to Device in the lambda.
+  // This is as we want the device to be destructed on the parent's executor
+  // as scheduled by UnbindAndRelease(). Otherwise, it would be possible for
+  // this task to be holding the last shared_ptr reference, and the executor
+  // will assert that a task is still running (ourself) during shutdown.
+  //
+  // We are guaranteed that the pointer will still be alive, as either
+  // the device has not yet been destructed, or the device has been
+  // destructed and the executor has purged all queued tasks during shutdown.
+  //
+  // Since all executors for the compat devices in the driver share a dispatcher,
+  // we are guaranteed that this task cannot be running at the same time as
+  // the task that destructs the device.
   executor_.schedule_task(WaitForInitToComplete().then(
-      [device = shared_from_this()](fpromise::result<void, zx_status_t>& init) {
+      [device = this](fpromise::result<void, zx_status_t>& init) {
         // If we don't have a controller, return early.
         // We are probably in a state where we are waiting for the controller to finish being
         // removed.
