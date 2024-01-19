@@ -29,8 +29,7 @@ impl DiscoverAction {
 
 #[async_trait]
 impl Action for DiscoverAction {
-    type Output = ();
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
         do_discover(component, self.dict).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {

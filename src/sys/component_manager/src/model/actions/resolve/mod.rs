@@ -32,8 +32,7 @@ impl ResolveAction {
 
 #[async_trait]
 impl Action for ResolveAction {
-    type Output = ();
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
         do_resolve(component).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {

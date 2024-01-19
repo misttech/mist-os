@@ -25,8 +25,7 @@ impl StopAction {
 
 #[async_trait]
 impl Action for StopAction {
-    type Output = ();
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError> {
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
         component.stop_instance_internal(self.shut_down).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
@@ -39,7 +38,7 @@ pub mod tests {
     use {
         super::*,
         crate::model::{
-            actions::{test_utils::is_stopped, ActionNotifier, ActionSet},
+            actions::{test_utils::is_stopped, ActionSet},
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             testing::{
@@ -182,9 +181,7 @@ pub mod tests {
         stopped_rx.await.unwrap();
 
         let actions = component_a.lock_actions().await;
-        let action_notifier = actions.rep[&ActionKey::Stop]
-            .downcast_ref::<ActionNotifier<<StopAction as Action>::Output>>()
-            .unwrap();
+        let action_notifier = &actions.rep[&ActionKey::Stop];
         assert_eq!(action_notifier.refcount.load(Ordering::Relaxed), 3);
         drop(actions);
 

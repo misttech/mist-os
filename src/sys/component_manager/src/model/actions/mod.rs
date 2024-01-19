@@ -76,7 +76,6 @@ use {
         task::{Context, Poll},
         Future,
     },
-    std::any::Any,
     std::collections::HashMap,
     std::fmt::Debug,
     std::hash::Hash,
@@ -90,8 +89,7 @@ use {
 /// A action on a component that must eventually be fulfilled.
 #[async_trait]
 pub trait Action: Send + Sync + 'static {
-    type Output: Send + Sync + Clone + Debug;
-    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<Self::Output, ActionError>;
+    async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError>;
     fn key(&self) -> ActionKey;
 }
 
@@ -111,7 +109,7 @@ pub enum ActionKey {
 ///
 /// Each action is mapped to a future that returns when the action is complete.
 pub struct ActionSet {
-    rep: HashMap<ActionKey, Box<dyn Any + Send + Sync>>,
+    rep: HashMap<ActionKey, ActionNotifier>,
     history: Vec<ActionKey>,
     passive_waiters: HashMap<ActionKey, Vec<oneshot::Sender<()>>>,
 }
@@ -121,35 +119,35 @@ pub struct ActionSet {
 /// Cloning this type will not duplicate the action, but generate another future that waits on the
 /// same action.
 #[derive(Debug)]
-pub struct ActionNotifier<Output: Send + Sync + Clone + Debug> {
+pub struct ActionNotifier {
     /// The inner future.
-    fut: Shared<BoxFuture<'static, Result<Output, ActionError>>>,
+    fut: Shared<BoxFuture<'static, Result<(), ActionError>>>,
     /// How many clones of this ActionNotifier are live, useful for testing.
     refcount: Arc<AtomicUsize>,
 }
 
-impl<Output: Send + Sync + Clone + Debug> ActionNotifier<Output> {
+impl ActionNotifier {
     /// Instantiate an `ActionNotifier` wrapping `fut`.
-    pub fn new(fut: BoxFuture<'static, Result<Output, ActionError>>) -> Self {
+    pub fn new(fut: BoxFuture<'static, Result<(), ActionError>>) -> Self {
         Self { fut: fut.shared(), refcount: Arc::new(AtomicUsize::new(1)) }
     }
 }
 
-impl<Output: Send + Sync + Clone + Debug> Clone for ActionNotifier<Output> {
+impl Clone for ActionNotifier {
     fn clone(&self) -> Self {
         self.refcount.fetch_add(1, Ordering::Relaxed);
         Self { fut: self.fut.clone(), refcount: self.refcount.clone() }
     }
 }
 
-impl<Output: Send + Sync + Clone + Debug> Drop for ActionNotifier<Output> {
+impl Drop for ActionNotifier {
     fn drop(&mut self) {
         self.refcount.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
-impl<Output: Send + Sync + Clone + Debug> Future for ActionNotifier<Output> {
-    type Output = Result<Output, ActionError>;
+impl Future for ActionNotifier {
+    type Output = Result<(), ActionError>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let fut = Pin::new(&mut self.fut);
         fut.poll(cx)
@@ -157,21 +155,15 @@ impl<Output: Send + Sync + Clone + Debug> Future for ActionNotifier<Output> {
 }
 
 /// Represents a task that implements an action.
-pub(crate) struct ActionTask<A>
-where
-    A: Action,
-{
-    tx: oneshot::Sender<Result<A::Output, ActionError>>,
-    fut: BoxFuture<'static, Result<A::Output, ActionError>>,
+pub(crate) struct ActionTask {
+    tx: oneshot::Sender<Result<(), ActionError>>,
+    fut: BoxFuture<'static, Result<(), ActionError>>,
 }
 
-impl<A> ActionTask<A>
-where
-    A: Action,
-{
+impl ActionTask {
     fn new(
-        tx: oneshot::Sender<Result<A::Output, ActionError>>,
-        fut: BoxFuture<'static, Result<A::Output, ActionError>>,
+        tx: oneshot::Sender<Result<(), ActionError>>,
+        fut: BoxFuture<'static, Result<(), ActionError>>,
     ) -> Self {
         Self { tx, fut }
     }
@@ -195,12 +187,9 @@ impl ActionSet {
     }
 
     #[cfg(test)]
-    pub fn mock_result<O>(&mut self, key: ActionKey, result: Result<O, ActionError>)
-    where
-        O: Send + Sync + Clone + Debug + 'static,
-    {
-        let notifier: ActionNotifier<O> = ActionNotifier::new(async move { result }.boxed());
-        self.rep.insert(key, Box::new(notifier));
+    pub fn mock_result(&mut self, key: ActionKey, result: Result<(), ActionError>) {
+        let notifier = ActionNotifier::new(async move { result }.boxed());
+        self.rep.insert(key, notifier);
     }
 
     #[cfg(test)]
@@ -228,7 +217,7 @@ impl ActionSet {
     pub async fn register<A>(
         component: Arc<ComponentInstance>,
         action: A,
-    ) -> Result<A::Output, ActionError>
+    ) -> Result<(), ActionError>
     where
         A: Action,
     {
@@ -248,7 +237,7 @@ impl ActionSet {
         &mut self,
         component: &Arc<ComponentInstance>,
         action: A,
-    ) -> impl Future<Output = Result<A::Output, ActionError>>
+    ) -> impl Future<Output = Result<(), ActionError>>
     where
         A: Action,
     {
@@ -260,20 +249,12 @@ impl ActionSet {
     }
 
     /// Returns a future that waits for the given action to complete, if one exists.
-    pub fn wait<A>(&self, action: A) -> Option<impl Future<Output = Result<A::Output, ActionError>>>
+    pub fn wait<A>(&self, action: A) -> Option<impl Future<Output = Result<(), ActionError>>>
     where
         A: Action,
     {
         let key = action.key();
-        if let Some(rx) = self.rep.get(&key) {
-            let rx = rx
-                .downcast_ref::<ActionNotifier<A::Output>>()
-                .expect("action notifier has unexpected type");
-            let rx = rx.clone();
-            Some(rx)
-        } else {
-            None
-        }
+        self.rep.get(&key).cloned()
     }
 
     /// Removes an action from the set, completing it.
@@ -297,18 +278,14 @@ impl ActionSet {
         &'a mut self,
         component: &Arc<ComponentInstance>,
         action: A,
-    ) -> (Option<ActionTask<A>>, ActionNotifier<A::Output>)
+    ) -> (Option<ActionTask>, ActionNotifier)
     where
         A: Action,
     {
         let key = action.key();
         // If this Action is already running, just subscribe to the result
         if let Some(rx) = self.rep.get(&key) {
-            let rx = rx
-                .downcast_ref::<ActionNotifier<A::Output>>()
-                .expect("action notifier has unexpected type");
-            let rx = rx.clone();
-            return (None, rx);
+            return (None, rx.clone());
         }
 
         // Otherwise we spin up the new Action
@@ -317,7 +294,9 @@ impl ActionSet {
         let component = component.clone();
 
         let action_fut = async move {
-            prereq.await;
+            if let Some(prereq) = prereq {
+                let _ = prereq.await;
+            }
             let key = action.key();
             let res = action.handle(&component).await;
             Self::finish(&component, &key).await;
@@ -327,7 +306,7 @@ impl ActionSet {
 
         let (tx, rx) = oneshot::channel();
         let task = ActionTask::new(tx, action_fut);
-        let notifier: ActionNotifier<A::Output> = ActionNotifier::new(
+        let notifier: ActionNotifier = ActionNotifier::new(
             async move {
                 match rx.await {
                     Ok(res) => res,
@@ -342,37 +321,21 @@ impl ActionSet {
             }
             .boxed(),
         );
-        self.rep.insert(key.clone(), Box::new(notifier.clone()));
+        self.rep.insert(key.clone(), notifier.clone());
         (Some(task), notifier)
     }
 
     /// Return a future that waits for any Action that must be waited on before
     /// executing the target Action. If none is required the returned future is
     /// empty.
-    fn get_prereq_action<'a, A: Action>(
-        &'a mut self,
-        action: &'a A,
-    ) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+    fn get_prereq_action<'a, A: Action>(&'a mut self, action: &'a A) -> Option<ActionNotifier> {
         // If the current action is Stop/Shutdown, ensure that
         // we block on the completion of Shutdown/Stop if it is
         // currently in progress.
-        let prereq_action = match action.key() {
-            ActionKey::Shutdown => self.rep.get(&ActionKey::Stop),
-            ActionKey::Stop => self.rep.get(&ActionKey::Shutdown),
+        match action.key() {
+            ActionKey::Shutdown => self.rep.get(&ActionKey::Stop).cloned(),
+            ActionKey::Stop => self.rep.get(&ActionKey::Shutdown).cloned(),
             _ => None,
-        };
-
-        if let Some(prereq_action) = prereq_action {
-            let prereq_action = prereq_action
-                .downcast_ref::<ActionNotifier<()>>()
-                .expect("action notifier has unexpected type")
-                .clone();
-            async move {
-                let _ = prereq_action.await;
-            }
-            .boxed()
-        } else {
-            async {}.boxed()
         }
     }
 }
@@ -393,8 +356,8 @@ pub mod tests {
     async fn register_action_in_new_task<A>(
         action: A,
         component: Arc<ComponentInstance>,
-        responder: oneshot::Sender<Result<A::Output, ActionError>>,
-        res: Result<A::Output, ActionError>,
+        responder: oneshot::Sender<Result<(), ActionError>>,
+        res: Result<(), ActionError>,
     ) where
         A: Action,
     {
