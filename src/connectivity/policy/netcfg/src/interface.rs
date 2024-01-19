@@ -72,7 +72,7 @@ fn get_mac_identifier_from_octets(
 // Ethernet Jack for VIM2
 // "/dev/sys/platform/04:02:7/aml-ethernet/Designware-MAC/ethernet"
 //
-// Virtio
+// VirtIo
 // "/dev/sys/platform/pt/PC00/bus/00:1e.0/00_1e_0/virtio-net/network-device"
 //
 // Since there is no real standard for topological paths, when no bus path can be found,
@@ -163,9 +163,11 @@ pub enum NameGenerationError {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum BusType {
-    USB,
     PCI,
     SDIO,
+    USB,
+    Unknown,
+    VirtIo,
 }
 
 impl BusType {
@@ -176,12 +178,12 @@ impl BusType {
     // * PCI/SDIO device: "wlans5009"
     fn get_default_name_composition_rules(&self) -> Vec<NameCompositionRule> {
         match *self {
-            BusType::USB => vec![
+            BusType::USB | BusType::Unknown => vec![
                 NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
                 NameCompositionRule::Static { value: String::from("x") },
                 NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
             ],
-            BusType::PCI | BusType::SDIO => vec![
+            BusType::PCI | BusType::SDIO | BusType::VirtIo => vec![
                 NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
                 NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusType },
                 NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
@@ -193,38 +195,40 @@ impl BusType {
 impl std::fmt::Display for BusType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let name = match *self {
-            Self::USB => "u",
             Self::PCI => "p",
             Self::SDIO => "s",
+            Self::USB => "u",
+            Self::Unknown => "unk",
+            Self::VirtIo => "v",
         };
         write!(f, "{}", name)
     }
 }
 
 // Extract the `BusType` for a device given the topological path.
-fn get_bus_type_for_topological_path(topological_path: &str) -> Result<BusType, anyhow::Error> {
-    if topological_path.contains("/PCI0") {
+fn get_bus_type_for_topological_path(topological_path: &str) -> BusType {
+    let p = topological_path;
+
+    if p.contains("/PCI0") {
         // A USB bus will require a bridge over a PCI controller, so a
         // topological path for a USB bus should contain strings to represent
         // PCI and USB.
-        if topological_path.contains("/usb/") {
-            Ok(BusType::USB)
-        } else {
-            Ok(BusType::PCI)
+        if p.contains("/usb/") {
+            return BusType::USB;
         }
-    } else if topological_path.contains("/usb-peripheral/") {
+        return BusType::PCI;
+    } else if p.contains("/usb-peripheral/") {
         // On VIM3 targets, the USB bus does not require a bridge over a PCI
         // controller, so the bus path represents the USB type with a
         // different string.
-        Ok(BusType::USB)
-    } else if topological_path.contains("/platform/") {
-        Ok(BusType::SDIO)
-    } else {
-        Err(anyhow::format_err!(
-            "unexpected topological path {}: did not match known bus types",
-            topological_path,
-        ))
+        return BusType::USB;
+    } else if p.contains("/sdio/") {
+        return BusType::SDIO;
+    } else if p.contains("/virtio-net/") {
+        return BusType::VirtIo;
     }
+
+    BusType::Unknown
 }
 
 fn deserialize_glob_pattern<'de, D>(deserializer: D) -> Result<glob::Pattern, D::Error>
@@ -270,7 +274,7 @@ impl MatchingRule {
             MatchingRule::BusTypes(type_list) => {
                 // Match the interface if the interface under comparison
                 // matches any of the types included in the list.
-                let bus_type = get_bus_type_for_topological_path(info.topological_path)?;
+                let bus_type = get_bus_type_for_topological_path(info.topological_path);
                 Ok(type_list.contains(&bus_type))
             }
             MatchingRule::TopologicalPath(pattern) => {
@@ -333,30 +337,28 @@ impl DynamicNameCompositionRule {
             DynamicNameCompositionRule::NormalizedMac => true,
         }
     }
-}
 
-impl DynamicNameCompositionRule {
     fn get_name(&self, info: &DeviceInfoRef<'_>, attempt_num: u8) -> Result<String, anyhow::Error> {
-        match *self {
+        Ok(match *self {
             DynamicNameCompositionRule::BusPath => {
-                Ok(get_normalized_bus_path_for_topo_path(info.topological_path))
+                get_normalized_bus_path_for_topo_path(info.topological_path)
             }
             DynamicNameCompositionRule::BusType => {
-                get_bus_type_for_topological_path(info.topological_path).map(|t| t.to_string())
+                get_bus_type_for_topological_path(info.topological_path).to_string()
             }
-            DynamicNameCompositionRule::DeviceClass => Ok(match info.device_class.into() {
+            DynamicNameCompositionRule::DeviceClass => match info.device_class.into() {
                 crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
                 crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
                 crate::InterfaceType::Ap => INTERFACE_PREFIX_AP,
             }
-            .to_string()),
+            .to_string(),
             DynamicNameCompositionRule::NormalizedMac => {
                 let fidl_fuchsia_net_ext::MacAddress { octets } = info.mac;
                 let mac_identifier =
                     get_mac_identifier_from_octets(octets, info.device_class.into(), attempt_num)?;
-                Ok(format!("{mac_identifier:x}"))
+                format!("{mac_identifier:x}")
             }
-        }
+        })
     }
 }
 
@@ -396,8 +398,7 @@ impl NamingRule {
     ) -> Result<String, NameGenerationError> {
         // When a bus type cannot be found for a path, use the USB
         // default naming policy which uses a MAC address.
-        let bus_type =
-            get_bus_type_for_topological_path(&info.topological_path).unwrap_or(BusType::USB);
+        let bus_type = get_bus_type_for_topological_path(&info.topological_path);
 
         // Expand any `Default` rules into the `Static` and `Dynamic` rules in a single vector.
         // If this was being consumed once, we could avoid the call to `collect`. However, since we
@@ -658,7 +659,7 @@ mod tests {
         "/dev/sys/platform/04:02:7/aml-ethernet/Designware-MAC/ethernet",
         [0x07, 0x07, 0x07, 0x07, 0x07, 0x07],
         crate::InterfaceType::Ethernet,
-        "eths04027";
+        "ethx7";
         "platform_eth"
     )]
     // unknown interfaces
@@ -683,6 +684,14 @@ mod tests {
         "apxa";
         "unknown_ap"
     )]
+    #[test_case(
+        "/dev/sys/platform/pt/PC00/bus/00:1e.0/00_1e_0/virtio-net/network-device",
+        [0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b],
+        crate::InterfaceType::Ethernet,
+        "ethv001e";
+        "virtio_attached_ethernet"
+    )]
+
     fn test_generate_name(
         topological_path: &'static str,
         mac: [u8; 6],
@@ -924,35 +933,35 @@ mod tests {
     )]
     #[test_case(
         "/dev/sys/platform/pt/PC00/bus/00:1e.0/00_1e_0/virtio-net/network-device",
-        vec![BusType::SDIO],
-        BusType::SDIO,
+        vec![BusType::VirtIo],
+        BusType::VirtIo,
         true,
         "001e";
-        "sdio_match_alternate_location"
+        "virtio_match_alternate_location"
     )]
     #[test_case(
         "/dev/sys/platform/pt/PC00/bus/<malformed>/00_1e_0/virtio-net/network-device",
-        vec![BusType::SDIO],
-        BusType::SDIO,
+        vec![BusType::VirtIo],
+        BusType::VirtIo,
         true,
         "001e";
-        "sdio_matches_underscore_path"
+        "virtio_matches_underscore_path"
     )]
     #[test_case(
         "/dev/sys/platform/pt/PC00/bus/00:1e.1/00_1e_1/virtio-net/network-device",
-        vec![BusType::SDIO],
-        BusType::SDIO,
+        vec![BusType::VirtIo],
+        BusType::VirtIo,
         true,
         "001e1";
-        "sdio_match_alternate_no_trim"
+        "virtio_match_alternate_no_trim"
     )]
     #[test_case(
         "/dev/sys/platform/pt/PC00/bus/<unrecognized_bus_path>/network-device",
-        vec![BusType::SDIO],
-        BusType::SDIO,
+        vec![BusType::Unknown],
+        BusType::Unknown,
         true,
         "ffffff";
-        "sdio_match_unrecognized"
+        "unknown_bus_match_unrecognized"
     )]
     fn test_interface_matching_and_naming_by_bus_properties(
         topological_path: &'static str,
@@ -970,7 +979,7 @@ mod tests {
 
         // Verify the `BusType` determined from the device's
         // topological path.
-        let bus_type = get_bus_type_for_topological_path(&device_info.topological_path).unwrap();
+        let bus_type = get_bus_type_for_topological_path(&device_info.topological_path);
         assert_eq!(bus_type, expected_bus_type);
 
         // Create a matching rule for the provided `BusType` list.
@@ -988,28 +997,6 @@ mod tests {
             let name = get_normalized_bus_path_for_topo_path(&device_info.topological_path);
             assert_eq!(name, "fffffe");
         }
-    }
-
-    #[test]
-    fn test_interface_matching_by_bus_type_unsupported() {
-        let device_info = DeviceInfoRef {
-            topological_path: "/dev/sys/unsupported-bus/ethernet",
-            // `device_class` and `mac` have no effect on `BusType`
-            // matching, so we use arbitrary values.
-            ..default_device_info()
-        };
-
-        // Verify the `BusType` determined from the device's topological
-        // path raises an error for being unsupported.
-        let bus_type_res = get_bus_type_for_topological_path(&device_info.topological_path);
-        assert!(bus_type_res.is_err());
-
-        // Create a matching rule for the provided `BusType` list. A device
-        // with an unsupported path should raise an error to signify the need
-        // to support a new bus type.
-        let matching_rule = MatchingRule::BusTypes(vec![BusType::USB, BusType::PCI, BusType::SDIO]);
-        let interface_match_res = matching_rule.does_interface_match(&device_info);
-        assert!(interface_match_res.is_err());
     }
 
     // Glob matches the number pattern of XX:XX in the path.
@@ -1501,36 +1488,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(name, expected_name.to_owned());
-    }
-
-    #[test]
-    fn test_generate_name_from_naming_rules_all_errors() {
-        // Create a `DeviceInfo` that has a device class, but has an empty
-        // topological path. This should prohibit the `BusType`
-        // dynamic `NameCompositionRule`s.
-        let info = DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
-            topological_path: "",
-            ..default_device_info()
-        };
-
-        // Both names should fail to be generated since the `BusType` relies on
-        // the topological path. The GenerationError should be surfaced.
-        let name = generate_name_from_naming_rules(
-            &[NamingRule {
-                matchers: HashSet::from([MatchingRule::Any(true)]),
-                naming_scheme: vec![NameCompositionRule::Dynamic {
-                    rule: DynamicNameCompositionRule::BusType,
-                }],
-            }],
-            &HashMap::new(),
-            &info,
-        );
-        assert_matches!(
-            name,
-            Err(NameGenerationError::GenerationError(e)) =>
-                e.to_string().contains("bus type")
-        );
     }
 
     #[test_case(true, ProvisioningAction::Delegated; "matches_first_rule")]
