@@ -61,10 +61,7 @@ source_set("lib") {
 
 fuchsia_driver("fuchsia_driver") {
   output_name = "usb_video"
-  deps = [
-    ":lib",
-    "//sdk/lib/syslog/cpp:backend",
-  ]
+  deps = [ ":lib" ]
 }
 
 fuchsia_driver_component("driver") {

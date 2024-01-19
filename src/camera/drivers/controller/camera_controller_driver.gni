@@ -58,10 +58,7 @@ template("camera_controller_driver") {
 
   fuchsia_driver(driver_target) {
     output_name = package_name
-    deps = [
-      "//sdk/lib/syslog/cpp:backend",
-      "//src/camera/drivers/controller:source",
-    ]
+    deps = [ "//src/camera/drivers/controller:source" ]
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
