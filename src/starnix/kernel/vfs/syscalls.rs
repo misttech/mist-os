@@ -2481,6 +2481,17 @@ pub fn sys_splice(
     splice::splice(current_task, fd_in, off_in, fd_out, off_out, len, flags)
 }
 
+pub fn sys_vmsplice(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    fd: FdNumber,
+    iovec_addr: UserAddress,
+    iovec_count: i32,
+    flags: u32,
+) -> Result<usize, Errno> {
+    splice::vmsplice(locked, current_task, fd, iovec_addr, iovec_count, flags)
+}
+
 pub fn sys_tee(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
