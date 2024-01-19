@@ -64,7 +64,7 @@ fn populate_initial_stack(
     original_stack_start_addr: UserAddress,
 ) -> Result<StackResult, Errno> {
     let mut stack_pointer = original_stack_start_addr;
-    let write_stack = |data: &[u8], addr: UserAddress| ma.vmo_write_memory(addr, data);
+    let write_stack = |data: &[u8], addr: UserAddress| ma.write_memory(addr, data);
 
     let argv_end = stack_pointer;
     for arg in argv.iter().rev() {
@@ -574,23 +574,7 @@ mod tests {
             todo!()
         }
 
-        fn vmo_read_memory<'a>(
-            &self,
-            _addr: UserAddress,
-            _bytes: &'a mut [MaybeUninit<u8>],
-        ) -> Result<&'a mut [u8], Errno> {
-            todo!()
-        }
-
         fn read_memory_partial_until_null_byte<'a>(
-            &self,
-            _addr: UserAddress,
-            _bytes: &'a mut [MaybeUninit<u8>],
-        ) -> Result<&'a mut [u8], Errno> {
-            todo!()
-        }
-
-        fn vmo_read_memory_partial_until_null_byte<'a>(
             &self,
             _addr: UserAddress,
             _bytes: &'a mut [MaybeUninit<u8>],
@@ -606,19 +590,7 @@ mod tests {
             todo!()
         }
 
-        fn vmo_read_memory_partial<'a>(
-            &self,
-            _addr: UserAddress,
-            _bytes: &'a mut [MaybeUninit<u8>],
-        ) -> Result<&'a mut [u8], Errno> {
-            todo!()
-        }
-
-        fn write_memory(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
-            todo!()
-        }
-
-        fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
             self.0.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))?;
             Ok(bytes.len())
         }
@@ -627,19 +599,7 @@ mod tests {
             todo!()
         }
 
-        fn vmo_write_memory_partial(
-            &self,
-            _addr: UserAddress,
-            _bytes: &[u8],
-        ) -> Result<usize, Errno> {
-            todo!()
-        }
-
         fn zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
-            todo!()
-        }
-
-        fn vmo_zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
             todo!()
         }
     }

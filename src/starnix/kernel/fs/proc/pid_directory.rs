@@ -772,7 +772,7 @@ impl FileOps for MemFile {
                     let read_bytes = if current_task.has_same_address_space(&task) {
                         current_task.read_memory_partial(addr, bytes)
                     } else {
-                        task.vmo_read_memory_partial(addr, bytes)
+                        task.read_memory_partial(addr, bytes)
                     }
                     .map_err(|_| errno!(EIO))?;
                     let actual = read_bytes.len();
@@ -800,7 +800,7 @@ impl FileOps for MemFile {
                     let actual = if current_task.has_same_address_space(&task) {
                         current_task.write_memory_partial(addr + written, bytes)
                     } else {
-                        task.vmo_write_memory_partial(addr + written, bytes)
+                        task.write_memory_partial(addr + written, bytes)
                     }
                     .map_err(|_| errno!(EIO))?;
                     written += actual;

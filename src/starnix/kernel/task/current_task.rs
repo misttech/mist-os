@@ -1595,28 +1595,12 @@ impl MemoryAccessor for CurrentTask {
         self.mm().unified_read_memory(self, addr, bytes)
     }
 
-    fn vmo_read_memory<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        self.mm().vmo_read_memory(addr, bytes)
-    }
-
     fn read_memory_partial_until_null_byte<'a>(
         &self,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
         self.mm().unified_read_memory_partial_until_null_byte(self, addr, bytes)
-    }
-
-    fn vmo_read_memory_partial_until_null_byte<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        self.mm().vmo_read_memory_partial_until_null_byte(addr, bytes)
     }
 
     fn read_memory_partial<'a>(
@@ -1627,36 +1611,16 @@ impl MemoryAccessor for CurrentTask {
         self.mm().unified_read_memory_partial(self, addr, bytes)
     }
 
-    fn vmo_read_memory_partial<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        self.mm().vmo_read_memory_partial(addr, bytes)
-    }
-
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.mm().unified_write_memory(self, addr, bytes)
-    }
-
-    fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm().vmo_write_memory(addr, bytes)
     }
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.mm().unified_write_memory_partial(self, addr, bytes)
     }
 
-    fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm().vmo_write_memory_partial(addr, bytes)
-    }
-
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.mm().unified_zero(self, addr, length)
-    }
-
-    fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.mm().vmo_zero(addr, length)
     }
 }
 

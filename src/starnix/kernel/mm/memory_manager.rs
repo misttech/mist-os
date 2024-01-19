@@ -1893,15 +1893,6 @@ pub trait MemoryAccessor {
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno>;
 
-    /// Like `read_memory` but always reads the memory through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno>;
-
     /// Reads bytes starting at `addr`, continuing until either a null byte is read, `bytes.len()`
     /// bytes have been read or no more bytes can be read from the target.
     ///
@@ -1910,16 +1901,6 @@ pub trait MemoryAccessor {
     ///
     /// Returns the bytes that have been read to on success.
     fn read_memory_partial_until_null_byte<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno>;
-
-    /// Like `read_memory_partial_until_null_byte` but always reads the memory
-    /// through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_partial_until_null_byte<'a>(
         &self,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
@@ -1939,15 +1920,6 @@ pub trait MemoryAccessor {
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno>;
 
-    /// Like `read_memory_partial` but always reads the memory through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_partial<'a>(
-        &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno>;
-
     /// Writes the provided bytes to `addr`.
     ///
     /// In case of success, the number of bytes written will always be `bytes.len()`.
@@ -1957,11 +1929,6 @@ pub trait MemoryAccessor {
     /// - `bytes`: The bytes to write from.
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno>;
 
-    /// Like `write_memory` but always writes the memory through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno>;
-
     /// Writes bytes starting at `addr`, continuing until either `bytes.len()` bytes have been
     /// written or no more bytes can be written.
     ///
@@ -1970,20 +1937,10 @@ pub trait MemoryAccessor {
     /// - `bytes`: The bytes to write from.
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno>;
 
-    /// Like `write_memory_partial` but always writes the memory through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno>;
-
     /// Writes zeros starting at `addr` and continuing for `length` bytes.
     ///
     /// Returns the number of bytes that were zeroed.
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
-
-    /// Like `zero` but always zeroes the bytes through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
 }
 
 pub trait TaskMemoryAccessor: MemoryAccessor {

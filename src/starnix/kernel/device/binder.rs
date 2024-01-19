@@ -2735,14 +2735,6 @@ impl MemoryAccessor for RemoteResourceAccessor {
     fn read_memory<'a>(
         &self,
         addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        self.vmo_read_memory(addr, bytes)
-    }
-
-    fn vmo_read_memory<'a>(
-        &self,
-        addr: UserAddress,
         mut unread_bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
         profile_duration!("RemoteReadMemory");
@@ -2785,14 +2777,6 @@ impl MemoryAccessor for RemoteResourceAccessor {
 
     fn read_memory_partial_until_null_byte<'a>(
         &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        self.vmo_read_memory_partial_until_null_byte(addr, bytes)
-    }
-
-    fn vmo_read_memory_partial_until_null_byte<'a>(
-        &self,
         _addr: UserAddress,
         _bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
@@ -2801,14 +2785,6 @@ impl MemoryAccessor for RemoteResourceAccessor {
 
     fn read_memory_partial<'a>(
         &self,
-        addr: UserAddress,
-        bytes: &'a mut [MaybeUninit<u8>],
-    ) -> Result<&'a mut [u8], Errno> {
-        self.vmo_read_memory_partial(addr, bytes)
-    }
-
-    fn vmo_read_memory_partial<'a>(
-        &self,
         _addr: UserAddress,
         _bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
@@ -2816,10 +2792,6 @@ impl MemoryAccessor for RemoteResourceAccessor {
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.vmo_write_memory(addr, bytes)
-    }
-
-    fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         profile_duration!("RemoteWriteMemory");
         let vmo = zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?;
         vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
@@ -2831,19 +2803,11 @@ impl MemoryAccessor for RemoteResourceAccessor {
         Ok(bytes.len())
     }
 
-    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.vmo_write_memory_partial(addr, bytes)
-    }
-
-    fn vmo_write_memory_partial(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
+    fn write_memory_partial(&self, _addr: UserAddress, _bytes: &[u8]) -> Result<usize, Errno> {
         error!(ENOTSUP)
     }
 
-    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.vmo_zero(addr, length)
-    }
-
-    fn vmo_zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
+    fn zero(&self, _addr: UserAddress, _length: usize) -> Result<usize, Errno> {
         error!(ENOTSUP)
     }
 }
