@@ -92,8 +92,6 @@ std::shared_ptr<fdf_testing::DriverRuntime> GetDriverRuntime();
 // Composite devices
 // Fidl messages
 // Any automatic responses from the DDK
-// The following libdriver calls:
-//   get_root_resource
 // This needs to be a struct, not a class, to match the public definition
 struct MockDevice : public std::enable_shared_from_this<MockDevice> {
  public:

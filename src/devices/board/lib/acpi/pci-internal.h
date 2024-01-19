@@ -43,7 +43,7 @@ struct acpi_legacy_irq {
 };
 
 zx_status_t get_pci_init_arg(acpi::Acpi* acpi, zx_pci_init_arg_t** arg, uint32_t* size);
-zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t root_resource_handle);
+zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t mmio_resource_handle);
 
 class AcpiPciroot : public PcirootBase {
  public:
@@ -90,4 +90,4 @@ ACPI_STATUS GetPciRootIrqRouting(acpi::Acpi* acpi, ACPI_HANDLE root_obj,
 
 __END_CDECLS
 
-#endif
+#endif  // SRC_DEVICES_BOARD_LIB_ACPI_PCI_INTERNAL_H_
