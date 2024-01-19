@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![warn(clippy::clone_on_ref_ptr)]
-#![warn(clippy::unused_async)]
-#![warn(clippy::await_holding_lock)]
-// TODO(https://fxbug.dev/126170): remove after the lint is fixed
-#![allow(unknown_lints, clippy::items_after_test_module)]
+#![warn(clippy::all, clippy::clone_on_ref_ptr, clippy::unused_async, clippy::await_holding_lock)]
 
 mod accessor;
 pub mod archivist;

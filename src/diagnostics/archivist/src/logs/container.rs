@@ -569,7 +569,7 @@ impl ContainerState {
     /// returned.
     fn min_interest(&self) -> FidlInterest {
         // btreemap: keys are sorted and ascending.
-        self.interests.keys().next().map(|i| i.0.clone()).unwrap_or(FidlInterest::default())
+        self.interests.keys().next().map(|i| i.0.clone()).unwrap_or_default()
     }
 }
 

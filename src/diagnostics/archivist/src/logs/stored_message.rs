@@ -29,7 +29,7 @@ pub struct LegacyStoredMessage {
 }
 
 impl LegacyStoredMessage {
-    pub fn new(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
+    pub fn create(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
         match buf.as_slice().try_into() {
             Ok(msg) => Box::new(Self { msg, stats }),
             Err(err) => Box::new(InvalidStoredMessage::new(err, stats)),
@@ -70,7 +70,7 @@ pub struct StructuredStoredMessage {
 }
 
 impl StructuredStoredMessage {
-    pub fn new(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
+    pub fn create(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
         match diagnostics_message::parse_basic_structured_info(&buf) {
             Ok((timestamp, severity)) => Box::new(StructuredStoredMessage {
                 bytes: buf.into_boxed_slice(),

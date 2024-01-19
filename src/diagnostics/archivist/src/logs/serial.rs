@@ -361,6 +361,6 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer);
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StructuredStoredMessage::new(encoded.to_vec(), Default::default())
+        StructuredStoredMessage::create(encoded.to_vec(), Default::default())
     }
 }

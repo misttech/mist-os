@@ -35,13 +35,13 @@ pub struct StructuredEncoding;
 
 impl Encoding for LegacyEncoding {
     fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
-        LegacyStoredMessage::new(buf, stats)
+        LegacyStoredMessage::create(buf, stats)
     }
 }
 
 impl Encoding for StructuredEncoding {
     fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
-        StructuredStoredMessage::new(buf, stats)
+        StructuredStoredMessage::create(buf, stats)
     }
 }
 

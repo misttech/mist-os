@@ -68,7 +68,7 @@ impl BudgetState {
 
             let container_with_oldest = Arc::clone(
                 self.containers
-                    .get(0)
+                    .first()
                     .expect("containers are added to budget before they can call allocate"),
             );
             let oldest_message = container_with_oldest
@@ -213,7 +213,7 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer);
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StructuredStoredMessage::new(encoded.to_vec(), Default::default())
+        StructuredStoredMessage::create(encoded.to_vec(), Default::default())
     }
 
     fn fake_message(timestamp: i64) -> LogsData {

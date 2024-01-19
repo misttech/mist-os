@@ -68,11 +68,13 @@ pub fn create_log_sink_requested_event(
     }
 }
 
-impl TestHarness {
-    pub fn default() -> Self {
+impl Default for TestHarness {
+    fn default() -> Self {
         Self::make(false)
     }
+}
 
+impl TestHarness {
     /// Create a new test harness which will keep its LogSinks alive as long as it itself is,
     /// useful for testing inspect hierarchies for attribution.
     // TODO(https://fxbug.dev/53932) this will be made unnecessary by historical retention of component stats
@@ -447,14 +449,12 @@ impl crate::logs::debuglog::DebugLog for TestDebugLog {
         self.read_responses.lock().pop_front().expect("Got more read requests than enqueued")
     }
 
-    fn ready_signal(&self) -> impl Future<Output = Result<(), zx::Status>> + Send {
-        async {
-            if self.read_responses.lock().is_empty() {
-                // ready signal should never complete if we have no logs left.
-                futures::future::pending::<()>().await;
-            }
-            Ok(())
+    async fn ready_signal(&self) -> Result<(), zx::Status> {
+        if self.read_responses.lock().is_empty() {
+            // ready signal should never complete if we have no logs left.
+            futures::future::pending::<()>().await;
         }
+        Ok(())
     }
 }
 

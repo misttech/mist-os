@@ -339,27 +339,22 @@ fn get_buffer_from_formatted_content(
 }
 
 impl ArchiveAccessorWriter for fuchsia_async::Socket {
-    fn write(
-        &mut self,
-        data: Vec<FormattedContent>,
-    ) -> impl Future<Output = Result<(), IteratorError>> + Send {
-        async {
-            if data.is_empty() {
-                return Err(IteratorError::PeerClosed);
-            }
-            let mut buf = vec![0];
-            for value in data {
-                let data = get_buffer_from_formatted_content(value)?;
-                buf.resize(data.size as usize, 0);
-                data.vmo.read(&mut buf, 0)?;
-                let res = self.write_all(&buf).await;
-                if res.is_err() {
-                    // connection probably closed.
-                    break;
-                }
-            }
-            Ok(())
+    async fn write(&mut self, data: Vec<FormattedContent>) -> Result<(), IteratorError> {
+        if data.is_empty() {
+            return Err(IteratorError::PeerClosed);
         }
+        let mut buf = vec![0];
+        for value in data {
+            let data = get_buffer_from_formatted_content(value)?;
+            buf.resize(data.size as usize, 0);
+            data.vmo.read(&mut buf, 0)?;
+            let res = self.write_all(&buf).await;
+            if res.is_err() {
+                // connection probably closed.
+                break;
+            }
+        }
+        Ok(())
     }
 
     fn wait_for_close(&mut self) -> impl Future<Output = ()> + Send {
@@ -386,47 +381,38 @@ pub enum IteratorError {
 }
 
 impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
-    fn write(
-        &mut self,
-        data: Vec<FormattedContent>,
-    ) -> impl Future<Output = Result<(), IteratorError>> + Send {
-        async {
-            loop {
-                match self.next().await {
-                    Some(Ok(BatchIteratorRequest::GetNext { responder })) => {
-                        responder.send(Ok(data))?;
-                        return Ok(());
-                    }
-                    Some(Ok(BatchIteratorRequest::WaitForReady { responder })) => {
-                        responder.send()?;
-                    }
-                    Some(Ok(BatchIteratorRequest::_UnknownMethod { .. })) => {
-                        return Err(IteratorError::PeerClosed);
-                    }
-                    Some(Err(err)) => return Err(err.into()),
-                    None => {
-                        return Err(IteratorError::PeerClosed);
-                    }
+    async fn write(&mut self, data: Vec<FormattedContent>) -> Result<(), IteratorError> {
+        loop {
+            match self.next().await {
+                Some(Ok(BatchIteratorRequest::GetNext { responder })) => {
+                    responder.send(Ok(data))?;
+                    return Ok(());
+                }
+                Some(Ok(BatchIteratorRequest::WaitForReady { responder })) => {
+                    responder.send()?;
+                }
+                Some(Ok(BatchIteratorRequest::_UnknownMethod { .. })) => {
+                    return Err(IteratorError::PeerClosed);
+                }
+                Some(Err(err)) => return Err(err.into()),
+                None => {
+                    return Err(IteratorError::PeerClosed);
                 }
             }
         }
     }
 
-    fn maybe_respond_ready(&mut self) -> impl Future<Output = Result<(), AccessorError>> + Send {
-        async {
-            let mut this = Pin::new(self);
-            if matches!(
-                this.as_mut().peek().await,
-                Some(Ok(BatchIteratorRequest::WaitForReady { .. }))
-            ) {
-                let Some(Ok(BatchIteratorRequest::WaitForReady { responder })) = this.next().await
-                else {
-                    unreachable!("We already checked the next request was WaitForReady");
-                };
-                responder.send()?;
-            }
-            Ok(())
+    async fn maybe_respond_ready(&mut self) -> Result<(), AccessorError> {
+        let mut this = Pin::new(self);
+        if matches!(this.as_mut().peek().await, Some(Ok(BatchIteratorRequest::WaitForReady { .. })))
+        {
+            let Some(Ok(BatchIteratorRequest::WaitForReady { responder })) = this.next().await
+            else {
+                unreachable!("We already checked the next request was WaitForReady");
+            };
+            responder.send()?;
         }
+        Ok(())
     }
 
     fn wait_for_buffer(&mut self) -> impl Future<Output = anyhow::Result<()>> + Send {
@@ -442,10 +428,8 @@ impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
         Some(self.get_ref().control_handle())
     }
 
-    fn wait_for_close(&mut self) -> impl Future<Output = ()> + Send {
-        async {
-            let _ = self.get_ref().control_handle().on_closed().await;
-        }
+    async fn wait_for_close(&mut self) {
+        let _ = self.get_ref().control_handle().on_closed().await;
     }
 }
 
