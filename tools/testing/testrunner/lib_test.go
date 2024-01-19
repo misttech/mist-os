@@ -981,6 +981,9 @@ func TestExecute(t *testing.T) {
 			if c.useFFX {
 				// No need to set the FFX option since we will use the mock instance instead.
 				testrunnerOpts.FFXExperimentLevel = 2
+				if _, err := ffx.WriteRunResult(build.TestList{}, filepath.Join(o.OutDir, "early-boot-profiles")); err != nil {
+					t.Errorf("failed to write early-boot profiles: %s", err)
+				}
 			}
 			err = execute(context.Background(), tests, o, net.IPAddr{}, c.sshKeyFile, c.serialSocketPath, t.TempDir(), testrunnerOpts)
 			if c.wantErr {

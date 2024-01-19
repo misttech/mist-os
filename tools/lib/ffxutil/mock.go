@@ -51,6 +51,10 @@ func (f *MockFFXInstance) Test(_ context.Context, testList build.TestList, outDi
 		return nil, fmt.Errorf(`schema_id must be %q, found %q`, build.TestListSchemaIDExperimental, testList.SchemaID)
 	}
 	f.run("test", args...)
+	return f.WriteRunResult(testList, outDir)
+}
+
+func (f *MockFFXInstance) WriteRunResult(testList build.TestList, outDir string) (*TestRunResult, error) {
 	outcome := TestPassed
 	if f.TestOutcome != "" {
 		outcome = f.TestOutcome
@@ -90,10 +94,11 @@ func (f *MockFFXInstance) Test(_ context.Context, testList build.TestList, outDi
 	}
 	runArtifactDir := "artifact-run"
 	debugDir := "debug"
-	if err := os.MkdirAll(filepath.Join(outDir, runArtifactDir, debugDir), os.ModePerm); err != nil {
+	earlyBootProfile := filepath.Join(outDir, runArtifactDir, debugDir, "llvm-profile", "kernel.profraw")
+	if err := os.MkdirAll(filepath.Dir(earlyBootProfile), os.ModePerm); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(outDir, runArtifactDir, debugDir, "kernel.profraw"), []byte("data"), os.ModePerm); err != nil {
+	if err := os.WriteFile(earlyBootProfile, []byte("data"), os.ModePerm); err != nil {
 		return nil, err
 	}
 
