@@ -31,7 +31,7 @@ class UsbVirtualBus;
 class UsbVirtualDevice;
 class UsbVirtualHost;
 using UsbVirtualBusType =
-    ddk::Device<UsbVirtualBus, ddk::Initializable, ddk::Unbindable,
+    ddk::Device<UsbVirtualBus, ddk::Initializable, ddk::Unbindable, ddk::ChildPreReleaseable,
                 ddk::Messageable<fuchsia_hardware_usb_virtual_bus::Bus>::Mixin>;
 
 // This is the main class for the USB virtual bus.
@@ -45,6 +45,7 @@ class UsbVirtualBus : public UsbVirtualBusType {
   // Device protocol implementation.
   void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
+  void DdkChildPreRelease(void* child_ctx);
   void DdkRelease();
 
   // USB device controller protocol implementation.

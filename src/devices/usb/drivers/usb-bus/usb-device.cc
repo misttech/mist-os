@@ -812,6 +812,7 @@ zx_status_t UsbDevice::Create(zx_device_t* parent, const ddk::UsbHciProtocolClie
 
   auto status = device->Init(dispatcher);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to Init UsbDevice: %s", zx_status_get_string(status));
     out_device->reset();
   }
   return status;

@@ -25,7 +25,7 @@ namespace usb_virtual_bus {
 // For mapping b_endpoint_address value to/from index in range 0 - 31.
 // OUT endpoints are in range 1 - 15, IN endpoints are in range 17 - 31.
 static inline uint8_t EpAddressToIndex(uint8_t addr) {
-  return static_cast<uint8_t>(((addr)&0xF) | (((addr)&0x80) >> 3));
+  return static_cast<uint8_t>(((addr) & 0xF) | (((addr) & 0x80) >> 3));
 }
 static constexpr uint8_t IN_EP_START = 17;
 
@@ -367,6 +367,18 @@ void UsbVirtualBus::DdkUnbind(ddk::UnbindTxn txn) {
   }
 }
 
+void UsbVirtualBus::DdkChildPreRelease(void* child_ctx) {
+  if (host_.get() == child_ctx) {
+    [[maybe_unused]] auto* host = host_.release();
+    return;
+  }
+
+  if (device_.get() == child_ctx) {
+    [[maybe_unused]] auto* device = device_.release();
+    return;
+  }
+}
+
 void UsbVirtualBus::DdkRelease() {
   if (device_thread_started_) {
     thrd_join(device_thread_, nullptr);
@@ -518,7 +530,7 @@ void UsbVirtualBus::UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bu
       connected = connected_;
     }
 
-    if (connected) {
+    if (connected && bus_intf_.is_valid()) {
       bus_intf_.AddDevice(DEVICE_SLOT_ID, DEVICE_HUB_ID, DEVICE_SPEED);
     }
   } else {

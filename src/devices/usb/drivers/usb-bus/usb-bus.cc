@@ -259,14 +259,7 @@ void UsbBus::DdkChildPreRelease(void* child_ctx) {
 
 void UsbBus::DdkUnbind(ddk::UnbindTxn txn) {
   hci_.SetBusInterface(nullptr, nullptr);
-
-  for (auto device : devices_) {
-    if (device != nullptr) {
-      device->DdkAsyncRemove();
-    }
-  }
   devices_.reset();
-
   txn.Reply();
 }
 

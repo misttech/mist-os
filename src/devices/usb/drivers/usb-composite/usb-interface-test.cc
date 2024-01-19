@@ -17,6 +17,7 @@ namespace usb_composite {
 
 void UsbComposite::DdkInit(ddk::InitTxn txn) { txn.Reply(ZX_OK); }
 void UsbComposite::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
+void UsbComposite::DdkChildPreRelease(void* child_ctx) {}
 void UsbComposite::DdkRelease() { delete this; }
 
 std::queue<std::tuple<uint8_t, uint8_t*, size_t>> expect_get_additional_descriptor_list_;

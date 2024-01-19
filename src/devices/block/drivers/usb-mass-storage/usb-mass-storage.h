@@ -63,8 +63,8 @@ struct UsbRequestContext {
   usb_request_complete_callback_t completion;
 };
 
-using MassStorageDeviceType =
-    ddk::Device<UsbMassStorageDevice, ddk::Unbindable, ddk::Initializable>;
+using MassStorageDeviceType = ddk::Device<UsbMassStorageDevice, ddk::Unbindable,
+                                          ddk::ChildPreReleaseable, ddk::Initializable>;
 class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceType {
  public:
   explicit UsbMassStorageDevice(fbl::RefPtr<WaiterInterface> waiter, zx_device_t* parent = nullptr)
@@ -76,6 +76,7 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
   void DdkInit(ddk::InitTxn txn);
 
   void DdkUnbind(ddk::UnbindTxn txn);
+  void DdkChildPreRelease(void* child_ctx);
 
   // scsi::Controller
   size_t BlockOpSize() override { return sizeof(Transaction); }

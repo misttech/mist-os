@@ -111,6 +111,15 @@ void UsbMassStorageDevice::DdkUnbind(ddk::UnbindTxn txn) {
   txn.Reply();
 }
 
+void UsbMassStorageDevice::DdkChildPreRelease(void* child_ctx) {
+  for (size_t i = 0; i < block_devs_.size(); i++) {
+    if (block_devs_[i].get() == child_ctx) {
+      block_devs_[i] = nullptr;
+      break;
+    }
+  }
+}
+
 void UsbMassStorageDevice::RequestQueue(usb_request_t* request,
                                         const usb_request_complete_callback_t* completion) {
   fbl::AutoLock l(&txn_lock_);

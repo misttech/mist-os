@@ -74,7 +74,7 @@ using fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor;
 
 class UsbPeripheral;
 using UsbPeripheralType =
-    ddk::Device<UsbPeripheral, ddk::Unbindable,
+    ddk::Device<UsbPeripheral, ddk::Unbindable, ddk::ChildPreReleaseable,
                 ddk::Messageable<fuchsia_hardware_usb_peripheral::Device>::Mixin>;
 
 struct UsbConfiguration : fbl::RefCounted<UsbConfiguration> {
@@ -102,6 +102,7 @@ class UsbPeripheral : public UsbPeripheralType,
 
   // Device protocol implementation.
   void DdkUnbind(ddk::UnbindTxn txn);
+  void DdkChildPreRelease(void* child_ctx);
   void DdkRelease();
 
   // UsbDciInterface implementation.
@@ -162,10 +163,10 @@ class UsbPeripheral : public UsbPeripheralType,
 
   // For mapping b_endpoint_address value to/from index in range 0 - 31.
   static inline uint8_t EpAddressToIndex(uint8_t addr) {
-    return static_cast<uint8_t>(((addr)&0xF) | (((addr)&0x80) >> 3));
+    return static_cast<uint8_t>(((addr) & 0xF) | (((addr) & 0x80) >> 3));
   }
   static inline uint8_t EpIndexToAddress(uint8_t index) {
-    return static_cast<uint8_t>(((index)&0xF) | (((index)&0x10) << 3));
+    return static_cast<uint8_t>(((index) & 0xF) | (((index) & 0x10) << 3));
   }
 
   zx_status_t Init();

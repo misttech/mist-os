@@ -329,13 +329,22 @@ void UsbComposite::DdkInit(ddk::InitTxn txn) {
 void UsbComposite::DdkUnbind(ddk::UnbindTxn txn) {
   {
     fbl::AutoLock lock(&lock_);
-    for (auto interface : interfaces_) {
-      interface->DdkAsyncRemove();
-    }
     interfaces_.reset();
   }
 
   txn.Reply();
+}
+
+void UsbComposite::DdkChildPreRelease(void* child_ctx) {
+  {
+    fbl::AutoLock lock(&lock_);
+    for (size_t i = 0; i < interfaces_.size(); i++) {
+      if (interfaces_[i] == child_ctx) {
+        interfaces_.erase(i);
+        break;
+      }
+    }
+  }
 }
 
 void UsbComposite::DdkRelease() { delete this; }

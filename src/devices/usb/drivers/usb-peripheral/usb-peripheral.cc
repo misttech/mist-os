@@ -1011,6 +1011,18 @@ void UsbPeripheral::DdkUnbind(ddk::UnbindTxn txn) {
   usb_monitor_.Stop();
 }
 
+void UsbPeripheral::DdkChildPreRelease(void* child_ctx) {
+  for (auto& configuration : configurations_) {
+    auto& functions = configuration->functions;
+    for (size_t i = 0; i < functions.size(); i++) {
+      if (functions[i].get() == child_ctx) {
+        functions.erase(i);
+        break;
+      }
+    }
+  }
+}
+
 void UsbPeripheral::DdkRelease() {
   zxlogf(DEBUG, "%s", __func__);
   {
