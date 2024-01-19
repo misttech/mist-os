@@ -7,12 +7,15 @@
 #include <assert.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
+#include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/fit/function.h>
 #include <lib/zircon-internal/align.h>
 #include <stdio.h>
@@ -20,8 +23,6 @@
 #include <string.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/resource.h>
-
-#include <vector>
 
 #include <fbl/string_printf.h>
 
@@ -800,7 +801,27 @@ void PlatformDevice::GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& co
 }
 
 void PlatformDevice::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  std::optional<std::vector<fuchsia_hardware_power::PowerElementConfiguration>> config =
+      node_.power_config();
+  if (config.has_value()) {
+    auto element_configs = config.value();
+    fidl::Arena arena;
+    fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> elements;
+    elements.Allocate(arena, element_configs.size());
+
+    size_t offset = 0;
+    for (auto& config : element_configs) {
+      fuchsia_hardware_power::wire::PowerElementConfiguration wire_config =
+          fidl::ToWire(arena, config);
+      elements.at(offset) = wire_config;
+
+      offset++;
+    }
+    completer.ReplySuccess(elements);
+
+  } else {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+  }
 }
 
 void PlatformDevice::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {
