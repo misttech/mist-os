@@ -51,12 +51,23 @@ impl ZipLoadedProductBundle {
             .ok_or(anyhow!("finding file 'product_bundle.json' in zip archive"))?
             .to_owned();
 
+        let product_bundle_parent_path =
+            product_bundle_manifest_name.strip_suffix("product_bundle.json").ok_or(anyhow!("despite the product_bundle.json being found, it's path did not include it as a suffix"))?;
+
         let product_bundle_manifest = zip
             .by_name(&product_bundle_manifest_name)
             .with_context(|| format!("getting 'product_bundle.json' in zip archive"))?;
-        let product_bundle = try_load_product_bundle(product_bundle_manifest)?;
-        // Do not need to canonicalize paths for this as it is a part of a zip ZipArchive
-        Ok(Self::new(product_bundle))
+        // Still need to canonicalize paths as the path to the product bundle'suffix
+        // parent directory may be arbitrarily deep in the zip file
+        match try_load_product_bundle(product_bundle_manifest)? {
+            ProductBundle::V2(data) => {
+                let mut data = data.clone();
+                data.canonicalize_paths(product_bundle_parent_path).with_context(|| {
+                    format!("Canonicalizing paths from {:?}", product_bundle_parent_path)
+                })?;
+                Ok(Self::new(ProductBundle::V2(data)))
+            }
+        }
     }
 
     pub fn new(product_bundle: ProductBundle) -> Self {
