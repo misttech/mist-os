@@ -281,6 +281,10 @@ impl TestServer {
             args.push(test_flag!("also_run_disabled_tests").to_owned());
         }
 
+        if run_options.break_on_failure.unwrap_or(false) {
+            args.push(test_flag!("break_on_failure").to_owned());
+        }
+
         let (test_stdout, stdout_client) = zx::Socket::create_stream();
         let (test_stderr, stderr_client) = zx::Socket::create_stream();
 
