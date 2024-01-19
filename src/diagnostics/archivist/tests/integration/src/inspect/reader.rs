@@ -355,7 +355,10 @@ async fn retrieve_and_validate_results(
     expected_results_count: usize,
 ) {
     let mut reader = ArchiveReader::new();
-    reader.with_archive(accessor).add_selectors(custom_selectors.into_iter());
+    reader
+        .with_archive(accessor)
+        .add_selectors(custom_selectors.into_iter())
+        .with_batch_retrieval_timeout_seconds(300);
     if expected_results_count == 0 {
         reader.with_timeout(fuchsia_zircon::Duration::from_seconds(10));
     } else {
