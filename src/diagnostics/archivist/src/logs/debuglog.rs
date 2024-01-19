@@ -14,10 +14,7 @@ use fidl_fuchsia_boot::ReadOnlyLogMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
-use futures::{
-    stream::{unfold, Stream},
-    TryFutureExt,
-};
+use futures::stream::{unfold, Stream};
 use lazy_static::lazy_static;
 use moniker::ExtendedMoniker;
 use std::{future::Future, sync::Arc};
@@ -47,8 +44,9 @@ impl DebugLog for KernelDebugLog {
         self.debuglogger.read()
     }
 
-    fn ready_signal(&self) -> impl Future<Output = Result<(), zx::Status>> + Send {
-        fasync::OnSignals::new(&self.debuglogger, zx::Signals::LOG_READABLE).map_ok(|_| ())
+    async fn ready_signal(&self) -> Result<(), zx::Status> {
+        fasync::OnSignals::new(&self.debuglogger, zx::Signals::LOG_READABLE).await?;
+        Ok(())
     }
 }
 

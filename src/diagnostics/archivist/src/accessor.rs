@@ -357,8 +357,8 @@ impl ArchiveAccessorWriter for fuchsia_async::Socket {
         Ok(())
     }
 
-    fn wait_for_close(&mut self) -> impl Future<Output = ()> + Send {
-        self.on_closed().map(|_| ())
+    async fn wait_for_close(&mut self) {
+        let _ = self.on_closed().await;
     }
 }
 
@@ -415,13 +415,12 @@ impl ArchiveAccessorWriter for Peekable<BatchIteratorRequestStream> {
         Ok(())
     }
 
-    fn wait_for_buffer(&mut self) -> impl Future<Output = anyhow::Result<()>> + Send {
-        Pin::new(self).peek().map(|result| {
-            if let Some(Ok(_)) = result {
-                return Ok(());
-            }
-            Err(IteratorError::PeerClosed.into())
-        })
+    async fn wait_for_buffer(&mut self) -> anyhow::Result<()> {
+        let this = Pin::new(self);
+        match this.peek().await {
+            Some(Ok(_)) => Ok(()),
+            _ => Err(IteratorError::PeerClosed.into()),
+        }
     }
 
     fn get_control_handle(&self) -> Option<BatchIteratorControlHandle> {
@@ -450,41 +449,33 @@ pub trait ArchiveAccessorTranslator {
 impl ArchiveAccessorTranslator for fhost::ArchiveAccessorRequestStream {
     type InnerDataRequestChannel = fuchsia_async::Socket;
 
-    fn next(
-        &mut self,
-    ) -> impl Future<Output = Option<ArchiveIteratorRequest<Self::InnerDataRequestChannel>>> + Send
-    {
-        StreamExt::next(self).map(|request| {
-            match request {
-                Some(Ok(fhost::ArchiveAccessorRequest::StreamDiagnostics {
+    async fn next(&mut self) -> Option<ArchiveIteratorRequest<Self::InnerDataRequestChannel>> {
+        match StreamExt::next(self).await {
+            Some(Ok(fhost::ArchiveAccessorRequest::StreamDiagnostics {
+                parameters,
+                responder,
+                stream,
+            })) => {
+                // It's fine for the client to send us a socket
+                // and discard the channel without waiting for a response.
+                // Future communication takes place over the socket so
+                // the client may opt to use this as an optimization.
+                let _ = responder.send();
+                Some(ArchiveIteratorRequest {
+                    iterator: fuchsia_async::Socket::from_socket(stream),
                     parameters,
-                    responder,
-                    stream,
-                })) => {
-                    // It's fine for the client to send us a socket
-                    // and discard the channel without waiting for a response.
-                    // Future communication takes place over the socket so
-                    // the client may opt to use this as an optimization.
-                    let _ = responder.send();
-                    Some(ArchiveIteratorRequest {
-                        iterator: fuchsia_async::Socket::from_socket(stream),
-                        parameters,
-                    })
-                }
-                _ => None,
+                })
             }
-        })
+            _ => None,
+        }
     }
 }
 
 impl ArchiveAccessorTranslator for ArchiveAccessorRequestStream {
     type InnerDataRequestChannel = Peekable<BatchIteratorRequestStream>;
 
-    fn next(
-        &mut self,
-    ) -> impl Future<Output = Option<ArchiveIteratorRequest<Self::InnerDataRequestChannel>>> + Send
-    {
-        StreamExt::next(self).map(|request| match request {
+    async fn next(&mut self) -> Option<ArchiveIteratorRequest<Self::InnerDataRequestChannel>> {
+        match StreamExt::next(self).await {
             Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
                 control_handle: _,
                 result_stream,
@@ -494,7 +485,7 @@ impl ArchiveAccessorTranslator for ArchiveAccessorRequestStream {
                 parameters: stream_parameters,
             }),
             _ => None,
-        })
+        }
     }
 }
 struct SchemaTruncationCounter {
@@ -935,24 +926,22 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn socket_writer_handles_closed_socket() {
-        let mut executor = fasync::TestExecutor::new();
+    async fn socket_writer_handles_closed_socket() {
         let (local, remote) = fuchsia_zircon::Socket::create_stream();
         drop(local);
         let mut remote = fuchsia_async::Socket::from_socket(remote);
         {
-            let fut = ArchiveAccessorWriter::write(
+            let result = ArchiveAccessorWriter::write(
                 &mut remote,
                 vec![FormattedContent::Text(Buffer {
                     size: 1,
                     vmo: fuchsia_zircon::Vmo::create(1).unwrap(),
                 })],
-            );
-            pin_mut!(fut);
-            assert_matches!(executor.run_singlethreaded(&mut fut), Ok(()));
+            )
+            .await;
+            assert_matches!(result, Ok(()));
         }
-        let mut fut = remote.wait_for_close();
-        executor.run_singlethreaded(&mut fut);
+        remote.wait_for_close().await;
     }
 
     #[fuchsia::test]
