@@ -65,6 +65,18 @@ executable("component_unittest_exe") {
   ]
 }
 
+executable("errors_unittest_exe") {
+  testonly = true
+
+  sources = [ "errors_unittest.cc" ]
+
+  deps = [
+    "//src/developer/forensics/testing:gtest_with_syslog_main",
+    "//src/developer/forensics/utils:errors",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 executable("fidl_oneshot_unittest_exe") {
   testonly = true
 
@@ -218,6 +230,10 @@ fuchsia_unittest_component("component_unittest") {
   ]
 }
 
+fuchsia_unittest_component("errors_unittest") {
+  deps = [ ":errors_unittest_exe" ]
+}
+
 fuchsia_unittest_component("fidl_oneshot_unittest") {
   deps = [ ":fidl_oneshot_unittest_exe" ]
 }
@@ -272,6 +288,7 @@ fuchsia_test_package("feedback-utils-tests") {
     ":archive_unittest",
     ":cobalt_unittest",
     ":component_unittest",
+    ":errors_unittest",
     ":fidl_oneshot_unittest",
     ":inspect_node_manager_unittest",
     ":instrumented_binding_set_unittest",

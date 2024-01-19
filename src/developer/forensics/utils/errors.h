@@ -11,13 +11,15 @@
 #include <string>
 #include <variant>
 
+#include "lib/utf-utils/utf-utils.h"
+
 namespace forensics {
 
 // Defines common errors that occur throughout //src/developer/feedback.
 enum class Error {
   kNotSet,
-  // TODO(https://fxbug.dev/49922): Remove kDefault. This value is temporary to allow the enum to be used
-  // without specifying the exact error that occurred.
+  // TODO(https://fxbug.dev/49922): Remove kDefault. This value is temporary to allow the enum to be
+  // used without specifying the exact error that occurred.
   kDefault,
   kLogicError,
   kTimeout,
@@ -25,6 +27,7 @@ enum class Error {
   kAsyncTaskPostFailure,
   kMissingValue,
   kBadValue,
+  kInvalidFormat,
   kFileReadFailure,
   kFileWriteFailure,
   kNotAvailableInProduct,
@@ -34,13 +37,13 @@ enum class Error {
 
 class ErrorOrString {
  public:
-  explicit ErrorOrString(std::string value) : data_(std::move(value)) {}
+  explicit ErrorOrString(std::string value) : data_(GetValueIfValidUtf8(std::move(value))) {}
   explicit ErrorOrString(enum Error error) : data_(error) {}
 
   // Allow construction from a ::fpromise::result.
   explicit ErrorOrString(::fpromise::result<std::string, Error> result) {
     if (result.is_ok()) {
-      data_ = std::move(result.value());
+      data_ = GetValueIfValidUtf8(std::move(result.value()));
     } else {
       data_ = result.error();
     }
@@ -64,6 +67,14 @@ class ErrorOrString {
   bool operator!=(const enum Error error) const { return !(*this == error); }
 
  private:
+  static std::variant<std::string, enum Error> GetValueIfValidUtf8(std::string value) {
+    if (utfutils_is_valid_utf8(value.c_str(), value.size())) {
+      return value;
+    }
+
+    return Error::kInvalidFormat;
+  }
+
   std::variant<std::string, enum Error> data_;
 };
 
@@ -86,6 +97,8 @@ inline std::string ToString(Error error) {
       return "Error::kMissingValue";
     case Error::kBadValue:
       return "Error::kBadValue";
+    case Error::kInvalidFormat:
+      return "Error::kInvalidFormat";
     case Error::kFileReadFailure:
       return "Error::kFileReadFailure";
     case Error::kFileWriteFailure:

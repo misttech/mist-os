@@ -29,7 +29,10 @@ source_set("archive") {
 source_set("errors") {
   sources = [ "errors.h" ]
 
-  public_deps = [ "//sdk/lib/syslog/cpp" ]
+  public_deps = [
+    "//sdk/lib/syslog/cpp",
+    "//sdk/lib/utf-utils:utf-utils",
+  ]
 }
 
 source_set("fidl_oneshot") {

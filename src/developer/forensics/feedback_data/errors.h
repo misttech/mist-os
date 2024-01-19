@@ -29,6 +29,8 @@ inline std::string ToReason(const Error error) {
       return "no data returned";
     case Error::kBadValue:
       return "bad data returned";
+    case Error::kInvalidFormat:
+      return "data not valid UTF8";
     case Error::kFileReadFailure:
       return "file read failure";
     case Error::kFileWriteFailure:
