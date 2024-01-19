@@ -76,6 +76,7 @@ TEST_fx-change-build-dir-links-artifacts() {
 
   touch "${BT_TEMP_DIR}/${BUILD_DIR}/compile_commands.json"
   touch "${BT_TEMP_DIR}/${BUILD_DIR}/rust-project.json"
+  touch "${BT_TEMP_DIR}/${BUILD_DIR}/rust-analyzer"
 
   fx-change-build-dir "${BUILD_DIR}"
 
@@ -86,6 +87,7 @@ TEST_fx-change-build-dir-links-artifacts() {
   # now be symlinked to the source root.
   BT_EXPECT_FILE_EXISTS "${FUCHSIA_DIR}/compile_commands.json"
   BT_EXPECT_FILE_EXISTS "${FUCHSIA_DIR}/rust-project.json"
+  BT_EXPECT_FILE_EXISTS "${FUCHSIA_DIR}/out/rust-analyzer"
 }
 
 TEST_fx-build-dir-if-present() {
