@@ -68,6 +68,8 @@
                 "fuchsia.posix.socket.packet.Provider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.posix.socket.raw.Provider",
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
