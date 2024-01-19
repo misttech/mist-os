@@ -387,7 +387,7 @@ where
         + CounterContext<DeviceCounters>,
 {
     core_ctx.with_counters(|counters| {
-        counters.ethernet.common.send_total_frames.increment();
+        counters.send_total_frames.increment();
     });
     match TransmitQueueHandler::<EthernetLinkDevice, _>::queue_tx_frame(
         core_ctx,
@@ -398,26 +398,26 @@ where
     ) {
         Ok(()) => {
             core_ctx.with_counters(|counters| {
-                counters.ethernet.common.send_frame.increment();
+                counters.send_frame.increment();
             });
             Ok(())
         }
         Err(TransmitQueueFrameError::NoQueue(e)) => {
             core_ctx.with_counters(|counters| {
-                counters.ethernet.send_no_queue.increment();
+                counters.send_dropped_no_queue.increment();
             });
             tracing::error!("device {device_id:?} not ready to send frame: {e:?}");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(s)) => {
             core_ctx.with_counters(|counters| {
-                counters.ethernet.common.send_queue_full.increment();
+                counters.send_queue_full.increment();
             });
             Err(s)
         }
         Err(TransmitQueueFrameError::SerializeError(s)) => {
             core_ctx.with_counters(|counters| {
-                counters.ethernet.common.send_serialize_error.increment();
+                counters.send_serialize_error.increment();
             });
             Err(s)
         }
@@ -866,7 +866,11 @@ where
     A::Version: EthernetIpExt,
 {
     core_ctx.with_counters(|counters| {
-        counters.ethernet.send_ip_frame.increment();
+        let () = A::Version::map_ip(
+            (),
+            |()| counters.send_ipv4_frame.increment(),
+            |()| counters.send_ipv6_frame.increment(),
+        );
     });
 
     trace!("ethernet::send_ip_frame: local_addr = {:?}; device = {:?}", local_addr, device_id);
@@ -926,7 +930,7 @@ where
         let RecvEthernetFrameMeta { device_id } = metadata;
         trace!("ethernet::receive_frame: device_id = {:?}", device_id);
         self.with_counters(|counters| {
-            counters.ethernet.common.recv_frame.increment();
+            counters.recv_frame.increment();
         });
         // NOTE(joshlf): We do not currently validate that the Ethernet frame
         // satisfies the minimum length requirement. We expect that if this
@@ -942,7 +946,7 @@ where
             frame
         } else {
             self.with_counters(|counters| {
-                counters.ethernet.common.recv_parse_error.increment();
+                counters.recv_parse_error.increment();
             });
             trace!("ethernet::receive_frame: failed to parse ethernet frame");
             return;
@@ -957,7 +961,7 @@ where
         let frame_dst = match frame_dest {
             None => {
                 self.with_counters(|counters| {
-                    counters.ethernet.recv_other_dest.increment();
+                    counters.recv_ethernet_other_dest.increment();
                 });
                 trace!(
                     "ethernet::receive_frame: destination mac {:?} not for device {:?}",
@@ -987,7 +991,7 @@ where
                 match types {
                     (ArpHardwareType::Ethernet, ArpNetworkType::Ipv4) => {
                         self.with_counters(|counters| {
-                            counters.ethernet.recv_arp_delivered.increment();
+                            counters.recv_arp_delivered.increment();
                         });
                         ArpPacketHandler::handle_packet(
                             self,
@@ -1001,7 +1005,7 @@ where
             }
             Some(EtherType::Ipv4) => {
                 self.with_counters(|counters| {
-                    counters.ethernet.common.recv_ip_delivered.increment();
+                    counters.recv_ip_delivered.increment();
                 });
                 self.receive_frame(
                     bindings_ctx,
@@ -1011,7 +1015,7 @@ where
             }
             Some(EtherType::Ipv6) => {
                 self.with_counters(|counters| {
-                    counters.ethernet.common.recv_ip_delivered.increment();
+                    counters.recv_ip_delivered.increment();
                 });
                 self.receive_frame(
                     bindings_ctx,
@@ -1019,9 +1023,14 @@ where
                     buffer,
                 )
             }
-            Some(EtherType::Other(_)) | None => {
+            Some(EtherType::Other(_)) => {
                 self.with_counters(|counters| {
-                    counters.ethernet.common.recv_unsupported_ethertype.increment();
+                    counters.recv_unsupported_ethertype.increment();
+                });
+            }
+            None => {
+                self.with_counters(|counters| {
+                    counters.recv_no_ethertype.increment();
                 });
             }
         }

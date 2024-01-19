@@ -79,7 +79,7 @@ pub mod device {
     // Re-exported types.
     pub use api::{RemoveDeviceResult, RemoveDeviceResultWithContext};
     pub use base::{
-        AddIpAddrSubnetError, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
+        AddIpAddrSubnetError, DeviceCounters, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
         DeviceSendFrameError, DevicesVisitor, InspectDeviceState,
     };
     pub use config::{

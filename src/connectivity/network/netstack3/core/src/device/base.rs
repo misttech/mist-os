@@ -352,39 +352,6 @@ impl<BT: DeviceLayerTypes> DeviceLayerState<BT> {
 /// Device layer counters.
 #[derive(Default)]
 pub struct DeviceCounters {
-    /// Device layer counters for Ethernet devices.
-    pub ethernet: EthernetDeviceCounters,
-    /// Device layer counters for Loopback devices.
-    pub loopback: LoopbackDeviceCounters,
-}
-
-/// Device layer counters for Ethernet devices.
-#[derive(Default)]
-pub struct EthernetDeviceCounters {
-    /// Common device layer counters.
-    pub common: CommonDeviceCounters,
-    /// Count of ip packets sent inside an ethernet frame.
-    pub(crate) send_ip_frame: Counter,
-    /// Count of ethernet frames that failed to send because there was no Tx queue.
-    pub send_no_queue: Counter,
-    /// Count of incoming ethernet frames dropped because the destination address was for another device.
-    pub recv_other_dest: Counter,
-    /// Count of incoming ethernet frames deliverd to the ARP layer.
-    pub recv_arp_delivered: Counter,
-}
-
-/// Device layer counters for Loopback devices.
-#[derive(Default)]
-pub struct LoopbackDeviceCounters {
-    /// Common device layer counters.
-    pub common: CommonDeviceCounters,
-    /// Count of incoming loopback frames dropped due to an empty ethertype.
-    pub recv_no_ethertype: Counter,
-}
-
-/// Device layer counters that are common to both Ethernet and Loopback devices.
-#[derive(Default)]
-pub struct CommonDeviceCounters {
     /// Count of outgoing frames which enter the device layer (but may or may
     /// not have been dropped prior to reaching the wire).
     pub send_total_frames: Counter,
@@ -402,6 +369,19 @@ pub struct CommonDeviceCounters {
     pub recv_ip_delivered: Counter,
     /// Count of incoming frames dropped due to an unsupported ethertype.
     pub recv_unsupported_ethertype: Counter,
+    /// Count of sent frames containing an IPv4 packet.
+    pub send_ipv4_frame: Counter,
+    /// Count of sent frames containing an IPv6 packet.
+    pub send_ipv6_frame: Counter,
+    /// Count of frames that failed to send because there was no Tx queue.
+    pub send_dropped_no_queue: Counter,
+    /// Count of incoming frames dropped because the destination address was for
+    /// another device.
+    pub recv_ethernet_other_dest: Counter,
+    /// Count of incoming ethernet frames deliverd to the ARP layer.
+    pub recv_arp_delivered: Counter,
+    /// Count of incoming frames dropped due to an empty ethertype.
+    pub recv_no_ethertype: Counter,
 }
 
 impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for StackState<BC> {

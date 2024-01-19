@@ -259,88 +259,39 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
         fn visit_counters(&self, counters: netstack3_core::inspect::StackCounters<'_>) {
             let Self(node) = self;
             node.record_child("Devices", |node| {
-                node.record_child("Ethernet", |node| {
-                    node.record_child("Rx", |node| {
-                        node.record_uint(
-                            "TotalFrames",
-                            counters.devices.ethernet.common.recv_frame.get(),
-                        );
-                        node.record_uint(
-                            "Malformed",
-                            counters.devices.ethernet.common.recv_parse_error.get(),
-                        );
-                        node.record_uint(
-                            "NonLocalDstAddr",
-                            counters.devices.ethernet.recv_other_dest.get(),
-                        );
-                        node.record_uint(
-                            "UnsupportedEthertype",
-                            counters.devices.ethernet.common.recv_unsupported_ethertype.get(),
-                        );
-                        node.record_uint(
-                            "ArpDelivered",
-                            counters.devices.ethernet.recv_arp_delivered.get(),
-                        );
-                        node.record_uint(
-                            "IpDelivered",
-                            counters.devices.ethernet.common.recv_ip_delivered.get(),
-                        );
-                    });
-                    node.record_child("Tx", |node| {
-                        node.record_uint(
-                            "TotalFrames",
-                            counters.devices.ethernet.common.send_total_frames.get(),
-                        );
-                        node.record_uint("Sent", counters.devices.ethernet.common.send_frame.get());
-                        node.record_uint("NoQueue", counters.devices.ethernet.send_no_queue.get());
-                        node.record_uint(
-                            "QueueFull",
-                            counters.devices.ethernet.common.send_queue_full.get(),
-                        );
-                        node.record_uint(
-                            "SerializeError",
-                            counters.devices.ethernet.common.send_serialize_error.get(),
-                        );
-                    });
+                let netstack3_core::device::DeviceCounters {
+                    recv_arp_delivered,
+                    recv_frame,
+                    recv_ip_delivered,
+                    recv_no_ethertype,
+                    recv_ethernet_other_dest,
+                    recv_parse_error,
+                    recv_unsupported_ethertype,
+                    send_frame,
+                    send_ipv4_frame,
+                    send_ipv6_frame,
+                    send_dropped_no_queue,
+                    send_queue_full,
+                    send_serialize_error,
+                    send_total_frames,
+                } = counters.devices;
+                node.record_child("Rx", |node| {
+                    node.record_uint("TotalFrames", recv_frame.get());
+                    node.record_uint("Malformed", recv_parse_error.get());
+                    node.record_uint("NonLocalDstAddr", recv_ethernet_other_dest.get());
+                    node.record_uint("NoEthertype", recv_no_ethertype.get());
+                    node.record_uint("UnsupportedEthertype", recv_unsupported_ethertype.get());
+                    node.record_uint("ArpDelivered", recv_arp_delivered.get());
+                    node.record_uint("IpDelivered", recv_ip_delivered.get());
                 });
-                node.record_child("Loopback", |node| {
-                    node.record_child("Rx", |node| {
-                        node.record_uint(
-                            "TotalFrames",
-                            counters.devices.loopback.common.recv_frame.get(),
-                        );
-                        node.record_uint(
-                            "Malformed",
-                            counters.devices.loopback.common.recv_parse_error.get(),
-                        );
-                        node.record_uint(
-                            "NoEthertype",
-                            counters.devices.loopback.recv_no_ethertype.get(),
-                        );
-                        node.record_uint(
-                            "UnsupportedEthertype",
-                            counters.devices.loopback.common.recv_unsupported_ethertype.get(),
-                        );
-                        node.record_uint(
-                            "IpDelivered",
-                            counters.devices.loopback.common.recv_ip_delivered.get(),
-                        );
-                    });
-                    node.record_child("Tx", |node| {
-                        node.record_uint(
-                            "TotalFrames",
-                            counters.devices.loopback.common.send_total_frames.get(),
-                        );
-                        node.record_uint("Sent", counters.devices.loopback.common.send_frame.get());
-                        node.record_uint(
-                            "QueueFull",
-                            counters.devices.loopback.common.send_queue_full.get(),
-                        );
-                        node.record_uint(
-                            "SerializeError",
-                            counters.devices.loopback.common.send_serialize_error.get(),
-                        );
-                    });
+                node.record_child("Tx", |node| {
+                    node.record_uint("TotalFrames", send_total_frames.get());
+                    node.record_uint("Sent", send_frame.get());
+                    node.record_uint("SendIpv4Frame", send_ipv4_frame.get());
+                    node.record_uint("SendIpv6Frame", send_ipv6_frame.get());
+                    node.record_uint("NoQueue", send_dropped_no_queue.get());
+                    node.record_uint("QueueFull", send_queue_full.get());
+                    node.record_uint("SerializeError", send_serialize_error.get());
                 });
             });
             node.record_child("Arp", |node| {

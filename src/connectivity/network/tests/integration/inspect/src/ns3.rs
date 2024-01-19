@@ -242,37 +242,23 @@ async fn inspect_counters(name: &str) {
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Counters": {
             "Devices": {
-                "Ethernet": {
-                    "Rx": {
-                        TotalFrames: 0u64,
-                        Malformed: 0u64,
-                        NonLocalDstAddr: 0u64,
-                        UnsupportedEthertype: 0u64,
-                        ArpDelivered: 0u64,
-                        IpDelivered: 0u64,
-                    },
-                    "Tx": {
-                        TotalFrames: 0u64,
-                        Sent: 0u64,
-                        NoQueue: 0u64,
-                        QueueFull: 0u64,
-                        SerializeError: 0u64,
-                    },
+                "Rx": {
+                    TotalFrames: 1u64,
+                    Malformed: 0u64,
+                    NonLocalDstAddr: 0u64,
+                    NoEthertype: 0u64,
+                    UnsupportedEthertype: 0u64,
+                    ArpDelivered: 0u64,
+                    IpDelivered: 1u64,
                 },
-                "Loopback": {
-                    "Rx": {
-                        TotalFrames: 1u64,
-                        Malformed: 0u64,
-                        NoEthertype: 0u64,
-                        UnsupportedEthertype: 0u64,
-                        IpDelivered: 1u64,
-                    },
-                    "Tx": {
-                        TotalFrames: 1u64,
-                        Sent: 1u64,
-                        QueueFull: 0u64,
-                        SerializeError: 0u64,
-                    },
+                "Tx": {
+                    TotalFrames: 1u64,
+                    Sent: 1u64,
+                    SendIpv4Frame: 1u64,
+                    SendIpv6Frame: 0u64,
+                    NoQueue: 0u64,
+                    QueueFull: 0u64,
+                    SerializeError: 0u64,
                 },
             },
             "Arp": {
