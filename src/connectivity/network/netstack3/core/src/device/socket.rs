@@ -23,7 +23,10 @@ use packet_formats::{
 
 use crate::{
     context::{ContextPair, SendFrameContext},
-    device::{self, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination, WeakDeviceId},
+    device::{
+        self, for_any_device_id, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination,
+        WeakDeviceId,
+    },
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
     CoreCtx, StackState,
 };
@@ -957,8 +960,10 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
         device: &Self::DeviceId,
         cb: F,
     ) -> R {
-        match device {
-            DeviceId::Ethernet(device) => device::integration::with_device_state_and_core_ctx(
+        for_any_device_id!(
+            DeviceId,
+            device,
+            device => device::integration::with_device_state_and_core_ctx(
                 self,
                 device,
                 |mut core_ctx_and_resource| {
@@ -968,19 +973,8 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
                     );
                     cb(&*device_sockets, &mut locked.cast_core_ctx())
                 },
-            ),
-            DeviceId::Loopback(device) => device::integration::with_device_state_and_core_ctx(
-                self,
-                device,
-                |mut core_ctx_and_resource| {
-                    let (device_sockets, mut locked) = core_ctx_and_resource
-                        .read_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
-                        |c| c.right(),
-                    );
-                    cb(&*device_sockets, &mut locked.cast_core_ctx())
-                },
-            ),
-        }
+            )
+        )
     }
 
     fn with_device_sockets_mut<
@@ -991,8 +985,10 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
         device: &Self::DeviceId,
         cb: F,
     ) -> R {
-        match device {
-            DeviceId::Ethernet(device) => device::integration::with_device_state_and_core_ctx(
+        for_any_device_id!(
+            DeviceId,
+            device,
+            device => device::integration::with_device_state_and_core_ctx(
                 self,
                 device,
                 |mut core_ctx_and_resource| {
@@ -1002,19 +998,8 @@ impl<BC: crate::BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocke
                     );
                     cb(&mut *device_sockets, &mut locked.cast_core_ctx())
                 },
-            ),
-            DeviceId::Loopback(device) => device::integration::with_device_state_and_core_ctx(
-                self,
-                device,
-                |mut core_ctx_and_resource| {
-                    let (mut device_sockets, mut locked) = core_ctx_and_resource
-                        .write_lock_with_and::<crate::lock_ordering::DeviceSockets, _>(
-                        |c| c.right(),
-                    );
-                    cb(&mut *device_sockets, &mut locked.cast_core_ctx())
-                },
-            ),
-        }
+            )
+        )
     }
 }
 

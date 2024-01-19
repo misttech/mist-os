@@ -26,6 +26,7 @@ use crate::{
         ethernet::{
             self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
         },
+        for_any_device_id,
         loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
         queue::tx::TransmitQueueHandler,
         socket,
@@ -830,20 +831,16 @@ where
         S::Buffer: BufferMut,
     {
         let socket::DeviceSocketMetadata { device_id, header } = metadata;
-        match device_id {
-            DeviceId::Ethernet(device_id) => SendFrameContext::send_frame(
+        for_any_device_id!(
+            DeviceId,
+            device_id,
+            device_id => SendFrameContext::send_frame(
                 self,
                 bindings_ctx,
                 socket::DeviceSocketMetadata { device_id, header },
                 frame,
-            ),
-            DeviceId::Loopback(device_id) => SendFrameContext::send_frame(
-                self,
-                bindings_ctx,
-                socket::DeviceSocketMetadata { device_id, header },
-                frame,
-            ),
-        }
+            )
+        )
     }
 }
 
@@ -978,10 +975,11 @@ pub(crate) fn with_ip_device_state<
     device: &DeviceId<BC>,
     cb: F,
 ) -> O {
-    match device {
-        DeviceId::Ethernet(id) => with_device_state(core_ctx, id, |mut state| cb(state.cast())),
-        DeviceId::Loopback(id) => with_device_state(core_ctx, id, |mut state| cb(state.cast())),
-    }
+    for_any_device_id!(
+        DeviceId,
+        device,
+        id => with_device_state(core_ctx, id, |mut state| cb(state.cast()))
+    )
 }
 
 pub(crate) fn with_ip_device_state_and_core_ctx<
@@ -994,18 +992,13 @@ pub(crate) fn with_ip_device_state_and_core_ctx<
     device: &DeviceId<BC>,
     cb: F,
 ) -> O {
-    match device {
-        DeviceId::Ethernet(id) => {
-            with_device_state_and_core_ctx(core_ctx, id, |mut core_ctx_and_resource| {
-                cb(core_ctx_and_resource.cast_right(|r| r.as_ref()))
-            })
-        }
-        DeviceId::Loopback(id) => {
-            with_device_state_and_core_ctx(core_ctx, id, |mut core_ctx_and_resource| {
-                cb(core_ctx_and_resource.cast_right(|r| r.as_ref()))
-            })
-        }
-    }
+    for_any_device_id!(
+        DeviceId,
+        device,
+        id => with_device_state_and_core_ctx(core_ctx, id, |mut core_ctx_and_resource| {
+            cb(core_ctx_and_resource.cast_right(|r| r.as_ref()))
+        })
+    )
 }
 
 fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>(

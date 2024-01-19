@@ -25,6 +25,7 @@ use crate::{
     device::{
         arp::ArpCounters,
         ethernet::{self, EthernetLinkDevice, EthernetTimerId},
+        for_any_device_id,
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
             StrongId, WeakId,
@@ -127,11 +128,7 @@ where
     Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
 {
     fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        let ip_state = match device_id {
-            DeviceId::Ethernet(id) => id.ip_device_state(),
-            DeviceId::Loopback(id) => id.ip_device_state(),
-        };
-        ip_state.metric
+        for_any_device_id!(DeviceId, device_id, id => id.ip_device_state().metric)
     }
 
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
@@ -148,11 +145,7 @@ pub fn get_routing_metric<BC: BindingsContext>(
     _core_ctx: &SyncCtx<BC>,
     device_id: &DeviceId<BC>,
 ) -> RawMetric {
-    let ip_state = match device_id {
-        DeviceId::Ethernet(id) => id.ip_device_state(),
-        DeviceId::Loopback(id) => id.ip_device_state(),
-    };
-    ip_state.metric
+    for_any_device_id!(DeviceId, device_id, id => id.ip_device_state().metric)
 }
 
 /// Creates a snapshot of the devices in the stack at the time of invocation.
@@ -195,10 +188,7 @@ pub fn inspect_devices<BC: BindingsContext, V: DevicesVisitor<BC>>(
 ) {
     let devices = snapshot_device_ids(core_ctx, Some).into_iter().map(|device| {
         let device_id = device.clone();
-        let ip = match &device {
-            DeviceId::Ethernet(d) => &d.device_state().ip,
-            DeviceId::Loopback(d) => &d.device_state().ip,
-        };
+        let ip = for_any_device_id!(DeviceId, &device, d => &d.device_state().ip);
         let ipv4 =
             lock_order::lock::RwLockFor::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>::read_lock(
                 ip,
@@ -1319,10 +1309,11 @@ mod tests {
 
         check_transmitted(bindings_ctx, &device, 1);
         assert_eq!(bindings_ctx.state_mut().tx_available, <[DeviceId::<_>; 0]>::default());
-        match device {
-            DeviceId::Ethernet(eth) => ctx.core_api().device().remove_device(eth).into_removed(),
-            DeviceId::Loopback(lo) => ctx.core_api().device().remove_device(lo).into_removed(),
-        }
+        for_any_device_id!(
+            DeviceId,
+            device,
+            device => ctx.core_api().device().remove_device(device).into_removed()
+        )
     }
 
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt>(

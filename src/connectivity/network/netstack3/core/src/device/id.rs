@@ -78,36 +78,44 @@ impl<BT: DeviceLayerTypes> From<LoopbackWeakDeviceId<BT>> for WeakDeviceId<BT> {
 impl<BT: DeviceLayerTypes> WeakDeviceId<BT> {
     /// Attempts to upgrade the ID.
     pub fn upgrade(&self) -> Option<DeviceId<BT>> {
-        match self {
-            WeakDeviceId::Ethernet(id) => id.upgrade().map(Into::into),
-            WeakDeviceId::Loopback(id) => id.upgrade().map(Into::into),
-        }
+        for_any_device_id!(WeakDeviceId, self, id => id.upgrade().map(Into::into))
     }
 
     /// Creates a [`DebugReferences`] instance for this device.
     pub fn debug_references(&self) -> DebugReferences<BT> {
-        DebugReferences(match self {
-            Self::Loopback(LoopbackWeakDeviceId { cookie }) => {
-                DebugReferencesInner::Loopback(cookie.weak_ref.debug_references())
-            }
-            Self::Ethernet(EthernetWeakDeviceId { cookie }) => {
-                DebugReferencesInner::Ethernet(cookie.weak_ref.debug_references())
-            }
-        })
+        DebugReferences(for_any_device_id!(
+            WeakDeviceId,
+            self,
+            BaseWeakDeviceId { cookie } => cookie.weak_ref.debug_references().into()
+        ))
     }
 
     /// Returns the bindings identifier associated with the device.
     pub fn bindings_id(&self) -> &BT::DeviceIdentifier {
-        match self {
-            WeakDeviceId::Ethernet(id) => id.bindings_id(),
-            WeakDeviceId::Loopback(id) => id.bindings_id(),
-        }
+        for_any_device_id!(WeakDeviceId, self, id => id.bindings_id())
     }
 }
 
 enum DebugReferencesInner<BT: DeviceLayerTypes> {
     Loopback(crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, BT>>),
     Ethernet(crate::sync::DebugReferences<BaseDeviceState<EthernetLinkDevice, BT>>),
+}
+
+impl<BT: DeviceLayerTypes> From<crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, BT>>>
+    for DebugReferencesInner<BT>
+{
+    fn from(inner: crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, BT>>) -> Self {
+        DebugReferencesInner::Loopback(inner)
+    }
+}
+
+impl<BT: DeviceLayerTypes>
+    From<crate::sync::DebugReferences<BaseDeviceState<EthernetLinkDevice, BT>>>
+    for DebugReferencesInner<BT>
+{
+    fn from(inner: crate::sync::DebugReferences<BaseDeviceState<EthernetLinkDevice, BT>>) -> Self {
+        DebugReferencesInner::Ethernet(inner)
+    }
 }
 
 /// A type offering a [`Debug`] implementation that helps debug dangling device
@@ -139,10 +147,7 @@ impl<BT: DeviceLayerTypes> WeakId for WeakDeviceId<BT> {
 
 impl<BT: DeviceLayerTypes> Debug for WeakDeviceId<BT> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            WeakDeviceId::Ethernet(id) => Debug::fmt(id, f),
-            WeakDeviceId::Loopback(id) => Debug::fmt(id, f),
-        }
+        for_any_device_id!(WeakDeviceId, self, id => Debug::fmt(id, f))
     }
 }
 
@@ -160,13 +165,24 @@ pub enum DeviceId<BT: DeviceLayerTypes> {
     Loopback(LoopbackDeviceId<BT>),
 }
 
+/// Evaluates the expression for the given device_id, regardless of its variant.
+///
+/// The first argument should be a device ID enum, either [`DeviceId`] or
+/// [`WeakDeviceId`].
+macro_rules! for_any_device_id {
+    ($device_id_enum_type:ident, $device_id:expr, $variable:pat => $expression:expr) => {
+        match $device_id {
+            $device_id_enum_type::Loopback($variable) => $expression,
+            $device_id_enum_type::Ethernet($variable) => $expression,
+        }
+    };
+}
+pub(crate) use for_any_device_id;
+
 impl<BT: DeviceLayerTypes> Clone for DeviceId<BT> {
     #[cfg_attr(feature = "instrumented", track_caller)]
     fn clone(&self) -> Self {
-        match self {
-            Self::Ethernet(d) => Self::Ethernet(d.clone()),
-            Self::Loopback(d) => Self::Loopback(d.clone()),
-        }
+        for_any_device_id!(DeviceId, self, id => id.clone().into())
     }
 }
 
@@ -213,18 +229,12 @@ impl<BT: DeviceLayerTypes> From<LoopbackDeviceId<BT>> for DeviceId<BT> {
 impl<BT: DeviceLayerTypes> DeviceId<BT> {
     /// Downgrade to a [`WeakDeviceId`].
     pub fn downgrade(&self) -> WeakDeviceId<BT> {
-        match self {
-            DeviceId::Ethernet(id) => id.downgrade().into(),
-            DeviceId::Loopback(id) => id.downgrade().into(),
-        }
+        for_any_device_id!(DeviceId, self, id => id.downgrade().into())
     }
 
     /// Returns the bindings identifier associated with the device.
     pub fn bindings_id(&self) -> &BT::DeviceIdentifier {
-        match self {
-            DeviceId::Ethernet(id) => id.bindings_id(),
-            DeviceId::Loopback(id) => id.bindings_id(),
-        }
+        for_any_device_id!(DeviceId, self, id => id.bindings_id())
     }
 
     #[cfg(test)]
@@ -248,10 +258,7 @@ impl<BT: DeviceLayerTypes> StrongId for DeviceId<BT> {
 
 impl<BT: DeviceLayerTypes> Debug for DeviceId<BT> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DeviceId::Ethernet(id) => Debug::fmt(id, f),
-            DeviceId::Loopback(id) => Debug::fmt(id, f),
-        }
+        for_any_device_id!(DeviceId, self, id => Debug::fmt(id, f))
     }
 }
 
