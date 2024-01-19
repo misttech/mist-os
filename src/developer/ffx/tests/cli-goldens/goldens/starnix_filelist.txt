@@ -1,0 +1,3 @@
+ffx/starnix.golden
+ffx/starnix/adb.golden
+ffx/starnix/console.golden

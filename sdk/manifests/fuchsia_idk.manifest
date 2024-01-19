@@ -107,6 +107,7 @@ ffx_tool://tools/arm64/ffx_tools/ffx-inspect
 ffx_tool://tools/arm64/ffx_tools/ffx-package
 ffx_tool://tools/arm64/ffx_tools/ffx-product
 ffx_tool://tools/arm64/ffx_tools/ffx-scrutiny
+ffx_tool://tools/arm64/ffx_tools/ffx-starnix
 ffx_tool://tools/arm64/ffx_tools/ffx-test
 ffx_tool://tools/x64/ffx_tools/ffx-agis
 ffx_tool://tools/x64/ffx_tools/ffx-assembly
@@ -116,6 +117,7 @@ ffx_tool://tools/x64/ffx_tools/ffx-inspect
 ffx_tool://tools/x64/ffx_tools/ffx-package
 ffx_tool://tools/x64/ffx_tools/ffx-product
 ffx_tool://tools/x64/ffx_tools/ffx-scrutiny
+ffx_tool://tools/x64/ffx_tools/ffx-starnix
 ffx_tool://tools/x64/ffx_tools/ffx-test
 fidl_library://fidl/fuchsia.accessibility.gesture
 fidl_library://fidl/fuchsia.accessibility.semantics
