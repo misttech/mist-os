@@ -6517,16 +6517,16 @@ mod tests {
             Buf::new(HELLO.to_vec(), ..),
         )
         .unwrap();
-        crate::testutil::handle_queued_rx_packets(core_ctx, bindings_ctx);
+        crate::testutil::handle_queued_rx_packets(&mut ctx);
 
         // TODO(https://fxbug.dev/135041): They should both be non-empty. The
         // socket map should allow a looped back packet to be delivered despite
         // it being bound to a device other than loopback.
         if bind_to_device {
-            assert_matches!(&bindings_ctx.take_udp_received(socket)[..], []);
+            assert_matches!(&ctx.bindings_ctx.take_udp_received(socket)[..], []);
         } else {
             assert_matches!(
-                &bindings_ctx.take_udp_received(socket)[..],
+                &ctx.bindings_ctx.take_udp_received(socket)[..],
                 [packet] => assert_eq!(packet, HELLO)
             );
         }

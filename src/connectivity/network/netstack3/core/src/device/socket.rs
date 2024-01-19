@@ -662,7 +662,7 @@ impl<S, D> StrongId<S, D> {
 ///
 /// This is implemented on top of [`DeviceSocketContext`] and abstracts packet
 /// socket delivery from the rest of the system.
-pub(crate) trait DeviceSocketHandler<D: Device, BC>: DeviceIdContext<D> {
+pub trait DeviceSocketHandler<D: Device, BC>: DeviceIdContext<D> {
     /// Dispatch a received frame to sockets.
     fn handle_frame(
         &mut self,
@@ -694,7 +694,7 @@ pub enum SentFrame<B> {
 
 /// A frame couldn't be parsed as a [`SentFrame`].
 #[derive(Debug)]
-pub(crate) struct ParseSentFrameError;
+pub struct ParseSentFrameError;
 
 impl SentFrame<&[u8]> {
     /// Tries to parse the given frame as an Ethernet frame.

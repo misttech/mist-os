@@ -8,7 +8,11 @@ use net_types::ip::Ip;
 
 use crate::{
     context::{ContextProvider, CoreCtx, CtxPair},
-    device::{api::DeviceApi, socket::DeviceSocketApi},
+    device::{
+        api::DeviceApi,
+        queue::api::{ReceiveQueueApi, TransmitQueueApi},
+        socket::DeviceSocketApi,
+    },
     ip::{
         api::{RoutesAnyApi, RoutesApi},
         device::nud::api::NeighborApi,
@@ -81,6 +85,18 @@ where
     pub fn device<D>(self) -> DeviceApi<D, CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         DeviceApi::new(ctx)
+    }
+
+    /// Gets access to the transmit queue API for device type `D`.
+    pub fn transmit_queue<D>(self) -> TransmitQueueApi<D, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        TransmitQueueApi::new(ctx)
+    }
+
+    /// Gets access to the receive queue API for device type `D`.
+    pub fn receive_queue<D>(self) -> ReceiveQueueApi<D, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        ReceiveQueueApi::new(ctx)
     }
 }
 

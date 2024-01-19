@@ -2197,11 +2197,11 @@ mod tests {
         )
         .unwrap();
 
-        handle_queued_rx_packets(core_ctx, bindings_ctx);
+        handle_queued_rx_packets(&mut ctx);
 
-        assert_eq!(bindings_ctx.frames_sent().len(), 0);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 0);
 
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]

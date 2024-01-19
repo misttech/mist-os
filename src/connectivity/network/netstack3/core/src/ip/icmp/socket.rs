@@ -866,8 +866,9 @@ mod tests {
             .serialize_vec_outer()
             .unwrap()
             .into_inner();
-        let conn = net.with_context(LOCAL_CTX_NAME, |Ctx { core_ctx, bindings_ctx }| {
-            crate::device::testutil::enable_device(&&*core_ctx, bindings_ctx, &loopback_device_id);
+        let conn = net.with_context(LOCAL_CTX_NAME, |ctx| {
+            let Ctx { core_ctx, bindings_ctx } = ctx;
+            crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
             let mut socket_api = CoreApi::with_contexts(core_ctx, bindings_ctx).icmp_echo::<I>();
             let conn = socket_api.create();
             if bind_to_device {
@@ -897,18 +898,15 @@ mod tests {
                         .unwrap();
                 }
             }
-            handle_queued_rx_packets(core_ctx, bindings_ctx);
+            handle_queued_rx_packets(ctx);
 
             conn
         });
 
-        net.run_until_idle(
-            crate::device::testutil::receive_frame,
-            |Ctx { core_ctx, bindings_ctx }, _, id| {
-                crate::handle_timer(&&*core_ctx, bindings_ctx, id);
-                handle_queued_rx_packets(core_ctx, bindings_ctx);
-            },
-        );
+        net.run_until_idle(crate::device::testutil::receive_frame, |ctx, _, id| {
+            crate::handle_timer(&ctx.core_ctx, &mut ctx.bindings_ctx, id);
+            handle_queued_rx_packets(ctx);
+        });
 
         assert_eq!(net.core_ctx(LOCAL_CTX_NAME).state.icmp_rx_counters::<I>().echo_reply.get(), 1);
         assert_eq!(

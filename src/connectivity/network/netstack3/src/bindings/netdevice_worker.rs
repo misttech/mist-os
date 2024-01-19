@@ -33,7 +33,7 @@ use rand::Rng as _;
 
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
-    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
+    Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 
 #[derive(Clone)]
@@ -507,28 +507,27 @@ impl DeviceHandler {
         }
         .into();
 
-        let core_id = ctx.api().device::<EthernetLinkDevice>().add_device(
+        let core_ethernet_id = ctx.api().device::<EthernetLinkDevice>().add_device(
             devices::DeviceIdAndName { id: binding_id, name },
             EthernetCreationProperties { mac: mac_addr, max_frame_size },
             RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
             info,
         );
 
-        state_entry.insert(core_id.downgrade());
-        let binding_id = core_id.bindings_id().id;
-        let core_id: DeviceId<_> = core_id.into();
-        let external_state = core_id.external_state();
+        state_entry.insert(core_ethernet_id.downgrade());
+        let binding_id = core_ethernet_id.bindings_id().id;
+        let external_state = core_ethernet_id.external_state();
         let devices::StaticCommonInfo { tx_notifier, authorization_token: _ } =
-            external_state.static_common_info();
+            &external_state.static_common_info;
+
+        let core_id = DeviceId::from(core_ethernet_id.clone());
         let task =
             crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        netstack3_core::device::set_tx_queue_configuration(
-            core_ctx,
-            bindings_ctx,
-            &core_id,
+        ctx.api().transmit_queue::<EthernetLinkDevice>().set_configuration(
+            &core_ethernet_id,
             netstack3_core::device::TransmitQueueConfiguration::Fifo,
         );
+        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
         add_initial_routes(bindings_ctx, &core_id).await;
 
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
@@ -571,7 +570,7 @@ impl DeviceHandler {
             .unwrap()
             .apply(core_ctx, bindings_ctx);
 
-        bindings_ctx.devices.add_device(binding_id, core_id.clone());
+        bindings_ctx.devices.add_device(binding_id, core_id);
 
         Ok((binding_id, status_stream, task))
     }

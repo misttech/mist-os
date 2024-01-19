@@ -1264,16 +1264,16 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
 }
 
 #[cfg(test)]
-pub(crate) fn handle_queued_rx_packets(core_ctx: &FakeCoreCtx, bindings_ctx: &mut FakeBindingsCtx) {
+pub(crate) fn handle_queued_rx_packets(ctx: &mut FakeCtx) {
     loop {
-        let rx_available = core::mem::take(&mut bindings_ctx.state_mut().rx_available);
+        let rx_available = core::mem::take(&mut ctx.bindings_ctx.state_mut().rx_available);
         if rx_available.len() == 0 {
             break;
         }
 
         for id in rx_available.into_iter() {
             loop {
-                match crate::device::handle_queued_rx_packets(core_ctx, bindings_ctx, &id) {
+                match ctx.core_api().receive_queue().handle_queued_frames(&id) {
                     crate::work_queue::WorkQueueReport::AllDone => break,
                     crate::work_queue::WorkQueueReport::Pending => (),
                 }

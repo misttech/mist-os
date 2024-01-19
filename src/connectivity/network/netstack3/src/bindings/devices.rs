@@ -20,8 +20,7 @@ use net_types::{
 };
 use netstack3_core::{
     device::{
-        handle_queued_rx_packets, transmit_queued_tx_frames, DeviceId, DeviceSendFrameError,
-        LoopbackDeviceId,
+        DeviceId, DeviceSendFrameError, EthernetLinkDevice, LoopbackDevice, LoopbackDeviceId,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     types::WorkQueueReport,
@@ -167,10 +166,9 @@ pub(crate) fn spawn_rx_task(
     fuchsia_async::Task::spawn(crate::bindings::util::yielding_data_notifier_loop(
         watcher,
         move || {
-            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
             device_id
                 .upgrade()
-                .map(|device_id| handle_queued_rx_packets(core_ctx, bindings_ctx, &device_id))
+                .map(|device_id| ctx.api().receive_queue().handle_queued_frames(&device_id))
         },
     ))
 }
@@ -186,17 +184,31 @@ pub(crate) fn spawn_tx_task(
     fuchsia_async::Task::spawn(crate::bindings::util::yielding_data_notifier_loop(
         watcher,
         move || {
-            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+            // NB: We could write this function generically in terms of `D:
+            // Device`, which is the type parameter given to instantiate the
+            // transmit queue API. To do that, core would need to expose a
+            // marker for CoreContext that is generic on `D`. That is doable but
+            // not worth the extra code at this moment since bindings doesn't
+            // have meaningful amounts of code that is generic over the device
+            // type.
             device_id.upgrade().map(|device_id| {
-                transmit_queued_tx_frames(core_ctx, bindings_ctx, &device_id).unwrap_or_else(
-                    |DeviceSendFrameError::DeviceNotReady(())| {
-                        warn!(
-                            "TODO(https://fxbug.dev/105921): Support waiting for TX buffers to be \
+                match &device_id {
+                    DeviceId::Ethernet(device_id) => ctx
+                        .api()
+                        .transmit_queue::<EthernetLinkDevice>()
+                        .transmit_queued_frames(device_id),
+                    DeviceId::Loopback(device_id) => ctx
+                        .api()
+                        .transmit_queue::<LoopbackDevice>()
+                        .transmit_queued_frames(device_id),
+                }
+                .unwrap_or_else(|DeviceSendFrameError::DeviceNotReady(())| {
+                    warn!(
+                        "TODO(https://fxbug.dev/105921): Support waiting for TX buffers to be \
                             available, dropping packet for now on device={device_id:?}",
-                        );
-                        WorkQueueReport::AllDone
-                    },
-                )
+                    );
+                    WorkQueueReport::AllDone
+                })
             })
         },
     ))

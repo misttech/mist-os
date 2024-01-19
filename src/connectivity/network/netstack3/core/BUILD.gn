@@ -31,6 +31,7 @@ lib_sources = [
   "src/device/loopback.rs",
   "src/device/ndp.rs",
   "src/device/queue.rs",
+  "src/device/queue/api.rs",
   "src/device/queue/fifo.rs",
   "src/device/queue/rx.rs",
   "src/device/queue/tx.rs",

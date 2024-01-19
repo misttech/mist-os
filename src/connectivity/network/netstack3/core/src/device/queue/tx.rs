@@ -6,7 +6,6 @@
 
 use alloc::vec::Vec;
 use core::convert::Infallible as Never;
-use core::marker::PhantomData;
 
 use derivative::Derivative;
 use packet::{
@@ -16,22 +15,18 @@ use packet::{
 
 use crate::{
     device::{
-        queue::{
-            fifo, DequeueResult, DequeueState, EnqueueResult, TransmitQueueFrameError,
-            MAX_BATCH_SIZE,
-        },
+        queue::{fifo, DequeueState, EnqueueResult, TransmitQueueFrameError},
         socket::{DeviceSocketHandler, ParseSentFrameError, SentFrame},
         Device, DeviceIdContext, DeviceSendFrameError,
     },
     sync::Mutex,
-    work_queue::WorkQueueReport,
 };
 
 #[derive(Derivative)]
 #[derivative(Default(bound = "Allocator: Default"))]
 pub(crate) struct TransmitQueueState<Meta, Buffer, Allocator> {
-    allocator: Allocator,
-    queue: Option<fifo::Queue<Meta, Buffer>>,
+    pub(super) allocator: Allocator,
+    pub(super) queue: Option<fifo::Queue<Meta, Buffer>>,
 }
 
 #[derive(Derivative)]
@@ -49,12 +44,12 @@ pub(crate) struct TransmitQueue<Meta, Buffer, Allocator> {
 }
 
 /// The bindings context for the transmit queue.
-pub(crate) trait TransmitQueueBindingsContext<D: Device, DeviceId> {
+pub trait TransmitQueueBindingsContext<D: Device, DeviceId> {
     /// Wakes up TX task.
     fn wake_tx_task(&mut self, device_id: &DeviceId);
 }
 
-pub(crate) trait TransmitQueueCommon<D: Device, C>: DeviceIdContext<D> {
+pub trait TransmitQueueCommon<D: Device, C>: DeviceIdContext<D> {
     type Meta;
     type Allocator;
     type Buffer: GrowBufferMut + ContiguousBuffer;
@@ -64,7 +59,7 @@ pub(crate) trait TransmitQueueCommon<D: Device, C>: DeviceIdContext<D> {
 }
 
 /// The execution context for a transmit queue.
-pub(crate) trait TransmitQueueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
+pub trait TransmitQueueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
     /// Returns the queue state, mutably.
     fn with_transmit_queue_mut<
         O,
@@ -88,7 +83,7 @@ pub(crate) trait TransmitQueueContext<D: Device, BC>: TransmitQueueCommon<D, BC>
     ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>>;
 }
 
-pub(crate) trait TransmitDequeueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
+pub trait TransmitDequeueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
     type TransmitQueueCtx<'a>: TransmitQueueContext<
             D,
             BC,
@@ -131,128 +126,7 @@ pub(crate) trait TransmitQueueHandler<D: Device, BC>: TransmitQueueCommon<D, BC>
         S::Buffer: ReusableBuffer;
 }
 
-/// Crate-internal transmit queue API interaction.
-pub(crate) struct TransmitQueueApi<CC, BT, D>(Never, PhantomData<(CC, BT, D)>);
-
-impl<
-        D: Device,
-        BC: TransmitQueueBindingsContext<D, CC::DeviceId>,
-        CC: TransmitDequeueContext<D, BC> + DeviceSocketHandler<D, BC>,
-    > TransmitQueueApi<CC, BC, D>
-{
-    /// Transmits any queued frames.
-    pub(crate) fn transmit_queued_frames(
-        core_ctx: &mut CC,
-        bindings_ctx: &mut BC,
-        device_id: &CC::DeviceId,
-    ) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
-        core_ctx.with_dequed_packets_and_tx_queue_ctx(
-            device_id,
-            |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
-                assert!(
-                    dequed_packets.is_empty(),
-                    "should never have left packets after attempting to dequeue"
-                );
-
-                let ret = tx_queue_ctx.with_transmit_queue_mut(
-                    device_id,
-                    |TransmitQueueState { allocator: _, queue }| {
-                        queue.as_mut().map(|q| q.dequeue_into(dequed_packets, MAX_BATCH_SIZE))
-                    },
-                );
-
-                // If we don't have a transmit queue installed, report no work
-                // left to be done.
-                let Some(ret) = ret else { return Ok(WorkQueueReport::AllDone) };
-
-                while let Some((meta, p)) = dequed_packets.pop_front() {
-                    deliver_to_device_sockets(tx_queue_ctx, bindings_ctx, device_id, &p);
-
-                    match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
-                        Ok(()) => {}
-                        Err(DeviceSendFrameError::DeviceNotReady(x)) => {
-                            // We failed to send the frame so requeue it and try
-                            // again later.
-                            tx_queue_ctx.with_transmit_queue_mut(
-                                device_id,
-                                |TransmitQueueState { allocator: _, queue }| {
-                                    dequed_packets.push_front(x);
-                                    queue.as_mut().unwrap().requeue_items(dequed_packets);
-                                },
-                            );
-                            return Err(DeviceSendFrameError::DeviceNotReady(()));
-                        }
-                    }
-                }
-
-                Ok(ret.into())
-            },
-        )
-    }
-
-    /// Sets the queue configuration for the device.
-    pub(crate) fn set_configuration(
-        core_ctx: &mut CC,
-        bindings_ctx: &mut BC,
-        device_id: &CC::DeviceId,
-        config: TransmitQueueConfiguration,
-    ) {
-        // We take the dequeue lock as well to make sure we finish any current
-        // dequeuing before changing the configuration.
-        core_ctx.with_dequed_packets_and_tx_queue_ctx(
-            device_id,
-            |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
-                assert!(
-                    dequed_packets.is_empty(),
-                    "should never have left packets after attempting to dequeue"
-                );
-
-                let prev_queue = tx_queue_ctx.with_transmit_queue_mut(
-                    device_id,
-                    |TransmitQueueState { allocator: _, queue }| {
-                        match config {
-                            TransmitQueueConfiguration::None => core::mem::take(queue),
-                            TransmitQueueConfiguration::Fifo => {
-                                match queue {
-                                    None => *queue = Some(fifo::Queue::default()),
-                                    // Already a FiFo queue.
-                                    Some(_) => {}
-                                }
-
-                                None
-                            }
-                        }
-                    },
-                );
-
-                let Some(mut prev_queue) = prev_queue else { return };
-
-                loop {
-                    let ret = prev_queue.dequeue_into(dequed_packets, MAX_BATCH_SIZE);
-
-                    while let Some((meta, p)) = dequed_packets.pop_front() {
-                        deliver_to_device_sockets(tx_queue_ctx, bindings_ctx, device_id, &p);
-                        match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
-                            Ok(()) => {}
-                            Err(DeviceSendFrameError::DeviceNotReady(x)) => {
-                                // We swapped to no-queue and device cannot send
-                                // the frame so we just drop it.
-                                let _: (CC::Meta, CC::Buffer) = x;
-                            }
-                        }
-                    }
-
-                    match ret {
-                        DequeueResult::NoMoreLeft => break,
-                        DequeueResult::MoreStillQueued => {}
-                    }
-                }
-            },
-        )
-    }
-}
-
-fn deliver_to_device_sockets<
+pub(super) fn deliver_to_device_sockets<
     D: Device,
     BC: TransmitQueueBindingsContext<D, CC::DeviceId>,
     CC: TransmitQueueCommon<D, BC> + DeviceSocketHandler<D, BC>,
@@ -347,7 +221,7 @@ where
 }
 
 #[derive(Default)]
-pub(crate) struct BufVecU8Allocator;
+pub struct BufVecU8Allocator;
 
 impl<'a> BufferAlloc<Buf<Vec<u8>>> for &'a mut BufVecU8Allocator {
     type Error = Never;
@@ -372,9 +246,10 @@ mod tests {
         context::testutil::{FakeBindingsCtx, FakeCoreCtx, FakeCtx},
         device::{
             link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
-            queue::MAX_TX_QUEUED_LEN,
+            queue::{api::TransmitQueueApi, MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN},
             socket::{EthernetFrame, Frame},
         },
+        work_queue::WorkQueueReport,
     };
 
     #[derive(Default)]
@@ -420,6 +295,15 @@ mod tests {
             body,
         })
     }
+
+    /// A trait providing a shortcut to instantiate a [`TransmitQueueApi`] from a context.
+    trait TransmitQueueApiExt: crate::context::ContextPair + Sized {
+        fn transmit_queue_api<D>(&mut self) -> TransmitQueueApi<D, &mut Self> {
+            TransmitQueueApi::new(self)
+        }
+    }
+
+    impl<O> TransmitQueueApiExt for O where O: crate::context::ContextPair + Sized {}
 
     impl TransmitQueueContext<FakeLinkDevice, FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_transmit_queue_mut<
@@ -484,14 +368,15 @@ mod tests {
 
     #[test]
     fn noqueue() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
         let body = Buf::new(vec![0], ..);
+
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
-                &mut core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &FakeLinkDeviceId,
                 (),
                 body.clone(),
@@ -510,36 +395,30 @@ mod tests {
         // Should not have any frames waiting to be transmitted since we have no
         // queue.
         assert_eq!(
-            TransmitQueueApi::transmit_queued_frames(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &FakeLinkDeviceId,
-            ),
+            ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId),
             Ok(WorkQueueReport::AllDone),
         );
+
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(bindings_ctx.state().woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), []);
     }
 
     #[test]
     fn fifo_queue_and_dequeue() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
-        TransmitQueueApi::set_configuration(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeLinkDeviceId,
-            TransmitQueueConfiguration::Fifo,
-        );
+        ctx.transmit_queue_api()
+            .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::Fifo);
 
         for _ in 0..2 {
+            let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
             for i in 0..MAX_TX_QUEUED_LEN {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
                     TransmitQueueHandler::queue_tx_frame(
-                        &mut core_ctx,
-                        &mut bindings_ctx,
+                        core_ctx,
+                        bindings_ctx,
                         &FakeLinkDeviceId,
                         (),
                         body
@@ -554,8 +433,8 @@ mod tests {
             let body = Buf::new(vec![131], ..);
             assert_eq!(
                 TransmitQueueHandler::queue_tx_frame(
-                    &mut core_ctx,
-                    &mut bindings_ctx,
+                    core_ctx,
+                    bindings_ctx,
                     &FakeLinkDeviceId,
                     (),
                     body.clone(),
@@ -574,15 +453,11 @@ mod tests {
             assert!(MAX_TX_QUEUED_LEN > MAX_BATCH_SIZE);
             for i in (0..(MAX_TX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
                 assert_eq!(
-                    TransmitQueueApi::transmit_queued_frames(
-                        &mut core_ctx,
-                        &mut bindings_ctx,
-                        &FakeLinkDeviceId,
-                    ),
+                    ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId),
                     Ok(WorkQueueReport::Pending),
                 );
                 assert_eq!(
-                    core::mem::take(&mut core_ctx.get_mut().transmitted_packets),
+                    core::mem::take(&mut ctx.core_ctx.get_mut().transmitted_packets),
                     (i..i + MAX_BATCH_SIZE)
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
@@ -590,13 +465,11 @@ mod tests {
             }
 
             assert_eq!(
-                TransmitQueueApi::transmit_queued_frames(
-                    &mut core_ctx,
-                    &mut bindings_ctx,
-                    &FakeLinkDeviceId,
-                ),
+                ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId),
                 Ok(WorkQueueReport::AllDone),
             );
+
+            let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
             assert_eq!(
                 core::mem::take(&mut core_ctx.get_mut().transmitted_packets),
                 (MAX_BATCH_SIZE * (MAX_TX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_TX_QUEUED_LEN)
@@ -622,21 +495,17 @@ mod tests {
 
     #[test]
     fn device_not_ready() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
-        TransmitQueueApi::set_configuration(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeLinkDeviceId,
-            TransmitQueueConfiguration::Fifo,
-        );
+        ctx.transmit_queue_api()
+            .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::Fifo);
 
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         let body = Buf::new(vec![0], ..);
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
-                &mut core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &FakeLinkDeviceId,
                 (),
                 body.clone(),
@@ -651,13 +520,10 @@ mod tests {
 
         core_ctx.get_mut().device_not_ready = true;
         assert_eq!(
-            TransmitQueueApi::transmit_queued_frames(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &FakeLinkDeviceId,
-            ),
+            ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId,),
             Err(DeviceSendFrameError::DeviceNotReady(())),
         );
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.get_mut().transmitted_packets, []);
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
             bindings_ctx.state();
@@ -671,13 +537,10 @@ mod tests {
 
         core_ctx.get_mut().device_not_ready = false;
         assert_eq!(
-            TransmitQueueApi::transmit_queued_frames(
-                &mut core_ctx,
-                &mut bindings_ctx,
-                &FakeLinkDeviceId,
-            ),
+            ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId,),
             Ok(WorkQueueReport::AllDone),
         );
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(bindings_ctx.state().woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut core_ctx.get_mut().transmitted_packets), [body]);
     }
@@ -685,21 +548,17 @@ mod tests {
     #[test_case(true; "device not ready")]
     #[test_case(false; "device ready")]
     fn drain_before_noqueue(device_not_ready: bool) {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::default());
 
-        TransmitQueueApi::set_configuration(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeLinkDeviceId,
-            TransmitQueueConfiguration::Fifo,
-        );
+        ctx.transmit_queue_api()
+            .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::Fifo);
 
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         let body = Buf::new(vec![0], ..);
         assert_eq!(
             TransmitQueueHandler::queue_tx_frame(
-                &mut core_ctx,
-                &mut bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 &FakeLinkDeviceId,
                 (),
                 body.clone(),
@@ -713,12 +572,10 @@ mod tests {
         assert_eq!(core_ctx.get_mut().transmitted_packets, []);
 
         core_ctx.get_mut().device_not_ready = device_not_ready;
-        TransmitQueueApi::set_configuration(
-            &mut core_ctx,
-            &mut bindings_ctx,
-            &FakeLinkDeviceId,
-            TransmitQueueConfiguration::None,
-        );
+        ctx.transmit_queue_api()
+            .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::None);
+
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
             bindings_ctx.state();
         assert_eq!(woken_tx_tasks, &[]);

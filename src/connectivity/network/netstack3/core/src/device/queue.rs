@@ -4,9 +4,10 @@
 
 //! Device queues.
 
+pub(crate) mod api;
 mod fifo;
-pub(super) mod rx;
-pub mod tx;
+pub(crate) mod rx;
+pub(crate) mod tx;
 
 use alloc::collections::VecDeque;
 use core::convert::From;
@@ -30,7 +31,7 @@ pub(crate) enum TransmitQueueFrameError<S> {
 }
 
 /// The state used to dequeue and handle frames from the device queue.
-pub(crate) struct DequeueState<Meta, Buffer> {
+pub struct DequeueState<Meta, Buffer> {
     dequeued_frames: VecDeque<(Meta, Buffer)>,
 }
 

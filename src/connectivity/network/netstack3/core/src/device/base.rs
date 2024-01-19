@@ -30,11 +30,7 @@ use crate::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
             StrongId, WeakId,
         },
-        loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
-        queue::{
-            rx::ReceiveQueueApi,
-            tx::{TransmitQueueApi, TransmitQueueConfiguration},
-        },
+        loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
         socket::{self, HeldSockets},
         state::DeviceStateSpec,
     },
@@ -54,7 +50,6 @@ use crate::{
         types::RawMetric,
     },
     sync::RwLock,
-    work_queue::WorkQueueReport,
     BindingsContext, CoreCtx, StackState, SyncCtx,
 };
 
@@ -554,71 +549,6 @@ pub enum DeviceSendFrameError<T> {
     DeviceNotReady(T),
 }
 
-/// Sets the TX queue configuration for a device.
-pub fn set_tx_queue_configuration<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    config: TransmitQueueConfiguration,
-) {
-    let core_ctx = &mut CoreCtx::new_deprecated(core_ctx);
-    match device {
-        DeviceId::Ethernet(id) => TransmitQueueApi::<_, _, EthernetLinkDevice>::set_configuration(
-            core_ctx,
-            bindings_ctx,
-            id,
-            config,
-        ),
-        DeviceId::Loopback(id) => TransmitQueueApi::<_, _, LoopbackDevice>::set_configuration(
-            core_ctx,
-            bindings_ctx,
-            id,
-            config,
-        ),
-    }
-}
-
-/// Does the work of transmitting frames for a device.
-pub fn transmit_queued_tx_frames<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
-    let core_ctx = &mut CoreCtx::new_deprecated(core_ctx);
-    match device {
-        DeviceId::Ethernet(id) => {
-            TransmitQueueApi::<_, _, EthernetLinkDevice>::transmit_queued_frames(
-                core_ctx,
-                bindings_ctx,
-                id,
-            )
-        }
-        DeviceId::Loopback(id) => TransmitQueueApi::<_, _, LoopbackDevice>::transmit_queued_frames(
-            core_ctx,
-            bindings_ctx,
-            id,
-        ),
-    }
-}
-
-/// Handle a batch of queued RX packets for the device.
-///
-/// If packets remain in the RX queue after a batch of RX packets has been
-/// handled, the RX task will be scheduled to run again so the next batch of
-/// RX packets may be handled. See [`DeviceLayerEventDispatcher::wake_rx_task`]
-/// for more details.
-pub fn handle_queued_rx_packets<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &LoopbackDeviceId<BC>,
-) -> WorkQueueReport {
-    ReceiveQueueApi::<_, _, LoopbackDevice>::handle_queued_rx_frames(
-        &mut CoreCtx::new_deprecated(core_ctx),
-        bindings_ctx,
-        device,
-    )
-}
-
 /// Set the promiscuous mode flag on `device`.
 // TODO(rheacock): remove `allow(dead_code)` when this is used.
 #[allow(dead_code)]
@@ -1038,7 +968,8 @@ mod tests {
         context::testutil::FakeInstant,
         device::{
             ethernet::{EthernetCreationProperties, MaxEthernetFrameSize},
-            loopback::LoopbackCreationProperties,
+            loopback::{LoopbackCreationProperties, LoopbackDevice},
+            queue::tx::TransmitQueueConfiguration,
         },
         error,
         ip::device::{
@@ -1047,6 +978,7 @@ mod tests {
             IpDeviceConfigurationUpdate,
         },
         testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
+        work_queue::WorkQueueReport,
     };
 
     #[test]
@@ -1241,16 +1173,21 @@ mod tests {
     ) {
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = add_device(&mut ctx);
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
         if with_tx_queue {
-            crate::device::set_tx_queue_configuration(
-                core_ctx,
-                bindings_ctx,
-                &device,
-                TransmitQueueConfiguration::Fifo,
-            );
+            match &device {
+                DeviceId::Ethernet(device) => ctx
+                    .core_api()
+                    .transmit_queue::<EthernetLinkDevice>()
+                    .set_configuration(device, TransmitQueueConfiguration::Fifo),
+                DeviceId::Loopback(device) => ctx
+                    .core_api()
+                    .transmit_queue::<LoopbackDevice>()
+                    .set_configuration(device, TransmitQueueConfiguration::Fifo),
+            }
         }
+
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
         let _: Ipv6DeviceConfigurationUpdate = crate::device::testutil::update_ipv6_configuration(
             core_ctx,
@@ -1281,14 +1218,20 @@ mod tests {
                 core::mem::take(&mut bindings_ctx.state_mut().tx_available),
                 [device.clone()]
             );
-            assert_eq!(
-                crate::device::transmit_queued_tx_frames(core_ctx, bindings_ctx, &device),
-                Ok(WorkQueueReport::AllDone)
-            );
+            let result = match &device {
+                DeviceId::Ethernet(device) => ctx
+                    .core_api()
+                    .transmit_queue::<EthernetLinkDevice>()
+                    .transmit_queued_frames(device),
+                DeviceId::Loopback(device) => {
+                    ctx.core_api().transmit_queue::<LoopbackDevice>().transmit_queued_frames(device)
+                }
+            };
+            assert_eq!(result, Ok(WorkQueueReport::AllDone));
         }
 
-        check_transmitted(bindings_ctx, &device, 1);
-        assert_eq!(bindings_ctx.state_mut().tx_available, <[DeviceId::<_>; 0]>::default());
+        check_transmitted(&mut ctx.bindings_ctx, &device, 1);
+        assert_eq!(ctx.bindings_ctx.state_mut().tx_available, <[DeviceId::<_>; 0]>::default());
         for_any_device_id!(
             DeviceId,
             device,

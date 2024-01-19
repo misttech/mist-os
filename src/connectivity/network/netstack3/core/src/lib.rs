@@ -70,9 +70,8 @@ pub mod device {
     // objects.
     pub use base::{
         add_ip_addr_subnet, del_ip_addr, get_all_ip_addr_subnets, get_ipv4_configuration_and_flags,
-        get_ipv6_configuration_and_flags, get_routing_metric, handle_queued_rx_packets,
-        inspect_devices, new_ipv4_configuration_update, new_ipv6_configuration_update,
-        set_ip_addr_properties, set_tx_queue_configuration, transmit_queued_tx_frames,
+        get_ipv6_configuration_and_flags, get_routing_metric, inspect_devices,
+        new_ipv4_configuration_update, new_ipv6_configuration_update, set_ip_addr_properties,
     };
     pub use config::{get_device_configuration, new_device_configuration_update};
 
