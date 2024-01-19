@@ -8,12 +8,12 @@
 
 DriverLoggerHarness::~DriverLoggerHarness() {}
 
-class DriverLoggerHarnessDFv1 : public DriverLoggerHarness {
+class DriverLoggerHarnessStub : public DriverLoggerHarness {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher test_env_dispatcher_ = runtime_.StartBackgroundDispatcher();
 };
 
 // static
 std::unique_ptr<DriverLoggerHarness> DriverLoggerHarness::Create() {
-  return std::make_unique<DriverLoggerHarnessDFv1>();
+  return std::make_unique<DriverLoggerHarnessStub>();
 }

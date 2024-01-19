@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],

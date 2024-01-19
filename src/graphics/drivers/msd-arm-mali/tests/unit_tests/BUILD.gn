@@ -60,7 +60,7 @@ source_set("common_non_hardware_tests") {
 source_set("tests_not_requiring_hardware") {
   testonly = true
 
-  sources = [ "driver_logger_harness_dfv1.cc" ]
+  sources = [ "driver_logger_harness_stub.cc" ]
 
   deps = [
     ":common_non_hardware_tests",
@@ -73,11 +73,11 @@ source_set("tests_not_requiring_hardware") {
   ]
 }
 
-executable("msd_arm_mali_dfv2_tests") {
+executable("msd_arm_mali_lifecycle_tests") {
   testonly = true
   sources = [
-    "dfv2_tests.cc",
     "driver_logger_harness_dfv2.cc",
+    "lifecycle_tests.cc",
   ]
   deps = [
     ":common_non_hardware_tests",
@@ -88,7 +88,7 @@ executable("msd_arm_mali_dfv2_tests") {
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-resource",
-    "//src/graphics/drivers/msd-arm-mali:msd_arm_entry_dfv2",
+    "//src/graphics/drivers/msd-arm-mali:msd_arm_entry",
     "//src/graphics/drivers/msd-arm-mali/src",
     "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",
     "//src/lib/fxl/test:gtest_main",

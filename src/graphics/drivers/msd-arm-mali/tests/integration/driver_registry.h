@@ -40,8 +40,8 @@ class RegisteredTestDriver {
   }
 
   // TODO(https://fxbug.dev/124976): Unify rebind and production drivers.
-  const char* GetRebindDriverSuffix() { return "msd_arm_rebind_dfv2.cm"; }
-  const char* GetTestDriverSuffix() { return "msd_arm_test_dfv2.cm"; }
+  const char* GetRebindDriverSuffix() { return "msd_arm_rebind.cm"; }
+  const char* GetTestDriverSuffix() { return "msd_arm_test.cm"; }
 
   std::optional<std::string> GetParentTopologicalPath() {
     // TODO(https://fxbug.dev/127515): Avoid hardcoding this path.

@@ -16,7 +16,7 @@ group("tests") {
 group("nonhardware_tests") {
   testonly = true
   deps = [
-    ":msd_arm_mali_dfv2_tests",
+    ":msd_arm_mali_lifecycle_tests",
     ":msd_arm_mali_nonhardware_tests",
   ]
 }
@@ -49,10 +49,10 @@ group("arm_mali_include_shard") {
   data_deps = [ "//sdk/lib/syslog:client_includes" ]
 }
 
-fuchsia_unittest_package("msd_arm_mali_dfv2_tests") {
+fuchsia_unittest_package("msd_arm_mali_lifecycle_tests") {
   deps = [
     ":arm_mali_include_shard",
-    "unit_tests:msd_arm_mali_dfv2_tests",
+    "unit_tests:msd_arm_mali_lifecycle_tests",
   ]
 
   # Assert that the syslog include shard is included so that we fail at build time
@@ -68,8 +68,8 @@ fuchsia_unittest_package("msd_arm_mali_dfv2_tests") {
 
 fuchsia_unittest_package("msd-arm-mali-integration-tests") {
   deps = [
-    "..:msd_arm_rebind_dfv2",
-    "..:msd_arm_test_dfv2",
+    "..:msd_arm_rebind",
+    "..:msd_arm_test",
     "integration",
     "//src/graphics/magma/tests/unit_tests:test_firmware",
   ]
