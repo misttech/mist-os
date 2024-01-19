@@ -23,12 +23,8 @@ fidl("fuchsia.power.broker") {
   ]
 }
 
-group("power-broker") {
-  testonly = true
-  deps = [
-    ":package",
-    ":tests",
-  ]
+group("broker") {
+  deps = [ ":package" ]
 }
 
 group("tests") {

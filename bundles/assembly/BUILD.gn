@@ -2355,6 +2355,11 @@ assembly_input_bundle("pkgfs_disable_executability_restrictions") {
       [ "//src/sys/pkg/bin/pkg-cache:disable-executability-restrictions" ]
 }
 
+# AIB to enable Power Broker.
+assembly_input_bundle("power_broker") {
+  base_packages = [ "//src/power/broker" ]
+}
+
 # AIB to enable virtualization support.
 #
 # optional: product must specify its inclusion
