@@ -67,6 +67,11 @@ local_repository(
     path = "third_party/bazel_rules_python",
 )
 
+local_repository(
+    name = "rules_proto",
+    path = "third_party/bazel_rules_proto",
+)
+
 # The repository containing common definitions for the Fuchsia platform build
 # and the Fuchsia Bazel SDK rules.
 local_repository(

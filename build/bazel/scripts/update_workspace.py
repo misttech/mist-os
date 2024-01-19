@@ -762,6 +762,12 @@ block *
 # Enable BlzMod, i.e. support for MODULE.bazel files.
 common --experimental_enable_bzlmod
 """
+    else:
+        bazelrc_content += """
+# Disable BzlMod, i.e. support for MODULE.bazel files, now that Bazel 7.0
+# enables BzlMod by default.
+common --enable_bzlmod=false
+"""
     generated.add_file(os.path.join("workspace", ".bazelrc"), bazelrc_content)
 
     # Create a symlink to the GN-generated file that will contain the list

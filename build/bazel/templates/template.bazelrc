@@ -49,6 +49,10 @@ common --experimental_workspace_rules_log_file={log_file}
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config={config_file}
 
+# TODO(http://b/319377689#comment5): Remove this flag when the linked issue is
+# fixed upstream.
+build --sandbox_add_mount_pair=/tmp
+
 # Disable verbose Bazel output with --config=quiet
 # Note that --show_result=0 is not supported by `bazel query`.
 common:quiet --noshow_loading_progress

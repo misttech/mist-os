@@ -95,6 +95,16 @@ local_path_override(
     path = "third_party/bazel_rules_go",
 )
 
+bazel_dep(
+    name = "rules_proto",
+    version = "",
+)
+
+local_path_override(
+    module_name = "rules_proto",
+    path = "third_party/bazel_rules_proto",
+)
+
 # NOTE: The following repository exists only to bootstrap other repositories
 # (eg: cipd, clang, fuchsia sdk).
 # Once @fuchsia_sdk is initialized, it should be used whenever possible.
