@@ -357,7 +357,7 @@ Text in double asterisks (`**`) or underscores (`__`) provides a bold style to s
 ## Escaping
 
 Certain characters are reserved syntax in Markdown. To use a special character,
-use a backslash escape (`\`) to display the following literal characters:
+use a backslash escape (**\\**) to display the following literal characters:
 
 ```none {:.devsite-disable-click-to-copy}
 \   backslash
