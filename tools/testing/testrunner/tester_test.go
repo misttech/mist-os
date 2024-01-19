@@ -426,8 +426,7 @@ func TestFFXTester(t *testing.T) {
 				outcome = ffxutil.TestNotStarted
 			}
 			ffx := &ffxutil.MockFFXInstance{TestOutcome: outcome}
-			localOutputDir := t.TempDir()
-			tester, err := NewFFXTester(context.Background(), ffx, sshTester, localOutputDir, c.experimentLevel)
+			tester, err := NewFFXTester(context.Background(), ffx, sshTester, t.TempDir(), c.experimentLevel)
 			if err != nil {
 				t.Fatalf("NewFFXTester got unexpected error: %s", err)
 			}
@@ -490,10 +489,6 @@ func TestFFXTester(t *testing.T) {
 			}
 
 			if tester.EnabledForTesting() {
-				// Write the early-boot profiles so EnsureSinks() can find them.
-				if _, err := ffx.WriteRunResult(build.TestList{}, filepath.Join(localOutputDir, "early-boot-profiles")); err != nil {
-					t.Errorf("failed to write early-boot profiles: %s", err)
-				}
 				// Call EnsureSinks() for v2 tests to set the copier.remoteDir to the data output dir for v2 tests.
 				// v1 tests will already have set the appropriate remoteDir value within Test().
 				outputs := &TestOutputs{OutDir: t.TempDir()}

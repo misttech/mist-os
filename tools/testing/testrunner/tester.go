@@ -774,29 +774,30 @@ func (t *FFXTester) Close() error {
 }
 
 func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkReference, outputs *TestOutputs) error {
-	useFFXEarlyBoot := t.experimentLevel >= 1
 	if !t.EnabledForTesting() {
-		if useFFXEarlyBoot {
-			if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok {
-				sshTester.IgnoreEarlyBoot()
-			}
-		}
-		if err := t.sshTester.EnsureSinks(ctx, sinks, outputs); err != nil {
-			return err
-		}
-		if !useFFXEarlyBoot {
-			return nil
-		}
+		return t.sshTester.EnsureSinks(ctx, sinks, outputs)
 	}
 	sinksPerTest := make(map[string]runtests.DataSinkReference)
 	for _, testOutDir := range t.testOutDirs {
-		if err := t.getSinks(ctx, testOutDir, sinksPerTest, useFFXEarlyBoot); err != nil {
+		runResult, err := ffxutil.GetRunResult(testOutDir)
+		if err != nil {
 			return err
 		}
-	}
-	if useFFXEarlyBoot {
-		if err := t.getEarlyBootProfiles(ctx, sinksPerTest); err != nil {
-			return err
+		runArtifactDir := filepath.Join(testOutDir, runResult.ArtifactDir)
+		seen := make(map[string]struct{})
+		startTime := clock.Now(ctx)
+		// The runResult's artifacts should contain a directory with the profiles from
+		// component v2 tests along with a summary.json that lists the data sinks per test.
+		// It should also contain a second directory with early boot data sinks.
+		for artifact := range runResult.Artifacts {
+			artifactPath := filepath.Join(runArtifactDir, artifact)
+			if err := t.getSinks(artifactPath, sinksPerTest, seen); err != nil {
+				return err
+			}
+		}
+		copyDuration := clock.Now(ctx).Sub(startTime)
+		if len(seen) > 0 {
+			logger.Debugf(ctx, "copied %d data sinks in %s", len(seen), copyDuration)
 		}
 	}
 	// If there were early boot sinks, record the "early_boot_sinks" test in the outputs
@@ -811,67 +812,48 @@ func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkRe
 	if len(sinksPerTest) > 0 {
 		outputs.updateDataSinks(sinksPerTest, "v2")
 	}
-	// Copy v1 sinks using the sshTester if ffx was used for testing.
-	if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok && t.EnabledForTesting() {
+	// Copy v1 sinks.
+	if sshTester, ok := t.sshTester.(*FuchsiaSSHTester); ok {
 		return sshTester.copySinks(ctx, sinks, t.localOutputDir)
 	}
 	return nil
 }
 
-func (t *FFXTester) getEarlyBootProfiles(ctx context.Context, sinksPerTest map[string]runtests.DataSinkReference) error {
-	testOutDir := filepath.Join(t.localOutputDir, "early-boot-profiles")
-	if err := os.MkdirAll(testOutDir, os.ModePerm); err != nil {
-		return err
-	}
-	if err := t.ffx.RunWithTarget(ctx, "test", "early-boot-profile", "--output-directory", testOutDir); err != nil {
-		return err
-	}
-	return t.getSinks(ctx, testOutDir, sinksPerTest, false)
-}
-
-func (t *FFXTester) getSinks(ctx context.Context, testOutDir string, sinksPerTest map[string]runtests.DataSinkReference, ignoreEarlyBoot bool) error {
-	runResult, err := ffxutil.GetRunResult(testOutDir)
-	if err != nil {
-		return err
-	}
-	runArtifactDir := filepath.Join(testOutDir, runResult.ArtifactDir)
-	seen := make(map[string]struct{})
-	startTime := clock.Now(ctx)
-	// The runResult's artifacts should contain a directory with the profiles from
-	// component v2 tests along with a summary.json that lists the data sinks per test.
-	// It should also contain a second directory with early boot data sinks.
-	for artifact := range runResult.Artifacts {
-		artifactPath := filepath.Join(runArtifactDir, artifact)
-		if err := t.getSinksFromArtifactDir(ctx, artifactPath, sinksPerTest, seen, ignoreEarlyBoot); err != nil {
+func (t *FFXTester) getSinks(artifactDir string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
+	return filepath.WalkDir(artifactDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
 			return err
 		}
-	}
-	copyDuration := clock.Now(ctx).Sub(startTime)
-	if len(seen) > 0 {
-		logger.Debugf(ctx, "copied %d data sinks in %s", len(seen), copyDuration)
-	}
-	return nil
-}
+		// If the path is a directory, check for the summary.json and copy all
+		// profiles to the localOutputDir. If the directory does not have a
+		// summary.json, that means it doesn't contain profile artifacts, so ignore
+		// it.
+		if d.IsDir() {
+			summaryPath := filepath.Join(path, runtests.TestSummaryFilename)
+			f, err := os.Open(summaryPath)
+			if os.IsNotExist(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			defer f.Close()
 
-func (t *FFXTester) getSinksFromArtifactDir(ctx context.Context, artifactDir string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}, ignoreEarlyBoot bool) error {
-	summaryPath := filepath.Join(artifactDir, runtests.TestSummaryFilename)
-	f, err := os.Open(summaryPath)
-	if os.IsNotExist(err) {
-		if ignoreEarlyBoot {
-			return nil
+			var summary runtests.TestSummary
+			if err = json.NewDecoder(f).Decode(&summary); err != nil {
+				return fmt.Errorf("failed to read test summary from %q: %w", summaryPath, err)
+			}
+			if err := t.getSinksPerTest(path, summary, sinksPerTest, seen); err != nil {
+				return err
+			}
+			return filepath.SkipDir
 		}
-		return t.getEarlyBootSinks(ctx, artifactDir, sinksPerTest, seen)
-	}
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	var summary runtests.TestSummary
-	if err = json.NewDecoder(f).Decode(&summary); err != nil {
-		return fmt.Errorf("failed to read test summary from %q: %w", summaryPath, err)
-	}
-	return t.getSinksPerTest(artifactDir, summary, sinksPerTest, seen)
+		// Else, if the path is a .profraw file, then it must be an early boot profile.
+		if filepath.Ext(path) == ".profraw" {
+			return t.getEarlyBootSink(path, sinksPerTest, seen)
+		}
+		return nil
+	})
 }
 
 // getSinksPerTest moves sinks from sinkDir to the localOutputDir and records
@@ -897,48 +879,28 @@ func (t *FFXTester) getSinksPerTest(sinkDir string, summary runtests.TestSummary
 	return nil
 }
 
-// getEarlyBootSinks moves the early boot sinks to the localOutputDir and records it with
+// getEarlyBootSink moves the early boot sink to the localOutputDir and records it with
 // an "early_boot_sinks" test in sinksPerTest.
-func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
-	return filepath.WalkDir(sinkDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
+func (t *FFXTester) getEarlyBootSink(path string, sinksPerTest map[string]runtests.DataSinkReference, seen map[string]struct{}) error {
+	sinkFile := filepath.Base(path)
+	if _, ok := seen[path]; !ok {
+		newPath := filepath.Join(t.localOutputDir, "v2", sinkFile)
+		if err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm); err != nil {
 			return err
 		}
-		// TODO(https://fxbug.dev/132081): Remove hardcoded check for logs once they
-		// are moved to a separate location.
-		if d.IsDir() || filepath.Ext(path) == ".log" {
-			return nil
-		}
-		// Record the file as an early boot profile.
-		sinkFile, err := filepath.Rel(sinkDir, path)
-		if err != nil {
+		if err := os.Rename(path, newPath); err != nil {
 			return err
 		}
-		if _, ok := seen[path]; !ok {
-			newPath := filepath.Join(t.localOutputDir, "v2", sinkFile)
-			if err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm); err != nil {
-				return err
-			}
-			if err := os.Rename(path, newPath); err != nil {
-				return err
-			}
-			seen[path] = struct{}{}
-		}
-		earlyBootSinks, ok := sinksPerTest[earlyBootSinksTestName]
-		if !ok {
-			earlyBootSinks = runtests.DataSinkReference{Sinks: runtests.DataSinkMap{}}
-		}
-
-		// The directory under sinkDir is named after the type of sinks it contains.
-		sinkType := strings.Split(filepath.ToSlash(sinkFile), "/")[0]
-		if _, ok := earlyBootSinks.Sinks[sinkType]; !ok {
-			earlyBootSinks.Sinks[sinkType] = []runtests.DataSink{}
-		}
-		earlyBootSinks.Sinks[sinkType] = append(earlyBootSinks.Sinks[sinkType], runtests.DataSink{Name: sinkFile, File: sinkFile})
-
-		sinksPerTest[earlyBootSinksTestName] = earlyBootSinks
-		return nil
-	})
+		seen[path] = struct{}{}
+	}
+	earlyBootSinks, ok := sinksPerTest[earlyBootSinksTestName]
+	if !ok {
+		earlyBootSinks = runtests.DataSinkReference{Sinks: runtests.DataSinkMap{}}
+	}
+	// TODO(https://fxbug.dev/132081): Don't hardcode llvm-profile sink type.
+	earlyBootSinks.Sinks["llvm-profile"] = append(earlyBootSinks.Sinks["llvm-profile"], runtests.DataSink{Name: sinkFile, File: sinkFile})
+	sinksPerTest[earlyBootSinksTestName] = earlyBootSinks
+	return nil
 }
 
 func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error {
@@ -987,7 +949,6 @@ type FuchsiaSSHTester struct {
 	localOutputDir              string
 	connectionErrorRetryBackoff retry.Backoff
 	serialSocket                serialClient
-	ignoreEarlyBoot             bool
 }
 
 // NewFuchsiaSSHTester returns a FuchsiaSSHTester associated to a fuchsia
@@ -1158,14 +1119,6 @@ func (t *FuchsiaSSHTester) Test(ctx context.Context, test testsharder.Test, stdo
 	return testResult, nil
 }
 
-// IgnoreEarlyBoot should be called from the FFXTester if it uses
-// the FuchsiaSSHTester to run tests but wants to collect early
-// boot profiles separately using ffx instead of getting it using
-// the FuchsiaSSHTester's EnsureSinks() method.
-func (t *FuchsiaSSHTester) IgnoreEarlyBoot() {
-	t.ignoreEarlyBoot = true
-}
-
 func (t *FuchsiaSSHTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.DataSinkReference, outputs *TestOutputs) error {
 	// Collect v2 references.
 	v2Sinks, err := t.copier.GetReferences(dataOutputDirV2)
@@ -1182,9 +1135,6 @@ func (t *FuchsiaSSHTester) EnsureSinks(ctx context.Context, sinkRefs []runtests.
 			return err
 		}
 		outputs.updateDataSinks(v2Sinks, "v2")
-	}
-	if t.ignoreEarlyBoot {
-		return t.copySinks(ctx, sinkRefs, t.localOutputDir)
 	}
 	// Collect early boot coverage.
 	earlyBootSinks, err := t.copier.GetAllDataSinks(dataOutputDirEarlyBoot)
