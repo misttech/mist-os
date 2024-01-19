@@ -22,6 +22,7 @@
                 "fcntl.openat_openat64",
                 "fcntl.f_getlk",
                 "fcntl.f_getlk64",
+                "fcntl.vmsplice",
                 "fcntl.tee",
                 "fcntl.sync_file_range",
                 "fcntl.f_getlk_FOB64",

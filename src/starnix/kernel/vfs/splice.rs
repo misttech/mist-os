@@ -6,22 +6,15 @@ use crate::{
     mm::{MemoryAccessorExt, PAGE_SIZE},
     task::CurrentTask,
     vfs::{
-        buffers::{
-            UserBuffersInputBuffer, UserBuffersOutputBuffer, VecInputBuffer, VecOutputBuffer,
-        },
+        buffers::{VecInputBuffer, VecOutputBuffer},
         pipe::{Pipe, PipeFileObject, PipeOperands},
         FdNumber, FileHandle,
     },
 };
-use starnix_logging::not_implemented;
-use starnix_sync::{ordered_lock, Locked, MutexGuard, Unlocked};
+use starnix_logging::log_warn;
+use starnix_sync::{ordered_lock, MutexGuard};
 use starnix_uapi::{
-    errno, error,
-    errors::Errno,
-    off_t,
-    open_flags::OpenFlags,
-    uapi,
-    user_address::{UserAddress, UserRef},
+    errno, error, errors::Errno, off_t, open_flags::OpenFlags, uapi, user_address::UserRef,
     user_buffer::MAX_RW_COUNT,
 };
 
@@ -194,7 +187,7 @@ pub fn splice(
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
-        not_implemented!("splice flags", flags & !KNOWN_FLAGS);
+        log_warn!("Unexpected flag for splice: {:#x}", flags & !KNOWN_FLAGS);
         return error!(EINVAL);
     }
 
@@ -252,44 +245,6 @@ pub fn splice(
     Ok(spliced)
 }
 
-pub fn vmsplice(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    fd: FdNumber,
-    iovec_addr: UserAddress,
-    iovec_count: i32,
-    flags: u32,
-) -> Result<usize, Errno> {
-    const KNOWN_FLAGS: u32 =
-        uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
-    if flags & !KNOWN_FLAGS != 0 {
-        not_implemented!("vmsplice flags", flags & !KNOWN_FLAGS);
-        return error!(EINVAL);
-    }
-
-    let non_blocking = flags & uapi::SPLICE_F_NONBLOCK != 0;
-
-    let file = current_task.files.get(fd)?;
-    let should_write = file.can_write();
-    let should_read = file.can_read();
-
-    let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
-    let pipe = file.downcast_file::<PipeFileObject>().ok_or_else(|| errno!(EBADF))?;
-    let mut bytes_transferred = 0;
-
-    if should_write {
-        let mut in_data = UserBuffersInputBuffer::new(current_task, iovec.clone())?;
-        bytes_transferred += pipe.vmsplice_from(current_task, &file, &mut in_data, non_blocking)?;
-    }
-
-    if should_read {
-        let mut out_data = UserBuffersOutputBuffer::new(current_task, iovec)?;
-        bytes_transferred += pipe.vmsplice_to(current_task, &file, &mut out_data, non_blocking)?;
-    }
-
-    Ok(bytes_transferred)
-}
-
 pub fn tee(
     current_task: &CurrentTask,
     fd_in: FdNumber,
@@ -300,7 +255,7 @@ pub fn tee(
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
-        not_implemented!("tee flags", flags & !KNOWN_FLAGS);
+        log_warn!("Unexpected flag for tee: {:#x}", flags & !KNOWN_FLAGS);
         return error!(EINVAL);
     }
 

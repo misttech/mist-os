@@ -232,6 +232,10 @@
                 "utsname03_clone",
                 "vhangup01",
                 "vhangup02",
+                "vmsplice01",
+                "vmsplice02",
+                "vmsplice03",
+                "vmsplice04",
                 "waitid10",
                 "writetest01",
 

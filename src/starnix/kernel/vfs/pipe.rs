@@ -151,12 +151,11 @@ impl Pipe {
 
     /// Returns whether the pipe can accommodate at least part of a message of length `data_size`.
     fn is_writable(&self, data_size: usize) -> bool {
-        let available_capacity = self.messages.available_capacity();
         // POSIX requires that a write smaller than PIPE_BUF be atomic, but requires no
         // atomicity for writes larger than this.
         self.had_reader
-            && (available_capacity >= data_size
-                || (available_capacity > 0 && data_size > uapi::PIPE_BUF as usize))
+            && (self.messages.available_capacity() >= data_size
+                || data_size > uapi::PIPE_BUF as usize)
     }
 
     pub fn read(&mut self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
@@ -781,70 +780,6 @@ impl PipeFileObject {
         let len = std::cmp::min(len, pipe.messages.len());
         let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
         to.write_raw(current_task, offset.unwrap_or(0), &mut buffer)
-    }
-
-    /// Copy data from the given input buffer into the pipe.
-    ///
-    /// Returns the number of bytes transferred.
-    pub fn vmsplice_from(
-        &self,
-        current_task: &CurrentTask,
-        self_file: &FileHandle,
-        data: &mut dyn InputBuffer,
-        non_blocking: bool,
-    ) -> Result<usize, Errno> {
-        let data_len = data.available();
-        let mut pipe =
-            self.lock_pipe_for_writing(current_task, self_file, non_blocking, data_len)?;
-        let mut available = std::cmp::min(data_len, pipe.messages.available_capacity());
-
-        let bytes_transferred = data.read_each(&mut |bytes| {
-            let actual = std::cmp::min(bytes.len(), available);
-            pipe.messages.write_message(bytes[0..actual].to_vec().into());
-            pipe.notify_write();
-            available -= actual;
-            Ok(actual)
-        })?;
-        Ok(bytes_transferred)
-    }
-
-    /// Copy data from the pipe to the given output buffer.
-    ///
-    /// Returns the number of bytes transferred.
-    pub fn vmsplice_to(
-        &self,
-        current_task: &CurrentTask,
-        self_file: &FileHandle,
-        data: &mut dyn OutputBuffer,
-        non_blocking: bool,
-    ) -> Result<usize, Errno> {
-        let data_len = data.available();
-        let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
-        let mut available = std::cmp::min(data_len, pipe.messages.len());
-
-        let mut bytes_transferred = 0;
-        while let Some(mut message) = pipe.messages.read_message() {
-            let requested = std::cmp::min(available, message.data.len());
-            let actual = match data.write(&message.data.bytes()[0..requested]) {
-                Ok(actual) => actual,
-                Err(e) => {
-                    pipe.messages.write_front(message);
-                    return Err(e);
-                }
-            };
-            assert_eq!(actual, requested);
-            if let Some(data) = message.data.split_off(actual) {
-                // Some data is left in the message. Push it back.
-                pipe.messages.write_front(data.into());
-            }
-            bytes_transferred += actual;
-            available -= actual;
-            if available == 0 {
-                pipe.notify_read();
-                return Ok(bytes_transferred);
-            }
-        }
-        panic!();
     }
 
     /// Obtain the pipe objects from the given file handles, if they are both pipes.
