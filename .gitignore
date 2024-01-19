@@ -192,3 +192,6 @@ reproxy-gomaip.cache*
 # Local test coverage file.
 lcov.info
 .coverage
+
+# Mypy Type Checker extension
+/.mypy_cache
