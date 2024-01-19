@@ -31,13 +31,13 @@ impl PowerManager {
     }
 
     pub fn suspend_states(&self) -> HashSet<SuspendState> {
-        // TODO(b/303507442): Gets the real supported states via SGA (System Activity Governor)
+        // TODO(b/303507442): Gets the real supported states via SAG (System Activity Governor)
         // fidl api.
         HashSet::from([SuspendState::Ram, SuspendState::Idle])
     }
 
     pub fn suspend(&self, _state: SuspendState) -> Result<(), Errno> {
-        // TODO(b/303507442): Execute ops of suspend state transition via SGA suspend fidl api.
+        // TODO(b/303507442): Execute ops of suspend state transition via SAG suspend fidl api.
         // Temporary hack to trigger system suspend directly.
         let resume_at = zx::Time::after(zx::Duration::from_seconds(5));
         zx::Status::ok(unsafe {
