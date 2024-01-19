@@ -71,7 +71,7 @@ use crate::{
         icmp::NdpCounters,
     },
     sync::{Mutex, RwLock},
-    trace_duration, BindingsContext, CoreCtx, Instant, TracingContext,
+    trace_duration, BindingsContext, BindingsTypes, CoreCtx, Instant, TracingContext,
 };
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
@@ -566,8 +566,8 @@ impl<II: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>> EthernetDeviceS
     }
 }
 
-impl<BC: BindingsContext, I: Ip> RwLockFor<crate::lock_ordering::NudConfig<I>>
-    for IpLinkDeviceState<EthernetLinkDevice, BC>
+impl<BT: BindingsTypes, I: Ip> RwLockFor<crate::lock_ordering::NudConfig<I>>
+    for IpLinkDeviceState<EthernetLinkDevice, BT>
 {
     type Data = NudUserConfig;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, NudUserConfig>

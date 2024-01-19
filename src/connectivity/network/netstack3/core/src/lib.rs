@@ -73,7 +73,6 @@ pub mod device {
         get_ipv6_configuration_and_flags, get_routing_metric, inspect_devices,
         new_ipv4_configuration_update, new_ipv6_configuration_update, set_ip_addr_properties,
     };
-    pub use config::{get_device_configuration, new_device_configuration_update};
 
     // Re-exported types.
     pub use api::{RemoveDeviceResult, RemoveDeviceResultWithContext};

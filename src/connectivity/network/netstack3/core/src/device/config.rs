@@ -4,13 +4,11 @@
 
 //! Device link layer configuration types.
 
-use lock_order::wrap::prelude::*;
-use net_types::ip::{Ipv4, Ipv6};
+use net_types::ip::Ip;
 
 use crate::{
-    device::{id::Id as _, DeviceId},
+    device::{Device, DeviceIdContext},
     ip::device::nud::{NudUserConfig, NudUserConfigUpdate},
-    BindingsContext, CoreCtx, SyncCtx,
 };
 
 /// Device ARP configuration.
@@ -77,95 +75,28 @@ pub enum DeviceConfigurationUpdateError {
     NdpNotSupported,
 }
 
-/// Pending device configuration update.
+/// A trait abstracting device configuration.
 ///
-/// Configuration is only applied when the `apply` method is called.
-pub struct PendingDeviceConfigurationUpdate<'a, D>(DeviceConfigurationUpdate, &'a D);
-
-impl<'a, BC> PendingDeviceConfigurationUpdate<'a, DeviceId<BC>>
-where
-    BC: BindingsContext,
-{
-    /// Applies the configuration and returns a [`DeviceConfigurationUpdate`]
-    /// with the previous values for all configurations for all `Some` fields.
+/// This trait allows the device API to perform device confiuration at the
+/// device layer.
+pub trait DeviceConfigurationContext<D: Device>: DeviceIdContext<D> {
+    /// Calls the callback with a mutable reference to the NUD user
+    /// configuration for IP version `I`.
     ///
-    /// Note that even if the previous value matched the requested value, it is
-    /// still populated in the returned `DeviceConfigurationUpdate`.
-    pub fn apply(self, core_ctx: &SyncCtx<BC>) -> DeviceConfigurationUpdate {
-        let Self(DeviceConfigurationUpdate { arp, ndp }, device_id) = self;
-        let eth = match device_id {
-            DeviceId::Loopback(_) => {
-                // Loopback currently doesn't support any configuration.
-                // Validation happens when we create a new pending configuration
-                // update we can assert the invariant here.
-                debug_assert!(arp.is_none());
-                debug_assert!(ndp.is_none());
-                return DeviceConfigurationUpdate::default();
-            }
-            DeviceId::Ethernet(eth) => eth,
-        };
-        crate::device::integration::with_device_state(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            eth,
-            |mut state| {
-                let arp = arp.map(|ArpConfigurationUpdate { nud }| {
-                    let nud = nud.map(|config| {
-                        config.apply_and_take_previous(
-                            &mut *state.write_lock::<crate::lock_ordering::NudConfig<Ipv4>>(),
-                        )
-                    });
-                    ArpConfigurationUpdate { nud }
-                });
-                let ndp = ndp.map(|NdpConfigurationUpdate { nud }| {
-                    let nud = nud.map(|config| {
-                        config.apply_and_take_previous(
-                            &mut *state.write_lock::<crate::lock_ordering::NudConfig<Ipv6>>(),
-                        )
-                    });
-                    NdpConfigurationUpdate { nud }
-                });
-                DeviceConfigurationUpdate { arp, ndp }
-            },
-        )
-    }
-}
+    /// If the device does not support NUD, the callback is called with `None`,
+    fn with_nud_config<I: Ip, O, F: FnOnce(Option<&NudUserConfig>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        f: F,
+    ) -> O;
 
-/// Creates a new device configuration update for the given device.
-pub fn new_device_configuration_update<BC: BindingsContext>(
-    device: &DeviceId<BC>,
-    config: DeviceConfigurationUpdate,
-) -> Result<PendingDeviceConfigurationUpdate<'_, DeviceId<BC>>, DeviceConfigurationUpdateError> {
-    let DeviceConfigurationUpdate { arp, ndp } = &config;
-    if device.is_loopback() {
-        if arp.is_some() {
-            return Err(DeviceConfigurationUpdateError::ArpNotSupported);
-        }
-        if ndp.is_some() {
-            return Err(DeviceConfigurationUpdateError::NdpNotSupported);
-        }
-    }
-    Ok(PendingDeviceConfigurationUpdate(config, device))
-}
-
-/// Returns a snapshot of the given device's configuration.
-pub fn get_device_configuration<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    device_id: &DeviceId<BC>,
-) -> DeviceConfiguration {
-    match device_id {
-        DeviceId::Loopback(_) => DeviceConfiguration { arp: None, ndp: None },
-        DeviceId::Ethernet(eth) => crate::device::integration::with_device_state(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            eth,
-            |mut state| {
-                let arp = Some(ArpConfiguration {
-                    nud: state.read_lock::<crate::lock_ordering::NudConfig<Ipv4>>().clone(),
-                });
-                let ndp = Some(NdpConfiguration {
-                    nud: state.read_lock::<crate::lock_ordering::NudConfig<Ipv6>>().clone(),
-                });
-                DeviceConfiguration { arp, ndp }
-            },
-        ),
-    }
+    /// Calls the callback with a mutable reference to the NUD user
+    /// configuration for IP version `I`.
+    ///
+    /// If the device does not support NUD, the callback is called with `None`,
+    fn with_nud_config_mut<I: Ip, O, F: FnOnce(Option<&mut NudUserConfig>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        f: F,
+    ) -> O;
 }

@@ -820,8 +820,8 @@ fn set_configuration(
     id: BindingId,
     config: fnet_interfaces_admin::Configuration,
 ) -> fnet_interfaces_admin::ControlSetConfigurationResult {
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-    let core_id = bindings_ctx
+    let core_id = ctx
+        .bindings_ctx()
         .devices
         .get_core_id(id)
         .expect("device lifetime should be tied to channel lifetime");
@@ -917,20 +917,23 @@ fn set_configuration(
                 fnet_interfaces_admin::ControlSetConfigurationError::Ipv6ForwardingUnsupported
             }
         })?;
-    let device_update = netstack3_core::device::new_device_configuration_update(
-        &core_id,
-        DeviceConfigurationUpdate { arp, ndp },
-    )
-    .map_err(|e| match e {
-        DeviceConfigurationUpdateError::ArpNotSupported => {
-            fnet_interfaces_admin::ControlSetConfigurationError::ArpNotSupported
-        }
-        DeviceConfigurationUpdateError::NdpNotSupported => {
-            fnet_interfaces_admin::ControlSetConfigurationError::NdpNotSupported
-        }
-    })?;
+    let device_update = ctx
+        .api()
+        .device_any()
+        .new_configuration_update(&core_id, DeviceConfigurationUpdate { arp, ndp })
+        .map_err(|e| match e {
+            DeviceConfigurationUpdateError::ArpNotSupported => {
+                fnet_interfaces_admin::ControlSetConfigurationError::ArpNotSupported
+            }
+            DeviceConfigurationUpdateError::NdpNotSupported => {
+                fnet_interfaces_admin::ControlSetConfigurationError::NdpNotSupported
+            }
+        })?;
 
-    let DeviceConfigurationUpdate { arp, ndp } = device_update.apply(core_ctx);
+    let DeviceConfigurationUpdate { arp, ndp } =
+        ctx.api().device_any().apply_configuration(device_update);
+
+    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
 
     // Apply both updates now that we have checked for errors and get the deltas
     // back. If we didn't apply updates, use the default struct to construct the
@@ -986,15 +989,15 @@ fn set_configuration(
 
 /// Returns the configuration used for the interface with the given `id`.
 fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Configuration {
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-    let core_id = bindings_ctx
+    let core_id = ctx
+        .bindings_ctx()
         .devices
         .get_core_id(id)
         .expect("device lifetime should be tied to channel lifetime");
 
-    let DeviceConfiguration { arp, ndp } =
-        netstack3_core::device::get_device_configuration(&core_ctx, &core_id);
+    let DeviceConfiguration { arp, ndp } = ctx.api().device_any().get_configuration(&core_id);
 
+    let core_ctx = ctx.core_ctx();
     fnet_interfaces_admin::Configuration {
         ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
             forwarding: Some(

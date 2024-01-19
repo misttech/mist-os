@@ -13,6 +13,14 @@ use tracing::debug;
 use crate::{
     context::{ContextPair, RecvFrameContext, ReferenceNotifiers},
     device::{
+        config::{
+            ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration,
+            DeviceConfigurationContext, DeviceConfigurationUpdate, DeviceConfigurationUpdateError,
+            NdpConfiguration, NdpConfigurationUpdate,
+        },
+        ethernet::EthernetLinkDevice,
+        for_any_device_id,
+        loopback::LoopbackDevice,
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
         AnyDevice, BaseDeviceId, BasePrimaryDeviceId, Device, DeviceCollectionContext, DeviceId,
         DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes, DeviceReceiveFrameSpec,
@@ -54,6 +62,16 @@ impl<R> RemoveDeviceResult<R, Never> {
 pub type RemoveDeviceResultWithContext<S, BT> =
     RemoveDeviceResult<S, <BT as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
 
+/// Pending device configuration update.
+///
+/// This type is a witness for a valid [`DeviceConfigurationUpdate`] for some
+/// device ID `D` and is obtained through
+/// [`DeviceApi::new_configuration_update`].
+///
+/// The configuration is only applied when [`DeviceApi::apply_configuration`] is
+/// called.
+pub struct PendingDeviceConfigurationUpdate<'a, D>(DeviceConfigurationUpdate, &'a D);
+
 /// The device API.
 pub struct DeviceApi<D, C>(C, PhantomData<D>);
 
@@ -67,18 +85,8 @@ impl<D, C> DeviceApi<D, C>
 where
     D: Device + DeviceStateSpec + DeviceReceiveFrameSpec,
     C: ContextPair,
-    C::CoreContext: DeviceIdContext<D, DeviceId = BaseDeviceId<D, C::BindingsContext>>
-        + OriginTrackerContext
-        + DeviceCollectionContext<D, C::BindingsContext>
-        + RecvFrameContext<C::BindingsContext, D::FrameMetadata<BaseDeviceId<D, C::BindingsContext>>>,
-    C::BindingsContext: DeviceLayerTypes + ReferenceNotifiers,
-    // Required to call into IP layer for cleanup on removal:
-    BaseDeviceId<D, C::BindingsContext>: Into<DeviceId<C::BindingsContext>>,
-    C::CoreContext: IpDeviceConfigurationContext<Ipv4, C::BindingsContext>
-        + Ipv6DeviceConfigurationContext<C::BindingsContext>
-        + DeviceIdContext<AnyDevice, DeviceId = DeviceId<C::BindingsContext>>,
-    C::BindingsContext: IpDeviceBindingsContext<Ipv4, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
-        + IpDeviceBindingsContext<Ipv6, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    C::CoreContext: DeviceApiCoreContext<D, C::BindingsContext>,
+    C::BindingsContext: DeviceApiBindingsContext,
 {
     pub(crate) fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
         let Self(pair, PhantomData) = self;
@@ -148,7 +156,16 @@ where
     pub fn remove_device(
         &mut self,
         device: BaseDeviceId<D, C::BindingsContext>,
-    ) -> RemoveDeviceResultWithContext<D::External<C::BindingsContext>, C::BindingsContext> {
+    ) -> RemoveDeviceResultWithContext<D::External<C::BindingsContext>, C::BindingsContext>
+    where
+        // Required to call into IP layer for cleanup on removal:
+        BaseDeviceId<D, C::BindingsContext>: Into<DeviceId<C::BindingsContext>>,
+        C::CoreContext: IpDeviceConfigurationContext<Ipv4, C::BindingsContext>
+            + Ipv6DeviceConfigurationContext<C::BindingsContext>
+            + DeviceIdContext<AnyDevice, DeviceId = DeviceId<C::BindingsContext>>,
+        C::BindingsContext: IpDeviceBindingsContext<Ipv4, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
+            + IpDeviceBindingsContext<Ipv6, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    {
         // Start cleaning up the device by disabling IP state. This removes timers
         // for the device that would otherwise hold references to defunct device
         // state.
@@ -189,4 +206,186 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.receive_frame(bindings_ctx, meta, frame)
     }
+
+    /// Applies the configuration and returns a [`DeviceConfigurationUpdate`]
+    /// with the previous values for all configurations for all `Some` fields.
+    ///
+    /// Note that even if the previous value matched the requested value, it is
+    /// still populated in the returned `DeviceConfigurationUpdate`.
+    pub fn apply_configuration(
+        &mut self,
+        pending: PendingDeviceConfigurationUpdate<'_, BaseDeviceId<D, C::BindingsContext>>,
+    ) -> DeviceConfigurationUpdate {
+        let PendingDeviceConfigurationUpdate(DeviceConfigurationUpdate { arp, ndp }, device_id) =
+            pending;
+        let core_ctx = self.core_ctx();
+        let arp = core_ctx.with_nud_config_mut::<Ipv4, _, _>(device_id, move |device_config| {
+            let device_config = match device_config {
+                Some(c) => c,
+                None => {
+                    // Can't set ARP configuration if device doesn't support it,
+                    // this is validated when creating the
+                    // `PendingDeviceConfigurationUpdate`.
+                    assert!(arp.is_none());
+                    return None;
+                }
+            };
+            arp.map(|ArpConfigurationUpdate { nud }| {
+                let nud = nud.map(|config| config.apply_and_take_previous(device_config));
+                ArpConfigurationUpdate { nud }
+            })
+        });
+        let ndp = core_ctx.with_nud_config_mut::<Ipv6, _, _>(device_id, move |device_config| {
+            let device_config = match device_config {
+                Some(c) => c,
+                None => {
+                    // Can't set NDP configuration if device doesn't support it,
+                    // this is validated when creating the
+                    // `PendingDeviceConfigurationUpdate`.
+                    assert!(ndp.is_none());
+                    return None;
+                }
+            };
+            ndp.map(|NdpConfigurationUpdate { nud }| {
+                let nud = nud.map(|config| config.apply_and_take_previous(device_config));
+                NdpConfigurationUpdate { nud }
+            })
+        });
+        DeviceConfigurationUpdate { arp, ndp }
+    }
+
+    /// Creates a new device configuration update for the given device.
+    ///
+    /// This method only validates that `config` is valid for `device`.
+    /// [`DeviceApi::apply`] must be called to apply the configuration.
+    pub fn new_configuration_update<'a>(
+        &mut self,
+        device: &'a BaseDeviceId<D, C::BindingsContext>,
+        config: DeviceConfigurationUpdate,
+    ) -> Result<
+        PendingDeviceConfigurationUpdate<'a, BaseDeviceId<D, C::BindingsContext>>,
+        DeviceConfigurationUpdateError,
+    > {
+        let core_ctx = self.core_ctx();
+        let DeviceConfigurationUpdate { arp, ndp } = &config;
+        if arp.is_some() && core_ctx.with_nud_config::<Ipv4, _, _>(device, |c| c.is_none()) {
+            return Err(DeviceConfigurationUpdateError::ArpNotSupported);
+        }
+        if ndp.is_some() && core_ctx.with_nud_config::<Ipv6, _, _>(device, |c| c.is_none()) {
+            return Err(DeviceConfigurationUpdateError::NdpNotSupported);
+        }
+        Ok(PendingDeviceConfigurationUpdate(config, device))
+    }
+
+    /// Returns a snapshot of the given device's configuration.
+    pub fn get_configuration(
+        &mut self,
+        device: &BaseDeviceId<D, C::BindingsContext>,
+    ) -> DeviceConfiguration {
+        let core_ctx = self.core_ctx();
+        let arp = core_ctx
+            .with_nud_config::<Ipv4, _, _>(device, |config| config.cloned())
+            .map(|nud| ArpConfiguration { nud });
+        let ndp = core_ctx
+            .with_nud_config::<Ipv6, _, _>(device, |config| config.cloned())
+            .map(|nud| NdpConfiguration { nud });
+        DeviceConfiguration { arp, ndp }
+    }
 }
+
+/// The device API interacting with any kind of supported device.
+pub struct DeviceAnyApi<C>(C);
+
+impl<C> DeviceAnyApi<C> {
+    pub(crate) fn new(ctx: C) -> Self {
+        Self(ctx)
+    }
+}
+
+impl<C> DeviceAnyApi<C>
+where
+    C: ContextPair,
+    C::CoreContext: DeviceApiCoreContext<EthernetLinkDevice, C::BindingsContext>
+        + DeviceApiCoreContext<LoopbackDevice, C::BindingsContext>,
+    C::BindingsContext: DeviceApiBindingsContext,
+{
+    fn device<D>(&mut self) -> DeviceApi<D, &mut C> {
+        let Self(pair) = self;
+        DeviceApi::new(pair)
+    }
+
+    /// Like [`DeviceApi::apply_configuration`] but for any device types.
+    pub fn apply_configuration(
+        &mut self,
+        pending: PendingDeviceConfigurationUpdate<'_, DeviceId<C::BindingsContext>>,
+    ) -> DeviceConfigurationUpdate {
+        let PendingDeviceConfigurationUpdate(config, device) = pending;
+        for_any_device_id!(DeviceId, device,
+            device => {
+                self.device().apply_configuration(PendingDeviceConfigurationUpdate(config, device))
+            }
+        )
+    }
+
+    /// Like [`DeviceApi::new_configuration_update`] but for any device
+    /// types.
+    pub fn new_configuration_update<'a>(
+        &mut self,
+        device: &'a DeviceId<C::BindingsContext>,
+        config: DeviceConfigurationUpdate,
+    ) -> Result<
+        PendingDeviceConfigurationUpdate<'a, DeviceId<C::BindingsContext>>,
+        DeviceConfigurationUpdateError,
+    > {
+        for_any_device_id!(DeviceId, device,
+            inner => {
+                self.device()
+                .new_configuration_update(inner, config)
+                .map(|PendingDeviceConfigurationUpdate(config, _)| {
+                    PendingDeviceConfigurationUpdate(config, device)
+                })
+            }
+        )
+    }
+
+    /// Like [`DeviceApi::get_configuration`] but for any device types.
+    pub fn get_configuration(
+        &mut self,
+        device: &DeviceId<C::BindingsContext>,
+    ) -> DeviceConfiguration {
+        for_any_device_id!(DeviceId, device,
+            device => self.device().get_configuration(device))
+    }
+}
+
+/// A marker trait for all the core context traits required to fulfill the
+/// [`DeviceApi`].
+pub trait DeviceApiCoreContext<
+    D: Device + DeviceStateSpec + DeviceReceiveFrameSpec,
+    BC: DeviceApiBindingsContext,
+>:
+    DeviceIdContext<D, DeviceId = BaseDeviceId<D, BC>>
+    + OriginTrackerContext
+    + DeviceCollectionContext<D, BC>
+    + DeviceConfigurationContext<D>
+    + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>
+{
+}
+
+impl<O, D, BC> DeviceApiCoreContext<D, BC> for O
+where
+    D: Device + DeviceStateSpec + DeviceReceiveFrameSpec,
+    BC: DeviceApiBindingsContext,
+    O: DeviceIdContext<D, DeviceId = BaseDeviceId<D, BC>>
+        + OriginTrackerContext
+        + DeviceCollectionContext<D, BC>
+        + DeviceConfigurationContext<D>
+        + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>,
+{
+}
+
+/// A marker trait for all the bindings context traits required to fulfill the
+/// [`DeviceApi`].
+pub trait DeviceApiBindingsContext: DeviceLayerTypes + ReferenceNotifiers {}
+
+impl<O> DeviceApiBindingsContext for O where O: DeviceLayerTypes + ReferenceNotifiers {}

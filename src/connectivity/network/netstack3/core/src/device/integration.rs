@@ -14,8 +14,8 @@ use lock_order::{
 };
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnet, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
-    MulticastAddr, SpecifiedAddr, Witness as _,
+    ip::{AddrSubnet, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
+    map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
@@ -23,6 +23,7 @@ use packet_formats::ethernet::EthernetIpExt;
 use crate::{
     context::{CoreCtxAndResource, CounterContext, Locked, RecvFrameContext, SendFrameContext},
     device::{
+        config::DeviceConfigurationContext,
         ethernet::{
             self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
         },
@@ -40,7 +41,9 @@ use crate::{
     error::{ExistsError, NotFoundError},
     ip::device::{
         integration::CoreCtxWithIpDeviceConfiguration,
-        nud::{ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler},
+        nud::{
+            ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
+        },
         state::{
             AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags, Ipv4AddressEntry,
             Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState,
@@ -930,14 +933,14 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>
 }
 
 pub(crate) fn with_device_state<
-    BC: BindingsContext,
+    BT: BindingsTypes,
     O,
-    F: FnOnce(Locked<&'_ IpLinkDeviceState<D, BC>, L>) -> O,
+    F: FnOnce(Locked<&'_ IpLinkDeviceState<D, BT>, L>) -> O,
     L,
     D: DeviceStateSpec,
 >(
-    core_ctx: &mut CoreCtx<'_, BC, L>,
-    device_id: &BaseDeviceId<D, BC>,
+    core_ctx: &mut CoreCtx<'_, BT, L>,
+    device_id: &BaseDeviceId<D, BT>,
     cb: F,
 ) -> O {
     with_device_state_and_core_ctx(core_ctx, device_id, |mut core_ctx_and_resource| {
@@ -946,14 +949,14 @@ pub(crate) fn with_device_state<
 }
 
 pub(crate) fn with_device_state_and_core_ctx<
-    BC: BindingsContext,
+    BT: BindingsTypes,
     O,
-    F: FnOnce(CoreCtxAndResource<'_, BC, IpLinkDeviceState<D, BC>, L>) -> O,
+    F: FnOnce(CoreCtxAndResource<'_, BT, IpLinkDeviceState<D, BT>, L>) -> O,
     L,
     D: DeviceStateSpec,
 >(
-    core_ctx: &mut CoreCtx<'_, BC, L>,
-    id: &BaseDeviceId<D, BC>,
+    core_ctx: &mut CoreCtx<'_, BT, L>,
+    id: &BaseDeviceId<D, BT>,
     cb: F,
 ) -> O {
     let state = id.device_state();
@@ -1146,5 +1149,69 @@ where
 impl<'a, BT: BindingsTypes, L> OriginTrackerContext for CoreCtx<'a, BT, L> {
     fn origin_tracker(&mut self) -> OriginTracker {
         self.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>().clone()
+    }
+}
+
+impl<'a, BT, L> DeviceConfigurationContext<EthernetLinkDevice> for CoreCtx<'a, BT, L>
+where
+    L: LockBefore<crate::lock_ordering::NudConfig<Ipv4>>
+        + LockBefore<crate::lock_ordering::NudConfig<Ipv6>>,
+    BT: BindingsTypes,
+{
+    fn with_nud_config<I: Ip, O, F: FnOnce(Option<&NudUserConfig>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        f: F,
+    ) -> O {
+        with_device_state(self, device_id, |state| {
+            // NB: We need map_ip here because we can't write a lock ordering
+            // restriction for all IP versions.
+            let IpInvariant(o) =
+                map_ip_twice!(I, IpInvariant((state, f)), |IpInvariant((mut state, f))| {
+                    IpInvariant(f(Some(&*state.read_lock::<crate::lock_ordering::NudConfig<I>>())))
+                });
+            o
+        })
+    }
+
+    fn with_nud_config_mut<I: Ip, O, F: FnOnce(Option<&mut NudUserConfig>) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        f: F,
+    ) -> O {
+        with_device_state(self, device_id, |state| {
+            // NB: We need map_ip here because we can't write a lock ordering
+            // restriction for all IP versions.
+            let IpInvariant(o) =
+                map_ip_twice!(I, IpInvariant((state, f)), |IpInvariant((mut state, f))| {
+                    IpInvariant(f(Some(
+                        &mut *state.write_lock::<crate::lock_ordering::NudConfig<I>>(),
+                    )))
+                });
+            o
+        })
+    }
+}
+
+impl<'a, BT, L> DeviceConfigurationContext<LoopbackDevice> for CoreCtx<'a, BT, L>
+where
+    BT: BindingsTypes,
+{
+    fn with_nud_config<I: Ip, O, F: FnOnce(Option<&NudUserConfig>) -> O>(
+        &mut self,
+        _device_id: &Self::DeviceId,
+        f: F,
+    ) -> O {
+        // Loopback doesn't support NUD.
+        f(None)
+    }
+
+    fn with_nud_config_mut<I: Ip, O, F: FnOnce(Option<&mut NudUserConfig>) -> O>(
+        &mut self,
+        _device_id: &Self::DeviceId,
+        f: F,
+    ) -> O {
+        // Loopback doesn't support NUD.
+        f(None)
     }
 }
