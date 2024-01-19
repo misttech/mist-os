@@ -38,6 +38,11 @@ void DumpDisplaySettings(const display_setting_t& settings) {
 
 }  // namespace
 
+Clock::Clock(fdf::MmioBuffer vpu_mmio, fdf::MmioBuffer hhi_mmio, bool clock_enabled)
+    : vpu_mmio_(std::move(vpu_mmio)),
+      hhi_mmio_(std::move(hhi_mmio)),
+      clock_enabled_(clock_enabled) {}
+
 // static
 LcdTiming Clock::CalculateLcdTiming(const display_setting_t& d) {
   LcdTiming out;
@@ -79,16 +84,16 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
     // The configurations used in retries are from Amlogic-provided code which
     // is undocumented.
     if (lock_attempts == 1) {
-      hhi_mmio_->Write32(
-          SetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL3), /*field_begin_bit=*/31,
+      hhi_mmio_.Write32(
+          SetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL3), /*field_begin_bit=*/31,
                           /*field_size_bits=*/1, /*field_value=*/1),
           HHI_HDMI_PLL_CNTL3);
     } else if (lock_attempts == 2) {
-      hhi_mmio_->Write32(0x55540000, HHI_HDMI_PLL_CNTL6);  // more magic
+      hhi_mmio_.Write32(0x55540000, HHI_HDMI_PLL_CNTL6);  // more magic
     }
 
     int retries = 1000;
-    while ((pll_lock = GetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL0),
+    while ((pll_lock = GetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL0),
                                        /*field_begin_bit=*/LCD_PLL_LOCK_HPLL_G12A,
                                        /*field_size_bits=*/1)) != 1 &&
            retries--) {
@@ -193,27 +198,27 @@ void Clock::Disable() {
   if (!clock_enabled_) {
     return;
   }
-  vpu_mmio_->Write32(0, ENCL_VIDEO_EN);
+  vpu_mmio_.Write32(0, ENCL_VIDEO_EN);
 
   VideoClockOutputControl::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .set_encoder_lvds_enabled(false)
-      .WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
   VideoClock2Control::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .set_div1_enabled(false)
       .set_div2_enabled(false)
       .set_div4_enabled(false)
       .set_div6_enabled(false)
       .set_div12_enabled(false)
-      .WriteTo(&*hhi_mmio_);
-  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_clock_enabled(false).WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&hhi_mmio_).set_clock_enabled(false).WriteTo(&hhi_mmio_);
 
   // disable pll
-  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL0),
-                                     /*field_begin_bit=*/LCD_PLL_EN_HPLL_G12A,
-                                     /*field_size_bits=*/1, /*field_value=*/0),
-                     HHI_HDMI_PLL_CNTL0);
+  hhi_mmio_.Write32(SetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL0),
+                                    /*field_begin_bit=*/LCD_PLL_EN_HPLL_G12A,
+                                    /*field_size_bits=*/1, /*field_value=*/0),
+                    HHI_HDMI_PLL_CNTL0);
   clock_enabled_ = false;
 }
 
@@ -241,27 +246,27 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
             (pll_cfg->pll_od1_sel << LCD_PLL_OD1_HPLL_G12A) |
             (pll_cfg->pll_od2_sel << LCD_PLL_OD2_HPLL_G12A) |
             (pll_cfg->pll_od3_sel << LCD_PLL_OD3_HPLL_G12A) | (useFrac ? (1 << 27) : (0 << 27)));
-  hhi_mmio_->Write32(regVal, HHI_HDMI_PLL_CNTL0);
+  hhi_mmio_.Write32(regVal, HHI_HDMI_PLL_CNTL0);
 
-  hhi_mmio_->Write32(pll_cfg->pll_frac, HHI_HDMI_PLL_CNTL1);
-  hhi_mmio_->Write32(0x00, HHI_HDMI_PLL_CNTL2);
+  hhi_mmio_.Write32(pll_cfg->pll_frac, HHI_HDMI_PLL_CNTL1);
+  hhi_mmio_.Write32(0x00, HHI_HDMI_PLL_CNTL2);
   // Magic numbers from U-Boot.
-  hhi_mmio_->Write32(useFrac ? 0x6a285c00 : 0x48681c00, HHI_HDMI_PLL_CNTL3);
-  hhi_mmio_->Write32(useFrac ? 0x65771290 : 0x33771290, HHI_HDMI_PLL_CNTL4);
-  hhi_mmio_->Write32(0x39272000, HHI_HDMI_PLL_CNTL5);
-  hhi_mmio_->Write32(useFrac ? 0x56540000 : 0x56540000, HHI_HDMI_PLL_CNTL6);
+  hhi_mmio_.Write32(useFrac ? 0x6a285c00 : 0x48681c00, HHI_HDMI_PLL_CNTL3);
+  hhi_mmio_.Write32(useFrac ? 0x65771290 : 0x33771290, HHI_HDMI_PLL_CNTL4);
+  hhi_mmio_.Write32(0x39272000, HHI_HDMI_PLL_CNTL5);
+  hhi_mmio_.Write32(useFrac ? 0x56540000 : 0x56540000, HHI_HDMI_PLL_CNTL6);
 
   // reset dpll
-  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL0),
-                                     /*field_begin_bit=*/LCD_PLL_RST_HPLL_G12A,
-                                     /*field_size_bits=*/1, /*field_value=*/1),
-                     HHI_HDMI_PLL_CNTL0);
+  hhi_mmio_.Write32(SetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL0),
+                                    /*field_begin_bit=*/LCD_PLL_RST_HPLL_G12A,
+                                    /*field_size_bits=*/1, /*field_value=*/1),
+                    HHI_HDMI_PLL_CNTL0);
   zx_nanosleep(zx_deadline_after(ZX_USEC(100)));
   // release from reset
-  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL0),
-                                     /*field_begin_bit=*/LCD_PLL_RST_HPLL_G12A,
-                                     /*field_size_bits=*/1, /*field_value=*/0),
-                     HHI_HDMI_PLL_CNTL0);
+  hhi_mmio_.Write32(SetFieldValue32(hhi_mmio_.Read32(HHI_HDMI_PLL_CNTL0),
+                                    /*field_begin_bit=*/LCD_PLL_RST_HPLL_G12A,
+                                    /*field_size_bits=*/1, /*field_value=*/0),
+                    HHI_HDMI_PLL_CNTL0);
 
   zx_nanosleep(zx_deadline_after(ZX_USEC(50)));
   zx::result<> wait_for_pll_lock_result = WaitForHdmiPllToLock();
@@ -271,170 +276,170 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   }
 
   // Disable Video Clock mux 2 since we are changing its input selection.
-  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_clock_enabled(false).WriteTo(&*hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&hhi_mmio_).set_clock_enabled(false).WriteTo(&hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
   // Sets the HDMI clock tree frequency division ratio to 1.
 
   // Disable the HDMI clock tree output
-  HdmiClockTreeControl hdmi_clock_tree_control = HdmiClockTreeControl::Get().ReadFrom(&*hhi_mmio_);
-  hdmi_clock_tree_control.set_clock_output_enabled(false).WriteTo(&*hhi_mmio_);
+  HdmiClockTreeControl hdmi_clock_tree_control = HdmiClockTreeControl::Get().ReadFrom(&hhi_mmio_);
+  hdmi_clock_tree_control.set_clock_output_enabled(false).WriteTo(&hhi_mmio_);
 
-  hdmi_clock_tree_control.set_preset_pattern_update_enabled(false).WriteTo(&*hhi_mmio_);
-  hdmi_clock_tree_control.SetFrequencyDividerRatio(ToU28_4(1.0)).WriteTo(&*hhi_mmio_);
+  hdmi_clock_tree_control.set_preset_pattern_update_enabled(false).WriteTo(&hhi_mmio_);
+  hdmi_clock_tree_control.SetFrequencyDividerRatio(ToU28_4(1.0)).WriteTo(&hhi_mmio_);
 
   // Enable the final output clock
-  hdmi_clock_tree_control.set_clock_output_enabled(true).WriteTo(&*hhi_mmio_);
+  hdmi_clock_tree_control.set_clock_output_enabled(true).WriteTo(&hhi_mmio_);
 
   // Enable DSI measure clocks.
   VideoInputMeasureClockControl::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .set_dsi_measure_clock_selection(
           VideoInputMeasureClockControl::ClockSource::kExternalOscillator24Mhz)
-      .WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
   VideoInputMeasureClockControl::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .SetDsiMeasureClockDivider(1)
-      .WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
   VideoInputMeasureClockControl::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .set_dsi_measure_clock_enabled(true)
-      .WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
 
   // Use Video PLL (vid_pll) as MIPI_DSY PHY clock source.
   MipiDsiPhyClockControl::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .set_clock_source(MipiDsiPhyClockControl::ClockSource::kVideoPll)
-      .WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
   // Enable MIPI-DSY PHY clock.
-  MipiDsiPhyClockControl::Get().ReadFrom(&*hhi_mmio_).set_enabled(true).WriteTo(&*hhi_mmio_);
+  MipiDsiPhyClockControl::Get().ReadFrom(&hhi_mmio_).set_enabled(true).WriteTo(&hhi_mmio_);
   // Set divider to 1.
   // TODO(https://fxbug.dev/131925): This should occur before enabling the clock.
-  MipiDsiPhyClockControl::Get().ReadFrom(&*hhi_mmio_).SetDivider(1).WriteTo(&*hhi_mmio_);
+  MipiDsiPhyClockControl::Get().ReadFrom(&hhi_mmio_).SetDivider(1).WriteTo(&hhi_mmio_);
 
   // Set the Video clock 2 divider.
   VideoClock2Divider::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .SetDivider2(pll_cfg_.clock_factor)
-      .WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
   VideoClock2Control::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .set_mux_source(VideoClockMuxSource::kVideoPll)
-      .WriteTo(&*hhi_mmio_);
-  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_clock_enabled(true).WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&hhi_mmio_).set_clock_enabled(true).WriteTo(&hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(2)));
 
   // Select video clock 2 for ENCL clock.
   VideoClock2Divider::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .set_encl_clock_selection(EncoderClockSource::kVideoClock2)
-      .WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
   // Enable video clock 2 divider.
-  VideoClock2Divider::Get().ReadFrom(&*hhi_mmio_).set_divider_enabled(true).WriteTo(&*hhi_mmio_);
+  VideoClock2Divider::Get().ReadFrom(&hhi_mmio_).set_divider_enabled(true).WriteTo(&hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
-  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_div1_enabled(true).WriteTo(&*hhi_mmio_);
-  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_soft_reset(true).WriteTo(&*hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&hhi_mmio_).set_div1_enabled(true).WriteTo(&hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&hhi_mmio_).set_soft_reset(true).WriteTo(&hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
-  VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_soft_reset(false).WriteTo(&*hhi_mmio_);
+  VideoClock2Control::Get().ReadFrom(&hhi_mmio_).set_soft_reset(false).WriteTo(&hhi_mmio_);
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
   // Enable ENCL clock output.
   VideoClockOutputControl::Get()
-      .ReadFrom(&*hhi_mmio_)
+      .ReadFrom(&hhi_mmio_)
       .set_encoder_lvds_enabled(true)
-      .WriteTo(&*hhi_mmio_);
+      .WriteTo(&hhi_mmio_);
 
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
-  vpu_mmio_->Write32(0, ENCL_VIDEO_EN);
+  vpu_mmio_.Write32(0, ENCL_VIDEO_EN);
 
   // connect both VIUs (Video Input Units) to LCD LVDS Encoders
   VideoInputUnitEncoderMuxControl::Get()
-      .ReadFrom(&*vpu_mmio_)
+      .ReadFrom(&vpu_mmio_)
       .set_vsync_shared_by_viu_blocks(false)
       .set_viu1_encoder_selection(VideoInputUnitEncoderMuxControl::Encoder::kLcd)
       .set_viu2_encoder_selection(VideoInputUnitEncoderMuxControl::Encoder::kLcd)
-      .WriteTo(&*vpu_mmio_);
+      .WriteTo(&vpu_mmio_);
 
   // Undocumented registers below
-  vpu_mmio_->Write32(0x8000, ENCL_VIDEO_MODE);      // bit[15] shadown en
-  vpu_mmio_->Write32(0x0418, ENCL_VIDEO_MODE_ADV);  // Sampling rate: 1
+  vpu_mmio_.Write32(0x8000, ENCL_VIDEO_MODE);      // bit[15] shadown en
+  vpu_mmio_.Write32(0x0418, ENCL_VIDEO_MODE_ADV);  // Sampling rate: 1
 
   // bypass filter -- Undocumented registers
-  vpu_mmio_->Write32(0x1000, ENCL_VIDEO_FILT_CTRL);
-  vpu_mmio_->Write32(d.h_period - 1, ENCL_VIDEO_MAX_PXCNT);
-  vpu_mmio_->Write32(d.v_period - 1, ENCL_VIDEO_MAX_LNCNT);
-  vpu_mmio_->Write32(lcd_timing_.vid_pixel_on, ENCL_VIDEO_HAVON_BEGIN);
-  vpu_mmio_->Write32(d.h_active - 1 + lcd_timing_.vid_pixel_on, ENCL_VIDEO_HAVON_END);
-  vpu_mmio_->Write32(lcd_timing_.vid_line_on, ENCL_VIDEO_VAVON_BLINE);
-  vpu_mmio_->Write32(d.v_active - 1 + lcd_timing_.vid_line_on, ENCL_VIDEO_VAVON_ELINE);
-  vpu_mmio_->Write32(lcd_timing_.hs_hs_addr, ENCL_VIDEO_HSO_BEGIN);
-  vpu_mmio_->Write32(lcd_timing_.hs_he_addr, ENCL_VIDEO_HSO_END);
-  vpu_mmio_->Write32(lcd_timing_.vs_hs_addr, ENCL_VIDEO_VSO_BEGIN);
-  vpu_mmio_->Write32(lcd_timing_.vs_he_addr, ENCL_VIDEO_VSO_END);
-  vpu_mmio_->Write32(lcd_timing_.vs_vs_addr, ENCL_VIDEO_VSO_BLINE);
-  vpu_mmio_->Write32(lcd_timing_.vs_ve_addr, ENCL_VIDEO_VSO_ELINE);
-  vpu_mmio_->Write32(3, ENCL_VIDEO_RGBIN_CTRL);
-  vpu_mmio_->Write32(1, ENCL_VIDEO_EN);
+  vpu_mmio_.Write32(0x1000, ENCL_VIDEO_FILT_CTRL);
+  vpu_mmio_.Write32(d.h_period - 1, ENCL_VIDEO_MAX_PXCNT);
+  vpu_mmio_.Write32(d.v_period - 1, ENCL_VIDEO_MAX_LNCNT);
+  vpu_mmio_.Write32(lcd_timing_.vid_pixel_on, ENCL_VIDEO_HAVON_BEGIN);
+  vpu_mmio_.Write32(d.h_active - 1 + lcd_timing_.vid_pixel_on, ENCL_VIDEO_HAVON_END);
+  vpu_mmio_.Write32(lcd_timing_.vid_line_on, ENCL_VIDEO_VAVON_BLINE);
+  vpu_mmio_.Write32(d.v_active - 1 + lcd_timing_.vid_line_on, ENCL_VIDEO_VAVON_ELINE);
+  vpu_mmio_.Write32(lcd_timing_.hs_hs_addr, ENCL_VIDEO_HSO_BEGIN);
+  vpu_mmio_.Write32(lcd_timing_.hs_he_addr, ENCL_VIDEO_HSO_END);
+  vpu_mmio_.Write32(lcd_timing_.vs_hs_addr, ENCL_VIDEO_VSO_BEGIN);
+  vpu_mmio_.Write32(lcd_timing_.vs_he_addr, ENCL_VIDEO_VSO_END);
+  vpu_mmio_.Write32(lcd_timing_.vs_vs_addr, ENCL_VIDEO_VSO_BLINE);
+  vpu_mmio_.Write32(lcd_timing_.vs_ve_addr, ENCL_VIDEO_VSO_ELINE);
+  vpu_mmio_.Write32(3, ENCL_VIDEO_RGBIN_CTRL);
+  vpu_mmio_.Write32(1, ENCL_VIDEO_EN);
 
-  vpu_mmio_->Write32(0, L_RGB_BASE_ADDR);
-  vpu_mmio_->Write32(0x400, L_RGB_COEFF_ADDR);
-  vpu_mmio_->Write32(0x400, L_DITH_CNTL_ADDR);
+  vpu_mmio_.Write32(0, L_RGB_BASE_ADDR);
+  vpu_mmio_.Write32(0x400, L_RGB_COEFF_ADDR);
+  vpu_mmio_.Write32(0x400, L_DITH_CNTL_ADDR);
 
   // DE signal
-  vpu_mmio_->Write32(lcd_timing_.de_hs_addr, L_DE_HS_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.de_he_addr, L_DE_HE_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.de_vs_addr, L_DE_VS_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.de_ve_addr, L_DE_VE_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.de_hs_addr, L_DE_HS_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.de_he_addr, L_DE_HE_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.de_vs_addr, L_DE_VS_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.de_ve_addr, L_DE_VE_ADDR);
 
   // Hsync signal
-  vpu_mmio_->Write32(lcd_timing_.hs_hs_addr, L_HSYNC_HS_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.hs_he_addr, L_HSYNC_HE_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.hs_vs_addr, L_HSYNC_VS_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.hs_ve_addr, L_HSYNC_VE_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.hs_hs_addr, L_HSYNC_HS_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.hs_he_addr, L_HSYNC_HE_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.hs_vs_addr, L_HSYNC_VS_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.hs_ve_addr, L_HSYNC_VE_ADDR);
 
   // Vsync signal
-  vpu_mmio_->Write32(lcd_timing_.vs_hs_addr, L_VSYNC_HS_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.vs_he_addr, L_VSYNC_HE_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.vs_vs_addr, L_VSYNC_VS_ADDR);
-  vpu_mmio_->Write32(lcd_timing_.vs_ve_addr, L_VSYNC_VE_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.vs_hs_addr, L_VSYNC_HS_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.vs_he_addr, L_VSYNC_HE_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.vs_vs_addr, L_VSYNC_VS_ADDR);
+  vpu_mmio_.Write32(lcd_timing_.vs_ve_addr, L_VSYNC_VE_ADDR);
 
-  vpu_mmio_->Write32(vpu_mmio_->Read32(VPP_MISC) & ~(VPP_OUT_SATURATE), VPP_MISC);
+  vpu_mmio_.Write32(vpu_mmio_.Read32(VPP_MISC) & ~(VPP_OUT_SATURATE), VPP_MISC);
 
   // Ready to be used
   clock_enabled_ = true;
   return zx::ok();
 }
 
-void Clock::SetVideoOn(bool on) { vpu_mmio_->Write32(on, ENCL_VIDEO_EN); }
+void Clock::SetVideoOn(bool on) { vpu_mmio_.Write32(on, ENCL_VIDEO_EN); }
 
 // static
 zx::result<std::unique_ptr<Clock>> Clock::Create(ddk::PDevFidl& pdev, bool already_enabled) {
-  fbl::AllocChecker ac;
-  auto self = fbl::make_unique_checked<Clock>(&ac);
-  if (!ac.check()) {
-    zxlogf(ERROR, "Clock: could not allocate memory");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
   zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, pdev);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }
-  self->vpu_mmio_ = std::move(vpu_mmio_result).value();
+  fdf::MmioBuffer vpu_mmio = std::move(vpu_mmio_result).value();
 
   zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }
-  self->hhi_mmio_ = std::move(hhi_mmio_result).value();
+  fdf::MmioBuffer hhi_mmio = std::move(hhi_mmio_result).value();
 
-  self->clock_enabled_ = already_enabled;
+  fbl::AllocChecker alloc_checker;
+  auto clock =
+      fbl::make_unique_checked<Clock>(&alloc_checker, std::move(vpu_mmio), std::move(hhi_mmio),
+                                      /*clock_enabled=*/already_enabled);
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for Clock");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
 
-  return zx::ok(std::move(self));
+  return zx::ok(std::move(clock));
 }
 
 }  // namespace amlogic_display

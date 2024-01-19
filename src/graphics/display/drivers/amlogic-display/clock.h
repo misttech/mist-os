@@ -27,9 +27,22 @@ namespace amlogic_display {
 
 class Clock {
  public:
-  // Map all necessary resources. This method does not change hardware state,
-  // and is therefore safe to use when adopting a bootloader initialized device.
+  // Factory method intended for production use.
+  //
+  // Creating a Clock instance doesn't change the hardware state, and is
+  // therefore safe to use when adopting a bootloader initialized device.
   static zx::result<std::unique_ptr<Clock>> Create(ddk::PDevFidl& pdev, bool already_enabled);
+
+  // Production code should prefer using the `Create()` factory method.
+  //
+  // `vpu_mmio` is the VPU MMIO register region. It must be a valid MMIO buffer.
+  //
+  // `hhi_mmio` is the HHI (HIU) MMIO register region. It must be a valid MMIO
+  // buffer.
+  //
+  // The VPU and HIU register regions are defined in Section 8.1 "Memory Map"
+  // of the AMLogic A311D datasheet.
+  Clock(fdf::MmioBuffer vpu_mmio, fdf::MmioBuffer hhi_mmio, bool clock_enabled);
 
   zx::result<> Enable(const display_setting_t& d);
   void Disable();
@@ -50,13 +63,13 @@ class Clock {
  private:
   zx::result<> WaitForHdmiPllToLock();
 
-  std::optional<fdf::MmioBuffer> vpu_mmio_;
-  std::optional<fdf::MmioBuffer> hhi_mmio_;
+  fdf::MmioBuffer vpu_mmio_;
+  fdf::MmioBuffer hhi_mmio_;
 
-  PllConfig pll_cfg_;
-  LcdTiming lcd_timing_;
+  PllConfig pll_cfg_ = {};
+  LcdTiming lcd_timing_ = {};
 
-  bool clock_enabled_ = false;
+  bool clock_enabled_;
 };
 
 }  // namespace amlogic_display
