@@ -358,7 +358,7 @@ async fn test_params_from_args(
                 parallel: cmd.parallel,
                 test_args,
                 tags: vec![],
-                break_on_failure: false,
+                break_on_failure: cmd.break_on_failure,
             };
 
             let count = cmd.count.unwrap_or(1);
@@ -577,6 +577,7 @@ mod test {
                     continue_on_timeout: false,
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
+                    break_on_failure: false,
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
@@ -611,6 +612,7 @@ mod test {
                     continue_on_timeout: false,
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
+                    break_on_failure: false,
                 },
                 vec![
                     run_test_suite_lib::TestParams {
@@ -648,6 +650,7 @@ mod test {
                     continue_on_timeout: false,
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
+                    break_on_failure: false,
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
@@ -684,6 +687,7 @@ mod test {
                     continue_on_timeout: false,
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
+                    break_on_failure: false,
                 },
                 vec![
                     run_test_suite_lib::TestParams {
@@ -776,6 +780,7 @@ mod test {
                 continue_on_timeout: false,
                 stop_after_failures: None,
                 experimental_parallel_execution: None,
+                break_on_failure: false,
             },
             true,
         )
@@ -812,6 +817,7 @@ mod test {
                     continue_on_timeout: false,
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
+                    break_on_failure: false,
                 },
             ),
             (
@@ -836,6 +842,7 @@ mod test {
                     continue_on_timeout: false,
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
+                    break_on_failure: false,
                 },
             ),
             (
@@ -860,6 +867,7 @@ mod test {
                     continue_on_timeout: false,
                     stop_after_failures: None,
                     experimental_parallel_execution: None,
+                    break_on_failure: false,
                 },
             ),
         ];

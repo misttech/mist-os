@@ -144,6 +144,16 @@ pub struct RunCommand {
     #[argh(option)]
     pub experimental_parallel_execution: Option<u16>,
 
+    /// enable break_on_failure for supported test runners. Any test case failure causes the test
+    /// execution to stop and wait for zxdb to attach to debug the failure. When the debugger
+    /// exits, the process will be released and the suite will be continued.
+    ///
+    /// Note: test runners may or may not have the ability to halt a test suite after it has
+    /// started executing. If there isn't a way to raise an exception for a debugger to catch, the
+    /// test will run and exit as normal, and will not wait for any debugger interaction.
+    #[argh(switch)]
+    pub break_on_failure: bool,
+
     // output options
     /// filter ANSI escape sequences from output.
     #[argh(switch)]
