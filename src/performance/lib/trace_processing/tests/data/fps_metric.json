@@ -1,0 +1,199 @@
+{
+    "displayTimeUnit": "ns",
+    "traceEvents": [
+        {
+            "cat": "gfx",
+            "name": "Display::Controller::OnDisplayVsync",
+            "ts": 0.1,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 0.01,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Controller::OnDisplayVsync",
+            "ts": 0.2,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 0.01,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 0.3,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 0.08,
+            "args": {
+                "frame_number": 1,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 0.35,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "101"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 0.405,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "101"
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Controller::OnDisplayVsync",
+            "ts": 0.4,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 0.01,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 0.4,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 0.08,
+            "args": {
+                "frame_number": 2,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 0.45,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "102"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 0.505,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "102"
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Controller::OnDisplayVsync",
+            "ts": 0.5,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 0.01,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 0.5,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 0.08,
+            "args": {
+                "frame_number": 3,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Controller::OnDisplayVsync",
+            "ts": 0.6,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 0.01,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 0.6,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 0.08,
+            "args": {
+                "frame_number": 4,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 0.65,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "103"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 0.705,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "103"
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Controller::OnDisplayVsync",
+            "ts": 0.7,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 0.01,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 0.9,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 0.08,
+            "args": {
+                "frame_number": 5,
+                "time": 0.4
+            }
+        }
+    ]
+}

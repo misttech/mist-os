@@ -4,7 +4,7 @@
 """Utilities to filter and extract events and statistics from a trace Model."""
 
 import math
-from typing import Any, Iterable, List, Optional, Tuple, Type
+from typing import Any, Iterable, List, Optional, Set, Tuple, Type
 
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
@@ -145,3 +145,45 @@ def get_arg_values_from_events(
         return arg  # Cannot be None if we reach here
 
     return map(event_to_arg_type, events)
+
+
+def get_following_events(
+    event: trace_model.Event,
+) -> Iterable[trace_model.Event]:
+    """Find all Events that are flow connected and follow |event|.
+
+    Args:
+      event: The starting event.
+
+    Returns:
+      An [Iterable] of flow connected events.
+    """
+    frontier: List[trace_model.Event] = [event]
+    visited: Set[trace_model.Event] = set()
+
+    def set_add(
+        event_set: Set[trace_model.Event], event: trace_model.Event
+    ) -> bool:
+        length_before = len(event_set)
+        event_set.add(event)
+        return len(event_set) != length_before
+
+    while frontier:
+        current: trace_model.Event = frontier.pop()
+        if current is None:
+            continue
+        added = set_add(visited, current)
+        if not added:
+            continue
+        if isinstance(current, trace_model.DurationEvent):
+            frontier.extend(current.child_durations)
+            frontier.extend(current.child_flows)
+        elif isinstance(current, trace_model.FlowEvent):
+            frontier.append(current.enclosing_duration)
+            frontier.append(current.next_flow)
+
+    def by_start_time(event: trace_model.Event) -> trace_time.TimePoint:
+        return event.start
+
+    for connected_event in sorted(visited, key=by_start_time):
+        yield connected_event

@@ -11,6 +11,7 @@ python_library("trace_processing") {
     "__init__.py",
     "metrics/__init__.py",
     "metrics/cpu.py",
+    "metrics/fps.py",
     "trace_importing.py",
     "trace_metrics.py",
     "trace_model.py",

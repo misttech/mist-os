@@ -75,6 +75,11 @@ class TimeDelta:
     def __mul__(self, factor: int) -> Self:
         return TimeDelta(self._delta * factor)
 
+    def __truediv__(self, other: Any) -> float:
+        if not isinstance(other, TimeDelta):
+            return NotImplemented
+        return self._delta / other._delta
+
     def __lt__(self, other: Any) -> bool:
         if not isinstance(other, TimeDelta):
             return NotImplemented

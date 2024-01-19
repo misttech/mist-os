@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 import unittest
 
 import trace_processing.metrics.cpu as cpu_metrics
+import trace_processing.metrics.fps as fps_metrics
 import trace_processing.trace_importing as trace_importing
 import trace_processing.trace_metrics as trace_metrics
 import trace_processing.trace_model as trace_model
@@ -107,3 +108,33 @@ class TraceMetricsTest(unittest.TestCase):
         self.assertAlmostEqual(aggregated_results[6].values[0], 43.0)
         self.assertEqual(aggregated_results[7].label, "CpuAverage")
         self.assertAlmostEqual(aggregated_results[7].values[0], 31.5)
+
+    def test_fps_metric(self) -> None:
+        model: trace_model.Model = trace_importing.create_model_from_file_path(
+            os.path.join(self._runtime_deps_path, "fps_metric.json")
+        )
+        results: List[
+            trace_metrics.TestCaseResult
+        ] = fps_metrics.metrics_processor(model, {})
+        self.assertAlmostEqual(results[0].values[0], 10000000.0)
+        self.assertAlmostEqual(results[0].values[1], 5000000.0)
+        aggregated_results: List[
+            trace_metrics.TestCaseResult
+        ] = fps_metrics.metrics_processor(model, {"aggregateMetricsOnly": True})
+        self.assertEqual(len(aggregated_results), 8)
+        self.assertEqual(aggregated_results[0].label, "FpsP5")
+        self.assertAlmostEqual(aggregated_results[0].values[0], 5250000.0)
+        self.assertEqual(aggregated_results[1].label, "FpsP25")
+        self.assertAlmostEqual(aggregated_results[1].values[0], 6250000.0)
+        self.assertEqual(aggregated_results[2].label, "FpsP50")
+        self.assertAlmostEqual(aggregated_results[2].values[0], 7500000.0)
+        self.assertEqual(aggregated_results[3].label, "FpsP75")
+        self.assertAlmostEqual(aggregated_results[3].values[0], 8750000.0)
+        self.assertEqual(aggregated_results[4].label, "FpsP95")
+        self.assertAlmostEqual(aggregated_results[4].values[0], 9750000.0)
+        self.assertEqual(aggregated_results[5].label, "FpsMin")
+        self.assertAlmostEqual(aggregated_results[5].values[0], 5000000.0)
+        self.assertEqual(aggregated_results[6].label, "FpsMax")
+        self.assertAlmostEqual(aggregated_results[6].values[0], 10000000.0)
+        self.assertEqual(aggregated_results[7].label, "FpsAverage")
+        self.assertAlmostEqual(aggregated_results[7].values[0], 7500000.0)
