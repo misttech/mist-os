@@ -1592,7 +1592,7 @@ impl MemoryAccessor for CurrentTask {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.mm().read_memory(addr, bytes)
+        self.mm().unified_read_memory(self, addr, bytes)
     }
 
     fn vmo_read_memory<'a>(
@@ -1608,7 +1608,7 @@ impl MemoryAccessor for CurrentTask {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.mm().read_memory_partial_until_null_byte(addr, bytes)
+        self.mm().unified_read_memory_partial_until_null_byte(self, addr, bytes)
     }
 
     fn vmo_read_memory_partial_until_null_byte<'a>(
@@ -1624,7 +1624,7 @@ impl MemoryAccessor for CurrentTask {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.mm().read_memory_partial(addr, bytes)
+        self.mm().unified_read_memory_partial(self, addr, bytes)
     }
 
     fn vmo_read_memory_partial<'a>(
@@ -1636,7 +1636,7 @@ impl MemoryAccessor for CurrentTask {
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm().write_memory(addr, bytes)
+        self.mm().unified_write_memory(self, addr, bytes)
     }
 
     fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -1644,7 +1644,7 @@ impl MemoryAccessor for CurrentTask {
     }
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm().write_memory_partial(addr, bytes)
+        self.mm().unified_write_memory_partial(self, addr, bytes)
     }
 
     fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -1652,7 +1652,7 @@ impl MemoryAccessor for CurrentTask {
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.mm().zero(addr, length)
+        self.mm().unified_zero(self, addr, length)
     }
 
     fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {

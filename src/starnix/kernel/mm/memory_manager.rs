@@ -2424,12 +2424,19 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     }
 }
 
-impl MemoryAccessor for MemoryManager {
-    fn read_memory<'a>(
+impl MemoryManager {
+    pub fn has_same_address_space(&self, other: &Self) -> bool {
+        self.root_vmar == other.root_vmar
+    }
+
+    pub fn unified_read_memory<'a>(
         &self,
+        current_task: &CurrentTask,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
+        debug_assert!(self.has_same_address_space(current_task.mm()));
+
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyRead");
             let (read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
@@ -2443,7 +2450,7 @@ impl MemoryAccessor for MemoryManager {
         }
     }
 
-    fn vmo_read_memory<'a>(
+    pub fn vmo_read_memory<'a>(
         &self,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
@@ -2451,11 +2458,14 @@ impl MemoryAccessor for MemoryManager {
         self.state.read().read_memory(addr, bytes)
     }
 
-    fn read_memory_partial_until_null_byte<'a>(
+    pub fn unified_read_memory_partial_until_null_byte<'a>(
         &self,
+        current_task: &CurrentTask,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
+        debug_assert!(self.has_same_address_space(current_task.mm()));
+
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyReadPartialUntilNull");
             let (read_bytes, unread_bytes) = usercopy.copyin_until_null_byte(addr.ptr(), bytes);
@@ -2469,7 +2479,7 @@ impl MemoryAccessor for MemoryManager {
         }
     }
 
-    fn vmo_read_memory_partial_until_null_byte<'a>(
+    pub fn vmo_read_memory_partial_until_null_byte<'a>(
         &self,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
@@ -2477,11 +2487,14 @@ impl MemoryAccessor for MemoryManager {
         self.state.read().read_memory_partial_until_null_byte(addr, bytes)
     }
 
-    fn read_memory_partial<'a>(
+    pub fn unified_read_memory_partial<'a>(
         &self,
+        current_task: &CurrentTask,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
+        debug_assert!(self.has_same_address_space(current_task.mm()));
+
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyReadPartial");
             let (read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
@@ -2495,7 +2508,7 @@ impl MemoryAccessor for MemoryManager {
         }
     }
 
-    fn vmo_read_memory_partial<'a>(
+    pub fn vmo_read_memory_partial<'a>(
         &self,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
@@ -2503,7 +2516,14 @@ impl MemoryAccessor for MemoryManager {
         self.state.read().read_memory_partial(addr, bytes)
     }
 
-    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+    pub fn unified_write_memory(
+        &self,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+        bytes: &[u8],
+    ) -> Result<usize, Errno> {
+        debug_assert!(self.has_same_address_space(current_task.mm()));
+
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyWrite");
             let num_copied = usercopy.copyout(bytes, addr.ptr());
@@ -2517,11 +2537,18 @@ impl MemoryAccessor for MemoryManager {
         }
     }
 
-    fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+    pub fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.state.read().write_memory(addr, bytes)
     }
 
-    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+    pub fn unified_write_memory_partial(
+        &self,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+        bytes: &[u8],
+    ) -> Result<usize, Errno> {
+        debug_assert!(self.has_same_address_space(current_task.mm()));
+
         if let Some(usercopy) = usercopy() {
             profile_duration!("UsercopyWritePartial");
             let num_copied = usercopy.copyout(bytes, addr.ptr());
@@ -2535,11 +2562,22 @@ impl MemoryAccessor for MemoryManager {
         }
     }
 
-    fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+    pub fn vmo_write_memory_partial(
+        &self,
+        addr: UserAddress,
+        bytes: &[u8],
+    ) -> Result<usize, Errno> {
         self.state.read().write_memory_partial(addr, bytes)
     }
 
-    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+    pub fn unified_zero(
+        &self,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+        length: usize,
+    ) -> Result<usize, Errno> {
+        debug_assert!(self.has_same_address_space(current_task.mm()));
+
         {
             let page_size = *PAGE_SIZE as usize;
             // Get the page boundary immediately following `addr` if `addr` is
@@ -2571,7 +2609,7 @@ impl MemoryAccessor for MemoryManager {
         }
     }
 
-    fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+    pub fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.state.read().zero(addr, length)
     }
 }
