@@ -161,6 +161,29 @@ function fx-is-bringup {
   grep '^[^#]*import("//products/bringup.gni")' "${FUCHSIA_BUILD_DIR}/args.gn" >/dev/null 2>&1
 }
 
+function _symlink_relative {
+  source="$1"
+  link="$2"
+  if [ -d "$link" ]; then
+    # Support ln's behavior passing a directory and reusing the source filename.
+    link_dir="$link"
+  else
+    link_dir="$(dirname "$link")"
+  fi
+  source_rel="${source#"$link_dir/"}"
+  ln -sf "$source_rel" "$link"
+}
+
+function _link_gen_artifacts {
+  # These artifacts need to be in the root directory.
+  local -r linked_artifacts=("compile_commands.json" "rust-project.json")
+  for artifact in "${linked_artifacts[@]}" ; do
+    if [[ -f "${FUCHSIA_BUILD_DIR}/$artifact" ]]; then
+      _symlink_relative "${FUCHSIA_BUILD_DIR}/$artifact" "${FUCHSIA_DIR}/$artifact"
+    fi
+  done
+}
+
 function fx-gen-internal {
   # which of `gn gen` and `gn args` we're doing
   local -r subcommand="$1"
@@ -173,10 +196,7 @@ function fx-gen-internal {
     cd "${FUCHSIA_DIR}" && \
     fx-gn "${subcommand}" --fail-on-unused-args --check=system --export-rust-project --ninja-executable="${PREBUILT_NINJA}" "${FUCHSIA_BUILD_DIR}" "$@"
   ) || return $?
-  # symlink rust-project.json to root of project
-  if [[ -f "${FUCHSIA_BUILD_DIR}/rust-project.json" ]]; then
-    ln -f -s "${FUCHSIA_BUILD_DIR}/rust-project.json" "${FUCHSIA_DIR}/rust-project.json"
-  fi
+  _link_gen_artifacts
 }
 
 function fx-gen {
@@ -285,12 +305,7 @@ function fx-change-build-dir {
   # the change.
   fx-config-read
 
-  local -r linked_artifacts=("compile_commands.json" "rust-project.json")
-  for artifact in "${linked_artifacts[@]}" ; do
-    if [[ -f "${FUCHSIA_BUILD_DIR}/$artifact" ]]; then
-      ln -sf "${FUCHSIA_BUILD_DIR}/$artifact" "${FUCHSIA_DIR}/$artifact"
-    fi
-  done
+  _link_gen_artifacts
 
   # Set relevant variables in the ffx build-level config file
   json-config-set "${FUCHSIA_BUILD_DIR}.json" "repository.default" "$(ffx-default-repository-name)"
