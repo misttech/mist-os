@@ -37,7 +37,6 @@ fuchsia_driver("gpt-driver") {
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp",
     "//sdk/lib/fit",
-    "//sdk/lib/syslog/cpp:backend",
     "//src/devices/bind/fuchsia.block:fuchsia.block_cpp",
     "//src/devices/bind/fuchsia.block.gpt:fuchsia.block.gpt_cpp",
     "//src/devices/block/lib/common:common-dfv1",
