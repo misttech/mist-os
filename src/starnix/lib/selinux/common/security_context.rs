@@ -179,7 +179,7 @@ impl fmt::Display for RangeValue {
 mod tests {
     use super::*;
 
-    #[fuchsia::test]
+    #[test]
     fn parse_security_context() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t")
             .expect("creating security context should succeed");
@@ -189,7 +189,7 @@ mod tests {
         assert_eq!(security_context.range, None);
     }
 
-    #[fuchsia::test]
+    #[test]
     fn parse_security_context_with_sensitivity_value() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0")
             .expect("creating security context should succeed");
@@ -205,7 +205,7 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn parse_security_context_with_sensitivity_range() {
         for label in ["u:unconfined_r:unconfined_t:s0 - s0", "u:unconfined_r:unconfined_t:s0-s0"] {
             let security_context =
@@ -226,7 +226,7 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
+    #[test]
     fn parse_security_context_with_sensitivity_value_and_category_interval() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0.c255")
             .expect("creating security context should succeed");
@@ -245,7 +245,7 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn parse_security_context_with_sensitivity_range_and_category_interval() {
         let security_context =
             SecurityContext::try_from("u:unconfined_r:unconfined_t:s0 - s0:c0.c1023")
@@ -268,7 +268,7 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn parse_security_context_with_sensitivity_value_and_category_list() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0,c255")
             .expect("creating security context should succeed");
@@ -287,7 +287,7 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn parse_security_context_with_sensitivity_range_and_category_list() {
         let security_context =
             SecurityContext::try_from("u:unconfined_r:unconfined_t:s0-s0:c0,c3,c7")
@@ -311,7 +311,7 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn parse_invalid_security_contexts() {
         for invalid_label in ["u", "u:unconfined_r"] {
             assert_eq!(
@@ -321,7 +321,7 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
+    #[test]
     fn format_security_contexts() {
         for label in [
             "u:unconfined_r:unconfined_t:s0",

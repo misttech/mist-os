@@ -4,11 +4,11 @@
 
 use crate::{
     access_vector_cache::{Manager as AvcManager, Query, QueryMut},
-    security_context::SecurityContext,
     AccessVector, ObjectClass, SecurityId,
 };
 
 use anyhow;
+use selinux_common::security_context::SecurityContext;
 use selinux_policy::{metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, Policy};
 use starnix_sync::Mutex;
 use std::{collections::HashMap, sync::Arc};

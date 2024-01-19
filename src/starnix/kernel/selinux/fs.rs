@@ -14,7 +14,8 @@ use crate::{
     },
 };
 
-use selinux::{security_context::SecurityContext, security_server::SecurityServer};
+use selinux::security_server::SecurityServer;
+use selinux_common::security_context::SecurityContext;
 use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_error, log_info, not_implemented};
 use starnix_sync::Mutex;

@@ -11,6 +11,7 @@ rustc_library("core") {
   with_unit_tests = true
   deps = [
     "//src/starnix/kernel:starnix_sync",
+    "//src/starnix/lib/selinux/common",
     "//src/starnix/lib/selinux/policy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitflags",
@@ -26,7 +27,6 @@ rustc_library("core") {
     "hooks.rs",
     "lib.rs",
     "permission_check.rs",
-    "security_context.rs",
     "security_server.rs",
   ]
   inputs = [ "../testdata/policies/minimal" ]

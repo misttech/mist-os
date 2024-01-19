@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{security_context::SecurityContext, security_server::SecurityServer, SecurityId};
+use crate::{security_server::SecurityServer, SecurityId};
+
+use selinux_common::security_context::SecurityContext;
 use std::sync::Arc;
 
 /// The SELinux security structure for `ThreadGroup`.

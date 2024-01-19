@@ -335,6 +335,7 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/magma",
     "//src/starnix/lib/range_map",
+    "//src/starnix/lib/selinux/common",
     "//src/starnix/lib/selinux/core",
     "//src/starnix/lib/selinux/policy",
     "//src/starnix/lib/starnix-syscalls",
