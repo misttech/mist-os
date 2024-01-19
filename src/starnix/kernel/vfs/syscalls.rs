@@ -81,8 +81,11 @@ pub fn sys_read(
     length: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    file.read(current_task, &mut UserBuffersOutputBuffer::new_at(current_task, address, length)?)
-        .map_eintr(errno!(ERESTARTSYS))
+    file.read(
+        current_task,
+        &mut UserBuffersOutputBuffer::unified_new_at(current_task, address, length)?,
+    )
+    .map_eintr(errno!(ERESTARTSYS))
 }
 
 pub fn sys_write(
@@ -93,8 +96,11 @@ pub fn sys_write(
     length: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    file.write(current_task, &mut UserBuffersInputBuffer::new_at(current_task, address, length)?)
-        .map_eintr(errno!(ERESTARTSYS))
+    file.write(
+        current_task,
+        &mut UserBuffersInputBuffer::unified_new_at(current_task, address, length)?,
+    )
+    .map_eintr(errno!(ERESTARTSYS))
 }
 
 pub fn sys_close(
@@ -301,7 +307,7 @@ pub fn sys_pread64(
     file.read_at(
         current_task,
         offset,
-        &mut UserBuffersOutputBuffer::new_at(current_task, address, length)?,
+        &mut UserBuffersOutputBuffer::unified_new_at(current_task, address, length)?,
     )
 }
 
@@ -318,7 +324,7 @@ pub fn sys_pwrite64(
     file.write_at(
         current_task,
         offset,
-        &mut UserBuffersInputBuffer::new_at(current_task, address, length)?,
+        &mut UserBuffersInputBuffer::unified_new_at(current_task, address, length)?,
     )
 }
 
@@ -338,7 +344,7 @@ fn do_readv(
     }
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
-    let mut data = UserBuffersOutputBuffer::new(current_task, iovec)?;
+    let mut data = UserBuffersOutputBuffer::unified_new(current_task, iovec)?;
     if let Some(offset) = offset {
         file.read_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &mut data)
     } else {
@@ -398,7 +404,7 @@ fn do_writev(
     // TODO(https://fxbug.dev/117677) Allow partial writes.
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
-    let mut data = UserBuffersInputBuffer::new(current_task, iovec)?;
+    let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
     if let Some(offset) = offset {
         file.write_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &mut data)
     } else {

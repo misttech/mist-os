@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{
-    read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt, TaskMemoryAccessor,
-    UNIFIED_ASPACES_ENABLED,
+use crate::{
+    mm::{
+        read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt, TaskMemoryAccessor,
+        UNIFIED_ASPACES_ENABLED,
+    },
+    task::{CurrentTask, Task},
 };
 use smallvec::SmallVec;
 use starnix_uapi::{
@@ -354,18 +357,14 @@ impl InputBufferExt for dyn InputBuffer + '_ {}
 impl<T: InputBuffer> InputBufferExt for T {}
 
 /// An OutputBuffer that write data to user space memory through a `TaskMemoryAccessor`.
-///
-/// `USE_VMO` indicates whether the data should be written through a VMO. If `false`,
-/// the user space memory is assumed to be mapped in the current address space and
-/// the memory will be written to directly instead of going through the VMO.
-pub struct UserBuffersOutputBuffer<'a, M, const USE_VMO: bool = false> {
+pub struct UserBuffersOutputBuffer<'a, M> {
     mm: &'a M,
     buffers: Vec<UserBuffer>,
     available: usize,
     bytes_written: usize,
 }
 
-impl<'a, M, const USE_VMO: bool> std::fmt::Debug for UserBuffersOutputBuffer<'a, M, USE_VMO> {
+impl<'a, M> std::fmt::Debug for UserBuffersOutputBuffer<'a, M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UserBuffersOutputBuffer")
             .field("buffers", &self.buffers)
@@ -375,7 +374,7 @@ impl<'a, M, const USE_VMO: bool> std::fmt::Debug for UserBuffersOutputBuffer<'a,
     }
 }
 
-impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> UserBuffersOutputBuffer<'a, M, USE_VMO> {
+impl<'a, M: TaskMemoryAccessor> UserBuffersOutputBuffer<'a, M> {
     fn new_inner(mm: &'a M, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         let (mut buffers, available) =
             UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_address(), buffers)?;
@@ -397,11 +396,7 @@ impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> UserBuffersOutputBuffer<'a,
             let bytes = callback(buffer.length)?;
             let bytes = bytes.as_ref();
 
-            bytes_written += if USE_VMO {
-                self.mm.vmo_write_memory(buffer.address, bytes)
-            } else {
-                self.mm.write_memory(buffer.address, bytes)
-            }?;
+            bytes_written += self.mm.write_memory(buffer.address, bytes)?;
             let bytes_len = bytes.len();
             buffer.advance(bytes_len)?;
             self.available -= bytes_len;
@@ -415,25 +410,27 @@ impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> UserBuffersOutputBuffer<'a,
     }
 }
 
-impl<'a, M: TaskMemoryAccessor> UserBuffersOutputBuffer<'a, M> {
-    pub fn new(mm: &'a M, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+impl<'a> UserBuffersOutputBuffer<'a, CurrentTask> {
+    pub fn unified_new(mm: &'a CurrentTask, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 
-    pub fn new_at(mm: &'a M, address: UserAddress, length: usize) -> Result<Self, Errno> {
-        Self::new(mm, vec![UserBuffer { address, length }])
+    pub fn unified_new_at(
+        mm: &'a CurrentTask,
+        address: UserAddress,
+        length: usize,
+    ) -> Result<Self, Errno> {
+        Self::unified_new(mm, vec![UserBuffer { address, length }])
     }
 }
 
-impl<'a, M: TaskMemoryAccessor> UserBuffersOutputBuffer<'a, M, true> {
-    pub fn vmo_new(mm: &'a M, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+impl<'a> UserBuffersOutputBuffer<'a, Task> {
+    pub fn vmo_new(mm: &'a Task, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }
 
-impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> Buffer
-    for UserBuffersOutputBuffer<'a, M, USE_VMO>
-{
+impl<'a, M: TaskMemoryAccessor> Buffer for UserBuffersOutputBuffer<'a, M> {
     fn segments_count(&self) -> Result<usize, Errno> {
         Ok(self.buffers.iter().filter(|b| b.is_null()).count())
     }
@@ -456,9 +453,7 @@ impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> Buffer
     }
 }
 
-impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> OutputBuffer
-    for UserBuffersOutputBuffer<'a, M, USE_VMO>
-{
+impl<'a, M: TaskMemoryAccessor> OutputBuffer for UserBuffersOutputBuffer<'a, M> {
     fn write(&mut self, mut bytes: &[u8]) -> Result<usize, Errno> {
         self.write_each_inner(|buflen| {
             let bytes_len = std::cmp::min(bytes.len(), buflen);
@@ -498,11 +493,7 @@ impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> OutputBuffer
                 continue;
             }
 
-            let count = if USE_VMO {
-                self.mm.vmo_zero(buffer.address, buffer.length)
-            } else {
-                self.mm.zero(buffer.address, buffer.length)
-            }?;
+            let count = self.mm.zero(buffer.address, buffer.length)?;
             buffer.advance(count)?;
             bytes_written += count;
 
@@ -544,18 +535,14 @@ impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> OutputBuffer
 }
 
 /// An InputBuffer that read data from user space memory through a `TaskMemoryAccessor`.
-///
-/// `USE_VMO` indicates whether the data should be read through a VMO. If `false`,
-/// the user space memory is assumed to be mapped in the current address space and
-/// the memory will be read directly instead of going through the VMO.
-pub struct UserBuffersInputBuffer<'a, M, const USE_VMO: bool = false> {
+pub struct UserBuffersInputBuffer<'a, M> {
     mm: &'a M,
     buffers: Vec<UserBuffer>,
     available: usize,
     bytes_read: usize,
 }
 
-impl<'a, M, const USE_VMO: bool> std::fmt::Debug for UserBuffersInputBuffer<'a, M, USE_VMO> {
+impl<'a, M> std::fmt::Debug for UserBuffersInputBuffer<'a, M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("UserBuffersOutputBuffer")
             .field("buffers", &self.buffers)
@@ -565,7 +552,7 @@ impl<'a, M, const USE_VMO: bool> std::fmt::Debug for UserBuffersInputBuffer<'a, 
     }
 }
 
-impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> UserBuffersInputBuffer<'a, M, USE_VMO> {
+impl<'a, M: TaskMemoryAccessor> UserBuffersInputBuffer<'a, M> {
     fn new_inner(mm: &'a M, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         let (mut buffers, available) =
             UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_address(), buffers)?;
@@ -597,25 +584,27 @@ impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> UserBuffersInputBuffer<'a, 
     }
 }
 
-impl<'a, M: TaskMemoryAccessor> UserBuffersInputBuffer<'a, M> {
-    pub fn new(mm: &'a M, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+impl<'a> UserBuffersInputBuffer<'a, CurrentTask> {
+    pub fn unified_new(mm: &'a CurrentTask, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 
-    pub fn new_at(mm: &'a M, address: UserAddress, length: usize) -> Result<Self, Errno> {
-        Self::new(mm, vec![UserBuffer { address, length }])
+    pub fn unified_new_at(
+        mm: &'a CurrentTask,
+        address: UserAddress,
+        length: usize,
+    ) -> Result<Self, Errno> {
+        Self::unified_new(mm, vec![UserBuffer { address, length }])
     }
 }
 
-impl<'a, M: TaskMemoryAccessor> UserBuffersInputBuffer<'a, M, true> {
-    pub fn vmo_new(mm: &'a M, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+impl<'a> UserBuffersInputBuffer<'a, Task> {
+    pub fn vmo_new(mm: &'a Task, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }
 
-impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> Buffer
-    for UserBuffersInputBuffer<'a, M, USE_VMO>
-{
+impl<'a, M: TaskMemoryAccessor> Buffer for UserBuffersInputBuffer<'a, M> {
     fn segments_count(&self) -> Result<usize, Errno> {
         Ok(self.buffers.iter().filter(|b| b.is_null()).count())
     }
@@ -638,19 +627,13 @@ impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> Buffer
     }
 }
 
-impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> InputBuffer
-    for UserBuffersInputBuffer<'a, M, USE_VMO>
-{
+impl<'a, M: TaskMemoryAccessor> InputBuffer for UserBuffersInputBuffer<'a, M> {
     fn peek(&mut self, uninit_bytes: &mut [MaybeUninit<u8>]) -> Result<usize, Errno> {
         self.peek_each_inner(|buffer, read_so_far| {
             let read_to = &mut uninit_bytes[read_so_far..];
             let read_count = std::cmp::min(buffer.length, read_to.len());
             let read_to = &mut read_to[..read_count];
-            let read_bytes = if USE_VMO {
-                self.mm.vmo_read_memory(buffer.address, read_to)
-            } else {
-                self.mm.read_memory(buffer.address, read_to)
-            }?;
+            let read_bytes = self.mm.read_memory(buffer.address, read_to)?;
             debug_assert_eq!(read_bytes.len(), read_count);
             Ok(read_count)
         })
@@ -658,11 +641,7 @@ impl<'a, M: TaskMemoryAccessor, const USE_VMO: bool> InputBuffer
 
     fn peek_each(&mut self, callback: &mut InputBufferCallback<'_>) -> Result<usize, Errno> {
         self.peek_each_inner(|buffer, _read_so_far| {
-            let bytes = if USE_VMO {
-                self.mm.vmo_read_memory_to_vec(buffer.address, buffer.length)
-            } else {
-                self.mm.read_memory_to_vec(buffer.address, buffer.length)
-            }?;
+            let bytes = self.mm.read_memory_to_vec(buffer.address, buffer.length)?;
             callback(&bytes)
         })
     }
@@ -910,14 +889,14 @@ mod tests {
 
         // Test incorrect callback.
         {
-            let mut input_buffer = UserBuffersInputBuffer::new(mm, input_iovec.clone())
+            let mut input_buffer = UserBuffersInputBuffer::unified_new(mm, input_iovec.clone())
                 .expect("UserBuffersInputBuffer");
             assert!(input_buffer.peek_each(&mut |data| Ok(data.len() + 1)).is_err());
         }
 
         // Test drain
         {
-            let mut input_buffer = UserBuffersInputBuffer::new(mm, input_iovec.clone())
+            let mut input_buffer = UserBuffersInputBuffer::unified_new(mm, input_iovec.clone())
                 .expect("UserBuffersInputBuffer");
             assert_eq!(input_buffer.available(), 37);
             assert_eq!(input_buffer.bytes_read(), 0);
@@ -928,7 +907,7 @@ mod tests {
 
         // Test read_all
         {
-            let mut input_buffer = UserBuffersInputBuffer::new(mm, input_iovec.clone())
+            let mut input_buffer = UserBuffersInputBuffer::unified_new(mm, input_iovec.clone())
                 .expect("UserBuffersInputBuffer");
             assert_eq!(input_buffer.available(), 37);
             assert_eq!(input_buffer.bytes_read(), 0);
@@ -942,8 +921,8 @@ mod tests {
 
         // Test read
         {
-            let mut input_buffer =
-                UserBuffersInputBuffer::new(mm, input_iovec).expect("UserBuffersInputBuffer");
+            let mut input_buffer = UserBuffersInputBuffer::unified_new(mm, input_iovec)
+                .expect("UserBuffersInputBuffer");
             let mut buffer = [0; 50];
             assert_eq!(input_buffer.available(), 37);
             assert_eq!(input_buffer.bytes_read(), 0);
@@ -986,15 +965,15 @@ mod tests {
 
         // Test incorrect callback.
         {
-            let mut output_buffer = UserBuffersOutputBuffer::new(mm, output_iovec.clone())
+            let mut output_buffer = UserBuffersOutputBuffer::unified_new(mm, output_iovec.clone())
                 .expect("UserBuffersOutputBuffer");
             assert!(output_buffer.write_each(&mut |data| Ok(data.len() + 1)).is_err());
         }
 
         // Test write
         {
-            let mut output_buffer =
-                UserBuffersOutputBuffer::new(mm, output_iovec).expect("UserBuffersOutputBuffer");
+            let mut output_buffer = UserBuffersOutputBuffer::unified_new(mm, output_iovec)
+                .expect("UserBuffersOutputBuffer");
             assert_eq!(output_buffer.available(), 37);
             assert_eq!(output_buffer.bytes_written(), 0);
             assert_eq!(output_buffer.write_all(&data[0..20]).expect("write"), 20);

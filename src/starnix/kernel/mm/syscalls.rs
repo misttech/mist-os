@@ -267,9 +267,9 @@ pub fn sys_process_vm_readv(
     // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
-    let mut output = UserBuffersOutputBuffer::new(current_task, local_iov)?;
+    let mut output = UserBuffersOutputBuffer::unified_new(current_task, local_iov)?;
     if current_task.has_same_address_space(&remote_task) {
-        let mut input = UserBuffersInputBuffer::new(remote_task.deref(), remote_iov)?;
+        let mut input = UserBuffersInputBuffer::unified_new(current_task, remote_iov)?;
         output.write_buffer(&mut input)
     } else {
         let mut input = UserBuffersInputBuffer::vmo_new(remote_task.deref(), remote_iov)?;
@@ -316,9 +316,9 @@ pub fn sys_process_vm_writev(
     // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
-    let mut input = UserBuffersInputBuffer::new(current_task, local_iov)?;
+    let mut input = UserBuffersInputBuffer::unified_new(current_task, local_iov)?;
     if current_task.has_same_address_space(&remote_task) {
-        let mut output = UserBuffersOutputBuffer::new(remote_task.deref(), remote_iov)?;
+        let mut output = UserBuffersOutputBuffer::unified_new(current_task, remote_iov)?;
         output.write_buffer(&mut input)
     } else {
         let mut output = UserBuffersOutputBuffer::vmo_new(remote_task.deref(), remote_iov)?;
