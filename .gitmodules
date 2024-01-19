@@ -643,3 +643,38 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/KhronosGroup/Vulkan-Utility-Libraries
 	name = third_party/Vulkan-Utility-Libraries
 	ignore = all
+[submodule "third_party/github.com/PyCQA/isort/src"]
+	path = third_party/github.com/PyCQA/isort/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/PyCQA/isort
+	name = third_party/github.com/PyCQA/isort
+	ignore = all
+[submodule "third_party/github.com/PyCQA/mccabe/src"]
+	path = third_party/github.com/PyCQA/mccabe/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/PyCQA/mccabe
+	name = third_party/github.com/PyCQA/mccabe
+	ignore = all
+[submodule "third_party/github.com/platformdirs/platformdirs/src"]
+	path = third_party/github.com/platformdirs/platformdirs/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/platformdirs/platformdirs
+	name = third_party/github.com/platformdirs/platformdirs
+	ignore = all
+[submodule "third_party/github.com/pylint-dev/astroid/src"]
+	path = third_party/github.com/pylint-dev/astroid/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/pylint-dev/astroid
+	name = third_party/github.com/pylint-dev/astroid
+	ignore = all
+[submodule "third_party/github.com/pylint-dev/pylint/src"]
+	path = third_party/github.com/pylint-dev/pylint/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/pylint-dev/pylint
+	name = third_party/github.com/pylint-dev/pylint
+	ignore = all
+[submodule "third_party/github.com/sdispater/tomlkit/src"]
+	path = third_party/github.com/sdispater/tomlkit/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/sdispater/tomlkit
+	name = third_party/github.com/sdispater/tomlkit
+	ignore = all
+[submodule "third_party/github.com/uqfoundation/dill/src"]
+	path = third_party/github.com/uqfoundation/dill/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/uqfoundation/dill
+	name = third_party/github.com/uqfoundation/dill
+	ignore = all
