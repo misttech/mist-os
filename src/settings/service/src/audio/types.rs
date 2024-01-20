@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
@@ -83,8 +84,8 @@ impl DeviceStorageCompatible for AudioInfo {
         default_audio_info()
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value).unwrap_or_else(|_| Self::from(AudioInfoV2::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| AudioInfoV2::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -117,8 +118,8 @@ impl DeviceStorageCompatible for AudioInfoV2 {
         }
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value).unwrap_or_else(|_| Self::from(AudioInfoV1::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| AudioInfoV1::try_deserialize_from(value).map(Self::from))
     }
 }
 

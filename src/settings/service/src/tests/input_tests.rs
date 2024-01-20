@@ -669,7 +669,7 @@ async fn test_restore() {
     stored_info.input_device_state = default_mic_cam_config_cam_sw_disabled().into();
     let env = TestInputEnvironmentBuilder::new()
         .set_starting_input_info_sources(stored_info)
-        .set_input_device_config(default_mic_config_muted())
+        .set_input_device_config(default_mic_cam_config_cam_sw_disabled())
         .build()
         .await;
 

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::base::{Merge, SettingInfo, SettingType};
@@ -89,8 +90,8 @@ impl DeviceStorageCompatible for DisplayInfo {
         default_display_info()
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value).unwrap_or_else(|_| Self::from(DisplayInfoV5::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV5::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -359,8 +360,8 @@ impl DeviceStorageCompatible for DisplayInfoV2 {
         )
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value).unwrap_or_else(|_| Self::from(DisplayInfoV1::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV1::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -438,8 +439,8 @@ impl DeviceStorageCompatible for DisplayInfoV3 {
         )
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value).unwrap_or_else(|_| Self::from(DisplayInfoV2::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV2::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -510,8 +511,8 @@ impl DeviceStorageCompatible for DisplayInfoV4 {
         )
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value).unwrap_or_else(|_| Self::from(DisplayInfoV3::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV3::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -570,8 +571,8 @@ impl DeviceStorageCompatible for DisplayInfoV5 {
         )
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value).unwrap_or_else(|_| Self::from(DisplayInfoV4::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|_| DisplayInfoV4::try_deserialize_from(value).map(Self::from))
     }
 }
 
@@ -588,7 +589,8 @@ mod tests {
         };
 
         let serialized_v1 = v1.serialize_to();
-        let v2 = DisplayInfoV2::deserialize_from(&serialized_v1);
+        let v2 = DisplayInfoV2::try_deserialize_from(&serialized_v1)
+            .expect("deserialization should succeed");
 
         assert_eq!(
             v2,
@@ -611,7 +613,8 @@ mod tests {
         };
 
         let serialized_v2 = v2.serialize_to();
-        let v3 = DisplayInfoV3::deserialize_from(&serialized_v2);
+        let v3 = DisplayInfoV3::try_deserialize_from(&serialized_v2)
+            .expect("deserialization should succeed");
 
         assert_eq!(
             v3,
@@ -636,7 +639,8 @@ mod tests {
         };
 
         let serialized_v3 = v3.serialize_to();
-        let v4 = DisplayInfoV4::deserialize_from(&serialized_v3);
+        let v4 = DisplayInfoV4::try_deserialize_from(&serialized_v3)
+            .expect("deserialization should succeed");
 
         // In v4, the field formally known as theme_mode is theme_type.
         assert_eq!(
@@ -662,7 +666,8 @@ mod tests {
         };
 
         let serialized_v4 = v4.serialize_to();
-        let v5 = DisplayInfoV5::deserialize_from(&serialized_v4);
+        let v5 = DisplayInfoV5::try_deserialize_from(&serialized_v4)
+            .expect("deserialization should succeed");
 
         assert_eq!(
             v5,
@@ -685,7 +690,8 @@ mod tests {
         };
 
         let serialized_v1 = v1.serialize_to();
-        let current = DisplayInfo::deserialize_from(&serialized_v1);
+        let current = DisplayInfo::try_deserialize_from(&serialized_v1)
+            .expect("deserialization should succeed");
 
         assert_eq!(
             current,
@@ -711,7 +717,8 @@ mod tests {
         };
 
         let serialized_v2 = v2.serialize_to();
-        let current = DisplayInfo::deserialize_from(&serialized_v2);
+        let current = DisplayInfo::try_deserialize_from(&serialized_v2)
+            .expect("deserialization should succeed");
 
         assert_eq!(
             current,
@@ -738,7 +745,8 @@ mod tests {
         };
 
         let serialized_v3 = v3.serialize_to();
-        let current = DisplayInfo::deserialize_from(&serialized_v3);
+        let current = DisplayInfo::try_deserialize_from(&serialized_v3)
+            .expect("deserialization should succeed");
 
         assert_eq!(
             current,
@@ -765,7 +773,8 @@ mod tests {
         };
 
         let serialized_v4 = v4.serialize_to();
-        let current = DisplayInfo::deserialize_from(&serialized_v4);
+        let current = DisplayInfo::try_deserialize_from(&serialized_v4)
+            .expect("deserialization should succeed");
 
         assert_eq!(
             current,
@@ -791,7 +800,8 @@ mod tests {
         };
 
         let serialized_v5 = v5.serialize_to();
-        let current = DisplayInfo::deserialize_from(&serialized_v5);
+        let current = DisplayInfo::try_deserialize_from(&serialized_v5)
+            .expect("deserialization should succeed");
 
         assert_eq!(
             current,

@@ -20,6 +20,7 @@ use crate::input::MediaButtons;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::StorageAccess;
 
+use anyhow::Error;
 use async_trait::async_trait;
 use fuchsia_trace as ftrace;
 use futures::lock::Mutex;
@@ -36,9 +37,11 @@ impl DeviceStorageCompatible for InputInfoSources {
         InputInfoSources { input_device_state: InputState::new() }
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value)
-            .unwrap_or_else(|_| Self::from(InputInfoSourcesV2::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|e| {
+            tracing::info!("Failed to deserialize InputInfoSources. Falling back to V2: {e:?}");
+            InputInfoSourcesV2::try_deserialize_from(value).map(Self::from)
+        })
     }
 }
 
@@ -100,9 +103,11 @@ impl DeviceStorageCompatible for InputInfoSourcesV2 {
         }
     }
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value)
-            .unwrap_or_else(|_| Self::from(InputInfoSourcesV1::deserialize_from(value)))
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value).or_else(|e| {
+            tracing::info!("Failed to deserialize InputInfoSourcesV2. Falling back to V1: {e:?}");
+            InputInfoSourcesV1::try_deserialize_from(value).map(Self::from)
+        })
     }
 }
 
@@ -178,13 +183,21 @@ impl InputControllerInner {
         let input_info = self.get_stored_info().await;
         self.input_device_state = input_info.input_device_state;
 
-        let cam_state = self.get_cam_sw_state().ok();
-        if let Some(state) = cam_state {
-            // Camera setup failure should not prevent start of service. This also allows
-            // clients to see that the camera may not be useable.
-            if let Err(e) = self.push_cam_sw_state(state).await {
-                tracing::error!("Unable to restore camera state: {e:?}");
-                self.set_cam_err_state(state);
+        if self.input_device_config.devices.iter().any(|d| d.device_type == InputDeviceType::CAMERA)
+        {
+            match self.get_cam_sw_state() {
+                Ok(state) => {
+                    // Camera setup failure should not prevent start of service. This also allows
+                    // clients to see that the camera may not be usable.
+                    if let Err(e) = self.push_cam_sw_state(state).await {
+                        tracing::error!("Unable to restore camera state: {e:?}");
+                        self.set_cam_err_state(state);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Unable to load cam sw state: {e:?}");
+                    self.set_cam_err_state(DeviceState::ERROR);
+                }
             }
         }
         Ok(())
@@ -500,7 +513,8 @@ mod tests {
         v1.sw_microphone = MUTED_MIC;
 
         let serialized_v1 = v1.serialize_to();
-        let current = InputInfoSources::deserialize_from(&serialized_v1);
+        let current = InputInfoSources::try_deserialize_from(&serialized_v1)
+            .expect("deserialization should succeed");
         let mut expected_input_state = InputState::new();
         expected_input_state.set_source_state(
             InputDeviceType::MICROPHONE,
@@ -524,7 +538,8 @@ mod tests {
         v1.sw_microphone = MUTED_MIC;
 
         let serialized_v1 = v1.serialize_to();
-        let v2 = InputInfoSourcesV2::deserialize_from(&serialized_v1);
+        let v2 = InputInfoSourcesV2::try_deserialize_from(&serialized_v1)
+            .expect("deserialization should succeed");
 
         assert_eq!(v2.hw_microphone, Microphone { muted: false });
         assert_eq!(v2.sw_microphone, MUTED_MIC);
@@ -551,7 +566,8 @@ mod tests {
         v2.sw_microphone = MUTED_MIC;
 
         let serialized_v2 = v2.serialize_to();
-        let current = InputInfoSources::deserialize_from(&serialized_v2);
+        let current = InputInfoSources::try_deserialize_from(&serialized_v2)
+            .expect("deserialization should succeed");
         let mut expected_input_state = InputState::new();
 
         expected_input_state.set_source_state(

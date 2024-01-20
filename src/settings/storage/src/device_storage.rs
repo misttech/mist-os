@@ -83,15 +83,12 @@ pub trait DeviceStorageCompatible:
 {
     fn default_value() -> Self;
 
-    fn deserialize_from(value: &str) -> Self {
-        Self::extract(value).unwrap_or_else(|error| {
-            tracing::error!("error occurred:{:?}", error);
-            Self::default_value()
-        })
+    fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        Self::extract(value)
     }
 
     fn extract(value: &str) -> Result<Self, Error> {
-        serde_json::from_str(value).map_err(|_| format_err!("could not deserialize"))
+        serde_json::from_str(value).map_err(|e| format_err!("could not deserialize: {e:?}"))
     }
 
     fn serialize_to(&self) -> String {
@@ -425,7 +422,16 @@ impl DeviceStorage {
         let (mut cached_storage, update) = self.get_inner(T::KEY).await;
         if let Some(update) = update {
             cached_storage.current_data = if let Some(string_value) = update {
-                Some(Box::new(T::deserialize_from(&string_value)) as Box<dyn Any + Send + Sync>)
+                match T::try_deserialize_from(&string_value) {
+                    Ok(val) => Some(Box::new(val) as Box<dyn Any + Send + Sync>),
+                    Err(e) => {
+                        tracing::error!(
+                            "Using default. Failed to deserialize type {}: {e:?}\nSource data: {string_value:?}",
+                            T::KEY
+                        );
+                        Some(Box::new(T::default_value()) as Box<dyn Any + Send + Sync>)
+                    }
+                }
             } else {
                 Some(Box::new(T::default_value()) as Box<dyn Any + Send + Sync>)
             };
@@ -498,7 +504,8 @@ mod tests {
             Ok(StoreAccessorRequest::SetValue { key, val, control_handle: _ }) => {
                 assert_eq!(key, STORE_KEY);
                 if let Value::Stringval(string_value) = val {
-                    let input_value = TestStruct::deserialize_from(&string_value);
+                    let input_value = TestStruct::try_deserialize_from(&string_value)
+                        .expect("deserialization should succeed");
                     assert_eq!(input_value.value, expected_value);
                 } else {
                     panic!("Unexpected type for key found in stash");
@@ -930,6 +937,7 @@ mod tests {
     // test_device_compatible_migration tests.
     mod test_device_compatible_migration {
         use super::super::DeviceStorageCompatible;
+        use anyhow::Error;
         use serde::{Deserialize, Serialize};
 
         pub(crate) const DEFAULT_V1_VALUE: i32 = 1;
@@ -968,10 +976,8 @@ mod tests {
                 Self { value: DEFAULT_CURRENT_VALUE, value_2: DEFAULT_CURRENT_VALUE_2 }
             }
 
-            fn deserialize_from(value: &str) -> Self {
-                Self::extract(value).unwrap_or_else(|_| {
-                    V1::extract(value).map_or(Self::default_value(), Self::from)
-                })
+            fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+                Self::extract(value).or_else(|_| V1::extract(value).map(Self::from))
             }
         }
     }
@@ -985,9 +991,45 @@ mod tests {
 
         // Deserialize using the second version.
         let current =
-            test_device_compatible_migration::Current::deserialize_from(&initial_serialized);
+            test_device_compatible_migration::Current::try_deserialize_from(&initial_serialized)
+                .expect("deserialization should succeed");
         // Assert values carried over from first version and defaults are used for rest.
         assert_eq!(current.value, test_device_compatible_migration::DEFAULT_V1_VALUE);
+        assert_eq!(current.value_2, test_device_compatible_migration::DEFAULT_CURRENT_VALUE_2);
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_corrupt_get_returns_default() {
+        let (stash_proxy, mut stash_stream) =
+            fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
+
+        fasync::Task::spawn(async move {
+            #[allow(clippy::single_match)]
+            while let Some(req) = stash_stream.try_next().await.unwrap() {
+                #[allow(unreachable_patterns)]
+                match req {
+                    StoreAccessorRequest::GetValue { key, responder } => {
+                        assert_eq!(
+                            key,
+                            format!("settings_{}", test_device_compatible_migration::Current::KEY)
+                        );
+                        let response = Value::Stringval("bad json".to_string());
+                        responder.send(Some(response)).unwrap();
+                    }
+                    _ => {}
+                }
+            }
+        })
+        .detach();
+
+        let storage = DeviceStorage::with_stash_proxy(
+            vec![test_device_compatible_migration::Current::KEY],
+            move || stash_proxy.clone(),
+            StashInspectLoggerHandle::new().logger,
+        );
+        let current = storage.get::<test_device_compatible_migration::Current>().await;
+
+        assert_eq!(current.value, test_device_compatible_migration::DEFAULT_CURRENT_VALUE);
         assert_eq!(current.value_2, test_device_compatible_migration::DEFAULT_CURRENT_VALUE_2);
     }
 }

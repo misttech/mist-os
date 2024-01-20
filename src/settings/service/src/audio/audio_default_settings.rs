@@ -139,7 +139,8 @@ mod tests {
 
         let serialized_v1 = v1.serialize_to();
 
-        let v2 = AudioInfoV2::deserialize_from(&serialized_v1);
+        let v2 = AudioInfoV2::try_deserialize_from(&serialized_v1)
+            .expect("deserialization should succeed");
 
         assert_eq!(v2.input.mic_mute, updated_mic_mute_val);
     }
@@ -158,7 +159,8 @@ mod tests {
 
         let serialized_v2 = v2.serialize_to();
 
-        let current = AudioInfo::deserialize_from(&serialized_v2);
+        let current = AudioInfo::try_deserialize_from(&serialized_v2)
+            .expect("deserialization should succeed");
 
         assert_eq!(current, AudioInfo::default_value());
     }
@@ -177,7 +179,8 @@ mod tests {
 
         let serialized_v1 = v1.serialize_to();
 
-        let current = AudioInfo::deserialize_from(&serialized_v1);
+        let current = AudioInfo::try_deserialize_from(&serialized_v1)
+            .expect("deserialization should succeed");
 
         assert_eq!(current, AudioInfo::default_value());
     }
