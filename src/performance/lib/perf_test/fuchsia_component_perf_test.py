@@ -7,12 +7,12 @@ component that publishes a fuchsiaperf.json file.
 """
 
 import os
-import pathlib
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from perf_publish import publish
-from mobly import asserts, test_runner
+from perf_test_utils import utils
+from mobly import test_runner
 
 
 class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
@@ -56,49 +56,28 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
             "test_component_args", []
         )
 
-        result_files: list[str] = []
-        for i in range(self.process_runs):
-            test_args: list[str] = []
-            if self.test_component_args:
-                test_args += self.test_component_args
-
-            results_file: str = "results.fuchsiaperf.json"
-            results_file_path = f"/custom_artifacts/{results_file}"
-            if self.results_path_test_arg:
-                if self.results_path_test_arg.endswith("="):
-                    test_args.append(
-                        f"{self.results_path_test_arg}{results_file_path}"
-                    )
-                else:
-                    test_args += [
-                        self.results_path_test_arg,
-                        results_file_path,
-                    ]
+        results_file_path: str = utils.DEFAULT_TARGET_RESULTS_PATH
+        if self.results_path_test_arg:
+            if self.results_path_test_arg.endswith("="):
+                self.test_component_args.append(
+                    f"{self.results_path_test_arg}{results_file_path}"
+                )
             else:
-                test_args.append(results_file_path)
+                self.test_component_args += [
+                    self.results_path_test_arg,
+                    results_file_path,
+                ]
+        else:
+            self.test_component_args.append(results_file_path)
 
-            test_dir = os.path.join(self.test_case_path, f"ffx_test_{i}")
-            ffx_test_args = self.ffx_test_args + [
-                "--output-directory",
-                test_dir,
-            ]
-            self.device.ffx.run_test_component(
-                self.ffx_test_url,
-                ffx_test_args=ffx_test_args,
-                test_component_args=test_args,
-                timeout=None,
-                capture_output=False,
-            )
-            test_result_files = list(
-                pathlib.Path(self.test_case_path).rglob(results_file)
-            )
-            asserts.assert_equal(len(test_result_files), 1)
-
-            dest_file = os.path.join(
-                self.test_case_path, f"results_process{i}.fuchsiaperf_full.json"
-            )
-            os.rename(test_result_files[0], dest_file)
-            result_files.append(dest_file)
+        result_files: list[str] = utils.run_test_component(
+            self.device.ffx,
+            self.ffx_test_url,
+            self.test_case_path,
+            ffx_test_args=self.ffx_test_args,
+            test_component_args=self.test_component_args,
+            process_runs=self.process_runs,
+        )
 
         publish.publish_fuchsiaperf(
             result_files,

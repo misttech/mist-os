@@ -20,7 +20,6 @@ test_list = [
   # keep-sorted start
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
-  "tracing_microbenchmarks_test",
 
   # keep-sorted end
 ]
@@ -147,6 +146,24 @@ _tests = [
     expected_metric_filenames = []
     libraries = [ "//src/performance/lib/trace_processing" ]
   },
+  {
+    name = "tracing_microbenchmarks_test"
+    expected_metric_filenames = [
+      "fuchsia.microbenchmarks.tracing.txt",
+      "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
+      "fuchsia.trace_records.rust.tracing_categories_disabled.txt",
+      "fuchsia.trace_records.rust.tracing_disabled.txt",
+    ]
+    libraries = [
+      "//src/performance/lib/perf_publish",
+      "//src/performance/lib/py_test_utils:perf_test_utils",
+      "//src/performance/lib/trace_processing",
+    ]
+    target_deps = [
+      "//src/lib/trace/rust/bench",
+      "//src/tests/microbenchmarks:fuchsia_microbenchmarks",
+    ]
+  },
 ]
 
 _python_benchmarks = []
@@ -156,7 +173,11 @@ foreach(test, _tests) {
   if (is_host) {
     python_perf_test(_test_name) {
       main_source = "test/${_name}.py"
-      forward_variables_from(test, [ "transport" ])
+      forward_variables_from(test,
+                             [
+                               "transport",
+                               "target_deps",
+                             ])
       expected_metric_names_filepaths = []
       foreach(filename, test.expected_metric_filenames) {
         expected_metric_names_filepaths +=
@@ -177,8 +198,6 @@ if (is_host) {
     # keep-sorted start
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
-    "fuchsia.microbenchmarks.tracing.txt",
-    "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_recv.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_send.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_udp_recv.txt",
@@ -187,8 +206,6 @@ if (is_host) {
     "fuchsia.netstack.iperf_benchmarks.localhost_udp.txt",
     "fuchsia.storage.starnix_data.txt",
     "fuchsia.storage.starnix_tmp.txt",
-    "fuchsia.trace_records.rust.tracing_categories_disabled.txt",
-    "fuchsia.trace_records.rust.tracing_disabled.txt",
 
     # keep-sorted end
   ]
@@ -246,9 +263,6 @@ group("test") {
 
     # These are used by flatland_benchmarks and input_latency_benchmarks
     "//src/ui/examples:flatland-examples",
-
-    # Used by the tracing_microbenchmarks test
-    "//src/lib/trace/rust/bench",
   ]
 
   if (!is_asan) {

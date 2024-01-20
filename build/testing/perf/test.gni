@@ -242,6 +242,7 @@ template("fuchsia_component_perf_test") {
     params = _params
     libraries = [
       "//src/performance/lib/perf_publish",
+      "//src/performance/lib/py_test_utils:perf_test_utils",
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/mobly",
