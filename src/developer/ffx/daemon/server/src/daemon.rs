@@ -132,22 +132,29 @@ impl DaemonEventHandler {
             }
         };
 
-        tracing::info!("Peer {node_id} identifies as: {identify:?}");
-
         let (update, addrs) =
             target::TargetUpdateBuilder::from_rcs_identify(rcs.clone(), &identify);
 
-        let updated = self.target_collection.update_target(
+        let nodename = identify.nodename.clone().unwrap_or_default();
+        let product_config = identify.product_config.clone().unwrap_or_default();
+        let board_config = identify.board_config.clone().unwrap_or_default();
+        let ids = identify.ids.clone().unwrap_or_default();
+
+        match self.target_collection.update_target(
             &[
                 TargetUpdateFilter::Ids(identify.ids.as_deref().unwrap_or(&[])),
                 TargetUpdateFilter::NetAddrs(&addrs),
             ],
             update.build(),
             false,
-        );
-
-        if updated == 0 {
-            tracing::error!("Target from Overnet {node_id} did not match any known targets");
+        ) {
+            // Print out better Peer information in logs
+            0 => {
+                tracing::error!("No targets match identity ['{nodename}', '{product_config}.{board_config}', {ids:?}] with node id: {node_id}");
+            }
+            _ => {
+                tracing::info!( "Overnet peer is identified as target: ['{nodename}', '{product_config}.{board_config}', {ids:?}] with node id: {node_id}");
+            }
         }
     }
 

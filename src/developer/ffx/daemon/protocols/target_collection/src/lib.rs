@@ -503,7 +503,7 @@ impl FidlProtocol for TargetCollectionProtocol {
             None
         };
         self.tasks.spawn(async move {
-            tracing::warn!("In start: spawned task to load manual targets");
+            tracing::info!("Loading previously configured manual targets");
             if let Err(e) = TargetCollectionProtocol::load_manual_targets(
                 &load_manual_cx,
                 manual_targets_collection,
