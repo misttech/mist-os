@@ -153,7 +153,8 @@ class Dfv2NodeTest : public DriverManagerTestBase {
 
     fidl::Arena arena;
     node->StartDriver(fidl::ToWire(arena, std::move(start_info)),
-                      std::move(controller_endpoints->server), [](zx::result<> result) {});
+                      std::move(controller_endpoints->server),
+                      [node](zx::result<> result) { node->CompleteBind(result); });
   }
 
  protected:

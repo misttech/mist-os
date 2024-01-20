@@ -36,10 +36,12 @@ enum class ShutdownIntent : uint8_t {
 };
 
 enum class NodeState : uint8_t {
-  kRunning,                   // Normal running state.
-  kPrestop,                   // Still running, but will remove soon. usually because
-                              //  Received Remove(kPackage), but is a boot driver.
-  kWaitingOnChildren,         // Received Remove, and waiting for children to be removed.
+  kRunning,              // Normal running state.
+  kPrestop,              // Still running, but will remove soon. usually because the node
+                         // received Remove(kPackage), but is a boot driver.
+  kWaitingOnDriverBind,  // Waiting for the driver to complete binding.
+  kWaitingOnChildren,    // Received Remove, and waiting for children to be removed.
+
   kWaitingOnDriver,           // Waiting for driver to respond from Stop() command.
   kWaitingOnDriverComponent,  // Waiting driver component to be destroyed.
   kStopped,                   // Node finished shutdown.
@@ -65,6 +67,8 @@ class NodeShutdownBridge {
   // Once the callback is invoked, the node state changes to to kStopped and the node removal
   // tracker is notified.
   virtual void FinishShutdown(fit::callback<void()> shutdown_callback) = 0;
+
+  virtual bool IsPendingBind() const = 0;
 
   virtual bool HasChildren() const = 0;
 
@@ -101,6 +105,7 @@ class ShutdownHelper {
 
   // Functions that check and transition the node's state.
   void CheckNodeState();
+  void CheckWaitingOnDriverBind();
   void CheckWaitingOnChildren();
   void CheckWaitingOnDriver();
   void CheckWaitingOnDriverComponent();

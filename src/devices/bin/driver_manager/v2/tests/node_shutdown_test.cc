@@ -184,7 +184,9 @@ class NodeShutdownTest : public DriverManagerTestBase {
 
     fidl::Arena arena;
     node->StartDriver(fidl::ToWire(arena, std::move(start_info)),
-                      std::move(controller_endpoints->server), [](zx::result<> result) {});
+                      std::move(controller_endpoints->server),
+                      [node](zx::result<> result) { node->CompleteBind(result); });
+    RunLoopUntilIdle();
   }
 
   void AddNode(std::string node) { AddChildNode("root", node); }
@@ -270,7 +272,10 @@ class NodeShutdownTest : public DriverManagerTestBase {
     RunLoopUntilIdle();
     auto node = nodes_[node_name].lock();
     ASSERT_TRUE(node);
-    ASSERT_EQ(expected_state, node->GetShutdownHelper().node_state()) << "Node: " << node_name;
+    ASSERT_EQ(expected_state, node->GetShutdownHelper().node_state())
+        << "Node: " << node_name
+        << "  Expected: " << ShutdownHelper::NodeStateAsString(expected_state)
+        << "  Actual: " << node->GetShutdownHelper().NodeStateAsString();
   }
 
   void VerifyStates(std::map<std::string, NodeState> expected_states) {
@@ -318,7 +323,6 @@ class NodeShutdownTest : public DriverManagerTestBase {
 };
 
 TEST_F(NodeShutdownTest, BasicRemoveAllNodes) {
-  // TODO, include the removal tracker and its callback.
   AddNodeAndStartDriver("node_a");
   AddChildNodeAndStartDriver("node_a", "node_a_a");
   AddChildNodeAndStartDriver("node_a", "node_a_b");
@@ -490,6 +494,80 @@ TEST_F(NodeShutdownTest, RemoveAfterBindFailure) {
   VerifyNodeRemovedFromParent("node_a", "root");
 }
 
+TEST_F(NodeShutdownTest, WaitBindBeforeShutdown) {
+  node_manager->driver_host().set_should_queue_start_callback(true);
+  AddNodeAndStartDriver("node_a");
+  AddChildNodeAndStartDriver("node_a", "node_a_b");
+  AddChildNodeAndStartDriver("node_a_b", "node_a_b_a");
+
+  // Complete bind successfully for node_a.
+  node_manager->driver_host().InvokeStartCallback("node_a", zx::ok());
+
+  InvokeRemoveNode("node_a");
+  VerifyStates({{"node_a", NodeState::kWaitingOnChildren},
+                {"node_a_b", NodeState::kWaitingOnDriverBind},
+                {"node_a_b_a", NodeState::kWaitingOnDriverBind}});
+
+  node_manager->driver_host().InvokeStartCallback("node_a_b", zx::ok());
+  VerifyStates({{"node_a", NodeState::kWaitingOnChildren},
+                {"node_a_b", NodeState::kWaitingOnChildren},
+                {"node_a_b_a", NodeState::kWaitingOnDriverBind}});
+
+  node_manager->driver_host().InvokeStartCallback("node_a_b_a", zx::ok());
+  VerifyStates({{"node_a", NodeState::kWaitingOnChildren},
+                {"node_a_b", NodeState::kWaitingOnChildren},
+                {"node_a_b_a", NodeState::kWaitingOnDriver}});
+
+  CloseDriverForNode("node_a_b_a");
+  InvokeDestroyChildResponse("node_a_b_a");
+  VerifyNodeRemovedFromParent("node_a_b_a", "node_a_b");
+
+  CloseDriverForNode("node_a_b");
+  InvokeDestroyChildResponse("node_a_b");
+  VerifyNodeRemovedFromParent("node_a_b", "node_a");
+
+  CloseDriverForNode("node_a");
+  InvokeDestroyChildResponse("node_a");
+  VerifyNodeRemovedFromParent("node_a", "root");
+
+  VerifyRemovalTrackerAllCallbackInvoked();
+}
+
+TEST_F(NodeShutdownTest, WaitBindBeforeShutdownForPkgNode) {
+  const char* node_pkg1 = "node_package1";
+  const char* node_pkg2 = "node_package2";
+  const char* node_boot = "node_boot";
+
+  node_manager->driver_host().set_should_queue_start_callback(true);
+  AddNodeAndStartDriver(node_boot, Collection::kBoot);
+  AddChildNodeAndStartDriver(node_boot, node_pkg1, Collection::kPackage);
+  AddChildNodeAndStartDriver(node_boot, node_pkg2, Collection::kPackage);
+
+  // Complete bind successfully for boot node.
+  node_manager->driver_host().InvokeStartCallback(node_boot, zx::ok());
+  node_manager->driver_host().InvokeStartCallback(node_pkg1, zx::ok());
+
+  InvokeRemoveNode(node_boot, RemovalSet::kPackage);
+  VerifyStates({{node_boot, NodeState::kPrestop},
+                {node_pkg1, NodeState::kWaitingOnDriver},
+                {node_pkg2, NodeState::kWaitingOnDriverBind}});
+
+  CloseDriverForNode(node_pkg1);
+  InvokeDestroyChildResponse(node_pkg1);
+  VerifyNodeRemovedFromParent(node_pkg1, node_boot);
+
+  node_manager->driver_host().InvokeStartCallback(node_pkg2, zx::ok());
+  VerifyStates({{node_boot, NodeState::kPrestop}, {node_pkg2, NodeState::kWaitingOnDriver}});
+
+  CloseDriverForNode(node_pkg2);
+  InvokeDestroyChildResponse(node_pkg2);
+  VerifyNodeRemovedFromParent(node_pkg2, node_boot);
+
+  VerifyState(node_boot, NodeState::kPrestop);
+
+  VerifyRemovalTrackerPkgCallbackInvoked();
+}
+
 TEST_F(NodeShutdownTest, BindFailureDuringRemove) {
   AddNodeAndStartDriver("node_a");
 
@@ -515,7 +593,7 @@ TEST_F(NodeShutdownTest, RemoveDuringDriverHostStartWithFailure) {
   AddNodeAndStartDriver("node_a");
 
   InvokeRemoveNode("node_a");
-  VerifyState("node_a", NodeState::kWaitingOnDriver);
+  VerifyState("node_a", NodeState::kWaitingOnDriverBind);
   node_manager->driver_host().InvokeStartCallback("node_a", zx::error(ZX_ERR_INTERNAL));
 
   VerifyNodeRemovedFromParent("node_a", "root");
@@ -653,13 +731,13 @@ TEST_F(NodeShutdownTest, NodesInDifferentCollections) {
   // Make the root and put it in the boot collection. We must have the root
   // in boot because if it were in package it would not matter if one of its
   // children were a boot driver.
-  AddNodeAndStartDriver(root_name, std::optional<Collection>(Collection::kBoot));
+  AddNodeAndStartDriver(root_name, Collection::kBoot);
 
-  AddChildNodeAndStartDriver(root_name, node_pkg1, std::optional<Collection>(Collection::kPackage));
+  AddChildNodeAndStartDriver(root_name, node_pkg1, Collection::kPackage);
 
-  AddChildNodeAndStartDriver(root_name, node_boot, std::optional<Collection>(Collection::kBoot));
+  AddChildNodeAndStartDriver(root_name, node_boot, Collection::kBoot);
 
-  AddChildNodeAndStartDriver(root_name, node_pkg2, std::optional<Collection>(Collection::kPackage));
+  AddChildNodeAndStartDriver(root_name, node_pkg2, Collection::kPackage);
 
   // Make the call to remove package-based drivers. This should *NOT* stopt the
   // boot drivers, but instead put them in a pre-stop state.
@@ -730,13 +808,13 @@ TEST_F(NodeShutdownTest, RemoveAllRemovesEverything) {
   // Make the root and put it in the boot collection. We must have the root
   // in boot because if it were in package it would not matter if one of its
   // children were a boot driver.
-  AddNodeAndStartDriver(root_name, std::optional<Collection>(Collection::kBoot));
+  AddNodeAndStartDriver(root_name, Collection::kBoot);
 
-  AddChildNodeAndStartDriver(root_name, node_pkg1, std::optional<Collection>(Collection::kPackage));
+  AddChildNodeAndStartDriver(root_name, node_pkg1, Collection::kPackage);
 
-  AddChildNodeAndStartDriver(root_name, node_boot, std::optional<Collection>(Collection::kBoot));
+  AddChildNodeAndStartDriver(root_name, node_boot, Collection::kBoot);
 
-  AddChildNodeAndStartDriver(root_name, node_pkg2, std::optional<Collection>(Collection::kPackage));
+  AddChildNodeAndStartDriver(root_name, node_pkg2, Collection::kPackage);
 
   // Make the call to remove package-based drivers. This should *NOT* stop the
   // boot drivers, but instead put them in a pre-stop state.

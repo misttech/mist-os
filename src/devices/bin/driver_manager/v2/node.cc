@@ -29,8 +29,8 @@ namespace {
 
 const std::string kUnboundUrl = "unbound";
 
-// TODO(https://fxbug.dev/124976): Remove this flag once composite node spec rebind once all clients are updated
-// to the new Rebind() behavior and this is fully implemented on both DFv1 and DFv2.
+// TODO(https://fxbug.dev/124976): Remove this flag once composite node spec rebind once all clients
+// are updated to the new Rebind() behavior and this is fully implemented on both DFv1 and DFv2.
 constexpr bool kEnableCompositeNodeSpecRebind = false;
 
 template <typename R, typename F>
@@ -351,8 +351,8 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
 }
 
 Node::~Node() {
-  // TODO(https://fxbug.dev/135416): Notify the NodeRemovalTracker if the node is deallocated before shutdown is
-  // complete.
+  // TODO(https://fxbug.dev/135416): Notify the NodeRemovalTracker if the node is deallocated before
+  // shutdown is complete.
   if (GetNodeState() != NodeState::kStopped) {
     LOGF(INFO, "Node %s deallocating while at state %s", MakeComponentMoniker().c_str(),
          GetShutdownHelper().NodeStateAsString());
@@ -425,9 +425,9 @@ void Node::CompleteBind(zx::result<> result) {
   }
 
   if (driver_component_) {
-    ZX_ASSERT_MSG(!driver_component_->is_bind_complete,
-                  "CompleteBind() called multiple times for node %s", name().c_str());
-    driver_component_->is_bind_complete = true;
+    ZX_ASSERT_MSG(driver_component_->state == DriverState::kBinding,
+                  "Node %s CompleteBind() invoked at invalid state", name().c_str());
+    driver_component_->state = DriverState::kRunning;
   }
 
   auto completer = std::move(pending_bind_completer_);
@@ -462,9 +462,9 @@ ShutdownHelper& Node::GetShutdownHelper() {
   return *shutdown_helper_.get();
 }
 
-// TODO(https://fxbug.dev/124976): If the node invoking this function cannot multibind to composites,
-// is parenting one composite node, and is not in a state for removal, then it
-// should attempt to bind to something else.
+// TODO(https://fxbug.dev/124976): If the node invoking this function cannot multibind to
+// composites, is parenting one composite node, and is not in a state for removal, then it should
+// attempt to bind to something else.
 void Node::RemoveChild(const std::shared_ptr<Node>& child) {
   LOGF(DEBUG, "RemoveChild %s from parent %s", child->name().c_str(), name().c_str());
   children_.erase(std::find(children_.begin(), children_.end(), child));
@@ -543,7 +543,6 @@ void Node::FinishRestart() {
 void Node::ClearHostDriver() {
   if (driver_component_) {
     driver_component_->driver = {};
-    driver_component_->is_bind_complete = false;
   }
 }
 
@@ -574,7 +573,8 @@ void Node::RestartNode() {
   Remove(RemovalSet::kAll, nullptr);
 }
 
-// TODO(https://fxbug.dev/132254): Handle the case in which this function is called during node removal.
+// TODO(https://fxbug.dev/132254): Handle the case in which this function is called during node
+// removal.
 void Node::RestartNodeWithRematch(std::optional<std::string> restart_driver_url_suffix,
                                   fit::callback<void(zx::result<>)> completer) {
   if (pending_bind_completer_.has_value()) {
@@ -591,7 +591,8 @@ void Node::RestartNodeWithRematch() {
   RestartNodeWithRematch("", [](zx::result<> result) {});
 }
 
-// TODO(https://fxbug.dev/132254): Handle the case in which this function is called during node removal.
+// TODO(https://fxbug.dev/132254): Handle the case in which this function is called during node
+// removal.
 void Node::RemoveCompositeNodeForRebind(fit::callback<void(zx::result<>)> completer) {
   if (composite_rebind_completer_.has_value()) {
     completer(zx::error(ZX_ERR_ALREADY_EXISTS));
@@ -986,24 +987,27 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints->client));
-  driver_host_.value()->Start(
-      std::move(endpoints->client), name_, symbols, start_info, std::move(driver_endpoints->server),
-      [weak_self = weak_from_this(), cb = std::move(cb)](zx::result<> result) mutable {
-        auto node_ptr = weak_self.lock();
-        if (!node_ptr) {
-          LOGF(WARNING, "Node freed before it is used");
-          cb(result);
-          return;
-        }
+  driver_host_.value()->Start(std::move(endpoints->client), name_, symbols, start_info,
+                              std::move(driver_endpoints->server),
+                              [weak_self = weak_from_this(), name = name_,
+                               cb = std::move(cb)](zx::result<> result) mutable {
+                                auto node_ptr = weak_self.lock();
+                                if (!node_ptr) {
+                                  LOGF(WARNING, "Node '%s' freed before it is used", name.c_str());
+                                  cb(result);
+                                  return;
+                                }
 
-        if (result.is_error()) {
-          LOGF(WARNING, "Failed to start driver host for %s",
-               node_ptr->MakeComponentMoniker().c_str());
-          node_ptr->driver_component_.reset();
-          node_ptr->GetShutdownHelper().CheckNodeState();
-        }
-        cb(result);
-      });
+                                if (result.is_error()) {
+                                  LOGF(WARNING, "Failed to start driver host for %s",
+                                       node_ptr->MakeComponentMoniker().c_str());
+                                  node_ptr->driver_component_.reset();
+                                  node_ptr->GetShutdownHelper().CheckNodeState();
+                                }
+                                cb(result);
+
+                                // If the node set in the process of shutting down, shut down now.
+                              });
 }
 
 bool Node::EvaluateRematchFlags(fuchsia_driver_development::RestartRematchFlags rematch_flags,
@@ -1043,9 +1047,10 @@ void Node::StopDriver() {
     return;
   }
 
-  if (!driver_component_->is_bind_complete) {
+  if (driver_component_->state == DriverState::kBinding) {
     LOGF(WARNING, "Stopping driver '%s' for node '%s' while bind is in process",
          driver_component_->driver_url.c_str(), MakeComponentMoniker().c_str());
+    return;
   }
 
   fidl::OneWayStatus result = driver_component_->driver->Stop();
@@ -1091,7 +1096,7 @@ void Node::StopDriverComponent() {
         }
 
         LOGF(INFO, "Destroyed driver component for %s", self->MakeComponentMoniker().c_str());
-        self->driver_component_->is_destroyed = true;
+        self->driver_component_->state = DriverState::kStopped;
         self->GetShutdownHelper().CheckNodeState();
       });
 }
@@ -1115,7 +1120,7 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
   if (GetNodeState() == NodeState::kWaitingOnDriverComponent) {
     LOGF(DEBUG, "Node: %s: driver channel had expected shutdown.", name().c_str());
     if (driver_component_) {
-      driver_component_->is_destroyed = true;
+      driver_component_->state = DriverState::kStopped;
     }
     GetShutdownHelper().CheckNodeState();
     return;

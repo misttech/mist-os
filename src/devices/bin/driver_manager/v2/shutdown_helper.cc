@@ -71,7 +71,7 @@ void ShutdownHelper::Remove(std::shared_ptr<Node> node, RemovalSet removal_set,
         (node->collection() == Collection::kBoot || node->collection() == Collection::kNone)) {
       shutdown_helper.node_state_ = NodeState::kPrestop;
     } else {
-      shutdown_helper.node_state_ = NodeState::kWaitingOnChildren;
+      shutdown_helper.node_state_ = NodeState::kWaitingOnDriverBind;
       // Either removing kAll, or is package driver and removing kPackage.
       // All children should be removed regardless as they block removal of this node.
       removal_set = RemovalSet::kAll;
@@ -113,6 +113,10 @@ void ShutdownHelper::CheckNodeState() {
     case NodeState::kPrestop:
     case NodeState::kStopped:
       return;
+    case NodeState::kWaitingOnDriverBind: {
+      CheckWaitingOnDriverBind();
+      return;
+    }
     case NodeState::kWaitingOnChildren: {
       CheckWaitingOnChildren();
       return;
@@ -126,6 +130,18 @@ void ShutdownHelper::CheckNodeState() {
       return;
     }
   }
+}
+
+void ShutdownHelper::CheckWaitingOnDriverBind() {
+  ZX_ASSERT(!is_transition_pending_);
+  ZX_ASSERT_MSG(node_state_ == NodeState::kWaitingOnDriverBind,
+                "ShutdownHelper::CheckWaitingOnDriverBind called in invalid node state: %s",
+                NodeStateAsString());
+  // Remain on this state if the node still has children.
+  if (bridge_->IsPendingBind()) {
+    return;
+  }
+  PerformTransition([this]() mutable { UpdateAndNotifyState(NodeState::kWaitingOnChildren); });
 }
 
 void ShutdownHelper::CheckWaitingOnChildren() {
@@ -211,6 +227,8 @@ bool ShutdownHelper::IsShuttingDown() const { return node_state_ != NodeState::k
 
 const char* ShutdownHelper::NodeStateAsString(NodeState state) {
   switch (state) {
+    case NodeState::kWaitingOnDriverBind:
+      return "kWaitingOnDriverBind";
     case NodeState::kRunning:
       return "kRunning";
     case NodeState::kPrestop:

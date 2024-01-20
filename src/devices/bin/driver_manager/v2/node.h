@@ -95,6 +95,12 @@ enum class NodeType {
   kComposite,        // Composite node created from composite node specs.
 };
 
+enum class DriverState : uint8_t {
+  kStopped,  // Driver is not running.
+  kBinding,  // Driver's bind hook is scheduled and running.
+  kRunning,  // Driver finished binding and is running.
+};
+
 class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
              public fidl::WireServer<fuchsia_driver_framework::Node>,
              public fidl::WireServer<fuchsia_component_runner::ComponentController>,
@@ -119,7 +125,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // NodeShutdownBridge
   // Exposed for testing.
   bool HasDriverComponent() const override {
-    return driver_component_.has_value() && !driver_component_->is_destroyed;
+    return driver_component_.has_value() && driver_component_->state != DriverState::kStopped;
   }
 
   void OnBind() const;
@@ -301,10 +307,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     fidl::WireClient<fuchsia_driver_host::Driver> driver;
     std::string driver_url;
 
-    bool is_bind_complete = false;
-
-    // Set to true when the component is destroyed.
-    bool is_destroyed = false;
+    DriverState state = DriverState::kBinding;
   };
 
   // fidl::WireServer<fuchsia_device::Controller>
@@ -349,6 +352,13 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   bool HasChildren() const override { return !children_.empty(); }
   bool HasDriver() const override {
     return driver_component_.has_value() && driver_component_->driver;
+  }
+
+  bool IsPendingBind() const override {
+    if (!driver_component_) {
+      return false;
+    }
+    return driver_component_->driver && driver_component_->state == DriverState::kBinding;
   }
 
   // Shutdown helpers:
