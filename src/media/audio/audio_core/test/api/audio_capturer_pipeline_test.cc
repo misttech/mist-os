@@ -533,13 +533,13 @@ TEST_F(AudioCapturerReleaseTest, AsyncCapture_PacketsNotManuallyReleased) {
   Unbind(capturer_);
 }
 
-////// Need to add similar tests for the Capture pipeline
-// TODO(mpuryear): validate signal gets bit-for-bit from driver to capturer
-// TODO(mpuryear): test OnPacketProduced timing etc.
-// TODO(mpuryear): test OnEndOfStream
-// TODO(mpuryear): test ReleasePacket
-// TODO(mpuryear): test DiscardAllPackets timing etc.
-// TODO(mpuryear): test DiscardAllPacketsNoReply timing etc.
-// Also: correct routing of loopback
+////// TODO(b/318433705): more extensively test the capture data pipeline:
+// - validate signal gets bit-for-bit from driver to capturer
+// - test OnPacketProduced (timing/sequencing/performance etc.)
+// - test OnEndOfStream (timing/sequencing/performance etc.)
+// - test ReleasePacket (timing/sequencing/performance etc.)
+// - test DiscardAllPackets  (timing/sequencing/performance etc.)
+// - test DiscardAllPacketsNoReply  (timing/sequencing/performance etc.)
+// - also: correct routing of loopback
 
 }  // namespace media::audio::test

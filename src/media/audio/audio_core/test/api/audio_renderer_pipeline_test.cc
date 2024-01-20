@@ -768,28 +768,6 @@ TEST_F(AudioRendererGainLimitsTest, KeepUsageMute) {
   });
 }
 
-// Validate that a slow effects pipeline registers an underflow.
-TEST_F(AudioRendererPipelineUnderflowTest, HasUnderflow) {
-  // Inject one packet and wait for it to be rendered.
-  auto input_buffer = GenerateSequentialAudio(format(), kPacketFrames);
-  auto packets = renderer()->AppendSlice(input_buffer, kPacketFrames);
-  renderer()->PlaySynchronized(this, output(), 0);
-  renderer()->WaitForPackets(this, packets);
-
-  // Wait an extra 20ms to account for the sleeper filter's delay.
-  RunLoopWithTimeout(zx::msec(20));
-
-  // Expect an underflow.
-  ExpectInspectMetrics(output(), DeviceUniqueIdToString(kUniqueId),
-                       {
-                           .children =
-                               {
-                                   {"pipeline underflows", {.nonzero_uints = {"count"}}},
-                               },
-                       });
-  Unbind(renderer());
-}
-
 // Validate that the effects package is loaded and that it processes the input.
 TEST_F(AudioRendererEffectsV1Test, RenderWithEffects) {
   auto [renderer, format] = CreateRenderer(kOutputFrameRate);
@@ -1098,20 +1076,17 @@ TEST_F(AudioRendererPipelineTuningTest, AudioTunerUpdateEffect) {
                       AudioBufferSlice<ASF::SIGNED_16>(), opts);
 }
 
-// /// Overall, need to add tests to validate various Renderer pipeline aspects
-// TODO(mpuryear): validate the combinations of NO_TIMESTAMP (Play ref_time,
-//     Play media_time, packet PTS)
-// TODO(mpuryear): validate channelization (future)
-// TODO(mpuryear): validate sample format
-// TODO(mpuryear): validate various permutations of PtsUnits. Ref clocks?
-// TODO(mpuryear): handle EndOfStream?
-// TODO(mpuryear): test >1 payload buffer
-// TODO(mpuryear): test late packets (no timestamps), gap-then-signal at driver.
-//     Should include various permutations of MinLeadTime, ContinuityThreshold
-// TODO(mpuryear): test packets with timestamps already played -- expect
-//     truncated-signal at driver
-// TODO(mpuryear): test packets with timestamps too late -- expect Renderer
-//     gap-then-truncated-signal at driver
-// TODO(mpuryear): test that no data is lost when Renderer Play-Pause-Play
+// TODO(b/318435490): more deeply test renderer data pipeline methods:
+// - validate the combinations of NO_TIMESTAMP (Play ref_time, Play media_time, packet PTS).
+// - validate channelization (future).
+// - validate sample format (all valid combinations, malformed, non-PCM).
+// - validate various permutations of PtsUnits. Ref clocks?
+// - handle EndOfStream?
+// - test >1 payload buffer.
+// - test late packets (no timestamps), gap-then-signal at driver.
+// - test packets with timestamps already played -- expect truncated-signal at driver.
+// - test packets with timestamps too late -- expect Renderer gap-then-truncated-signal at driver.
+// - test that no data is lost when Renderer Play-Pause-Play.
+// - test all of the above with various permutations of MinLeadTime, ContinuityThreshold.
 
 }  // namespace media::audio::test

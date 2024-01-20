@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <cmath>
-
 #include <gtest/gtest.h>
 
 #include "src/media/audio/audio_core/test/api/gain_control_test_shared.h"
@@ -56,60 +54,6 @@ TYPED_TEST(GainControlTest, DuplicateSetMute) {
 
   this->SetGain(expect_gain_db);
   this->ExpectGainCallback(expect_gain_db, true);
-}
-
-// Setting gain too high should cause a disconnect.
-TYPED_TEST(GainControlTest, SetGainTooHigh) {
-  this->SetGain(kTooHighGainDb);
-
-  this->ExpectParentDisconnect();
-  EXPECT_FALSE(this->gain_control_1().is_bound());
-  EXPECT_FALSE(this->gain_control_2().is_bound());
-}
-
-// Setting gain too low should cause a disconnect.
-TYPED_TEST(GainControlTest, SetGainTooLow) {
-  this->SetGain(kTooLowGainDb);
-
-  this->ExpectParentDisconnect();
-  EXPECT_FALSE(this->gain_control_1().is_bound());
-  EXPECT_FALSE(this->gain_control_2().is_bound());
-}
-
-// Setting gain to NAN should cause a disconnect.
-TYPED_TEST(GainControlTest, SetGainNaN) {
-  this->SetGain(NAN);
-
-  this->ExpectParentDisconnect();
-  EXPECT_FALSE(this->gain_control_1().is_bound());
-  EXPECT_FALSE(this->gain_control_2().is_bound());
-}
-
-// Setting ramp target-gain too high should cause a disconnect of the parent and gain interfaces.
-TEST_F(GainControlRampTest, SetGainRampTooHigh) {
-  this->SetGainWithRamp(kTooHighGainDb, zx::msec(1));
-
-  this->ExpectParentDisconnect();
-  EXPECT_FALSE(this->gain_control_1().is_bound());
-  EXPECT_FALSE(this->gain_control_2().is_bound());
-}
-
-// Setting ramp target-gain too low should cause a disconnect of the parent and gain interfaces.
-TEST_F(GainControlRampTest, SetGainRampTooLow) {
-  this->SetGainWithRamp(kTooLowGainDb, zx::msec(1));
-
-  this->ExpectParentDisconnect();
-  EXPECT_FALSE(this->gain_control_1().is_bound());
-  EXPECT_FALSE(this->gain_control_2().is_bound());
-}
-
-// Setting a gain-ramp with NaN target gain should cause parent and children to disconnect.
-TEST_F(GainControlRampTest, SetGainRampNaN) {
-  this->SetGainWithRamp(NAN, zx::msec(1));
-
-  this->ExpectParentDisconnect();
-  EXPECT_FALSE(this->gain_control_1().is_bound());
-  EXPECT_FALSE(this->gain_control_2().is_bound());
 }
 
 // A gain-ramp with zero duration should take effect immediately.

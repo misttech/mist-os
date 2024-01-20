@@ -12,6 +12,7 @@ group("api") {
   testonly = true
 
   deps = [
+    ":audio-core-api-error-tests",
     ":audio-core-api-test-effects",
     ":audio-core-api-tests",
   ]
@@ -72,6 +73,17 @@ audio_core_api_test_component("activity-reporter-test") {
 
 audio_core_api_test_component("audio-capturer-test") {
   source = "audio_capturer_test.cc"
+  executable_deps = [
+    ":audio_api_test_shared",
+    "//sdk/lib/media/audio/cpp",
+    "//src/media/audio/lib/clock",
+    "//src/media/audio/lib/clock/testing",
+  ]
+  test_type = "system"
+}
+
+audio_core_api_test_component("audio-capturer-error-test") {
+  source = "audio_capturer_error_test.cc"
   executable_deps = [
     ":audio_api_test_shared",
     "//sdk/lib/media/audio/cpp",
@@ -149,6 +161,12 @@ audio_core_api_test_component("audio-renderer-pipeline-test") {
   test_type = "system"
 }
 
+audio_core_api_test_component("audio-renderer-error-test") {
+  source = "audio_renderer_error_test.cc"
+  executable_deps = [ ":audio_api_test_shared" ]
+  test_type = "system"
+}
+
 audio_core_api_test_component("audio-test") {
   source = "audio_test.cc"
   executable_deps = [ "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp" ]
@@ -168,6 +186,12 @@ audio_core_api_test_component("gain-control-test") {
   test_type = "system"
 }
 
+audio_core_api_test_component("gain-control-error-test") {
+  source = "gain_control_error_test.cc"
+  executable_deps = [ ":audio_api_test_shared" ]
+  test_type = "system"
+}
+
 audio_core_api_test_component("ultrasound-test") {
   source = "ultrasound_test.cc"
   executable_deps = [
@@ -175,6 +199,12 @@ audio_core_api_test_component("ultrasound-test") {
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/clock/testing",
   ]
+  test_type = "system"
+}
+
+audio_core_api_test_component("ultrasound-error-test") {
+  source = "ultrasound_error_test.cc"
+  executable_deps = [ ":audio_api_test_shared" ]
   test_type = "system"
 }
 
@@ -211,7 +241,6 @@ audio_core_test_package("audio-core-api-tests") {
     ":audio-device-enumerator-test",
     ":audio-renderer-test",
     ":audio-test",
-    ":audio-tuner-test",
     ":gain-control-test",
     ":ultrasound-test",
     ":usage-gain-reporter-test",
@@ -219,7 +248,32 @@ audio_core_test_package("audio-core-api-tests") {
     ":volume-control-test",
   ]
 
-  # Many of the above tests print ERROR logs in cases where the client makes an error.
+  # Tests that intentionally cause ERROR logs in audio_core have been moved to another test suite.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+# These tests can run anywhere, including in emulators.
+audio_core_test_package("audio-core-api-error-tests") {
+  package_deps = [ ":audio-core-api-test-effects" ]
+  audio_core_manifest_shards = [
+    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
+    "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
+  ]
+
+  test_components = [
+    ":audio-capturer-error-test",
+    ":audio-renderer-error-test",
+    ":audio-tuner-test",
+    ":gain-control-error-test",
+    ":ultrasound-error-test",
+  ]
+
+  # This suite includes cases from audio-core-api-tests and audio-core-api-pipeline-tests that
+  # intentionally cause audio_core to log at the ERROR level.
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -242,7 +296,7 @@ audio_core_test_package("audio-core-api-pipeline-tests") {
     ":audio-renderer-pipeline-test",
   ]
 
-  # Many of the above tests print ERROR logs in cases where the client makes an error.
+  # Tests that intentionally cause ERROR logs in audio_core have been moved to another test suite.
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
