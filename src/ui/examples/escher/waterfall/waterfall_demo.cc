@@ -110,8 +110,11 @@ void WaterfallDemo::WarmPipelineCache(vk::Format swapchain_format) const {
 
   // Build pipelines for rendering to the display as well as offscreen.
   std::vector<std::pair<vk::Format, vk::ImageLayout>> formats_and_layouts = {
-      {swapchain_format, vk::ImageLayout::eColorAttachmentOptimal},
-      {swapchain_format, vk::ImageLayout::ePresentSrcKHR},
+      {swapchain_format, vk::ImageLayout::eColorAttachmentOptimal}};
+
+  if (renderer()->escher()->device()->params().required_extension_names.count(
+          VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
+    formats_and_layouts.push_back({swapchain_format, vk::ImageLayout::ePresentSrcKHR});
   };
 
   std::vector<escher::SamplerPtr> immutable_samplers;
