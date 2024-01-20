@@ -34,7 +34,25 @@ enum class ColorSpaceConversionMode {
 // engine. These functional units should be split into different classes.
 class Vpu {
  public:
-  Vpu() = default;
+  // Factory method intended for production use.
+  static zx::result<std::unique_ptr<Vpu>> Create(ddk::PDevFidl& pdev);
+
+  // Production code should prefer the `Create()` factory method.
+  //
+  // `vpu_mmio` is the region documented as "VPU" in Section 8.1 "Memory Map"
+  // of the AMLogic A311D datasheet. It must be valid.
+  //
+  // `hhi_mmio` is the region documented as "HIU" in Section 8.1 "Memory Map"
+  // of the AMLogic A311D datasheet. It must be valid.
+  //
+  // `aobus_mmio` is the region documented as "RTI" in Section 8.1 "Memory Map"
+  // of the AMLogic A311D datasheet. It must be valid.
+  //
+  // `reset_mmio` is the region documented as "RESET" in Section 8.1
+  // "Memory Map" of the AMLogic A311D datasheet. It must be valid.
+  Vpu(fdf::MmioBuffer vpu_mmio, fdf::MmioBuffer hhi_mmio, fdf::MmioBuffer aobus_mmio,
+      fdf::MmioBuffer reset_mmio);
+
   ~Vpu() = default;
 
   // Disallows copying and moving.
@@ -42,10 +60,6 @@ class Vpu {
   Vpu(Vpu&&) = delete;
   Vpu& operator=(const Vpu&) = delete;
   Vpu& operator=(Vpu&&) = delete;
-
-  // Initialization work that is not suitable for the constructor.
-  // Must be called exactly once and before any other method.
-  zx_status_t Init(ddk::PDevFidl& pdev);
 
   // Powers on the hardware.
   void PowerOn();
@@ -87,12 +101,10 @@ class Vpu {
   // and/or clock initialization sequences
   void ConfigureClock();
 
-  std::optional<fdf::MmioBuffer> vpu_mmio_;
-  std::optional<fdf::MmioBuffer> hhi_mmio_;
-  std::optional<fdf::MmioBuffer> aobus_mmio_;
-  std::optional<fdf::MmioBuffer> reset_mmio_;
-
-  bool initialized_ = false;
+  fdf::MmioBuffer vpu_mmio_;
+  fdf::MmioBuffer hhi_mmio_;
+  fdf::MmioBuffer aobus_mmio_;
+  fdf::MmioBuffer reset_mmio_;
 
   uint32_t first_time_load_ = false;
 

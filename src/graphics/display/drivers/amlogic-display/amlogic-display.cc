@@ -33,6 +33,7 @@
 #include <zircon/types.h>
 
 #include <cstddef>
+#include <memory>
 
 #include <ddk/metadata/display.h>
 #include <fbl/algorithm.h>
@@ -1286,16 +1287,12 @@ zx_status_t AmlogicDisplay::Bind() {
   }
   video_input_unit_ = std::move(video_input_unit_create_result).value();
 
-  fbl::AllocChecker ac;
-  vpu_ = fbl::make_unique_checked<Vpu>(&ac);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  zx::result<std::unique_ptr<Vpu>> vpu_result = Vpu::Create(pdev_);
+  if (vpu_result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize VPU object: %s", vpu_result.status_string());
+    return vpu_result.status_value();
   }
-  status = vpu_->Init(pdev_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize VPU object: %s", zx_status_get_string(status));
-    return status;
-  }
+  vpu_ = std::move(vpu_result).value();
 
   // If the display engine was previously owned by a different driver, we
   // attempt to complete a seamless takeover. If we previously owned the
