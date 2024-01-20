@@ -84,62 +84,6 @@ Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node)
       node_(std::move(node)),
       hdmi_{.hdmi_host = std::move(hdmi_host)} {
   node_.RecordInt("vout_type", static_cast<int>(type()));
-  node_.RecordUint("panel_type", panel_type());
-}
-
-uint32_t Vout::display_width() const {
-  switch (type_) {
-    case VoutType::kDsi:
-      return dsi_.disp_setting.h_active;
-    case VoutType::kHdmi:
-      return hdmi_.current_display_timing_.horizontal_active_px;
-  }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
-  return 0;
-}
-
-uint32_t Vout::display_height() const {
-  switch (type_) {
-    case VoutType::kDsi:
-      return dsi_.disp_setting.v_active;
-    case VoutType::kHdmi:
-      return hdmi_.current_display_timing_.vertical_active_lines;
-  }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
-  return 0;
-}
-
-uint32_t Vout::fb_width() const {
-  switch (type_) {
-    case VoutType::kDsi:
-      return dsi_.width;
-    case VoutType::kHdmi:
-      return hdmi_.current_display_timing_.horizontal_active_px;
-  }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
-  return 0;
-}
-
-uint32_t Vout::fb_height() const {
-  switch (type_) {
-    case VoutType::kDsi:
-      return dsi_.height;
-    case VoutType::kHdmi:
-      return hdmi_.current_display_timing_.vertical_active_lines;
-  }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
-  return 0;
-}
-
-uint32_t Vout::panel_type() const {
-  switch (type_) {
-    case VoutType::kDsi:
-      return dsi_.dsi_host->panel_type();
-    case VoutType::kHdmi:
-      return 0;
-  }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
-  return 0;
 }
 
 zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint32_t panel_type,

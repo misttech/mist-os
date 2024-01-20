@@ -62,12 +62,6 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   VoutType type() { return type_; }
   bool supports_hpd() const { return supports_hpd_; }
 
-  uint32_t display_width() const;
-  uint32_t display_height() const;
-  uint32_t fb_width() const;
-  uint32_t fb_height() const;
-  uint32_t panel_type() const;
-
   void DisplayConnected();
   void DisplayDisconnected();
 
