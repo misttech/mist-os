@@ -76,38 +76,6 @@ ValidDcoFrequencyRange GetHdmiPllValidDcoFrequencyRange(int pixel_clock_khz) {
 }
 
 // `timing` must be a timing supported by `HdmiHost`.
-cea_timing CalculateDisplayTimings(const display::DisplayTiming& timing) {
-  cea_timing timings;
-
-  timings.interlace_mode = timing.fields_per_frame == display::FieldsPerFrame::kInterlaced;
-  timings.pfreq_khz = timing.pixel_clock_frequency_khz;
-  // TODO: pixel repetition is 0 for most progressive. We don't support interlaced
-  timings.pixel_repeat = false;
-  timings.hactive = timing.horizontal_active_px;
-  timings.hblank = timing.horizontal_blank_px();
-  timings.hfront = timing.horizontal_front_porch_px;
-  timings.hsync = timing.horizontal_sync_width_px;
-  timings.htotal = timing.horizontal_total_px();
-  timings.hback = timing.horizontal_back_porch_px;
-  timings.hpol = timing.hsync_polarity == display::SyncPolarity::kPositive;
-
-  timings.vactive = timing.vertical_active_lines;
-  timings.vblank0 = timing.vertical_blank_lines();
-  timings.vfront = timing.vertical_front_porch_lines;
-  timings.vsync = timing.vertical_sync_width_lines;
-  timings.vtotal = timing.vertical_total_lines();
-  timings.vback = timing.vertical_back_porch_lines;
-  timings.vpol = timing.vsync_polarity == display::SyncPolarity::kPositive;
-
-  // FIXE: VENC Repeat is undocumented. It seems to be only needed for the following
-  // resolutions: 1280x720p60, 1280x720p50, 720x480p60, 720x480i60, 720x576p50, 720x576i50
-  // For now, we will simply not support this feature.
-  timings.venc_pixel_repeat = false;
-
-  return timings;
-}
-
-// `timing` must be a timing supported by `HdmiHost`.
 pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
   pll_param params;
 
@@ -321,9 +289,6 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // TODO(https://fxbug.dev/135377): Do not use cea_timing; use display::DisplayTiming
-  // directly instead.
-  cea_timing encoder_timing = CalculateDisplayTimings(timing);
   pll_param clock_params = CalculateClockParameters(timing);
   ConfigurePll(clock_params);
 
@@ -347,12 +312,11 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   vpu_mmio_.Write32(0, VPU_ENCI_VIDEO_EN);
   vpu_mmio_.Write32(1, VPU_ENCP_VIDEO_EN);
 
-  vpu_mmio_.Write32((encoder_timing.venc_pixel_repeat) ? ((encoder_timing.htotal << 1) - 1)
-                                                       : (encoder_timing.htotal - 1),
+  vpu_mmio_.Write32(timing.horizontal_total_px() * (1 + timing.pixel_repetition) - 1,
                     VPU_ENCP_VIDEO_MAX_PXCNT);
-  vpu_mmio_.Write32(encoder_timing.vtotal - 1, VPU_ENCP_VIDEO_MAX_LNCNT);
+  vpu_mmio_.Write32(timing.vertical_total_lines() - 1, VPU_ENCP_VIDEO_MAX_LNCNT);
 
-  if (encoder_timing.venc_pixel_repeat) {
+  if (timing.pixel_repetition != 0) {
     vpu_mmio_.Write32(
         SetFieldValue32(vpu_mmio_.Read32(VPU_ENCP_VIDEO_MODE_ADV), /*field_begin_bit=*/0,
                         /*field_size_bits=*/1, /*field_value=*/1),
@@ -360,7 +324,7 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   }
 
   // Configure Encoder with detailed timing info (based on resolution)
-  ConfigEncoder(encoder_timing);
+  ConfigEncoder(timing);
 
   // Configure VDAC
   hhi_mmio_.Write32(0, HHI_VDAC_CNTL0_G12A);
@@ -525,48 +489,71 @@ bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) co
   return true;
 }
 
-void HdmiHost::ConfigEncoder(const cea_timing& timings) {
-  int active_lines = (timings.vactive / (1 + timings.interlace_mode));
-  int total_lines = (active_lines + timings.vblank0) +
-                    ((active_lines + timings.vblank1) * timings.interlace_mode);
+void HdmiHost::ConfigEncoder(const display::DisplayTiming& timing) {
+  // TODO(https://fxbug.dev/136952): The current encoder configuration logic
+  // contains some redundant code and dead code. We should clean it up and
+  // simplify it.
+
+  int active_lines = timing.fields_per_frame == display::FieldsPerFrame::kInterlaced
+                         ? (timing.vertical_active_lines / 2)
+                         : timing.vertical_active_lines;
+
+  int total_lines = timing.vertical_total_lines();
 
   // If the pixels are repeated at the HDMI transmitter, the encoder should
   // be configured to half the frequency for horizontal active pixels / blanks.
-  const int kHdmiTransmitterPixelRepeatDivisionFactor = timings.pixel_repeat ? 2 : 1;
+  const int kHdmiTransmitterPixelRepeatDivisionFactor = timing.pixel_repetition + 1;
+
+  // TODO(https://fxbug.dev/135218): Amlogic-provided code uses different flags
+  // to configure pixel repetition at the encoder level and the HDMI transmitter
+  // level.
+  //
+  // Only some interlaced timings (such as 720x480i60 and 720x576i50) may need
+  // it; none of them are currently supported by Fuchsia. Thus, we always set
+  // `kVideoEncoderPixelRepeated` to false.
+  const bool kVideoEncoderPixelRepeated = false;
 
   // If the pixels are repeated at the encoder, the encoder should be configured
   // to double the frequency for horizontal active pixels / blanks.
-  const int kEncoderPixelRepeatMultiplicationFactor = timings.venc_pixel_repeat ? 2 : 1;
+  const int kEncoderPixelRepeatMultiplicationFactor = kVideoEncoderPixelRepeated ? 2 : 1;
 
-  int venc_total_pixels = timings.htotal / kHdmiTransmitterPixelRepeatDivisionFactor *
+  int venc_total_pixels = timing.horizontal_total_px() / kHdmiTransmitterPixelRepeatDivisionFactor *
                           kEncoderPixelRepeatMultiplicationFactor;
-  int venc_active_pixels = timings.hactive / kHdmiTransmitterPixelRepeatDivisionFactor *
+  int venc_active_pixels = timing.horizontal_active_px / kHdmiTransmitterPixelRepeatDivisionFactor *
                            kEncoderPixelRepeatMultiplicationFactor;
-  int venc_fp = timings.hfront / kHdmiTransmitterPixelRepeatDivisionFactor *
-                kEncoderPixelRepeatMultiplicationFactor;
-  int venc_hsync = timings.hsync / kHdmiTransmitterPixelRepeatDivisionFactor *
-                   kEncoderPixelRepeatMultiplicationFactor;
+  int venc_front_porch_pixels = timing.horizontal_front_porch_px /
+                                kHdmiTransmitterPixelRepeatDivisionFactor *
+                                kEncoderPixelRepeatMultiplicationFactor;
+  int venc_hsync_width_pixels = timing.horizontal_sync_width_px /
+                                kHdmiTransmitterPixelRepeatDivisionFactor *
+                                kEncoderPixelRepeatMultiplicationFactor;
 
   vpu_mmio_.Write32(SetFieldValue32(vpu_mmio_.Read32(VPU_ENCP_VIDEO_MODE), /*field_begin_bit=*/14,
                                     /*field_size_bits=*/1, /*field_value=*/1),
                     VPU_ENCP_VIDEO_MODE);  // DE Signal polarity
-  vpu_mmio_.Write32(timings.hsync + timings.hback, VPU_ENCP_VIDEO_HAVON_BEGIN);
-  vpu_mmio_.Write32(timings.hsync + timings.hback + timings.hactive - 1, VPU_ENCP_VIDEO_HAVON_END);
+  vpu_mmio_.Write32(timing.horizontal_sync_width_px + timing.horizontal_back_porch_px,
+                    VPU_ENCP_VIDEO_HAVON_BEGIN);
+  vpu_mmio_.Write32(timing.horizontal_sync_width_px + timing.horizontal_back_porch_px +
+                        timing.horizontal_active_px - 1,
+                    VPU_ENCP_VIDEO_HAVON_END);
 
-  vpu_mmio_.Write32(timings.vsync + timings.vback, VPU_ENCP_VIDEO_VAVON_BLINE);
-  vpu_mmio_.Write32(timings.vsync + timings.vback + timings.vactive - 1,
+  vpu_mmio_.Write32(timing.vertical_sync_width_lines + timing.vertical_back_porch_lines,
+                    VPU_ENCP_VIDEO_VAVON_BLINE);
+  vpu_mmio_.Write32(timing.vertical_sync_width_lines + timing.vertical_back_porch_lines +
+                        timing.vertical_active_lines - 1,
                     VPU_ENCP_VIDEO_VAVON_ELINE);
 
   vpu_mmio_.Write32(0, VPU_ENCP_VIDEO_HSO_BEGIN);
-  vpu_mmio_.Write32(timings.hsync, VPU_ENCP_VIDEO_HSO_END);
+  vpu_mmio_.Write32(timing.horizontal_sync_width_px, VPU_ENCP_VIDEO_HSO_END);
 
   vpu_mmio_.Write32(0, VPU_ENCP_VIDEO_VSO_BLINE);
-  vpu_mmio_.Write32(timings.vsync, VPU_ENCP_VIDEO_VSO_ELINE);
+  vpu_mmio_.Write32(timing.vertical_sync_width_lines, VPU_ENCP_VIDEO_VSO_ELINE);
 
   // Below calculations assume no pixel repeat and progressive mode.
   // HActive Start/End
-  int h_begin = timings.hsync + timings.hback + 2;  // 2 is the HDMI Latency
-  h_begin = h_begin % venc_total_pixels;            // wrap around if needed
+  int h_begin = timing.horizontal_sync_width_px + timing.horizontal_back_porch_px +
+                2;                        // 2 is the HDMI Latency
+  h_begin = h_begin % venc_total_pixels;  // wrap around if needed
 
   int h_end = h_begin + venc_active_pixels;
   h_end = h_end % venc_total_pixels;  // wrap around if needed
@@ -575,39 +562,42 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   vpu_mmio_.Write32(h_end, VPU_ENCP_DE_H_END);
 
   // VActive Start/End
-  int v_begin = timings.vsync + timings.vback;
+  int v_begin = timing.vertical_sync_width_lines + timing.vertical_back_porch_lines;
   int v_end = v_begin + active_lines;
 
   vpu_mmio_.Write32(v_begin, VPU_ENCP_DE_V_BEGIN_EVEN);
   vpu_mmio_.Write32(v_end, VPU_ENCP_DE_V_END_EVEN);
 
-  if (timings.interlace_mode) {
+  if (timing.fields_per_frame == display::FieldsPerFrame::kInterlaced) {
     // TODO: Add support for interlace mode
     // We should not even get here
     zxlogf(ERROR, "Interlace mode not supported");
   }
 
   // HSync Timings
-  int hs_begin = h_end + venc_fp;
+  int hs_begin = h_end + venc_front_porch_pixels;
   int vsync_adjust = 0;
   if (hs_begin >= venc_total_pixels) {
     hs_begin -= venc_total_pixels;
     vsync_adjust = 1;
   }
 
-  int hs_end = hs_begin + venc_hsync;
+  int hs_end = hs_begin + venc_hsync_width_pixels;
   hs_end = hs_end % venc_total_pixels;
   vpu_mmio_.Write32(hs_begin, VPU_ENCP_DVI_HSO_BEGIN);
   vpu_mmio_.Write32(hs_end, VPU_ENCP_DVI_HSO_END);
 
   // VSync Timings
   int vs_begin;
-  if (v_begin >= (timings.vback + timings.vsync + (1 - vsync_adjust))) {
-    vs_begin = v_begin - timings.vback - timings.vsync - (1 - vsync_adjust);
+  if (v_begin >=
+      (timing.vertical_back_porch_lines + timing.vertical_sync_width_lines + (1 - vsync_adjust))) {
+    vs_begin = v_begin - timing.vertical_back_porch_lines - timing.vertical_sync_width_lines -
+               (1 - vsync_adjust);
   } else {
-    vs_begin = timings.vtotal + v_begin - timings.vback - timings.vsync - (1 - vsync_adjust);
+    vs_begin = timing.vertical_total_lines() + v_begin - timing.vertical_back_porch_lines -
+               timing.vertical_sync_width_lines - (1 - vsync_adjust);
   }
-  int vs_end = vs_begin + timings.vsync;
+  int vs_end = vs_begin + timing.vertical_sync_width_lines;
   vs_end = vs_end % total_lines;
 
   vpu_mmio_.Write32(vs_begin, VPU_ENCP_DVI_VSO_BLINE_EVN);
@@ -619,15 +609,15 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   // hsync, vsync active high. output CbYCr (GRB)
   // TODO: output desired format is hardcoded here to CbYCr (GRB)
   uint32_t vpu_hdmi_setting = 0b100 << 5;
-  if (timings.hpol) {
+  if (timing.hsync_polarity == display::SyncPolarity::kPositive) {
     vpu_hdmi_setting |= (1 << 2);
   }
-  if (timings.vpol) {
+  if (timing.vsync_polarity == display::SyncPolarity::kPositive) {
     vpu_hdmi_setting |= (1 << 3);
   }
   vpu_mmio_.Write32(vpu_hdmi_setting, VPU_HDMI_SETTING);
 
-  if (timings.venc_pixel_repeat) {
+  if (kVideoEncoderPixelRepeated) {
     vpu_mmio_.Write32(SetFieldValue32(vpu_mmio_.Read32(VPU_HDMI_SETTING), /*field_begin_bit=*/8,
                                       /*field_size_bits=*/1, /*field_value=*/1),
                       VPU_HDMI_SETTING);

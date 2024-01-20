@@ -40,33 +40,6 @@ struct pll_param {
   uint32_t enci_div;
 };
 
-struct cea_timing {
-  bool interlace_mode;
-  int pfreq_khz;
-  int8_t ln;
-  bool pixel_repeat;
-  bool venc_pixel_repeat;
-
-  int hfreq;
-  int hactive;
-  int htotal;
-  int hblank;
-  int hfront;
-  int hsync;
-  int hback;
-  bool hpol;
-
-  int vfreq;
-  int vactive;
-  int vtotal;
-  int vblank0;  // in case of interlace
-  int vblank1;  // vblank0 + 1 for interlace
-  int vfront;
-  int vsync;
-  int vback;
-  bool vpol;
-};
-
 // HdmiHost has access to the amlogic/designware HDMI block and controls its
 // operation. It also handles functions and keeps track of data that the
 // amlogic/designware block does not need to know about, including clock
@@ -113,7 +86,7 @@ class HdmiHost {
 
  private:
   void ConfigurePll(const pll_param& pll_params);
-  void ConfigEncoder(const cea_timing& timings);
+  void ConfigEncoder(const display::DisplayTiming& timings);
   void ConfigPhy();
 
   void ConfigureHpllClkOut(uint32_t hpll);
