@@ -118,8 +118,8 @@ class PageQueues {
   // prevent it from being considered part of the reclaim set, which makes it neither active nor
   // inactive. The specified page must be in the page queues, but if not presently in a reclaim
   // queue this method will do nothing.
-  // TODO(https://fxbug.dev/60238): Determine whether/how pages are moved back into the reclaim pool and
-  // either further generalize this to support pager backed, or specialize FailedReclaim to be
+  // TODO(https://fxbug.dev/60238): Determine whether/how pages are moved back into the reclaim pool
+  // and either further generalize this to support pager backed, or specialize FailedReclaim to be
   // explicitly only anonymous.
   void CompressFailed(vm_page_t* page);
 
@@ -595,18 +595,26 @@ class PageQueues {
   ktl::optional<PageQueues::VmoBacklink> ProcessDontNeedAndLruQueues(uint64_t target_gen,
                                                                      bool peek);
 
-  enum ProcessingQueue {
-    DontNeed,
-    Lru,
-  };
-  // Helper used by ProcessDontNeedAndLruQueues. |processing_queue| indicates whether the LRU queue
-  // should be processed or the DontNeed queue. |target_gen| controls whether the function needs to
-  // return early in the face of multiple concurrent calls, each of which acquire and drop the
-  // lock_. For the LRU queue, |target_gen| is the minimum value lru_gen_ should advance to. For
-  // the DontNeed queue |target_gen| is ignored. If |peek| is true, the first page that is
-  // encountered in the respective queue, whose age does not require to be fixed up, is returned.
-  ktl::optional<PageQueues::VmoBacklink> ProcessQueueHelper(ProcessingQueue processing_queue,
-                                                            uint64_t target_gen, bool peek);
+  // Helper used by ProcessDontNeedAndLruQueues. |target_gen| is the minimum value lru_gen_ should
+  // advance to. If |peek| is true, the first page that  encountered in the respective queue, whose
+  // age does not require to be fixed up, is returned.
+  // The passed in LruIsolate object is used to process reclamation work outside of the lock and can
+  // be reused across multiple calls. The |Items| parameter therefore controls how much work will be
+  // done within the lock acquisition before returning.
+  template <size_t Items>
+  class LruIsolate;
+  template <size_t Items>
+  ktl::optional<PageQueues::VmoBacklink> ProcessLruQueueHelper(LruIsolate<Items>& deferred_list,
+                                                               uint64_t target_gen, bool peek)
+      TA_EXCL(lock_);
+
+  // Helper used by ProcessDontNeedAndLruQueues. Processes the provided DoneNeed list (which should
+  // either be |dont_need_processing_list_| or |page_queues_[PageQueueReclaimDontNeed|) and places
+  // items in their correct list. If |peek| is true then the first item found that is correctly in
+  // the DontNeed list is returned.
+  // As this moves pages to their correct list, it is an error to call this with real DontNeed list
+  // and peek being false, as it would never terminate.
+  ktl::optional<VmoBacklink> ProcessDontNeedList(list_node_t* list, bool peek) TA_EXCL(lock_);
 
   // Helpers for adding and removing to the queues. All of the public Set/Move/Remove operations
   // are convenience wrappers around these.

@@ -38,13 +38,15 @@ KCOUNTER(pq_accessed_normal_same_queue, "pq.accessed.normal_same_queue")
 KCOUNTER(pq_accessed_deferred_count, "pq.accessed.deferred")
 KCOUNTER(pq_accessed_deferred_count_same_queue, "pq.accessed.deferred_same_queue")
 
+}  // namespace
+
 // Helper class for building an isolate list for deferred processing when acting on the LRU queues.
 // Pages are added while the page queues lock is held, and processed once the lock is dropped.
 // Statically sized with the maximum number of items it might need to hold and it is an error to
 // attempt to add more than this many items, as Flush() cannot automatically be called due to
 // incompatible locking requirements between flushing and adding items.
 template <size_t Items>
-class LruIsolate {
+class PageQueues::LruIsolate {
  public:
   using LruAction = PageQueues::LruAction;
   LruIsolate() = default;
@@ -57,6 +59,7 @@ class LruIsolate {
   // Requires PageQueues lock to be held
   void AddLoanReplacement(vm_page_t* page, PageQueues* pq) TA_REQ(pq -> get_lock()) {
     DEBUG_ASSERT(page);
+    DEBUG_ASSERT(!page->is_loaned());
     VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
     DEBUG_ASSERT(cow);
     fbl::RefPtr<VmCowPages> cow_ref = fbl::MakeRefPtrUpgradeFromRaw(cow, pq->get_lock());
@@ -171,8 +174,6 @@ class LruIsolate {
   // Number of items in the list_.
   size_t items_ = 0;
 };
-
-}  // namespace
 
 // static
 uint64_t PageQueues::GetLruPagesCompressed() { return pq_lru_pages_compressed.SumAcrossAllCpus(); }
@@ -643,24 +644,10 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
   }
 }
 
-ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessQueueHelper(
-    ProcessingQueue processing_queue, uint64_t target_gen, bool peek) {
+template <size_t Items>
+ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessLruQueueHelper(
+    LruIsolate<Items>& deferred_list, uint64_t target_gen, bool peek) {
   VM_KTRACE_DURATION(2, "ProcessQueue");
-
-  // Processing the DontNeed/LRU queue requires holding the page_queues_ lock_. The only other
-  // actions that require this lock are inserting or removing pages from the page queues. To ensure
-  // these actions can complete in a small bounded time kMaxQueueWork is chosen to be very small so
-  // that the lock will be regularly dropped. As processing the DontNeed/LRU queue is not time
-  // critical and can be somewhat inefficient in its operation we err on the side of doing less work
-  // per lock acquisition.
-  //
-  // Also, we need to limit the number to avoid sweep_to_loaned taking up excessive stack space.
-  static constexpr uint32_t kMaxQueueWork = 16;
-
-  // Pages in this list might be reclaimed or replaced with a loaned page, depending on the action
-  // specified in deferred_action. Each of these actions must be done outside the lock_, so we
-  // accumulate pages and then act after lock_ is released.
-  LruIsolate<kMaxQueueWork> deferred_list;
 
   // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
   // we're allowed to borrow at this code location.
@@ -668,73 +655,47 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessQueueHelper(
                            pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
 
   DeferPendingSignals dps{*this};
+  // Ensure the list is empty before we start.
+  deferred_list.Flush();
   Guard<SpinLock, IrqSave> guard{&lock_};
-  const uint64_t mru = mru_gen_.load(ktl::memory_order_relaxed);
+  const PageQueue mru_queue = mru_gen_to_queue();
   const uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
   // Fill in the lru action now that the lock is held.
   deferred_list.SetLruAction(lru_action_);
 
   // If we're processing the lru queue and it has already hit the target gen, return early.
-  if (processing_queue == ProcessingQueue::Lru && lru >= target_gen) {
+  if (lru >= target_gen) {
     return ktl::nullopt;
   }
 
-  uint32_t work_remain = kMaxQueueWork;
-  PageQueue queue;
-  list_node* operating_queue;
-  if (processing_queue == ProcessingQueue::Lru) {
-    queue = gen_to_queue(lru);
-    operating_queue = &page_queues_[queue];
-  } else {
-    // Processing the DontNeed queue typically involves moving from the Processing to the regular
-    // DontNeed queue, unless we're peeking in which case we can also grab from the regular. When
-    // peeking we prefer to grab from the dont_need_processign_list_ first, as its pages are older,
-    // or at least were moved to the DontNeed queue further in the past.
-    queue = PageQueueReclaimDontNeed;
-    if (peek && list_is_empty(&dont_need_processing_list_)) {
-      operating_queue = &page_queues_[queue];
-    } else {
-      operating_queue = &dont_need_processing_list_;
-    }
-  }
+  uint32_t work_remain = Items;
+  const PageQueue lru_queue = gen_to_queue(lru);
+  list_node* operating_queue = &page_queues_[lru_queue];
 
   while (!list_is_empty(operating_queue) && work_remain > 0) {
     work_remain--;
-    // When moving pages we want to maintain relative page age as far as possible. For pages in the
-    // LRU queue this means the pages we are moving have overall been touched more recently than
-    // their destination, and so we want to take from the oldest (tail). The opposite is true for
-    // the don't need process queue, as they are less recently used than their target queue.
-    // When not moving pages, aka peeking, we always want the oldest pages though.
-    vm_page_t* page;
-    if (processing_queue == ProcessingQueue::Lru || peek) {
-      page = list_peek_tail_type(operating_queue, vm_page_t, queue_node);
-    } else {
-      page = list_peek_head_type(operating_queue, vm_page_t, queue_node);
-    }
+    // When moving pages around we want to maintain relative page age as far as possible. Therefore,
+    // if forcefully moving pages from LRU to LRU+1 we want all the pages from LRU, to appear after
+    // those already in LRU+1, as the ones in LRU are older. To achieve this we want to take from
+    // the head of LRU, and place in the tail of LRU+1.
+    // However, if peeking (and not forcefully moving), then we always want to return the oldest
+    // page, which is the tail. For any pages whose stored queue does not match, it is irrelevant
+    // which end we take from as such pages have no meaningful relative ordering.
+    vm_page_t* page = peek ? list_peek_tail_type(operating_queue, vm_page_t, queue_node)
+                           : list_peek_head_type(operating_queue, vm_page_t, queue_node);
     PageQueue page_queue =
         (PageQueue)page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
-
-    if (processing_queue == ProcessingQueue::DontNeed) {
-      DEBUG_ASSERT(page_queue >= PageQueueReclaimDontNeed);
-    } else {
-      DEBUG_ASSERT(page_queue >= PageQueueReclaimBase);
-    }
+    DEBUG_ASSERT(page_queue >= PageQueueReclaimBase);
 
     // If the queue stored in the page does not match then we want to move it to its correct queue
     // with the caveat that its queue could be invalid. The queue would be invalid if MarkAccessed
     // had raced. Should this happen we know that the page is actually *very* old, and so we will
     // fall back to the case of forcibly changing its age to the new lru gen.
-    const PageQueue mru_queue = gen_to_queue(mru);
-    // A page in the DontNeed queue will never be allowed to age to the point that its queue
-    // becomes invalid, because we process *all* the DontNeed pages each time we change the lru.
-    // In other words, no DontNeed page will be left behind when lru advances.
-    DEBUG_ASSERT(page_queue == queue || processing_queue != ProcessingQueue::DontNeed ||
-                 queue_is_valid(page_queue, gen_to_queue(lru), mru_queue));
-    if (page_queue != queue && queue_is_valid(page_queue, gen_to_queue(lru), mru_queue)) {
+    if (page_queue != lru_queue && queue_is_valid(page_queue, lru_queue, mru_queue)) {
       list_delete(&page->queue_node);
       list_add_head(&page_queues_[page_queue], &page->queue_node);
 
-      if (queue_is_active(page_queue, mru_queue) && do_sweeping && !page->is_loaned()) {
+      if (do_sweeping && !page->is_loaned() && queue_is_active(page_queue, mru_queue)) {
         deferred_list.AddLoanReplacement(page, this);
       }
     } else if (peek) {
@@ -751,43 +712,98 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessQueueHelper(
     } else {
       // Force it into our target queue, don't care about races. If we happened to access it at
       // the same time then too bad.
-      PageQueue new_queue = processing_queue == ProcessingQueue::DontNeed ? PageQueueReclaimDontNeed
-                                                                          : gen_to_queue(lru + 1);
+      PageQueue new_queue = gen_to_queue(lru + 1);
       PageQueue old_queue = (PageQueue)page->object.get_page_queue_ref().exchange(new_queue);
-      if (processing_queue == ProcessingQueue::DontNeed) {
-        DEBUG_ASSERT(old_queue >= PageQueueReclaimDontNeed);
-      } else {
-        DEBUG_ASSERT(old_queue >= PageQueueReclaimBase);
-      }
+      DEBUG_ASSERT(old_queue >= PageQueueReclaimBase);
 
       page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
       page_queue_counts_[new_queue].fetch_add(1, ktl::memory_order_relaxed);
       list_delete(&page->queue_node);
-      if (processing_queue == ProcessingQueue::DontNeed) {
-        // When pulling from the DontNeedProcessing queue we pulled from the head, and so we
-        // conversely need to place them in the tail to preserve order (see comment at start of the
-        // loop).
-        list_add_tail(&page_queues_[new_queue], &page->queue_node);
-      } else {
-        list_add_head(&page_queues_[new_queue], &page->queue_node);
-      }
+      list_add_tail(&page_queues_[new_queue], &page->queue_node);
       // We should only have performed this step to move from one inactive bucket to the next,
       // so there should be no active/inactive count changes needed.
-      DEBUG_ASSERT(!queue_is_active(new_queue, mru_gen_to_queue()));
+      DEBUG_ASSERT(!queue_is_active(new_queue, mru_queue));
       deferred_list.AddReclaimable(page, this);
     }
   }
-
   if (list_is_empty(operating_queue)) {
-    if (processing_queue == ProcessingQueue::Lru) {
-      lru_gen_.store(lru + 1, ktl::memory_order_relaxed);
-      mru_semaphore_.Post();
-      // Changing the lru_gen_ might  in the future trigger a scenario where need to age, but this
-      // is presently a no-op.
-      MaybeTriggerAgingLocked(dps);
-    }
+    lru_gen_.store(lru + 1, ktl::memory_order_relaxed);
+    mru_semaphore_.Post();
+    // Changing the lru_gen_ might  in the future trigger a scenario where need to age, but this
+    // is presently a no-op.
+    MaybeTriggerAgingLocked(dps);
   }
 
+  return ktl::nullopt;
+}
+
+ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(list_node_t* list,
+                                                                       bool peek) {
+  // Need to move every page out of the list and either put it back in the regular DontNeed list,
+  // or in its correct queue. If we hit active pages we may need to replace them with loaned.
+
+  // Processing the DontNeed queue requires holding the page_queues_ lock_. The only other actions
+  // that require this lock are inserting or removing pages from the page queues. To ensure these
+  // actions can complete in a small bounded time kMaxDeferredWork is chosen to be very small so
+  // that the lock will be regularly dropped. As processing the DontNeed queue is not time critical
+  // and can be somewhat inefficient in its operation we err on the side of doing less work per lock
+  // acquisition.
+  constexpr uint64_t kMaxDeferredWork = 16;
+  // Pages in this list might be replaced with a loaned page, this must be done outside the lock_,
+  // so we accumulate pages and then act after lock_ is released.
+  LruIsolate<kMaxDeferredWork> deferred_list;
+  // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
+  // we're allowed to borrow at this code location.
+  const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
+                           pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
+
+  Guard<SpinLock, IrqSave> guard{&lock_};
+  // If not peeking we must be processing the dont_need_processing_list_, otherwise we will
+  // infinite loop taking items out and placing them back into the same list we are processing.
+  DEBUG_ASSERT(peek || list == &dont_need_processing_list_);
+  // Count work done separately to all iterations so we can periodically drop the lock and process
+  // the deferred_list.
+  uint64_t work_done = 0;
+  while (!list_is_empty(list)) {
+    // Take from the tail of the list as that represents the oldest item. That way if |peek| is true
+    // pages will get returned in oldest->newest order.
+    vm_page_t* page = list_remove_tail_type(list, vm_page_t, queue_node);
+    PageQueue page_queue =
+        static_cast<PageQueue>(page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
+    // Place in the correct list, preserving age
+    if (page_queue == PageQueueReclaimDontNeed) {
+      // As we removed from the tail we place in the head, that way overall ordering is preserved.
+      list_add_head(&page_queues_[page_queue], &page->queue_node);
+      if (peek) {
+        VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
+        DEBUG_ASSERT(cow);
+        // We may be racing with destruction of VMO. As we currently hold our lock we know that our
+        // back pointer is correct in so far as the VmCowPages has not yet had completed running its
+        // destructor, so we know it is safe to attempt to upgrade it to a RefPtr. If upgrading
+        // fails we assume the page is about to be removed from the page queue once the VMO
+        // destructor gets a chance to run.
+        return VmoBacklink{fbl::MakeRefPtrUpgradeFromRaw(cow, lock_), page,
+                           page->object.get_page_offset()};
+      }
+    } else {
+      // Only reason for a page to be in the DontNeed list and have the wrong queue is if it was
+      // recently accessed. That means it's active and we can attempt to loan to it. As the entire
+      // DontNeed queue is processed each time we change the LRU, we know this is a valid page queue
+      // that has not yet aged out.
+      // We have no way to know the relative age of this page with respect to its target queue, so
+      // the head is as good a place as any to put it.
+      list_add_head(&page_queues_[page_queue], &page->queue_node);
+      if (do_sweeping && !page->is_loaned()) {
+        deferred_list.AddLoanReplacement(page, this);
+      }
+    }
+    work_done++;
+    if (work_done >= kMaxDeferredWork) {
+      // Drop the lock and flush the deferred_list
+      guard.CallUnlocked([&deferred_list]() { deferred_list.Flush(); });
+      work_done = 0;
+    }
+  }
   return ktl::nullopt;
 }
 
@@ -800,53 +816,61 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedAndLruQueues(u
   // it should continue to be true.
   ASSERT(target_gen <= mru_gen_.load(ktl::memory_order_relaxed) - (kNumActiveQueues - 1));
 
-  // Calculate a truly worst case loop iteration count based on every page being in either the LRU
-  // queue or the wrong DontNeed queue and needing to iterate the LRU multiple steps to the
-  // target_gen. Instead of reading the LRU and comparing the target_gen, just add a buffer of the
-  // maximum number of page queues.
+  {
+    VM_KTRACE_DURATION(2, "ProcessDontNeedQueue");
+    if (peek) {
+      // When peeking we prefer to grab from the dont_need_processign_list_ first, as its pages are
+      // older, or at least were moved to the DontNeed queue further in the past.
+      ktl::optional<VmoBacklink> backlink = ProcessDontNeedList(&dont_need_processing_list_, true);
+      if (backlink != ktl::nullopt) {
+        return backlink;
+      }
+      list_node_t* list = [this]() TA_NO_THREAD_SAFETY_ANALYSIS {
+        return &page_queues_[PageQueueReclaimDontNeed];
+      }();
+      backlink = ProcessDontNeedList(list, true);
+      if (backlink != ktl::nullopt) {
+        return backlink;
+      }
+    } else {
+      // If not peeking then we will need to properly process the DontNeed queue, and so we must
+      // take the processing lock and move the existing pages into the processing list.
+      Guard<Mutex> dont_need_processing_guard{&dont_need_processing_lock_};
+      {
+        Guard<SpinLock, IrqSave> guard{&lock_};
+        ASSERT(list_is_empty(&dont_need_processing_list_));
+        list_move(&page_queues_[PageQueueReclaimDontNeed], &dont_need_processing_list_);
+      }
+      ProcessDontNeedList(&dont_need_processing_list_, false);
+    }
+  }
+
+  // Calculate a truly worst case loop iteration count based on every page being in the LRU
+  // queue and needing to iterate the LRU multiple steps to the target_gen. Instead of reading the
+  // LRU and comparing the target_gen, just add a buffer of the maximum number of page queues.
   ActiveInactiveCounts active_inactive = GetActiveInactiveCounts();
-  const uint64_t max_dont_need_iterations = page_queue_counts_[PageQueueReclaimDontNeed] + 1;
   const uint64_t max_lru_iterations =
       active_inactive.active + active_inactive.inactive + kNumReclaim;
   // Loop iteration counting is just for diagnostic purposes.
   uint64_t loop_iterations = 0;
 
-  ktl::optional<Guard<Mutex>> dont_need_processing_guard;
-  if (!peek) {
-    // If not peeking then we will need to properly process the DontNeed queue, and so we must take
-    // the processing lock and move the existing pages into the processing list.
-    dont_need_processing_guard.emplace(&dont_need_processing_lock_);
-    Guard<SpinLock, IrqSave> guard{&lock_};
-    ASSERT(list_is_empty(&dont_need_processing_list_));
-    list_move(&page_queues_[PageQueueReclaimDontNeed], &dont_need_processing_list_);
-  }
+  // Processing the LRU queue requires holding the page_queues_ lock_. The only other
+  // actions that require this lock are inserting or removing pages from the page queues. To ensure
+  // these actions can complete in a small bounded time kMaxQueueWork is chosen to be very small so
+  // that the lock will be regularly dropped. As processing the DontNeed/LRU queue is not time
+  // critical and can be somewhat inefficient in its operation we err on the side of doing less work
+  // per lock acquisition.
+  //
+  // Also, we need to limit the number to avoid sweep_to_loaned taking up excessive stack space.
+  static constexpr uint32_t kMaxQueueWork = 16;
 
-  while (true) {
-    VM_KTRACE_DURATION(2, "ProcessDontNeedQueue");
-    if (loop_iterations++ == max_dont_need_iterations) {
-      printf("[pq]: WARNING: %s exceeded expected max DontNeed loop iterations %" PRIu64 "\n",
-             __FUNCTION__, max_dont_need_iterations);
-    }
-    auto optional_backlink = ProcessQueueHelper(ProcessingQueue::DontNeed, 0, peek);
-    if (optional_backlink != ktl::nullopt) {
-      DEBUG_ASSERT(peek);
-      return optional_backlink;
-    }
+  // Pages in this list might be reclaimed or replaced with a loaned page, depending on the action
+  // specified in deferred_action. Each of these actions must be done outside the lock_, so we
+  // accumulate pages and then act after lock_ is released.
+  // The deferred_list is declared here as it is expensive to construct/destruct and we would like
+  // to reuse it between iterations.
+  LruIsolate<kMaxQueueWork> deferred_list;
 
-    Guard<SpinLock, IrqSave> guard{&lock_};
-    // If we have been asked to peek, we want to keep processing until both the DontNeed queues
-    // are empty. ProcessQueueHelper will process one queue and then move on to the other when
-    // the first is empty, so that both get processed.
-    if (list_is_empty(&dont_need_processing_list_) &&
-        (!peek || list_is_empty(&page_queues_[PageQueueReclaimDontNeed]))) {
-      break;
-    }
-  }
-  // Not strictly required, but we're done with the dontneed processing lock.
-  dont_need_processing_guard.reset();
-
-  // Reset diagnostic counter for the new loop.
-  loop_iterations = 0;
   // Process the lru queue to reach target_gen.
   while (lru_gen_.load(ktl::memory_order_relaxed) < target_gen) {
     VM_KTRACE_DURATION(2, "ProcessLruQueue");
@@ -854,7 +878,8 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedAndLruQueues(u
       printf("[pq]: WARNING: %s exceeded expected max LRU loop iterations %" PRIu64 "\n",
              __FUNCTION__, max_lru_iterations);
     }
-    auto optional_backlink = ProcessQueueHelper(ProcessingQueue::Lru, target_gen, peek);
+    auto optional_backlink = ProcessLruQueueHelper(deferred_list, target_gen, peek);
+
     if (optional_backlink != ktl::nullopt) {
       return optional_backlink;
     }
