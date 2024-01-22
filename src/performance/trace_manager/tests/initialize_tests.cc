@@ -26,6 +26,15 @@ TEST_F(TraceManagerTest, DuplicateInitialization) {
   RunLoopUntilIdle();
 }
 
+TEST_F(TraceManagerTest, LargeBuffers) {
+  ConnectToControllerService();
+
+  controller::TraceConfig config{GetDefaultTraceConfig()};
+  config.set_buffer_size_megabytes_hint(1024);
+  ASSERT_TRUE(InitializeSession(std::move(config)));
+  EXPECT_EQ(GetSessionState(), SessionState::kInitialized);
+}
+
 TEST_F(TraceManagerTest, InitializeWithoutProviders) {
   ConnectToControllerService();
 

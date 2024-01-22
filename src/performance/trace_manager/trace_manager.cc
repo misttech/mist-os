@@ -24,7 +24,6 @@ namespace {
 // all the records. E.g., cpuperf_provider can take 40 seconds with --verbose=2
 constexpr zx::duration kStopTimeout = zx::sec(60);
 constexpr uint32_t kMinBufferSizeMegabytes = 1;
-constexpr uint32_t kMaxBufferSizeMegabytes = 64;
 
 // These defaults are copied from fuchsia.tracing/trace_controller.fidl.
 constexpr uint32_t kDefaultBufferSizeMegabytesHint = 4;
@@ -35,8 +34,7 @@ constexpr fuchsia::tracing::BufferingMode kDefaultBufferingMode =
 constexpr size_t kMaxAlertQueueDepth = 16;
 
 uint32_t ConstrainBufferSize(uint32_t buffer_size_megabytes) {
-  return std::min(std::max(buffer_size_megabytes, kMinBufferSizeMegabytes),
-                  kMaxBufferSizeMegabytes);
+  return std::max(buffer_size_megabytes, kMinBufferSizeMegabytes);
 }
 
 struct KnownCategoryHash {

@@ -523,13 +523,6 @@ pub async fn trace(
                      Trace should be run with the --background flag."
                 );
             }
-            if opts.buffer_size > 64 {
-                ffx_bail!(
-                    "Error: Requested buffer size of {}MB is larger \
-                           than the maximum supported buffer size of 64MB",
-                    opts.buffer_size
-                );
-            }
             let expanded_categories = expand_categories(&context, opts.categories).await?;
             let trace_config = TraceConfig {
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
@@ -1465,24 +1458,32 @@ Current tracing status:
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let writer = Writer::new_test(None, &test_buffers);
-        let proxy = setup_fake_service();
-        let controller = setup_closed_fake_controller_proxy();
-        let cmd = TraceCommand {
-            sub_cmd: TraceSubCommand::Start(Start {
-                buffering_mode: tracing::BufferingMode::Oneshot,
-                categories: vec![],
-                duration: Some(1.0),
-                background: false,
-                buffer_size: 65,
-                output: "foober.fxt".to_owned(),
-                verbose: false,
-                trigger: vec![],
-            }),
-        };
-        let res = trace(env.context.clone(), proxy, controller, writer, cmd).await.unwrap_err();
-        assert!(res.ffx_error().is_some());
-        assert!(res.to_string().contains("Error: Requested buffer size of"));
-        assert!(test_buffers.into_stdout_str().is_empty());
+        run_trace_test(
+            env.context.clone(),
+            TraceCommand {
+                sub_cmd: TraceSubCommand::Start(Start {
+                    buffer_size: 1024,
+                    categories: vec![],
+                    buffering_mode: tracing::BufferingMode::Oneshot,
+                    duration: None,
+                    output: "foober.fxt".to_owned(),
+                    background: false,
+                    verbose: false,
+                    trigger: vec![],
+                }),
+            },
+            writer,
+        )
+        .await;
+        let output = test_buffers.into_stdout_str();
+        let regex_str =
+            "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt\n\
+            Press <enter> to stop trace.\n\
+            Shutting down recording and writing to file.\n\
+            Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foober.fxt\n\
+            Upload to https://ui.perfetto.dev/#!/ to view.";
+        let want = Regex::new(regex_str).unwrap();
+        assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

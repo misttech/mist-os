@@ -13,6 +13,7 @@
 
 #include <fbl/algorithm.h>
 
+#include "lib/fit/defer.h"
 #include "src/performance/trace_manager/trace_session.h"
 #include "src/performance/trace_manager/util.h"
 
@@ -340,24 +341,37 @@ TransferStatus Tracee::DoWriteChunk(const zx::socket& socket, uint64_t vmo_offse
   // For paranoia purposes verify size is a multiple of the word size so we
   // don't risk overflowing the buffer later.
   FX_DCHECK(trace::WordsToBytes(size_in_words) == size);
-  std::vector<uint64_t> buffer(size_in_words);
 
-  if (buffer_vmo_.read(buffer.data(), vmo_offset, size) != ZX_OK) {
-    FX_LOGS(ERROR) << *bundle_ << ": Failed to read data from buffer_vmo: "
-                   << "offset=" << vmo_offset << ", size=" << size;
+  // The passed in vmo_offset isn't necessarily page aligned. Unlike zx_vmar_read, zx_vmar_map
+  // requires a page aligned offset, so we'll need to fudge the offset a bit. Truncate the offset to
+  // be page aligned and then add back the extra bytes to the size of the region that we are mapping
+  // and then also offset the addr we get back from the mapping.
+  uint64_t page_aligned_offset = vmo_offset & (~(ZX_PAGE_SIZE - 1));
+  uint64_t page_aligned_remainder = vmo_offset % ZX_PAGE_SIZE;
+
+  zx_vaddr_t addr;
+  zx_status_t map_result = zx::vmar::root_self()->map(
+      ZX_VM_PERM_READ, 0, buffer_vmo_, page_aligned_offset, size + page_aligned_remainder, &addr);
+  if (map_result != ZX_OK) {
+    FX_PLOGS(ERROR, map_result) << *bundle_ << ": Failed to read data from buffer_vmo: "
+                                << "offset=" << page_aligned_offset << ", size=" << size;
     return TransferStatus::kProviderError;
   }
+  auto d = fit::defer([addr, size]() { zx::vmar::root_self()->unmap(addr, size); });
 
+  zx_vaddr_t offset_addr = addr + page_aligned_remainder;
   uint64_t bytes_written;
   if (!by_size) {
-    uint64_t words_written = GetBufferWordsWritten(buffer.data(), size_in_words);
+    uint64_t words_written =
+        GetBufferWordsWritten(reinterpret_cast<const uint64_t*>(offset_addr), size_in_words);
     bytes_written = trace::WordsToBytes(words_written);
     FX_LOGS(INFO) << "By-record -> " << bytes_written << " bytes";
   } else {
     bytes_written = size;
   }
 
-  auto status = WriteBufferToSocket(socket, buffer.data(), bytes_written);
+  auto status =
+      WriteBufferToSocket(socket, reinterpret_cast<const void*>(offset_addr), bytes_written);
   if (status != TransferStatus::kComplete) {
     FX_VLOGS(1) << *bundle_ << ": Failed to write " << name << " records";
   }
