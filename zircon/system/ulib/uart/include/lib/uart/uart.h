@@ -191,7 +191,8 @@ class DriverBase {
   template <class IoProvider>
   void SetLineControl(IoProvider& io, std::optional<DataBits> data_bits,
                       std::optional<Parity> parity, std::optional<StopBits> stop_bits) {
-    static_assert(!std::is_same_v<IoProvider, IoProvider>, "TODO(https://fxbug.dev/102726): implment me");
+    static_assert(!std::is_same_v<IoProvider, IoProvider>,
+                  "TODO(https://fxbug.dev/102726): implment me");
   }
 
   // API for use in IoProvider setup.
@@ -301,8 +302,7 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
   // a subclass constructor method to map the physical address to a virtual
   // address.
   template <typename T>
-  BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size, T&& map_mmio)
-      : pio_size_(pio_size) {
+  BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size, T&& map_mmio) {
     auto ptr = map_mmio(cfg.mmio_phys);
     if (pio_size != 0) {
       // Scaled MMIO with 32-byte I/O access.
@@ -318,18 +318,14 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
 
   BasicIoProvider& operator=(BasicIoProvider&& other) {
     io_.swap(other.io_);
-    pio_size_ = other.pio_size_;
     return *this;
   }
 
   auto* io() { return &io_; }
 
-  uint16_t pio_size() const { return pio_size_; }
-
  private:
   std::variant<hwreg::RegisterMmio, hwreg::RegisterMmioScaled<uint32_t>> io_{std::in_place_index<0>,
                                                                              nullptr};
-  uint16_t pio_size_;
 };
 
 // The specialization for devices using actual PIO only occurs on x86.
