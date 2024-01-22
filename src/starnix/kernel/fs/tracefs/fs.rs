@@ -7,7 +7,7 @@ use crate::{
     task::CurrentTask,
     vfs::{
         CacheMode, ConstFile, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNodeInfo, FsStr, FsString, StaticDirectoryBuilder,
+        FsNodeInfo, FsStr, StaticDirectoryBuilder,
     },
 };
 use once_cell::sync::Lazy;
@@ -37,7 +37,7 @@ impl TraceFs {
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         dir.node(
-            "trace".into(),
+            "trace",
             fs.create_node(
                 current_task,
                 ConstFile::new_node(vec![]),
@@ -47,17 +47,17 @@ impl TraceFs {
         // The remaining contents of the fs are a minimal set of files that we want to exist so
         // that Perfetto's ftrace controller will not error out. None of them provide any real
         // functionality.
-        dir.subdir(current_task, "per_cpu".into(), 0o755, |dir| {
+        dir.subdir(current_task, "per_cpu", 0o755, |dir| {
             /// A name for each cpu directory, cached to provide a 'static lifetime.
-            static CPU_DIR_NAMES: Lazy<Vec<FsString>> = Lazy::new(|| {
+            static CPU_DIR_NAMES: Lazy<Vec<String>> = Lazy::new(|| {
                 (0..fuchsia_zircon::system_get_num_cpus())
-                    .map(|cpu| FsString::from(format!("cpu{}", cpu)))
+                    .map(|cpu| format!("cpu{}", cpu))
                     .collect()
             });
-            for dir_name in CPU_DIR_NAMES.iter() {
-                dir.subdir(current_task, dir_name.as_ref(), 0o755, |dir| {
+            for dir_name in CPU_DIR_NAMES.iter().map(|s| s.as_str()) {
+                dir.subdir(current_task, dir_name, 0o755, |dir| {
                     dir.node(
-                        "trace_pipe_raw".into(),
+                        "trace_pipe_raw",
                         fs.create_node(
                             current_task,
                             ConstFile::new_node(vec![]),
@@ -68,7 +68,7 @@ impl TraceFs {
             }
         });
         dir.node(
-            "tracing_on".into(),
+            "tracing_on",
             fs.create_node(
                 current_task,
                 ConstFile::new_node("0".into()),
@@ -76,7 +76,7 @@ impl TraceFs {
             ),
         );
         dir.node(
-            "trace_marker".into(),
+            "trace_marker",
             fs.create_node(
                 current_task,
                 TraceMarkerFile::new_node(),

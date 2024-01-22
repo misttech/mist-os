@@ -335,7 +335,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
         dir.set_mode(mode!(IFDIR, 0o500));
         dir.dir_creds(connection.creds);
         dir.node(
-            "abort".into(),
+            "abort",
             fs.create_node(
                 current_task,
                 AbortFile::new_node(connection.clone()),
@@ -343,7 +343,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
             ),
         );
         dir.node(
-            "waiting".into(),
+            "waiting",
             fs.create_node(
                 current_task,
                 WaitingFile::new_node(connection.clone()),

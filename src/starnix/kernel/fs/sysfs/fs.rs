@@ -37,37 +37,27 @@ impl SysFs {
         let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         let dir_mode = mode!(IFDIR, 0o755);
-        dir.subdir(current_task, "fs".into(), 0o755, |dir| {
-            dir.subdir(current_task, "selinux".into(), 0o755, |_| ());
-            dir.subdir(current_task, "bpf".into(), 0o755, |_| ());
+        dir.subdir(current_task, "fs", 0o755, |dir| {
+            dir.subdir(current_task, "selinux", 0o755, |_| ());
+            dir.subdir(current_task, "bpf", 0o755, |_| ());
             dir.node(
-                "cgroup".into(),
+                "cgroup",
                 fs.create_node(
                     current_task,
                     CgroupDirectoryNode::new(),
                     FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
                 ),
             );
-            dir.subdir(current_task, "fuse".into(), 0o755, |dir| {
-                dir.subdir(current_task, "connections".into(), 0o755, |_| ())
+            dir.subdir(current_task, "fuse", 0o755, |dir| {
+                dir.subdir(current_task, "connections", 0o755, |_| ())
             });
         });
 
         let registry = &kernel.device_registry;
-        dir.entry(current_task, SYSFS_DEVICES.into(), registry.root_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BUS.into(), registry.bus_subsystem_kobject().ops(), dir_mode);
-        dir.entry(
-            current_task,
-            SYSFS_BLOCK.into(),
-            registry.block_subsystem_kobject().ops(),
-            dir_mode,
-        );
-        dir.entry(
-            current_task,
-            SYSFS_CLASS.into(),
-            registry.class_subsystem_kobject().ops(),
-            dir_mode,
-        );
+        dir.entry(current_task, SYSFS_DEVICES, registry.root_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BUS, registry.bus_subsystem_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BLOCK, registry.block_subsystem_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_CLASS, registry.class_subsystem_kobject().ops(), dir_mode);
 
         // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
         kernel

@@ -124,7 +124,7 @@ pub fn pid_directory(
     );
     dir.entry(
         current_task,
-        "task".into(),
+        "task",
         TaskListDirectory { thread_group: task.thread_group.clone() },
         mode!(IFDIR, 0o777),
     );
@@ -154,7 +154,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry_creds(task.as_fscred());
     dir.entry(
         current_task,
-        "cwd".into(),
+        "cwd",
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
             move || Ok(SymlinkTarget::Node(Task::from_weak(&task)?.fs().cwd()))
@@ -163,7 +163,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     );
     dir.entry(
         current_task,
-        "exe".into(),
+        "exe",
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
             move || {
@@ -176,107 +176,57 @@ fn static_directory_builder_with_common_task_entries<'a>(
         }),
         mode!(IFLNK, 0o777),
     );
-    dir.entry(current_task, "fd".into(), FdDirectory::new(task.into()), mode!(IFDIR, 0o777));
+    dir.entry(current_task, "fd", FdDirectory::new(task.into()), mode!(IFDIR, 0o777));
+    dir.entry(current_task, "fdinfo", FdInfoDirectory::new(task.into()), mode!(IFDIR, 0o777));
+    dir.entry(current_task, "io", IoFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(current_task, "limits", LimitsFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(current_task, "maps", ProcMapsFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(current_task, "mem", MemFile::new_node(task.into()), mode!(IFREG, 0o600));
     dir.entry(
         current_task,
-        "fdinfo".into(),
-        FdInfoDirectory::new(task.into()),
-        mode!(IFDIR, 0o777),
-    );
-    dir.entry(current_task, "io".into(), IoFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(
-        current_task,
-        "limits".into(),
-        LimitsFile::new_node(task.into()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(
-        current_task,
-        "maps".into(),
-        ProcMapsFile::new_node(task.into()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(current_task, "mem".into(), MemFile::new_node(task.into()), mode!(IFREG, 0o600));
-    dir.entry(
-        current_task,
-        "root".into(),
+        "root",
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
             move || Ok(SymlinkTarget::Node(Task::from_weak(&task)?.fs().root()))
         }),
         mode!(IFLNK, 0o777),
     );
+    dir.entry(current_task, "smaps", ProcSmapsFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(current_task, "stat", StatFile::new_node(task.into(), scope), mode!(IFREG, 0o444));
+    dir.entry(current_task, "statm", StatmFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(
         current_task,
-        "smaps".into(),
-        ProcSmapsFile::new_node(task.into()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(
-        current_task,
-        "stat".into(),
-        StatFile::new_node(task.into(), scope),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(current_task, "statm".into(), StatmFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(
-        current_task,
-        "status".into(),
+        "status",
         StatusFile::new_node(task.into(), task.persistent_info.clone()),
         mode!(IFREG, 0o444),
     );
+    dir.entry(current_task, "cmdline", CmdlineFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(current_task, "environ", EnvironFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(current_task, "auxv", AuxvFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(
         current_task,
-        "cmdline".into(),
-        CmdlineFile::new_node(task.into()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(
-        current_task,
-        "environ".into(),
-        EnvironFile::new_node(task.into()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(current_task, "auxv".into(), AuxvFile::new_node(task.into()), mode!(IFREG, 0o444));
-    dir.entry(
-        current_task,
-        "comm".into(),
+        "comm",
         CommFile::new_node(task.into(), task.persistent_info.clone()),
         mode!(IFREG, 0o644),
     );
-    dir.subdir(current_task, "attr".into(), 0o555, |dir| {
+    dir.subdir(current_task, "attr", 0o555, |dir| {
         dir.entry_creds(task.as_fscred());
         dir.dir_creds(task.as_fscred());
         selinux_proc_attrs(current_task, task, dir);
     });
-    dir.entry(current_task, "ns".into(), NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));
+    dir.entry(current_task, "ns", NsDirectory { task: task.into() }, mode!(IFDIR, 0o777));
     dir.entry(
         current_task,
-        "mountinfo".into(),
+        "mountinfo",
         ProcMountinfoFile::new_node(task.into()),
         mode!(IFREG, 0o444),
     );
+    dir.entry(current_task, "mounts", ProcMountsFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(current_task, "oom_adj", OomAdjFile::new_node(task.into()), mode!(IFREG, 0o744));
+    dir.entry(current_task, "oom_score", OomScoreFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(
         current_task,
-        "mounts".into(),
-        ProcMountsFile::new_node(task.into()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(
-        current_task,
-        "oom_adj".into(),
-        OomAdjFile::new_node(task.into()),
-        mode!(IFREG, 0o744),
-    );
-    dir.entry(
-        current_task,
-        "oom_score".into(),
-        OomScoreFile::new_node(task.into()),
-        mode!(IFREG, 0o444),
-    );
-    dir.entry(
-        current_task,
-        "oom_score_adj".into(),
+        "oom_score_adj",
         OomScoreAdjFile::new_node(task.into()),
         mode!(IFREG, 0o744),
     );

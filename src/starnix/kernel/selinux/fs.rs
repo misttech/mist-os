@@ -67,54 +67,44 @@ impl SeLinuxFs {
         };
 
         // Read-only files & directories, exposing SELinux internal state.
+        dir.entry(current_task, "checkreqprot", SeCheckReqProt::new_node(), mode!(IFREG, 0o644));
+        dir.entry(current_task, "class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
         dir.entry(
             current_task,
-            "checkreqprot".into(),
-            SeCheckReqProt::new_node(),
-            mode!(IFREG, 0o644),
-        );
-        dir.entry(current_task, "class".into(), SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
-        dir.entry(
-            current_task,
-            "deny_unknown".into(),
+            "deny_unknown",
             SeDenyUnknown::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
         dir.entry(
             current_task,
-            "reject_unknown".into(),
+            "reject_unknown",
             SeRejectUnknown::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
-        dir.subdir(current_task, "initial_contexts".into(), 0o555, |dir| {
+        dir.subdir(current_task, "initial_contexts", 0o555, |dir| {
             dir.entry(
                 current_task,
-                "kernel".into(),
+                "kernel",
                 BytesFile::new_node(b"system_u:system_r:kernel_t:s0".to_vec()),
                 mode!(IFREG, 0o444),
             );
         });
+        dir.entry(current_task, "mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
         dir.entry(
             current_task,
-            "mls".into(),
-            BytesFile::new_node(b"1".to_vec()),
-            mode!(IFREG, 0o444),
-        );
-        dir.entry(
-            current_task,
-            "policy".into(),
+            "policy",
             SePolicy::new_node(security_server.clone()),
             mode!(IFREG, 0o600),
         );
         dir.entry(
             current_task,
-            "policyvers".into(),
+            "policyvers",
             BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).as_bytes().to_vec()),
             mode!(IFREG, 0o444),
         );
         dir.entry(
             current_task,
-            "status".into(),
+            "status",
             // The status file needs to be mmap-able, so use a VMO-backed file.
             // When the selinux state changes in the future, the way to update this data (and
             // communicate updates with userspace) is to use the
@@ -127,17 +117,17 @@ impl SeLinuxFs {
         );
 
         // Write-only files used to configure and query SELinux.
-        dir.entry(current_task, "access".into(), AccessFileNode::new(), mode!(IFREG, 0o666));
+        dir.entry(current_task, "access", AccessFileNode::new(), mode!(IFREG, 0o666));
         dir.entry(
             current_task,
-            "context".into(),
+            "context",
             SeContext::new_node(security_server.clone()),
             mode!(IFREG, 0o666),
         );
-        dir.entry(current_task, "create".into(), SeCreate::new_node(), mode!(IFREG, 0o666));
+        dir.entry(current_task, "create", SeCreate::new_node(), mode!(IFREG, 0o666));
         dir.entry(
             current_task,
-            "load".into(),
+            "load",
             SeLoad::new_node(security_server.clone()),
             mode!(IFREG, 0o600),
         );
@@ -145,20 +135,14 @@ impl SeLinuxFs {
         // Allows the SELinux enforcing mode to be queried, or changed.
         dir.entry(
             current_task,
-            "enforce".into(),
+            "enforce",
             SeEnforce::new_node(security_server.clone()),
             // TODO(b/297313229): Get mode from the container.
             mode!(IFREG, 0o644),
         );
 
         // "/dev/null" equivalent used for file descriptors redirected by SELinux.
-        dir.entry_dev(
-            current_task,
-            "null".into(),
-            DeviceFileNode,
-            mode!(IFCHR, 0o666),
-            DeviceType::NULL,
-        );
+        dir.entry_dev(current_task, "null", DeviceFileNode, mode!(IFCHR, 0o666), DeviceType::NULL);
 
         dir.build_root();
 
@@ -461,14 +445,9 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
                 let index = format!("{next_index}\n").into_bytes();
                 let fs = node.fs();
                 let mut dir = StaticDirectoryBuilder::new(&fs);
-                dir.entry(
-                    current_task,
-                    "index".into(),
-                    BytesFile::new_node(index),
-                    mode!(IFREG, 0o444),
-                );
-                dir.subdir(current_task, "perms".into(), 0o555, |perms| {
-                    for (i, perm) in SELINUX_PERMS.iter().map(|&p| <&FsStr>::from(p)).enumerate() {
+                dir.entry(current_task, "index", BytesFile::new_node(index), mode!(IFREG, 0o444));
+                dir.subdir(current_task, "perms", 0o555, |perms| {
+                    for (i, perm) in SELINUX_PERMS.iter().enumerate() {
                         let node = BytesFile::new_node(format!("{}\n", i + 1).into_bytes());
                         perms.entry(current_task, perm, node, mode!(IFREG, 0o444));
                     }
@@ -486,12 +465,12 @@ pub fn selinux_proc_attrs(
     dir: &mut StaticDirectoryBuilder<'_>,
 ) {
     use SeProcAttrNodeType::*;
-    dir.entry(current_task, "current".into(), Current.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "exec".into(), Exec.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "fscreate".into(), FsCreate.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "keycreate".into(), KeyCreate.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "prev".into(), Previous.new_node(task), mode!(IFREG, 0o666));
-    dir.entry(current_task, "sockcreate".into(), SockCreate.new_node(task), mode!(IFREG, 0o666));
+    dir.entry(current_task, "current", Current.new_node(task), mode!(IFREG, 0o666));
+    dir.entry(current_task, "exec", Exec.new_node(task), mode!(IFREG, 0o666));
+    dir.entry(current_task, "fscreate", FsCreate.new_node(task), mode!(IFREG, 0o666));
+    dir.entry(current_task, "keycreate", KeyCreate.new_node(task), mode!(IFREG, 0o666));
+    dir.entry(current_task, "prev", Previous.new_node(task), mode!(IFREG, 0o666));
+    dir.entry(current_task, "sockcreate", SockCreate.new_node(task), mode!(IFREG, 0o666));
 }
 
 enum SeProcAttrNodeType {

@@ -52,7 +52,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     pub fn entry(
         &mut self,
         current_task: &CurrentTask,
-        name: &'static FsStr,
+        name: &'static str,
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
     ) {
@@ -64,7 +64,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     pub fn entry_dev(
         &mut self,
         current_task: &CurrentTask,
-        name: &'static FsStr,
+        name: &'static str,
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
         dev: DeviceType,
@@ -81,7 +81,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     pub fn subdir(
         &mut self,
         current_task: &CurrentTask,
-        name: &'static FsStr,
+        name: &'static str,
         mode: u32,
         build_subdir: impl Fn(&mut Self),
     ) {
@@ -93,9 +93,9 @@ impl<'a> StaticDirectoryBuilder<'a> {
 
     /// Adds an [`FsNode`] entry to the directory, which already has an inode number and file mode.
     /// Panics if an entry with the same name was already added.
-    pub fn node(&mut self, name: &'static FsStr, node: FsNodeHandle) {
+    pub fn node(&mut self, name: &'static str, node: FsNodeHandle) {
         assert!(
-            self.entries.insert(name, node).is_none(),
+            self.entries.insert(name.into(), node).is_none(),
             "adding a duplicate entry into a StaticDirectory",
         );
     }

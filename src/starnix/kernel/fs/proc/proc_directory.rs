@@ -350,7 +350,7 @@ impl FsNodeOps for MountsSymlink {
 /// Creates the /proc/pressure directory. https://docs.kernel.org/accounting/psi.html
 fn pressure_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry(current_task, "memory".into(), PressureFile::new_node(), mode!(IFREG, 0o666));
+    dir.entry(current_task, "memory", PressureFile::new_node(), mode!(IFREG, 0o666));
     dir.build(current_task)
 }
 
