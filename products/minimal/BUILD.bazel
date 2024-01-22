@@ -54,14 +54,7 @@ _PRODUCT_CONFIG_BASE_JSON = {
             "configure_fshost": True,
             "live_usb_enabled": False,
             "filesystems": {
-                "volume": {
-                    "fvm": {
-                        "data": {
-                        },
-                        "blob": {
-                        },
-                    },
-                },
+                "volume": "fxfs",
             },
         },
     },
@@ -95,7 +88,7 @@ fuchsia_product_bundle(
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
     product_image = ":image.x64",
     product_name = "fuchsia",
-    recovery = "//products/zedboot:x64_with_fvm",
+    recovery = "//products/zedboot:x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
@@ -119,7 +112,7 @@ fuchsia_product_bundle(
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
     product_image = ":image.arm64",
     product_name = "fuchsia",
-    recovery = "//products/zedboot:arm64_with_fvm",
+    recovery = "//products/zedboot:arm64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
@@ -143,7 +136,7 @@ fuchsia_product_bundle(
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
     product_image = ":image.qemu-x64",
     product_name = "fuchsia",
-    recovery = "//products/zedboot:qemu-x64_with_fvm",
+    recovery = "//products/zedboot:qemu-x64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )
@@ -191,7 +184,7 @@ fuchsia_product_bundle(
     partitions_config = "//build/bazel/assembly/partitions_configurations:riscv64",
     product_image = ":image.riscv64",
     product_name = "fuchsia",
-    recovery = "//products/zedboot:riscv64_with_fvm",
+    recovery = "//products/zedboot:riscv64",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
 )

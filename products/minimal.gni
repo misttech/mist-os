@@ -18,7 +18,7 @@ product_bootfs_labels = [ "//products/kernel_cmdline:oom.reboot-timeout--low" ]
 #
 # This should be overridden by products which inherit from minimal.
 fuchsia_product_assembly_config_label = "//products/minimal"
-zedboot_product_assembly_config_label = "//products/zedboot:zedboot_with_fvm"
+zedboot_product_assembly_config_label = "//products/zedboot"
 
 bazel_product_bundle_prefix = "//products/minimal:product_bundle"
 extra_bazel_assembly_targets =
@@ -32,5 +32,3 @@ cipd_assembly_artifact_targets = [
   "//build/images:main_assembly",
   "//products/minimal:board_assembly_artifacts",
 ]
-
-fxfs_blob = false
