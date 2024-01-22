@@ -102,3 +102,31 @@ class TestArgs(unittest.TestCase):
         self.assertEqual(flags.parallel, 10)
         flags = args.parse_args(["--parallel=1"], config_file.default_flags)
         self.assertEqual(flags.parallel, 1)
+
+    @parameterized.expand(
+        [
+            ("default is None", [], [], None),
+            ("config file overrides output", [], ["--output"], True),
+            ("-o shows output", ["-o"], [], True),
+            ("--output shows output", ["--output"], [], True),
+            ("--no-output hides output", ["--no-output"], [], False),
+            (
+                "--no-output overrides config",
+                ["--no-output"],
+                ["--output"],
+                False,
+            ),
+        ]
+    )
+    def test_output_toggle(
+        self,
+        _unused_name,
+        arguments: typing.List[str],
+        config_arguments: typing.List[str],
+        expected_value: bool,
+    ):
+        config_file = config.ConfigFile(
+            "path", args.parse_args(config_arguments)
+        )
+        flags = args.parse_args(arguments, config_file.default_flags)
+        self.assertEqual(flags.output, expected_value)

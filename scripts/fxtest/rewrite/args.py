@@ -349,7 +349,7 @@ def parse_args(
     output.add_argument(
         "-o",
         "--output",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         help="Display the output from passing tests. Some test arguments may be needed.",
     )
     output.add_argument(
