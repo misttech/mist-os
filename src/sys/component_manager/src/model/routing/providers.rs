@@ -27,10 +27,21 @@ use {
 /// This provider will start the source component instance and open the capability `name` at
 /// `path` under the source component's outgoing namespace.
 pub struct DefaultComponentCapabilityProvider {
-    pub target: WeakComponentInstance,
-    pub source: WeakComponentInstance,
-    pub name: Name,
-    pub path: Path,
+    target: WeakComponentInstance,
+    source: WeakComponentInstance,
+    name: Name,
+    path: Path,
+}
+
+impl DefaultComponentCapabilityProvider {
+    pub fn new(
+        target: WeakComponentInstance,
+        source: WeakComponentInstance,
+        name: Name,
+        path: Path,
+    ) -> Self {
+        DefaultComponentCapabilityProvider { target, source, name, path }
+    }
 }
 
 #[async_trait]
