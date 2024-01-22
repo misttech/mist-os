@@ -36,11 +36,5 @@ fuchsia_test_component("bt-host-integration-tests-component") {
 # Note: The integration tests include the bt-host and bt-hci-emulator driver
 # components in this package via the dep on the bt-test-harness crate.
 fuchsia_test_package("bt-host-integration-tests") {
-  # b/317259066 causes driver_manager ERRORs. Ignore until fixed.
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
   test_components = [ ":bt-host-integration-tests-component" ]
 }
