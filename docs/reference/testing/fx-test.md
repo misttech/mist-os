@@ -92,7 +92,7 @@ inclusive-OR operation. Test selection supports composite AND
 operations as follows:
 
 ```posix-terminal
-fx test --package archivist --and unittests
+fx test --package archivist --and unittests --dry
 ```
 
 This command selects all tests where the package matches `archivist` and any field
@@ -177,10 +177,12 @@ useful when running `fx -i test`, which will detect changes to your
 source directory and re-invoke `fx test` following each file
 modification. Test rebuilding works as follows (with overrides listed inline).
 
-- All selected tests are rebuilt by calling `fx build <targets>`
-for each `fx test` invocation.
+- **All selected tests are rebuilt by calling `fx build <targets>`
+  for each `fx test` invocation.**
   - Use `--[no-]build` to toggle this behavior.
-- If selected tests are in the "base packages" for your build (specified using `fx set --with-base`), the `updates` package will be built and an OTA will be performed.
+- **If selected tests are in the "base packages" for your build
+  (specified using `fx set --with-base`), the `updates` package
+  will be built and an OTA will be performed.**
   - Use `--[no-]updateifinbase` to toggle this behavior.
   - Warning: OTA will fail when targeting an emulator.
 
@@ -228,37 +230,41 @@ Tests are executed in a specific way that maximizes throughput and
 stability, but each element of this default may be overridden. Tests
 are executed as follows (with overrides listed inline):
 
-- Each selected test is executed in the order they appear within `tests.json`
+- **Each selected test is executed in the order they appear within `tests.json`**
   - Use `--random` to randomize this execution order.
-- All selected tests are run, starting at the beginning of the ordered list above.
+- **All selected tests are run, starting at the beginning of the ordered list above.**
   - Use `--offset N` to skip `N` tests at the beginning of the list. Default is 0.
   - Use `--limit N` to run at most `N` tests from the offset. Default is no limit.
-- At most 4 tests may run in parallel, such that at most one of
-those tests is "non-hermetic" (as determined by `test-list.json`).
+- **At most 4 tests may run in parallel, such that at most one of
+those tests is "non-hermetic" (as determined by `test-list.json`).**
   - Use `--parallel N` to change this default. `--parallel 1` means to execute
   each test serially.
-- Tests run until they terminate themselves.
+- **Tests run until they terminate themselves.**
   - Use `--timeout N` to wait at most `N` seconds per test.
-- Each test runs one time.
+- **Each test runs one time.**
   - Use `--count N` to run each test `N` times.
-- All test cases are run from each test.
+- **All test cases are run from each test.**
   - Use `--test-filter` to run only specifically named test cases.
-- Failed tests are recorded and execution continues with the next selected test.
+- **Failed tests are recorded and execution continues with the next selected test.**
   - Use `--fail` (`-f`) to terminate all tests following the first failure.
-- Tests that specify a maximum log level in `tests.json` will fail
-if logs at a higher severity are seen.
+- **Tests that specify a maximum log level in `tests.json` will fail
+if logs at a higher severity are seen.**
   - Use `--[no-]restrict-logs` to toggle this behavior.
-- Tests components themselves choose the minimum log severity to emit.
+- **Tests components themselves choose the minimum log severity to emit.**
   - Use `--min-severity-logs` to override this minimum for all test components.
-- Test components are run using the Merkle root hash from build
+- **Test components are run using the Merkle root hash from build
 artifacts, which ensures that the latest version built was successfully
-pushed to the target and is being run.
+pushed to the target and is being run.**
   - Use `--[no-]use-package-hash` to toggle this behavior.
-- Test cases that are disabled are not run.
+- **Test cases that are disabled are not run.**
   - Use `--also-run-disabled-tests` to run disabled test cases anyway.
-- Test output logs contain only the last segment of the component
-moniker, so they are easier to visually inspect.
+- **Test output logs contain only the last segment of the component
+moniker, so they are easier to visually inspect.**
   - Use `--[no-]show-full-moniker-in-logs` to toggle this behavior.
+- **Command line arguments to the test are completely controlled by test runners**
+  - Append `--` to your arguments to pass remaining arguments verbatim to the
+  test. For example: `fx test foo -- --argument_for_test`
+  will pass `--argument_for_test` to the test itself.
 
 ### Output options
 
@@ -266,28 +272,28 @@ moniker, so they are easier to visually inspect.
 that displays the status of tests as they are executing. The default output
 behavior is as follows (with overrides listed inline):
 
-- A status display is shown at the bottom of the terminal, and it
+- **A status display is shown at the bottom of the terminal, and it
 is automatically updated to show what operations are currently
-executing.
+executing.**
   - Use `--[no-]status` to toggle status display.
   - Use `--status-lines N` to change the number of status output lines.
   - Use `--status-delay N` to change the refresh rate (default is
   0.033 or approximately 30hz). If your terminal is slow you may
   want to change this to 0.5 or 1.
-- Output is styled with ANSI terminal colors.
+- **Output is styled with ANSI terminal colors.**
   - Use `--[no-]style` to toggle this behavior.
   - Use `--simple` as shorthand for `--no-style --no-status`.
-- Test outputs are only shown for tests that fail.
+- **Test outputs are only shown for tests that fail.**
   - Use `--output` (`-o`) to show all test output (combine with
   `--parallel 1` to prevent interleaving).
-- Logs are written to a timestamped `.json.gz` file under the build
-directory specified by `fx status`.
+- **Logs are written to a timestamped `.json.gz` file under the build
+directory specified by `fx status`.**
   - Use `--[no-]log` to toggle logging entirely.
   - Use `--logpath` to change the output path of the log.
-- Test artifacts are not streamed off of the device.
+- **Test artifacts are not streamed off of the device.**
   - Use `--ffx-output-directory` to specify a directory where
   artifacts may be streamed in the `ffx test` output format.
-- Debug printing is suppressed.
+- **Debug printing is suppressed.**
   - Use `--verbose` (`-v`) to print debug information to the console.
   This data is *extremely* verbose, and is only useful to debug `fx
   test` itself.
