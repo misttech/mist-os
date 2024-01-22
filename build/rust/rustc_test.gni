@@ -52,7 +52,11 @@ template("rustc_test_internal") {
   if (is_host) {
     exe_target_name = "${target_name}_executable"
     host_test(target_name) {
-      binary_path = "${root_out_dir}/${crate_name}"
+      if (defined(invoker.output_dir)) {
+        binary_path = "${invoker.output_dir}/${crate_name}"
+      } else {
+        binary_path = "${root_out_dir}/${crate_name}"
+      }
 
       # The host test should only depend on the _actual_ binary, because only
       # the binary is able to properly depend on the toolchain variants

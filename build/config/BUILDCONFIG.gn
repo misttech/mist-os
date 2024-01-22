@@ -622,6 +622,10 @@ set_defaults("rustc_library") {
   configs = default_common_binary_configs + default_rust_configs
 }
 
+set_defaults("rustc_library_with_features") {
+  configs = default_common_binary_configs + default_rust_configs
+}
+
 set_defaults("rustc_wasm_library") {
   configs = default_shared_library_configs + default_rust_configs
 }

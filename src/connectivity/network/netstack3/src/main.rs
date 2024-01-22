@@ -7,9 +7,6 @@
 #![deny(missing_docs, unreachable_patterns, unused)]
 #![recursion_limit = "256"]
 
-#[cfg(feature = "instrumented")]
-extern crate netstack3_core_instrumented as netstack3_core;
-
 mod bindings;
 
 use argh::FromArgs;

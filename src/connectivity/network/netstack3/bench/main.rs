@@ -6,7 +6,7 @@
 use fuchsia_criterion::{criterion::Criterion, FuchsiaCriterion};
 
 pub(crate) fn main() {
-    let core_benches = netstack3_core_benchmarks::benchmarks::get_benchmark();
+    let core_benches = netstack3_core::benchmarks::get_benchmark();
 
     let mut c = FuchsiaCriterion::default();
     let internal_c: &mut Criterion = &mut c;

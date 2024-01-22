@@ -4,8 +4,6 @@
 
 #![warn(dead_code, unused_imports, unused_macros)]
 
-extern crate netstack3_core_testutils as netstack3_core;
-
 use core::{
     convert::{Infallible as Never, TryInto as _},
     time::Duration,

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-extern crate netstack3_core_loom as netstack3_core;
-
 use std::num::NonZeroU16;
 
 use assert_matches::assert_matches;

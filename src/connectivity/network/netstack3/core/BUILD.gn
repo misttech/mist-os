@@ -5,226 +5,218 @@
 import("//build/components.gni")
 import("//build/fuzz.gni")
 import("//build/rust/rustc_fuzzer.gni")
-import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
+import(
+    "//src/connectivity/network/netstack3/core/rustc_library_with_features.gni")
 
-lib_sources = [
-  "src/algorithm.rs",
-  "src/algorithm/port_alloc.rs",
-  "src/api.rs",
-  "src/benchmarks.rs",
-  "src/context.rs",
-  "src/convert.rs",
-  "src/counters.rs",
-  "src/data_structures.rs",
-  "src/data_structures/ref_counted_hash_map.rs",
-  "src/data_structures/socketmap.rs",
-  "src/data_structures/token_bucket.rs",
-  "src/device/api.rs",
-  "src/device/arp.rs",
-  "src/device/base.rs",
-  "src/device/config.rs",
-  "src/device/ethernet.rs",
-  "src/device/id.rs",
-  "src/device/integration.rs",
-  "src/device/link.rs",
-  "src/device/loopback.rs",
-  "src/device/ndp.rs",
-  "src/device/queue.rs",
-  "src/device/queue/api.rs",
-  "src/device/queue/fifo.rs",
-  "src/device/queue/rx.rs",
-  "src/device/queue/tx.rs",
-  "src/device/socket.rs",
-  "src/device/state.rs",
-  "src/error.rs",
-  "src/ip/api.rs",
-  "src/ip/base.rs",
-  "src/ip/device.rs",
-  "src/ip/device/dad.rs",
-  "src/ip/device/integration.rs",
-  "src/ip/device/nud.rs",
-  "src/ip/device/nud/api.rs",
-  "src/ip/device/route_discovery.rs",
-  "src/ip/device/router_solicitation.rs",
-  "src/ip/device/slaac.rs",
-  "src/ip/device/state.rs",
-  "src/ip/forwarding.rs",
-  "src/ip/gmp.rs",
-  "src/ip/gmp/igmp.rs",
-  "src/ip/gmp/mld.rs",
-  "src/ip/icmp.rs",
-  "src/ip/icmp/socket.rs",
-  "src/ip/integration.rs",
-  "src/ip/ipv6.rs",
-  "src/ip/path_mtu.rs",
-  "src/ip/reassembly.rs",
-  "src/ip/socket.rs",
-  "src/ip/types.rs",
-  "src/lib.rs",
-  "src/lock_ordering.rs",
-  "src/macros.rs",
-  "src/marker.rs",
-  "src/socket/address.rs",
-  "src/socket/base.rs",
-  "src/socket/datagram.rs",
-  "src/state.rs",
-  "src/testutil.rs",
-  "src/time.rs",
-  "src/trace.rs",
-  "src/transport.rs",
-  "src/transport/integration.rs",
-  "src/transport/tcp.rs",
-  "src/transport/tcp/buffer.rs",
-  "src/transport/tcp/congestion.rs",
-  "src/transport/tcp/congestion/cubic.rs",
-  "src/transport/tcp/rtt.rs",
-  "src/transport/tcp/segment.rs",
-  "src/transport/tcp/seqnum.rs",
-  "src/transport/tcp/socket.rs",
-  "src/transport/tcp/socket/accept_queue.rs",
-  "src/transport/tcp/socket/demux.rs",
-  "src/transport/tcp/socket/isn.rs",
-  "src/transport/tcp/state.rs",
-  "src/transport/udp.rs",
-  "src/uninstantiable.rs",
-  "src/work_queue.rs",
-]
-
-lib_deps = [
-  # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
-  # remove this module.
-  "//src/lib/fakealloc",
-
-  # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
-  "fakestd",
-  "lock-order",
-  "macros:netstack3-macros",
-  "//src/connectivity/lib/net-types",
-  "//src/connectivity/lib/packet-formats",
-  "//src/connectivity/network/lib/explicit",
-  "//src/connectivity/network/lib/todo_unused",
-  "//src/lib/const-unwrap",
-  "//src/lib/cstr",
-  "//src/lib/dense-map",
-  "//src/lib/network/packet",
-  "//src/lib/replace-with",
-  "//third_party/rust_crates:assert_matches",
-  "//third_party/rust_crates:derivative",
-  "//third_party/rust_crates:either",
-  "//third_party/rust_crates:hmac",
-  "//third_party/rust_crates:rand",
-  "//third_party/rust_crates:sha2",
-  "//third_party/rust_crates:siphasher",
-  "//third_party/rust_crates:smallvec",
-  "//third_party/rust_crates:thiserror",
-  "//third_party/rust_crates:tracing",
-  "//third_party/rust_crates:zerocopy",
-]
-
-lib_test_deps = [
-  "//src/connectivity/lib/ip-test-macro",
-  "//src/connectivity/lib/net-declare",
-  "//src/lib/proptest-support",
-  "//third_party/rust_crates:assert_matches",
-  "//third_party/rust_crates:itertools",
-  "//third_party/rust_crates:proptest",
-  "//third_party/rust_crates:rand_xorshift",
-  "//third_party/rust_crates:test-case",
-  "//third_party/rust_crates:tracing-subscriber",
-]
-
-lib_instrumented_deps = [ "sync:netstack3_sync_instrumented" ]
-
-lib_not_instrumented_deps = [ "sync:netstack3_sync_not_instrumented" ]
-
-lib_testutils_deps = [ "//third_party/rust_crates:rand_xorshift" ]
-
-rustc_library("netstack3-core") {
+rustc_library_with_features("netstack3-core") {
   version = "0.1.0"
   edition = "2021"
-
-  deps = lib_deps + lib_not_instrumented_deps
-
-  features = []
-
-  sources = lib_sources
-
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-}
+  sources = [
+    "src/algorithm.rs",
+    "src/algorithm/port_alloc.rs",
+    "src/api.rs",
+    "src/benchmarks.rs",
+    "src/context.rs",
+    "src/convert.rs",
+    "src/counters.rs",
+    "src/data_structures.rs",
+    "src/data_structures/ref_counted_hash_map.rs",
+    "src/data_structures/socketmap.rs",
+    "src/data_structures/token_bucket.rs",
+    "src/device/api.rs",
+    "src/device/arp.rs",
+    "src/device/base.rs",
+    "src/device/config.rs",
+    "src/device/ethernet.rs",
+    "src/device/id.rs",
+    "src/device/integration.rs",
+    "src/device/link.rs",
+    "src/device/loopback.rs",
+    "src/device/ndp.rs",
+    "src/device/queue.rs",
+    "src/device/queue/api.rs",
+    "src/device/queue/fifo.rs",
+    "src/device/queue/rx.rs",
+    "src/device/queue/tx.rs",
+    "src/device/socket.rs",
+    "src/device/state.rs",
+    "src/error.rs",
+    "src/ip/api.rs",
+    "src/ip/base.rs",
+    "src/ip/device.rs",
+    "src/ip/device/dad.rs",
+    "src/ip/device/integration.rs",
+    "src/ip/device/nud.rs",
+    "src/ip/device/nud/api.rs",
+    "src/ip/device/route_discovery.rs",
+    "src/ip/device/router_solicitation.rs",
+    "src/ip/device/slaac.rs",
+    "src/ip/device/state.rs",
+    "src/ip/forwarding.rs",
+    "src/ip/gmp.rs",
+    "src/ip/gmp/igmp.rs",
+    "src/ip/gmp/mld.rs",
+    "src/ip/icmp.rs",
+    "src/ip/icmp/socket.rs",
+    "src/ip/integration.rs",
+    "src/ip/ipv6.rs",
+    "src/ip/path_mtu.rs",
+    "src/ip/reassembly.rs",
+    "src/ip/socket.rs",
+    "src/ip/types.rs",
+    "src/lib.rs",
+    "src/lock_ordering.rs",
+    "src/macros.rs",
+    "src/marker.rs",
+    "src/socket/address.rs",
+    "src/socket/base.rs",
+    "src/socket/datagram.rs",
+    "src/state.rs",
+    "src/testutil.rs",
+    "src/time.rs",
+    "src/trace.rs",
+    "src/transport.rs",
+    "src/transport/integration.rs",
+    "src/transport/tcp.rs",
+    "src/transport/tcp/buffer.rs",
+    "src/transport/tcp/congestion.rs",
+    "src/transport/tcp/congestion/cubic.rs",
+    "src/transport/tcp/rtt.rs",
+    "src/transport/tcp/segment.rs",
+    "src/transport/tcp/seqnum.rs",
+    "src/transport/tcp/socket.rs",
+    "src/transport/tcp/socket/accept_queue.rs",
+    "src/transport/tcp/socket/demux.rs",
+    "src/transport/tcp/socket/isn.rs",
+    "src/transport/tcp/state.rs",
+    "src/transport/udp.rs",
+    "src/uninstantiable.rs",
+    "src/work_queue.rs",
+  ]
+  deps = [
+    # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
+    # remove this module.
+    "//src/lib/fakealloc",
 
-# A variant of the netstack3-core library that has additional instrumentation
-# that is useful for debugging and testing, like recursive lock detection.
-rustc_library("netstack3-core-instrumented") {
-  version = "0.1.0"
-  edition = "2021"
-  with_unit_tests = true
+    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
+    "fakestd",
+    "lock-order",
+    "macros:netstack3-macros",
+    "//src/connectivity/lib/net-types",
+    "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/network/lib/explicit",
+    "//src/connectivity/network/lib/todo_unused",
+    "//src/lib/const-unwrap",
+    "//src/lib/cstr",
+    "//src/lib/dense-map",
+    "//src/lib/network/packet",
+    "//src/lib/replace-with",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:either",
+    "//third_party/rust_crates:hmac",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:sha2",
+    "//third_party/rust_crates:siphasher",
+    "//third_party/rust_crates:smallvec",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:zerocopy",
+  ]
+  test_deps = [
+    "//src/connectivity/lib/ip-test-macro",
+    "//src/connectivity/lib/net-declare",
+    "//src/lib/proptest-support",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:proptest",
+    "//third_party/rust_crates:rand_xorshift",
+    "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:tracing-subscriber",
+  ]
 
-  # TODO(https://fxbug.dev/136837): Split up large tests.
-  # Compiling the tests OOMs on RBE with these variants.
-  if (is_coverage || is_hwasan || is_fuzzer || target_cpu == "arm64") {
-    test_disable_rbe = true
+  feature_sets = [
+    {
+      features = []
+      deps += [ "sync:netstack3-sync" ]
+    },
 
-    # This is known to take over 17GB memory locally for coverage.
-    pool = "//build/config:highmem($default_toolchain)"
+    # A variant of the netstack3-core library that has additional
+    # instrumentation that is useful for debugging and testing, like recursive
+    # lock acquisition detection.
+    {
+      target_name = "netstack3-core-instrumented"
+      features = [ "instrumented" ]
+      with_unit_tests = true
+      deps += [ "sync:netstack3-sync-instrumented" ]
+      test_deps += [ "//third_party/rust_crates:scopeguard" ]
+
+      # TODO(https://fxbug.dev/136837): Split up large tests.
+      # Compiling the tests OOMs on RBE with these variants.
+      if (is_coverage || is_hwasan || is_fuzzer || target_cpu == "arm64") {
+        test_disable_rbe = true
+
+        # This is known to take over 17GB memory locally for coverage.
+        pool = "//build/config:highmem($default_toolchain)"
+      }
+    },
+
+    # A variant of the netstack3-core library that exposes test utilities.
+    {
+      target_name = "netstack3-core-testutils"
+      testonly = true
+      features = [
+        "instrumented",
+        "testutils",
+      ]
+      deps += [
+        "sync:netstack3-sync-instrumented",
+        "//third_party/rust_crates:rand_xorshift",
+      ]
+    },
+
+    # A variant of the netstack3-core library that is built for running
+    # benchmarks.
+    {
+      target_name = "netstack3-core-benchmarks"
+      testonly = true
+      features = []
+      deps += [
+        "sync:netstack3-sync",
+        "//third_party/rust_crates:criterion",
+        "//third_party/rust_crates:rand_xorshift",
+      ]
+      deps += test_deps
+      configs += [ ":benchmark" ]
+    },
+  ]
+  if (is_host) {
+    feature_sets += [
+      # A variant of the netstack3-core library that is built for running loom
+      # tests, by using instrumented loom-provided types for all
+      # synchronization.
+      {
+        target_name = "netstack3-core-loom"
+        testonly = true
+        features = [
+          "instrumented",
+          "testutils",
+        ]
+        deps += [
+          "sync:netstack3-sync-loom",
+          "//third_party/rust_crates:rand_xorshift",
+        ]
+        configs += [ ":loom" ]
+      },
+    ]
   }
-
-  deps = lib_deps + lib_instrumented_deps
-  test_deps = lib_test_deps + [ "//third_party/rust_crates:scopeguard" ]
-
-  features = [ "instrumented" ]
-
-  sources = lib_sources
-
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-
-  disable_rustdoc = true
 }
 
 fuchsia_unittest_package("netstack3-core-test-package") {
   package_name = "netstack3-core-test"
   deps = [ ":netstack3-core-instrumented_test" ]
-}
-
-# A variant of the netstack3-core library that exposes test utilities.
-rustc_library("netstack3-core-testutils") {
-  version = "0.1.0"
-  edition = "2021"
-
-  deps = lib_deps + lib_instrumented_deps + lib_testutils_deps
-
-  features = [
-    "instrumented",
-    "testutils",
-  ]
-
-  sources = lib_sources
-
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-
-  disable_rustdoc = true
-}
-
-if (is_host) {
-  rustc_library("netstack3-core-loom") {
-    version = "0.1.0"
-    edition = "2021"
-    testonly = true
-
-    deps = lib_deps + [ "sync:netstack3_sync_loom" ] + lib_testutils_deps
-
-    features = [
-      "instrumented",
-      "testutils",
-    ]
-
-    sources = lib_sources
-
-    configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-    configs += [ ":loom" ]
-
-    disable_rustdoc = true
-  }
 }
 
 config("loom") {
@@ -241,18 +233,6 @@ config("benchmark") {
     "--cfg=benchmark",
     "--cfg=test",
   ]
-}
-
-rustc_library("netstack3-core-benchmarks") {
-  name = "netstack3_core_benchmarks"
-  edition = "2021"
-  testonly = true
-  with_unit_tests = true
-  sources = lib_sources
-  deps = lib_deps + lib_test_deps + lib_not_instrumented_deps +
-         [ "//third_party/rust_crates:criterion" ]
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  configs += [ ":benchmark" ]
 }
 
 rustc_fuzzer("fuzz-single-device") {

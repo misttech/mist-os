@@ -3,74 +3,62 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/rust/rustc_library.gni")
+import(
+    "//src/connectivity/network/netstack3/core/rustc_library_with_features.gni")
 
-_sources = [
-  "src/lib.rs",
-  "src/rc.rs",
-]
-_deps = [ "//third_party/rust_crates:derivative" ]
-
-rustc_library("netstack3_sync_instrumented") {
+rustc_library_with_features("netstack3-sync") {
   version = "0.0.1"
   edition = "2021"
-  with_unit_tests = true
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  features = [
-    "recursive-lock-panic",
-    "rc-debug-names",
+  sources = [
+    "src/lib.rs",
+    "src/rc.rs",
   ]
+  deps = [ "//third_party/rust_crates:derivative" ]
 
-  sources = _sources
-  deps = _deps
-
-  disable_rustdoc = true
-}
-
-rustc_library("netstack3_sync_not_instrumented") {
-  version = "0.0.1"
-  edition = "2021"
-  with_unit_tests = true
-  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  features = []
-
-  sources = _sources
-  deps = _deps
-}
-
-if (is_host) {
-  rustc_library("netstack3_sync_loom") {
-    version = "0.0.1"
-    edition = "2021"
-    with_unit_tests = false
-    testonly = true
-
-    sources = _sources
-    deps = _deps + [ "//third_party/rust_crates:loom" ]
-
-    configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-    configs += [ "//src/connectivity/network/netstack3/core:loom" ]
-
-    disable_rustdoc = true
+  feature_sets = [
+    {
+      features = []
+      with_unit_tests = true
+    },
+    {
+      target_name = "netstack3-sync-instrumented"
+      features = [
+        "recursive-lock-panic",
+        "rc-debug-names",
+      ]
+      with_unit_tests = true
+    },
+  ]
+  if (is_host) {
+    feature_sets += [
+      {
+        target_name = "netstack3-sync-loom"
+        features = []
+        deps += [ "//third_party/rust_crates:loom" ]
+        testonly = true
+        configs += [ "//src/connectivity/network/netstack3/core:loom" ]
+      },
+    ]
   }
 }
 
 fuchsia_unittest_package("netstack3-sync-instrumented-package") {
   package_name = "netstack3-sync-instrumented"
-  deps = [ ":netstack3_sync_instrumented_test" ]
+  deps = [ ":netstack3-sync-instrumented_test" ]
 }
 
-fuchsia_unittest_package("netstack3-sync-not-instrumented-package") {
-  package_name = "netstack3-sync-not-instrumented"
-  deps = [ ":netstack3_sync_not_instrumented_test" ]
+fuchsia_unittest_package("netstack3-sync-package") {
+  package_name = "netstack3-sync"
+  deps = [ ":netstack3-sync_test" ]
 }
 
 group("tests") {
   testonly = true
   public_deps = [
+    ":netstack3-sync($host_toolchain)",
     ":netstack3-sync-instrumented-package",
-    ":netstack3-sync-not-instrumented-package",
-    ":netstack3_sync_instrumented_test($host_toolchain)",
-    ":netstack3_sync_not_instrumented($host_toolchain)",
+    ":netstack3-sync-instrumented_test($host_toolchain)",
+    ":netstack3-sync-package",
   ]
 }

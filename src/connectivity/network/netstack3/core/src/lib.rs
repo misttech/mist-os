@@ -204,17 +204,6 @@ pub mod sync {
     // TODO(https://fxbug.dev/110884): Support single-threaded variants of types
     // exported from this module.
 
-    #[cfg(all(feature = "instrumented", not(loom)))]
-    use netstack3_sync_instrumented as netstack3_sync;
-
-    // Don't perform recursive lock checks when benchmarking so that the benchmark
-    // results are not affected by the extra bookkeeping.
-    #[cfg(all(not(feature = "instrumented"), not(loom)))]
-    use netstack3_sync_not_instrumented as netstack3_sync;
-
-    #[cfg(loom)]
-    use netstack3_sync_loom as netstack3_sync;
-
     // Exclusively re-exports from the sync crate.
     pub use netstack3_sync::{
         rc::{
