@@ -12,7 +12,7 @@ use {
     cm_types::Name,
     cm_util::TaskGroup,
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,
     futures::prelude::*,
     lazy_static::lazy_static,
@@ -37,8 +37,8 @@ impl FactoryCapabilityProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for FactoryCapabilityProvider {
-    type Marker = fsandbox::FactoryMarker;
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fsandbox::FactoryMarker>::new(server_end);
         // We only need to look up the component matching this scope.
         // These operations should all work, even if the component is not running.
         let serve_result = self.host.serve(server_end.into_stream().unwrap()).await;

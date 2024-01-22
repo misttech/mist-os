@@ -20,7 +20,7 @@ use {
     cm_rust::{ExposeDecl, SourceName, UseDecl},
     cm_types::Name,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::{future::join_all, TryStreamExt},
     lazy_static::lazy_static,
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
@@ -366,9 +366,8 @@ impl RouteValidatorCapabilityProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for RouteValidatorCapabilityProvider {
-    type Marker = fsys::RouteValidatorMarker;
-
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fsys::RouteValidatorMarker>::new(server_end);
         self.query.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
     }
 }

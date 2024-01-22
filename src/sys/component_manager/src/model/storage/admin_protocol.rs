@@ -35,6 +35,7 @@ use {
     fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType},
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_fs::directory as ffs_dir,
+    fuchsia_zircon as zx,
     futures::{
         stream::{FuturesUnordered, StreamExt},
         Future, TryFutureExt, TryStreamExt,
@@ -163,8 +164,8 @@ impl StorageAdminProtocolProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for StorageAdminProtocolProvider {
-    type Marker = fsys::StorageAdminMarker;
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fsys::StorageAdminMarker>::new(server_end);
         if let Err(error) = self
             .storage_admin
             .serve(self.storage_decl, self.component, server_end.into_stream().unwrap())

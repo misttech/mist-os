@@ -11,7 +11,6 @@ use {
     async_trait::async_trait,
     cm_util::channel,
     cm_util::TaskGroup,
-    fidl::endpoints::{ProtocolMarker, ServerEnd},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     std::path::PathBuf,
     std::sync,
@@ -46,11 +45,9 @@ pub trait CapabilityProvider: Send + Sync {
 /// fully fuchsia.io-compliant.
 #[async_trait]
 pub trait InternalCapabilityProvider: Send + Sync {
-    type Marker: ProtocolMarker;
-
     /// Binds a server end of a zx::Channel to the provided capability, which is assumed to be a
     /// protocol capability.
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>);
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel);
 }
 
 #[async_trait]
@@ -67,9 +64,7 @@ impl<T: InternalCapabilityProvider + 'static> CapabilityProvider for T {
             move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
                 let mut this = this.lock().unwrap();
                 let this = this.take().expect("vfs open shouldn't be called more than once");
-                let server_end: ServerEnd<<Self as InternalCapabilityProvider>::Marker> =
-                    server_end.into_zx_channel().into();
-                task_group.spawn(this.open_protocol(server_end));
+                task_group.spawn(this.open_protocol(server_end.into_zx_channel()));
             },
         );
         let relative_path = match relative_path.to_string_lossy() {

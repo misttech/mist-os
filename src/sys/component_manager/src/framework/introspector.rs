@@ -90,9 +90,8 @@ impl IntrospectorCapability {
 
 #[async_trait]
 impl InternalCapabilityProvider for IntrospectorCapability {
-    type Marker = fcomponent::IntrospectorMarker;
-
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fcomponent::IntrospectorMarker>::new(server_end);
         let serve_result = self.serve(server_end.into_stream().unwrap()).await;
         if let Err(error) = serve_result {
             warn!(%error, "Error serving Introspector");

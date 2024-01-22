@@ -20,7 +20,7 @@ use {
     cm_types::Name,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::{ChildName, ChildNameBase, Moniker},
@@ -48,9 +48,8 @@ impl RealmCapabilityProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for RealmCapabilityProvider {
-    type Marker = fcomponent::RealmMarker;
-
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fcomponent::RealmMarker>::new(server_end);
         // We only need to look up the component matching this scope.
         // These operations should all work, even if the component is not running.
         if let Some(model) = self.host.model.upgrade() {

@@ -13,8 +13,7 @@ use {
     },
     async_trait::async_trait,
     cm_types::Name,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     lazy_static::lazy_static,
     routing::capability_source::{ComponentCapability, InternalCapability},
     tracing::warn,
@@ -68,9 +67,7 @@ impl BinderCapabilityProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for BinderCapabilityProvider {
-    type Marker = fcomponent::BinderMarker;
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
-        let server_end = server_end.into_channel().into();
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
         let _ = self.bind(server_end).await;
     }
 }

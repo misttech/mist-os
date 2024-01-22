@@ -11,7 +11,7 @@ use {
     async_trait::async_trait,
     cm_types::Name,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
         prelude::*,
@@ -41,9 +41,8 @@ impl NamespaceCapabilityProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for NamespaceCapabilityProvider {
-    type Marker = fcomponent::NamespaceMarker;
-
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fcomponent::NamespaceMarker>::new(server_end);
         let serve_result = self.host.serve(server_end.into_stream().unwrap()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.

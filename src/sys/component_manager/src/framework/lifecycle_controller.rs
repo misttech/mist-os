@@ -16,7 +16,7 @@ use {
     cm_types::Name,
     fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::{ChildName, Moniker, MonikerBase, MonikerError},
@@ -269,9 +269,8 @@ impl LifecycleControllerCapabilityProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for LifecycleControllerCapabilityProvider {
-    type Marker = fsys::LifecycleControllerMarker;
-
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fsys::LifecycleControllerMarker>::new(server_end);
         self.control.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
     }
 }

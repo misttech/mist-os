@@ -22,7 +22,7 @@ use {
         prelude::*,
     },
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::StreamExt,
     lazy_static::lazy_static,
@@ -206,8 +206,8 @@ impl RealmQueryCapabilityProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for RealmQueryCapabilityProvider {
-    type Marker = fsys::RealmQueryMarker;
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fsys::RealmQueryMarker>::new(server_end);
         self.query.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;
     }
 }

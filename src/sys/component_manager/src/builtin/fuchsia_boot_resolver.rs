@@ -17,6 +17,7 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_pkg::PackagePath,
     fuchsia_url::{boot_url::BootUrl, PackageName, PackageVariant},
+    fuchsia_zircon as zx,
     futures::TryStreamExt,
     routing::capability_source::InternalCapability,
     routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
@@ -274,9 +275,8 @@ impl ComponentResolverCapabilityProvider {
 
 #[async_trait]
 impl InternalCapabilityProvider for ComponentResolverCapabilityProvider {
-    type Marker = fresolution::ResolverMarker;
-
-    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+    async fn open_protocol(self: Box<Self>, server_end: zx::Channel) {
+        let server_end = ServerEnd::<fresolution::ResolverMarker>::new(server_end);
         if let Err(error) = self.component_resolver.serve(server_end.into_stream().unwrap()).await {
             tracing::warn!(%error, "FuchsiaBootResolver::serve failed");
         }
