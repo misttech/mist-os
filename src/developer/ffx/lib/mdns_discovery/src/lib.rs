@@ -810,7 +810,12 @@ fn contains_source_address<B: zerocopy::ByteSlice + Copy>(
             return true;
         }
     }
-    tracing::warn!(
+    // This message was a warning. Changed to debug as this is internal logic.
+    // This is also expected as part of this function.
+    // There is nothing actionable for the user.
+    // This warning is most obvious when launching an emulator in user mode (which is the default)
+    // and causes a lot of noise in the logs.
+    tracing::debug!(
         "Dubious mdns from: {:?} does not contain an answer that includes the source address, therefore it is ignored.",
         addr
     );
