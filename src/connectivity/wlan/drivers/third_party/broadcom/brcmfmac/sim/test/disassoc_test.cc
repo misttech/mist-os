@@ -93,7 +93,7 @@ TEST_F(SimTest, SmeDeauthFollowedByFwDisassoc) {
 
   // Verify that we got the deauth confirmation
   ASSERT_EQ(client_ifc.stats_.deauth_results.size(), 1U);
-  wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest& deauth_confirm =
+  wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest& deauth_confirm =
       client_ifc.stats_.deauth_results.front();
   ASSERT_TRUE(client_ifc.stats_.deauth_results.front().has_peer_sta_address());
   ASSERT_EQ(ETH_ALEN, deauth_confirm.peer_sta_address().size());

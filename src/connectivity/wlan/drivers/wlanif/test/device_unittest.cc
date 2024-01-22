@@ -219,7 +219,7 @@ class FakeFullmacParent : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullm
     fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
     memcpy(peer_sta_address.data(), peer_sta_addr_, ETH_ALEN);
 
-    auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcDeauthConfRequest::Builder(arena_)
+    auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(arena_)
                    .peer_sta_address(peer_sta_address)
                    .Build();
     auto result = client_.buffer(arena_)->DeauthConf(req);

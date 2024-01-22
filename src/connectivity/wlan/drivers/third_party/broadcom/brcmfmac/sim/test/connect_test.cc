@@ -148,7 +148,7 @@ class ConnectTest : public SimTest {
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
   void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp);
-  void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
+  void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest* resp);
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
 
@@ -389,7 +389,8 @@ void ConnectTest::OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocCon
   }
 }
 
-void ConnectTest::OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp) {
+void ConnectTest::OnDeauthConf(
+    const wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest* resp) {
   context_.deauth_conf_count++;
 }
 

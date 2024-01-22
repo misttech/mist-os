@@ -268,7 +268,7 @@ struct WlanInterfaceTest : public zxtest::Test,
     bool connect_conf_called_ = false;
     fuchsia_wlan_fullmac::wire::WlanFullmacAuthInd auth_ind_;
     bool auth_ind_called_ = false;
-    fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcDeauthConfRequest deauth_conf_;
+    fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcBaseDeauthConfRequest deauth_conf_;
     // Use completion as the invoke flag when the event could be triggered by a asynchronous
     // routine to avoid flakeness.
     libsync::Completion deauth_conf_called_;
@@ -312,7 +312,7 @@ struct WlanInterfaceTest : public zxtest::Test,
   void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
                   DeauthConfCompleter::Sync& completer) override {
     auto builder =
-        fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcDeauthConfRequest::Builder(test_arena_);
+        fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(test_arena_);
     if (request->has_peer_sta_address()) {
       builder.peer_sta_address(request->peer_sta_address());
     }

@@ -1286,7 +1286,7 @@ static void brcmf_notify_deauth(struct net_device* ndev, const uint8_t peer_sta_
   fidl::Array<uint8_t, ETH_ALEN> address;
   memcpy(address.data(), peer_sta_address, ETH_ALEN);
 
-  auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*arena)
+  auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(*arena)
                   .peer_sta_address(address)
                   .Build();
 

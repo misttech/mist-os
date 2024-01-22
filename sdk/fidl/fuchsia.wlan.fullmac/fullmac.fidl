@@ -428,10 +428,11 @@ type WlanFullmacPmkInfo = struct {
     pmkid vector<uint8>:MAX;
 };
 
-@discoverable
-@transport("Driver")
-@banjo_layout("ddk-interface")
-closed protocol WlanFullmacImplIfc {
+/// Protocol definition for communication from the fullmac vendor driver to the platform.
+///
+/// This base protocol is composed into WlanFullmacImplIfc and WlanFullmacImplIfcBridge
+/// below to share common methods definitions.
+closed protocol WlanFullmacImplIfcBase {
     // MLME operations
     strict OnScanResult(struct {
         result WlanFullmacScanResult;
@@ -497,6 +498,18 @@ closed protocol WlanFullmacImplIfc {
         status zx.Status;
         wmm_params fuchsia.wlan.common.WlanWmmParameters;
     }) -> ();
+};
+
+@discoverable
+closed protocol WlanFullmacImplIfcBridge {
+    compose WlanFullmacImplIfcBase;
+};
+
+@discoverable
+@transport("Driver")
+@banjo_layout("ddk-interface")
+closed protocol WlanFullmacImplIfc {
+    compose WlanFullmacImplIfcBase;
 };
 
 @discoverable
@@ -660,7 +673,6 @@ closed protocol WlanFullmacImpl {
         online bool;
     }) -> ();
 };
-
 
 service Service {
     wlan_fullmac_impl client_end:WlanFullmacImpl;

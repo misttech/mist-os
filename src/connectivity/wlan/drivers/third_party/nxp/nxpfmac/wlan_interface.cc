@@ -505,9 +505,10 @@ void WlanInterface::Deauth(DeauthRequestView request, fdf::Arena& arena,
         return;
       }
 
-      auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*arena)
-                      .peer_sta_address(request->peer_sta_address())
-                      .Build();
+      auto resp =
+          fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(*arena)
+              .peer_sta_address(request->peer_sta_address())
+              .Build();
 
       auto result = fullmac_ifc_.buffer(*arena)->DeauthConf(resp);
       if (!result.ok()) {
@@ -972,7 +973,7 @@ void WlanInterface::OnStaDisconnectEvent(uint8_t* sta_mac_addr, uint16_t reason_
     memcpy(address.data(), sta_mac_addr, ETH_ALEN);
 
     auto conf =
-        fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*deauth_arena)
+        fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(*deauth_arena)
             .peer_sta_address(address)
             .Build();
 
@@ -1059,7 +1060,7 @@ void WlanInterface::ConfirmDeauth() {
   fidl::Array<uint8_t, ETH_ALEN> address;
   memcpy(address.data(), mac_address_, sizeof(mac_address_));
 
-  auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*arena)
+  auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(*arena)
                   .peer_sta_address(address)
                   .Build();
 
