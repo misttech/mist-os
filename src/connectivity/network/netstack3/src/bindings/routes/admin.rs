@@ -2,31 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::borrow::Borrow;
+use std::{borrow::BorrowMut, collections::HashSet};
 
+use fidl_fuchsia_net_interfaces_admin::ProofOfInterfaceAuthorization;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fnet_routes_ext::{
     admin::{FidlRouteAdminIpExt, Responder as _, RouteSetRequest},
     FidlRouteIpExt,
 };
+use fuchsia_zircon::AsHandleRef;
 use futures::{pin_mut, TryStream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{device::DeviceId, routes::AddableEntry};
 
 use crate::bindings::{
+    devices::StaticCommonInfo,
     routes,
     util::{TaskWaitGroupSpawner, TryFromFidlWithContext},
-    BindingsCtx,
+    BindingsCtx, DeviceIdExt,
 };
+
+use super::WeakDeviceId;
 
 async fn serve_user_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
     ctx: crate::bindings::Ctx,
     stream: I::RouteSetRequestStream,
 ) {
-    let route_set = UserRouteSet::new(ctx);
+    let mut route_set = UserRouteSet::new(ctx);
 
-    serve_route_set::<I, UserRouteSet, _>(stream, &route_set).await;
+    serve_route_set::<I, UserRouteSet, _>(stream, &mut route_set).await;
 
     route_set.close().await;
 }
@@ -34,10 +39,10 @@ async fn serve_user_route_set<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
 pub(crate) async fn serve_route_set<
     I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
     R: RouteSet,
-    B: Borrow<R>,
+    B: BorrowMut<R>,
 >(
     stream: I::RouteSetRequestStream,
-    route_set: B,
+    mut route_set: B,
 ) {
     let debug_name = match I::VERSION {
         IpVersion::V4 => "RouteSetV4",
@@ -51,22 +56,20 @@ pub(crate) async fn serve_route_set<
     );
 
     stream
-        .try_for_each(|request| {
-            let route_set = route_set.borrow();
-            async move {
-                let request = net_types::map_ip_twice!(I, In(request), |In(request)| {
-                    fnet_routes_ext::admin::RouteSetRequest::<I>::from(request)
-                });
+        .try_fold(route_set.borrow_mut(), |route_set, request| async {
+            let request = net_types::map_ip_twice!(I, In(request), |In(request)| {
+                fnet_routes_ext::admin::RouteSetRequest::<I>::from(request)
+            });
 
-                route_set.handle_request(request).await.unwrap_or_else(|e| {
-                    if !e.is_closed() {
-                        tracing::error!("error handling {debug_name} request: {e:?}");
-                    }
-                });
-                Ok(())
-            }
+            route_set.handle_request(request).await.unwrap_or_else(|e| {
+                if !e.is_closed() {
+                    tracing::error!("error handling {debug_name} request: {e:?}");
+                }
+            });
+            Ok(route_set)
         })
         .await
+        .map(|_| ())
         .unwrap_or_else(|e| {
             if !e.is_closed() {
                 tracing::error!("error serving {debug_name}: {e:?}");
@@ -130,6 +133,7 @@ pub(crate) type StrongUserRouteSet = netstack3_core::sync::StrongRc<UserRouteSet
 pub(crate) struct UserRouteSet {
     ctx: crate::bindings::Ctx,
     set: Option<netstack3_core::sync::PrimaryRc<UserRouteSetId>>,
+    authorization_set: HashSet<WeakDeviceId>,
 }
 
 impl Drop for UserRouteSet {
@@ -146,7 +150,7 @@ impl UserRouteSet {
         let set = netstack3_core::sync::PrimaryRc::new(UserRouteSetId {
             _private_field_to_prevent_construction_outside_of_this_mod: (),
         });
-        Self { ctx, set: Some(set) }
+        Self { ctx, set: Some(set), authorization_set: HashSet::new() }
     }
 
     fn weak_set_id(&self) -> netstack3_core::sync::WeakRc<UserRouteSetId> {
@@ -192,7 +196,7 @@ impl UserRouteSet {
                 .await,
         );
 
-        let UserRouteSet { ctx: _, set } = &mut self;
+        let UserRouteSet { ctx: _, set, authorization_set: _ } = &mut self;
         let UserRouteSetId { _private_field_to_prevent_construction_outside_of_this_mod: () } =
             netstack3_core::sync::PrimaryRc::unwrap(
                 set.take().expect("close() can't be called twice"),
@@ -208,16 +212,25 @@ impl RouteSet for UserRouteSet {
     fn ctx(&self) -> &crate::bindings::Ctx {
         &self.ctx
     }
+
+    fn authorization_set(&self) -> &HashSet<WeakDeviceId> {
+        &self.authorization_set
+    }
+
+    fn authorization_set_mut(&mut self) -> &mut HashSet<WeakDeviceId> {
+        &mut self.authorization_set
+    }
 }
 
 pub(crate) struct GlobalRouteSet {
     ctx: crate::bindings::Ctx,
+    authorization_set: HashSet<WeakDeviceId>,
 }
 
 impl GlobalRouteSet {
     #[cfg_attr(feature = "instrumented", track_caller)]
     pub(crate) fn new(ctx: crate::bindings::Ctx) -> Self {
-        Self { ctx }
+        Self { ctx, authorization_set: HashSet::new() }
     }
 }
 
@@ -231,14 +244,24 @@ impl RouteSet for GlobalRouteSet {
     fn ctx(&self) -> &crate::bindings::Ctx {
         &self.ctx
     }
+
+    fn authorization_set(&self) -> &HashSet<WeakDeviceId> {
+        &self.authorization_set
+    }
+
+    fn authorization_set_mut(&mut self) -> &mut HashSet<WeakDeviceId> {
+        &mut self.authorization_set
+    }
 }
 
 pub(crate) trait RouteSet: Send + Sync {
     fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId>>;
     fn ctx(&self) -> &crate::bindings::Ctx;
+    fn authorization_set(&self) -> &HashSet<WeakDeviceId>;
+    fn authorization_set_mut(&mut self) -> &mut HashSet<WeakDeviceId>;
 
     async fn handle_request<I: Ip + FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt>(
-        &self,
+        &mut self,
         request: RouteSetRequest<I>,
     ) -> Result<(), fidl::Error> {
         tracing::debug!("RouteSet::handle_request {request:?}");
@@ -266,12 +289,8 @@ pub(crate) trait RouteSet: Send + Sync {
                 let result = self.remove_fidl_route(route).await;
                 responder.send(result)
             }
-            RouteSetRequest::AuthenticateForInterface { credential: _, responder } => {
-                tracing::warn!(
-                    "TODO(https://fxbug.dev/134307): RouteSetVX.AuthenticateForInterface \
-                    is not implemented; assuming authenticated"
-                );
-                responder.send(Ok(()))
+            RouteSetRequest::AuthenticateForInterface { credential, responder } => {
+                responder.send(self.authenticate_for_interface(credential))
             }
         }
     }
@@ -292,6 +311,10 @@ pub(crate) trait RouteSet: Send + Sync {
     ) -> Result<bool, fnet_routes_admin::RouteSetError> {
         let addable_entry = try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)?
             .map_device_id(|d| d.downgrade());
+
+        if !self.authorization_set().contains(&addable_entry.device) {
+            return Err(fnet_routes_admin::RouteSetError::Unauthenticated);
+        }
 
         let result = self.apply_route_op::<I::Addr>(routes::RouteOp::Add(addable_entry)).await;
 
@@ -321,6 +344,10 @@ pub(crate) trait RouteSet: Send + Sync {
             try_to_addable_entry::<I>(self.ctx().bindings_ctx(), route)?
                 .map_device_id(|d| d.downgrade());
 
+        if !self.authorization_set().contains(&device) {
+            return Err(fnet_routes_admin::RouteSetError::Unauthenticated);
+        }
+
         let result = self
             .apply_route_op::<I::Addr>(routes::RouteOp::RemoveMatching {
                 subnet,
@@ -345,6 +372,56 @@ pub(crate) trait RouteSet: Send + Sync {
                     as `RouteSet::close()` takes ownership of `self`"
                 ),
             },
+        }
+    }
+
+    fn authenticate_for_interface(
+        &mut self,
+        client_credential: ProofOfInterfaceAuthorization,
+    ) -> Result<(), fnet_routes_admin::AuthenticateForInterfaceError> {
+        let bindings_id = client_credential
+            .interface_id
+            .try_into()
+            .map_err(|_| fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication)?;
+
+        let core_id =
+            self.ctx().bindings_ctx().devices.get_core_id(bindings_id).ok_or_else(|| {
+                tracing::warn!("authentication interface {bindings_id} does not exist");
+                fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
+            })?;
+
+        let external_state = core_id.external_state();
+        let StaticCommonInfo { authorization_token: netstack_token, tx_notifier: _ } =
+            external_state.static_common_info();
+
+        let netstack_koid = netstack_token
+            .basic_info()
+            .expect("failed to get basic info for netstack-owned token")
+            .koid;
+
+        let client_koid = client_credential
+            .token
+            .basic_info()
+            .map_err(|e| {
+                tracing::error!("failed to get basic info for client-provided token: {}", e);
+                fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication
+            })?
+            .koid;
+
+        if netstack_koid == client_koid {
+            let authorization_set = self.authorization_set_mut();
+
+            // Prune any devices that no longer exist.  Since we store
+            // weak references, we only need to check whether any given
+            // reference can be upgraded.
+            authorization_set.retain(|k| k.upgrade().is_some());
+
+            // Insert after pruning the map to avoid a needless call to upgrade.
+            let _ = authorization_set.insert(core_id.downgrade());
+
+            Ok(())
+        } else {
+            Err(fnet_routes_admin::AuthenticateForInterfaceError::InvalidAuthentication)
         }
     }
 }
