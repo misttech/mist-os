@@ -1182,7 +1182,8 @@ static bool vmaspace_priority_reference_test() {
 
   // Create a reference of the VMO.
   fbl::RefPtr<VmObject> vmo_reference;
-  status = vmo->CreateChildReference(Resizability::NonResizable, 0, 0, true, &vmo_reference);
+  status =
+      vmo->CreateChildReference(Resizability::NonResizable, 0, 0, true, nullptr, &vmo_reference);
   ASSERT_OK(status);
   VmObjectPaged* refp = reinterpret_cast<VmObjectPaged*>(vmo_reference.get());
 

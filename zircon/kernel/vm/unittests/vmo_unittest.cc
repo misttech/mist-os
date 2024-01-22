@@ -459,7 +459,8 @@ static bool vmo_reference_attribution_commit_test() {
   ASSERT_TRUE(vmo, "vmobject creation\n");
 
   fbl::RefPtr<VmObject> vmo_reference;
-  status = vmo->CreateChildReference(Resizability::NonResizable, 0u, 0, true, &vmo_reference);
+  status =
+      vmo->CreateChildReference(Resizability::NonResizable, 0u, 0, true, nullptr, &vmo_reference);
   ASSERT_EQ(status, ZX_OK, "vmobject reference creation\n");
   ASSERT_TRUE(vmo_reference, "vmobject reference creation\n");
 

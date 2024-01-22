@@ -43,6 +43,7 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
   zx_rights_t GetMapRights(zx_rights_t iob_rights, size_t region_index) const;
   zx_rights_t GetMediatedRights(size_t region_index) const;
   const fbl::RefPtr<VmObject>& GetVmo(size_t region_index) const;
+  zx::result<fbl::RefPtr<VmObject>> CreateMappableVmoForRegion(size_t region_index);
   zx_iob_region_t GetRegion(size_t region_index) const;
   size_t RegionCount() const;
 
@@ -57,7 +58,6 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
 
   // VmObjectChildObserver implementation
   void OnZeroChild() override;
-  void OnOneChild() override;
 
  private:
   class IobRegion {

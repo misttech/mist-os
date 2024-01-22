@@ -47,7 +47,6 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
 
   // VmObjectChildObserver implementation.
   void OnZeroChild() final;
-  void OnOneChild() final;
 
   // SoloDispatcher implementation.
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_VMO; }
@@ -101,6 +100,11 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   explicit VmObjectDispatcher(fbl::RefPtr<VmObject> vmo,
                               fbl::RefPtr<ContentSizeManager> content_size_manager,
                               zx_koid_t pager_koid, InitialMutability initial_mutability);
+
+  zx_status_t CreateChildInternal(uint32_t options, uint64_t offset, uint64_t size, bool copy_name,
+                                  const fbl::RefPtr<AttributionObject>& attribution_object,
+                                  fbl::RefPtr<VmObject>* child_vmo) TA_REQ(get_lock());
+
   // The 'const' here is load bearing; we give a raw pointer to
   // ourselves to |vmo_| so we have to ensure we don't reset vmo_
   // except during destruction.

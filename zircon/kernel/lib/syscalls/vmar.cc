@@ -312,18 +312,11 @@ zx_status_t sys_vmar_map_iob(zx_handle_t handle, zx_vm_option_t options, size_t 
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  zx_rights_t region_rights = iobuffer_disp->GetMapRights(iobuffer_rights, region_index);
-  fbl::RefPtr<VmObject> child_reference;
-  Resizability resizability = iobuffer_disp->GetVmo(region_index)->is_resizable()
-                                  ? Resizability::Resizable
-                                  : Resizability::NonResizable;
-  status = iobuffer_disp->GetVmo(region_index)
-               ->CreateChildReference(resizability, 0, 0, true, &child_reference);
-  child_reference->set_user_id(iobuffer_disp->GetVmo(region_index)->user_id());
-  if (status != ZX_OK) {
-    return status;
+  zx::result<fbl::RefPtr<VmObject>> vmo = iobuffer_disp->CreateMappableVmoForRegion(region_index);
+  if (vmo.is_error()) {
+    return vmo.status_value();
   }
-  return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights,
-                         ktl::move(child_reference), region_offset, region_rights, region_length,
-                         mapped_addr);
+  zx_rights_t region_rights = iobuffer_disp->GetMapRights(iobuffer_rights, region_index);
+  return vmar_map_common(options, ktl::move(vmar), vmar_offset, vmar_rights, ktl::move(*vmo),
+                         region_offset, region_rights, region_length, mapped_addr);
 }

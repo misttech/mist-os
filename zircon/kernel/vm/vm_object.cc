@@ -244,21 +244,6 @@ bool VmObject::AddChildLocked(VmObject* child) {
   return children_list_len_ == 1;
 }
 
-void VmObject::NotifyOneChild() {
-  canary_.Assert();
-
-  // Make sure we're not holding the shared lock while notifying the observer in case it calls
-  // back into this object.
-  DEBUG_ASSERT(!lock_ref().lock().IsHeld());
-
-  Guard<Mutex> observer_guard{&child_observer_lock_};
-
-  // Signal the dispatcher that there are child VMOS
-  if (child_observer_ != nullptr) {
-    child_observer_->OnOneChild();
-  }
-}
-
 void VmObject::DropChildLocked(VmObject* c) {
   canary_.Assert();
   DEBUG_ASSERT(children_list_len_ > 0);

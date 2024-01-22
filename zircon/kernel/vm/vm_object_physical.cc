@@ -129,7 +129,6 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
     return ZX_ERR_NO_MEMORY;
   }
 
-  bool notify_one_child;
   {
     Guard<CriticalMutex> guard{lock()};
 
@@ -141,15 +140,11 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
     vmo->parent_user_id_ = user_id_locked();
 
     // add the new vmo as a child.
-    notify_one_child = AddChildLocked(vmo.get());
+    AddChildLocked(vmo.get());
 
     if (copy_name) {
       vmo->name_ = name_;
     }
-  }
-
-  if (notify_one_child) {
-    NotifyOneChild();
   }
 
   *child_vmo = ktl::move(vmo);

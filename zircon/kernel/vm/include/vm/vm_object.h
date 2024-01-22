@@ -45,8 +45,11 @@ class VmHierarchyState;
 
 class VmObjectChildObserver {
  public:
+  // Called anytime a VMO has zero children. This call is synchronized with
+  // |VmObject::SetChildObserver|, but is not otherwise synchronized with other VMO operations
+  // such as creating additional children. As such it is the users responsibility to synchronize
+  // with child creation.
   virtual void OnZeroChild() = 0;
-  virtual void OnOneChild() = 0;
 };
 
 // Typesafe enum for resizability arguments.
@@ -603,8 +606,11 @@ class VmObject : public VmHierarchyBase,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  // TODO: use a zx::result return instead of multiple out parameters and be consistent with the
+  // other Create* methods.
   virtual zx_status_t CreateChildReference(Resizability resizable, uint64_t offset, uint64_t size,
-                                           bool copy_name, fbl::RefPtr<VmObject>* child_vmo) {
+                                           bool copy_name, bool* first_child,
+                                           fbl::RefPtr<VmObject>* child_vmo) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -658,9 +664,6 @@ class VmObject : public VmHierarchyBase,
   // Adds a child to this VMO and returns true if the dispatcher which matches
   // user_id should be notified about the first child being added.
   bool AddChildLocked(VmObject* child) TA_REQ(lock());
-
-  // Notifies the child observer that there is one child.
-  void NotifyOneChild() TA_EXCL(lock());
 
   // Removes the child |child| from this VMO and notifies the child observer if the new child count
   // is zero. The |guard| must be this VMO's lock.

@@ -577,7 +577,6 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
     return ZX_ERR_NO_MEMORY;
   }
 
-  bool notify_one_child;
   {
     Guard<CriticalMutex> guard{lock()};
     AssertHeld(vmo->lock_ref());
@@ -602,7 +601,7 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
     vmo->cow_pages_ = ktl::move(cow_pages);
 
     vmo->parent_ = this;
-    notify_one_child = AddChildLocked(vmo.get());
+    AddChildLocked(vmo.get());
 
     if (copy_name) {
       vmo->name_ = name_;
@@ -613,17 +612,13 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
   // Add to the global list now that fully initialized.
   vmo->AddToGlobalList();
 
-  if (notify_one_child) {
-    NotifyOneChild();
-  }
-
   *child_vmo = ktl::move(vmo);
 
   return ZX_OK;
 }
 
 zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t offset,
-                                                uint64_t size, bool copy_name,
+                                                uint64_t size, bool copy_name, bool* first_child,
                                                 fbl::RefPtr<VmObject>* child_vmo) {
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);
 
@@ -664,7 +659,6 @@ zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t
     return ZX_ERR_NO_MEMORY;
   }
 
-  bool notify_one_child;
   {
     Guard<CriticalMutex> guard{lock()};
     AssertHeld(vmo->lock_ref());
@@ -682,7 +676,10 @@ zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t
     vmo->cow_pages_ = ktl::move(cow_pages);
 
     vmo->parent_ = this;
-    notify_one_child = AddChildLocked(vmo.get());
+    const bool first = AddChildLocked(vmo.get());
+    if (first_child) {
+      *first_child = first;
+    }
 
     // Also insert into the reference list. The reference should only be inserted in the list of the
     // object that the cow_pages_locked() has the backlink to, i.e. the notional "owner" of the
@@ -708,10 +705,6 @@ zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t
 
   // Add to the global list now that fully initialized.
   vmo->AddToGlobalList();
-
-  if (notify_one_child) {
-    NotifyOneChild();
-  }
 
   *child_vmo = ktl::move(vmo);
 
@@ -755,7 +748,6 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     return ZX_ERR_NO_MEMORY;
   }
 
-  bool notify_one_child;
   {
     // Declare these prior to the guard so that any failure paths destroy these without holding
     // the lock.
@@ -785,7 +777,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
 
     // add the new vmo as a child before we do anything, since its
     // dtor expects to find it in its parent's child list
-    notify_one_child = AddChildLocked(vmo.get());
+    AddChildLocked(vmo.get());
 
     if (copy_name) {
       vmo->name_ = name_;
@@ -795,10 +787,6 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
 
   // Add to the global list now that fully initialized.
   vmo->AddToGlobalList();
-
-  if (notify_one_child) {
-    NotifyOneChild();
-  }
 
   *child_vmo = ktl::move(vmo);
 

@@ -135,11 +135,11 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
 
     Resizability resizability =
         vmo->is_resizable() ? Resizability::Resizable : Resizability::NonResizable;
-    status = vmo->CreateChildReference(resizability, 0, 0, true, &ep0_reference);
+    status = vmo->CreateChildReference(resizability, 0, 0, true, nullptr, &ep0_reference);
     if (status != ZX_OK) {
       return status;
     }
-    status = vmo->CreateChildReference(resizability, 0, 0, true, &ep1_reference);
+    status = vmo->CreateChildReference(resizability, 0, 0, true, nullptr, &ep1_reference);
     if (status != ZX_OK) {
       return status;
     }
@@ -219,16 +219,16 @@ void IoBufferDispatcher::OnPeerZeroHandlesLocked() {
 
 void IoBufferDispatcher::OnZeroChild() {
   Guard<CriticalMutex> guard{get_lock()};
+
+  // OnZeroChildren gets called every time the number of children is equal to zero. Due to races, by
+  // the time this method is called we could already have children again. This is fine, since all
+  // we need to do is ensure that every increment of peer_mapped_regions_ is paired with a
+  // decrement.
   DEBUG_ASSERT(peer_mapped_regions_ > 0);
   peer_mapped_regions_--;
   if (peer_mapped_regions_ == 0 && peer_zero_handles_) {
     UpdateStateLocked(0, ZX_IOB_PEER_CLOSED);
   }
-}
-
-void IoBufferDispatcher::OnOneChild() {
-  Guard<CriticalMutex> guard{get_lock()};
-  peer_mapped_regions_++;
 }
 
 IoBufferDispatcher::~IoBufferDispatcher() {
@@ -307,4 +307,33 @@ zx_status_t IoBufferDispatcher::set_name(const char* name, size_t len) {
     }
   }
   return ZX_OK;
+}
+
+zx::result<fbl::RefPtr<VmObject>> IoBufferDispatcher::CreateMappableVmoForRegion(
+    size_t region_index) {
+  fbl::RefPtr<VmObject> child_reference;
+  const fbl::RefPtr<VmObject>& vmo = GetVmo(region_index);
+  Resizability resizability =
+      vmo->is_resizable() ? Resizability::Resizable : Resizability::NonResizable;
+  {
+    bool first_child = false;
+
+    zx_status_t status =
+        vmo->CreateChildReference(resizability, 0, 0, true, &first_child, &child_reference);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    if (first_child) {
+      // Need to record 0->1 transition. As we are holding a refptr to the child we know that
+      // OnZeroChildren cannot get called to decrement before we can increment. In this case the
+      // lock is not attempting to synchronize anything beyond the raw access of
+      // peer_mapped_regions_.
+      Guard<CriticalMutex> guard{get_lock()};
+      const fbl::RefPtr<IoBufferDispatcher>& p = peer();
+      AssertHeld(*p->get_lock());
+      p->peer_mapped_regions_++;
+    }
+  }
+  child_reference->set_user_id(vmo->user_id());
+  return zx::ok(child_reference);
 }
