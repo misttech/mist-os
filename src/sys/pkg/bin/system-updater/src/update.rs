@@ -28,8 +28,7 @@ use {
     thiserror::Error,
     tracing::{error, info},
     update_package::{
-        Image, ImagePackagesSlots, ImageType, ResolveImagesError, UpdateImagePackage, UpdateMode,
-        UpdatePackage, VerifyError,
+        Image, ImagePackagesSlots, ImageType, UpdateImagePackage, UpdateMode, UpdatePackage,
     },
 };
 
@@ -75,6 +74,9 @@ enum PrepareError {
 
     #[error("while determining packages to fetch")]
     ParsePackages(#[source] update_package::ParsePackageError),
+
+    #[error("while determining which images to fetch")]
+    ParseImages(#[source] update_package::ImagePackagesError),
 
     #[error("while determining update mode")]
     ParseUpdateMode(#[source] update_package::ParseUpdateModeError),
@@ -139,12 +141,6 @@ enum StageError {
 
     #[error("while resolving an image package")]
     Resolve(#[source] ResolveError),
-
-    #[error("while determining which images to write")]
-    ResolveImages(#[source] ResolveImagesError),
-
-    #[error("while ensuring the target images are compatible with this update mode")]
-    Verify(#[source] VerifyError),
 
     #[error("while writing images")]
     Write(#[source] anyhow::Error),
@@ -663,7 +659,6 @@ impl<'a> Attempt<'a> {
                 co,
                 &mut state,
                 &update_pkg,
-                mode,
                 current_configuration,
                 images_to_write,
                 &packages_to_fetch,
@@ -723,7 +718,7 @@ impl<'a> Attempt<'a> {
             (UpdatePackage, Option<Hash>),
             UpdateMode,
             Vec<PinnedAbsolutePackageUrl>,
-            Option<ImagesToWrite>,
+            ImagesToWrite,
             paver::CurrentConfiguration,
         ),
         PrepareError,
@@ -799,141 +794,134 @@ impl<'a> Attempt<'a> {
 
         let () = validate_epoch(SOURCE_EPOCH_RAW, &update_pkg).await?;
 
-        match update_pkg.image_packages().await {
-            Ok(image_package_manifest) => {
-                let mut images_to_write = ImagesToWrite::new();
-                let manifest: ImagePackagesSlots = image_package_manifest.into();
-                manifest.verify(mode).map_err(PrepareError::VerifyImages)?;
+        let manifest = ImagePackagesSlots::from(
+            update_pkg.image_packages().await.map_err(PrepareError::ParseImages)?,
+        );
+        let () = manifest.verify(mode).map_err(PrepareError::VerifyImages)?;
+        let mut images_to_write = ImagesToWrite::new();
 
-                if let Some(fuchsia) = manifest.fuchsia() {
-                    target_version.zbi_hash = fuchsia.zbi().hash().to_string();
+        if let Some(fuchsia) = manifest.fuchsia() {
+            target_version.zbi_hash = fuchsia.zbi().hash().to_string();
 
-                    // Determine if the fuchsia zbi has changed in this update. If an error is raised, do not fail the update.
-                    match asset_to_write(
-                        fuchsia.zbi(),
-                        current_config,
-                        &self.env.data_sink,
-                        Asset::Kernel,
-                        &Image::new(ImageType::Zbi, None),
-                    )
-                    .await
-                    {
-                        Ok(url) => images_to_write.fuchsia.set_zbi(url),
-                        Err(e) => {
-                            error!(
-                                "Error while determining whether to write the zbi image, assume update is needed: {:#}", anyhow!(e));
-                            images_to_write.fuchsia.set_zbi(Some(fuchsia.zbi().url().to_owned()))
-                        }
-                    };
-
-                    if let Some(vbmeta_image) = fuchsia.vbmeta() {
-                        target_version.vbmeta_hash = vbmeta_image.hash().to_string();
-                        // Determine if the vbmeta has changed in this update. If an error is raised, do not fail the update.
-                        match asset_to_write(
-                            vbmeta_image,
-                            current_config,
-                            &self.env.data_sink,
-                            Asset::VerifiedBootMetadata,
-                            &Image::new(ImageType::FuchsiaVbmeta, None),
-                        )
-                        .await
-                        {
-                            Ok(url) => images_to_write.fuchsia.set_vbmeta(url),
-                            Err(e) => {
-                                error!(
-                                    "Error while determining whether to write the vbmeta image, assume update is needed: {:#}", anyhow!(e));
-                                images_to_write
-                                    .fuchsia
-                                    .set_vbmeta(Some(vbmeta_image.url().to_owned()))
-                            }
-                        };
-                    }
-                }
-
-                // Only check these images if we have to.
-                if self.config.should_write_recovery {
-                    if let Some(recovery) = manifest.recovery() {
-                        match recovery_to_write(recovery.zbi(), &self.env.data_sink, Asset::Kernel)
-                            .await
-                        {
-                            Ok(url) => images_to_write.recovery.set_zbi(url),
-                            Err(e) => {
-                                error!(
-                                    "Error while determining whether to write the recovery zbi image, assume update is needed: {:#}", anyhow!(e));
-                                images_to_write
-                                    .recovery
-                                    .set_zbi(Some(recovery.zbi().url().to_owned()))
-                            }
-                        };
-
-                        if let Some(vbmeta_image) = recovery.vbmeta() {
-                            // Determine if the vbmeta has changed in this update. If an error is raised, do not fail the update.
-                            match recovery_to_write(
-                                vbmeta_image,
-                                &self.env.data_sink,
-                                Asset::VerifiedBootMetadata,
-                            )
-                            .await
-                            {
-                                Ok(url) => images_to_write.recovery.set_vbmeta(url),
-                                Err(e) => {
-                                    error!("Error while determining whether to write the recovery vbmeta image, assume update is needed: {:#}", anyhow!(e));
-                                    images_to_write
-                                        .recovery
-                                        .set_vbmeta(Some(vbmeta_image.url().to_owned()))
-                                }
-                            };
-                        }
-                    }
-                }
-
-                for (filename, imagemetadata) in manifest.firmware() {
-                    match firmware_to_write(
-                        filename,
-                        imagemetadata,
-                        current_config,
-                        &self.env.data_sink,
-                        &Image::new(ImageType::Firmware, Some(filename)),
-                    )
-                    .await
-                    {
-                        Ok(Some(url)) => images_to_write.firmware.push((filename.to_string(), url)),
-                        Ok(None) => (),
-                        Err(e) => {
-                            // If an error is raised, do not fail the update.
-                            error!("Error while determining firmware to write, assume update is needed: {:#}", anyhow!(e));
-                            images_to_write
-                                .firmware
-                                .push((filename.to_string(), imagemetadata.url().to_owned()))
-                        }
-                    }
-                }
-
-                return Ok((
-                    (update_pkg, update_package_hash),
-                    mode,
-                    packages_to_fetch,
-                    Some(images_to_write),
-                    current_config,
-                ));
-            }
-            Err(err) => {
-                if !matches!(err, update_package::ImagePackagesError::NotFound) {
+            // Determine if the fuchsia zbi has changed in this update. If an error is raised, do
+            // not fail the update.
+            match asset_to_write(
+                fuchsia.zbi(),
+                current_config,
+                &self.env.data_sink,
+                Asset::Kernel,
+                &Image::new(ImageType::Zbi, None),
+            )
+            .await
+            {
+                Ok(url) => images_to_write.fuchsia.set_zbi(url),
+                Err(e) => {
                     error!(
-                        "Failed to parse images manifest, trying to use inline images: {:#}",
-                        anyhow!(err)
+                        "Error while determining whether to write the zbi image, assume update is \
+                        needed: {:#}",
+                        anyhow!(e)
                     );
+                    images_to_write.fuchsia.set_zbi(Some(fuchsia.zbi().url().to_owned()))
                 }
+            };
 
-                Ok((
-                    (update_pkg, update_package_hash),
-                    mode,
-                    packages_to_fetch,
-                    None,
+            if let Some(vbmeta_image) = fuchsia.vbmeta() {
+                target_version.vbmeta_hash = vbmeta_image.hash().to_string();
+                // Determine if the vbmeta has changed in this update. If an error is raised, do
+                // not fail the update.
+                match asset_to_write(
+                    vbmeta_image,
                     current_config,
-                ))
+                    &self.env.data_sink,
+                    Asset::VerifiedBootMetadata,
+                    &Image::new(ImageType::FuchsiaVbmeta, None),
+                )
+                .await
+                {
+                    Ok(url) => images_to_write.fuchsia.set_vbmeta(url),
+                    Err(e) => {
+                        error!(
+                            "Error while determining whether to write the vbmeta image, assume \
+                            update is needed: {:#}",
+                            anyhow!(e)
+                        );
+                        images_to_write.fuchsia.set_vbmeta(Some(vbmeta_image.url().to_owned()))
+                    }
+                };
             }
         }
+
+        // Only check these images if we have to.
+        if self.config.should_write_recovery {
+            if let Some(recovery) = manifest.recovery() {
+                match recovery_to_write(recovery.zbi(), &self.env.data_sink, Asset::Kernel).await {
+                    Ok(url) => images_to_write.recovery.set_zbi(url),
+                    Err(e) => {
+                        error!(
+                            "Error while determining whether to write the recovery zbi image, \
+                            assume update is needed: {:#}",
+                            anyhow!(e)
+                        );
+                        images_to_write.recovery.set_zbi(Some(recovery.zbi().url().to_owned()))
+                    }
+                };
+
+                if let Some(vbmeta_image) = recovery.vbmeta() {
+                    // Determine if the vbmeta has changed in this update. If an error is raised,
+                    // do not fail the update.
+                    match recovery_to_write(
+                        vbmeta_image,
+                        &self.env.data_sink,
+                        Asset::VerifiedBootMetadata,
+                    )
+                    .await
+                    {
+                        Ok(url) => images_to_write.recovery.set_vbmeta(url),
+                        Err(e) => {
+                            error!(
+                                "Error while determining whether to write the recovery vbmeta \
+                                image, assume update is needed: {:#}",
+                                anyhow!(e)
+                            );
+                            images_to_write.recovery.set_vbmeta(Some(vbmeta_image.url().to_owned()))
+                        }
+                    };
+                }
+            }
+        }
+
+        for (filename, imagemetadata) in manifest.firmware() {
+            match firmware_to_write(
+                filename,
+                imagemetadata,
+                current_config,
+                &self.env.data_sink,
+                &Image::new(ImageType::Firmware, Some(filename)),
+            )
+            .await
+            {
+                Ok(Some(url)) => images_to_write.firmware.push((filename.to_string(), url)),
+                Ok(None) => (),
+                Err(e) => {
+                    // If an error is raised, do not fail the update.
+                    error!(
+                        "Error while determining firmware to write, assume update is needed: {:#}",
+                        anyhow!(e)
+                    );
+                    images_to_write
+                        .firmware
+                        .push((filename.to_string(), imagemetadata.url().to_owned()))
+                }
+            }
+        }
+
+        Ok((
+            (update_pkg, update_package_hash),
+            mode,
+            packages_to_fetch,
+            images_to_write,
+            current_config,
+        ))
     }
 
     /// Pave the various raw images (zbi, firmware, vbmeta) for fuchsia and/or recovery.
@@ -942,69 +930,19 @@ impl<'a> Attempt<'a> {
         co: &mut async_generator::Yield<State>,
         state: &mut state::Stage,
         update_pkg: &(UpdatePackage, Option<Hash>),
-        mode: UpdateMode,
         current_configuration: paver::CurrentConfiguration,
-        images_to_write: Option<ImagesToWrite>,
+        images_to_write: ImagesToWrite,
         packages_to_fetch: &[PinnedAbsolutePackageUrl],
     ) -> Result<(), StageError> {
-        if let Some(images_to_write) = images_to_write {
-            if images_to_write.is_empty() {
-                // This is possible if the images for the update were on one of the partitions already
-                // and written during State::Prepare.
-                //
-                // This is a separate block so that we avoid unnecessarily replacing the retained index
-                // and garbage collecting.
-                info!("Images have already been written!");
+        if images_to_write.is_empty() {
+            // This is possible if the images for the update were on one of the partitions already
+            // and written during State::Prepare.
+            //
+            // This is a separate block so that we avoid unnecessarily replacing the retained index
+            // and garbage collecting.
+            info!("Images have already been written!");
 
-                // Be sure to persist those images that were written during State::Prepare!
-                paver::paver_flush_data_sink(&self.env.data_sink)
-                    .await
-                    .map_err(StageError::PaverFlush)?;
-
-                state.add_progress(co, 1).await;
-                return Ok(());
-            }
-
-            let () = replace_retained_packages(
-                packages_to_fetch
-                    .iter()
-                    .map(|url| url.hash())
-                    .chain(images_to_write.get_url_hashes())
-                    .chain(update_pkg.1),
-                &self.env.retained_packages,
-            )
-            .await
-            .unwrap_or_else(|e| {
-                error!(
-                    "unable to replace retained packages set before gc in preparation \
-                        for fetching image packages listed in update package: {:#}",
-                    anyhow!(e)
-                )
-            });
-
-            if let Err(e) = gc(&self.env.space_manager).await {
-                error!(
-                    "unable to gc packages in preparation to write image packages: {:#}",
-                    anyhow!(e)
-                );
-            }
-
-            info!("Images to write: {:?}", images_to_write.print_list());
-            let desired_config = current_configuration.to_non_current_configuration();
-            info!("Targeting configuration: {:?}", desired_config);
-
-            write_image_packages(
-                images_to_write,
-                &self.env.pkg_resolver,
-                desired_config,
-                &self.env.data_sink,
-                update_pkg.1,
-                &self.env.retained_packages,
-                &self.env.space_manager,
-                self.concurrent_package_resolves,
-            )
-            .await?;
-
+            // Be sure to persist those images that were written during State::Prepare!
             paver::paver_flush_data_sink(&self.env.data_sink)
                 .await
                 .map_err(StageError::PaverFlush)?;
@@ -1013,43 +951,49 @@ impl<'a> Attempt<'a> {
             return Ok(());
         }
 
-        let image_list = [
-            ImageType::Bootloader,
-            ImageType::Firmware,
-            ImageType::Zbi,
-            ImageType::ZbiSigned,
-            ImageType::FuchsiaVbmeta,
-            ImageType::Recovery,
-            ImageType::RecoveryVbmeta,
-        ];
-
-        let images = update_pkg
-            .0
-            .resolve_images(&image_list[..])
-            .await
-            .map_err(StageError::ResolveImages)?;
-
-        let images = images.verify(mode).map_err(StageError::Verify)?.filter(|image| {
-            if self.config.should_write_recovery {
-                true
-            } else if image.classify().targets_recovery() {
-                info!("Skipping recovery image: {}", image.name());
-                false
-            } else {
-                true
-            }
+        let () = replace_retained_packages(
+            packages_to_fetch
+                .iter()
+                .map(|url| url.hash())
+                .chain(images_to_write.get_url_hashes())
+                .chain(update_pkg.1),
+            &self.env.retained_packages,
+        )
+        .await
+        .unwrap_or_else(|e| {
+            error!(
+                "unable to replace retained packages set before gc in preparation \
+                    for fetching image packages listed in update package: {:#}",
+                anyhow!(e)
+            )
         });
-        info!("Images to write via legacy path: {:?}", images);
+
+        if let Err(e) = gc(&self.env.space_manager).await {
+            error!(
+                "unable to gc packages in preparation to write image packages: {:#}",
+                anyhow!(e)
+            );
+        }
+
+        info!("Images to write: {:?}", images_to_write.print_list());
         let desired_config = current_configuration.to_non_current_configuration();
         info!("Targeting configuration: {:?}", desired_config);
 
-        write_images(&self.env.data_sink, &update_pkg.0, desired_config, images.iter())
-            .await
-            .map_err(StageError::Write)?;
+        write_image_packages(
+            images_to_write,
+            &self.env.pkg_resolver,
+            desired_config,
+            &self.env.data_sink,
+            update_pkg.1,
+            &self.env.retained_packages,
+            &self.env.space_manager,
+            self.concurrent_package_resolves,
+        )
+        .await?;
+
         paver::paver_flush_data_sink(&self.env.data_sink).await.map_err(StageError::PaverFlush)?;
 
         state.add_progress(co, 1).await;
-
         Ok(())
     }
 
@@ -1137,23 +1081,6 @@ impl<'a> Attempt<'a> {
     }
 }
 
-async fn write_images<'a, I>(
-    data_sink: &DataSinkProxy,
-    update_pkg: &UpdatePackage,
-    desired_config: paver::NonCurrentConfiguration,
-    images: I,
-) -> Result<(), Error>
-where
-    I: Iterator<Item = &'a Image>,
-{
-    for image in images {
-        paver::write_image(data_sink, update_pkg, image, desired_config)
-            .await
-            .context("while writing images")?;
-    }
-    Ok(())
-}
-
 async fn write_image(
     proxy: &UpdateImagePackage,
     path: &str,
@@ -1169,10 +1096,10 @@ async fn write_image(
 }
 
 /// Ok(None) indicates that the firmware image is on the device in the desired configuration.
-/// If the firmware image is on the active configuration, this function will write it to the desired
-/// configuration before returning Ok(None).
+/// If the firmware image is on the active configuration, this function will write it to the
+/// desired configuration before returning Ok(None).
 ///
-/// Ok(Some(url)) indicates that the firmware image in the update differs from what is on the device.
+/// Ok(Some(url)) indicates that the firmware image in the update differs from the device's.
 async fn firmware_to_write(
     filename: &str,
     image_metadata: &update_package::ImageMetadata,

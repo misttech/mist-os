@@ -23,10 +23,10 @@ pub use crate::{
     image::{Image, ImageClass, ImageType, OpenImageError},
     images::{
         parse_image_packages_json, BootSlot, ImageMetadata, ImageMetadataError, ImagePackagesError,
-        ImagePackagesManifest, ImagePackagesManifestBuilder, ImagePackagesSlots, VerifyError,
+        ImagePackagesManifest, ImagePackagesManifestBuilder, ImagePackagesSlots,
         VersionedImagePackagesManifest,
     },
-    images::{ImageList, ResolveImagesError, UnverifiedImageList},
+    images::{ResolveImagesError, VerifyError},
     name::VerifyNameError,
     packages::{
         parse_packages_json, serialize_packages_json, ParsePackageError, SerializePackageError,
@@ -76,27 +76,6 @@ impl UpdatePackage {
     /// Loads the image packages manifest, or determines that it is not present.
     pub async fn image_packages(&self) -> Result<ImagePackagesManifest, ImagePackagesError> {
         images::image_packages(&self.proxy).await
-    }
-
-    /// Searches for the requested images in the update package, returning the resolved sequence of
-    /// images in the same order as the requests.
-    ///
-    /// If a request ends in `[_type]`, that request is expanded to all found images with the
-    /// prefix of the request, sorted alphabetically.
-    pub async fn resolve_images(
-        &self,
-        requests: &[ImageType],
-    ) -> Result<UnverifiedImageList, ResolveImagesError> {
-        images::resolve_images(&self.proxy, requests).await
-    }
-
-    /// Opens the given `image` as a resizable VMO buffer.
-    #[cfg(target_os = "fuchsia")]
-    pub async fn open_image(
-        &self,
-        image: &Image,
-    ) -> Result<fidl_fuchsia_mem::Buffer, OpenImageError> {
-        image::open(&self.proxy, image).await
     }
 
     /// Verifies the board file has the given `contents`.

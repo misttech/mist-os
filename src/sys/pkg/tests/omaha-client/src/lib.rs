@@ -796,7 +796,23 @@ async fn omaha_client_update(
                 "packages.json",
                 make_packages_json(["fuchsia-pkg://fuchsia.com/system_image/0?hash=beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdead"]),
             )
-            .add_file("zbi", "fake zbi")
+            .add_file(
+                "images.json",
+                serde_json::to_vec(
+                    &update_package::ImagePackagesManifest::builder()
+                    .fuchsia_package(
+                        update_package::ImageMetadata::new(
+                            8,
+                            [0; 32].into(),
+                            "fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=2222222222222222222222222222222222222222222222222222222222222222#zbi".parse().unwrap(),
+                        ),
+                        None
+                    )
+                    .clone()
+                    .build()
+                )
+                .unwrap()
+            )
             .add_file("epoch.json", make_current_epoch_json())
     );
     env.proxies
@@ -805,6 +821,14 @@ async fn omaha_client_update(
         &env.proxies
             .resolver
             .package("system_image", "beefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeada")
+    );
+    env.proxies
+        .resolver.url("fuchsia-pkg://fuchsia.com/update_images_fuchsia/0?hash=2222222222222222222222222222222222222222222222222222222222222222")
+        .resolve(
+        &env.proxies
+            .resolver
+            .package("update_images_fuchsia", "2222222222222222222222222222222222222222222222222222222222222222")
+            .add_file("zbi", "fake zbi")
     );
 
     let mut stream = env.check_now().await;

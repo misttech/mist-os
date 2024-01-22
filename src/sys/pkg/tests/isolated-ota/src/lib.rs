@@ -14,7 +14,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_component_test::LocalComponentHandles,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
-    fuchsia_pkg_testing::{make_current_epoch_json, Package, PackageBuilder},
+    fuchsia_pkg_testing::{Package, PackageBuilder},
     fuchsia_sync::Mutex,
     fuchsia_zircon as zx,
     futures::{future::FutureExt, prelude::*},
@@ -46,7 +46,7 @@ impl TestResult {
         let written_blobs = self
             .blobfs
             .as_ref()
-            .unwrap_or_else(|| panic!("Test had no blobfs"))
+            .expect("Test had no blobfs")
             .list_blobs()
             .expect("Listing blobfs blobs");
         let mut all_package_blobs = BTreeSet::new();
@@ -372,7 +372,7 @@ pub async fn test_pave_fails() -> Result<(), Error> {
     let test_package = build_test_package().await?;
     let paver_hook = |p: &PaverEvent| {
         if let PaverEvent::WriteAsset { payload, .. } = p {
-            if payload.as_slice() == "FAIL".as_bytes() {
+            if payload.as_slice() == b"zbi-contents" {
                 return zx::Status::IO;
             }
         }
@@ -383,9 +383,7 @@ pub async fn test_pave_fails() -> Result<(), Error> {
         .test_executor(IsolatedOtaTestExecutor::new())
         .paver(|p| p.insert_hook(mphooks::return_error(paver_hook)))
         .add_package(test_package)
-        .add_image("zbi.signed", "FAIL".as_bytes())
-        .add_image("epoch.json", make_current_epoch_json().as_bytes())
-        .add_image("fuchsia.vbmeta", "FAIL".as_bytes())
+        .fuchsia_image(b"zbi-contents".to_vec(), None)
         .build()
         .await
         .context("Building TestEnv")?;
@@ -404,14 +402,14 @@ pub async fn test_pave_fails() -> Result<(), Error> {
             PaverEvent::QueryConfigurationStatus { configuration: Configuration::A },
             PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
             PaverEvent::BootManagerFlush,
+            PaverEvent::ReadAsset { configuration: Configuration::B, asset: Asset::Kernel },
             PaverEvent::WriteAsset {
                 asset: Asset::Kernel,
                 configuration: Configuration::B,
-                payload: "FAIL".as_bytes().to_vec(),
+                payload: b"zbi-contents".to_vec(),
             },
         ]
     );
-    println!("Paver events: {:?}", result.paver_events);
     assert_matches!(result.result.unwrap_err(), UpdateError::InstallError(_));
 
     Ok(())
@@ -421,13 +419,13 @@ pub async fn test_pave_fails() -> Result<(), Error> {
 pub async fn test_updater_succeeds() -> Result<(), Error> {
     let mut builder = TestEnvBuilder::new()
         .test_executor(IsolatedOtaTestExecutor::new())
-        .add_image("zbi.signed", "This is a zbi".as_bytes())
-        .add_image("fuchsia.vbmeta", "This is a vbmeta".as_bytes())
-        .add_image("recovery", "This is recovery".as_bytes())
-        .add_image("recovery.vbmeta", "This is another vbmeta".as_bytes())
-        .add_image("bootloader", "This is a bootloader upgrade".as_bytes())
-        .add_image("epoch.json", make_current_epoch_json().as_bytes())
-        .add_image("firmware_test", "This is the test firmware".as_bytes());
+        .fuchsia_image(b"zbi-contents".to_vec(), Some(b"vbmeta-contents".to_vec()))
+        .recovery_image(
+            b"recovery-zbi-contents".to_vec(),
+            Some(b"recovery-vbmeta-contents".to_vec()),
+        )
+        .firmware_image("".into(), b"This is a bootloader upgrade".to_vec())
+        .firmware_image("test".into(), b"This is the test firmware".to_vec());
     for i in 0i64..3 {
         let name = format!("test-package{i}");
         let package = PackageBuilder::new(name)
@@ -460,25 +458,35 @@ pub async fn test_updater_succeeds() -> Result<(), Error> {
             PaverEvent::QueryConfigurationStatus { configuration: Configuration::A },
             PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
             PaverEvent::BootManagerFlush,
-            PaverEvent::WriteFirmware {
+            PaverEvent::ReadAsset { configuration: Configuration::B, asset: Asset::Kernel },
+            PaverEvent::ReadAsset {
                 configuration: Configuration::B,
-                firmware_type: "".to_owned(),
-                payload: "This is a bootloader upgrade".as_bytes().to_vec(),
+                asset: Asset::VerifiedBootMetadata
+            },
+            PaverEvent::ReadFirmware { configuration: Configuration::B, firmware_type: "".into() },
+            PaverEvent::ReadFirmware {
+                configuration: Configuration::B,
+                firmware_type: "test".into()
             },
             PaverEvent::WriteFirmware {
                 configuration: Configuration::B,
-                firmware_type: "test".to_owned(),
-                payload: "This is the test firmware".as_bytes().to_vec(),
+                firmware_type: "".into(),
+                payload: b"This is a bootloader upgrade".into(),
+            },
+            PaverEvent::WriteFirmware {
+                configuration: Configuration::B,
+                firmware_type: "test".into(),
+                payload: b"This is the test firmware".into(),
             },
             PaverEvent::WriteAsset {
-                configuration: Configuration::B,
                 asset: Asset::Kernel,
-                payload: "This is a zbi".as_bytes().to_vec(),
+                configuration: Configuration::B,
+                payload: b"zbi-contents".into(),
             },
             PaverEvent::WriteAsset {
-                configuration: Configuration::B,
                 asset: Asset::VerifiedBootMetadata,
-                payload: "This is a vbmeta".as_bytes().to_vec(),
+                configuration: Configuration::B,
+                payload: b"vbmeta-contents".into(),
             },
             PaverEvent::DataSinkFlush,
             // Note that recovery isn't written, as isolated-ota skips them.
@@ -652,7 +660,7 @@ pub async fn test_blobfs_broken() -> Result<(), Error> {
     let env = TestEnvBuilder::new()
         .test_executor(IsolatedOtaTestExecutor::new())
         .add_package(package)
-        .add_image("zbi.signed", "ZBI".as_bytes())
+        .fuchsia_image(b"zbi-contents".to_vec(), None)
         .blobfs(ClientEnd::from(client))
         .paver(|p| p.insert_hook(mphooks::return_error(paver_hook)))
         .build()
@@ -686,7 +694,7 @@ pub async fn test_omaha_broken() -> Result<(), Error> {
     let env = TestEnvBuilder::new()
         .test_executor(IsolatedOtaTestExecutor::new())
         .add_package(package)
-        .add_image("zbi.signed", "ZBI".as_bytes())
+        .fuchsia_image(b"zbi-contents".to_vec(), None)
         .omaha_state(OmahaState::Manual(bad_omaha_config))
         .build()
         .await
@@ -702,13 +710,13 @@ pub async fn test_omaha_broken() -> Result<(), Error> {
 pub async fn test_omaha_works() -> Result<(), Error> {
     let mut builder = TestEnvBuilder::new()
         .test_executor(IsolatedOtaTestExecutor::new())
-        .add_image("zbi.signed", "This is a zbi".as_bytes())
-        .add_image("fuchsia.vbmeta", "This is a vbmeta".as_bytes())
-        .add_image("recovery", "This is recovery".as_bytes())
-        .add_image("recovery.vbmeta", "This is another vbmeta".as_bytes())
-        .add_image("bootloader", "This is a bootloader upgrade".as_bytes())
-        .add_image("epoch.json", make_current_epoch_json().as_bytes())
-        .add_image("firmware_test", "This is the test firmware".as_bytes());
+        .fuchsia_image(b"zbi-contents".to_vec(), None)
+        .recovery_image(
+            b"recovery-zbi-contents".to_vec(),
+            Some(b"recovery-vbmeta-contents".to_vec()),
+        )
+        .firmware_image("".into(), b"This is a bootloader upgrade".to_vec())
+        .firmware_image("test".into(), b"This is the test firmware".to_vec());
     for i in 0i64..3 {
         let name = format!("test-package{i}");
         let package = PackageBuilder::new(name)
@@ -730,8 +738,6 @@ pub async fn test_omaha_works() -> Result<(), Error> {
         .context("Building TestEnv")?;
 
     let result = env.run().await;
-    result.check_packages();
-    assert!(result.result.is_ok());
     assert_eq!(
         result.paver_events,
         vec![
@@ -745,25 +751,26 @@ pub async fn test_omaha_works() -> Result<(), Error> {
             PaverEvent::QueryConfigurationStatus { configuration: Configuration::A },
             PaverEvent::SetConfigurationUnbootable { configuration: Configuration::B },
             PaverEvent::BootManagerFlush,
-            PaverEvent::WriteFirmware {
+            PaverEvent::ReadAsset { configuration: Configuration::B, asset: Asset::Kernel },
+            PaverEvent::ReadFirmware { configuration: Configuration::B, firmware_type: "".into() },
+            PaverEvent::ReadFirmware {
                 configuration: Configuration::B,
-                firmware_type: "".to_owned(),
-                payload: "This is a bootloader upgrade".as_bytes().to_vec(),
+                firmware_type: "test".into()
             },
             PaverEvent::WriteFirmware {
                 configuration: Configuration::B,
-                firmware_type: "test".to_owned(),
-                payload: "This is the test firmware".as_bytes().to_vec(),
+                firmware_type: "".into(),
+                payload: b"This is a bootloader upgrade".into(),
+            },
+            PaverEvent::WriteFirmware {
+                configuration: Configuration::B,
+                firmware_type: "test".into(),
+                payload: b"This is the test firmware".into(),
             },
             PaverEvent::WriteAsset {
-                configuration: Configuration::B,
                 asset: Asset::Kernel,
-                payload: "This is a zbi".as_bytes().to_vec(),
-            },
-            PaverEvent::WriteAsset {
                 configuration: Configuration::B,
-                asset: Asset::VerifiedBootMetadata,
-                payload: "This is a vbmeta".as_bytes().to_vec(),
+                payload: b"zbi-contents".to_vec(),
             },
             PaverEvent::DataSinkFlush,
             // Note that recovery isn't written, as isolated-ota skips them.
@@ -773,6 +780,8 @@ pub async fn test_omaha_works() -> Result<(), Error> {
             PaverEvent::QueryActiveConfiguration,
         ]
     );
+    assert_matches!(result.result, Ok(()));
+    let () = result.check_packages();
 
     Ok(())
 }

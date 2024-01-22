@@ -41,6 +41,7 @@ rustc_test("driver") {
     "//src/sys/pkg/lib/fidl-fuchsia-update-installer-ext",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/omaha-client",
+    "//src/sys/pkg/lib/update-package",
     "//src/sys/pkg/testing/mock-boot-arguments:lib",
     "//src/sys/pkg/testing/mock-crash-reporter:lib",
     "//src/sys/pkg/testing/mock-installer",

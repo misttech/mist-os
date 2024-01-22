@@ -107,34 +107,6 @@ impl Image {
         }
     }
 
-    /// Attempt to construct an Image using the given `filename` if it is of the form "{name}" or
-    /// "{name}_{subtype}" where name is equal to the given `imagetype.name()`, or return None if
-    /// `filename` does not start with `imagetype.name()`.
-    ///
-    /// # Examples
-    ///
-    /// `firmware_bar` starts with `firmware`, so it matches:
-    /// ```
-    /// let image = Image::matches_base("firmware_bar", ImageType::Firmware).unwrap();
-    /// assert_eq!(image.subtype(), Some("bar"));
-    /// ```
-    ///
-    /// `firmware_zbi` doesn't start with `zbi`, so it doesn't match:
-    /// ```
-    /// let image = Image::matches_base("firmware_zbi", ImageType::Zbi);
-    /// assert_eq!(image, None);
-    /// ```
-    pub(crate) fn matches_base(filename: impl Into<String>, imagetype: ImageType) -> Option<Self> {
-        let filename = filename.into();
-
-        match filename.strip_prefix(imagetype.name()) {
-            None | Some("_") => None,
-            Some("") => Some(Self { imagetype, filename }),
-            Some(subtype) if !subtype.starts_with('_') => None,
-            Some(_) => Some(Self { imagetype, filename }),
-        }
-    }
-
     /// The particular type of this image as understood by the paver service, if present.
     pub fn subtype(&self) -> Option<&str> {
         if self.filename.len() == self.imagetype.name().len() {
@@ -142,11 +114,6 @@ impl Image {
         }
 
         Some(&self.filename[(self.imagetype.name().len() + 1)..])
-    }
-
-    /// The filename of the image relative to the update package.
-    pub fn name(&self) -> &str {
-        &self.filename
     }
 }
 
@@ -180,16 +147,7 @@ impl ImageClass {
 }
 
 #[cfg(target_os = "fuchsia")]
-/// Opens the given `image` as a resizable VMO buffer and return the buffer on success.
-pub(crate) async fn open(
-    proxy: &fio::DirectoryProxy,
-    image: &Image,
-) -> Result<Buffer, OpenImageError> {
-    open_from_path(proxy, image.name()).await
-}
-
-#[cfg(target_os = "fuchsia")]
-/// Opens the given `path` as a resizable VMO buffer and return the buffer on success.
+/// Opens the given `path` as a resizable VMO buffer and returns the buffer on success.
 pub(crate) async fn open_from_path(
     proxy: &fio::DirectoryProxy,
     path: &str,
@@ -224,10 +182,7 @@ pub(crate) async fn open_from_path(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::TestUpdatePackage, assert_matches::assert_matches, proptest::prelude::*,
-        proptest_derive::Arbitrary,
-    };
+    use {super::*, proptest::prelude::*, proptest_derive::Arbitrary};
 
     #[test]
     fn image_new() {
@@ -270,37 +225,12 @@ mod tests {
     }
 
     #[test]
-    fn image_matches_base() {
-        assert_eq!(Image::matches_base("foo_bar", ImageType::Zbi), None);
-        assert_eq!(
-            Image::matches_base("firmware", ImageType::Firmware),
-            Some(Image { imagetype: ImageType::Firmware, filename: "firmware".to_string() })
-        );
-        assert_eq!(
-            Image::matches_base("firmware_bar", ImageType::Firmware),
-            Some(Image { imagetype: ImageType::Firmware, filename: "firmware_bar".to_string() })
-        );
-    }
-
-    #[test]
-    fn image_matches_base_rejects_underscore_with_no_subtype() {
-        assert_eq!(Image::matches_base("firmware_", ImageType::Firmware), None);
-    }
-
-    #[test]
-    fn image_matches_base_rejects_no_underscore_before_subtype() {
-        assert_eq!(Image::matches_base("zbi3", ImageType::Zbi), None);
-    }
-
-    #[test]
     fn test_image_typed_accessors() {
         let image = Image::new(ImageType::Zbi, None);
-        assert_eq!(image.name(), "zbi");
         assert_eq!(image.imagetype(), ImageType::Zbi);
         assert_eq!(image.subtype(), None);
 
         let image = Image::new(ImageType::Zbi, Some("ibz"));
-        assert_eq!(image.name(), "zbi_ibz");
         assert_eq!(image.imagetype(), ImageType::Zbi);
         assert_eq!(image.subtype(), Some("ibz"));
     }
@@ -323,7 +253,7 @@ mod tests {
             match constructor {
                 ImageConstructor::New => image,
                 ImageConstructor::MatchesBase => {
-                    Image::matches_base(imagetype.name(), imagetype).unwrap()
+                    Image::new(imagetype, None)
                 }
             }
         }
@@ -332,66 +262,9 @@ mod tests {
     proptest! {
         #[test]
         fn image_accessors_do_not_panic(image in arb_image()) {
-            image.name();
             image.subtype();
             image.classify();
             format!("{image:?}");
         }
-
-        #[test]
-        fn filename_starts_with_imagetype(image in arb_image()) {
-            prop_assert!(image.name().starts_with(image.imagetype().name()));
-        }
-
-        #[test]
-        fn filename_ends_with_underscore_subtype_if_present(image in arb_image()) {
-            if let Some(subtype) = image.subtype() {
-                let suffix = format!("_{subtype}");
-                prop_assert!(image.name().ends_with(&suffix));
-            }
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn open_present_image_succeeds() {
-        assert_matches!(
-            TestUpdatePackage::new()
-                .add_file("zbi", "zbi contents")
-                .await
-                .open_image(&Image::new(ImageType::Zbi, None))
-                .await,
-            Ok(_)
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn open_missing_image_fails() {
-        assert_matches!(
-            TestUpdatePackage::new().open_image(&Image::new(ImageType::Zbi, None)).await,
-            Err(OpenImageError::OpenPath {
-                err: fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND),
-                ..
-            })
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn open_image_buffer_matches_expected_contents() {
-        let update_pkg = TestUpdatePackage::new().add_file("zbi", "zbi contents").await;
-        let buffer = update_pkg.open_image(&Image::new(ImageType::Zbi, None)).await.unwrap();
-        let expected = &b"zbi contents"[..];
-        assert_eq!(expected.len() as u64, buffer.size);
-
-        let mut actual = vec![0; buffer.size as usize];
-        buffer.vmo.read(&mut actual[..], 0).unwrap();
-
-        assert_eq!(expected, actual);
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn open_image_buffer_is_resizable() {
-        let update_pkg = TestUpdatePackage::new().add_file("zbi", "zbi contents").await;
-        let buffer = update_pkg.open_image(&Image::new(ImageType::Zbi, None)).await.unwrap();
-        assert_eq!(buffer.vmo.set_size(buffer.size * 2), Ok(()));
     }
 }
