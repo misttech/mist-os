@@ -375,16 +375,34 @@ static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
   notenoughargs:
     printf("not enough arguments\n");
-    printf("%s enter <resume after ns>\n", argv[0].str);
+  badunits:
+    printf("%s enter <resume delay> <m|s|ms|us|ns>\n", argv[0].str);
     return -1;
   }
 
   if (!strcmp(argv[1].str, "enter")) {
-    if (argc < 3) {
+    if (argc < 4) {
       goto notenoughargs;
     }
 
-    const zx_time_t resume_at = zx_time_add_duration(current_time(), argv[2].i);
+    zx_duration_t delay = argv[2].i;
+    const char* units = argv[3].str;
+    if (!strcmp(units, "m")) {
+      delay = ZX_MIN(delay);
+    } else if (!strcmp(units, "s")) {
+      delay = ZX_SEC(delay);
+    } else if (!strcmp(units, "ms")) {
+      delay = ZX_MSEC(delay);
+    } else if (!strcmp(units, "us")) {
+      delay = ZX_USEC(delay);
+    } else if (!strcmp(units, "ns")) {
+      delay = ZX_NSEC(delay);
+    } else {
+      printf("Invalid units: %s\n", units);
+      goto badunits;
+    }
+
+    const zx_time_t resume_at = zx_time_add_duration(current_time(), delay);
     return IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   }
 
