@@ -523,6 +523,11 @@ def main():
         # *silently* with a Java exception, leaving no traces on the client
         # terminal :-(
         f"--experimental_downloader_config={downloader_config_file}",
+        # TODO: b/318334703 - Enable bzlmod when the Fuchsia build is ready.
+        #
+        # NOTE: Bazel 7 turns on bzlmod by default, so it need to be explicitly
+        # turned off here.
+        "--enable_bzlmod=false",
     ]
 
     # Override repositories since all downloads are forbidden.
@@ -580,6 +585,9 @@ def main():
 
     # These options must appear for commands that act on the configure graph (i.e. all except `bazel query`
     bazel_config_args = bazel_common_args + [
+        # TODO: b/321637402 - Enable platform-based toolchain resolution in
+        # these tests.
+        "--incompatible_enable_cc_toolchain_resolution=false",
         # Ensure binaries are generated for the right Fuchsia CPU architecture.
         # Without this, @fuchsia_sdk rules assume that target_cpu == host_cpu,
         # and will use an incorrect output path prefix (i.e.
