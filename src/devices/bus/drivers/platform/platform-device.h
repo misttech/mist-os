@@ -126,6 +126,7 @@ class PlatformDevice : public PlatformDeviceType,
   void GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& completer) override;
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
   void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override;
+  void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override;
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,

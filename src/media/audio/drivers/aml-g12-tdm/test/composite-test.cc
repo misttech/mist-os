@@ -104,6 +104,8 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
 
   void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override {}
 
+  void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {}
+
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {}
 
   void handle_unknown_method(
@@ -288,7 +290,8 @@ TEST_F(AmlG12CompositeTest, CompositeProperties) {
 }
 
 TEST_F(AmlG12CompositeTest, Reset) {
-  // TODO(https://fxbug.dev/132252): Add behavior to change state recovered to the configuration below.
+  // TODO(https://fxbug.dev/132252): Add behavior to change state recovered to the configuration
+  // below.
   fidl::Result reset_result = client_->Reset();
   ASSERT_TRUE(reset_result.is_ok());
 

@@ -845,6 +845,27 @@ void PlatformDevice::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {
   }
 }
 
+void PlatformDevice::GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) {
+  pdev_device_info_t banjo_info;
+  zx_status_t status = PDevGetDeviceInfo(&banjo_info);
+  if (status == ZX_OK) {
+    fidl::Arena arena;
+    completer.ReplySuccess(fuchsia_hardware_platform_device::wire::NodeDeviceInfo::Builder(arena)
+                               .vid(banjo_info.vid)
+                               .pid(banjo_info.pid)
+                               .did(banjo_info.did)
+                               .mmio_count(banjo_info.mmio_count)
+                               .irq_count(banjo_info.irq_count)
+                               .bti_count(banjo_info.bti_count)
+                               .smc_count(banjo_info.smc_count)
+                               .metadata_count(banjo_info.metadata_count)
+                               .name(banjo_info.name)
+                               .Build());
+  } else {
+    completer.ReplyError(status);
+  }
+}
+
 void PlatformDevice::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
   pdev_board_info_t banjo_info;
   zx_status_t status = PDevGetBoardInfo(&banjo_info);
