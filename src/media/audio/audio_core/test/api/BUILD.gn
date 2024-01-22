@@ -20,6 +20,7 @@ group("api") {
   # These have real-time requirements and must run in release builds (debug builds are too slow).
   if (!is_debug) {
     deps += [
+      ":audio-core-api-pipeline-error-tests",
       ":audio-core-api-pipeline-tests",
       ":audio_core_fidelity_tests",
       ":audio_core_thermal_tests",
@@ -167,6 +168,12 @@ audio_core_api_test_component("audio-renderer-error-test") {
   test_type = "system"
 }
 
+audio_core_api_test_component("audio-renderer-pipeline-error-test") {
+  source = "audio_renderer_pipeline_error_test.cc"
+  executable_deps = [ ":audio_api_test_shared" ]
+  test_type = "system"
+}
+
 audio_core_api_test_component("audio-test") {
   source = "audio_test.cc"
   executable_deps = [ "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp" ]
@@ -297,6 +304,26 @@ audio_core_test_package("audio-core-api-pipeline-tests") {
   ]
 
   # Tests that intentionally cause ERROR logs in audio_core have been moved to another test suite.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+    environments = hardware_envs
+  }
+}
+
+# These tests have real-time constraints and must run on real hardware (emulators are too slow).
+audio_core_test_package("audio-core-api-pipeline-error-tests") {
+  package_deps = [ ":audio-core-api-test-effects" ]
+  audio_core_manifest_shards = [
+    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
+    "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
+  ]
+
+  test_components = [ ":audio-renderer-pipeline-error-test" ]
+
+  # This suite includes cases from audio-core-api-pipeline-tests that intentionally cause audio_core
+  # to log at the ERROR level.
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

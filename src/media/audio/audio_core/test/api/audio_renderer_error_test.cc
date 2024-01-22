@@ -6,36 +6,12 @@
 #include <cmath>
 #include <cstdint>
 
-#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/test/api/audio_renderer_test_shared.h"
-#include "src/media/audio/lib/analysis/generators.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
 
 namespace media::audio::test {
 
 using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
-
-// Validate that a slow effects pipeline registers an underflow.
-TEST_F(AudioRendererPipelineUnderflowTest, DISABLED_HasUnderflow) {
-  // Inject one packet and wait for it to be rendered.
-  auto input_buffer = GenerateSequentialAudio(format(), kPacketFrames);
-  auto packets = renderer()->AppendSlice(input_buffer, kPacketFrames);
-  renderer()->PlaySynchronized(this, output(), 0);
-  renderer()->WaitForPackets(this, packets);
-
-  // Wait an extra 20ms to account for the sleeper filter's delay.
-  RunLoopWithTimeout(zx::msec(20));
-
-  // Expect an underflow.
-  ExpectInspectMetrics(output(), DeviceUniqueIdToString(kUniqueId),
-                       {
-                           .children =
-                               {
-                                   {"pipeline underflows", {.nonzero_uints = {"count"}}},
-                               },
-                       });
-  Unbind(renderer());
-}
 
 class AudioRendererBufferErrorTest : public AudioRendererBufferTest {};
 
