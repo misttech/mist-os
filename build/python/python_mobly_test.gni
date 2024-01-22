@@ -224,6 +224,8 @@ template("python_mobly_test") {
     rebase_path("${root_out_dir}/ffx", root_build_dir),
     "-transport",
     invoker.transport,
+    "-ffx_subtools_search_path",
+    rebase_path(host_tools_dir, root_build_dir),
   ]
   if (defined(invoker.multi_fuchsia_device) && invoker.multi_fuchsia_device) {
     _host_test_args += [ "-multi_device" ]

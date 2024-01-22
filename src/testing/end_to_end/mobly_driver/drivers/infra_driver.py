@@ -40,6 +40,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
         transport: str,
         log_path: Optional[str] = None,
         params_path: Optional[str] = None,
+        ffx_subtools_search_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
 
@@ -49,6 +50,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
           transport: host->target transport type to use.
           log_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
+          ffx_subtools_search_path: absolute path to where to search for FFX plugins.
 
         Raises:
           KeyError if required environment variables not found.
@@ -58,6 +60,7 @@ class InfraDriver(base_mobly_driver.BaseDriver):
             transport=transport,
             log_path=log_path,
             params_path=params_path,
+            ffx_subtools_search_path=ffx_subtools_search_path,
         )
         self._tb_json_path = tb_json_path
 
@@ -102,13 +105,14 @@ class InfraDriver(base_mobly_driver.BaseDriver):
                 "ssh_key": "ssh_private_key",
             }
             config = api_mobly.new_testbed_config(
-                self._TESTBED_NAME,
-                self._log_path,
-                self._ffx_path,
-                self._transport,
-                tb_config,
-                test_params,
-                botanist_honeydew_translation_map,
+                testbed_name=self._TESTBED_NAME,
+                log_path=self._log_path,
+                ffx_path=self._ffx_path,
+                transport=self._transport,
+                mobly_controllers=tb_config,
+                test_params_dict=test_params,
+                botanist_honeydew_map=botanist_honeydew_translation_map,
+                ffx_subtools_search_path=self._ffx_subtools_search_path,
             )
             return yaml.dump(config)
         except (IOError, OSError) as e:

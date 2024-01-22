@@ -152,8 +152,17 @@ class FFXConfig:
     """Dataclass that holds FFX config information.
 
     Args:
-        isolate_dir: FFX isolation directory
-        logs_dir: FFX logs directory
+        binary_path: absolute path to the FFX binary.
+        isolate_dir: Directory that will be passed to `--isolate-dir`
+            arg of FFX
+        logs_dir: Directory that will be passed to `--config log.dir`
+            arg of FFX
+        logs_level: logs level that will be passed to `--config log.level`
+            arg of FFX
+        enable_mdns: Whether or not mdns need to be enabled. This will be
+            passed to `--config discovery.mdns.enabled` arg of FFX
+        subtools_search_path: A path of where ffx should
+            look for plugins.
     """
 
     binary_path: str
@@ -161,6 +170,7 @@ class FFXConfig:
     logs_dir: str
     logs_level: str
     mdns_enabled: bool
+    subtools_search_path: str | None
 
     def __str__(self) -> str:
         return (
@@ -168,7 +178,8 @@ class FFXConfig:
             f"isolate_dir={self.isolate_dir.directory()}, "
             f"logs_dir={self.logs_dir}, "
             f"logs_level={self.logs_level}, "
-            f"mdns_enabled={self.mdns_enabled}"
+            f"mdns_enabled={self.mdns_enabled}, "
+            f"subtools_search_path={self.subtools_search_path}, "
         )
 
 

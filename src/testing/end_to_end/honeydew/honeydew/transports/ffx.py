@@ -8,7 +8,6 @@ import atexit
 import ipaddress
 import json
 import logging
-import os
 import subprocess
 from typing import Any, Iterable, Type
 
@@ -79,6 +78,7 @@ class FfxConfig:
         logs_dir: str,
         logs_level: str | None,
         enable_mdns: bool,
+        subtools_search_path: str | None,
     ) -> None:
         """Sets up configuration need to be used while running FFX command.
 
@@ -92,6 +92,8 @@ class FfxConfig:
                 arg of FFX
             enable_mdns: Whether or not mdns need to be enabled. This will be
                 passed to `--config discovery.mdns.enabled` arg of FFX
+            subtools_search_path: A path of where ffx should
+                look for plugins.
 
         Raises:
             errors.FfxCommandError: In case of failure.
@@ -124,19 +126,15 @@ class FfxConfig:
         self._logs_dir: str = logs_dir
         self._logs_level: str = logs_level if logs_level else _FFX_LOGS_LEVEL
         self._mdns_enabled: bool = enable_mdns
+        self.subtools_search_path: str | None = subtools_search_path
 
         self._run(_FFX_CONFIG_CMDS["LOG_DIR"] + [self._logs_dir])
         self._run(_FFX_CONFIG_CMDS["LOG_LEVEL"] + [self._logs_level])
         self._run(_FFX_CONFIG_CMDS["MDNS"] + [str(self._mdns_enabled).lower()])
-
-        # TODO(b/319659911): Send `subtool-search-paths` as part of `ffx_config`
-        # from mobly controller to honeydew
-        fuchsia_dir: str | None = os.getenv("FUCHSIA_DIR")
-        if fuchsia_dir:
-            host_tools_path: str = os.path.join(
-                fuchsia_dir, "out/default/host-tools"
+        if self.subtools_search_path:
+            self._run(
+                _FFX_CONFIG_CMDS["SUB_TOOLS_PATH"] + [self.subtools_search_path]
             )
-            self._run(_FFX_CONFIG_CMDS["SUB_TOOLS_PATH"] + [host_tools_path])
 
         self._setup_done = True
 
@@ -174,6 +172,7 @@ class FfxConfig:
             logs_dir=self._logs_dir,
             logs_level=self._logs_level,
             mdns_enabled=self._mdns_enabled,
+            subtools_search_path=self.subtools_search_path,
         )
 
     def _atexit_callback(self) -> None:

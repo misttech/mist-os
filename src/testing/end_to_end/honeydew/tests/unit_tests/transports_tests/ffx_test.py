@@ -5,7 +5,6 @@
 """Unit tests for honeydew.transports.ffx.py."""
 
 import ipaddress
-import os
 import subprocess
 import unittest
 from typing import Any
@@ -34,6 +33,7 @@ _LOGS_DIR: str = "/tmp/logs"
 _BINARY_PATH: str = "ffx"
 _LOGS_LEVEL: str = "debug"
 _MDNS_ENABLED: bool = False
+_SUBTOOLS_SEARCH_PATH: str = "/subtools"
 
 _FFX_TARGET_SHOW_OUTPUT: bytes = (
     r'[{"title":"Target","label":"target","description":"",'
@@ -124,6 +124,14 @@ _FFX_TARGET_LIST_JSON: list[dict[str, Any]] = [
     }
 ]
 
+_FFX_CONFIG_SET: list[str] = [
+    "ffx",
+    "--isolate-dir",
+    _ISOLATE_DIR,
+    "config",
+    "set",
+]
+
 _INPUT_ARGS: dict[str, Any] = {
     "target_name": _TARGET_NAME,
     "target_ip_port": _TARGET_SSH_ADDRESS,
@@ -133,6 +141,7 @@ _INPUT_ARGS: dict[str, Any] = {
         binary_path=_BINARY_PATH,
         logs_level=_LOGS_LEVEL,
         mdns_enabled=_MDNS_ENABLED,
+        subtools_search_path=_SUBTOOLS_SEARCH_PATH,
     ),
     "run_cmd": ffx._FFX_CMDS["TARGET_SHOW"],
 }
@@ -175,18 +184,34 @@ class FfxConfigTests(unittest.TestCase):
 
         ffx_config = ffx.FfxConfig()
 
-        with mock.patch.dict(
-            os.environ, {"FUCHSIA_DIR": "mock_fuchsia_dir"}, clear=False
-        ):
-            ffx_config.setup(
-                binary_path=_BINARY_PATH,
-                isolate_dir=_ISOLATE_DIR,
-                logs_dir=_LOGS_DIR,
-                logs_level=_LOGS_LEVEL,
-                enable_mdns=_MDNS_ENABLED,
-            )
+        ffx_config.setup(
+            binary_path=_BINARY_PATH,
+            isolate_dir=_ISOLATE_DIR,
+            logs_dir=_LOGS_DIR,
+            logs_level=_LOGS_LEVEL,
+            enable_mdns=_MDNS_ENABLED,
+            subtools_search_path=_SUBTOOLS_SEARCH_PATH,
+        )
 
-        mock_subprocess_check_call.assert_called()
+        ffx_configs_calls = [
+            mock.call(_FFX_CONFIG_SET + ["log.dir", _LOGS_DIR], timeout=10),
+            mock.call(
+                _FFX_CONFIG_SET + ["log.level", _LOGS_LEVEL.lower()], timeout=10
+            ),
+            mock.call(
+                _FFX_CONFIG_SET
+                + ["discovery.mdns.enabled", str(_MDNS_ENABLED).lower()],
+                timeout=10,
+            ),
+            mock.call(
+                _FFX_CONFIG_SET
+                + ["ffx.subtool-search-paths", _SUBTOOLS_SEARCH_PATH],
+                timeout=10,
+            ),
+        ]
+        mock_subprocess_check_call.assert_has_calls(
+            ffx_configs_calls, any_order=True
+        )
 
         # Calling setup() again should fail
         with self.assertRaises(errors.FfxConfigError):
@@ -196,6 +221,7 @@ class FfxConfigTests(unittest.TestCase):
                 logs_dir=_LOGS_DIR,
                 logs_level=_LOGS_LEVEL,
                 enable_mdns=_MDNS_ENABLED,
+                subtools_search_path=_SUBTOOLS_SEARCH_PATH,
             )
 
     @mock.patch.object(
@@ -222,6 +248,7 @@ class FfxConfigTests(unittest.TestCase):
                 logs_dir=_LOGS_DIR,
                 logs_level=_LOGS_LEVEL,
                 enable_mdns=_MDNS_ENABLED,
+                subtools_search_path=_SUBTOOLS_SEARCH_PATH,
             )
 
         mock_subprocess_check_call.assert_called()
@@ -246,6 +273,7 @@ class FfxConfigTests(unittest.TestCase):
                 logs_dir=_LOGS_DIR,
                 logs_level=_LOGS_LEVEL,
                 enable_mdns=_MDNS_ENABLED,
+                subtools_search_path=_SUBTOOLS_SEARCH_PATH,
             )
 
         mock_subprocess_check_call.assert_called()
@@ -267,6 +295,7 @@ class FfxConfigTests(unittest.TestCase):
             logs_dir=_LOGS_DIR,
             logs_level=_LOGS_LEVEL,
             enable_mdns=_MDNS_ENABLED,
+            subtools_search_path=_SUBTOOLS_SEARCH_PATH,
         )
         mock_ffx_config_run.assert_called()
 
@@ -299,6 +328,7 @@ class FfxConfigTests(unittest.TestCase):
             logs_dir=_LOGS_DIR,
             logs_level=_LOGS_LEVEL,
             enable_mdns=_MDNS_ENABLED,
+            subtools_search_path=_SUBTOOLS_SEARCH_PATH,
         )
         mock_ffx_config_run.assert_called()
 

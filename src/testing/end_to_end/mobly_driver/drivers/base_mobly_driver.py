@@ -27,6 +27,7 @@ class BaseDriver(ABC):
         transport: str,
         log_path: Optional[str] = None,
         params_path: Optional[str] = None,
+        ffx_subtools_search_path: Optional[str] = None,
     ) -> None:
         """Initializes the instance.
 
@@ -35,7 +36,7 @@ class BaseDriver(ABC):
           transport: host->target transport type to use.
           log_path: absolute path to directory for storing Mobly test output.
           params_path: absolute path to the Mobly testbed params file.
-
+          ffx_subtools_search_path: absolute path to where to search for FFX plugins.
         Raises:
           KeyError if required environment variables not found.
         """
@@ -45,6 +46,7 @@ class BaseDriver(ABC):
         self._log_path = (
             log_path if log_path is not None else os.environ[TEST_OUTDIR_ENV]
         )
+        self._ffx_subtools_search_path = ffx_subtools_search_path
 
     @abstractmethod
     def generate_test_config(self) -> str:

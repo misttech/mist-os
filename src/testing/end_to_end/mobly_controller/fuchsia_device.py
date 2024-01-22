@@ -74,6 +74,7 @@ def create(
         logs_dir=f"{test_logs_dir}/ffx/",
         logs_level=None,
         enable_mdns=_enable_mdns(configs),
+        subtools_search_path=_get_ffx_subtools_search_path(configs),
     )
 
     fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice] = []
@@ -282,3 +283,21 @@ def _get_ffx_path(configs: List[Dict[str, Any]]) -> str:
         if "ffx_path" in config:
             return config["ffx_path"]
     raise RuntimeError("No FFX path found in any device config")
+
+
+def _get_ffx_subtools_search_path(configs: List[Dict[str, Any]]) -> str | None:
+    """Returns the ffx subtools search path to use.
+
+    Args:
+      configs: List of dicts. Each dict representing a configuration for a
+            Fuchsia device.
+
+    Returns:
+        Absolute path to the subtools search path, or None.
+    """
+    # FFX CLI is currently global and not localized to the individual devices so
+    # just return the the first "ffx_path" encountered.
+    for config in configs:
+        if "ffx_subtools_search_path" in config:
+            return config["ffx_subtools_search_path"]
+    return None

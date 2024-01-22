@@ -31,6 +31,7 @@ _INPUT_ARGS: dict[str, Any] = {
         binary_path="/bin/ffx",
         logs_level="debug",
         mdns_enabled=False,
+        subtools_search_path=None,
     ),
 }
 

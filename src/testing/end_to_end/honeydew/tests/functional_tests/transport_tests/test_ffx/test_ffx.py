@@ -85,6 +85,16 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         cmd: list[str] = ["target", "ssh", "ls"]
         self.device.ffx.run(cmd)
 
+    def test_ffx_run_subtool(self) -> None:
+        """Test case for FFX.run() with a subtool.
+
+        This test requires the test to have `test_data_deps=["//src/developer/ffx/tools/power:ffx_power_test_data"]`
+        to ensure the subtool exists.
+        """
+        assert isinstance(self.device, transports_capable.FFXCapableDevice)
+        cmd: list[str] = ["power", "help"]
+        self.device.ffx.run(cmd)
+
     def test_wait_for_rcs_connection(self) -> None:
         """Test case for FFX.wait_for_rcs_connection()."""
         assert isinstance(self.device, transports_capable.FFXCapableDevice)

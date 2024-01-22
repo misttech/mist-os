@@ -18,6 +18,7 @@ LATEST_RES_SYMLINK_NAME: str = "latest"
 MOBLY_CONTROLLER_FUCHSIA_DEVICE: str = "FuchsiaDevice"
 TRANSPORT_KEY: str = "transport"
 FFX_PATH_KEY: str = "ffx_path"
+FFX_SUBTOOLS_SEARCH_PATH_KEY: str = "ffx_subtools_search_path"
 
 MoblyConfigComponent = Dict[str, Any]
 
@@ -83,6 +84,7 @@ def new_testbed_config(
     mobly_controllers: List[Dict[str, Any]],
     test_params_dict: MoblyConfigComponent,
     botanist_honeydew_map: Dict[str, str],
+    ffx_subtools_search_path: str | None,
 ) -> MoblyConfigComponent:
     """Returns a Mobly testbed config which is required for running Mobly tests.
 
@@ -116,7 +118,8 @@ def new_testbed_config(
                     "serial_socket":"/tmp/fuchsia-54b2-030e-eb19_mux",
                     "ssh_private_key":"/etc/botanist/keys/pkey_infra",
                     "ffx_path":"/path/to/ffx",
-                    "transport":"fuchsia-controller"
+                    "transport":"fuchsia-controller",
+                    "ffx_subtools_search_path":"/path/to/ffx/subtools"
                   }
                 ],
                 "AccessPoint": [
@@ -141,6 +144,7 @@ def new_testbed_config(
         test_params_dict: Mobly testbed params dictionary.
         botanist_honeydew_map: Dictionary that maps Botanist config names to
                                Honeydew config names.
+        ffx_subtools_search_path: absolute path to where to search for FFX plugins.
     Returns:
       A Mobly Config that corresponds to the user-specified arguments.
     """
@@ -159,6 +163,11 @@ def new_testbed_config(
             for botanist_key, honeydew_key in botanist_honeydew_map.items():
                 if botanist_key in controller:
                     controller[honeydew_key] = controller.pop(botanist_key)
+            # Add ffx subtools search path.
+            if ffx_subtools_search_path:
+                controller[
+                    FFX_SUBTOOLS_SEARCH_PATH_KEY
+                ] = ffx_subtools_search_path
         if controller_type in controllers:
             controllers[controller_type].append(controller)
         else:
@@ -218,7 +227,7 @@ def set_transport(mobly_config: MoblyConfigComponent, transport: str):
 
 
 def set_ffx_path(mobly_config: MoblyConfigComponent, ffx_path: str):
-    """Updates all fuchsia device configs use the specified ffx_path.
+    """Updates all fuchsia device configs to use the specified ffx_path.
 
     Overwrites the existing value if the key already exists.
 
@@ -227,6 +236,22 @@ def set_ffx_path(mobly_config: MoblyConfigComponent, ffx_path: str):
       ffx_path: FFX path to set on fuchsia devices in the Mobly config.
     """
     _set_per_device_config(mobly_config, FFX_PATH_KEY, ffx_path)
+
+
+def set_ffx_subtools_search_path(
+    mobly_config: MoblyConfigComponent, subtools_search_path: str
+):
+    """Updates all fuchsia device configs to use the specified ffx_path.
+
+    Overwrites the existing value if the key already exists.
+
+    Args:
+      mobly_config: Mobly config object to update.
+      subtools_search_path: absolute path to where to search for FFX plugins..
+    """
+    _set_per_device_config(
+        mobly_config, FFX_SUBTOOLS_SEARCH_PATH_KEY, subtools_search_path
+    )
 
 
 def _set_per_device_config(

@@ -38,6 +38,11 @@ parser.add_argument(
 )
 parser.add_argument("-ffx_path", default=None, help="path to FFX.")
 parser.add_argument(
+    "-ffx_subtools_search_path",
+    default=None,
+    help="path to FFX subtools search path.",
+)
+parser.add_argument(
     "-transport",
     default=None,
     help="value to use in mobly config for host->device transport type.",
@@ -72,6 +77,9 @@ def main():
         multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
+        ffx_subtools_search_path=os.path.abspath(args.ffx_subtools_search_path)
+        if args.ffx_subtools_search_path
+        else None,
     )
     driver = factory.get_driver()
 
