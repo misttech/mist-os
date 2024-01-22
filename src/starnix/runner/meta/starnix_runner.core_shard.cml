@@ -99,17 +99,5 @@
             to: [ "#starnix_runner" ],
             subdir: "gpu",
         },
-        {
-            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
-            from: "#system-activity-governor",
-            to: "#starnix_runner",
-            availability: "optional",
-        },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-            to: "#starnix_runner",
-            availability: "optional",
-        },
     ],
 }
