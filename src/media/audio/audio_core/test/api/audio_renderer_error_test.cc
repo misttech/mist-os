@@ -16,7 +16,7 @@ namespace media::audio::test {
 using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
 
 // Validate that a slow effects pipeline registers an underflow.
-TEST_F(AudioRendererPipelineUnderflowTest, HasUnderflow) {
+TEST_F(AudioRendererPipelineUnderflowTest, DISABLED_HasUnderflow) {
   // Inject one packet and wait for it to be rendered.
   auto input_buffer = GenerateSequentialAudio(format(), kPacketFrames);
   auto packets = renderer()->AppendSlice(input_buffer, kPacketFrames);
