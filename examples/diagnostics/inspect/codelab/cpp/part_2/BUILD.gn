@@ -13,7 +13,7 @@ source_set("lib") {
 
   public_deps = [
     "//examples/diagnostics/inspect/codelab/fidl:fuchsia.examples.inspect_hlcpp",
-    "//sdk/lib/sys/inspect/cpp",
+    "//sdk/lib/inspect/component/cpp",
   ]
 }
 

@@ -4,6 +4,8 @@
 
 #include "example_server_app.h"
 
+#include <lib/async/default.h>
+
 namespace example {
 
 ExampleServerApp::ExampleServerApp()
@@ -12,7 +14,8 @@ ExampleServerApp::ExampleServerApp()
 ExampleServerApp::ExampleServerApp(std::unique_ptr<sys::ComponentContext> context)
     : context_(std::move(context)) {
   // [START initialization]
-  inspector_ = std::make_unique<sys::ComponentInspector>(context_.get());
+  inspector_ = std::make_unique<inspect::ComponentInspector>(async_get_default_dispatcher(),
+                                                             inspect::PublishOptions{});
   // [END initialization]
 
   // [START properties]

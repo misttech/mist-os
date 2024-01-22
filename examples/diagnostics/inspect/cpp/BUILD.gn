@@ -32,8 +32,8 @@ source_set("lib") {
     "//sdk/lib/fidl/cpp",
 
     # [START inspect_libs]
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
 
     # [END inspect_libs]
   ]

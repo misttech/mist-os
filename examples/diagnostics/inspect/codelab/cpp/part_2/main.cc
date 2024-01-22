@@ -7,7 +7,7 @@
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/log_settings.h>
 // [START part_1_include_inspect]
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 // [END part_1_include_inspect]
 
 #include <lib/syslog/cpp/macros.h>
@@ -26,14 +26,14 @@ int main(int argc, char** argv) {
 
   // Create an inspector for this component.
   // [START part_1_init_inspect]
-  sys::ComponentInspector inspector(context.get());
+  inspect::ComponentInspector inspector(loop.dispatcher(), {});
   // [END part_1_init_inspect]
 
   // Create a version string.
   // We pass the inspector along when creating the property to tie their lifecycles together.
   // It is an error to not retain the created property.
   // [START part_1_write_version]
-  inspector.root().CreateString("version", "part2", &inspector);
+  inspector.root().RecordString("version", "part2");
   // [END part_1_write_version]
 
   // Serve the reverser service.

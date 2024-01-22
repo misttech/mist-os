@@ -6,8 +6,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  sys::ComponentInspector inspector(context.get());
+  inspect::ComponentInspector inspector(loop.dispatcher(), {});
 
   FizzBuzz fizzbuzz(inspector.root().CreateChild("fizzbuzz_service"));
   context->outgoing()->AddPublicService(fizzbuzz.GetHandler());

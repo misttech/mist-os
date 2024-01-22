@@ -8,7 +8,7 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 // [START inspect_imports]
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 // [END inspect_imports]
 #include "echo_connection.h"
 
@@ -26,7 +26,7 @@ class ExampleServerApp {
   ExampleServerApp& operator=(const ExampleServerApp&) = delete;
 
   std::unique_ptr<sys::ComponentContext> context_;
-  std::unique_ptr<sys::ComponentInspector> inspector_;
+  std::unique_ptr<inspect::ComponentInspector> inspector_;
   std::shared_ptr<EchoConnectionStats> echo_stats_;
   fidl::BindingSet<EchoConnection::Echo, std::unique_ptr<EchoConnection>> bindings_;
 };

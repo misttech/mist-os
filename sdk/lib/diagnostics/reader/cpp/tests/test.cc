@@ -35,7 +35,6 @@ const char CM1_EXPECTED_DATA[] = R"JSON({
     "data_source": "Inspect",
     "metadata": {
         "component_url": "REALM_BUILDER_URL_PREFIX/test_app",
-        "filename": "fuchsia.inspect.Tree",
         "timestamp": TIMESTAMP
     },
     "moniker": "REALM_BUILDER_MONIKER_PREFIX/test_app",
@@ -56,7 +55,6 @@ const char CM2_EXPECTED_DATA[] = R"JSON({
     "data_source": "Inspect",
     "metadata": {
         "component_url": "REALM_BUILDER_URL_PREFIX/test_app_2",
-        "filename": "fuchsia.inspect.Tree",
         "timestamp": TIMESTAMP
     },
     "moniker": "REALM_BUILDER_MONIKER_PREFIX/test_app_2",

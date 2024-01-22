@@ -4,8 +4,8 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -13,14 +13,15 @@ int main() {
   fuchsia_logging::SetTags({"test_program"});
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  auto inspector = std::make_unique<sys::ComponentInspector>(context.get());
+  auto inspector =
+      std::make_unique<inspect::ComponentInspector>(loop.dispatcher(), inspect::PublishOptions{});
 
-  inspector->root().CreateString("version", "v1", inspector.get());
+  inspector->root().RecordString("version", "v1");
   auto option_a = inspector->root().CreateChild("option_a");
-  option_a.CreateInt("value", 10, inspector.get());
+  option_a.RecordInt("value", 10);
 
   auto option_b = inspector->root().CreateChild("option_b");
-  option_b.CreateInt("value", 20, inspector.get());
+  option_b.RecordInt("value", 20);
 
   FX_SLOG(INFO, "I'm an info log", FX_KV("tag", "hello"), FX_KV("foo", 100));
   FX_SLOG(WARNING, "I'm a warn log", FX_KV("bar", "baz"));

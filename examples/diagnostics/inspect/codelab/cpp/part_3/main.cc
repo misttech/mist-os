@@ -4,8 +4,8 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
@@ -23,16 +23,16 @@ int main(int argc, char** argv) {
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
   // Create an inspector for this component.
-  sys::ComponentInspector inspector(context.get());
+  inspect::ComponentInspector inspector(loop.dispatcher(), {});
 
   // ComponentInspector has built-in health checking. Set it to "starting up" so snapshots show we
   // may still be initializing.
   inspector.Health().StartingUp();
 
-  // Create a version string.
-  // We pass the inspector along when creating the property to tie their lifecycles together.
-  // It is an error to not retain the created property.
-  inspector.root().CreateString("version", "part3", &inspector);
+  // Record a version string.
+  // We use the RecordString method when creating the property to tie lifecycles together.
+  // It is an error to not retain the property if we had used CreateString.
+  inspector.root().RecordString("version", "part3");
 
   // Serve the reverser service.
   context->outgoing()->AddPublicService(

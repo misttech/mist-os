@@ -15,8 +15,8 @@ executable("bin") {
   sources = [ "program.cc" ]
 
   deps = [
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
