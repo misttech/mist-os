@@ -223,6 +223,9 @@ user_platform_aib_names =
 
       # Virtualization
       "virtualization_support",
+
+      # The tzif zoneinfo files
+      "zoneinfo",
     ]
 
 # LINT.ThenChange(platform_aib_names.bzl)

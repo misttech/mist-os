@@ -33,4 +33,9 @@ pub struct IntlConfig {
     /// The intl configuration type in use.
     #[serde(default)]
     pub config_type: Type,
+
+    /// Should assembly include the zoneinfo files, in addition to the
+    /// "regular" ICU time zone data.
+    #[serde(default)]
+    pub include_zoneinfo_files: bool,
 }

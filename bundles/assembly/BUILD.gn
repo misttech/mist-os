@@ -1330,7 +1330,7 @@ assembly_input_bundle("common_minimal") {
     "//src/diagnostics/sampler",
 
     # Internationalization
-    "//src/intl/tzdata_provider",
+    "//src/intl/tzdata_provider:tzdata_provider_pkg",
 
     # Security
     "//src/security/bin/root_ssl_certificates",
@@ -3274,4 +3274,23 @@ assembly_input_bundle("kernel_anonymous_memory_compression") {
 # "kernel_compression" is also included.
 assembly_input_bundle("kernel_anonymous_memory_compression_eager_lru") {
   kernel_cmdline = [ "kernel.page-scanner.lru-action=compress_only" ]
+}
+
+# Assembly selects whether to include this AIB or not.
+assembly_input_bundle("zoneinfo") {
+  base_packages = [ "//src/intl/tzdata_provider:zoneinfo_provider_pkg" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/intl/tzdata_provider/meta/zoneinfo_provider.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
 }

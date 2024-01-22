@@ -32,6 +32,10 @@ impl DefineSubsystemConfiguration<IntlConfig> for IntlSubsystem {
             Type::None => { /* Skip the bundle altogether. */ }
         };
 
+        if config.include_zoneinfo_files {
+            builder.icu_platform_bundle("zoneinfo").context("while configuring `zoneinfo`")?;
+        }
+
         Ok(())
     }
 }

@@ -136,6 +136,7 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "wlan_legacy_privacy_support",
     "wlan_softmac_support",
     "wlan_wlanix",
+    "zoneinfo",
 ]
 
 USERDEBUG_PLATFORM_AIB_NAMES = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLATFORM_AIB_NAMES + [

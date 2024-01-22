@@ -7,6 +7,15 @@ import("//src/lib/icu/tzdata/icu_tzdata_resource.gni")
 import("//src/lib/intl/tz/zoneinfo_resource.gni")
 import("//src/sys/core/build/core_shard.gni")
 
+group("tzdata_provider") {
+  testonly = true
+  deps = [
+    ":tests",
+    ":tzdata_provider_pkg",
+    ":zoneinfo_provider_pkg",
+  ]
+}
+
 group("tests") {
   testonly = true
   deps = [ "test" ]
@@ -22,7 +31,7 @@ fuchsia_component("component") {
   manifest = "meta/tzdata_provider.cml"
 }
 
-fuchsia_package("tzdata_provider") {
+fuchsia_package("tzdata_provider_pkg") {
   package_name = "tzdata-provider"
   deps = [
     ":component",

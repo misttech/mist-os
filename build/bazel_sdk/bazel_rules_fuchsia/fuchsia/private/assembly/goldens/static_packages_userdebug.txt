@@ -110,3 +110,4 @@ system-update-committer
 ?wlanif
 ?wlanix
 ?wlansoftmac
+?zoneinfo-provider
