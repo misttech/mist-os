@@ -4,7 +4,7 @@
 
 exports_files(
     srcs = [
-        "default.json",
         "delegated_network_provisioning.json",
+        "netcfg_default.json",
     ],
 )

@@ -8,7 +8,7 @@ use anyhow::bail;
 use assembly_config_schema::platform_config::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanRecoveryProfile,
 };
-use assembly_util::FileEntry;
+use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct ConnectivitySubsystemConfig;
 impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySubsystemConfig {
@@ -96,12 +96,18 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 }
             }
 
-            if let Some(netcfg_config_path) = &connectivity_config.network.netcfg_config_path {
-                builder.package("netcfg").config_data(FileEntry {
-                    source: netcfg_config_path.clone(),
-                    destination: "default.json".into(),
-                })?;
-            }
+            let config_src = connectivity_config
+                .network
+                .netcfg_config_path
+                .clone()
+                .unwrap_or(context.get_resource("netcfg_default.json"));
+            let config_dir = builder
+                .add_domain_config(PackageSetDestination::Blob(PackageDestination::NetcfgConfig))
+                .directory("netcfg-config");
+            config_dir.entry(FileEntry {
+                source: config_src,
+                destination: "netcfg_default.json".into(),
+            })?;
 
             if let Some(netstack_config_path) = &connectivity_config.network.netstack_config_path {
                 builder.package("netstack").config_data(FileEntry {

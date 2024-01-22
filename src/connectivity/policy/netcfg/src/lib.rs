@@ -151,7 +151,7 @@ struct Opt {
     min_severity: LogLevel,
 
     /// config file to use
-    #[argh(option, default = "\"/config/data/default.json\".to_string()")]
+    #[argh(option, default = "\"/netcfg-config/netcfg_default.json\".to_string()")]
     config_data: String,
 }
 

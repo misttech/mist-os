@@ -3269,6 +3269,9 @@ assembly_resources_directory("resources") {
     "//src/security/policy/subsystems/component_manager_policy_starnix.json5",
     "//src/sys/component_manager/configs/bootfs_config.json5",
 
+    # Networking resources.
+    "//src/connectivity/policy/netcfg/config/netcfg_default.json",
+
     # ICU resources.
     "${icu_tzres_path}/metaZones.res",
     "${icu_tzres_path}/timezoneTypes.res",

@@ -101,6 +101,8 @@ pub enum PackageDestination {
     ConfigData,
     /// The shell commands package.
     ShellCommands,
+    /// The network provisioning configuration.
+    NetcfgConfig,
     /// Variant specifically for making tests easier.
     ForTest,
     /// Any package that came from an AIB.
@@ -121,6 +123,7 @@ impl std::fmt::Display for PackageDestination {
                 Self::Base => "system_image",
                 Self::ConfigData => "config-data",
                 Self::ShellCommands => "shell-commands",
+                Self::NetcfgConfig => "netcfg-config",
                 Self::ForTest => "for-test",
             }
         )
@@ -368,6 +371,7 @@ mod tests {
             "for-test",
             "for-test2",
             "fshost",
+            "netcfg-config",
             "network",
             "sensor-config",
             "shell-commands",

@@ -7,6 +7,12 @@
         // Subscribe to component lifecycle events
         lifecycle: { stop_event: "notify" },
     },
+    children: [
+        {
+            name: "netcfg-config",
+            url: "fuchsia-pkg://fuchsia.com/netcfg-config#meta/netcfg-config.cm",
+        },
+    ],
     capabilities: [
         {
             protocol: [
@@ -41,9 +47,10 @@
             path: "/dev/class/network",
         },
         {
-            directory: "config-data",
+            directory: "netcfg-config",
+            from: "#netcfg-config",
             rights: [ "r*" ],
-            path: "/config/data",
+            path: "/netcfg-config",
         },
     ],
     expose: [

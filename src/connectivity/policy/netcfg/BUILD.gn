@@ -135,8 +135,8 @@ fuchsia_package("package-advanced") {
 
 config_data("config-default") {
   for_pkg = "netcfg"
-  sources = [ "config/default.json" ]
-  outputs = [ "default.json" ]
+  sources = [ "config/netcfg_default.json" ]
+  outputs = [ "netcfg_default.json" ]
 }
 
 fuchsia_unittest_package("netcfg-tests") {

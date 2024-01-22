@@ -95,7 +95,6 @@ template("assemble_network_conformance_system") {
     base_packages = [
       "//src/connectivity/network/net-cli",
       "//src/connectivity/network/testing/network-test-realm/service:network-test-realm",
-      "//src/connectivity/policy/netcfg:config-default",
     ]
     base_packages += invoker.additional_base_packages
 

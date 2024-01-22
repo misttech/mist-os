@@ -144,7 +144,6 @@ if (is_fuchsia) {
   recovery_packages = board_recovery_package_labels + core_realm_aib_pkgs +
                       core_realm_network_aib_pkgs +
                       [
-                        "//src/connectivity/policy/netcfg:config-default",
                         "//src/recovery/factory_reset",
                         "//src/recovery/system:system_recovery",
                         "//src/ui/bin/brightness_manager:auto-brightness",
@@ -285,7 +284,6 @@ if (is_fuchsia) {
     base_packages = core_realm_aib_pkgs + core_realm_eng_aib_pkgs +
                     core_realm_network_aib_pkgs +
                     [
-                      "//src/connectivity/policy/netcfg:config-default",
                       "//src/firmware/fastboot-tcp",
                       "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
                       "//src/firmware/fastboot-usb",

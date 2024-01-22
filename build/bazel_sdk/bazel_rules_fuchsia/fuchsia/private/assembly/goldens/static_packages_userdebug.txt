@@ -54,6 +54,7 @@ forensics
 ?memory_sampler
 ?netcfg-advanced
 ?netcfg-basic
+?netcfg-config
 ?netstack
 ?netstack-migration
 ?netstack3
