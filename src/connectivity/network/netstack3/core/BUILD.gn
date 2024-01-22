@@ -46,6 +46,7 @@ rustc_library_with_features("netstack3-core") {
     "src/ip/api.rs",
     "src/ip/base.rs",
     "src/ip/device.rs",
+    "src/ip/device/api.rs",
     "src/ip/device/dad.rs",
     "src/ip/device/integration.rs",
     "src/ip/device/nud.rs",

@@ -4,13 +4,14 @@
 
 //! An IP device.
 
-pub mod dad;
+pub(crate) mod api;
+pub(crate) mod dad;
 pub(crate) mod integration;
-pub mod nud;
-pub mod route_discovery;
+pub(crate) mod nud;
+pub(crate) mod route_discovery;
 pub(crate) mod router_solicitation;
-pub mod slaac;
-pub mod state;
+pub(crate) mod slaac;
+pub(crate) mod state;
 
 use alloc::{boxed::Box, vec::Vec};
 use core::{fmt::Debug, num::NonZeroU8, ops::Deref};
@@ -45,12 +46,11 @@ use crate::{
             router_solicitation::{RsHandler, RsTimerId},
             slaac::{SlaacConfiguration, SlaacHandler, SlaacTimerId},
             state::{
-                DelIpv6AddrReason, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags,
-                IpDeviceState, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState,
-                Ipv4DeviceConfiguration, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState,
-                Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddressFlags, Ipv6AddressState,
-                Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState,
-                Lifetime,
+                IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags, IpDeviceState,
+                IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
+                Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig,
+                Ipv6AddrManualConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
+                Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Lifetime,
             },
         },
         gmp::{
@@ -303,10 +303,16 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
     type Configuration: AsRef<IpDeviceConfiguration>;
     type Timer<DeviceId>: Into<IpDeviceTimerId<Self, DeviceId>>
         + From<IpDeviceTimerId<Self, DeviceId>>;
-    type AssignedWitness: Witness<Self::Addr> + Copy + PartialEq + Debug;
-    type AddressConfig<I>: Default;
-    type ManualAddressConfig<I>: Default;
-    type AddressState<I>;
+    type AssignedWitness: Witness<Self::Addr>
+        + Copy
+        + PartialEq
+        + Debug
+        + Into<SpecifiedAddr<Self::Addr>>;
+    type AddressConfig<I: Instant>: Default + Debug;
+    type ManualAddressConfig<I: Instant>: Default + Debug + Into<Self::AddressConfig<I>>;
+    type AddressState<I: Instant>;
+
+    fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I>;
 }
 
 impl IpDeviceIpExt for Ipv4 {
@@ -314,9 +320,13 @@ impl IpDeviceIpExt for Ipv4 {
     type Configuration = Ipv4DeviceConfiguration;
     type Timer<DeviceId> = Ipv4DeviceTimerId<DeviceId>;
     type AssignedWitness = SpecifiedAddr<Ipv4Addr>;
-    type AddressConfig<I> = Ipv4AddrConfig<I>;
-    type ManualAddressConfig<I> = Ipv4AddrConfig<I>;
-    type AddressState<I> = Ipv4AddressState<I>;
+    type AddressConfig<I: Instant> = Ipv4AddrConfig<I>;
+    type ManualAddressConfig<I: Instant> = Ipv4AddrConfig<I>;
+    type AddressState<I: Instant> = Ipv4AddressState<I>;
+
+    fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I> {
+        config.valid_until
+    }
 }
 
 impl IpDeviceIpExt for Ipv6 {
@@ -324,9 +334,13 @@ impl IpDeviceIpExt for Ipv6 {
     type Configuration = Ipv6DeviceConfiguration;
     type Timer<DeviceId> = Ipv6DeviceTimerId<DeviceId>;
     type AssignedWitness = Ipv6DeviceAddr;
-    type AddressConfig<I> = Ipv6AddrConfig<I>;
-    type ManualAddressConfig<I> = Ipv6AddrManualConfig<I>;
-    type AddressState<I> = Ipv6AddressState<I>;
+    type AddressConfig<I: Instant> = Ipv6AddrConfig<I>;
+    type ManualAddressConfig<I: Instant> = Ipv6AddrManualConfig<I>;
+    type AddressState<I: Instant> = Ipv6AddressState<I>;
+
+    fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I> {
+        config.valid_until()
+    }
 }
 
 /// An Ip address that witnesses properties needed to be assigned to a device.
@@ -359,15 +373,6 @@ pub enum AddressRemovedReason {
     Manual,
     /// The address was removed because it was detected as a duplicate via DAD.
     DadFailed,
-}
-
-impl From<DelIpv6AddrReason> for AddressRemovedReason {
-    fn from(reason: DelIpv6AddrReason) -> Self {
-        match reason {
-            DelIpv6AddrReason::ManualAction => Self::Manual,
-            DelIpv6AddrReason::DadFailed => Self::DadFailed,
-        }
-    }
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, GenericOverIp)]
@@ -692,10 +697,12 @@ pub trait IpDeviceConfigurationContext<
 >: IpDeviceStateContext<I, BC> + DeviceIdContext<AnyDevice>
 {
     type DevicesIter<'s>: Iterator<Item = Self::DeviceId> + 's;
-    type WithIpDeviceConfigurationInnerCtx<'s>: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId>
+    type WithIpDeviceConfigurationInnerCtx<'s>: IpDeviceStateContext<I, BC, DeviceId = Self::DeviceId, AddressId = Self::AddressId>
         + GmpHandler<I, BC>
         + NudIpHandler<I, BC>
+        + DadHandler<I, BC>
         + TimerHandler<BC, I::Timer<Self::DeviceId>>
+        + IpAddressRemovalHandler<I, BC>
         + 's;
     type WithIpDeviceConfigurationMutInner<'s>: WithIpDeviceConfigurationMutInner<I, BC, DeviceId = Self::DeviceId>
         + 's;
@@ -752,8 +759,8 @@ pub trait WithIpv6DeviceConfigurationMutInner<BC: IpDeviceBindingsContext<Ipv6, 
     type Ipv6DeviceStateCtx<'s>: Ipv6DeviceContext<BC, DeviceId = Self::DeviceId>
         + GmpHandler<Ipv6, BC>
         + NudIpHandler<Ipv6, BC>
+        + DadHandler<Ipv6, BC>
         + RsHandler<BC>
-        + DadHandler<BC>
         + SlaacHandler<BC>
         + RouteDiscoveryHandler<BC>
         + 's
@@ -774,7 +781,7 @@ pub trait Ipv6DeviceConfigurationContext<BC: IpDeviceBindingsContext<Ipv6, Self:
         + GmpHandler<Ipv6, BC>
         + MldPacketHandler<BC, Self::DeviceId>
         + NudIpHandler<Ipv6, BC>
-        + DadHandler<BC>
+        + DadHandler<Ipv6, BC>
         + RsHandler<BC>
         + SlaacHandler<BC>
         + RouteDiscoveryHandler<BC>
@@ -1008,12 +1015,12 @@ impl<
         if assigned {
             IpAddressState::Assigned
         } else {
-            del_ipv6_addr_with_reason(
+            del_ip_addr(
                 self,
                 bindings_ctx,
                 device_id,
-                DelIpv6Addr::AddressId(addr_id),
-                DelIpv6AddrReason::DadFailed,
+                DelIpAddr::AddressId(addr_id),
+                AddressRemovedReason::DadFailed,
             )
             .unwrap();
             IpAddressState::Tentative
@@ -1100,7 +1107,7 @@ pub(crate) trait IpDeviceSendContext<I: Ip, BC>: DeviceIdContext<AnyDevice> {
 
 fn enable_ipv6_device_with_config<
     BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-    CC: Ipv6DeviceContext<BC> + GmpHandler<Ipv6, BC> + RsHandler<BC> + DadHandler<BC>,
+    CC: Ipv6DeviceContext<BC> + GmpHandler<Ipv6, BC> + RsHandler<BC> + DadHandler<Ipv6, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1157,7 +1164,7 @@ fn enable_ipv6_device_with_config<
                 .expect("valid link-local address")
             };
 
-            match add_ipv6_addr_subnet_with_config(
+            match add_ip_addr_subnet_with_config(
                 core_ctx,
                 bindings_ctx,
                 device_id,
@@ -1190,7 +1197,7 @@ fn disable_ipv6_device_with_config<
     CC: Ipv6DeviceContext<BC>
         + GmpHandler<Ipv6, BC>
         + RsHandler<BC>
-        + DadHandler<BC>
+        + DadHandler<Ipv6, BC>
         + RouteDiscoveryHandler<BC>
         + SlaacHandler<BC>
         + NudIpHandler<Ipv6, BC>,
@@ -1225,12 +1232,12 @@ fn disable_ipv6_device_with_config<
         .into_iter()
         .for_each(|(addr_id, config)| {
             if config == Ipv6AddrConfig::SLAAC_LINK_LOCAL {
-                del_ipv6_addr_with_reason_with_config(
+                del_ip_addr_inner_and_notify_handler(
                     core_ctx,
                     bindings_ctx,
                     device_id,
-                    DelIpv6Addr::AddressId(addr_id),
-                    DelIpv6AddrReason::ManualAction,
+                    DelIpAddr::AddressId(addr_id),
+                    AddressRemovedReason::Manual,
                     device_config,
                 )
                 .expect("delete listed address")
@@ -1480,83 +1487,23 @@ pub(crate) fn leave_ip_multicast<
     })
 }
 
-/// Adds an IPv4 address and associated subnet to this device.
-pub(crate) fn add_ipv4_addr_subnet<
-    CC: IpDeviceConfigurationContext<Ipv4, BC>,
-    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
+fn add_ip_addr_subnet_with_config<
+    I: IpDeviceIpExt,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
+    CC: IpDeviceStateContext<I, BC> + GmpHandler<I, BC> + DadHandler<I, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    addr_sub: AddrSubnet<Ipv4Addr>,
-    addr_config: Ipv4AddrConfig<BC::Instant>,
-) -> Result<(), ExistsError> {
-    core_ctx.with_ip_device_configuration(device_id, |_config, mut core_ctx| {
-        let address_state = match core_ctx
-            .with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled)
-        {
-            true => IpAddressState::Assigned,
-            false => IpAddressState::Unavailable,
-        };
-
-        let Ipv4AddrConfig { valid_until } = addr_config;
-
-        core_ctx.add_ip_address(device_id, addr_sub, addr_config).map(|id| {
-            assert_eq!(id.addr().addr(), addr_sub.addr().get());
-            bindings_ctx.on_event(IpDeviceEvent::AddressAdded {
-                device: device_id.clone(),
-                addr: addr_sub,
-                state: address_state,
-                valid_until,
-            })
-        })
-    })
-}
-
-/// Adds an IPv6 address (with duplicate address detection) and associated
-/// subnet to this device and joins the address's solicited-node multicast
-/// group.
-///
-/// `config` is the way this address is being configured. See [`AddrConfig`]
-/// for more details.
-pub(crate) fn add_ipv6_addr_subnet<
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-    CC: Ipv6DeviceConfigurationContext<BC>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-    addr_config: Ipv6AddrManualConfig<BC::Instant>,
-) -> Result<(), ExistsError> {
-    core_ctx.with_ipv6_device_configuration(device_id, |config, mut core_ctx| {
-        add_ipv6_addr_subnet_with_config(
-            &mut core_ctx,
-            bindings_ctx,
-            device_id,
-            addr_sub,
-            Ipv6AddrConfig::Manual(addr_config),
-            config,
-        )
-        .map(|_address_id| ())
-    })
-}
-
-fn add_ipv6_addr_subnet_with_config<
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-    CC: IpDeviceStateContext<Ipv6, BC> + GmpHandler<Ipv6, BC> + DadHandler<BC>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-    addr_config: Ipv6AddrConfig<BC::Instant>,
+    addr_sub: AddrSubnet<I::Addr, I::AssignedWitness>,
+    addr_config: I::AddressConfig<BC::Instant>,
     // Not used but required to make sure that the caller is currently holding a
     // a reference to the IP device's IP configuration as a way to prove that
     // caller has synchronized this operation with other accesses to the IP
     // device configuration.
-    _device_config: &Ipv6DeviceConfiguration,
+    _device_config: &I::Configuration,
 ) -> Result<CC::AddressId, ExistsError> {
+    let valid_until = I::get_valid_until(&addr_config);
     let addr_id = core_ctx.add_ip_address(device_id, addr_sub, addr_config)?;
     assert_eq!(addr_id.addr().addr(), addr_sub.addr().get());
 
@@ -1564,7 +1511,7 @@ fn add_ipv6_addr_subnet_with_config<
         core_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
 
     let state = match ip_enabled {
-        true => IpAddressState::Tentative,
+        true => CC::INITIAL_ADDRESS_STATE,
         false => IpAddressState::Unavailable,
     };
 
@@ -1572,7 +1519,7 @@ fn add_ipv6_addr_subnet_with_config<
         device: device_id.clone(),
         addr: addr_sub.to_witness(),
         state,
-        valid_until: addr_config.valid_until(),
+        valid_until,
     });
 
     if ip_enabled {
@@ -1641,46 +1588,81 @@ pub(crate) fn set_ipv6_addr_properties<
     )
 }
 
-/// Removes an IPv4 address and associated subnet from this device.
-pub(crate) fn del_ipv4_addr<
-    CC: IpDeviceConfigurationContext<Ipv4, BC>,
-    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
+/// A handler to abstract side-effects of removing IP device addresses.
+pub trait IpAddressRemovalHandler<I: IpDeviceIpExt, BC: InstantBindingsTypes>:
+    DeviceIdContext<AnyDevice>
+{
+    /// Notifies the handler that the addr `addr` with `config` has been removed
+    /// from `device_id` with `reason`.
+    fn on_address_removed(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        addr_sub: AddrSubnet<I::Addr, I::AssignedWitness>,
+        config: I::AddressConfig<BC::Instant>,
+        reason: AddressRemovedReason,
+    );
+}
+
+/// There's no special action to be taken for removed IPv4 addresses.
+impl<CC: DeviceIdContext<AnyDevice>, BC: InstantBindingsTypes> IpAddressRemovalHandler<Ipv4, BC>
+    for CC
+{
+    fn on_address_removed(
+        &mut self,
+        _bindings_ctx: &mut BC,
+        _device_id: &Self::DeviceId,
+        _addr_sub: AddrSubnet<Ipv4Addr, SpecifiedAddr<Ipv4Addr>>,
+        _config: Ipv4AddrConfig<BC::Instant>,
+        _reason: AddressRemovedReason,
+    ) {
+        // Nothing to do.
+    }
+}
+
+/// Provide the IPv6 implementation for all [`SlaacHandler`] implementations.
+impl<CC: SlaacHandler<BC>, BC: InstantContext> IpAddressRemovalHandler<Ipv6, BC> for CC {
+    fn on_address_removed(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
+        config: Ipv6AddrConfig<BC::Instant>,
+        reason: AddressRemovedReason,
+    ) {
+        match config {
+            Ipv6AddrConfig::Slaac(s) => {
+                SlaacHandler::on_address_removed(self, bindings_ctx, device_id, addr_sub, s, reason)
+            }
+            Ipv6AddrConfig::Manual(_manual_config) => (),
+        }
+    }
+}
+
+pub(crate) enum DelIpAddr<Id, A> {
+    SpecifiedAddr(SpecifiedAddr<A>),
+    AddressId(Id),
+}
+
+// Deletes an IP address from a device, returning the address and its
+// configuration if it was removed.
+fn del_ip_addr_inner<
+    I: IpDeviceIpExt,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
+    CC: IpDeviceStateContext<I, BC> + GmpHandler<I, BC> + DadHandler<I, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    addr: &SpecifiedAddr<Ipv4Addr>,
-) -> Result<(), NotFoundError> {
-    let addr_id = core_ctx.get_address_id(device_id, *addr)?;
-    let (addr_sub, config) = core_ctx.remove_ip_address(device_id, addr_id);
-    let _: Ipv4AddrConfig<_> = config;
-    bindings_ctx.on_event(IpDeviceEvent::AddressRemoved {
-        device: device_id.clone(),
-        addr: addr_sub.addr(),
-        reason: AddressRemovedReason::Manual,
-    });
-    Ok(())
-}
-
-pub(crate) enum DelIpv6Addr<A> {
-    SpecifiedAddr(SpecifiedAddr<Ipv6Addr>),
-    AddressId(A),
-}
-
-fn del_ipv6_addr_with_config<
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-    CC: Ipv6DeviceContext<BC> + GmpHandler<Ipv6, BC> + DadHandler<BC>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device_id: &CC::DeviceId,
-    addr: DelIpv6Addr<CC::AddressId>,
+    addr: DelIpAddr<CC::AddressId, I::Addr>,
     reason: AddressRemovedReason,
-    _config: &Ipv6DeviceConfiguration,
-) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, Ipv6AddrConfig<BC::Instant>), NotFoundError> {
+    // Require configuration lock to do this.
+    _config: &I::Configuration,
+) -> Result<(AddrSubnet<I::Addr, I::AssignedWitness>, I::AddressConfig<BC::Instant>), NotFoundError>
+{
     let addr_id = match addr {
-        DelIpv6Addr::SpecifiedAddr(addr) => core_ctx.get_address_id(device_id, addr)?,
-        DelIpv6Addr::AddressId(id) => id,
+        DelIpAddr::SpecifiedAddr(addr) => core_ctx.get_address_id(device_id, addr)?,
+        DelIpAddr::AddressId(id) => id,
     };
 
     DadHandler::stop_duplicate_address_detection(core_ctx, bindings_ctx, device_id, &addr_id);
@@ -1689,26 +1671,27 @@ fn del_ipv6_addr_with_config<
 
     bindings_ctx.on_event(IpDeviceEvent::AddressRemoved {
         device: device_id.clone(),
-        addr: addr.into_specified(),
+        addr: addr.into(),
         reason,
     });
 
     Ok((addr_sub, addr_config))
 }
 
-/// Removes an IPv6 address and associated subnet from this device.
-pub(crate) fn del_ipv6_addr_with_reason<
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-    CC: Ipv6DeviceConfigurationContext<BC>,
+/// Removes an IP address and associated subnet from this device.
+fn del_ip_addr<
+    I: IpDeviceIpExt,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
+    CC: IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    addr: DelIpv6Addr<CC::AddressId>,
-    reason: DelIpv6AddrReason,
+    addr: DelIpAddr<CC::AddressId, I::Addr>,
+    reason: AddressRemovedReason,
 ) -> Result<(), NotFoundError> {
-    core_ctx.with_ipv6_device_configuration(device_id, |config, mut core_ctx| {
-        del_ipv6_addr_with_reason_with_config(
+    core_ctx.with_ip_device_configuration(device_id, |config, mut core_ctx| {
+        del_ip_addr_inner_and_notify_handler(
             &mut core_ctx,
             bindings_ctx,
             device_id,
@@ -1719,29 +1702,26 @@ pub(crate) fn del_ipv6_addr_with_reason<
     })
 }
 
-/// Removes an IPv6 address and associated subnet from this device.
-fn del_ipv6_addr_with_reason_with_config<
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-    CC: Ipv6DeviceContext<BC> + GmpHandler<Ipv6, BC> + DadHandler<BC> + SlaacHandler<BC>,
+/// Removes an IP address and associated subnet from this device and notifies
+/// the address removal handler.
+fn del_ip_addr_inner_and_notify_handler<
+    I: IpDeviceIpExt,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
+    CC: IpDeviceStateContext<I, BC>
+        + GmpHandler<I, BC>
+        + DadHandler<I, BC>
+        + IpAddressRemovalHandler<I, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
-    addr: DelIpv6Addr<CC::AddressId>,
-    reason: DelIpv6AddrReason,
-    config: &Ipv6DeviceConfiguration,
+    addr: DelIpAddr<CC::AddressId, I::Addr>,
+    reason: AddressRemovedReason,
+    config: &I::Configuration,
 ) -> Result<(), NotFoundError> {
-    del_ipv6_addr_with_config(core_ctx, bindings_ctx, device_id, addr, reason.into(), config).map(
-        |(addr_sub, config)| match config {
-            Ipv6AddrConfig::Slaac(s) => SlaacHandler::on_address_removed(
-                core_ctx,
-                bindings_ctx,
-                device_id,
-                addr_sub,
-                s,
-                reason,
-            ),
-            Ipv6AddrConfig::Manual(_manual_config) => (),
+    del_ip_addr_inner(core_ctx, bindings_ctx, device_id, addr, reason, config).map(
+        |(addr_sub, config)| {
+            core_ctx.on_address_removed(bindings_ctx, device_id, addr_sub, config, reason)
         },
     )
 }
@@ -2525,14 +2505,10 @@ mod tests {
         );
 
         let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
-        add_ipv4_addr_subnet(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &mut ctx.bindings_ctx,
-            &device_id,
-            ipv4_addr_subnet.clone(),
-            Ipv4AddrConfig::default(),
-        )
-        .expect("failed to add IPv4 Address");
+        ctx.core_api()
+            .device_ip::<Ipv4>()
+            .add_ip_addr_subnet(&device_id, ipv4_addr_subnet.clone())
+            .expect("failed to add IPv4 Address");
         assert_eq!(
             ctx.bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressAdded {
@@ -2833,14 +2809,10 @@ mod tests {
             &device_id,
             multicast_addr,
         );
-        add_ipv6_addr_subnet(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &mut ctx.bindings_ctx,
-            &device_id,
-            ll_addr.to_unicast().add_witness::<NonMappedAddr<_>>().unwrap(),
-            Ipv6AddrManualConfig::default(),
-        )
-        .expect("add MAC based IPv6 link-local address");
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&device_id, ll_addr.replace_witness().unwrap())
+            .expect("add MAC based IPv6 link-local address");
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
                 &mut CoreCtx::new_deprecated(&ctx.core_ctx),
@@ -3012,9 +2984,8 @@ mod tests {
 
         enable_ipv6_device(&mut ctx, &device_id, ll_addr, false);
         let weak_device_id = device_id.downgrade();
-        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
-            bindings_ctx.take_events()[..],
+            &ctx.bindings_ctx.take_events()[..],
             [
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
                     device: weak_device_id.clone(),
@@ -3030,15 +3001,11 @@ mod tests {
         );
 
         let assigned_addr = AddrSubnet::new(net_ip_v6!("fe80::1"), 64).unwrap();
-        add_ipv6_addr_subnet(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            &device_id,
-            assigned_addr,
-            Ipv6AddrManualConfig::default(),
-        )
-        .expect("add succeeds");
-
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&device_id, assigned_addr)
+            .expect("add succeeds");
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
             bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
@@ -3065,7 +3032,7 @@ mod tests {
             bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
                 device: weak_device_id,
-                addr: assigned_addr.addr().into(),
+                addr: assigned_addr.addr(),
                 reason: AddressRemovedReason::DadFailed,
             }),]
         );

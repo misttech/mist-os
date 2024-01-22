@@ -1113,13 +1113,8 @@ impl FakeEventDispatcherBuilder {
                 }
                 crate::device::testutil::enable_device(core_ctx, bindings_ctx, &id);
                 match ip_and_subnet {
-                    Some(AddrSubnetEither::V4(addr_sub)) => {
-                        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &id, addr_sub)
-                            .unwrap();
-                    }
-                    Some(AddrSubnetEither::V6(addr_sub)) => {
-                        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &id, addr_sub)
-                            .unwrap();
+                    Some(addr_sub) => {
+                        ctx.core_api().device_ip_any().add_ip_addr_subnet(&id, addr_sub).unwrap();
                     }
                     None => {}
                 }

@@ -15,7 +15,10 @@ use crate::{
     },
     ip::{
         api::{RoutesAnyApi, RoutesApi},
-        device::nud::api::NeighborApi,
+        device::{
+            api::{DeviceIpAnyApi, DeviceIpApi},
+            nud::api::NeighborApi,
+        },
         icmp::socket::IcmpEchoSocketApi,
     },
     transport::{tcp::socket::TcpApi, udp::UdpApi},
@@ -91,6 +94,18 @@ where
     pub fn device_any(self) -> DeviceAnyApi<CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         DeviceAnyApi::new(ctx)
+    }
+
+    /// Gets access to the device IP API for IP version `I``.
+    pub fn device_ip<I: Ip>(self) -> DeviceIpApi<I, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        DeviceIpApi::new(ctx)
+    }
+
+    /// Gets access to the device IP API for all IP versions.
+    pub fn device_ip_any(self) -> DeviceIpAnyApi<CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        DeviceIpAnyApi::new(ctx)
     }
 
     /// Gets access to the transmit queue API for device type `D`.

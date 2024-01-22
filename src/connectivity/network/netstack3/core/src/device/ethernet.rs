@@ -1457,11 +1457,12 @@ mod tests {
             testutil::{
                 set_forwarding_enabled, update_ipv6_configuration, FakeDeviceId, FakeWeakDeviceId,
             },
-            AddIpAddrSubnetError, DeviceId,
+            DeviceId,
         },
         error::NotFoundError,
         ip::{
             device::{
+                api::AddIpAddrSubnetError,
                 nud::{self, api::NeighborApi, DynamicNeighborUpdateSource},
                 slaac::SlaacConfiguration,
                 IpAddressId as _, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
@@ -2255,8 +2256,9 @@ mod tests {
         );
     }
 
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     #[ip_test]
-    fn test_add_remove_ip_addresses<I: Ip + TestIpExt>() {
+    fn test_add_remove_ip_addresses<I: Ip + TestIpExt + crate::IpExt>() {
         let config = I::FAKE_CONFIG;
         let mut ctx = crate::testutil::FakeCtx::default();
 
@@ -2272,8 +2274,7 @@ mod tests {
             )
             .into();
 
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &device);
 
         let ip1 = I::get_other_ip_address(1);
         let ip2 = I::get_other_ip_address(2);
@@ -2283,65 +2284,57 @@ mod tests {
         let as1 = AddrSubnet::new(ip1.get(), prefix).unwrap();
         let as2 = AddrSubnet::new(ip2.get(), prefix).unwrap();
 
-        assert!(!contains_addr(core_ctx, &device, ip1));
-        assert!(!contains_addr(core_ctx, &device, ip2));
-        assert!(!contains_addr(core_ctx, &device, ip3));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip2));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Add ip1 (ok)
-        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, as1).unwrap();
-        assert!(contains_addr(core_ctx, &device, ip1));
-        assert!(!contains_addr(core_ctx, &device, ip2));
-        assert!(!contains_addr(core_ctx, &device, ip3));
+        ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, as1).unwrap();
+        assert!(contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip2));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Add ip2 (ok)
-        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, as2).unwrap();
-        assert!(contains_addr(core_ctx, &device, ip1));
-        assert!(contains_addr(core_ctx, &device, ip2));
-        assert!(!contains_addr(core_ctx, &device, ip3));
+        ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, as2).unwrap();
+        assert!(contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(contains_addr(&ctx.core_ctx, &device, ip2));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Del ip1 (ok)
-        crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, ip1).unwrap();
-        assert!(!contains_addr(core_ctx, &device, ip1));
-        assert!(contains_addr(core_ctx, &device, ip2));
-        assert!(!contains_addr(core_ctx, &device, ip3));
+        ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap();
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(contains_addr(&ctx.core_ctx, &device, ip2));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Del ip1 again (ip1 not found)
-        assert_eq!(
-            crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, ip1),
-            Err(NotFoundError)
-        );
-        assert!(!contains_addr(core_ctx, &device, ip1));
-        assert!(contains_addr(core_ctx, &device, ip2));
-        assert!(!contains_addr(core_ctx, &device, ip3));
+        assert_eq!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1), Err(NotFoundError));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(contains_addr(&ctx.core_ctx, &device, ip2));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Add ip2 again (ip2 already exists)
         assert_eq!(
-            crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, as2).unwrap_err(),
-            AddIpAddrSubnetError::Exists,
+            ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, as2),
+            Err(AddIpAddrSubnetError::Exists),
         );
-        assert!(!contains_addr(core_ctx, &device, ip1));
-        assert!(contains_addr(core_ctx, &device, ip2));
-        assert!(!contains_addr(core_ctx, &device, ip3));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(contains_addr(&ctx.core_ctx, &device, ip2));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
 
         // Add ip2 with different subnet (ip2 already exists)
         assert_eq!(
-            crate::device::add_ip_addr_subnet(
-                core_ctx,
-                bindings_ctx,
-                &device,
-                AddrSubnet::new(ip2.get(), prefix - 1).unwrap()
-            )
-            .unwrap_err(),
-            AddIpAddrSubnetError::Exists,
+            ctx.core_api()
+                .device_ip::<I>()
+                .add_ip_addr_subnet(&device, AddrSubnet::new(ip2.get(), prefix - 1).unwrap()),
+            Err(AddIpAddrSubnetError::Exists),
         );
-        assert!(!contains_addr(core_ctx, &device, ip1));
-        assert!(contains_addr(core_ctx, &device, ip2));
-        assert!(!contains_addr(core_ctx, &device, ip3));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(contains_addr(&ctx.core_ctx, &device, ip2));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip3));
     }
 
     fn receive_simple_ip_packet_test<A: IpAddress>(
-        core_ctx: &mut crate::testutil::FakeCoreCtx,
-        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        ctx: &mut crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         src_ip: A,
         dst_ip: A,
@@ -2349,6 +2342,7 @@ mod tests {
     ) where
         A::Version: TestIpExt,
     {
+        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = ctx;
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(<<A::Version as IpExt>::PacketBuilder as IpPacketBuilder<_>>::new(
                 src_ip,
@@ -2374,8 +2368,9 @@ mod tests {
         );
     }
 
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     #[ip_test]
-    fn test_multiple_ip_addresses<I: Ip + TestIpExt>() {
+    fn test_multiple_ip_addresses<I: Ip + TestIpExt + crate::IpExt>() {
         let config = I::FAKE_CONFIG;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
@@ -2389,58 +2384,51 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &device);
 
         let ip1 = I::get_other_ip_address(1);
         let ip2 = I::get_other_ip_address(2);
         let from_ip = I::get_other_ip_address(3).get();
 
-        assert!(!contains_addr(core_ctx, &device, ip1));
-        assert!(!contains_addr(core_ctx, &device, ip2));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip2));
 
         // Should not receive packets on any IP.
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 0);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 0);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 0);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 0);
 
         // Add ip1 to device.
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            AddrSubnet::new(ip1.get(), I::Addr::BYTES * 8).unwrap(),
-        )
-        .unwrap();
-        assert!(contains_addr(core_ctx, &device, ip1));
-        assert!(!contains_addr(core_ctx, &device, ip2));
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet(&device, AddrSubnet::new(ip1.get(), I::Addr::BYTES * 8).unwrap())
+            .unwrap();
+        assert!(contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip2));
 
         // Should receive packets on ip1 but not ip2
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 1);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 1);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 1);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 1);
 
         // Add ip2 to device.
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            AddrSubnet::new(ip2.get(), I::Addr::BYTES * 8).unwrap(),
-        )
-        .unwrap();
-        assert!(contains_addr(core_ctx, &device, ip1));
-        assert!(contains_addr(core_ctx, &device, ip2));
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet(&device, AddrSubnet::new(ip2.get(), I::Addr::BYTES * 8).unwrap())
+            .unwrap();
+        assert!(contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(contains_addr(&ctx.core_ctx, &device, ip2));
 
         // Should receive packets on both ips
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 2);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 3);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 2);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 3);
 
         // Remove ip1
-        crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, ip1).unwrap();
-        assert!(!contains_addr(core_ctx, &device, ip1));
-        assert!(contains_addr(core_ctx, &device, ip2));
+        ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip1).unwrap();
+        assert!(!contains_addr(&ctx.core_ctx, &device, ip1));
+        assert!(contains_addr(&ctx.core_ctx, &device, ip2));
 
         // Should receive packets on ip2
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 3);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 4);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 3);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 4);
     }
 
     fn join_ip_multicast<A: IpAddress, BC: BindingsContext>(
@@ -2614,27 +2602,28 @@ mod tests {
         // Add ip1 to the device.
         //
         // Should get packets destined for the solicited node address and ip1.
-        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, addr_sub1).unwrap();
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 1);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 1);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, sn_addr, 2);
+        ctx.core_api().device_ip::<Ipv6>().add_ip_addr_subnet(&device, addr_sub1).unwrap();
+
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 1);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 1);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, sn_addr, 2);
 
         // Add ip2 to the device.
         //
         // Should get packets destined for the solicited node address, ip1 and
         // ip2.
-        crate::device::add_ip_addr_subnet(core_ctx, bindings_ctx, &device, addr_sub2).unwrap();
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 3);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 4);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, sn_addr, 5);
+        ctx.core_api().device_ip::<Ipv6>().add_ip_addr_subnet(&device, addr_sub2).unwrap();
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 3);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 4);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, sn_addr, 5);
 
         // Remove ip1 from the device.
         //
         // Should get packets destined for the solicited node address and ip2.
-        crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, ip1).unwrap();
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip1.get(), 5);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, ip2.get(), 6);
-        receive_simple_ip_packet_test(core_ctx, bindings_ctx, &device, from_ip, sn_addr, 7);
+        ctx.core_api().device_ip::<Ipv6>().del_ip_addr(&device, ip1).unwrap();
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip1.get(), 5);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 6);
+        receive_simple_ip_packet_test(&mut ctx, &device, from_ip, sn_addr, 7);
     }
 
     #[test]
@@ -2687,13 +2676,13 @@ mod tests {
                 .collect::<Vec<UnicastAddr<_>>>(),
             [config.local_mac.to_ipv6_link_local().addr().get()]
         );
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            AddrSubnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(
+                &device,
+                AddrSubnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), 128).unwrap(),
+            )
+            .unwrap();
         // Assert that the new address got added.
         let addr_subs: Vec<_> = eth_device
             .ip

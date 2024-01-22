@@ -2835,6 +2835,13 @@ impl<S: IpAddress, A: Witness<S> + Copy> AddrSubnet<S, A> {
         let addr = B::new(self.addr)?;
         Some(AddrSubnet { addr, subnet: self.subnet })
     }
+
+    /// Replaces the [`AddrSubnet`] witness.
+    #[inline]
+    pub fn replace_witness<B: Witness<S> + Copy>(&self) -> Option<AddrSubnet<S, B>> {
+        let addr = B::new(self.addr.get())?;
+        Some(AddrSubnet { addr, subnet: self.subnet })
+    }
 }
 
 impl<S: IpAddress, A: Witness<S> + Copy + Display> Display for AddrSubnet<S, A> {

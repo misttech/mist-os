@@ -74,15 +74,15 @@ use netstack3_core::{
     handle_timer,
     icmp::{self, IcmpEchoBindingsContext},
     ip::{
-        AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
+        AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
         Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
         Lifetime, SlaacConfiguration,
     },
     neighbor,
     routes::RawMetric,
     udp::{self, UdpBindingsContext},
-    BindingsContext, EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext,
-    SyncCtx, TimerContext, TimerId, TracingContext,
+    EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, SyncCtx, TimerContext,
+    TimerId, TracingContext,
 };
 
 mod ctx {
@@ -785,10 +785,9 @@ impl BindingsCtx {
     }
 }
 
-fn add_loopback_ip_addrs<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    loopback: &DeviceId<BC>,
+fn add_loopback_ip_addrs(
+    ctx: &mut Ctx,
+    loopback: &DeviceId<BindingsCtx>,
 ) -> Result<(), NetstackError> {
     for addr_subnet in [
         AddrSubnetEither::V4(
@@ -800,13 +799,14 @@ fn add_loopback_ip_addrs<BC: BindingsContext>(
                 .expect("error creating IPv6 loopback AddrSub"),
         ),
     ] {
-        netstack3_core::device::add_ip_addr_subnet(core_ctx, bindings_ctx, loopback, addr_subnet)
-            .map_err(|e| match e {
-                netstack3_core::device::AddIpAddrSubnetError::Exists => NetstackError::Exists,
-                netstack3_core::device::AddIpAddrSubnetError::InvalidAddr => {
+        ctx.api().device_ip_any().add_ip_addr_subnet(loopback, addr_subnet).map_err(
+            |e| match e {
+                AddIpAddrSubnetError::Exists => NetstackError::Exists,
+                AddIpAddrSubnetError::InvalidAddr => {
                     panic!("loopback address should not be invalid")
                 }
-            })?
+            },
+        )?
     }
     Ok(())
 }
@@ -989,9 +989,8 @@ impl Netstack {
             )
             .unwrap()
             .apply(core_ctx, bindings_ctx);
-        add_loopback_ip_addrs(core_ctx, bindings_ctx, &loopback)
-            .expect("error adding loopback addresses");
-        add_loopback_routes(bindings_ctx, &loopback).await;
+        add_loopback_ip_addrs(&mut self.ctx, &loopback).expect("error adding loopback addresses");
+        add_loopback_routes(self.ctx.bindings_ctx_mut(), &loopback).await;
 
         let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
 

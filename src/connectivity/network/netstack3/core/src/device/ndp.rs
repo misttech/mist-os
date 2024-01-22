@@ -148,7 +148,6 @@ mod tests {
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
-            add_ip_addr_subnet, del_ip_addr,
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
             link::LinkAddress,
             testutil::{
@@ -352,30 +351,29 @@ mod tests {
             req,
         ));
         // Manually assigning the addresses.
-        net.with_context("remote", |Ctx { core_ctx, bindings_ctx }| {
-            add_ip_addr_subnet(
-                core_ctx,
-                bindings_ctx,
-                &remote_device_id,
-                AddrSubnet::<Ipv6Addr, _>::new(remote_ip().into(), 128).unwrap(),
-            )
-            .unwrap();
-
-            assert_empty(bindings_ctx.frames_sent().iter());
+        net.with_context("remote", |ctx| {
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .add_ip_addr_subnet(
+                    &remote_device_id,
+                    AddrSubnet::new(remote_ip().into(), 128).unwrap(),
+                )
+                .unwrap();
+            assert_empty(ctx.bindings_ctx.frames_sent().iter());
         });
-        net.with_context("local", |Ctx { core_ctx, bindings_ctx }| {
-            add_ip_addr_subnet(
-                core_ctx,
-                bindings_ctx,
-                &local_device_id,
-                AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
-            )
-            .unwrap();
-
+        net.with_context("local", |mut ctx| {
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .add_ip_addr_subnet(
+                    &local_device_id,
+                    AddrSubnet::new(local_ip().into(), 128).unwrap(),
+                )
+                .unwrap();
+            let Ctx { core_ctx, bindings_ctx } = &mut ctx;
             assert_empty(bindings_ctx.frames_sent().iter());
 
             crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
-                &mut CoreCtx::new_deprecated(&*core_ctx),
+                &mut CoreCtx::new_deprecated(core_ctx),
                 bindings_ctx,
                 SendIpPacketMeta {
                     device: &local_device_id,
@@ -564,11 +562,15 @@ mod tests {
         };
         let addr = AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap();
         let multicast_addr = local_ip().to_solicited_node_address();
-        net.with_context("local", |Ctx { core_ctx, bindings_ctx }| {
-            let _: Ipv6DeviceConfigurationUpdate =
-                update_ipv6_configuration(core_ctx, bindings_ctx, &local_device_id, update)
-                    .unwrap();
-            add_ip_addr_subnet(core_ctx, bindings_ctx, &local_device_id, addr).unwrap();
+        net.with_context("local", |ctx| {
+            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+                &ctx.core_ctx,
+                &mut ctx.bindings_ctx,
+                &local_device_id,
+                update,
+            )
+            .unwrap();
+            ctx.core_api().device_ip::<Ipv6>().add_ip_addr_subnet(&local_device_id, addr).unwrap();
         });
         net.with_context("remote", |Ctx { core_ctx, bindings_ctx }| {
             let _: Ipv6DeviceConfigurationUpdate =
@@ -592,8 +594,8 @@ mod tests {
             Some(true)
         );
 
-        net.with_context("remote", |Ctx { core_ctx, bindings_ctx }| {
-            add_ip_addr_subnet(core_ctx, bindings_ctx, &remote_device_id, addr).unwrap();
+        net.with_context("remote", |ctx| {
+            ctx.core_api().device_ip::<Ipv6>().add_ip_addr_subnet(&remote_device_id, addr).unwrap();
         });
         // Local & remote should be in the multicast group.
         assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
@@ -642,10 +644,9 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &dev_id,
             Ipv6DeviceConfigurationUpdate {
                 dad_transmits: Some(NonZeroU8::new(1)),
@@ -658,25 +659,19 @@ mod tests {
         )
         .unwrap();
         let addr = local_ip();
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            AddrSubnet::<Ipv6Addr, _>::new(addr.into(), 128).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, addr,), Some(false));
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(addr.into(), 128).unwrap())
+            .unwrap();
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, addr,), Some(false));
 
         let addr = remote_ip();
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, addr,), None,);
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            AddrSubnet::<Ipv6Addr, _>::new(addr.into(), 128).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, addr,), Some(false));
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, addr,), None,);
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(addr.into(), 128).unwrap())
+            .unwrap();
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, addr,), Some(false));
 
         // Clear all device references.
         ctx.core_api().device().remove_device(dev_id.unwrap_ethernet()).into_removed();
@@ -712,13 +707,11 @@ mod tests {
             },
         )
         .unwrap();
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         for _ in 0..3 {
             assert_eq!(
                 bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
@@ -745,18 +738,22 @@ mod tests {
             }),
             ..Default::default()
         };
-        net.with_context("local", |Ctx { core_ctx, bindings_ctx }| {
-            let _: Ipv6DeviceConfigurationUpdate =
-                update_ipv6_configuration(core_ctx, bindings_ctx, &local_device_id, update)
-                    .unwrap();
-
-            add_ip_addr_subnet(
-                core_ctx,
-                bindings_ctx,
+        net.with_context("local", |ctx| {
+            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
+                &ctx.core_ctx,
+                &mut ctx.bindings_ctx,
                 &local_device_id,
-                AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
+                update,
             )
             .unwrap();
+
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .add_ip_addr_subnet(
+                    &local_device_id,
+                    AddrSubnet::new(local_ip().into(), 128).unwrap(),
+                )
+                .unwrap();
         });
         net.with_context("remote", |Ctx { core_ctx, bindings_ctx }| {
             let _: Ipv6DeviceConfigurationUpdate =
@@ -776,14 +773,14 @@ mod tests {
                 expected_timer_id
             );
         });
-        net.with_context("remote", |Ctx { core_ctx, bindings_ctx }| {
-            add_ip_addr_subnet(
-                core_ctx,
-                bindings_ctx,
-                &remote_device_id,
-                AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
-            )
-            .unwrap();
+        net.with_context("remote", |ctx| {
+            ctx.core_api()
+                .device_ip::<Ipv6>()
+                .add_ip_addr_subnet(
+                    &remote_device_id,
+                    AddrSubnet::new(local_ip().into(), 128).unwrap(),
+                )
+                .unwrap();
         });
         // The local host should have sent out 3 packets while the remote one
         // should only have sent out 1.
@@ -880,13 +877,11 @@ mod tests {
         .unwrap();
 
         // Add an IP.
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
         assert_eq!(bindings_ctx.frames_sent().len(), 1);
 
@@ -902,13 +897,11 @@ mod tests {
         assert_eq!(bindings_ctx.frames_sent().len(), 2);
 
         // Add another IP
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            AddrSubnet::<Ipv6Addr, _>::new(remote_ip().into(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(remote_ip().into(), 128).unwrap())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
         assert_matches!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(bindings_ctx.frames_sent().len(), 3);
@@ -982,13 +975,11 @@ mod tests {
         assert_empty(bindings_ctx.frames_sent().iter());
 
         // Add an IP.
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
         assert_eq!(bindings_ctx.frames_sent().len(), 1);
 
@@ -1004,13 +995,11 @@ mod tests {
         assert_eq!(bindings_ctx.frames_sent().len(), 2);
 
         // Add another IP
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            AddrSubnet::<Ipv6Addr, _>::new(remote_ip().into(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&dev_id, AddrSubnet::new(remote_ip().into(), 128).unwrap())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
         assert_matches!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(bindings_ctx.frames_sent().len(), 3);
@@ -1029,7 +1018,11 @@ mod tests {
         assert_eq!(bindings_ctx.frames_sent().len(), 5);
 
         // Remove local ip
-        del_ip_addr(core_ctx, bindings_ctx, &dev_id, local_ip().into_specified()).unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .del_ip_addr(&dev_id, local_ip().into_specified())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(get_address_assigned(core_ctx, &dev_id, local_ip()), None);
         assert_matches!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(bindings_ctx.frames_sent().len(), 5);
@@ -1461,13 +1454,14 @@ mod tests {
         // Before the next one, lets assign an IP address (DAD won't be
         // performed so it will be assigned immediately). The router solicitation
         // message should continue to use the link-local address.
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            AddrSubnet::new(fake_config.local_ip.get(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(
+                &device_id,
+                AddrSubnet::new(fake_config.local_ip.get(), 128).unwrap(),
+            )
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let time = bindings_ctx.now();
         assert_eq!(
             bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
@@ -1699,13 +1693,12 @@ mod tests {
 
         // Updating the IP should resolve immediately since DAD is turned off by
         // `FakeEventDispatcherBuilder::build`.
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            AddrSubnet::new(fake_config.local_ip.get(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&device, AddrSubnet::new(fake_config.local_ip.get(), 128).unwrap())
+            .unwrap();
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let device_id = device.clone().try_into().unwrap();
         assert_eq!(get_address_assigned(core_ctx, &device, local_ip()), Some(true));
         assert_empty(bindings_ctx.frames_sent().iter());
@@ -1729,13 +1722,11 @@ mod tests {
         .unwrap();
 
         // Updating the IP should start the DAD process.
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            AddrSubnet::new(fake_config.remote_ip.get(), 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&device, AddrSubnet::new(fake_config.remote_ip.get(), 128).unwrap())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(get_address_assigned(core_ctx, &device, local_ip()), Some(true));
         assert_eq!(get_address_assigned(core_ctx, &device, remote_ip()), Some(false));
         assert_eq!(bindings_ctx.frames_sent().len(), 1);
@@ -1771,18 +1762,15 @@ mod tests {
         // Updating the IP should resolve immediately since DAD has just been
         // turned off.
         let new_ip = Ipv6::get_other_ip_address(3);
-        add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            AddrSubnet::new(new_ip.get(), 128).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(get_address_assigned(core_ctx, &device, local_ip()), Some(true));
-        assert_eq!(get_address_assigned(core_ctx, &device, remote_ip()), Some(true));
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&device, AddrSubnet::new(new_ip.get(), 128).unwrap())
+            .unwrap();
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, remote_ip()), Some(true));
         assert_eq!(
             get_address_assigned(
-                core_ctx,
+                &ctx.core_ctx,
                 &device,
                 NonMappedAddr::new(new_ip.try_into().unwrap()).unwrap()
             ),
@@ -2253,14 +2241,11 @@ mod tests {
         // Now that we know what address will be assigned, create a new instance
         // of the stack and assign that same address manually.
         let (mut ctx, device, _config) = initialize_with_temporary_addresses_enabled();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&device, conflicted_addr.to_witness())
+            .expect("adding address failed");
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            conflicted_addr.to_witness(),
-        )
-        .expect("adding address failed");
 
         // Sanity check: `conflicted_addr` is already assigned on the device.
         assert_matches!(
@@ -3771,9 +3756,12 @@ mod tests {
         ]);
 
         // Deleting the address should cancel its SLAAC timers.
-        del_ip_addr(core_ctx, bindings_ctx, &device, expected_addr.into_specified()).unwrap();
-        assert_empty(get_global_ipv6_addrs(core_ctx, &device));
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .del_ip_addr(&device, expected_addr.into_specified())
+            .unwrap();
+        assert_empty(get_global_ipv6_addrs(&ctx.core_ctx, &device));
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
     #[test]
@@ -3783,10 +3771,13 @@ mod tests {
         // only observe timers for temporary addresses.
         let (mut ctx, device, expected_addr) =
             test_host_generate_temporary_slaac_address(INFINITE_LIFETIME, INFINITE_LIFETIME);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Deleting the address should cancel its SLAAC timers.
-        del_ip_addr(core_ctx, bindings_ctx, &device, expected_addr.into_specified()).unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .del_ip_addr(&device, expected_addr.into_specified())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_empty(get_global_ipv6_addrs(core_ctx, &device).into_iter().filter(
             |e| match e.config {
                 Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,

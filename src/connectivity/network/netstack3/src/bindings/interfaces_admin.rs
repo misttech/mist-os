@@ -55,9 +55,9 @@ use netstack3_core::{
         DeviceConfiguration, DeviceConfigurationUpdate, DeviceConfigurationUpdateError, DeviceId,
     },
     ip::{
-        AddrSubnetAndManualConfigEither, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
-        Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate,
-        Lifetime, UpdateIpConfigurationError,
+        AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfigurationUpdate,
+        Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
+        Ipv6DeviceConfigurationUpdate, Lifetime, UpdateIpConfigurationError,
     },
 };
 
@@ -782,13 +782,7 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
         // TODO(https://fxbug.dev/135102): Rather than falling back in this way,
         // make it impossible to make this mistake by centralizing the
         // "source of truth" for addresses on a device.
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        return match netstack3_core::device::del_ip_addr(
-            core_ctx,
-            bindings_ctx,
-            &core_id,
-            specified_addr,
-        ) {
+        return match ctx.api().device_ip_any().del_ip_addr(&core_id, specified_addr) {
             Ok(()) => true,
             Err(netstack3_core::error::NotFoundError) => false,
         };
@@ -1215,22 +1209,16 @@ async fn run_address_state_provider(
     // for the address to exist in core (e.g. auto-configured addresses such as
     // loopback or SLAAC).
     let add_to_core_result = {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let device_id = bindings_ctx.devices.get_core_id(id).expect("interface not found");
-        netstack3_core::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            addr_subnet_and_config,
-        )
+        let device_id = ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");
+        ctx.api().device_ip_any().add_ip_addr_subnet(&device_id, addr_subnet_and_config)
     };
     let (state_to_remove_from_core, removal_reason) = match add_to_core_result {
         Err(e) => {
             let removal_reason = match e {
-                netstack3_core::device::AddIpAddrSubnetError::Exists => {
+                AddIpAddrSubnetError::Exists => {
                     fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
                 }
-                netstack3_core::device::AddIpAddrSubnetError::InvalidAddr => {
+                AddIpAddrSubnetError::InvalidAddr => {
                     fnet_interfaces_admin::AddressRemovalReason::Invalid
                 }
             };
@@ -1339,7 +1327,7 @@ async fn run_address_state_provider(
     };
 
     // Remove the address.
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+    let bindings_ctx = ctx.bindings_ctx();
     let core_id = bindings_ctx.devices.get_core_id(id).expect("missing device info for interface");
     // Don't drop the worker yet; it's what's driving THIS function.
     let _worker: futures::future::Shared<fuchsia_async::Task<()>> =
@@ -1364,10 +1352,7 @@ async fn run_address_state_provider(
     }
 
     if remove_address {
-        assert_matches!(
-            netstack3_core::device::del_ip_addr(core_ctx, bindings_ctx, &device_id, address),
-            Ok(())
-        );
+        assert_matches!(ctx.api().device_ip_any().del_ip_addr(&device_id, address), Ok(()));
     }
 
     if let Some(removal_reason) = removal_reason {

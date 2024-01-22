@@ -69,7 +69,7 @@ pub mod device {
     // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
     pub use base::{
-        add_ip_addr_subnet, del_ip_addr, get_all_ip_addr_subnets, get_ipv4_configuration_and_flags,
+        get_all_ip_addr_subnets, get_ipv4_configuration_and_flags,
         get_ipv6_configuration_and_flags, get_routing_metric, inspect_devices,
         new_ipv4_configuration_update, new_ipv6_configuration_update, set_ip_addr_properties,
     };
@@ -77,8 +77,8 @@ pub mod device {
     // Re-exported types.
     pub use api::{RemoveDeviceResult, RemoveDeviceResultWithContext};
     pub use base::{
-        AddIpAddrSubnetError, DeviceCounters, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
-        DeviceSendFrameError, DevicesVisitor, InspectDeviceState,
+        DeviceCounters, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
+        DevicesVisitor, InspectDeviceState,
     };
     pub use config::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
@@ -150,11 +150,9 @@ pub mod ip {
     pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
     pub use base::{IpLayerEvent, ResolveRouteError};
     pub use device::{
+        api::{AddIpAddrSubnetError, AddrSubnetAndManualConfigEither},
         slaac::{SlaacConfiguration, TemporarySlaacAddressConfiguration},
-        state::{
-            AddrSubnetAndManualConfigEither, Ipv4AddrConfig, Ipv6AddrManualConfig,
-            Ipv6DeviceConfiguration, Lifetime,
-        },
+        state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Lifetime},
         AddressRemovedReason, IpAddressState, IpDeviceConfigurationUpdate, IpDeviceEvent,
         Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
     };

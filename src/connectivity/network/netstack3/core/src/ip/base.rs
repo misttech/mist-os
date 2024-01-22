@@ -2778,7 +2778,7 @@ fn lookup_route_table<
 
 /// The metadata associated with an outgoing IP packet.
 #[cfg_attr(test, derive(Debug))]
-pub(crate) struct SendIpPacketMeta<I: packet_formats::ip::IpExt, D, Src> {
+pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt, D, Src> {
     /// The outgoing device.
     pub(crate) device: D,
 
@@ -3495,9 +3495,8 @@ mod tests {
         },
         ip::{
             device::{
-                slaac::SlaacConfiguration, state::AddrSubnetAndManualConfigEither,
-                IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-                Ipv6DeviceConfigurationUpdate,
+                slaac::SlaacConfiguration, IpDeviceConfigurationUpdate,
+                Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
             },
             testutil::is_in_ip_multicast,
             types::{AddableEntryEither, AddableMetric, RawMetric},
@@ -4898,13 +4897,11 @@ mod tests {
 
         // Set the new IP (this should trigger DAD).
         let ip = config.local_ip.get();
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            AddrSubnet::new(ip, 128).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&device, AddrSubnet::new(ip, 128).unwrap())
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let buf = Buf::new(vec![0; 10], ..)
             .encapsulate(Ipv6PacketBuilder::new(config.remote_ip, ip, 64, IpProto::Udp.into()))
@@ -5265,8 +5262,9 @@ mod tests {
         I::get_other_ip_address(27)
     }
 
-    fn make_test_ctx<I: Ip + TestIpExt>() -> (Ctx<FakeBindingsCtx>, Vec<DeviceId<FakeBindingsCtx>>)
-    {
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn make_test_ctx<I: Ip + TestIpExt + crate::IpExt>(
+    ) -> (Ctx<FakeBindingsCtx>, Vec<DeviceId<FakeBindingsCtx>>) {
         let mut builder = FakeEventDispatcherBuilder::default();
         for device in [Device::First, Device::Second] {
             let ip: SpecifiedAddr<I::Addr> = device.ip_address().into();
@@ -5286,18 +5284,14 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_id);
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &loopback_id,
-            AddrSubnetAndManualConfigEither::new::<I>(
+        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &loopback_id);
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet(
+                &loopback_id,
                 AddrSubnet::from_witness(I::LOOPBACK_ADDRESS, I::LOOPBACK_SUBNET.prefix()).unwrap(),
-                Default::default(),
-            ),
-        )
-        .unwrap();
+            )
+            .unwrap();
         assert_eq!(device_ids.len(), Device::Loopback.index());
         device_ids.push(loopback_id);
         (ctx, device_ids)
@@ -5396,15 +5390,13 @@ mod tests {
                 Device::First.ip_address(),
                 Ok(ResolvedRoute {src_addr: Device::Second.ip_address(), device: Device::Loopback,
                     next_hop: NextHop::RemoteAsNeighbor }); "local delivery cross device")]
-    fn lookup_route<I: Ip + TestIpExt + IpDeviceIpExt + IpLayerIpExt>(
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn lookup_route<I: Ip + TestIpExt + crate::IpExt>(
         local_ip: Option<IpDeviceAddr<I::Addr>>,
         egress_device: Option<Device>,
         dest_ip: RoutableIpAddr<I::Addr>,
         expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,
-    ) where
-        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
-            IpSocketContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
-    {
+    ) {
         set_logger_for_test();
 
         let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = make_test_ctx::<I>();
@@ -5453,14 +5445,12 @@ mod tests {
     #[test_case(None, Some(Device::Second),
                 Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Second,
                     next_hop: NextHop::RemoteAsNeighbor }); "constrain to second device")]
-    fn lookup_route_multiple_devices_with_route<I: Ip + TestIpExt + IpDeviceIpExt + IpLayerIpExt>(
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn lookup_route_multiple_devices_with_route<I: Ip + TestIpExt + crate::IpExt>(
         local_ip: Option<IpDeviceAddr<I::Addr>>,
         egress_device: Option<Device>,
         expected_result: Result<ResolvedRoute<I, Device>, ResolveRouteError>,
-    ) where
-        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
-            IpSocketContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
-    {
+    ) {
         set_logger_for_test();
 
         let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = make_test_ctx::<I>();

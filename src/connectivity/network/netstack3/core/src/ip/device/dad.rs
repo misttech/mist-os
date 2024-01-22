@@ -7,7 +7,7 @@
 use core::num::NonZeroU8;
 
 use net_types::{
-    ip::{Ipv6, Ipv6Addr},
+    ip::{Ipv4, Ipv6, Ipv6Addr},
     MulticastAddr, UnicastAddr, Witness as _,
 };
 use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
@@ -16,7 +16,10 @@ use tracing::debug;
 use crate::{
     context::{EventContext, TimerContext, TimerHandler},
     device::{AnyDevice, DeviceIdContext},
-    ip::device::{state::Ipv6DadState, IpAddressId as _, IpDeviceAddressIdContext},
+    ip::device::{
+        state::Ipv6DadState, IpAddressId as _, IpAddressState, IpDeviceAddressIdContext,
+        IpDeviceIpExt,
+    },
 };
 
 /// A timer ID for duplicate address detection.
@@ -140,7 +143,13 @@ impl<DeviceId, BC: TimerContext<DadTimerId<DeviceId>> + EventContext<DadEvent<De
 }
 
 /// An implementation for Duplicate Address Detection.
-pub trait DadHandler<BC>: DeviceIdContext<AnyDevice> + IpDeviceAddressIdContext<Ipv6> {
+pub trait DadHandler<I: IpDeviceIpExt, BC>:
+    DeviceIdContext<AnyDevice> + IpDeviceAddressIdContext<I>
+{
+    // TODO(https://fxbug.dev/42077260): This can probably be removed when we
+    // can do DAD over IPv4.
+    const INITIAL_ADDRESS_STATE: IpAddressState;
+
     /// Starts duplicate address detection.
     ///
     /// # Panics
@@ -296,7 +305,32 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
     );
 }
 
-impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<BC> for CC {
+// TODO(https://fxbug.dev/42077260): Actually support DAD for IPv4.
+impl<BC, CC> DadHandler<Ipv4, BC> for CC
+where
+    CC: IpDeviceAddressIdContext<Ipv4> + DeviceIdContext<AnyDevice>,
+{
+    const INITIAL_ADDRESS_STATE: IpAddressState = IpAddressState::Assigned;
+    fn start_duplicate_address_detection(
+        &mut self,
+        _bindings_ctx: &mut BC,
+        _device_id: &Self::DeviceId,
+        _addr: &Self::AddressId,
+    ) {
+    }
+
+    fn stop_duplicate_address_detection(
+        &mut self,
+        _bindings_ctx: &mut BC,
+        _device_id: &Self::DeviceId,
+        _addr: &Self::AddressId,
+    ) {
+    }
+}
+
+impl<BC: DadBindingsContext<CC::DeviceId>, CC: DadContext<BC>> DadHandler<Ipv6, BC> for CC {
+    const INITIAL_ADDRESS_STATE: IpAddressState = IpAddressState::Tentative;
+
     fn start_duplicate_address_detection(
         &mut self,
         bindings_ctx: &mut BC,

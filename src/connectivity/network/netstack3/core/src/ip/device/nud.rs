@@ -5059,13 +5059,11 @@ mod tests {
             },
         )
         .unwrap();
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            AddrSubnet::new(LOCAL_IP, Ipv6Addr::BYTES * 8).unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(&device_id, AddrSubnet::new(LOCAL_IP, Ipv6Addr::BYTES * 8).unwrap())
+            .unwrap();
+        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         if let Some(NonZeroU8 { .. }) = dad_transmits {
             // Take DAD message.
             assert_matches!(

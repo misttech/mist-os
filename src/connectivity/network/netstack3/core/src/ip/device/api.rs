@@ -1,0 +1,240 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+//! Device IP API.
+
+use net_types::{
+    ip::{
+        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant,
+        IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+    },
+    SpecifiedAddr,
+};
+use tracing::trace;
+
+use crate::{
+    context::{ContextPair, InstantBindingsTypes},
+    device::{AnyDevice, DeviceIdContext},
+    error::ExistsError,
+    error::NotFoundError,
+    ip::{
+        self,
+        device::{
+            state::{Ipv4AddrConfig, Ipv6AddrManualConfig},
+            DelIpAddr, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
+        },
+        AddressRemovedReason,
+    },
+};
+
+/// Provides an API for dealing with devices at the IP layer, aka interfaces.
+pub struct DeviceIpApi<I: Ip, C>(C, IpVersionMarker<I>);
+
+impl<I: Ip, C> DeviceIpApi<I, C> {
+    pub(crate) fn new(ctx: C) -> Self {
+        Self(ctx, IpVersionMarker::new())
+    }
+}
+
+impl<I, C> DeviceIpApi<I, C>
+where
+    I: IpDeviceIpExt,
+    C: ContextPair,
+    C::CoreContext: IpDeviceConfigurationContext<I, C::BindingsContext>,
+    C::BindingsContext:
+        IpDeviceBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+{
+    fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
+        let Self(pair, IpVersionMarker { .. }) = self;
+        pair.contexts()
+    }
+
+    /// Like [`DeviceIpApi::add_ip_addr_subnet_with_config`] with a default
+    /// address configuration.
+    pub fn add_ip_addr_subnet(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        addr_subnet: AddrSubnet<I::Addr>,
+    ) -> Result<(), AddIpAddrSubnetError> {
+        self.add_ip_addr_subnet_with_config(device, addr_subnet, Default::default())
+    }
+
+    /// Adds an IP address and associated subnet to this device.
+    ///
+    /// If Duplicate Address Detection (DAD) is enabled, begins performing DAD.
+    ///
+    /// For IPv6, this function also joins the solicited-node multicast group.
+    pub fn add_ip_addr_subnet_with_config(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        addr_subnet: AddrSubnet<I::Addr>,
+        addr_config: I::ManualAddressConfig<<C::BindingsContext as InstantBindingsTypes>::Instant>,
+    ) -> Result<(), AddIpAddrSubnetError> {
+        trace!("adding addr {addr_subnet:?} config {addr_config:?} to device {device:?}");
+        let addr_subnet = addr_subnet
+            .replace_witness::<I::AssignedWitness>()
+            .ok_or(AddIpAddrSubnetError::InvalidAddr)?;
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.with_ip_device_configuration(device, |config, mut core_ctx| {
+            ip::device::add_ip_addr_subnet_with_config(
+                &mut core_ctx,
+                bindings_ctx,
+                device,
+                addr_subnet,
+                addr_config.into(),
+                config,
+            )
+            .map(|_address_id| ())
+            .map_err(|ExistsError| AddIpAddrSubnetError::Exists)
+        })
+    }
+
+    /// Delete an IP address on a device.
+    pub fn del_ip_addr(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        addr: SpecifiedAddr<I::Addr>,
+    ) -> Result<(), NotFoundError> {
+        trace!("del_ip_addr: removing addr {addr:?} from device {device:?}");
+        let (core_ctx, bindings_ctx) = self.contexts();
+        ip::device::del_ip_addr(
+            core_ctx,
+            bindings_ctx,
+            device,
+            DelIpAddr::SpecifiedAddr(addr),
+            AddressRemovedReason::Manual,
+        )
+    }
+}
+/// The device IP API interacting with all IP versions.
+pub struct DeviceIpAnyApi<C>(C);
+
+impl<C> DeviceIpAnyApi<C> {
+    pub(crate) fn new(ctx: C) -> Self {
+        Self(ctx)
+    }
+}
+
+impl<C> DeviceIpAnyApi<C>
+where
+    C: ContextPair,
+    C::CoreContext: IpDeviceConfigurationContext<Ipv4, C::BindingsContext>
+        + IpDeviceConfigurationContext<Ipv6, C::BindingsContext>,
+    C::BindingsContext: IpDeviceBindingsContext<Ipv4, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
+        + IpDeviceBindingsContext<Ipv6, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+{
+    fn ip<I: Ip>(&mut self) -> DeviceIpApi<I, &mut C> {
+        let Self(pair) = self;
+        DeviceIpApi::new(pair)
+    }
+
+    /// Like [`DeviceIpApi::add_ip_addr_subnet`].
+    pub fn add_ip_addr_subnet(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        addr_sub_and_config: impl Into<
+            AddrSubnetAndManualConfigEither<<C::BindingsContext as InstantBindingsTypes>::Instant>,
+        >,
+    ) -> Result<(), AddIpAddrSubnetError> {
+        match addr_sub_and_config.into() {
+            AddrSubnetAndManualConfigEither::V4(addr_sub, config) => {
+                self.ip::<Ipv4>().add_ip_addr_subnet_with_config(device, addr_sub, config)
+            }
+            AddrSubnetAndManualConfigEither::V6(addr_sub, config) => {
+                self.ip::<Ipv6>().add_ip_addr_subnet_with_config(device, addr_sub, config)
+            }
+        }
+    }
+
+    /// Like [`DeviceIpApi::del_ip_addr`].
+    pub fn del_ip_addr(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        addr: impl Into<SpecifiedAddr<IpAddr>>,
+    ) -> Result<(), NotFoundError> {
+        let addr = addr.into();
+        match addr.into() {
+            IpAddr::V4(addr) => self.ip::<Ipv4>().del_ip_addr(device, addr),
+            IpAddr::V6(addr) => self.ip::<Ipv6>().del_ip_addr(device, addr),
+        }
+    }
+}
+
+/// An AddrSubnet together with configuration specified for it when adding it
+/// to the stack.
+#[derive(Debug)]
+pub enum AddrSubnetAndManualConfigEither<Instant> {
+    /// Variant for an Ipv4 AddrSubnet.
+    V4(AddrSubnet<Ipv4Addr>, Ipv4AddrConfig<Instant>),
+    /// Variant for an Ipv6 AddrSubnet.
+    V6(AddrSubnet<Ipv6Addr>, Ipv6AddrManualConfig<Instant>),
+}
+
+impl<Instant: crate::time::Instant> AddrSubnetAndManualConfigEither<Instant> {
+    /// Constructs an `AddrSubnetAndManualConfigEither`.
+    pub(crate) fn new<I: Ip + IpDeviceIpExt>(
+        addr_subnet: AddrSubnet<I::Addr>,
+        config: I::ManualAddressConfig<Instant>,
+    ) -> Self {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct AddrSubnetAndConfig<I: IpDeviceIpExt, Instant: crate::time::Instant> {
+            addr_subnet: AddrSubnet<I::Addr>,
+            config: I::ManualAddressConfig<Instant>,
+        }
+
+        let IpInvariant(result) = I::map_ip(
+            AddrSubnetAndConfig { addr_subnet, config },
+            |AddrSubnetAndConfig { addr_subnet, config }| {
+                IpInvariant(AddrSubnetAndManualConfigEither::V4(addr_subnet, config))
+            },
+            |AddrSubnetAndConfig { addr_subnet, config }| {
+                IpInvariant(AddrSubnetAndManualConfigEither::V6(addr_subnet, config))
+            },
+        );
+        result
+    }
+
+    /// Extracts the `AddrSubnetEither`.
+    pub fn addr_subnet_either(&self) -> AddrSubnetEither {
+        match self {
+            Self::V4(addr_subnet, _) => AddrSubnetEither::V4(*addr_subnet),
+            Self::V6(addr_subnet, _) => AddrSubnetEither::V6(*addr_subnet),
+        }
+    }
+}
+
+impl<Instant: crate::time::Instant> From<AddrSubnetEither>
+    for AddrSubnetAndManualConfigEither<Instant>
+{
+    fn from(value: AddrSubnetEither) -> Self {
+        match value {
+            AddrSubnetEither::V4(addr_subnet) => {
+                AddrSubnetAndManualConfigEither::new::<Ipv4>(addr_subnet, Default::default())
+            }
+            AddrSubnetEither::V6(addr_subnet) => {
+                AddrSubnetAndManualConfigEither::new::<Ipv6>(addr_subnet, Default::default())
+            }
+        }
+    }
+}
+
+impl<Instant: crate::time::Instant, I: IpAddress> From<AddrSubnet<I>>
+    for AddrSubnetAndManualConfigEither<Instant>
+{
+    fn from(value: AddrSubnet<I>) -> Self {
+        AddrSubnetEither::from(value).into()
+    }
+}
+
+/// Errors that can be returned by the [`DeviceIpApiAny::add_ip_addr_subnet`]
+/// function.
+#[derive(Debug, Eq, PartialEq)]
+pub enum AddIpAddrSubnetError {
+    /// The address is already assigned to this device.
+    Exists,
+    /// The address is invalid and cannot be assigned to any device. For
+    /// example, an IPv4-mapped-IPv6 address.
+    InvalidAddr,
+}

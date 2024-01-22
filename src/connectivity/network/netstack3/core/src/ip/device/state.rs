@@ -11,10 +11,7 @@ use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::lock::{LockFor, RwLockFor};
 use net_types::{
-    ip::{
-        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr,
-        Ipv6, Ipv6Addr,
-    },
+    ip::{AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     SpecifiedAddr,
 };
 use packet_formats::utils::NonZeroDuration;
@@ -23,7 +20,7 @@ use crate::{
     ip::{
         device::{
             route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration, IpAddressId,
-            IpDeviceAddr, IpDeviceIpExt, Ipv6DeviceAddr,
+            IpDeviceAddr, Ipv6DeviceAddr,
         },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
         types::RawMetric,
@@ -41,12 +38,6 @@ pub(crate) const RETRANS_TIMER_DEFAULT: NonZeroDuration =
 /// The default value for the default hop limit to be used when sending IP
 /// packets.
 const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum DelIpv6AddrReason {
-    ManualAction,
-    DadFailed,
-}
 
 /// An `Ip` extension trait adding IP device state properties.
 pub trait IpDeviceStateIpExt: Ip {
@@ -819,6 +810,12 @@ impl<Instant> Default for Ipv6AddrManualConfig<Instant> {
     }
 }
 
+impl<Instant> From<Ipv6AddrManualConfig<Instant>> for Ipv6AddrConfig<Instant> {
+    fn from(value: Ipv6AddrManualConfig<Instant>) -> Self {
+        Self::Manual(value)
+    }
+}
+
 impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     /// The configuration for a link-local address configured via SLAAC.
     ///
@@ -843,69 +840,6 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
             },
             Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => *valid_until,
         }
-    }
-}
-
-/// An AddrSubnet together with configuration specified for it when adding it
-/// to the stack.
-#[derive(Debug)]
-pub enum AddrSubnetAndManualConfigEither<Instant> {
-    /// Variant for an Ipv4 AddrSubnet.
-    V4(AddrSubnet<Ipv4Addr>, Ipv4AddrConfig<Instant>),
-    /// Variant for an Ipv6 AddrSubnet.
-    V6(AddrSubnet<Ipv6Addr>, Ipv6AddrManualConfig<Instant>),
-}
-
-impl<Instant> AddrSubnetAndManualConfigEither<Instant> {
-    /// Constructs an `AddrSubnetAndManualConfigEither`.
-    pub(crate) fn new<I: Ip + IpDeviceIpExt>(
-        addr_subnet: AddrSubnet<I::Addr>,
-        config: I::ManualAddressConfig<Instant>,
-    ) -> Self {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct AddrSubnetAndConfig<I: IpDeviceIpExt, Instant> {
-            addr_subnet: AddrSubnet<I::Addr>,
-            config: I::ManualAddressConfig<Instant>,
-        }
-
-        let IpInvariant(result) = I::map_ip(
-            AddrSubnetAndConfig { addr_subnet, config },
-            |AddrSubnetAndConfig { addr_subnet, config }| {
-                IpInvariant(AddrSubnetAndManualConfigEither::V4(addr_subnet, config))
-            },
-            |AddrSubnetAndConfig { addr_subnet, config }| {
-                IpInvariant(AddrSubnetAndManualConfigEither::V6(addr_subnet, config))
-            },
-        );
-        result
-    }
-
-    /// Extracts the `AddrSubnetEither`.
-    pub fn addr_subnet_either(&self) -> AddrSubnetEither {
-        match self {
-            Self::V4(addr_subnet, _) => AddrSubnetEither::V4(*addr_subnet),
-            Self::V6(addr_subnet, _) => AddrSubnetEither::V6(*addr_subnet),
-        }
-    }
-}
-
-impl<Instant> From<AddrSubnetEither> for AddrSubnetAndManualConfigEither<Instant> {
-    fn from(value: AddrSubnetEither) -> Self {
-        match value {
-            AddrSubnetEither::V4(addr_subnet) => {
-                AddrSubnetAndManualConfigEither::new::<Ipv4>(addr_subnet, Default::default())
-            }
-            AddrSubnetEither::V6(addr_subnet) => {
-                AddrSubnetAndManualConfigEither::new::<Ipv6>(addr_subnet, Default::default())
-            }
-        }
-    }
-}
-
-impl<Instant, I: IpAddress> From<AddrSubnet<I>> for AddrSubnetAndManualConfigEither<Instant> {
-    fn from(value: AddrSubnet<I>) -> Self {
-        AddrSubnetEither::from(value).into()
     }
 }
 
@@ -986,7 +920,7 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceAddressState> for Ipv
 pub(crate) mod testutil {
     use super::*;
 
-    use net_types::Witness as _;
+    use net_types::{ip::IpInvariant, Witness as _};
 
     impl<I: IpDeviceStateIpExt, Instant: crate::Instant> AsRef<Self> for IpDeviceState<Instant, I> {
         fn as_ref(&self) -> &Self {

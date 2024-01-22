@@ -391,15 +391,14 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 // raw IP sockets once we support those.
 
 /// The bindings execution context for IP sockets.
-pub(crate) trait IpSocketBindingsContext: InstantContext + TracingContext {}
+pub trait IpSocketBindingsContext: InstantContext + TracingContext {}
 impl<BC: InstantContext + TracingContext> IpSocketBindingsContext for BC {}
 
 /// The context required in order to implement [`IpSocketHandler`].
 ///
 /// Blanket impls of `IpSocketHandler` are provided in terms of
 /// `IpSocketContext`.
-pub(crate) trait IpSocketContext<I, BC: IpSocketBindingsContext>:
-    DeviceIdContext<AnyDevice>
+pub trait IpSocketContext<I, BC: IpSocketBindingsContext>: DeviceIdContext<AnyDevice>
 where
     I: IpDeviceStateIpExt + IpExt,
 {
@@ -1784,18 +1783,14 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::{testutil::FakeInstant, EventContext, TimerContext},
+        context::EventContext,
         device::{
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::FakeDeviceId,
             DeviceId,
         },
         ip::{
-            device::{
-                IpDeviceBindingsContext,
-                IpDeviceConfigurationContext as DeviceIpDeviceConfigurationContext, IpDeviceEvent,
-                IpDeviceIpExt,
-            },
+            device::IpDeviceConfigurationContext as DeviceIpDeviceConfigurationContext,
             types::{AddableEntryEither, AddableMetric, RawMetric},
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
         },
@@ -1855,20 +1850,10 @@ mod tests {
         }
     }
 
-    fn remove_all_local_addrs<I: Ip + IpLayerIpExt + IpDeviceIpExt>(
-        core_ctx: &FakeCoreCtx,
-        bindings_ctx: &mut FakeBindingsCtx,
-    ) where
-        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: DeviceIpDeviceConfigurationContext<
-            I,
-            FakeBindingsCtx,
-            DeviceId = DeviceId<FakeBindingsCtx>,
-        >,
-        FakeBindingsCtx:
-            IpDeviceBindingsContext<I, DeviceId<FakeBindingsCtx>, Instant = FakeInstant>,
-    {
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn remove_all_local_addrs<I: crate::IpExt>(ctx: &mut FakeCtx) {
         let devices = DeviceIpDeviceConfigurationContext::<I, _>::with_devices_and_state(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
             |devices, _ctx| devices.collect::<Vec<_>>(),
         );
         for device in devices {
@@ -1877,7 +1862,7 @@ mod tests {
             struct WrapVecAddrSubnet<I: Ip>(Vec<AddrSubnet<I::Addr>>);
 
             let WrapVecAddrSubnet(subnets) = I::map_ip(
-                IpInvariant((&mut CoreCtx::new_deprecated(core_ctx), &device)),
+                IpInvariant((&mut CoreCtx::new_deprecated(&ctx.core_ctx), &device)),
                 |IpInvariant((core_ctx, device))| {
                     crate::ip::device::with_assigned_ipv4_addr_subnets(core_ctx, device, |addrs| {
                         WrapVecAddrSubnet(addrs.collect::<Vec<_>>())
@@ -1893,7 +1878,9 @@ mod tests {
             );
 
             for subnet in subnets {
-                crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, subnet.addr())
+                ctx.core_api()
+                    .device_ip::<I>()
+                    .del_ip_addr(&device, subnet.addr())
                     .expect("failed to remove addr from device");
             }
         }
@@ -1966,18 +1953,8 @@ mod tests {
             device_type: DeviceType::Unspecified,
             expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
         }; "new remote to local")]
-    fn test_new<I: Ip + IpSocketIpExt + IpLayerIpExt + IpDeviceIpExt>(test_case: NewSocketTestCase)
-    where
-        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
-            + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeBindingsCtx>>
-            + DeviceIpDeviceConfigurationContext<
-                I,
-                FakeBindingsCtx,
-                DeviceId = DeviceId<FakeBindingsCtx>,
-            >,
-        FakeBindingsCtx: TimerContext<I::Timer<DeviceId<FakeBindingsCtx>>>
-            + EventContext<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>,
-    {
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn test_new<I: Ip + IpSocketIpExt + crate::IpExt>(test_case: NewSocketTestCase) {
         let cfg = I::FAKE_CONFIG;
         let proto = I::ICMP_IP_PROTO;
 
@@ -2010,16 +1987,16 @@ mod tests {
             AddressType::Remote => (remote_ip, Some(remote_ip)),
             AddressType::Unspecified { can_select } => {
                 if !can_select {
-                    remove_all_local_addrs::<I>(core_ctx, bindings_ctx);
+                    remove_all_local_addrs::<I>(&mut ctx);
                 }
                 (local_ip, None)
             }
             AddressType::Unroutable => {
-                remove_all_local_addrs::<I>(core_ctx, bindings_ctx);
+                remove_all_local_addrs::<I>(&mut ctx);
                 (local_ip, Some(local_ip))
             }
         };
-
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let to_ip = match remote_ip_type {
             AddressType::LocallyOwned => local_ip,
             AddressType::Remote => remote_ip,
@@ -2034,9 +2011,7 @@ mod tests {
         };
 
         let get_expected_result = |template| expected_result.map(|()| template);
-        let weak_local_device = local_device
-            .as_ref()
-            .map(|d| DeviceIdContext::downgrade_device_id(&CoreCtx::new_deprecated(core_ctx), d));
+        let weak_local_device = local_device.as_ref().map(|d| d.downgrade());
         let template = IpSock {
             definition: IpSockDefinition {
                 remote_ip: SocketIpAddr::try_from(to_ip).unwrap(),
@@ -2074,7 +2049,7 @@ mod tests {
             .map_err(|(e, WithHopLimit(_))| e),
             {
                 // The template socket, but with the TTL set to 1.
-                let mut template_with_hop_limit = template.clone();
+                let mut template_with_hop_limit = template;
                 let IpSock { definition: _, options } = &mut template_with_hop_limit;
                 *options = WithHopLimit(Some(SPECIFIED_HOP_LIMIT));
                 get_expected_result(template_with_hop_limit)
@@ -2087,7 +2062,8 @@ mod tests {
     #[test_case(AddressType::Unspecified { can_select: true },
             AddressType::LocallyOwned; "unspecified to local")]
     #[test_case(AddressType::LocallyOwned, AddressType::Remote; "local to remote")]
-    fn test_send_local<I: Ip + IpSocketIpExt>(
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn test_send_local<I: Ip + IpSocketIpExt + crate::IpExt>(
         from_addr_type: AddressType,
         to_addr_type: AddressType,
     ) where
@@ -2110,27 +2086,22 @@ mod tests {
         let device_idx = builder.add_device(local_mac);
         let (mut ctx, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
+
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet(&device_id, AddrSubnet::new(local_ip.get(), 16).unwrap())
+            .unwrap();
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet(&device_id, AddrSubnet::new(remote_ip.get(), 16).unwrap())
+            .unwrap();
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            AddrSubnet::new(local_ip.get(), 16).unwrap(),
-        )
-        .unwrap();
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            AddrSubnet::new(remote_ip.get(), 16).unwrap(),
-        )
-        .unwrap();
         crate::testutil::add_route(
             core_ctx,
             bindings_ctx,
             AddableEntryEither::without_gateway(
                 subnet.into(),
-                device_id.clone(),
+                device_id,
                 AddableMetric::ExplicitMetric(RawMetric(0)),
             ),
         )
@@ -2349,12 +2320,8 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpLayerIpExt>()
-    where
-        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>: IpSocketHandler<I, FakeBindingsCtx>
-            + IpDeviceContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>
-            + IpStateContext<I, FakeBindingsCtx>,
-    {
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn test_send_hop_limits<I: Ip + IpSocketIpExt + crate::IpExt>() {
         set_logger_for_test();
 
         #[derive(Copy, Clone, Debug)]
@@ -2379,25 +2346,23 @@ mod tests {
 
         let mut builder = FakeEventDispatcherBuilder::default();
         let device_idx = builder.add_device(local_mac);
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = builder.build();
+        let (mut ctx, device_ids) = builder.build();
         let device_id: DeviceId<_> = device_ids[device_idx].clone().into();
-        let core_ctx = &core_ctx;
-        crate::device::add_ip_addr_subnet(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device_id,
-            AddrSubnet::new(local_ip.get(), 16).unwrap(),
-        )
-        .unwrap();
 
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet(&device_id, AddrSubnet::new(local_ip.get(), 16).unwrap())
+            .unwrap();
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Use multicast remote addresses since unicast addresses would trigger
         // ARP/NDP requests.
         crate::testutil::add_route(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             AddableEntryEither::without_gateway(
                 I::MULTICAST_SUBNET.into(),
-                device_id.clone(),
+                device_id,
                 AddableMetric::ExplicitMetric(RawMetric(0)),
             ),
         )
@@ -2409,7 +2374,7 @@ mod tests {
         let mut send_to = |destination_ip| {
             let sock = IpSocketHandler::<I, _>::new_ip_socket(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 None,
                 None,
                 destination_ip,
@@ -2420,7 +2385,7 @@ mod tests {
 
             IpSocketHandler::<I, _>::send_ip_packet(
                 &mut CoreCtx::new_deprecated(core_ctx),
-                &mut bindings_ctx,
+                bindings_ctx,
                 &sock,
                 (&[0u8][..]).into_serializer(),
                 None,
@@ -2505,15 +2470,11 @@ mod tests {
         core::mem::drop(device_ids);
         let device_id: DeviceId<_> = eth_device_id.clone().into();
 
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet(&device_id, AddrSubnet::new(local_ip.get(), 16).unwrap())
+            .unwrap();
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            AddrSubnet::new(local_ip.get(), 16).unwrap(),
-        )
-        .unwrap();
         crate::testutil::add_route(
             core_ctx,
             bindings_ctx,

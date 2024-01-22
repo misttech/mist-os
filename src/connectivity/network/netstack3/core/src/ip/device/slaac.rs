@@ -35,8 +35,8 @@ use crate::{
     device::{AnyDevice, DeviceIdContext, Id},
     error::{ExistsError, NotFoundError},
     ip::device::{
-        state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
-        Ipv6DeviceAddr,
+        state::{Lifetime, SlaacConfig, TemporarySlaacConfig},
+        AddressRemovedReason, Ipv6DeviceAddr,
     },
     BindingsContext, CoreCtx, Instant, StackState,
 };
@@ -288,7 +288,7 @@ pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
         device_id: &Self::DeviceId,
         addr: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         state: SlaacConfig<BC::Instant>,
-        reason: DelIpv6AddrReason,
+        reason: AddressRemovedReason,
     );
 
     /// Removes all SLAAC addresses assigned to the device.
@@ -429,7 +429,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
         device_id: &Self::DeviceId,
         addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
         state: SlaacConfig<BC::Instant>,
-        reason: DelIpv6AddrReason,
+        reason: AddressRemovedReason,
     ) {
         let preferred_until = bindings_ctx.cancel_timer(SlaacTimerId::new_deprecate_slaac_address(
             device_id.clone(),
@@ -454,8 +454,8 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
             };
 
         match reason {
-            DelIpv6AddrReason::ManualAction => return,
-            DelIpv6AddrReason::DadFailed => {
+            AddressRemovedReason::Manual => return,
+            AddressRemovedReason::DadFailed => {
                 // Attempt to regenerate the address.
             }
         }
@@ -543,7 +543,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                 device_id,
                 addr,
                 config,
-                DelIpv6AddrReason::ManualAction,
+                AddressRemovedReason::Manual,
             )
         })
     }
@@ -905,7 +905,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>>
                     &device_id,
                     addr,
                     config,
-                    DelIpv6AddrReason::ManualAction,
+                    AddressRemovedReason::Manual,
                 );
             }
             InnerSlaacTimerId::RegenerateTemporaryAddress { addr_subnet } => {
@@ -2003,9 +2003,9 @@ mod tests {
         bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
-    #[test_case(DelIpv6AddrReason::ManualAction; "manual action")]
-    #[test_case(DelIpv6AddrReason::DadFailed; "dad failed")]
-    fn remove_stable_address(reason: DelIpv6AddrReason) {
+    #[test_case(AddressRemovedReason::Manual; "manual")]
+    #[test_case(AddressRemovedReason::DadFailed; "dad failed")]
+    fn remove_stable_address(reason: AddressRemovedReason) {
         let addr_sub = calculate_addr_sub(SUBNET, IID);
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =

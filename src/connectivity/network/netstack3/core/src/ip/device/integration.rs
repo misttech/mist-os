@@ -31,11 +31,10 @@ use crate::{
     ip::{
         self,
         device::{
-            self, add_ipv6_addr_subnet_with_config,
+            self, add_ip_addr_subnet_with_config,
             dad::{DadAddressContext, DadAddressStateRef, DadContext, DadHandler, DadStateRef},
-            del_ipv6_addr_with_config, get_ipv6_hop_limit, is_ip_device_enabled,
-            is_ip_forwarding_enabled, join_ip_multicast_with_config,
-            leave_ip_multicast_with_config,
+            del_ip_addr_inner, get_ipv6_hop_limit, is_ip_device_enabled, is_ip_forwarding_enabled,
+            join_ip_multicast_with_config, leave_ip_multicast_with_config,
             nud::{self, ConfirmationFlags, NudIpHandler},
             route_discovery::{
                 Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6RouteDiscoveryContext,
@@ -51,7 +50,7 @@ use crate::{
                 Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState,
                 Ipv6DeviceConfiguration, SlaacConfig,
             },
-            AddressRemovedReason, DelIpv6Addr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
+            AddressRemovedReason, DelIpAddr, IpAddressId, IpDeviceAddr, IpDeviceBindingsContext,
             IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
         },
         gmp::{
@@ -168,7 +167,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     ) -> Result<O, ExistsError> {
         let SlaacAddrs { core_ctx, device_id, config, _marker } = self;
 
-        add_ipv6_addr_subnet_with_config(
+        add_ip_addr_subnet_with_config(
             core_ctx,
             bindings_ctx,
             device_id,
@@ -204,11 +203,11 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
     ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<BC::Instant>), NotFoundError>
     {
         let SlaacAddrs { core_ctx, device_id, config, _marker } = self;
-        del_ipv6_addr_with_config(
+        del_ip_addr_inner(
             core_ctx,
             bindings_ctx,
             device_id,
-            DelIpv6Addr::SpecifiedAddr(addr.into_specified()),
+            DelIpAddr::SpecifiedAddr(addr.into_specified()),
             AddressRemovedReason::Manual,
             config,
         )
@@ -645,7 +644,7 @@ where
     >: IpDeviceStateContext<Ipv6, BC, DeviceId = Self::DeviceId>
         + GmpHandler<Ipv6, BC>
         + NudIpHandler<Ipv6, BC>
-        + DadHandler<BC>
+        + DadHandler<Ipv6, BC>
         + RsHandler<BC>,
 {
     type Ipv6DeviceStateCtx<'s> = CoreCtxWithIpDeviceConfiguration<'s, &'s Ipv6DeviceConfiguration,crate::lock_ordering::IpDeviceConfiguration<Ipv6>, BC> where Self: 's;

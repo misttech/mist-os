@@ -1328,14 +1328,11 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
+        ctx.core_api()
+            .device_ip::<Ipv4>()
+            .add_ip_addr_subnet(&device_id, AddrSubnet::new(MY_ADDR.get(), 24).unwrap())
+            .unwrap();
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::add_ip_addr_subnet(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            AddrSubnet::new(MY_ADDR.get(), 24).unwrap(),
-        )
-        .unwrap();
         bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         let now = bindings_ctx.now();

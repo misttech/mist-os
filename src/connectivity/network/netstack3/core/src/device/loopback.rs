@@ -577,17 +577,16 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
 
-    use net_types::ip::{AddrSubnet, AddrSubnetEither, Ip, Ipv4, Ipv6, Mtu};
+    use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu};
     use packet::ParseBuffer;
 
     use crate::{
-        device::DeviceId,
         error::NotFoundError,
-        ip::device::{IpAddressId as _, IpDeviceIpExt, IpDeviceStateContext},
+        ip::device::IpAddressId as _,
         testutil::{
             FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
-        CoreCtx, UnlockedCoreCtx,
+        CoreCtx,
     };
 
     use super::*;
@@ -624,12 +623,9 @@ mod tests {
         );
     }
 
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
     #[ip_test]
-    fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpDeviceIpExt>()
-    where
-        for<'a> UnlockedCoreCtx<'a, FakeBindingsCtx>:
-            IpDeviceStateContext<I, FakeBindingsCtx, DeviceId = DeviceId<FakeBindingsCtx>>,
-    {
+    fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + crate::IpExt>() {
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
             .core_api()
@@ -642,9 +638,9 @@ mod tests {
         let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
-        let get_addrs = || {
+        let get_addrs = |ctx: &mut crate::testutil::FakeCtx| {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
                 &device,
                 |addrs, _core_ctx| addrs.map(|a| SpecifiedAddr::from(a.addr())).collect::<Vec<_>>(),
             )
@@ -660,27 +656,16 @@ mod tests {
         let addr =
             AddrSubnet::from_witness(local_ip, subnet.prefix()).expect("error creating AddrSubnet");
 
-        assert_eq!(get_addrs(), []);
+        assert_eq!(get_addrs(&mut ctx), []);
 
-        assert_eq!(
-            crate::device::add_ip_addr_subnet(
-                core_ctx,
-                bindings_ctx,
-                &device,
-                AddrSubnetEither::from(addr)
-            ),
-            Ok(())
-        );
+        assert_eq!(ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, addr,), Ok(()));
         let addr = addr.addr();
-        assert_eq!(&get_addrs()[..], [addr]);
+        assert_eq!(&get_addrs(&mut ctx)[..], [addr]);
 
-        assert_eq!(crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, addr), Ok(()));
-        assert_eq!(get_addrs(), []);
+        assert_eq!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, addr), Ok(()));
+        assert_eq!(get_addrs(&mut ctx), []);
 
-        assert_eq!(
-            crate::device::del_ip_addr(core_ctx, bindings_ctx, &device, addr),
-            Err(NotFoundError)
-        );
+        assert_eq!(ctx.core_api().device_ip::<I>().del_ip_addr(&device, addr), Err(NotFoundError));
     }
 
     #[ip_test]

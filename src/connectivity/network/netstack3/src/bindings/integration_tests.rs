@@ -527,19 +527,16 @@ impl TestSetupBuilder {
                 });
                 if let Some(addr) = addr {
                     stack.with_ctx(|ctx| {
-                        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-                        let core_id = bindings_ctx
+                        let core_id = ctx
+                            .bindings_ctx()
                             .devices
                             .get_core_id(if_id)
                             .unwrap_or_else(|| panic!("failed to get device {if_id} info"));
 
-                        netstack3_core::device::add_ip_addr_subnet(
-                            core_ctx,
-                            bindings_ctx,
-                            &core_id,
-                            addr,
-                        )
-                        .expect("add interface address")
+                        ctx.api()
+                            .device_ip_any()
+                            .add_ip_addr_subnet(&core_id, addr)
+                            .expect("add interface address")
                     });
 
                     let (_, subnet) = addr.addr_subnet();

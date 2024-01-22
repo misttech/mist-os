@@ -12,8 +12,8 @@ use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6, Ipv6Addr},
-    BroadcastAddr, MulticastAddr, NonMappedAddr, SpecifiedAddr, Witness as _,
+    ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6},
+    BroadcastAddr, MulticastAddr, SpecifiedAddr, Witness as _,
 };
 use packet::Buf;
 use smallvec::SmallVec;
@@ -34,16 +34,16 @@ use crate::{
         socket::{self, HeldSockets},
         state::DeviceStateSpec,
     },
-    error::{self, ExistsError, NotSupportedError, SetIpAddressPropertiesError},
+    error::{NotSupportedError, SetIpAddressPropertiesError},
     ip::{
         device::{
             nud::LinkResolutionContext,
             state::{
-                AddrSubnetAndManualConfigEither, AssignedAddress as _, IpDeviceFlags,
-                Ipv4DeviceConfigurationAndFlags, Ipv6DeviceConfigurationAndFlags, Lifetime,
+                AssignedAddress as _, IpDeviceFlags, Ipv4DeviceConfigurationAndFlags,
+                Ipv6DeviceConfigurationAndFlags, Lifetime,
             },
-            DelIpv6Addr, DualStackDeviceHandler, IpDeviceIpExt, IpDeviceStateContext,
-            Ipv4DeviceConfigurationUpdate, Ipv6DeviceAddr, Ipv6DeviceConfigurationUpdate,
+            DualStackDeviceHandler, IpDeviceIpExt, IpDeviceStateContext,
+            Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
             PendingIpv4DeviceConfigurationUpdate, PendingIpv6DeviceConfigurationUpdate,
         },
         forwarding::IpForwardingDeviceContext,
@@ -577,62 +577,6 @@ pub fn get_all_ip_addr_subnets<BC: BindingsContext>(
     DualStackDeviceHandler::get_all_ip_addr_subnets(&mut CoreCtx::new_deprecated(core_ctx), device)
 }
 
-/// Errors that can be returned by the [`add_ip_addr_subnet`] function.
-#[derive(Debug, Eq, PartialEq)]
-pub enum AddIpAddrSubnetError {
-    /// The address is already assigned to this device.
-    Exists,
-    /// The address is invalid and cannot be assigned to any device. For
-    /// example, and IPv4-mapped-IPv6 address.
-    InvalidAddr,
-}
-
-/// Adds an IP address and associated subnet to this device.
-///
-/// For IPv6, this function also joins the solicited-node multicast group and
-/// begins performing Duplicate Address Detection (DAD).
-pub fn add_ip_addr_subnet<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    addr_sub_and_config: impl Into<AddrSubnetAndManualConfigEither<BC::Instant>>,
-) -> Result<(), AddIpAddrSubnetError> {
-    let addr_sub_and_config = addr_sub_and_config.into();
-    trace!(
-        "add_ip_addr_subnet: adding addr_sub_and_config {:?} to device {:?}",
-        addr_sub_and_config,
-        device
-    );
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-
-    match addr_sub_and_config {
-        AddrSubnetAndManualConfigEither::V4(addr_sub, config) => {
-            crate::ip::device::add_ipv4_addr_subnet(
-                &mut core_ctx,
-                bindings_ctx,
-                device,
-                addr_sub,
-                config,
-            )
-            .map_err(|ExistsError| AddIpAddrSubnetError::Exists)
-        }
-        AddrSubnetAndManualConfigEither::V6(addr_sub, config) => {
-            let addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> = addr_sub
-                .to_unicast()
-                .add_witness::<NonMappedAddr<_>>()
-                .ok_or(AddIpAddrSubnetError::InvalidAddr)?;
-            crate::ip::device::add_ipv6_addr_subnet(
-                &mut core_ctx,
-                bindings_ctx,
-                device,
-                addr_sub,
-                config,
-            )
-            .map_err(|ExistsError| AddIpAddrSubnetError::Exists)
-        }
-    }
-}
-
 /// Sets properties on an IP address.
 pub fn set_ip_addr_properties<BC: BindingsContext, A: IpAddress>(
     core_ctx: &SyncCtx<BC>,
@@ -662,30 +606,6 @@ pub fn set_ip_addr_properties<BC: BindingsContext, A: IpAddress>(
             device,
             address,
             next_valid_until,
-        ),
-    }
-}
-
-/// Delete an IP address on a device.
-pub fn del_ip_addr<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    addr: impl Into<SpecifiedAddr<IpAddr>>,
-) -> Result<(), error::NotFoundError> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let addr = addr.into();
-    trace!("del_ip_addr: removing addr {:?} from device {:?}", addr, device);
-    match addr.into() {
-        IpAddr::V4(addr) => {
-            crate::ip::device::del_ipv4_addr(&mut core_ctx, bindings_ctx, &device, &addr)
-        }
-        IpAddr::V6(addr) => crate::ip::device::del_ipv6_addr_with_reason(
-            &mut core_ctx,
-            bindings_ctx,
-            &device,
-            DelIpv6Addr::SpecifiedAddr(addr),
-            crate::ip::device::state::DelIpv6AddrReason::ManualAction,
         ),
     }
 }
@@ -973,6 +893,7 @@ mod tests {
         },
         error,
         ip::device::{
+            api::AddIpAddrSubnetError,
             slaac::SlaacConfiguration,
             state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
             IpDeviceConfigurationUpdate,
@@ -1121,14 +1042,14 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        crate::device::add_ip_addr_subnet(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            &device,
-            AddrSubnet::from_witness(Ipv6::LOOPBACK_ADDRESS, Ipv6::LOOPBACK_SUBNET.prefix())
-                .unwrap(),
-        )
-        .unwrap();
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .add_ip_addr_subnet(
+                &device,
+                AddrSubnet::from_witness(Ipv6::LOOPBACK_ADDRESS, Ipv6::LOOPBACK_SUBNET.prefix())
+                    .unwrap(),
+            )
+            .unwrap();
         device
     }
 
@@ -1239,7 +1160,8 @@ mod tests {
         )
     }
 
-    fn test_add_remove_ip_addresses<I: Ip + TestIpExt>(
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
+    fn test_add_remove_ip_addresses<I: Ip + TestIpExt + crate::IpExt>(
         addr_config: Option<I::ManualAddressConfig<FakeInstant>>,
     ) {
         let config = I::FAKE_CONFIG;
@@ -1261,70 +1183,73 @@ mod tests {
 
         let ip = I::get_other_ip_address(1).get();
         let prefix = config.subnet.prefix();
-        let addr_subnet = AddrSubnetEither::new(ip.into(), prefix).unwrap();
+        let addr_subnet = AddrSubnet::new(ip, prefix).unwrap();
+        let addr_subnet_either = AddrSubnetEither::from(addr_subnet);
 
         // IP doesn't exist initially.
         assert_eq!(
-            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(core_ctx, &device)
+                .into_iter()
+                .find(|&a| a == addr_subnet_either),
             None
         );
 
         // Add IP (OK).
-        if let Some(addr_config) = addr_config {
-            add_ip_addr_subnet(
-                core_ctx,
-                bindings_ctx,
-                &device,
-                AddrSubnetAndManualConfigEither::new::<I>(
-                    AddrSubnet::new(ip, prefix).unwrap(),
-                    addr_config,
-                ),
-            )
+        ctx.core_api()
+            .device_ip::<I>()
+            .add_ip_addr_subnet_with_config(&device, addr_subnet, addr_config.unwrap_or_default())
             .unwrap();
-        } else {
-            let () = add_ip_addr_subnet(core_ctx, bindings_ctx, &device, addr_subnet).unwrap();
-        }
         assert_eq!(
-            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
-            Some(addr_subnet)
+            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
+                .into_iter()
+                .find(|&a| a == addr_subnet_either),
+            Some(addr_subnet_either)
         );
 
         // Add IP again (already exists).
         assert_eq!(
-            add_ip_addr_subnet(core_ctx, bindings_ctx, &device, addr_subnet).unwrap_err(),
-            AddIpAddrSubnetError::Exists,
+            ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, addr_subnet),
+            Err(AddIpAddrSubnetError::Exists),
         );
         assert_eq!(
-            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
-            Some(addr_subnet)
+            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
+                .into_iter()
+                .find(|&a| a == addr_subnet_either),
+            Some(addr_subnet_either)
         );
 
         // Add IP with different subnet (already exists).
-        let wrong_addr_subnet = AddrSubnetEither::new(ip.into(), prefix - 1).unwrap();
+        let wrong_addr_subnet = AddrSubnet::new(ip, prefix - 1).unwrap();
         assert_eq!(
-            add_ip_addr_subnet(core_ctx, bindings_ctx, &device, wrong_addr_subnet).unwrap_err(),
-            AddIpAddrSubnetError::Exists,
+            ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, wrong_addr_subnet),
+            Err(AddIpAddrSubnetError::Exists),
         );
         assert_eq!(
-            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
-            Some(addr_subnet)
+            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
+                .into_iter()
+                .find(|&a| a == addr_subnet_either),
+            Some(addr_subnet_either)
         );
 
-        let ip: SpecifiedAddr<IpAddr> = SpecifiedAddr::new(ip.into()).unwrap();
+        let ip = SpecifiedAddr::new(ip).unwrap();
         // Del IP (ok).
-        let () = del_ip_addr(core_ctx, bindings_ctx, &device, ip).unwrap();
+        let () = ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip).unwrap();
         assert_eq!(
-            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
+                .into_iter()
+                .find(|&a| a == addr_subnet_either),
             None
         );
 
         // Del IP again (not found).
         assert_eq!(
-            del_ip_addr(core_ctx, bindings_ctx, &device, ip).unwrap_err(),
-            error::NotFoundError
+            ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip),
+            Err(error::NotFoundError),
         );
         assert_eq!(
-            get_all_ip_addr_subnets(core_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
+                .into_iter()
+                .find(|&a| a == addr_subnet_either),
             None
         );
     }
