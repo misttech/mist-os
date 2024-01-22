@@ -46,8 +46,29 @@ class CloseCountingFileServer : public zxio_tests::TestFileServerBase {
 
   uint32_t num_close() const { return num_close_.load(); }
 
+  void ForceErrorAfterNCalls(uint8_t n, zx_status_t status) {
+    EXPECT_EQ(forced_error_after_n_calls_, std::nullopt);
+    forced_error_after_n_calls_ = std::make_pair(n, status);
+  }
+
+ protected:
+  zx_status_t CheckForcedError() {
+    if (forced_error_after_n_calls_) {
+      auto& [n, status] = forced_error_after_n_calls_.value();
+      if (n == 0) {
+        forced_error_after_n_calls_ = std::nullopt;
+        return status;
+      }
+
+      --n;
+    }
+
+    return ZX_OK;
+  }
+
  private:
   std::atomic<uint32_t> num_close_ = 0;
+  std::optional<std::pair<uint8_t, zx_status_t>> forced_error_after_n_calls_ = std::nullopt;
 };
 
 class File : public zxtest::Test {
@@ -195,6 +216,12 @@ class TestServerChannel final : public CloseCountingFileServer {
   }
 
   void Read(ReadRequestView request, ReadCompleter::Sync& completer) override {
+    zx_status_t status = CheckForcedError();
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+
     if (request->count > fio::wire::kMaxBuf) {
       completer.Close(ZX_ERR_OUT_OF_RANGE);
       return;
@@ -205,7 +232,7 @@ class TestServerChannel final : public CloseCountingFileServer {
         .capacity = request->count,
     };
     size_t actual = 0u;
-    zx_status_t status = stream_.readv(0, &vec, 1, &actual);
+    status = stream_.readv(0, &vec, 1, &actual);
     if (status != ZX_OK) {
       completer.ReplyError(status);
       return;
@@ -214,6 +241,12 @@ class TestServerChannel final : public CloseCountingFileServer {
   }
 
   void ReadAt(ReadAtRequestView request, ReadAtCompleter::Sync& completer) override {
+    zx_status_t status = CheckForcedError();
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+
     if (request->count > fio::wire::kMaxBuf) {
       completer.Close(ZX_ERR_OUT_OF_RANGE);
       return;
@@ -224,7 +257,7 @@ class TestServerChannel final : public CloseCountingFileServer {
         .capacity = request->count,
     };
     size_t actual = 0u;
-    zx_status_t status = stream_.readv_at(0, request->offset, &vec, 1, &actual);
+    status = stream_.readv_at(0, request->offset, &vec, 1, &actual);
     if (status != ZX_OK) {
       completer.ReplyError(status);
       return;
@@ -233,6 +266,12 @@ class TestServerChannel final : public CloseCountingFileServer {
   }
 
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {
+    zx_status_t status = CheckForcedError();
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+
     if (request->data.count() > fio::wire::kMaxBuf) {
       completer.Close(ZX_ERR_OUT_OF_RANGE);
       return;
@@ -242,7 +281,7 @@ class TestServerChannel final : public CloseCountingFileServer {
         .capacity = request->data.count(),
     };
     size_t actual = 0u;
-    zx_status_t status = stream_.writev(0, &vec, 1, &actual);
+    status = stream_.writev(0, &vec, 1, &actual);
     if (status != ZX_OK) {
       completer.ReplyError(status);
       return;
@@ -251,6 +290,12 @@ class TestServerChannel final : public CloseCountingFileServer {
   }
 
   void WriteAt(WriteAtRequestView request, WriteAtCompleter::Sync& completer) override {
+    zx_status_t status = CheckForcedError();
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+
     if (request->data.count() > fio::wire::kMaxBuf) {
       completer.Close(ZX_ERR_OUT_OF_RANGE);
       return;
@@ -260,7 +305,7 @@ class TestServerChannel final : public CloseCountingFileServer {
         .capacity = request->data.count(),
     };
     size_t actual = 0u;
-    zx_status_t status = stream_.writev_at(0, request->offset, &vec, 1, &actual);
+    status = stream_.writev_at(0, request->offset, &vec, 1, &actual);
     if (status != ZX_OK) {
       completer.ReplyError(status);
       return;
@@ -288,6 +333,46 @@ TEST_F(File, ReadWriteChannel) {
   ASSERT_NO_FAILURES(StartServer<TestServerChannel>());
   ASSERT_OK(OpenFile());
   ASSERT_NO_FAILURES(FileTestSuite::ReadWrite(&file_.io));
+}
+
+TEST_F(File, ReadvWritevChannel) {
+  ASSERT_NO_FAILURES(StartServer<TestServerChannel>());
+  ASSERT_OK(OpenFile());
+
+  auto check_io =
+      [&](zx_status_t (*zxio_fn)(zxio_t*, const zx_iovec_t*, size_t, zxio_flags_t, size_t*),
+          void* buf, size_t buflen, zx_status_t status) {
+        char random_unused_buf[1];
+        const zx_iovec_t iov[2] = {
+            {
+                .buffer = buf,
+                .capacity = buflen,
+            },
+            {
+                .buffer = reinterpret_cast<void*>(random_unused_buf),
+                .capacity = sizeof(random_unused_buf),
+            },
+        };
+
+        size_t actual = 0u;
+        server_->ForceErrorAfterNCalls(0, status);
+        ASSERT_NOT_OK(zxio_fn(&file_.io, reinterpret_cast<const zx_iovec_t*>(iov), 2, 0, &actual),
+                      status);
+        server_->ForceErrorAfterNCalls(1, status);
+        ASSERT_OK(zxio_fn(&file_.io, reinterpret_cast<const zx_iovec_t*>(iov), 2, 0, &actual));
+        EXPECT_EQ(actual, buflen);
+      };
+
+  char write_buf[] = "abcd";
+  ASSERT_NO_FAILURES(check_io(zxio_writev, write_buf, sizeof(write_buf), ZX_ERR_IO));
+
+  size_t seek = 0;
+  ASSERT_OK(zxio_seek(&file_.io, ZXIO_SEEK_ORIGIN_START, 0, &seek));
+  EXPECT_EQ(seek, 0);
+
+  char read_buf[sizeof(write_buf) - 2] = {};
+  ASSERT_NO_FAILURES(check_io(zxio_readv, read_buf, sizeof(read_buf), ZX_ERR_NOT_FOUND));
+  ASSERT_EQ(strncmp(write_buf, read_buf, sizeof(read_buf)), 0);
 }
 
 class TestServerStream final : public CloseCountingFileServer {
