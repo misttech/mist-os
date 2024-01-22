@@ -9,7 +9,6 @@
 #include <limits>
 #include <optional>
 #include <string_view>
-#include <variant>
 
 #include "constants.h"
 #include "field.h"
@@ -40,6 +39,9 @@ struct LocalAbiTraits;
 // enum class with the natural underlying type, and has a simple lowercase name
 // with no prefix or suffix.  For compound fields, specific accessors are also
 // provided to do the bit-field extraction.
+
+template <typename T, typename... AnyOfThese>
+inline constexpr bool kIsAnyOf = (std::is_same_v<T, AnyOfThese> || ...);
 
 // The basic types and some structure layouts are identical across bit width
 // (ElfClass).  This base class handles differences in byte order (ElfData).
@@ -229,6 +231,10 @@ struct Layout<ElfClass::k64, Data> : public LayoutBase<Data> {
 struct ElfNote;
 template <ElfData Data>
 class ElfNoteSegment;
+
+// Forward declaration (see tls-layout.h).
+template <class Elf>
+class TlsLayout;
 
 template <typename Addr>
 constexpr auto kAddrBits = std::numeric_limits<typename Addr::value_type>::digits;
@@ -477,6 +483,22 @@ struct Elf : private Layout<Class, Data> {
 
   template <class AbiTraits = LocalAbiTraits>
   struct RDebug;
+
+  // This is true for any T that's an layout.h or field.h type, i.e. guaranteed
+  // to use the right format and byte order for the given ELF Class and Data.
+  // Note that all <lib/elfldltl/field.h> types yield true even if they aren't
+  // sized or byte orders used in this Elf instantiation: they are still types
+  // whose exact intended target format is both well-known and represented for
+  // byte-by-byte copying directly in T.  Conversely, note neither LinkMap,
+  // RDebug, nor any other type that indirectly uses AbiPtr, is considered a
+  // "layout" type; these types are specialized by an AbiTraits parameter that
+  // determines their actual memory format.  All non-layout types (aside from
+  // single-byte integers and the like) require specialized transcription when
+  // copying between address spaces or pointer formats.  This is defined
+  // primarily for the benefit of <lib/ld/remote-abi-transcriber.h>, which see.
+  template <typename T>
+  static constexpr bool kIsLayout = kIsAnyOf<T, Ehdr, Shdr, Nhdr, Phdr, Dyn, Sym, Rel, Rela,
+                                             TlsGetAddrGot, TlsDescGot, TlsLayout<Elf>>;
 };
 
 template <ElfData Data = ElfData::kNative>
@@ -493,6 +515,28 @@ using AllNativeFormats = Template<Elf64<>, Elf32<>>;
 template <template <class...> typename Template>
 using AllFormats = Template<Elf64<ElfData::k2Lsb>, Elf32<ElfData::k2Lsb>,  //
                             Elf64<ElfData::k2Msb>, Elf32<ElfData::k2Msb>>;
+
+template <typename T>
+struct IsAnyLayout {
+  template <class... Elf>
+  using type = std::bool_constant<(Elf::template kIsLayout<T> || ...)>;
+};
+
+// Like Elf::kIsLayout, but across any known format.
+template <typename T>
+static constexpr bool kIsLayout = AllFormats<IsAnyLayout<T>::template type>{};
+
+template <ElfClass Class, ElfData Data>
+template <typename T, bool kSwap>
+constexpr bool Elf<Class, Data>::kIsLayout<UnsignedField<T, kSwap>> = true;
+
+template <ElfClass Class, ElfData Data>
+template <typename T, bool kSwap>
+constexpr bool Elf<Class, Data>::kIsLayout<SignedField<T, kSwap>> = true;
+
+template <ElfClass Class, ElfData Data>
+template <typename T, bool kSwap, typename U>
+constexpr bool Elf<Class, Data>::kIsLayout<EnumField<T, kSwap, U>> = true;
 
 }  // namespace elfldltl
 

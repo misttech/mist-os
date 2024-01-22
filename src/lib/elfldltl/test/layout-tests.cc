@@ -7,6 +7,7 @@
 #include <lib/elfldltl/machine.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/typed-test.h>
+#include <lib/elfldltl/tls-layout.h>
 
 #include <string_view>
 #include <tuple>
@@ -92,6 +93,32 @@ TEST(ElfldltlLayoutTests, Sizes) {
 // Just instantiating this tests the constexpr Elf::Ehdr methods.
 template <class Elf, auto Machine>
 struct EhdrTests {
+  static_assert(Elf::template kIsLayout<typename Elf::Addr>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Addr>);
+  static_assert(Elf::template kIsLayout<typename Elf::Word>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Word>);
+  static_assert(Elf::template kIsLayout<typename Elf::Half>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Half>);
+  static_assert(Elf::template kIsLayout<typename Elf::Ehdr>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Ehdr>);
+  static_assert(Elf::template kIsLayout<typename Elf::Phdr>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Phdr>);
+  static_assert(Elf::template kIsLayout<typename Elf::Shdr>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Shdr>);
+  static_assert(Elf::template kIsLayout<typename Elf::Sym>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Sym>);
+  static_assert(Elf::template kIsLayout<typename Elf::Addend>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Addend>);
+  static_assert(Elf::template kIsLayout<typename Elf::Nhdr>);
+  static_assert(elfldltl::kIsLayout<typename Elf::Nhdr>);
+  static_assert(Elf::template kIsLayout<elfldltl::TlsLayout<Elf>>);
+  static_assert(elfldltl::kIsLayout<elfldltl::TlsLayout<Elf>>);
+
+  static_assert(!Elf::template kIsLayout<uint32_t>);
+  static_assert(!elfldltl::kIsLayout<uint32_t>);
+  static_assert(!Elf::template kIsLayout<uint64_t>);
+  static_assert(!elfldltl::kIsLayout<uint64_t>);
+
   static constexpr typename Elf::Ehdr kGood = {
       .magic = Elf::Ehdr::kMagic,
       .elfclass = Elf::kClass,
