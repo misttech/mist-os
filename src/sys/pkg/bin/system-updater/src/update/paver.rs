@@ -972,8 +972,8 @@ mod abr_not_supported_tests {
 
         write_image_buffer(
             &data_sink,
-            make_buffer("zbi.signed contents"),
-            &Image::new(ImageType::ZbiSigned, None),
+            make_buffer("zbi contents"),
+            &Image::new(ImageType::Zbi, None),
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -994,12 +994,12 @@ mod abr_not_supported_tests {
                 PaverEvent::WriteAsset {
                     configuration: Configuration::A,
                     asset: Asset::Kernel,
-                    payload: b"zbi.signed contents".to_vec()
+                    payload: b"zbi contents".to_vec()
                 },
                 PaverEvent::WriteAsset {
                     configuration: Configuration::B,
                     asset: Asset::Kernel,
-                    payload: b"zbi.signed contents".to_vec()
+                    payload: b"zbi contents".to_vec()
                 },
                 PaverEvent::WriteAsset {
                     configuration: Configuration::A,
@@ -1065,8 +1065,8 @@ mod abr_not_supported_tests {
         assert_matches!(
             write_image_buffer(
                 &data_sink,
-                make_buffer("zbi.signed contents"),
-                &Image::new(ImageType::ZbiSigned, None),
+                make_buffer("zbi contents"),
+                &Image::new(ImageType::Zbi, None),
                 NonCurrentConfiguration::NotSupported,
             )
             .await,
@@ -1078,7 +1078,7 @@ mod abr_not_supported_tests {
             vec![PaverEvent::WriteAsset {
                 configuration: Configuration::A,
                 asset: Asset::Kernel,
-                payload: b"zbi.signed contents".to_vec()
+                payload: b"zbi contents".to_vec()
             },]
         );
     }
@@ -1101,8 +1101,8 @@ mod abr_not_supported_tests {
 
         write_image_buffer(
             &data_sink,
-            make_buffer("zbi.signed contents"),
-            &Image::new(ImageType::ZbiSigned, None),
+            make_buffer("zbi contents"),
+            &Image::new(ImageType::Zbi, None),
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -1114,12 +1114,12 @@ mod abr_not_supported_tests {
                 PaverEvent::WriteAsset {
                     configuration: Configuration::A,
                     asset: Asset::Kernel,
-                    payload: b"zbi.signed contents".to_vec()
+                    payload: b"zbi contents".to_vec()
                 },
                 PaverEvent::WriteAsset {
                     configuration: Configuration::B,
                     asset: Asset::Kernel,
-                    payload: b"zbi.signed contents".to_vec()
+                    payload: b"zbi contents".to_vec()
                 },
             ]
         );
@@ -1182,8 +1182,8 @@ mod abr_not_supported_tests {
         assert_matches!(
             write_image_buffer(
                 &data_sink,
-                make_buffer("zbi.signed contents"),
-                &Image::new(ImageType::ZbiSigned, None),
+                make_buffer("zbi contents"),
+                &Image::new(ImageType::Zbi, None),
                 NonCurrentConfiguration::NotSupported,
             )
             .await,
@@ -1196,12 +1196,12 @@ mod abr_not_supported_tests {
                 PaverEvent::WriteAsset {
                     configuration: Configuration::A,
                     asset: Asset::Kernel,
-                    payload: b"zbi.signed contents".to_vec()
+                    payload: b"zbi contents".to_vec()
                 },
                 PaverEvent::WriteAsset {
                     configuration: Configuration::B,
                     asset: Asset::Kernel,
-                    payload: b"zbi.signed contents".to_vec()
+                    payload: b"zbi contents".to_vec()
                 },
             ]
         );
