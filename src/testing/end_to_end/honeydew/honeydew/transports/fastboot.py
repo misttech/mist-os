@@ -66,7 +66,7 @@ class Fastboot:
         self._ffx_transport: ffx.FFX = ffx_transport
         self._get_fastboot_node(fastboot_node_id)
 
-    # List all the public properties in alphabetical order
+    # List all the public properties
     @properties.PersistentProperty
     def node_id(self) -> str:
         """Fastboot node id.
@@ -76,7 +76,7 @@ class Fastboot:
         """
         return self._fastboot_node_id
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def boot_to_fastboot_mode(self) -> None:
         """Boot the device to fastboot mode from fuchsia mode.
 
@@ -267,7 +267,7 @@ class Fastboot:
                 f"{timeout}sec."
             ) from err
 
-    # List all the private methods in alphabetical order
+    # List all the private methods
     def _get_fastboot_node(self, fastboot_node_id: str | None = None) -> None:
         """Gets the fastboot node id and stores it in `self._fastboot_node_id`.
 

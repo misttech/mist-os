@@ -31,7 +31,7 @@ class Wlan(wlan.Wlan):
         self._name: str = device_name
         self._sl4f: SL4F = sl4f
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def get_phy_ids(self) -> list[int]:
         """Get list of phy ids located on device.
 

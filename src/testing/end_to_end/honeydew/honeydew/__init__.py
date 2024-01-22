@@ -19,7 +19,7 @@ from honeydew.transports import ffx
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-# List all the public methods in alphabetical order
+# List all the public methods
 def create_device(
     device_name: str,
     transport: transports.TRANSPORT,

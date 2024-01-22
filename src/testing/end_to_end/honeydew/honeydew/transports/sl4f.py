@@ -66,7 +66,7 @@ class SL4F:
 
         self.start_server()
 
-    # List all the properties in alphabetical order
+    # List all the properties
     @properties.DynamicProperty
     def url(self) -> str:
         """URL of the SL4F server.
@@ -88,7 +88,7 @@ class SL4F:
         else:
             return f"http://{sl4f_server_address.ip}:{sl4f_server_address.port}"
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def check_connection(self) -> None:
         """Check SL4F connection between host and SL4F server running on device.
 
@@ -207,7 +207,7 @@ class SL4F:
         # verify the device is responsive to SL4F requests
         self.check_connection()
 
-    # List all private methods in alphabetical order
+    # List all private methods
     def _get_sl4f_server_address(self) -> custom_types.Sl4fServerAddress:
         """Returns the SL4F server ip address and port information.
 

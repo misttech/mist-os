@@ -104,29 +104,17 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice
         )
 
-    # List all the tests related to affordances in alphabetical order
+    # List all the tests related to affordances
     def test_fuchsia_device_is_bluetooth_gap_capable(self) -> None:
         """Test case to make sure fuchsia device is BluetoothGap capable"""
         self.assertIsInstance(
             self.fd_obj, affordances_capable.BluetoothGapCapableDevice
         )
 
-    def test_fuchsia_device_is_reboot_capable(self) -> None:
-        """Test case to make sure fuchsia device is reboot capable"""
+    def test_fuchsia_device_is_bluetooth_avrcp_capable(self) -> None:
+        """Test case to make sure fuchsia device is BluetoothAvrcp capable"""
         self.assertIsInstance(
-            self.fd_obj, affordances_capable.RebootCapableDevice
-        )
-
-    def test_fuchsia_device_is_screenshot_capable(self) -> None:
-        """Test case to make sure fuchsia device is screenshot capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.ScreenshotCapableDevice
-        )
-
-    def test_fuchsia_device_is_session_capable(self) -> None:
-        """Test case to make sure fuchsia device is session capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.SessionCapableDevice
+            self.fd_obj, affordances_capable.BluetoothAvrcpCapableDevice
         )
 
     def test_fuchsia_device_is_tracing_capable(self) -> None:
@@ -153,17 +141,17 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
             self.fd_obj, affordances_capable.WlanCapableDevice
         )
 
-    # List all the tests related to transports in alphabetical order
+    # List all the tests related to transports
     def test_fuchsia_device_is_sl4f_capable(self) -> None:
         """Test case to make sure fuchsia device is sl4f capable"""
         self.assertIsInstance(self.fd_obj, transports_capable.SL4FCapableDevice)
 
-    # List all the tests related to public methods in alphabetical order
+    # List all the tests related to public methods
     def test_close(self) -> None:
         """Testcase for FuchsiaDevice.close()"""
         self.fd_obj.close()
 
-    # List all the tests related to private methods in alphabetical order
+    # List all the tests related to private methods
     @mock.patch.object(
         fuchsia_device.sl4f_transport.SL4F,
         "run",

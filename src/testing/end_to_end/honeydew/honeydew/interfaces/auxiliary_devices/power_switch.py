@@ -30,7 +30,7 @@ class PowerSwitchError(Exception):
 class PowerSwitch(abc.ABC):
     """Abstract base class for power switch hardware."""
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     @abc.abstractmethod
     def power_off(self, outlet: int | None = None) -> None:
         """Turns off the power at the specified outlet on the power switch.

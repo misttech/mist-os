@@ -27,7 +27,7 @@ class BluetoothAvrcp(
 ):
     """SL4F based implementation for BluetoothAvrcp Profile affordance."""
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def init_avrcp(self, target_id: str) -> None:
         """Initialize AVRCP service from the sink device.
 

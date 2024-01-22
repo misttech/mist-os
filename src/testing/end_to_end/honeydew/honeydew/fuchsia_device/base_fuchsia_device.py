@@ -74,7 +74,7 @@ class BaseFuchsiaDevice(
 
         self.health_check()
 
-    # List all the persistent properties in alphabetical order
+    # List all the persistent properties
     @properties.PersistentProperty
     def device_name(self) -> str:
         """Returns the name of the device.
@@ -141,7 +141,7 @@ class BaseFuchsiaDevice(
         """
         return self._device_info["serial_number"]
 
-    # List all the dynamic properties in alphabetical order
+    # List all the dynamic properties
     @properties.DynamicProperty
     def firmware_version(self) -> str:
         """Returns the firmware version of the device.
@@ -151,7 +151,7 @@ class BaseFuchsiaDevice(
         """
         return self._build_info["version"]
 
-    # List all transports in alphabetical order
+    # List all transports
     @properties.Transport
     def fastboot(self) -> fastboot_transport.Fastboot:
         """Returns the Fastboot transport object.
@@ -184,15 +184,6 @@ class BaseFuchsiaDevice(
         )
         return ffx_obj
 
-    @properties.Affordance
-    def screenshot(self) -> screenshot.Screenshot:
-        """Returns a screenshot affordance object.
-
-        Returns:
-            screenshot.Screenshot object
-        """
-        return screenshot_ffx.Screenshot(self.ffx)
-
     @properties.Transport
     def ssh(self) -> ssh_transport.SSH:
         """Returns the SSH transport object.
@@ -215,7 +206,7 @@ class BaseFuchsiaDevice(
         )
         return ssh_obj
 
-    # List all the affordances in alphabetical order
+    # List all the affordances
     @properties.Affordance
     def session(self) -> session.Session:
         """Returns a session affordance object.
@@ -225,7 +216,16 @@ class BaseFuchsiaDevice(
         """
         return session_ffx.Session(device_name=self.device_name, ffx=self.ffx)
 
-    # List all the public methods in alphabetical order
+    @properties.Affordance
+    def screenshot(self) -> screenshot.Screenshot:
+        """Returns a screenshot affordance object.
+
+        Returns:
+            screenshot.Screenshot object
+        """
+        return screenshot_ffx.Screenshot(self.ffx)
+
+    # List all the public methods
     def health_check(self) -> None:
         """Ensure device is healthy.
 
@@ -419,7 +419,7 @@ class BaseFuchsiaDevice(
                 f"'{self.device_name}' failed to go online in {timeout}sec."
             ) from err
 
-    # List all private properties in alphabetical order
+    # List all private properties
     @property
     @abc.abstractmethod
     def _build_info(self) -> dict[str, Any]:
@@ -459,7 +459,7 @@ class BaseFuchsiaDevice(
             errors.Sl4FError: On communications failure.
         """
 
-    # List all private methods, in alphabetical order
+    # List all private methods,
     @abc.abstractmethod
     def _send_log_command(
         self, tag: str, message: str, level: custom_types.LEVEL

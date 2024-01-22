@@ -18,6 +18,7 @@ from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
 from honeydew.interfaces.device_classes import transports_capable
+from honeydew.interfaces.device_classes import affordances_capable
 
 # pylint: disable=protected-access
 _INPUT_ARGS: dict[str, Any] = {
@@ -80,7 +81,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
             mock_ffx_check_connection.assert_called()
             mock_ssh_check_connection.assert_called()
 
-    # # List all the tests related to __init__ in alphabetical order
+    # # List all the tests related to __init__
     @parameterized.expand(
         [
             (
@@ -150,7 +151,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice
         )
 
-    # List all the tests related to static properties in alphabetical order
+    # List all the tests related to static properties
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
         "get_target_type",
@@ -216,7 +217,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         """Testcase for BaseFuchsiaDevice.serial_number property"""
         self.assertEqual(self.fd_obj.serial_number, "default-serial-number")
 
-    # List all the tests related to dynamic properties in alphabetical order
+    # List all the tests related to dynamic properties
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice,
         "_build_info",
@@ -229,7 +230,26 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         """Testcase for BaseFuchsiaDevice.firmware_version property"""
         self.assertEqual(self.fd_obj.firmware_version, "1.2.3")
 
-    # List all the tests related to transports in alphabetical order
+    # List all the tests related to affordances
+    def test_fuchsia_device_is_reboot_capable(self) -> None:
+        """Test case to make sure fuchsia device is reboot capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.RebootCapableDevice
+        )
+
+    def test_fuchsia_device_is_screenshot_capable(self) -> None:
+        """Test case to make sure fuchsia device is screenshot capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.ScreenshotCapableDevice
+        )
+
+    def test_fuchsia_device_is_session_capable(self) -> None:
+        """Test case to make sure fuchsia device is session capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.SessionCapableDevice
+        )
+
+    # List all the tests related to transports
     def test_fuchsia_device_is_fastboot_capable(self) -> None:
         """Test case to make sure fuchsia device is Fastboot capable"""
         self.assertIsInstance(
@@ -244,7 +264,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         """Test case to make sure fuchsia device is SSH capable"""
         self.assertIsInstance(self.fd_obj, transports_capable.SSHCapableDevice)
 
-    # List all the tests related to public methods in alphabetical order
+    # List all the tests related to public methods
     def test_close(self) -> None:
         """Testcase for BaseFuchsiaDevice.close()"""
         self.fd_obj.close()

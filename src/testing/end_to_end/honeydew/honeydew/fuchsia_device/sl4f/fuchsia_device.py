@@ -65,9 +65,9 @@ class FuchsiaDevice(
     affordances_capable.BluetoothAvrcpCapableDevice,
     affordances_capable.BluetoothGapCapableDevice,
     affordances_capable.TracingCapableDevice,
+    affordances_capable.UserInputCapableDevice,
     affordances_capable.WlanPolicyCapableDevice,
     affordances_capable.WlanCapableDevice,
-    affordances_capable.UserInputCapableDevice,
     transports_capable.SL4FCapableDevice,
 ):
     """FuchsiaDevice abstract base class implementation using SL4F.
@@ -99,7 +99,7 @@ class FuchsiaDevice(
         )
         _LOGGER.debug("Initialized SL4F-based FuchsiaDevice")
 
-    # List all the transports in alphabetical order
+    # List all the transports
     @properties.Transport
     def sl4f(self) -> sl4f_transport.SL4F:
         """Returns the SL4F transport object.
@@ -117,7 +117,7 @@ class FuchsiaDevice(
         )
         return sl4f_obj
 
-    # List all the affordances in alphabetical order
+    # List all the affordances
     @properties.Affordance
     def bluetooth_avrcp(self) -> bluetooth_avrcp_interface.BluetoothAvrcp:
         """Returns a BluetoothAvrcp affordance object.
@@ -180,7 +180,7 @@ class FuchsiaDevice(
         """
         return wlan_sl4f.Wlan(device_name=self.device_name, sl4f=self.sl4f)
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def close(self) -> None:
         """Clean up method."""
         return
@@ -210,7 +210,7 @@ class FuchsiaDevice(
 
         super().on_device_boot()
 
-    # List all private properties in alphabetical order
+    # List all private properties
     @property
     def _build_info(self) -> dict[str, Any]:
         """Returns the build information of the device.
@@ -256,7 +256,7 @@ class FuchsiaDevice(
         )
         return get_product_info_resp["result"]
 
-    # List all private methods in alphabetical order
+    # List all private methods
     def _send_log_command(
         self, tag: str, message: str, level: custom_types.LEVEL
     ) -> None:

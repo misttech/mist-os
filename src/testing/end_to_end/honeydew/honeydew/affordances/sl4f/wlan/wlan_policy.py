@@ -60,7 +60,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         self._name: str = device_name
         self._sl4f: SL4F = sl4f
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def connect(
         self, target_ssid: str, security_type: SecurityType
     ) -> RequestStatus:

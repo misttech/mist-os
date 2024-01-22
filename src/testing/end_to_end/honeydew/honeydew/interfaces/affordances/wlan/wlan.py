@@ -10,7 +10,7 @@ import abc
 class Wlan(abc.ABC):
     """Abstract base class for Wlan affordance."""
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     @abc.abstractmethod
     def get_phy_ids(self) -> list[int]:
         """Get a list of identifiers for WLAN PHYs.

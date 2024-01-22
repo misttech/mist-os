@@ -35,7 +35,7 @@ _INPUT_ARGS: dict[str, Any] = {
 class InitTests(unittest.TestCase):
     """Unit tests for honeydew.__init__.py."""
 
-    # List all the tests related to public methods in alphabetical order
+    # List all the tests related to public methods
     @mock.patch.object(
         honeydew.fc_fuchsia_device.fuchsia_controller_transport.FuchsiaController,
         "check_connection",

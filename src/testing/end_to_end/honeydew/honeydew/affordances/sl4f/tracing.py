@@ -65,7 +65,7 @@ class Tracing(tracing.Tracing):
         """
         return self._session_initialized
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def initialize(
         self,
         categories: list[str] | None = None,

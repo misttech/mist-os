@@ -13,7 +13,7 @@ from typing import Iterator
 class Tracing(abc.ABC):
     """Abstract base class for Tracing affordance."""
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     @abc.abstractmethod
     def initialize(
         self,

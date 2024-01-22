@@ -57,7 +57,7 @@ class PowerSwitchDmc(power_switch.PowerSwitch):
                 f"{platform.node()}"
             ) from error
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def power_off(self, outlet: int | None = None) -> None:
         """Turns off the power of the Fuchsia device.
 

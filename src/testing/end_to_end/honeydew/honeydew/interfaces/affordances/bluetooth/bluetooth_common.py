@@ -15,7 +15,7 @@ BluetoothConnectionType = bluetooth.BluetoothConnectionType
 class BluetoothCommon(abc.ABC):
     """Abstract base class for BluetoothCommon affordance."""
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     @abc.abstractmethod
     def sys_init(self) -> None:
         """Initializes bluetooth stack."""

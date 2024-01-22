@@ -67,12 +67,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class FuchsiaDevice(
     base_fuchsia_device.BaseFuchsiaDevice,
-    affordances_capable.BluetoothAvrcpCapableDevice,
-    affordances_capable.BluetoothGapCapableDevice,
     affordances_capable.TracingCapableDevice,
-    affordances_capable.UserInputCapableDevice,
-    affordances_capable.WlanPolicyCapableDevice,
-    affordances_capable.WlanCapableDevice,
 ):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
@@ -106,7 +101,7 @@ class FuchsiaDevice(
         )
         _LOGGER.debug("Initialized Fuchsia-Controller based FuchsiaDevice")
 
-    # List all the transports in alphabetical order
+    # List all the transports
     @properties.Transport
     def fuchsia_controller(
         self,
@@ -126,7 +121,7 @@ class FuchsiaDevice(
         )
         return fuchsia_controller_obj
 
-    # List all the affordances in alphabetical order
+    # List all the affordances
     @properties.Affordance
     def bluetooth_avrcp(self) -> bluetooth_avrcp_interface.BluetoothAvrcp:
         """Returns a BluetoothAvrcp affordance object.
@@ -185,7 +180,7 @@ class FuchsiaDevice(
         """
         raise NotImplementedError
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     def close(self) -> None:
         """Clean up method."""
         return
@@ -215,7 +210,7 @@ class FuchsiaDevice(
 
         super().on_device_boot()
 
-    # List all private properties in alphabetical order
+    # List all private properties
     @property
     def _build_info(self) -> dict[str, Any]:
         """Returns the build information of the device.
@@ -287,7 +282,7 @@ class FuchsiaDevice(
                 "Fuchsia Controller FIDL Error"
             ) from status
 
-    # List all private methods in alphabetical order
+    # List all private methods
     def _send_log_command(
         self, tag: str, message: str, level: custom_types.LEVEL
     ) -> None:

@@ -744,7 +744,7 @@ class FFX:
                 f" {timeout}sec."
             ) from err
 
-    # List all private methods in alphabetical order
+    # List all private methods
     def _generate_ffx_cmd(
         self,
         cmd: list[str],

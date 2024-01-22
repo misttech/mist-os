@@ -15,7 +15,7 @@ BluetoothAvrcpCommand = bluetooth.BluetoothAvrcpCommand
 class BluetoothAvrcp(bluetooth_common.BluetoothCommon):
     """Abstract base class for BluetoothAvrcp Profile affordance."""
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     @abc.abstractmethod
     def init_avrcp(self, target_id: str) -> None:
         """Initialize AVRCP service from the sink device."""

@@ -33,7 +33,7 @@ class FuchsiaDevice(abc.ABC):
     running Fuchsia irrespective of the device type.
     """
 
-    # List all the persistent properties in alphabetical order
+    # List all the persistent properties
     @properties.PersistentProperty
     @abc.abstractmethod
     def device_name(self) -> str:
@@ -88,7 +88,7 @@ class FuchsiaDevice(abc.ABC):
             Serial number of the device.
         """
 
-    # List all the dynamic properties in alphabetical order
+    # List all the dynamic properties
     @properties.DynamicProperty
     @abc.abstractmethod
     def firmware_version(self) -> str:
@@ -98,7 +98,7 @@ class FuchsiaDevice(abc.ABC):
             Firmware version of the device.
         """
 
-    # List all the affordances in alphabetical order
+    # List all the affordances
     @properties.Affordance
     @abc.abstractmethod
     def bluetooth_avrcp(self) -> bluetooth_avrcp.BluetoothAvrcp:
@@ -171,7 +171,7 @@ class FuchsiaDevice(abc.ABC):
             wlan.Wlan object
         """
 
-    # List all the public methods in alphabetical order
+    # List all the public methods
     @abc.abstractmethod
     def close(self) -> None:
         """Clean up method."""

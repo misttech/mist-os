@@ -136,62 +136,14 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice
         )
 
-    # List all the tests related to affordances in alphabetical order
-    def test_fuchsia_device_is_bluetooth_avrcp_capable(self) -> None:
-        """Test case to make sure fuchsia device is BluetoothAvrcp capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.BluetoothAvrcpCapableDevice
-        )
-
-    def test_fuchsia_device_is_bluetooth_gap_capable(self) -> None:
-        """Test case to make sure fuchsia device is BluetoothGap capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.BluetoothGapCapableDevice
-        )
-
-    def test_fuchsia_device_is_reboot_capable(self) -> None:
-        """Test case to make sure fuchsia device is reboot capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.RebootCapableDevice
-        )
-
-    def test_fuchsia_device_is_screenshot_capable(self) -> None:
-        """Test case to make sure fuchsia device is screenshot capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.ScreenshotCapableDevice
-        )
-
-    def test_fuchsia_device_is_session_capable(self) -> None:
-        """Test case to make sure fuchsia device is session capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.SessionCapableDevice
-        )
-
+    # List all the tests related to affordances
     def test_fuchsia_device_is_tracing_capable(self) -> None:
         """Test case to make sure fuchsia device is tracing capable"""
         self.assertIsInstance(
             self.fd_obj, affordances_capable.TracingCapableDevice
         )
 
-    def test_fuchsia_device_is_user_input_capable(self) -> None:
-        """Test case to make sure fuchsia device is user_input capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.UserInputCapableDevice
-        )
-
-    def test_fuchsia_device_is_wlan_policy_capable(self) -> None:
-        """Test case to make sure fuchsia device is wlan_policy capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.WlanPolicyCapableDevice
-        )
-
-    def test_fuchsia_device_is_wlan_capable(self) -> None:
-        """Test case to make sure fuchsia device is wlan capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.WlanCapableDevice
-        )
-
-    # List all the tests related to public methods in alphabetical order
+    # List all the tests related to public methods
     def test_close(self) -> None:
         """Testcase for FuchsiaDevice.close()"""
         self.fd_obj.close()
@@ -238,7 +190,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_fc_create_context.assert_called_once()
         mock_health_check.assert_called_once()
 
-    # List all the tests related to private properties in alphabetical order
+    # List all the tests related to private properties
     @mock.patch.object(
         f_buildinfo.Provider.Client,
         "get_build_info",
@@ -398,7 +350,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
         mock_fc_connect_device_proxy.assert_called_once()
 
-    # List all the tests related to private methods in alphabetical order
+    # List all the tests related to private methods
     @parameterized.expand(
         [
             (
