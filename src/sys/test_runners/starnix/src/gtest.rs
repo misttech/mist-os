@@ -121,6 +121,8 @@ pub async fn run_gtest_cases(
         test_type,
         &format!("output={}:{}{}", output_format, OUTPUT_PATH, output_file_name),
     );
+
+    tracing::info!("writing json output to {:?}", output_arg);
     append_program_args(
         vec![test_filter_arg, output_arg],
         start_info.program.as_mut().expect("No program."),

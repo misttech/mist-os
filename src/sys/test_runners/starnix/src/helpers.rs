@@ -4,7 +4,7 @@
 
 use {
     anyhow::{anyhow, Context as _, Error},
-    fidl::endpoints::create_proxy,
+    fidl::endpoints::{create_proxy, Proxy},
     fidl::HandleBased,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess,
@@ -219,25 +219,22 @@ pub fn add_output_dir_to_namespace(
 
     let test_data_path = format!("{}/{}", TEST_DATA_DIR, uuid::Uuid::new_v4());
     std::fs::create_dir_all(&test_data_path).expect("cannot create test output directory.");
-    let test_data_dir = fuchsia_fs::directory::open_in_namespace(
+    let data_dir_proxy = fuchsia_fs::directory::open_in_namespace(
         &test_data_path,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     )
     .expect("Cannot open test data directory.");
 
-    let (dir_client, dir_server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-    test_data_dir
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server)
-        .expect("Couldn't clone output directory.");
-    let data_dir =
-        fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::new(dir_client.into_channel());
-
+    let data_dir = data_dir_proxy.into_client_end().expect("Cannot get client end from proxy.");
     start_info.ns.as_mut().ok_or(anyhow!("Missing namespace."))?.push(ComponentNamespaceEntry {
         path: Some("/test_data".to_string()),
         directory: Some(data_dir),
         ..Default::default()
     });
 
+    let test_data_dir =
+        fuchsia_fs::directory::open_in_namespace(&test_data_path, fio::OpenFlags::RIGHT_READABLE)
+            .expect("Cannot open test data directory.");
     Ok(test_data_dir)
 }
 
