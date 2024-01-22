@@ -142,6 +142,8 @@ func NewFFXInstance(
 		ffxCmds = append(ffxCmds, []string{"config", "set", "ssh.priv", fmt.Sprintf("[\"%s\"]", sshKey)})
 	}
 	for _, args := range ffxCmds {
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		defer cancel()
 		if err := ffx.Run(ctx, args...); err != nil {
 			if stopErr := ffx.Stop(); stopErr != nil {
 				logger.Debugf(ctx, "failed to stop daemon: %s", stopErr)
