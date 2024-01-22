@@ -3388,7 +3388,7 @@ template("executable") {
       deps += [ "//zircon/system/ulib/zx-panic-libc" ]
     }
 
-    if (disable_syslog_backend) {
+    if (disable_syslog_backend && !is_host) {
       assert_no_deps += [ "//sdk/lib/syslog/cpp" ]
     }
 
