@@ -20,15 +20,16 @@ namespace amlogic_display {
 
 // The resource ordering in the board driver's `display_mmios` table.
 enum class MmioResourceIndex : uint8_t {
-  kVpu = 0,               // VPU (Video Processing Unit)
-  kDsiTop = 1,            // TOP_MIPI_DSI (DSI "top" host controller integration)
-  kDsiPhy = 2,            // DSI_PHY
-  kHhi = 3,               // HIU (Host Interface Unit) / HHI
-  kAonRti = 4,            // RTI / AO_RTI / AOBUS_RTI
-  kEeReset = 5,           // RESET
-  kGpioMux = 6,           // PERIPHS_REGS (GPIO Multiplexing)
-  kHdmiTxController = 7,  // HDMITX (HDMI Transmitter Controller IP)
-  kHdmiTxTop = 8,         // HDMITX (HDMI Transmitter Top-Level)
+  kVpu = 0,                // VPU (Video Processing Unit)
+  kDsiTop = 1,             // TOP_MIPI_DSI (DSI "top" host controller integration)
+  kDsiPhy = 2,             // DSI_PHY
+  kDsiHostController = 3,  // DesignWare Cores MIPI DSI Host Controller IP block
+  kHhi = 4,                // HIU (Host Interface Unit) / HHI
+  kAonRti = 5,             // RTI / AO_RTI / AOBUS_RTI
+  kEeReset = 6,            // RESET
+  kGpioMux = 7,            // PERIPHS_REGS (GPIO Multiplexing)
+  kHdmiTxController = 8,   // HDMITX (HDMI Transmitter Controller IP)
+  kHdmiTxTop = 9,          // HDMITX (HDMI Transmitter Top-Level)
 };
 
 // Typesafe wrapper for PdevFidl::MapMmio().

@@ -43,6 +43,11 @@ static const std::vector<fpbus::Mmio> display_mmios{
         .length = S905D2_DSI_PHY_LENGTH,
     }},
     {{
+        // DSI Host Controller
+        .base = S905D2_MIPI_DSI_BASE,
+        .length = S905D2_MIPI_DSI_LENGTH,
+    }},
+    {{
         // HIU / HHI
         .base = S905D2_HIU_BASE,
         .length = S905D2_HIU_LENGTH,

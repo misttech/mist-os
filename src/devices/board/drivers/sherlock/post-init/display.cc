@@ -45,6 +45,11 @@ static const std::vector<fpbus::Mmio> display_mmios{
         .length = T931_DSI_PHY_LENGTH,
     }},
     {{
+        // DSI Host Controller
+        .base = T931_MIPI_DSI_BASE,
+        .length = T931_MIPI_DSI_LENGTH,
+    }},
+    {{
         // HIU / HHI
         .base = T931_HIU_BASE,
         .length = T931_HIU_LENGTH,
