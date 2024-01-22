@@ -36,8 +36,10 @@ constexpr uint32_t G12B_CLK_AUDIO = AmlClkId(11, clk_type::kMesonGate);
 
 constexpr uint32_t G12B_CLK_EMMC_C = AmlClkId(12, clk_type::kMesonGate);
 
+constexpr uint32_t G12B_CLK_TSENSOR = AmlClkId(13, clk_type::kMesonGate);
+
 // NB: This must be the last entry
-constexpr uint32_t CLK_G12B_COUNT = 13;
+constexpr uint32_t CLK_G12B_COUNT = 14;
 
 // kMesonPllClocks
 constexpr uint32_t CLK_GP0_PLL = AmlClkId(GP0_PLL, clk_type::kMesonPll);

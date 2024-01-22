@@ -61,8 +61,9 @@ static constexpr meson_clk_gate_t g12b_clk_gates[] = {
     {.reg = kG12bHhiXtalDivnCntl, .bit = 12},  // G12B_CLK_25M
 
     {.reg = kG12bHhiGclkMpeg1, .bit = 0},  // G12B_CLK_AUDIO
-
     {.reg = kG12bHhiGclkMpeg0, .bit = 26},  // G12B_CLK_EMMC_C
+
+    {.reg = kG12bHhiTsClkCntl, .bit = 8},   // For Temperature Sensors
 };
 
 static_assert(g12b_clk::CLK_G12B_COUNT == std::size(g12b_clk_gates),
