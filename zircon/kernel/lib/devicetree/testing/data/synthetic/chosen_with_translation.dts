@@ -9,7 +9,7 @@
   #size-cells = <0x02>;
   #address-cells = <0x02>;
 
-  some-interrupt-controller {
+  some-interrupt-controller@0 {
     #address-cells = <0x02>;
     #size-cells = <0x02>;
     #interrupt-cells = <0x03>;
@@ -33,6 +33,6 @@
   };
 
   aliases {
-    my-favorite-uart = "/some-interrupt-controller/pl011uart@9000000";
+    my-favorite-uart = "/some-interrupt-controller@0/pl011uart@9000000";
   };
 };

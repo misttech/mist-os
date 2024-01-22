@@ -190,7 +190,7 @@ TEST_F(ChosenNodeMatcherTest, ChosenWithAddressTranslation) {
                                  .mmio_phys = 0x9030000,
                                  .irq = 33,
                              },
-                         .uart_absolute_path = "/some-interrupt-controller/pl011uart@9000000",
+                         .uart_absolute_path = "/some-interrupt-controller@0/pl011uart@9000000",
                      });
 }
 
