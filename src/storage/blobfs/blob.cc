@@ -359,9 +359,9 @@ fs::VnodeProtocolSet Blob::GetProtocols() const { return fs::VnodeProtocol::kFil
 bool Blob::ValidateRights(fs::Rights rights) const {
   // To acquire write access to a blob, it must be empty.
   //
-  // TODO(https://fxbug.dev/67659) If we run FIDL on multiple threads (we currently don't) there is a race
-  // condition here where another thread could start writing at the same time. Decide whether we
-  // support FIDL from multiple threads and if so, whether this condition is important.
+  // TODO(https://fxbug.dev/67659) If we run FIDL on multiple threads (we currently don't) there is
+  // a race condition here where another thread could start writing at the same time. Decide whether
+  // we support FIDL from multiple threads and if so, whether this condition is important.
   std::lock_guard lock(mutex_);
   return !rights.write || state_ == BlobState::kEmpty;
 }
@@ -597,7 +597,8 @@ void Blob::VmoRead(uint64_t offset, uint64_t length) {
   fs::PagedVfs& vfs = vfs_opt.value().get();
 
   if (is_corrupt_) {
-    FX_LOGS(ERROR) << "Blobfs failing page request because blob was previously found corrupt.";
+    FX_LOGS(ERROR) << "Blobfs failing page request because blob was previously found corrupt: "
+                   << digest();
     if (auto error_result = vfs.ReportPagerError(paged_vmo(), offset, length, ZX_ERR_BAD_STATE);
         error_result.is_error()) {
       FX_LOGS(ERROR) << "Failed to report pager error to kernel: " << error_result.status_string();
