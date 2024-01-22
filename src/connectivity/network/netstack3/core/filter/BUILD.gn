@@ -1,0 +1,41 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("netstack3-filter") {
+  edition = "2021"
+  with_unit_tests = true
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  sources = [
+    "src/context.rs",
+    "src/lib.rs",
+    "src/logic.rs",
+    "src/matchers.rs",
+    "src/packets.rs",
+    "src/state.rs",
+  ]
+  deps = [
+    "//src/connectivity/lib/net-types",
+    "//src/connectivity/lib/packet-formats",
+    "//src/lib/fakealloc",
+    "//third_party/rust_crates:derivative",
+  ]
+  test_deps = [
+    "//src/connectivity/lib/ip-test-macro",
+    "//src/connectivity/lib/net-declare",
+    "//src/lib/const-unwrap",
+    "//third_party/rust_crates:test-case",
+  ]
+}
+
+fuchsia_unittest_package("netstack3-filter-test") {
+  deps = [ ":netstack3-filter_test" ]
+}
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":netstack3-filter-test" ]
+}
