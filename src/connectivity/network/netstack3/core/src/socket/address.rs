@@ -6,6 +6,7 @@
 
 use core::{
     fmt::{self, Debug, Display, Formatter},
+    marker::PhantomData,
     ops::Deref,
 };
 
@@ -20,22 +21,36 @@ use crate::{
     socket::{AddrVec, DualStackIpExt, SocketMapAddrSpec},
 };
 
-/// A [`ZonedAddr`] whose addr is witness to the properties required by sockets.
-#[derive(Copy, Clone, Eq, GenericOverIp, Hash, PartialEq)]
-#[generic_over_ip(A, IpAddress)]
-pub struct SocketZonedIpAddr<A: IpAddress, Z>(ZonedAddr<SpecifiedAddr<A>, Z>);
+/// A [`ZonedAddr`] whose address is `Zoned` iff a zone is required.
+///
+/// Any address whose scope can have a zone, will be the `Zoned` variant. The
+/// one exception is the loopback address, which is represented as `Unzoned`.
+/// This is because the loopback address is allowed to have, but does not
+/// require having, a zone.
+///
+/// # Type Parameters
+///
+/// A: The base [`IpAddress`] type.
+/// W: The [`Witness`] types of the `A`.
+/// Z: The zone of `A`.
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+pub struct StrictlyZonedAddr<A, W, Z> {
+    addr: ZonedAddr<W, Z>,
+    marker: PhantomData<A>,
+}
 
-impl<A: IpAddress, Z: Debug> Debug for SocketZonedIpAddr<A, Z> {
+impl<A: Debug, W: Debug, Z: Debug> Debug for StrictlyZonedAddr<A, W, Z> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Self(addr) = self;
+        let StrictlyZonedAddr { addr, marker: PhantomData } = self;
         write!(f, "{:?}", addr)
     }
 }
 
-impl<A: IpAddress, Z> SocketZonedIpAddr<A, Z> {
-    /// Convert self the inner [`ZonedAddr`]
-    pub fn into_inner(self) -> ZonedAddr<SpecifiedAddr<A>, Z> {
-        self.0
+impl<A: IpAddress, W: Witness<A> + ScopeableAddress + Copy, Z> StrictlyZonedAddr<A, W, Z> {
+    /// Convert self into the inner [`ZonedAddr`]
+    pub fn into_inner(self) -> ZonedAddr<W, Z> {
+        let StrictlyZonedAddr { addr, marker: PhantomData } = self;
+        addr
     }
 
     /// Creates from a specified IP address and an optional zone.
@@ -46,26 +61,29 @@ impl<A: IpAddress, Z> SocketZonedIpAddr<A, Z> {
     /// # Panics
     /// This method panics if the `addr` wants a zone and `get_zone` will panic
     /// when called.
-    pub fn new_with_zone(addr: SpecifiedAddr<A>, get_zone: impl FnOnce() -> Z) -> Self {
-        if let Some(addr_and_zone) = crate::socket::try_into_null_zoned(&addr) {
-            ZonedAddr::Zoned(addr_and_zone.map_zone(move |()| get_zone())).into()
+    pub fn new_with_zone(addr: W, get_zone: impl FnOnce() -> Z) -> Self {
+        if let Some(addr_and_zone) = crate::socket::try_into_null_zoned::<A, W>(&addr) {
+            StrictlyZonedAddr {
+                addr: ZonedAddr::Zoned(addr_and_zone.map_zone(move |()| get_zone())),
+                marker: PhantomData,
+            }
         } else {
-            ZonedAddr::Unzoned(addr).into()
+            StrictlyZonedAddr { addr: ZonedAddr::Unzoned(addr), marker: PhantomData }
         }
     }
-}
 
-impl<A: IpAddress, Z> Deref for SocketZonedIpAddr<A, Z> {
-    type Target = ZonedAddr<SpecifiedAddr<A>, Z>;
-    fn deref(&self) -> &Self::Target {
-        let SocketZonedIpAddr(addr) = self;
-        addr
+    #[cfg(test)]
+    /// Creates the unzoned variant, or panics if the addr's scope needs a zone.
+    pub(crate) fn new_unzoned_or_panic(addr: W) -> Self {
+        Self::new_with_zone(addr, || panic!("addr unexpectedly required a zone."))
     }
 }
 
-impl<A: IpAddress, Z> From<ZonedAddr<SpecifiedAddr<A>, Z>> for SocketZonedIpAddr<A, Z> {
-    fn from(addr: ZonedAddr<SpecifiedAddr<A>, Z>) -> Self {
-        SocketZonedIpAddr(addr)
+impl<A: IpAddress, W: Witness<A>, Z> Deref for StrictlyZonedAddr<A, W, Z> {
+    type Target = ZonedAddr<W, Z>;
+    fn deref(&self) -> &Self::Target {
+        let StrictlyZonedAddr { addr, marker: PhantomData } = self;
+        addr
     }
 }
 
@@ -427,8 +445,8 @@ pub(crate) enum TryUnmapResult<I: DualStackIpExt, D> {
     CannotBeUnmapped(ZonedAddr<SocketIpAddr<I::Addr>, D>),
     /// The address in the other stack that corresponds to the input.
     ///
-    /// Since [`SocketZonedIpAddr`] is guaranteed to hold a specified address,
-    /// this must hold an `Option<SocketZonedIpAddr>`. Since `::FFFF:0.0.0.0` is
+    /// Since [`SocketIpAddr`] is guaranteed to hold a specified address,
+    /// this must hold an `Option<SocketIpAddr>`. Since `::FFFF:0.0.0.0` is
     /// a legal IPv4-mapped IPv6 address, this allows us to represent it as the
     /// unspecified IPv4 address.
     Mapped(Option<ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>>),
@@ -445,13 +463,13 @@ pub(crate) enum TryUnmapResult<I: DualStackIpExt, D> {
 /// IPv4-mapped IPv6 addresses. All other inputs will produce
 /// [`TryUnmapResult::CannotBeUnmapped`].
 pub(crate) fn try_unmap<A: IpAddress, D>(
-    addr: SocketZonedIpAddr<A, D>,
+    addr: ZonedAddr<SpecifiedAddr<A>, D>,
 ) -> TryUnmapResult<A::Version, D>
 where
     A::Version: DualStackIpExt,
 {
     <A::Version as Ip>::map_ip(
-        addr.into_inner(),
+        addr,
         |v4| {
             let addr = SocketIpAddr::new_ipv4_specified(v4.addr());
             TryUnmapResult::CannotBeUnmapped(ZonedAddr::Unzoned(addr))
@@ -489,12 +507,10 @@ pub(crate) enum DualStackRemoteIp<I: DualStackIpExt, D> {
 /// an unspecified address will be populated with
 /// [`crate::socket::specify_unspecified_remote()`].
 pub(crate) fn dual_stack_remote_ip<I: DualStackIpExt, D>(
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, D>>,
+    remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, D>>,
 ) -> DualStackRemoteIp<I, D> {
-    let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(
-        remote_ip.map(SocketZonedIpAddr::into_inner),
-    );
-    match try_unmap(remote_ip.into()) {
+    let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(remote_ip);
+    match try_unmap(remote_ip) {
         TryUnmapResult::CannotBeUnmapped(remote_ip) => {
             DualStackRemoteIp::<I, _>::ThisStack(remote_ip)
         }

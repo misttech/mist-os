@@ -21,7 +21,7 @@ use net_types::{
         GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, IpVersion, IpVersionMarker, Ipv4,
         Ipv4Addr, Ipv6, Ipv6Addr,
     },
-    MulticastAddr, SpecifiedAddr, Witness,
+    MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::{
@@ -51,7 +51,7 @@ use crate::{
     socket::{
         address::{
             AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackConnIpAddr, DualStackListenerIpAddr,
-            ListenerAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
+            ListenerAddr, ListenerIpAddr, SocketIpAddr, StrictlyZonedAddr,
         },
         datagram::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
@@ -896,11 +896,11 @@ impl<I: IpExt, D: WeakId> PortAllocImpl for UdpBoundSocketMap<I, D> {
 #[generic_over_ip(A, IpAddress)]
 pub struct ConnInfo<A: IpAddress, D> {
     /// The local address associated with a UDP connection.
-    pub local_ip: SocketZonedIpAddr<A, D>,
+    pub local_ip: StrictlyZonedAddr<A, SpecifiedAddr<A>, D>,
     /// The local port associated with a UDP connection.
     pub local_port: NonZeroU16,
     /// The remote address associated with a UDP connection.
-    pub remote_ip: SocketZonedIpAddr<A, D>,
+    pub remote_ip: StrictlyZonedAddr<A, SpecifiedAddr<A>, D>,
     /// The remote port associated with a UDP connection.
     pub remote_port: UdpRemotePort,
 }
@@ -959,11 +959,11 @@ where
             );
 
         Self {
-            local_ip: SocketZonedIpAddr::new_with_zone(local_ip, || {
+            local_ip: StrictlyZonedAddr::new_with_zone(local_ip, || {
                 device.clone().expect("device must be bound for addresses that require zones")
             }),
             local_port,
-            remote_ip: SocketZonedIpAddr::new_with_zone(remote_ip, || {
+            remote_ip: StrictlyZonedAddr::new_with_zone(remote_ip, || {
                 device.expect("device must be bound for addresses that require zones")
             }),
             remote_port,
@@ -978,7 +978,7 @@ where
 pub struct ListenerInfo<A: IpAddress, D> {
     /// The local address associated with a UDP listener, or `None` for any
     /// address.
-    pub local_ip: Option<SocketZonedIpAddr<A, D>>,
+    pub local_ip: Option<StrictlyZonedAddr<A, SpecifiedAddr<A>, D>>,
     /// The local port associated with a UDP listener.
     pub local_port: NonZeroU16,
 }
@@ -1020,7 +1020,7 @@ where
         );
 
         let local_ip = addr.map(|addr| {
-            SocketZonedIpAddr::new_with_zone(addr, || {
+            StrictlyZonedAddr::new_with_zone(addr, || {
                 device.expect("device must be bound for addresses that require zones")
             })
         });
@@ -1601,7 +1601,10 @@ where
         &mut self,
         id: &SocketId<I>,
         remote_ip: Option<
-            SocketZonedIpAddr<<I>::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            ZonedAddr<
+                SpecifiedAddr<I::Addr>,
+                <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+            >,
         >,
         remote_port: UdpRemotePort,
     ) -> Result<(), ConnectError> {
@@ -2046,7 +2049,10 @@ where
         &mut self,
         id: &SocketId<I>,
         addr: Option<
-            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            ZonedAddr<
+                SpecifiedAddr<I::Addr>,
+                <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+            >,
         >,
         port: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
@@ -2107,7 +2113,10 @@ where
         &mut self,
         id: &SocketId<I>,
         remote_ip: Option<
-            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            ZonedAddr<
+                SpecifiedAddr<I::Addr>,
+                <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+            >,
         >,
         remote_port: UdpRemotePort,
         body: B,
@@ -3037,7 +3046,7 @@ mod tests {
         let remote_ip = remote_ip::<I>();
         let socket = api.create();
         // Create a listener on the local port, bound to the local IP:
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
             .expect("listen_udp failed");
 
         // Inject a packet and check that the context receives it:
@@ -3074,7 +3083,7 @@ mod tests {
         // Send a packet providing a local ip:
         api.send_to(
             &socket,
-            Some(ZonedAddr::Unzoned(remote_ip).into()),
+            Some(ZonedAddr::Unzoned(remote_ip)),
             REMOTE_PORT.into(),
             Buf::new(body.to_vec(), ..),
         )
@@ -3083,7 +3092,7 @@ mod tests {
         // And send a packet that doesn't:
         api.send_to(
             &socket,
-            Some(ZonedAddr::Unzoned(remote_ip).into()),
+            Some(ZonedAddr::Unzoned(remote_ip)),
             REMOTE_PORT.into(),
             Buf::new(body.to_vec(), ..),
         )
@@ -3151,9 +3160,9 @@ mod tests {
         let remote_ip = remote_ip::<I>();
         let socket = api.create();
         // Create a UDP connection with a specified local port and local IP.
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
             .expect("listen_udp failed");
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect failed");
 
         // Inject a UDP packet and see if we receive it on the context.
@@ -3204,7 +3213,7 @@ mod tests {
         // Create a UDP connection with a specified local port and local IP.
         let unbound = api.create();
         let conn_err = api
-            .connect(&unbound, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+            .connect(&unbound, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .unwrap_err();
 
         assert_eq!(conn_err, ConnectError::Ip(ResolveRouteError::Unreachable.into()));
@@ -3222,8 +3231,7 @@ mod tests {
         let remote_ip = remote_ip::<I>();
         // Create a UDP listener with a specified local port and local ip:
         let unbound = api.create();
-        let result =
-            api.listen(&unbound, Some(ZonedAddr::Unzoned(remote_ip).into()), Some(LOCAL_PORT));
+        let result = api.listen(&unbound, Some(ZonedAddr::Unzoned(remote_ip)), Some(LOCAL_PORT));
 
         assert_eq!(result, Err(Either::Right(LocalAddressError::CannotBindToAddress)));
     }
@@ -3242,7 +3250,7 @@ mod tests {
         );
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
         let socket = api.create();
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("can connect");
 
         let info = api.get_info(&socket);
@@ -3256,10 +3264,10 @@ mod tests {
             }) => (conn_local_ip, conn_remote_ip)
         );
         assert_eq!(
-            conn_local_ip.into_inner(),
-            ZonedAddr::Zoned(AddrAndZone::new(local_ip, FakeWeakDeviceId(FakeDeviceId)).unwrap())
+            conn_local_ip,
+            StrictlyZonedAddr::new_with_zone(local_ip, || FakeWeakDeviceId(FakeDeviceId)),
         );
-        assert_eq!(conn_remote_ip.into_inner(), ZonedAddr::Unzoned(remote_ip));
+        assert_eq!(conn_remote_ip, StrictlyZonedAddr::new_unzoned_or_panic(remote_ip));
 
         // Double-check that the bound device can't be changed after being set
         // implicitly.
@@ -3297,7 +3305,7 @@ mod tests {
 
         let remote_ip = remote_ip::<I>();
         assert_eq!(
-            api.connect(&unbound, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into()),
+            api.connect(&unbound, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into()),
             expected,
         );
     }
@@ -3314,18 +3322,14 @@ mod tests {
         // Exhaust local ports to trigger FailedToAllocateLocalPort error.
         for port_num in UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE {
             let socket = api.create();
-            api.listen(
-                &socket,
-                Some(ZonedAddr::Unzoned(local_ip).into()),
-                NonZeroU16::new(port_num),
-            )
-            .unwrap();
+            api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), NonZeroU16::new(port_num))
+                .unwrap();
         }
 
         let remote_ip = remote_ip::<I>();
         let unbound = api.create();
         let conn_err = api
-            .connect(&unbound, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+            .connect(&unbound, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .unwrap_err();
 
         assert_eq!(conn_err, ConnectError::CouldNotAllocateLocalPort);
@@ -3352,10 +3356,10 @@ mod tests {
         )
         .expect("join multicast group should succeed");
 
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
             .expect("Initial call to listen_udp was expected to succeed");
 
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect should succeed");
 
         // Check that socket options set on the listener are propagated to the
@@ -3400,11 +3404,11 @@ mod tests {
         .expect("join multicast group should succeed");
 
         // Create a UDP connection with a specified local port and local IP.
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
             .expect("Initial call to listen_udp was expected to succeed");
 
         assert_matches!(
-            api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into()),
+            api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into()),
             Err(ConnectError::Ip(IpSockCreationError::Route(ResolveRouteError::Unreachable)))
         );
 
@@ -3443,24 +3447,21 @@ mod tests {
             ));
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
-        let local_ip = ZonedAddr::Unzoned(local_ip).into();
-        let remote_ip = ZonedAddr::Unzoned(remote_ip).into();
-        let other_remote_ip = ZonedAddr::Unzoned(other_remote_ip).into();
-
         let socket = api.create();
-        api.listen(&socket, Some(local_ip), Some(LOCAL_PORT)).expect("listen should succeed");
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
+            .expect("listen should succeed");
 
-        api.connect(&socket, Some(remote_ip), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect was expected to succeed");
 
-        api.connect(&socket, Some(other_remote_ip), OTHER_REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(other_remote_ip)), OTHER_REMOTE_PORT.into())
             .expect("connect should succeed");
         assert_eq!(
             api.get_info(&socket),
             SocketInfo::Connected(ConnInfo {
-                local_ip: local_ip.into_inner().map_zone(FakeWeakDeviceId).into(),
+                local_ip: StrictlyZonedAddr::new_unzoned_or_panic(local_ip),
                 local_port: LOCAL_PORT,
-                remote_ip: other_remote_ip.into_inner().map_zone(FakeWeakDeviceId).into(),
+                remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(other_remote_ip),
                 remote_port: OTHER_REMOTE_PORT.into(),
             })
         );
@@ -3471,17 +3472,18 @@ mod tests {
         set_logger_for_test();
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
-        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>()).into();
-        let other_remote_ip = ZonedAddr::Unzoned(I::get_other_ip_address(3)).into();
+        let local_ip = local_ip::<I>();
+        let remote_ip = remote_ip::<I>();
+        let other_remote_ip = I::get_other_ip_address(3);
 
         let socket = api.create();
-        api.listen(&socket, Some(local_ip), Some(LOCAL_PORT)).expect("listen should succeed");
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
+            .expect("listen should succeed");
 
-        api.connect(&socket, Some(remote_ip), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect was expected to succeed");
         let error = api
-            .connect(&socket, Some(other_remote_ip), OTHER_REMOTE_PORT.into())
+            .connect(&socket, Some(ZonedAddr::Unzoned(other_remote_ip)), OTHER_REMOTE_PORT.into())
             .expect_err("connect should fail");
         assert_matches!(
             error,
@@ -3491,9 +3493,9 @@ mod tests {
         assert_eq!(
             api.get_info(&socket),
             SocketInfo::Connected(ConnInfo {
-                local_ip: local_ip.into_inner().map_zone(FakeWeakDeviceId).into(),
+                local_ip: StrictlyZonedAddr::new_unzoned_or_panic(local_ip),
                 local_port: LOCAL_PORT,
-                remote_ip: remote_ip.into_inner().map_zone(FakeWeakDeviceId).into(),
+                remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(remote_ip),
                 remote_port: REMOTE_PORT.into()
             })
         );
@@ -3515,16 +3517,16 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
         let socket = api.create();
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
             .expect("listen should succeed");
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect should succeed");
 
         let body = [1, 2, 3, 4, 5];
         // Try to send something with send_to
         api.send_to(
             &socket,
-            Some(ZonedAddr::Unzoned(other_remote_ip).into()),
+            Some(ZonedAddr::Unzoned(other_remote_ip)),
             REMOTE_PORT.into(),
             Buf::new(body.to_vec(), ..),
         )
@@ -3533,8 +3535,8 @@ mod tests {
         // The socket should not have been affected.
         let info = api.get_info(&socket);
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
-        assert_eq!(info.local_ip, ZonedAddr::Unzoned(local_ip).into());
-        assert_eq!(info.remote_ip, ZonedAddr::Unzoned(remote_ip).into());
+        assert_eq!(info.local_ip.into_inner(), ZonedAddr::Unzoned(local_ip));
+        assert_eq!(info.remote_ip.into_inner(), ZonedAddr::Unzoned(remote_ip));
         assert_eq!(info.remote_port, REMOTE_PORT.into());
 
         // Check first frame.
@@ -3566,7 +3568,7 @@ mod tests {
         let remote_ip = remote_ip::<I>();
         // Create a UDP connection with a specified local port and local IP.
         let socket = api.create();
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect failed");
 
         // Instruct the fake frame context to throw errors.
@@ -3586,7 +3588,7 @@ mod tests {
         let remote_ip = remote_ip::<I>();
         let socket = api.create();
         api.set_device(&socket, Some(&FakeDeviceId)).unwrap();
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect failed");
 
         for (device_removed, expected_res) in [
@@ -3637,7 +3639,7 @@ mod tests {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
-        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>()).into();
+        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
         let send_to_ip = send_to.then_some(remote_ip);
 
         let socket = api.create();
@@ -3659,9 +3661,9 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
         let socket = api.create();
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip::<I>()).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
             .expect("can bind");
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip::<I>()).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip::<I>())), REMOTE_PORT.into())
             .expect("can connect");
 
         // Receive once, then set the shutdown flag, then receive again and
@@ -3746,17 +3748,17 @@ mod tests {
         let [conn1, conn2] = [remote_ip_a, remote_ip_b].map(|remote_ip| {
             let socket = api.create();
             api.set_posix_reuse_port(&socket, true).expect("is unbound");
-            api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(local_port_d))
+            api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(local_port_d))
                 .expect("listen_udp failed");
-            api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+            api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
                 .expect("connect failed");
             socket
         });
         let list1 = api.create();
-        api.listen(&list1, Some(ZonedAddr::Unzoned(local_ip).into()), Some(local_port_a))
+        api.listen(&list1, Some(ZonedAddr::Unzoned(local_ip)), Some(local_port_a))
             .expect("listen_udp failed");
         let list2 = api.create();
-        api.listen(&list2, Some(ZonedAddr::Unzoned(local_ip).into()), Some(local_port_b))
+        api.listen(&list2, Some(ZonedAddr::Unzoned(local_ip)), Some(local_port_b))
             .expect("listen_udp failed");
         let wildcard_list = api.create();
         api.listen(&wildcard_list, None, Some(local_port_c)).expect("listen_udp failed");
@@ -4063,7 +4065,7 @@ mod tests {
             api.set_posix_reuse_port(&socket, true).expect("is unbound");
             api.listen(
                 &socket,
-                Some(ZonedAddr::Unzoned(multicast_addr.into_specified()).into()),
+                Some(ZonedAddr::Unzoned(multicast_addr.into_specified())),
                 Some(LOCAL_PORT),
             )
             .expect("listen_udp failed");
@@ -4133,13 +4135,13 @@ mod tests {
         let bound_first_device = api.create();
         api.listen(
             &bound_first_device,
-            Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
+            Some(ZonedAddr::Unzoned(local_ip::<I>())),
             Some(LOCAL_PORT),
         )
         .expect("listen should succeed");
         api.connect(
             &bound_first_device,
-            Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)).into()),
+            Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1))),
             REMOTE_PORT.into(),
         )
         .expect("connect should succeed");
@@ -4207,7 +4209,7 @@ mod tests {
         for socket in bound_on_devices {
             api.send_to(
                 &socket,
-                Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)).into()),
+                Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1))),
                 REMOTE_PORT.into(),
                 Buf::new(body.to_vec(), ..),
             )
@@ -4338,7 +4340,7 @@ mod tests {
         let socket = api.create();
         api.connect(
             &socket,
-            Some(ZonedAddr::Unzoned(device_configs[&MultipleDevicesId::A].remote_ips[0]).into()),
+            Some(ZonedAddr::Unzoned(device_configs[&MultipleDevicesId::A].remote_ips[0])),
             REMOTE_PORT.into(),
         )
         .expect("connect should succeed");
@@ -4428,15 +4430,15 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let socket = api.create();
         api.listen(&socket, None, Some(LOCAL_PORT)).expect("listen_udp failed");
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip::<I>()).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip::<I>())), REMOTE_PORT.into())
             .expect("connect failed");
         let info = api.get_info(&socket);
         assert_eq!(
             info,
             SocketInfo::Connected(ConnInfo {
-                local_ip: ZonedAddr::Unzoned(local_ip::<I>()).into(),
+                local_ip: StrictlyZonedAddr::new_unzoned_or_panic(local_ip::<I>()),
                 local_port: LOCAL_PORT,
-                remote_ip: ZonedAddr::Unzoned(remote_ip::<I>()).into(),
+                remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(remote_ip::<I>()),
                 remote_port: REMOTE_PORT.into(),
             })
         );
@@ -4458,16 +4460,16 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
         let conn_a = api.create();
-        api.connect(&conn_a, Some(ZonedAddr::Unzoned(ip_a).into()), REMOTE_PORT.into())
+        api.connect(&conn_a, Some(ZonedAddr::Unzoned(ip_a)), REMOTE_PORT.into())
             .expect("connect failed");
         let conn_b = api.create();
-        api.connect(&conn_b, Some(ZonedAddr::Unzoned(ip_b).into()), REMOTE_PORT.into())
+        api.connect(&conn_b, Some(ZonedAddr::Unzoned(ip_b)), REMOTE_PORT.into())
             .expect("connect failed");
         let conn_c = api.create();
-        api.connect(&conn_c, Some(ZonedAddr::Unzoned(ip_a).into()), OTHER_REMOTE_PORT.into())
+        api.connect(&conn_c, Some(ZonedAddr::Unzoned(ip_a)), OTHER_REMOTE_PORT.into())
             .expect("connect failed");
         let conn_d = api.create();
-        api.connect(&conn_d, Some(ZonedAddr::Unzoned(ip_a).into()), REMOTE_PORT.into())
+        api.connect(&conn_d, Some(ZonedAddr::Unzoned(ip_a)), REMOTE_PORT.into())
             .expect("connect failed");
         let valid_range = &UdpBoundSocketMap::<I, FakeWeakDeviceId<FakeDeviceId>>::EPHEMERAL_RANGE;
         let mut get_conn_port = |id| {
@@ -4497,7 +4499,7 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
         let listen_unbound = |api: &mut UdpApi<_, _>, socket| {
-            api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip::<I>()).into()), Some(LOCAL_PORT))
+            api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
         };
 
         // Tie up the address so the second call to `connect` fails.
@@ -4532,9 +4534,8 @@ mod tests {
         let wildcard_list = api.create();
         api.listen(&wildcard_list, None, None).expect("listen_udp failed");
         let specified_list = api.create();
-        api.listen(&specified_list, Some(ZonedAddr::Unzoned(local_ip).into()), None)
+        api.listen(&specified_list, Some(ZonedAddr::Unzoned(local_ip)), None)
             .expect("listen_udp failed");
-
         let mut get_listener_port = |id| {
             let info = api.get_info(&id);
             let info = assert_matches!(info, SocketInfo::Listener(info) => info);
@@ -4615,17 +4616,17 @@ mod tests {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
 
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
-        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>()).into();
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
+        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
         let socket = api.create();
         api.listen(&socket, Some(local_ip), Some(LOCAL_PORT)).unwrap();
         api.connect(&socket, Some(remote_ip), REMOTE_PORT.into()).expect("connect failed");
         let info = api.close(socket);
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
         // Assert that the info gotten back matches what was expected.
-        assert_eq!(info.local_ip, local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
+        assert_eq!(info.local_ip.into_inner(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, LOCAL_PORT);
-        assert_eq!(info.remote_ip, remote_ip.into_inner().map_zone(FakeWeakDeviceId).into());
+        assert_eq!(info.remote_ip.into_inner(), remote_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.remote_port, REMOTE_PORT.into());
 
         // Assert that that connection id was removed from the connections
@@ -4639,14 +4640,14 @@ mod tests {
     fn test_remove_udp_listener<I: Ip + TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
 
         // Test removing a specified listener.
         let specified = api.create();
         api.listen(&specified, Some(local_ip), Some(LOCAL_PORT)).expect("listen_udp failed");
         let info = api.close(specified);
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
-        assert_eq!(info.local_ip.unwrap(), local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
+        assert_eq!(info.local_ip.unwrap().into_inner(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, LOCAL_PORT);
         let Wrapped { outer: sockets_state, inner: _ } = api.core_ctx();
         assert_matches!(sockets_state.as_ref().get_socket_state(&specified), None);
@@ -4697,7 +4698,7 @@ mod tests {
 
     fn bind_as_listener<I: TestIpExt>(ctx: &mut UdpMultipleDevicesCtx, unbound: SocketId<I>) {
         UdpApi::<I, _>::new(ctx.as_mut())
-            .listen(&unbound, Some(ZonedAddr::Unzoned(local_ip::<I>()).into()), Some(LOCAL_PORT))
+            .listen(&unbound, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
             .expect("listen should succeed")
     }
 
@@ -4705,7 +4706,7 @@ mod tests {
         UdpApi::<I, _>::new(ctx.as_mut())
             .connect(
                 &unbound,
-                Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)).into()),
+                Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1))),
                 REMOTE_PORT.into(),
             )
             .expect("connect should succeed")
@@ -4869,7 +4870,7 @@ mod tests {
         )
         .expect("join group failed");
 
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
             .expect("listen_udp failed");
         let second_group = I::get_multicast_addr(5);
         api.set_multicast_membership(
@@ -4915,7 +4916,7 @@ mod tests {
 
         api.connect(
             &socket,
-            Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1)).into()),
+            Some(ZonedAddr::Unzoned(I::get_other_remote_ip_address(1))),
             REMOTE_PORT.into(),
         )
         .expect("connect failed");
@@ -4952,12 +4953,12 @@ mod tests {
         let local_ip = local_ip::<I>();
         let socket = api.create();
 
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT))
             .expect("listen_udp failed");
 
         // Attempting to create a new listener from the same unbound ID should
         // panic since the unbound socket ID is now invalid.
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(OTHER_LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(OTHER_LOCAL_PORT))
             .expect("listen again failed");
     }
 
@@ -4965,17 +4966,17 @@ mod tests {
     fn test_get_conn_info<I: Ip + TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
-        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>()).into();
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
+        let remote_ip = ZonedAddr::Unzoned(remote_ip::<I>());
         // Create a UDP connection with a specified local port and local IP.
         let socket = api.create();
         api.listen(&socket, Some(local_ip), Some(LOCAL_PORT)).expect("listen_udp failed");
         api.connect(&socket, Some(remote_ip), REMOTE_PORT.into()).expect("connect failed");
         let info = api.get_info(&socket);
         let info = assert_matches!(info, SocketInfo::Connected(info) => info);
-        assert_eq!(info.local_ip, local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
+        assert_eq!(info.local_ip.into_inner(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, LOCAL_PORT);
-        assert_eq!(info.remote_ip, remote_ip.into_inner().map_zone(FakeWeakDeviceId).into());
+        assert_eq!(info.remote_ip.into_inner(), remote_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.remote_port, REMOTE_PORT.into());
     }
 
@@ -4983,14 +4984,14 @@ mod tests {
     fn test_get_listener_info<I: Ip + TestIpExt>() {
         let mut ctx = UdpFakeDeviceCtx::with_core_ctx(UdpFakeDeviceCoreCtx::new_fake_device::<I>());
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
-        let local_ip = ZonedAddr::Unzoned(local_ip::<I>()).into();
+        let local_ip = ZonedAddr::Unzoned(local_ip::<I>());
 
         // Check getting info on specified listener.
         let specified = api.create();
         api.listen(&specified, Some(local_ip), Some(LOCAL_PORT)).expect("listen_udp failed");
         let info = api.get_info(&specified);
         let info = assert_matches!(info, SocketInfo::Listener(info) => info);
-        assert_eq!(info.local_ip.unwrap(), local_ip.into_inner().map_zone(FakeWeakDeviceId).into());
+        assert_eq!(info.local_ip.unwrap().into_inner(), local_ip.map_zone(FakeWeakDeviceId));
         assert_eq!(info.local_port, LOCAL_PORT);
 
         // Check getting info on wildcard listener.
@@ -5013,14 +5014,13 @@ mod tests {
 
         assert_eq!(api.get_posix_reuse_port(&first), true);
 
-        api.listen(&first, Some(ZonedAddr::Unzoned(local_ip::<I>()).into()), None)
-            .expect("listen failed");
+        api.listen(&first, Some(ZonedAddr::Unzoned(local_ip::<I>())), None).expect("listen failed");
         assert_eq!(api.get_posix_reuse_port(&first), true);
         let _: SocketInfo<_, _> = api.close(first);
 
         let second = api.create();
         api.set_posix_reuse_port(&second, true).expect("is unbound");
-        api.connect(&second, Some(ZonedAddr::Unzoned(remote_ip::<I>()).into()), REMOTE_PORT.into())
+        api.connect(&second, Some(ZonedAddr::Unzoned(remote_ip::<I>())), REMOTE_PORT.into())
             .expect("connect failed");
 
         assert_eq!(api.get_posix_reuse_port(&second), true);
@@ -5045,7 +5045,7 @@ mod tests {
         let socket = api.create();
 
         api.set_device(&socket, Some(&FakeDeviceId)).unwrap();
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip::<I>()).into()), Some(LOCAL_PORT))
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip::<I>())), Some(LOCAL_PORT))
             .expect("failed to listen");
         assert_eq!(api.get_bound_device(&socket), Some(FakeWeakDeviceId(FakeDeviceId)));
 
@@ -5059,7 +5059,7 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let socket = api.create();
         api.set_device(&socket, Some(&FakeDeviceId)).unwrap();
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip::<I>()).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip::<I>())), REMOTE_PORT.into())
             .expect("failed to connect");
         assert_eq!(api.get_bound_device(&socket), Some(FakeWeakDeviceId(FakeDeviceId)));
         api.set_device(&socket, None).expect("failed to set device");
@@ -5075,7 +5075,7 @@ mod tests {
         // Check listening to a non-local IP fails.
         let unbound = api.create();
         let listen_err = api
-            .listen(&unbound, Some(ZonedAddr::Unzoned(remote_ip).into()), Some(LOCAL_PORT))
+            .listen(&unbound, Some(ZonedAddr::Unzoned(remote_ip)), Some(LOCAL_PORT))
             .expect_err("listen_udp unexpectedly succeeded");
         assert_eq!(listen_err, Either::Right(LocalAddressError::CannotBindToAddress));
 
@@ -5109,8 +5109,7 @@ mod tests {
         assert!(bind_addr.scope().can_have_zone());
 
         let unbound = api.create();
-        let result =
-            api.listen(&unbound, Some(ZonedAddr::Unzoned(bind_addr).into()), Some(LOCAL_PORT));
+        let result = api.listen(&unbound, Some(ZonedAddr::Unzoned(bind_addr)), Some(LOCAL_PORT));
         assert_eq!(
             result,
             Err(Either::Right(LocalAddressError::Zone(ZonedAddressError::RequiredZoneNotProvided)))
@@ -5147,7 +5146,7 @@ mod tests {
         let result = api
             .listen(
                 &socket,
-                Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, zone_id).unwrap()).into()),
+                Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, zone_id).unwrap())),
                 Some(LOCAL_PORT),
             )
             .map_err(Either::unwrap_right);
@@ -5182,7 +5181,7 @@ mod tests {
         let result = api
             .listen(
                 &socket,
-                Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, zone_id).unwrap()).into()),
+                Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, zone_id).unwrap())),
                 Some(LOCAL_PORT),
             )
             .map_err(Either::unwrap_right);
@@ -5218,7 +5217,7 @@ mod tests {
         let socket = api.create();
         api.listen(
             &socket,
-            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap()).into()),
+            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap())),
             Some(LOCAL_PORT),
         )
         .expect("listen failed");
@@ -5261,12 +5260,12 @@ mod tests {
 
         let socket = api.create();
 
-        api.listen(&socket, bound_addr.map(SocketZonedIpAddr::from), Some(LOCAL_PORT)).unwrap();
+        api.listen(&socket, bound_addr, Some(LOCAL_PORT)).unwrap();
 
         assert_matches!(
             api.connect(
                 &socket,
-                Some(ZonedAddr::Unzoned(remote_ip::<Ipv6>()).into()),
+                Some(ZonedAddr::Unzoned(remote_ip::<Ipv6>())),
                 REMOTE_PORT.into(),
             ),
             Ok(())
@@ -5296,22 +5295,20 @@ mod tests {
         api.set_device(&socket, Some(&MultipleDevicesId::A)).unwrap();
 
         let zoned_local_addr =
-            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap()).into();
+            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap());
         api.listen(&socket, Some(zoned_local_addr), Some(LOCAL_PORT)).unwrap();
 
-        api.connect(
-            &socket,
-            Some(ZonedAddr::Unzoned(remote_ip::<Ipv6>()).into()),
-            REMOTE_PORT.into(),
-        )
-        .expect("connect should succeed");
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip::<Ipv6>())), REMOTE_PORT.into())
+            .expect("connect should succeed");
 
         assert_eq!(
             api.get_info(&socket),
             SocketInfo::Connected(ConnInfo {
-                local_ip: zoned_local_addr.into_inner().map_zone(FakeWeakDeviceId).into(),
+                local_ip: StrictlyZonedAddr::new_with_zone(ll_addr, || FakeWeakDeviceId(
+                    MultipleDevicesId::A
+                )),
                 local_port: LOCAL_PORT,
-                remote_ip: ZonedAddr::Unzoned(remote_ip::<Ipv6>()).into(),
+                remote_ip: StrictlyZonedAddr::new_unzoned_or_panic(remote_ip::<Ipv6>()),
                 remote_port: REMOTE_PORT.into(),
             })
         );
@@ -5350,22 +5347,19 @@ mod tests {
 
         api.listen(
             &socket,
-            Some(
-                ZonedAddr::Zoned(
-                    AddrAndZone::new(
-                        SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap(),
-                        MultipleDevicesId::A,
-                    )
-                    .unwrap(),
+            Some(ZonedAddr::Zoned(
+                AddrAndZone::new(
+                    SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap(),
+                    MultipleDevicesId::A,
                 )
-                .into(),
-            ),
+                .unwrap(),
+            )),
             Some(LOCAL_PORT),
         )
         .unwrap();
 
         let result = api
-            .connect(&socket, Some(remote_addr.into()), REMOTE_PORT.into())
+            .connect(&socket, Some(remote_addr), REMOTE_PORT.into())
             .map(|()| api.get_bound_device(&socket).unwrap());
         assert_eq!(result, expected);
     }
@@ -5391,7 +5385,7 @@ mod tests {
         api.set_device(&unbound, Some(&MultipleDevicesId::A)).unwrap();
 
         let result =
-            api.listen(&unbound, Some(ZonedAddr::Unzoned(loopback_addr).into()), Some(LOCAL_PORT));
+            api.listen(&unbound, Some(ZonedAddr::Unzoned(loopback_addr)), Some(LOCAL_PORT));
         assert_matches!(result, Ok(_));
     }
 
@@ -5440,14 +5434,10 @@ mod tests {
         }
 
         let send_to_remote_addr =
-            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap()).into();
+            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::A).unwrap());
         let result = if connect {
-            api.connect(
-                &socket,
-                Some(ZonedAddr::Unzoned(conn_remote_ip).into()),
-                REMOTE_PORT.into(),
-            )
-            .expect("connect should succeed");
+            api.connect(&socket, Some(ZonedAddr::Unzoned(conn_remote_ip)), REMOTE_PORT.into())
+                .expect("connect should succeed");
             api.send_to(
                 &socket,
                 Some(send_to_remote_addr),
@@ -5492,16 +5482,13 @@ mod tests {
         let socket = api.create();
         api.listen(
             &socket,
-            Some(
-                ZonedAddr::Zoned(
-                    AddrAndZone::new(
-                        SpecifiedAddr::new(device_a_local_ip).unwrap(),
-                        MultipleDevicesId::A,
-                    )
-                    .unwrap(),
+            Some(ZonedAddr::Zoned(
+                AddrAndZone::new(
+                    SpecifiedAddr::new(device_a_local_ip).unwrap(),
+                    MultipleDevicesId::A,
                 )
-                .into(),
-            ),
+                .unwrap(),
+            )),
             Some(LOCAL_PORT),
         )
         .expect("listen should succeed");
@@ -5509,15 +5496,11 @@ mod tests {
         // Use a remote address on device B, while the socket is listening on
         // device A. This should cause a failure when sending.
         let send_to_remote_addr =
-            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::B).unwrap()).into();
+            ZonedAddr::Zoned(AddrAndZone::new(ll_addr, MultipleDevicesId::B).unwrap());
 
         let result = if connect {
-            api.connect(
-                &socket,
-                Some(ZonedAddr::Unzoned(conn_remote_ip).into()),
-                REMOTE_PORT.into(),
-            )
-            .expect("connect should succeed");
+            api.connect(&socket, Some(ZonedAddr::Unzoned(conn_remote_ip)), REMOTE_PORT.into())
+                .expect("connect should succeed");
             api.send_to(
                 &socket,
                 Some(send_to_remote_addr),
@@ -5556,10 +5539,10 @@ mod tests {
         let socket = api.create();
         api.set_device(&socket, bind_device.as_ref()).unwrap();
 
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT)).unwrap();
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT)).unwrap();
         api.connect(
             &socket,
-            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap()).into()),
+            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap())),
             REMOTE_PORT.into(),
         )
         .expect("connect should succeed");
@@ -5588,11 +5571,11 @@ mod tests {
         let socket = api.create();
         api.listen(
             &socket,
-            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap()).into()),
+            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap())),
             Some(LOCAL_PORT),
         )
         .unwrap();
-        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into())
+        api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into())
             .expect("connect should succeed");
 
         assert_eq!(api.get_bound_device(&socket), Some(FakeWeakDeviceId(FakeDeviceId)));
@@ -5614,10 +5597,10 @@ mod tests {
         );
         let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
         let socket = api.create();
-        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip).into()), Some(LOCAL_PORT)).unwrap();
+        api.listen(&socket, Some(ZonedAddr::Unzoned(local_ip)), Some(LOCAL_PORT)).unwrap();
         api.connect(
             &socket,
-            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap()).into()),
+            Some(ZonedAddr::Zoned(AddrAndZone::new(ll_addr, FakeDeviceId).unwrap())),
             REMOTE_PORT.into(),
         )
         .expect("connect should succeed");
@@ -5670,7 +5653,7 @@ mod tests {
         let mut send_and_get_ttl = |remote_ip| {
             api.send_to(
                 &listener,
-                Some(ZonedAddr::Unzoned(remote_ip).into()),
+                Some(ZonedAddr::Unzoned(remote_ip)),
                 REMOTE_PORT.into(),
                 Buf::new(vec![], ..),
             )
@@ -5747,7 +5730,7 @@ mod tests {
         let listener = api.create();
         api.listen(
             &listener,
-            SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a).into()),
+            SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a)),
             Some(LOCAL_PORT),
         )
         .expect("can bind");
@@ -5802,7 +5785,7 @@ mod tests {
         let bind_v4 = |mut api: UdpApi<Ipv4, _>| {
             api.listen(
                 &v4_listener,
-                SpecifiedAddr::new(V4_LOCAL_IP).map(|a| ZonedAddr::Unzoned(a).into()),
+                SpecifiedAddr::new(V4_LOCAL_IP).map(|a| ZonedAddr::Unzoned(a)),
                 Some(LOCAL_PORT),
             )
         };
@@ -5810,7 +5793,7 @@ mod tests {
             api.listen(
                 &v6_listener,
                 SpecifiedAddr::new(bind_addr.v6_addr().unwrap_or(V4_LOCAL_IP_MAPPED))
-                    .map(|a| ZonedAddr::Unzoned(a).into()),
+                    .map(ZonedAddr::Unzoned),
                 Some(LOCAL_PORT),
             )
         };
@@ -5846,7 +5829,7 @@ mod tests {
         assert_eq!(
             api.listen(
                 &listener,
-                SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a).into()),
+                SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a)),
                 Some(LOCAL_PORT),
             ),
             Err(Either::Right(LocalAddressError::CannotBindToAddress))
@@ -5856,7 +5839,7 @@ mod tests {
         assert_eq!(
             api.listen(
                 &listener,
-                SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a).into()),
+                SpecifiedAddr::new(bind_addr).map(|a| ZonedAddr::Unzoned(a)),
                 Some(LOCAL_PORT),
             ),
             Ok(())
@@ -5877,7 +5860,7 @@ mod tests {
         assert_eq!(
             api.listen(
                 &listener,
-                SpecifiedAddr::new(NOT_ASSIGNED_MAPPED).map(|a| ZonedAddr::Unzoned(a).into()),
+                SpecifiedAddr::new(NOT_ASSIGNED_MAPPED).map(|a| ZonedAddr::Unzoned(a)),
                 Some(LOCAL_PORT),
             ),
             Err(Either::Right(LocalAddressError::CannotBindToAddress))
@@ -5896,7 +5879,7 @@ mod tests {
                 vec![Ipv6::FAKE_CONFIG.remote_ip],
             ));
 
-        const DUAL_STACK_ANY_ADDR: Option<SocketZonedIpAddr<Ipv6Addr, FakeDeviceId>> = None;
+        const DUAL_STACK_ANY_ADDR: Option<ZonedAddr<SpecifiedAddr<Ipv6Addr>, FakeDeviceId>> = None;
 
         fn assert_listeners(core_ctx: &mut FakeUdpCoreCtx<FakeDeviceId>, expect_present: bool) {
             const V4_LISTENER_ADDR: ListenerAddr<
@@ -5942,7 +5925,7 @@ mod tests {
         assert_eq!(
             api.connect(
                 &socket,
-                Some(ZonedAddr::Unzoned(Ipv6::FAKE_CONFIG.remote_ip).into()),
+                Some(ZonedAddr::Unzoned(Ipv6::FAKE_CONFIG.remote_ip)),
                 REMOTE_PORT.into(),
             ),
             Ok(())
@@ -5975,18 +5958,14 @@ mod tests {
             .expect("can set dual-stack enabled");
         let bind_addr = SpecifiedAddr::new(bind_addr);
         assert_eq!(
-            api.listen(
-                &listener,
-                bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
-                Some(LOCAL_PORT),
-            ),
+            api.listen(&listener, bind_addr.map(|a| ZonedAddr::Unzoned(a)), Some(LOCAL_PORT),),
             Ok(())
         );
 
         assert_eq!(
             api.get_info(&listener),
             SocketInfo::Listener(ListenerInfo {
-                local_ip: bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
+                local_ip: bind_addr.map(StrictlyZonedAddr::new_unzoned_or_panic),
                 local_port: LOCAL_PORT,
             })
         );
@@ -6020,18 +5999,14 @@ mod tests {
                 .expect("can set dual-stack enabled");
             let bind_addr = SpecifiedAddr::new(bind_addr);
             assert_eq!(
-                api.listen(
-                    &listener,
-                    bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
-                    Some(LOCAL_PORT),
-                ),
+                api.listen(&listener, bind_addr.map(|a| ZonedAddr::Unzoned(a)), Some(LOCAL_PORT),),
                 Ok(())
             );
 
             assert_eq!(
                 api.close(listener),
                 SocketInfo::Listener(ListenerInfo {
-                    local_ip: bind_addr.map(|a| ZonedAddr::Unzoned(a).into()),
+                    local_ip: bind_addr.map(StrictlyZonedAddr::new_unzoned_or_panic),
                     local_port: LOCAL_PORT,
                 })
             );
@@ -6066,11 +6041,7 @@ mod tests {
             api.set_dual_stack_enabled(&socket, enable_dual_stack)
                 .expect("can set dual-stack enabled");
             assert_eq!(
-                api.connect(
-                    &socket,
-                    Some(ZonedAddr::Unzoned(remote_ip).into()),
-                    REMOTE_PORT.into(),
-                ),
+                api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into(),),
                 Ok(())
             );
 
@@ -6081,7 +6052,7 @@ mod tests {
                     local_port: _,
                     remote_ip: found_remote_ip,
                     remote_port: found_remote_port,
-                }) if found_remote_ip.into_inner().addr() == remote_ip &&
+                }) if found_remote_ip.addr() == remote_ip &&
                     found_remote_port == REMOTE_PORT.into()
             );
         };
@@ -6121,7 +6092,7 @@ mod tests {
         api.set_dual_stack_enabled(&socket, enable_dual_stack).expect("can set dual-stack enabled");
 
         assert_eq!(
-            api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into()),
+            api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into()),
             expected_outcome
         );
 
@@ -6133,7 +6104,7 @@ mod tests {
                     local_port: _,
                     remote_ip: found_remote_ip,
                     remote_port: found_remote_port,
-                }) if found_remote_ip.into_inner().addr() == remote_ip &&
+                }) if found_remote_ip.addr() == remote_ip &&
                     found_remote_port == REMOTE_PORT.into()
             );
             // Disconnect the socket, returning it to the original state.
@@ -6176,14 +6147,14 @@ mod tests {
         assert_eq!(
             api.listen(
                 &socket,
-                SpecifiedAddr::new(local_ip).map(|local_ip| ZonedAddr::Unzoned(local_ip).into()),
+                SpecifiedAddr::new(local_ip).map(|local_ip| ZonedAddr::Unzoned(local_ip)),
                 Some(LOCAL_PORT),
             ),
             Ok(())
         );
 
         assert_eq!(
-            api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip).into()), REMOTE_PORT.into()),
+            api.connect(&socket, Some(ZonedAddr::Unzoned(remote_ip)), REMOTE_PORT.into()),
             expected_outcome
         );
 
@@ -6195,7 +6166,7 @@ mod tests {
                     local_port: _,
                     remote_ip: found_remote_ip,
                     remote_port: found_remote_port,
-                }) if found_remote_ip.into_inner().addr() == remote_ip &&
+                }) if found_remote_ip.addr() == remote_ip &&
                     found_remote_port == REMOTE_PORT.into()
             );
             // Disconnect the socket, returning it to the original state.
@@ -6209,7 +6180,7 @@ mod tests {
                 local_ip: found_local_ip, local_port: found_local_port
             }) if found_local_port == LOCAL_PORT &&
                 local_ip == found_local_ip.map(
-                        |a| a.into_inner().addr().get()
+                        |a| a.addr().get()
                     ).unwrap_or(Ipv6::UNSPECIFIED_ADDRESS)
         );
     }
@@ -6241,18 +6212,14 @@ mod tests {
         let socket = api.create();
 
         assert_eq!(
-            api.connect(
-                &socket,
-                Some(ZonedAddr::Unzoned(original_remote_ip).into()),
-                REMOTE_PORT.into(),
-            ),
+            api.connect(&socket, Some(ZonedAddr::Unzoned(original_remote_ip)), REMOTE_PORT.into(),),
             Ok(())
         );
 
         assert_eq!(
             api.connect(
                 &socket,
-                Some(ZonedAddr::Unzoned(new_remote_ip).into()),
+                Some(ZonedAddr::Unzoned(new_remote_ip)),
                 OTHER_REMOTE_PORT.into(),
             ),
             expected_outcome
@@ -6271,7 +6238,7 @@ mod tests {
                 local_port: _,
                 remote_ip: found_remote_ip,
                 remote_port: found_remote_port,
-            }) if found_remote_ip.into_inner().addr() == expected_remote_ip &&
+            }) if found_remote_ip.addr() == expected_remote_ip &&
                 found_remote_port == expected_remote_port.into()
         );
 
@@ -6512,7 +6479,7 @@ mod tests {
         }
         api.send_to(
             &socket,
-            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip))),
+            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
             LOCAL_PORT.into(),
             Buf::new(HELLO.to_vec(), ..),
         )
@@ -6555,7 +6522,7 @@ mod tests {
                 OriginalSocketState::Listener => {
                     api.listen(
                         &socket,
-                        Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                        Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
                         Some(LOCAL_PORT),
                     )
                     .expect("listen should succeed");
@@ -6563,7 +6530,7 @@ mod tests {
                 OriginalSocketState::Connected => {
                     api.connect(
                         &socket,
-                        Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                        Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
                         UdpRemotePort::Set(REMOTE_PORT),
                     )
                     .expect("connect should succeed");

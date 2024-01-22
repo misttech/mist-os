@@ -44,7 +44,7 @@ use crate::{
         address::{
             dual_stack_remote_ip, try_unmap, AddrVecIter, ConnAddr, ConnIpAddr,
             DualStackConnIpAddr, DualStackListenerIpAddr, DualStackRemoteIp, ListenerAddr,
-            ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr, TryUnmapResult,
+            ListenerIpAddr, SocketIpAddr, TryUnmapResult,
         },
         AddrVec, BoundSocketMap, EitherStack, InsertError, MaybeDualStack,
         NotDualStackCapableError, Shutdown, ShutdownType, SocketMapAddrSpec,
@@ -1812,7 +1812,7 @@ pub(crate) fn listen<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-    addr: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
+    addr: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
     core_ctx.with_sockets_state_mut(|core_ctx, state| {
@@ -2120,7 +2120,7 @@ fn listen_inner<
     bindings_ctx: &mut BC,
     state: &mut SocketsState<I, CC::WeakDeviceId, S>,
     id: S::SocketId<I>,
-    addr: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
+    addr: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
     /// Possible operations that might be performed, depending on whether the
@@ -3075,7 +3075,7 @@ pub(crate) fn connect<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
+    remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     extra: S::ConnStateExtra,
 ) -> Result<(), ConnectError> {
@@ -3575,7 +3575,7 @@ pub(crate) fn send_to<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     id: S::SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, CC::DeviceId>>,
+    remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, CC::DeviceId>>,
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     body: B,
 ) -> Result<(), Either<LocalAddressError, SendToError<S::SerializeError>>> {
@@ -5678,7 +5678,7 @@ mod test {
             &mut core_ctx,
             &mut bindings_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
             'a',
             body,
         )
@@ -5712,7 +5712,7 @@ mod test {
                 &mut core_ctx,
                 &mut bindings_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
                 'a',
                 body,
             ),
@@ -5938,7 +5938,7 @@ mod test {
                 &mut core_ctx,
                 &mut bindings_ctx,
                 socket,
-                SpecifiedAddr::new(local_ip).map(|a| ZonedAddr::Unzoned(a).into()),
+                SpecifiedAddr::new(local_ip).map(ZonedAddr::Unzoned),
                 Some(LOCAL_PORT),
             )
             .expect("listen should succeed"),
@@ -5946,7 +5946,7 @@ mod test {
                 &mut core_ctx,
                 &mut bindings_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(remote_ip).into()),
+                Some(ZonedAddr::Unzoned(remote_ip)),
                 ORIGINAL_REMOTE_PORT,
                 Default::default(),
             )
@@ -5975,7 +5975,7 @@ mod test {
                 &mut core_ctx,
                 &mut bindings_ctx,
                 socket,
-                Some(ZonedAddr::Unzoned(remote_ip).into()),
+                Some(ZonedAddr::Unzoned(remote_ip)),
                 NEW_REMOTE_PORT,
                 Default::default(),
             ),
@@ -6057,7 +6057,7 @@ mod test {
             &mut core_ctx,
             &mut bindings_ctx,
             socket,
-            Some(ZonedAddr::Unzoned(remote_ip).into()),
+            Some(ZonedAddr::Unzoned(remote_ip)),
             REMOTE_PORT,
             Default::default(),
         )
@@ -6135,7 +6135,7 @@ mod test {
                     &mut core_ctx,
                     &mut bindings_ctx,
                     socket,
-                    SpecifiedAddr::new(local_ip).map(|a| ZonedAddr::Unzoned(a).into()),
+                    SpecifiedAddr::new(local_ip).map(ZonedAddr::Unzoned),
                     Some(LOCAL_PORT),
                 )
                 .expect("listen should succeed"),
@@ -6143,7 +6143,7 @@ mod test {
                     &mut core_ctx,
                     &mut bindings_ctx,
                     socket,
-                    Some(ZonedAddr::Unzoned(remote_ip).into()),
+                    Some(ZonedAddr::Unzoned(remote_ip)),
                     REMOTE_PORT,
                     Default::default(),
                 )

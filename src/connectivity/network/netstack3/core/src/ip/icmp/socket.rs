@@ -15,7 +15,7 @@ use either::Either;
 
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker},
-    SpecifiedAddr,
+    SpecifiedAddr, ZonedAddr,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::{
@@ -36,7 +36,7 @@ use crate::{
     },
     socket::{
         self,
-        address::{ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketZonedIpAddr},
+        address::{ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr},
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
             DatagramSocketSpec, DatagramStateContext, ExpectedUnboundError, SocketHopLimits,
@@ -545,7 +545,10 @@ where
         &mut self,
         id: &SocketId<I>,
         remote_ip: Option<
-            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            ZonedAddr<
+                SpecifiedAddr<I::Addr>,
+                <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+            >,
         >,
         remote_id: u16,
     ) -> Result<(), datagram::ConnectError> {
@@ -561,7 +564,10 @@ where
         &mut self,
         id: &SocketId<I>,
         local_ip: Option<
-            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            ZonedAddr<
+                SpecifiedAddr<I::Addr>,
+                <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+            >,
         >,
         icmp_id: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
@@ -720,7 +726,10 @@ where
         &mut self,
         id: &SocketId<I>,
         remote_ip: Option<
-            SocketZonedIpAddr<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+            ZonedAddr<
+                SpecifiedAddr<I::Addr>,
+                <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+            >,
         >,
         body: B,
     ) -> Result<
@@ -880,22 +889,12 @@ mod tests {
             match send_type {
                 IcmpSendType::Send => {
                     socket_api
-                        .connect(
-                            &conn,
-                            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
-                            REMOTE_ID,
-                        )
+                        .connect(&conn, Some(ZonedAddr::Unzoned(remote_addr)), REMOTE_ID)
                         .unwrap();
                     socket_api.send(&conn, buf).unwrap();
                 }
                 IcmpSendType::SendTo => {
-                    socket_api
-                        .send_to(
-                            &conn,
-                            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
-                            buf,
-                        )
-                        .unwrap();
+                    socket_api.send_to(&conn, Some(ZonedAddr::Unzoned(remote_addr)), buf).unwrap();
                 }
             }
             handle_queued_rx_packets(ctx);
@@ -938,9 +937,9 @@ mod tests {
         assert_eq!(
             api.connect(
                 &conn,
-                Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(
+                Some(ZonedAddr::Unzoned(
                     SpecifiedAddr::new(net_ip_v6!("::ffff:192.0.2.1")).unwrap(),
-                ))),
+                )),
                 REMOTE_ID,
             ),
             Err(datagram::ConnectError::RemoteUnexpectedlyMapped)
@@ -952,12 +951,7 @@ mod tests {
         let mut ctx = FakeIcmpCtx::<I>::default();
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let conn = api.create();
-        api.connect(
-            &conn,
-            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
-            REMOTE_ID,
-        )
-        .unwrap();
+        api.connect(&conn, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), REMOTE_ID).unwrap();
 
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
@@ -992,12 +986,7 @@ mod tests {
             SocketInfo::Bound { local_ip: None, id: ICMP_ID, device: None }
         );
 
-        api.connect(
-            &id,
-            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
-            REMOTE_ID,
-        )
-        .unwrap();
+        api.connect(&id, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)), REMOTE_ID).unwrap();
         assert_eq!(
             api.get_info(&id),
             SocketInfo::Connected {

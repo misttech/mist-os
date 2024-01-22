@@ -191,7 +191,7 @@ pub mod socket {
 
     pub(crate) use base::*;
 
-    pub use address::{AddrIsMappedError, SocketZonedIpAddr};
+    pub use address::{AddrIsMappedError, StrictlyZonedAddr};
     pub use base::{NotDualStackCapableError, SetDualStackEnabledError, ShutdownType};
     pub use datagram::{
         ConnectError, ExpectedConnError, ExpectedUnboundError, MulticastInterfaceSelector,

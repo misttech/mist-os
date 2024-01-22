@@ -3007,7 +3007,6 @@ mod tests {
             types::RoutableIpAddr,
             IpCounters, SendIpPacketMeta,
         },
-        socket::address::SocketZonedIpAddr,
         state::StackStateBuilder,
         testutil::{assert_empty, Ctx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
         transport::udp::UdpStateBuilder,
@@ -4147,13 +4146,8 @@ mod tests {
             assert_eq!(conn, SocketId::new(0));
             socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
             socket_api
-                .connect(
-                    &conn,
-                    Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip))),
-                    REMOTE_ID,
-                )
+                .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip)), REMOTE_ID)
                 .unwrap();
-
             let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
             <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
                 &mut core_ctx.inner,
@@ -4447,13 +4441,8 @@ mod tests {
             assert_eq!(conn, SocketId::new(0));
             socket_api.bind(&conn, None, NonZeroU16::new(ICMP_ID)).unwrap();
             socket_api
-                .connect(
-                    &conn,
-                    Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip))),
-                    REMOTE_ID,
-                )
+                .connect(&conn, Some(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip)), REMOTE_ID)
                 .unwrap();
-
             let FakeCtxWithCoreCtx { core_ctx, bindings_ctx } = &mut ctx;
             <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
                 &mut core_ctx.inner,

@@ -16,7 +16,7 @@ use fuchsia_zircon as zx;
 use futures::StreamExt as _;
 use net_types::{
     ip::{Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    ScopeableAddress, SpecifiedAddr, Witness,
+    ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
 use netstack3_core::{
     device::DeviceId,
@@ -24,7 +24,7 @@ use netstack3_core::{
     ip::{IpSockCreationError, IpSockSendError, ResolveRouteError},
     socket::{
         ConnectError, NotDualStackCapableError, SetDualStackEnabledError,
-        SetMulticastMembershipError, SocketZonedIpAddr,
+        SetMulticastMembershipError,
     },
     tcp, udp,
 };
@@ -304,7 +304,7 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     /// `addr` is either `Some(a)` where `a` holds a specified address an
     /// optional zone, or `None` for the unspecified address (which can't have a
     /// zone).
-    fn new(addr: Option<SocketZonedIpAddr<Self::AddrType, NonZeroU64>>, port: u16) -> Self;
+    fn new(addr: Option<ZonedAddr<SpecifiedAddr<Self::AddrType>, NonZeroU64>>, port: u16) -> Self;
 
     /// Gets this `SockAddr`'s address.
     fn addr(&self) -> Self::AddrType;
@@ -343,7 +343,7 @@ impl SockAddr for fnet::Ipv6SocketAddress {
     };
 
     /// Creates a new `SockAddr6`.
-    fn new(addr: Option<SocketZonedIpAddr<Ipv6Addr, NonZeroU64>>, port: u16) -> Self {
+    fn new(addr: Option<ZonedAddr<SpecifiedAddr<Ipv6Addr>, NonZeroU64>>, port: u16) -> Self {
         let (addr, zone_index) = addr.map_or((Ipv6::UNSPECIFIED_ADDRESS, 0), |addr| {
             let (addr, zone) = addr.into_addr_zone();
             (addr.get(), zone.map_or(0, NonZeroU64::get))
@@ -390,9 +390,8 @@ impl SockAddr for fnet::Ipv4SocketAddress {
         fnet::Ipv4SocketAddress { address: fnet::Ipv4Address { addr: [0; 4] }, port: 0 };
 
     /// Creates a new `SockAddr4`.
-    fn new(addr: Option<SocketZonedIpAddr<Ipv4Addr, NonZeroU64>>, port: u16) -> Self {
-        let addr =
-            addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, |zoned| zoned.into_inner().into_unzoned().get());
+    fn new(addr: Option<ZonedAddr<SpecifiedAddr<Ipv4Addr>, NonZeroU64>>, port: u16) -> Self {
+        let addr = addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, |zoned| zoned.into_unzoned().get());
         fnet::Ipv4SocketAddress { address: addr.into_fidl(), port }
     }
 

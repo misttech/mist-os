@@ -13,7 +13,7 @@ use dense_map::{collection::DenseMapCollectionKey, EntryKey};
 use derivative::Derivative;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
-    AddrAndZone, SpecifiedAddr, Witness as _, ZonedAddr,
+    AddrAndZone, ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
 
 use crate::{
@@ -184,9 +184,9 @@ pub(crate) fn can_device_change<
 /// Converts into a [`AddrAndZone<A, ()>`] if the address requires a zone.
 ///
 /// Otherwise returns `None`.
-pub(crate) fn try_into_null_zoned<A: IpAddress>(
-    addr: &SpecifiedAddr<A>,
-) -> Option<AddrAndZone<SpecifiedAddr<A>, ()>> {
+pub(crate) fn try_into_null_zoned<A: IpAddress, W: Witness<A> + ScopeableAddress + Copy>(
+    addr: &W,
+) -> Option<AddrAndZone<W, ()>> {
     if addr.get().is_loopback() {
         return None;
     }

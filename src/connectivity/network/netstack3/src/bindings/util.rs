@@ -41,7 +41,9 @@ use netstack3_core::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Metric,
         RawMetric,
     },
-    socket::{MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, SocketZonedIpAddr},
+    socket::{
+        self as core_socket, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
+    },
     types::WorkQueueReport,
 };
 
@@ -870,7 +872,7 @@ impl IntoErrno for SocketAddressError {
 }
 
 impl<A: IpAddress, D> TryFromFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
-    for (Option<SocketZonedIpAddr<A, D>>, u16)
+    for (Option<ZonedAddr<SpecifiedAddr<A>, D>>, u16)
 where
     A::Version: IpSockAddrExt,
     D: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
@@ -906,7 +908,7 @@ where
 }
 
 impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
-    for (Option<SocketZonedIpAddr<A, D>>, u16)
+    for (Option<ZonedAddr<SpecifiedAddr<A>, D>>, u16)
 where
     A::Version: IpSockAddrExt,
     D: TryIntoFidlWithContext<NonZeroU64>,
@@ -920,7 +922,7 @@ where
         let (addr, port) = self;
         let addr = addr
             .map(|addr| {
-                Ok(match addr.into_inner() {
+                Ok(match addr {
                     ZonedAddr::Unzoned(addr) => ZonedAddr::Unzoned(addr),
                     ZonedAddr::Zoned(z) => z
                         .try_map_zone(|zone| {
@@ -936,7 +938,24 @@ where
 }
 
 impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
-    for (SocketZonedIpAddr<A, D>, NonZeroU16)
+    for (Option<core_socket::StrictlyZonedAddr<A, SpecifiedAddr<A>, D>>, u16)
+where
+    A::Version: IpSockAddrExt,
+    D: TryIntoFidlWithContext<NonZeroU64>,
+{
+    type Error = D::Error;
+
+    fn try_into_fidl_with_ctx<C: ConversionContext>(
+        self,
+        ctx: &C,
+    ) -> Result<<A::Version as IpSockAddrExt>::SocketAddress, Self::Error> {
+        let (addr, port) = self;
+        (addr.map(core_socket::StrictlyZonedAddr::into_inner), port).try_into_fidl_with_ctx(ctx)
+    }
+}
+
+impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
+    for (ZonedAddr<SpecifiedAddr<A>, D>, NonZeroU16)
 where
     A::Version: IpSockAddrExt,
     D: TryIntoFidlWithContext<NonZeroU64>,
@@ -953,7 +972,7 @@ where
 }
 
 impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
-    for (Option<SocketZonedIpAddr<A, D>>, NonZeroU16)
+    for (Option<ZonedAddr<SpecifiedAddr<A>, D>>, NonZeroU16)
 where
     A::Version: IpSockAddrExt,
     D: TryIntoFidlWithContext<NonZeroU64>,
@@ -1540,7 +1559,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn sock_addr_into_core_err<A: SockAddr>(addr: A, expected: SocketAddressError)
     where
-        (Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsCtx>>>, u16):
+        (Option<ZonedAddr<SpecifiedAddr<A::AddrType>, DeviceId<BindingsCtx>>>, u16):
             TryFromFidlWithContext<A, Error = SocketAddressError>,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
         DeviceId<BindingsCtx>: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
@@ -1595,9 +1614,9 @@ mod tests {
         addr: A,
         (zoned, port): (Option<ZonedAddr<SpecifiedAddr<A::AddrType>, ReplaceWithCoreId>>, u16),
     ) where
-        (Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsCtx>>>, u16):
+        (Option<ZonedAddr<SpecifiedAddr<A::AddrType>, DeviceId<BindingsCtx>>>, u16):
             TryFromFidlWithContext<A, Error = SocketAddressError> + TryIntoFidlWithContext<A>,
-        <(Option<SocketZonedIpAddr<A::AddrType, DeviceId<BindingsCtx>>>, u16) as
+        <(Option<ZonedAddr<SpecifiedAddr<A::AddrType>, DeviceId<BindingsCtx>>>, u16) as
                  TryIntoFidlWithContext<A>>::Error: Debug,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
         DeviceId<BindingsCtx>:
@@ -1611,7 +1630,7 @@ mod tests {
             }
         });
 
-        let result: (Option<SocketZonedIpAddr<_, _>>, _) =
+        let result: (Option<ZonedAddr<_, _>>, _) =
             addr.clone().try_into_core_with_ctx(&ctx).expect("into core should succeed");
         assert_eq!(result, (zoned, port));
 

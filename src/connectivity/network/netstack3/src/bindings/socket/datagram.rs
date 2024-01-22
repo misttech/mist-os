@@ -36,7 +36,7 @@ use netstack3_core::{
     socket::{
         self as core_socket, ConnectError, ExpectedConnError, ExpectedUnboundError,
         MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NotDualStackCapableError,
-        SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType, SocketZonedIpAddr,
+        SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     udp::{self, UdpBindingsContext},
@@ -219,11 +219,11 @@ pub(crate) trait OptionFromU16: Sized {
 }
 
 pub(crate) struct LocalAddress<I: Ip, D, L> {
-    address: Option<SocketZonedIpAddr<I::Addr, D>>,
+    address: Option<core_socket::StrictlyZonedAddr<I::Addr, SpecifiedAddr<I::Addr>, D>>,
     identifier: Option<L>,
 }
 pub(crate) struct RemoteAddress<I: Ip, D, R> {
-    address: SocketZonedIpAddr<I::Addr, D>,
+    address: core_socket::StrictlyZonedAddr<I::Addr, SpecifiedAddr<I::Addr>, D>,
     identifier: R,
 }
 
@@ -252,14 +252,14 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     fn connect(
         ctx: &mut Ctx,
         id: &Self::SocketId,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>,
+        remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, DeviceId<BindingsCtx>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError>;
 
     fn bind(
         ctx: &mut Ctx,
         id: &Self::SocketId,
-        addr: Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>,
+        addr: Option<ZonedAddr<SpecifiedAddr<I::Addr>, DeviceId<BindingsCtx>>>,
         port: Option<Self::LocalIdentifier>,
     ) -> Result<(), Self::ListenError>;
 
@@ -355,7 +355,10 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     fn send_to<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
-        remote: (Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>, Self::RemoteIdentifier),
+        remote: (
+            Option<ZonedAddr<SpecifiedAddr<I::Addr>, DeviceId<BindingsCtx>>>,
+            Self::RemoteIdentifier,
+        ),
         body: B,
     ) -> Result<(), Self::SendToError>;
 }
@@ -401,7 +404,7 @@ where
     fn connect(
         ctx: &mut Ctx,
         id: &Self::SocketId,
-        remote_ip: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
+        remote_ip: Option<ZonedAddr<SpecifiedAddr<<I as Ip>::Addr>, DeviceId<BindingsCtx>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError> {
         ctx.api().udp().connect(id, remote_ip, remote_id)
@@ -410,7 +413,7 @@ where
     fn bind(
         ctx: &mut Ctx,
         id: &Self::SocketId,
-        addr: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
+        addr: Option<ZonedAddr<SpecifiedAddr<<I as Ip>::Addr>, DeviceId<BindingsCtx>>>,
         port: Option<Self::LocalIdentifier>,
     ) -> Result<(), Self::ListenError> {
         ctx.api().udp().listen(id, addr, port)
@@ -556,7 +559,7 @@ where
         ctx: &mut Ctx,
         id: &Self::SocketId,
         (remote_ip, remote_port): (
-            Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
+            Option<ZonedAddr<SpecifiedAddr<I::Addr>, DeviceId<BindingsCtx>>>,
             Self::RemoteIdentifier,
         ),
         body: B,
@@ -631,7 +634,7 @@ where
     fn connect(
         ctx: &mut Ctx,
         id: &Self::SocketId,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<BindingsCtx>>>,
+        remote_ip: Option<ZonedAddr<SpecifiedAddr<I::Addr>, DeviceId<BindingsCtx>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError> {
         ctx.api().icmp_echo().connect(id, remote_ip, remote_id)
@@ -640,7 +643,7 @@ where
     fn bind(
         ctx: &mut Ctx,
         id: &Self::SocketId,
-        addr: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
+        addr: Option<ZonedAddr<SpecifiedAddr<<I as Ip>::Addr>, DeviceId<BindingsCtx>>>,
         port: Option<Self::LocalIdentifier>,
     ) -> Result<(), Self::ListenError> {
         ctx.api().icmp_echo().bind(id, addr, port)
@@ -821,7 +824,7 @@ where
         ctx: &mut Ctx,
         id: &Self::SocketId,
         (remote_ip, _remote_id): (
-            Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<BindingsCtx>>>,
+            Option<ZonedAddr<SpecifiedAddr<I::Addr>, DeviceId<BindingsCtx>>>,
             Self::RemoteIdentifier,
         ),
         body: B,
@@ -1804,8 +1807,9 @@ where
         };
         let addr = want_addr.then(|| {
             I::SocketAddress::new(
-                SpecifiedAddr::new(source_addr)
-                    .map(|a| SocketZonedIpAddr::new_with_zone(a, || interface_id)),
+                SpecifiedAddr::new(source_addr).map(|a| {
+                    core_socket::StrictlyZonedAddr::new_with_zone(a, || interface_id).into_inner()
+                }),
                 source_port,
             )
             .into_sock_addr()
@@ -2220,14 +2224,14 @@ impl<I: Ip, D: Clone> IntoFidl<LocalAddress<I, D, NonZeroU16>> for icmp::SocketI
             Self::Unbound => (None, None),
             Self::Bound { local_ip, id, device } => (
                 local_ip.map(|addr| {
-                    SocketZonedIpAddr::new_with_zone(addr, || {
+                    core_socket::StrictlyZonedAddr::new_with_zone(addr, || {
                         device.expect("device must be bound for addresses that require zones")
                     })
                 }),
                 Some(id),
             ),
             Self::Connected { local_ip, id, remote_ip: _, remote_id: _, device } => (
-                Some(SocketZonedIpAddr::new_with_zone(local_ip, || {
+                Some(core_socket::StrictlyZonedAddr::new_with_zone(local_ip, || {
                     device.expect("device must be bound for addresses that require zones")
                 })),
                 Some(id),
@@ -2244,7 +2248,7 @@ impl<I: Ip, D: Clone> TryIntoFidl<RemoteAddress<I, D, u16>> for icmp::SocketInfo
             Self::Unbound | Self::Bound { .. } => Err(fposix::Errno::Enotconn),
             Self::Connected { local_ip: _, id: _, remote_ip, remote_id, device } => {
                 Ok(RemoteAddress {
-                    address: SocketZonedIpAddr::new_with_zone(remote_ip, || {
+                    address: core_socket::StrictlyZonedAddr::new_with_zone(remote_ip, || {
                         device.expect("device must be bound for addresses that require zones")
                     }),
                     identifier: remote_id,

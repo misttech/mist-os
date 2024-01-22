@@ -5388,7 +5388,7 @@ mod tests {
             tcp_api
                 .bind(
                     &socket,
-                    Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                    Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
                     Some(REMOTE_PORT),
                 )
                 .unwrap();
@@ -5401,7 +5401,7 @@ mod tests {
             tcp_api
                 .connect(
                     &socket,
-                    Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                    Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
                     REMOTE_PORT,
                 )
                 .unwrap();
