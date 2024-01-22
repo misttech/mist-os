@@ -364,6 +364,13 @@ mod test {
                 "in-tree link to /docs/no_readme could not be found at \"doc_checker_test_data/docs/no_readme\" or  \"doc_checker_test_data/docs/no_readme/README.md\""),
             DocCheckError::new_error(4,PathBuf::from("doc_checker_test_data/docs/path.md"),
                 "in-tree link to /docs/missing-image.png could not be found at \"doc_checker_test_data/docs/missing-image.png\""),
+            // There are 3 instances of [i] on the same line.
+            DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
+                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
+            DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
+                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
+            DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
+                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
             DocCheckError::new_error(6, PathBuf::from("doc_checker_test_data/docs/second.md"),
                 "Invalid link http://{}.com/markdown : invalid uri character"),
             DocCheckError::new_error(10, PathBuf::from("doc_checker_test_data/docs/second.md"),

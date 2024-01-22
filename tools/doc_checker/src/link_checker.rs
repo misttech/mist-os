@@ -249,7 +249,7 @@ impl DocCheck for LinkChecker {
                                     .collect::<Vec<String>>()
                                     .join("");
                                 if text == link_url.to_string() && link_url == link_title {
-                                    errors.push(DocCheckError::new_info_helpful(
+                                    errors.push(DocCheckError::new_error_helpful(
                                         ele.doc_line().line_num,
                                         ele.doc_line().file_name.clone(),
                                         &format!(
@@ -664,12 +664,12 @@ fn handle_shortcut_unknown(
         return errors;
     }
     if text == link_url.to_string() && link_url == link_title {
-        errors.push(DocCheckError::new_info_helpful(
+        errors.push(DocCheckError::new_error_helpful(
             ele.doc_line().line_num,
             ele.doc_line().file_name.clone(),
             &format!("unescaped [{}] not treating this as a shortcut link.", link_url),
             &format!(
-                "escaped \\[{}\\] or make a link [{}](/docs/{}",
+                "escape brackets \\[{}\\] or make a link [{}](/docs/{})",
                 link_title, link_url, link_url
             ),
         ));
@@ -1169,9 +1169,9 @@ mod tests {
             PathBuf::from("/docs/README.md"),
             "brackets which are not a link [your name here]"
         ),
-        Some([DocCheckError::new_info_helpful(1, PathBuf::from("/docs/README.md"),
+        Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
             "unescaped [your name here] not treating this as a shortcut link.",
-            "escaped \\[your name here\\] or make a link [your name here](/docs/your name here")
+            "escape brackets \\[your name here\\] or make a link [your name here](/docs/your name here)")
             ].to_vec()),
         ),
         (

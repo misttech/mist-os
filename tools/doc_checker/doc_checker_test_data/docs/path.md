@@ -16,4 +16,6 @@ Missing alt text for an image ![image](/docs/images/fuchsia_icon_256x256.png)
 
     <img src="/docs/images/fuchsia_icon_256x256.png">
 
+Some text that looks like a reference link c[i] = a[i] + b[i]
+
 [second-file]: /docs/second.md
