@@ -528,6 +528,16 @@
   related_guides: [""]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
+- term: "Configuration Capability"
+  short_description: "A
+  A <a href=\"/docs/glossary#capability\">capability</a> that provides a data
+  value that a component can use for configuration. A component
+  <a href=\"/docs/glossary#use\">using</a> a configuration capability will be
+  able to read the value in it's structured configuration."
+  full_description: ""
+  related_guides: [""]
+  area: ["System", "Component Framework"]
+
 - term: "Concurrent device driver"
   short_description: "A
   <a href=\"/docs/glossary#hardware-driver\">hardware driver</a> that supports multiple

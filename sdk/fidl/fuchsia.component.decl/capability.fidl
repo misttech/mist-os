@@ -186,6 +186,11 @@ type Dictionary = table {
 };
 
 /// Declares a configuration capability.
+///
+/// To learn more about configuration capabilities, see:
+/// https://fuchsia.dev/fuchsia-src/glossary#configuration-capability
+/// or:
+/// https://fuchsia.dev/fuchsia-src/docs/concepts/components/v2/capabilities/configuration
 @available(added=HEAD)
 type Configuration = table {
     /// (Required) The name of this configuration
