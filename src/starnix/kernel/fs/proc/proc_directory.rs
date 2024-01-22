@@ -16,7 +16,7 @@ use crate::{
         BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource,
         FdEvents, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
         FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
-        SymlinkTarget,
+        StubEmptyFile, SymlinkTarget,
     },
 };
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -119,6 +119,11 @@ impl ProcDirectory {
                 // This file is normally writable only by root.
                 // (https://man7.org/linux/man-pages/man5/proc.5.html)
                 FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
+            ),
+            "version".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node_with_bug("/proc/version", 309002311),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
         };
 

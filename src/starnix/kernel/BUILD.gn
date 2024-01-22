@@ -261,6 +261,7 @@ rustc_library("starnix_core") {
     "vfs/socket/syscalls.rs",
     "vfs/splice.rs",
     "vfs/static_directory.rs",
+    "vfs/stubs.rs",
     "vfs/symlink_node.rs",
     "vfs/syscalls.rs",
     "vfs/vec_directory.rs",

@@ -13,17 +13,32 @@ static NOT_IMPLEMENTED_COUNTS: Lazy<Mutex<HashMap<Invocation, Counts>>> =
 
 #[macro_export]
 macro_rules! not_implemented {
-    (fxb@$bug_number:literal, $message:expr, $context:expr) => {
-        $crate::__not_implemented_inner(Some($bug_number), $message, Some($context.into()));
+    (fxb@ $bug_number:expr, $message:expr, $context:expr) => {
+        $crate::__not_implemented_inner(
+            Some($bug_number),
+            $message,
+            Some($context.into()),
+            std::panic::Location::caller(),
+        );
     };
-    (fxb@$bug_number:literal, $message:expr) => {
-        $crate::__not_implemented_inner(Some($bug_number), $message, None);
+    (fxb@ $bug_number:expr, $message:expr) => {
+        $crate::__not_implemented_inner(
+            Some($bug_number),
+            $message,
+            None,
+            std::panic::Location::caller(),
+        );
     };
     ($message:expr, $context:expr) => {
-        $crate::__not_implemented_inner(None, $message, Some($context.into()));
+        $crate::__not_implemented_inner(
+            None,
+            $message,
+            Some($context.into()),
+            std::panic::Location::caller(),
+        );
     };
     ($message:expr) => {
-        $crate::__not_implemented_inner(None, $message, None);
+        $crate::__not_implemented_inner(None, $message, None, std::panic::Location::caller());
     };
 }
 
@@ -41,14 +56,13 @@ struct Counts {
 
 #[doc(hidden)]
 #[inline]
-#[track_caller]
 pub fn __not_implemented_inner(
     bug_number: Option<u64>,
     message: &'static str,
     context: Option<u64>,
+    location: &'static Location<'static>,
 ) {
     let mut counts = NOT_IMPLEMENTED_COUNTS.lock();
-    let location = Location::caller();
     let message_counts = counts.entry(Invocation { location, message, bug_number }).or_default();
     let context_count = message_counts.by_context.entry(context).or_default();
 
