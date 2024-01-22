@@ -35,8 +35,6 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 class BaseFuchsiaDevice(
     fuchsia_device.FuchsiaDevice,
     affordances_capable.RebootCapableDevice,
-    affordances_capable.ScreenshotCapableDevice,
-    affordances_capable.SessionCapableDevice,
     transports_capable.FastbootCapableDevice,
     transports_capable.FFXCapableDevice,
     transports_capable.SSHCapableDevice,

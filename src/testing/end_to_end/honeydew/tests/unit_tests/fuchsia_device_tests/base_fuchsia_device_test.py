@@ -14,11 +14,11 @@ from parameterized import parameterized
 
 from honeydew import custom_types, errors
 from honeydew.fuchsia_device import base_fuchsia_device
+from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
 from honeydew.interfaces.device_classes import transports_capable
-from honeydew.interfaces.device_classes import affordances_capable
 
 # pylint: disable=protected-access
 _INPUT_ARGS: dict[str, Any] = {
@@ -235,18 +235,6 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         """Test case to make sure fuchsia device is reboot capable"""
         self.assertIsInstance(
             self.fd_obj, affordances_capable.RebootCapableDevice
-        )
-
-    def test_fuchsia_device_is_screenshot_capable(self) -> None:
-        """Test case to make sure fuchsia device is screenshot capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.ScreenshotCapableDevice
-        )
-
-    def test_fuchsia_device_is_session_capable(self) -> None:
-        """Test case to make sure fuchsia device is session capable"""
-        self.assertIsInstance(
-            self.fd_obj, affordances_capable.SessionCapableDevice
         )
 
     # List all the tests related to transports

@@ -29,7 +29,7 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
 )
 from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
-from honeydew.interfaces.device_classes import affordances_capable
+from honeydew.interfaces.device_classes import transports_capable
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
@@ -67,7 +67,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class FuchsiaDevice(
     base_fuchsia_device.BaseFuchsiaDevice,
-    affordances_capable.TracingCapableDevice,
+    transports_capable.FuchsiaControllerCapableDevice,
 ):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.

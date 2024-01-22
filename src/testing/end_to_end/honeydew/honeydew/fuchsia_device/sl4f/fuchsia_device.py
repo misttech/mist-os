@@ -35,10 +35,7 @@ from honeydew.interfaces.affordances.wlan import wlan as wlan_interface
 from honeydew.interfaces.affordances.wlan import (
     wlan_policy as wlan_policy_interface,
 )
-from honeydew.interfaces.device_classes import (
-    affordances_capable,
-    transports_capable,
-)
+from honeydew.interfaces.device_classes import transports_capable
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.utils import common, properties
 
@@ -62,12 +59,6 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class FuchsiaDevice(
     base_fuchsia_device.BaseFuchsiaDevice,
-    affordances_capable.BluetoothAvrcpCapableDevice,
-    affordances_capable.BluetoothGapCapableDevice,
-    affordances_capable.TracingCapableDevice,
-    affordances_capable.UserInputCapableDevice,
-    affordances_capable.WlanPolicyCapableDevice,
-    affordances_capable.WlanCapableDevice,
     transports_capable.SL4FCapableDevice,
 ):
     """FuchsiaDevice abstract base class implementation using SL4F.

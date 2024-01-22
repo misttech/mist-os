@@ -8,6 +8,9 @@ import abc
 
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
+from honeydew.transports import (
+    fuchsia_controller as fuchsia_controller_transport,
+)
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.transports import ssh as ssh_transport
 from honeydew.utils import properties
@@ -52,6 +55,22 @@ class SL4FCapableDevice(abc.ABC):
 
         Returns:
             sl4f_transport.SL4F object
+        """
+
+
+class FuchsiaControllerCapableDevice(abc.ABC):
+    """Abstract base class to be implemented by a device which supports the
+    Fuchsia-Controller transport."""
+
+    @properties.Transport
+    @abc.abstractmethod
+    def fuchsia_controller(
+        self,
+    ) -> fuchsia_controller_transport.FuchsiaController:
+        """Returns a Fuchsia-Controller transport object.
+
+        Returns:
+            fuchsia_controller_transport.FuchsiaController object
         """
 
 
