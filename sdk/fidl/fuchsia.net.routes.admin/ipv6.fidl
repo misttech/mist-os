@@ -43,10 +43,6 @@ closed protocol RouteSetV6 {
     /// Authenticate this route set to manage routes on the provided interface.
     /// Authentication is valid for the lifetime of the route set.
     ///
-    /// TODO(https://fxbug.dev/117846): This is not implemented yet in
-    /// netstack2, but will be in the future. Calls to this method are currently
-    /// a no-op but will be enforced once implemented.
-    ///
     /// TODO(https://fxbug.dev/134307): This is not implemented yet in
     /// netstack3, but will be in the future. Calls to this method are currently
     /// a no-op but will be enforced once implemented.

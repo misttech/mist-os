@@ -18,6 +18,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routetypes"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
+	"gvisor.dev/gvisor/pkg/tcpip"
 
 	fuchsianet "fidl/fuchsia/net"
 	"fidl/fuchsia/net/interfaces/admin"
@@ -31,28 +32,49 @@ const (
 	routesAdminName = "fuchsia.net.routes.admin"
 )
 
+type UnauthenticatedError struct {
+	ID tcpip.NICID
+}
+
+func (e *UnauthenticatedError) Error() string {
+	return fmt.Sprintf("Interface %v was not authenticated", e.ID)
+}
+
+func (*UnauthenticatedError) Is(other error) bool {
+	_, ok := other.(*UnauthenticatedError)
+	return ok
+}
+
 type routeSet[A fidlconv.IpAddress] struct {
-	ns *Netstack
-	id *routetypes.RouteSetId
+	ns                      *Netstack
+	id                      *routetypes.RouteSetId
+	authenticatedInterfaces map[tcpip.NICID]struct{}
 }
 
 func makeUserRouteSet[A fidlconv.IpAddress](ns *Netstack) routeSet[A] {
 	return routeSet[A]{
-		ns: ns,
-		id: &routetypes.RouteSetId{},
+		ns:                      ns,
+		id:                      &routetypes.RouteSetId{},
+		authenticatedInterfaces: make(map[tcpip.NICID]struct{}),
 	}
 }
 
 func makeGlobalRouteSet[A fidlconv.IpAddress](ns *Netstack) routeSet[A] {
 	return routeSet[A]{
-		ns: ns,
-		id: routetypes.GlobalRouteSet(),
+		ns:                      ns,
+		id:                      routetypes.GlobalRouteSet(),
+		authenticatedInterfaces: make(map[tcpip.NICID]struct{}),
 	}
 }
 
 // addRoute adds a route to the routeSet and returns whether the route is new
 // to the routeSet.
 func (r *routeSet[A]) addRoute(route fidlconv.Route[A]) (bool, error) {
+	nicID := tcpip.NICID(route.Action.Forward.OutboundInterface)
+	if _, ok := r.authenticatedInterfaces[nicID]; !ok {
+		return false, &UnauthenticatedError{nicID}
+	}
+
 	gvisorRoute, err := route.GVisorRoute()
 	if err != nil {
 		return false, err
@@ -81,6 +103,11 @@ func (r *routeSet[A]) addRoute(route fidlconv.Route[A]) (bool, error) {
 // removesRoute removes a route from the routeSet and returns whether the route
 // was present in the routeSet.
 func (r *routeSet[A]) removeRoute(route fidlconv.Route[A]) (bool, error) {
+	nicID := tcpip.NICID(route.Action.Forward.OutboundInterface)
+	if _, ok := r.authenticatedInterfaces[nicID]; !ok {
+		return false, &UnauthenticatedError{nicID}
+	}
+
 	gvisorRoute, err := route.GVisorRoute()
 	if err != nil {
 		return false, err
@@ -185,6 +212,28 @@ func bindV6RouteSet(ch zx.Channel, rs routeSet[fuchsianet.Ipv6Address]) error {
 	return nil
 }
 
+func validateInterfaceCredential(ns *Netstack, clientCredential admin.ProofOfInterfaceAuthorization) bool {
+	nsIfInfo, ok := ns.stack.NICInfo()[tcpip.NICID(clientCredential.InterfaceId)]
+	if !ok {
+		// A NIC not existing should be transformed into INVALID_AUTHENTICATION,
+		// just like an invalid credential.
+		return false
+	}
+
+	nsTokenInfo, err := nsIfInfo.Context.(*ifState).authorizationToken.Handle().GetInfoHandleBasic()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to get basic info for Netstack-generated token: %s", err))
+	}
+
+	clientTokenInfo, err := clientCredential.Token.Handle().GetInfoHandleBasic()
+	if err != nil {
+		_ = syslog.ErrorTf(routesAdminName, "while getting handle info for credential object: %s", err)
+		return false
+	}
+
+	return nsTokenInfo.Koid == clientTokenInfo.Koid
+}
+
 type routeSetV4Impl struct {
 	routeSet routeSet[fuchsianet.Ipv4Address]
 }
@@ -202,6 +251,8 @@ func (r *routeSetV4Impl) AddRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.RouteV
 			if errors.Is(err, routes.ErrNoSuchNIC) {
 				result.SetErr(routesAdmin.RouteSetErrorPreviouslyAuthenticatedInterfaceNoLongerExists)
 				return result, nil
+			} else if errors.Is(err, &UnauthenticatedError{}) {
+				return routesAdmin.RouteSetV4AddRouteResultWithErr(routesAdmin.RouteSetErrorUnauthenticated), nil
 			} else {
 				_ = syslog.ErrorTf(routeSetV4Name, "error while adding route: %s", err)
 			}
@@ -226,14 +277,22 @@ func (r *routeSetV4Impl) AddRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.RouteV
 	return result, nil
 }
 
-func (*routeSetV4Impl) AuthenticateForInterface(ctx_ fidl.Context, credential admin.ProofOfInterfaceAuthorization) (routesAdmin.RouteSetV4AuthenticateForInterfaceResult, error) {
-	_ = syslog.WarnTf(routeSetV4Name, "TODO(https://fxbug.dev/117846): implement interface authentication")
-	// Close credential token to prevent resource leaks.
-	if err := credential.Token.Close(); err != nil {
-		_ = syslog.WarnTf(routeSetV4Name, "failed to close credential: %s", err)
-	}
+func (r *routeSetV4Impl) AuthenticateForInterface(ctx_ fidl.Context, credential admin.ProofOfInterfaceAuthorization) (routesAdmin.RouteSetV4AuthenticateForInterfaceResult, error) {
+	defer func() {
+		// Close credential token to prevent resource leaks.
+		if err := credential.Token.Close(); err != nil {
+			_ = syslog.WarnTf(routeSetV6Name, "failed to close credential: %s", err)
+		}
+	}()
+
 	var result routesAdmin.RouteSetV4AuthenticateForInterfaceResult
-	result.SetResponse(routesAdmin.RouteSetV4AuthenticateForInterfaceResponse{})
+	if validateInterfaceCredential(r.routeSet.ns, credential) {
+		r.routeSet.authenticatedInterfaces[tcpip.NICID(credential.InterfaceId)] = struct{}{}
+		result.SetResponse(routesAdmin.RouteSetV4AuthenticateForInterfaceResponse{})
+	} else {
+		result.SetErr(routesAdmin.AuthenticateForInterfaceErrorInvalidAuthentication)
+	}
+
 	return result, nil
 }
 
@@ -248,6 +307,8 @@ func (r *routeSetV4Impl) RemoveRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.Rou
 			if errors.Is(err, routes.ErrNoSuchNIC) {
 				result.SetErr(routesAdmin.RouteSetErrorPreviouslyAuthenticatedInterfaceNoLongerExists)
 				return result, nil
+			} else if errors.Is(err, &UnauthenticatedError{}) {
+				return routesAdmin.RouteSetV4RemoveRouteResultWithErr(routesAdmin.RouteSetErrorUnauthenticated), nil
 			} else {
 				_ = syslog.ErrorTf(routeSetV4Name, "error while removing route: %s", err)
 			}
@@ -289,6 +350,8 @@ func (r *routeSetV6Impl) AddRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.RouteV
 			if errors.Is(err, routes.ErrNoSuchNIC) {
 				result.SetErr(routesAdmin.RouteSetErrorUnauthenticated)
 				return result, nil
+			} else if errors.Is(err, &UnauthenticatedError{}) {
+				return routesAdmin.RouteSetV6AddRouteResultWithErr(routesAdmin.RouteSetErrorUnauthenticated), nil
 			} else {
 				_ = syslog.ErrorTf(routeSetV6Name, "error while adding route: %s", err)
 			}
@@ -315,14 +378,22 @@ func (r *routeSetV6Impl) AddRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.RouteV
 	return result, nil
 }
 
-func (*routeSetV6Impl) AuthenticateForInterface(ctx_ fidl.Context, credential admin.ProofOfInterfaceAuthorization) (routesAdmin.RouteSetV6AuthenticateForInterfaceResult, error) {
-	_ = syslog.WarnTf(routeSetV6Name, "TODO(https://fxbug.dev/117846): implement interface authentication")
-	// Close credential token to prevent resource leaks.
-	if err := credential.Token.Close(); err != nil {
-		_ = syslog.WarnTf(routeSetV6Name, "failed to close credential: %s", err)
-	}
+func (r *routeSetV6Impl) AuthenticateForInterface(ctx_ fidl.Context, credential admin.ProofOfInterfaceAuthorization) (routesAdmin.RouteSetV6AuthenticateForInterfaceResult, error) {
+	defer func() {
+		// Close credential token to prevent resource leaks.
+		if err := credential.Token.Close(); err != nil {
+			_ = syslog.WarnTf(routeSetV6Name, "failed to close credential: %s", err)
+		}
+	}()
+
 	var result routesAdmin.RouteSetV6AuthenticateForInterfaceResult
-	result.SetResponse(routesAdmin.RouteSetV6AuthenticateForInterfaceResponse{})
+	if validateInterfaceCredential(r.routeSet.ns, credential) {
+		r.routeSet.authenticatedInterfaces[tcpip.NICID(credential.InterfaceId)] = struct{}{}
+		result.SetResponse(routesAdmin.RouteSetV6AuthenticateForInterfaceResponse{})
+	} else {
+		result.SetErr(routesAdmin.AuthenticateForInterfaceErrorInvalidAuthentication)
+	}
+
 	return result, nil
 }
 
@@ -337,6 +408,8 @@ func (r *routeSetV6Impl) RemoveRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.Rou
 			if errors.Is(err, routes.ErrNoSuchNIC) {
 				result.SetErr(routesAdmin.RouteSetErrorUnauthenticated)
 				return result, nil
+			} else if errors.Is(err, &UnauthenticatedError{}) {
+				return routesAdmin.RouteSetV6RemoveRouteResultWithErr(routesAdmin.RouteSetErrorUnauthenticated), nil
 			} else {
 				_ = syslog.ErrorTf(routeSetV6Name, "error while removing route: %s", err)
 			}
