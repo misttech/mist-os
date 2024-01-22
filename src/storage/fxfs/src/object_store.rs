@@ -22,7 +22,7 @@ mod tree_cache;
 pub mod volume;
 
 pub use caching_object_handle::CachingObjectHandle;
-pub use data_object_handle::{DataObjectHandle, DirectWriter};
+pub use data_object_handle::{DataObjectHandle, DirectWriter, FsverityState, FsverityStateInner};
 pub use directory::Directory;
 pub use object_record::{ChildValue, ObjectDescriptor, PosixAttributes, Timestamp};
 pub use store_object_handle::{
@@ -867,16 +867,19 @@ impl ObjectStore {
             permanent,
             DEFAULT_DATA_ATTRIBUTE_ID,
             size,
-            fsverity_descriptor.clone(),
+            FsverityState::None,
             options,
             false,
         );
-        if fsverity_descriptor.is_some() {
+        if let Some(descriptor) = fsverity_descriptor {
             match data_object_handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await? {
                 None => {
                     return Err(anyhow!(FxfsError::NotFound));
                 }
-                Some(data) => data_object_handle.set_merkle_tree(data),
+                Some(data) => {
+                    data_object_handle.set_fsverity_state_pending(descriptor, data);
+                    data_object_handle.finalize_fsverity_state();
+                }
             }
         }
         Ok(data_object_handle)
@@ -969,7 +972,7 @@ impl ObjectStore {
             permanent,
             DEFAULT_DATA_ATTRIBUTE_ID,
             0,
-            None,
+            FsverityState::None,
             options,
             false,
         ))

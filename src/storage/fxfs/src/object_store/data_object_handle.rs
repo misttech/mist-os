@@ -37,7 +37,7 @@ use {
     mundane::hash::{Digest, Hasher, Sha256, Sha512},
     std::{
         cmp::min,
-        ops::{Bound, Range},
+        ops::{Bound, DerefMut, Range},
         sync::{
             atomic::{self, AtomicU64, Ordering},
             Arc, Mutex,
@@ -57,10 +57,26 @@ pub struct DataObjectHandle<S: HandleOwner> {
     handle: StoreObjectHandle<S>,
     attribute_id: u64,
     content_size: AtomicU64,
-    fsverity_descriptor: Mutex<Option<FsverityMetadata>>,
+    fsverity_state: Mutex<FsverityState>,
+}
+
+pub enum FsverityState {
+    None,
+    Pending(FsverityStateInner),
+    Some(FsverityStateInner),
+}
+
+pub struct FsverityStateInner {
+    descriptor: FsverityMetadata,
     // TODO(b/309656632): This should store the entire merkle tree and not just the leaf nodes.
     // Potentially store a pager-backed vmo instead of passing around a boxed array.
-    merkle_tree: Mutex<Option<Box<[u8]>>>,
+    merkle_tree: Box<[u8]>,
+}
+
+impl FsverityStateInner {
+    pub fn new(descriptor: FsverityMetadata, merkle_tree: Box<[u8]>) -> Self {
+        FsverityStateInner { descriptor, merkle_tree }
+    }
 }
 
 impl<S: HandleOwner> DataObjectHandle<S> {
@@ -70,7 +86,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         permanent_keys: bool,
         attribute_id: u64,
         size: u64,
-        fsverity_descriptor: Option<FsverityMetadata>,
+        fsverity_state: FsverityState,
         options: HandleOptions,
         trace: bool,
     ) -> Self {
@@ -78,8 +94,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             handle: StoreObjectHandle::new(owner, object_id, permanent_keys, options, trace),
             attribute_id,
             content_size: AtomicU64::new(size),
-            fsverity_descriptor: Mutex::new(fsverity_descriptor),
-            merkle_tree: Mutex::new(None),
+            fsverity_state: Mutex::new(fsverity_state),
         }
     }
 
@@ -92,7 +107,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     }
 
     pub fn verified_file(&self) -> bool {
-        self.fsverity_descriptor.lock().unwrap().is_some()
+        matches!(*self.fsverity_state.lock().unwrap(), FsverityState::Some(_))
     }
 
     pub fn store(&self) -> &ObjectStore {
@@ -107,58 +122,70 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         &self.handle
     }
 
+    /// Sets `self.fsverity_state` to Pending. Must be called before `finalize_fsverity_state()`.
+    /// Asserts that the prior state of `self.fsverity_state` was `FsverityState::None`.
+    pub fn set_fsverity_state_pending(&self, descriptor: FsverityMetadata, merkle_tree: Box<[u8]>) {
+        let mut fsverity_guard = self.fsverity_state.lock().unwrap();
+        assert!(matches!(*fsverity_guard, FsverityState::None));
+        *fsverity_guard = FsverityState::Pending(FsverityStateInner { descriptor, merkle_tree });
+    }
+
+    /// Sets `self.fsverity_state` to Some. Panics if the prior state of `self.fsverity_state` was
+    /// not `FsverityState::Pending(_)`.
+    pub fn finalize_fsverity_state(&self) {
+        let mut fsverity_state_guard = self.fsverity_state.lock().unwrap();
+        let mut_fsverity_state = fsverity_state_guard.deref_mut();
+        let fsverity_state = std::mem::replace(mut_fsverity_state, FsverityState::None);
+        match fsverity_state {
+            FsverityState::None => panic!("Cannot go from FsverityState::None to Some"),
+            FsverityState::Pending(inner) => *mut_fsverity_state = FsverityState::Some(inner),
+            FsverityState::Some(_) => panic!("Fsverity state was already set to Some"),
+        }
+    }
+
     /// Verifies contents of `buffer` against the corresponding hashes in the stored merkle tree.
     /// `offset` is the logical offset in the file that `buffer` starts at. `offset` must be
     /// block-aligned. Fails on non fsverity-enabled files.
     async fn verify_data(&self, mut offset: usize, buffer: &[u8]) -> Result<(), Error> {
         let block_size = self.block_size() as usize;
         assert!(offset % block_size == 0);
-        let merkle_tree = self.merkle_tree.lock().unwrap();
-        if let Some(merkle_tree) = merkle_tree.clone() {
-            let descriptor = self.fsverity_descriptor.lock().unwrap().clone().ok_or_else(|| {
-                anyhow!(FxfsError::Inconsistent).context("merkle tree exists without descriptor")
-            })?;
-            let (hasher, digest_size) = match descriptor.root_digest {
-                RootDigest::Sha256(_) => {
-                    let hasher = FsVerityHasher::Sha256(FsVerityHasherOptions::new(
-                        descriptor.salt.clone(),
-                        block_size,
-                    ));
-                    (hasher, <Sha256 as Hasher>::Digest::DIGEST_LEN)
-                }
-                RootDigest::Sha512(_) => {
-                    let hasher = FsVerityHasher::Sha512(FsVerityHasherOptions::new(
-                        descriptor.salt.clone(),
-                        block_size,
-                    ));
-                    (hasher, <Sha512 as Hasher>::Digest::DIGEST_LEN)
-                }
-            };
-            let leaf_nodes: Vec<&[u8]> = merkle_tree.chunks(digest_size).collect();
-            fxfs_trace::duration!("fsverity-verify", "len" => buffer.len());
-            // TODO(b/318880297): Consider parallelizing computation.
-            for b in buffer.chunks(block_size) {
-                ensure!(
-                    hasher.hash_block(b) == leaf_nodes[offset / block_size],
-                    anyhow!(FxfsError::Inconsistent).context("Hash mismatch")
-                );
-                offset += block_size;
+        match &*self.fsverity_state.lock().unwrap() {
+            FsverityState::None => {
+                Err(anyhow!("Tried to verify read on a non verity-enabled file"))
             }
-            Ok(())
-        } else {
-            Err(anyhow!("Tried to verify read on a non verity-enabled file"))
+            FsverityState::Pending(_) => {
+                Err(anyhow!("Mutation for fsverity metadata has not yet been applied"))
+            }
+            FsverityState::Some(metadata) => {
+                let (hasher, digest_size) = match metadata.descriptor.root_digest {
+                    RootDigest::Sha256(_) => {
+                        let hasher = FsVerityHasher::Sha256(FsVerityHasherOptions::new(
+                            metadata.descriptor.salt.clone(),
+                            block_size,
+                        ));
+                        (hasher, <Sha256 as Hasher>::Digest::DIGEST_LEN)
+                    }
+                    RootDigest::Sha512(_) => {
+                        let hasher = FsVerityHasher::Sha512(FsVerityHasherOptions::new(
+                            metadata.descriptor.salt.clone(),
+                            block_size,
+                        ));
+                        (hasher, <Sha512 as Hasher>::Digest::DIGEST_LEN)
+                    }
+                };
+                let leaf_nodes: Vec<&[u8]> = metadata.merkle_tree.chunks(digest_size).collect();
+                fxfs_trace::duration!("fsverity-verify", "len" => buffer.len());
+                // TODO(b/318880297): Consider parallelizing computation.
+                for b in buffer.chunks(block_size) {
+                    ensure!(
+                        hasher.hash_block(b) == leaf_nodes[offset / block_size],
+                        anyhow!(FxfsError::Inconsistent).context("Hash mismatch")
+                    );
+                    offset += block_size;
+                }
+                Ok(())
+            }
         }
-    }
-
-    // TODO(b/309656632): This should take a pager-backed vmo instead of a boxed array.
-    pub fn set_merkle_tree(&self, merkle_tree: Box<[u8]>) {
-        let mut merkle_tree_guard = self.merkle_tree.lock().unwrap();
-        *merkle_tree_guard = Some(merkle_tree);
-    }
-
-    pub fn set_descriptor(&self, descriptor: FsverityMetadata) {
-        let mut fsverity_descriptor_guard = self.fsverity_descriptor.lock().unwrap();
-        *fsverity_descriptor_guard = Some(descriptor);
     }
 
     /// Extend the file with the given extent.  The only use case for this right now is for files
@@ -232,40 +259,43 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.handle.zero(transaction, self.attribute_id(), range).await
     }
 
-    /// The cached value for `self.fsverity_descriptor` is set either in `open_object` or on
-    /// `enable_verity`. If set, translates `self.fsverity_descriptor` into an
+    /// The cached value for `self.fsverity_state` is set either in `open_object` or on
+    /// `enable_verity`. If set, translates `self.fsverity_state.descriptor` into an
     /// fio::VerificationOptions instance and a root hash. Otherwise, returns None.
     pub async fn get_descriptor(
         &self,
     ) -> Result<Option<(fio::VerificationOptions, Vec<u8>)>, Error> {
-        let fsverity_descriptor = self.fsverity_descriptor.lock().unwrap();
-        if let Some(metadata) = fsverity_descriptor.clone() {
-            let (options, root_hash) = match metadata.root_digest {
-                RootDigest::Sha256(root_hash) => {
-                    let mut root_vec = root_hash.to_vec();
-                    // Need to zero out the rest of the vector so that there's no garbage.
-                    root_vec.extend_from_slice(&[0; 32]);
-                    (
+        match &*self.fsverity_state.lock().unwrap() {
+            FsverityState::None => Ok(None),
+            FsverityState::Pending(_) => {
+                Err(anyhow!("Mutation for fsverity metadata has not yet been applied"))
+            }
+            FsverityState::Some(metadata) => {
+                let (options, root_hash) = match &metadata.descriptor.root_digest {
+                    RootDigest::Sha256(root_hash) => {
+                        let mut root_vec = root_hash.to_vec();
+                        // Need to zero out the rest of the vector so that there's no garbage.
+                        root_vec.extend_from_slice(&[0; 32]);
+                        (
+                            fio::VerificationOptions {
+                                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                                salt: Some(metadata.descriptor.salt.clone()),
+                                ..Default::default()
+                            },
+                            root_vec,
+                        )
+                    }
+                    RootDigest::Sha512(root_hash) => (
                         fio::VerificationOptions {
-                            hash_algorithm: Some(fio::HashAlgorithm::Sha256),
-                            salt: Some(metadata.salt),
+                            hash_algorithm: Some(fio::HashAlgorithm::Sha512),
+                            salt: Some(metadata.descriptor.salt.clone()),
                             ..Default::default()
                         },
-                        root_vec,
-                    )
-                }
-                RootDigest::Sha512(root_hash) => (
-                    fio::VerificationOptions {
-                        hash_algorithm: Some(fio::HashAlgorithm::Sha512),
-                        salt: Some(metadata.salt),
-                        ..Default::default()
-                    },
-                    root_hash,
-                ),
-            };
-            Ok(Some((options, root_hash)))
-        } else {
-            Ok(None)
+                        root_hash.clone(),
+                    ),
+                };
+                Ok(Some((options, root_hash)))
+            }
         }
     }
 
@@ -281,7 +311,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let hash_alg =
             options.hash_algorithm.ok_or_else(|| anyhow!("No hash algorithm provided"))?;
         let salt = options.salt.ok_or_else(|| anyhow!("No salt provided"))?;
-        let root_digest = match hash_alg {
+        let (root_digest, merkle_tree) = match hash_alg {
             fio::HashAlgorithm::Sha256 => {
                 let hasher = FsVerityHasher::Sha256(FsVerityHasherOptions::new(
                     salt.clone(),
@@ -306,7 +336,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 // TODO(b/314194485): Eventually want streaming writes.
                 self.write_attr(FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes).await?;
                 let root: [u8; 32] = tree.root().try_into().unwrap();
-                RootDigest::Sha256(root)
+                (RootDigest::Sha256(root), merkle_leaf_nodes)
             }
             fio::HashAlgorithm::Sha512 => {
                 let hasher = FsVerityHasher::Sha512(FsVerityHasherOptions::new(
@@ -331,7 +361,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     tree.as_ref()[0].iter().flat_map(|x| x.clone()).collect();
                 // TODO(b/314194485): Eventually want streaming writes.
                 self.write_attr(FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes).await?;
-                RootDigest::Sha512(tree.root().to_vec())
+                (RootDigest::Sha512(tree.root().to_vec()), merkle_leaf_nodes)
             }
             _ => {
                 bail!(anyhow!(FxfsError::NotSupported)
@@ -340,8 +370,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         };
         let mut transaction = self.new_transaction().await?;
         let descriptor = FsverityMetadata { root_digest, salt };
-        self.set_descriptor(descriptor.clone());
-        transaction.add(
+        self.set_fsverity_state_pending(descriptor.clone(), merkle_tree.into());
+        transaction.add_with_object(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
                 ObjectKey::attribute(
@@ -351,6 +381,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 ),
                 ObjectValue::verified_attribute(self.get_size(), descriptor),
             ),
+            AssocObj::Borrowed(self),
         );
         transaction.commit().await?;
 
@@ -1167,11 +1198,14 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
     fn will_apply_mutation(&self, mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
         match mutation {
-            // TODO(b/308898343): Add match arms for merkle tree and fsverity descriptor.
             Mutation::ObjectStore(ObjectStoreMutation {
                 item: ObjectItem { value: ObjectValue::Attribute { size }, .. },
                 ..
             }) => self.content_size.store(*size, atomic::Ordering::Relaxed),
+            Mutation::ObjectStore(ObjectStoreMutation {
+                item: ObjectItem { value: ObjectValue::VerifiedAttribute { .. }, .. },
+                ..
+            }) => self.finalize_fsverity_state(),
             _ => {}
         }
     }

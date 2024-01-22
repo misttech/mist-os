@@ -421,6 +421,9 @@ impl File for FxFile {
     }
 
     async fn enable_verity(&self, options: fio::VerificationOptions) -> Result<(), Status> {
+        if self.verified_file() {
+            return Err(Status::ALREADY_EXISTS);
+        }
         self.handle.set_read_only();
         self.handle.flush().await.map_err(map_to_status)?;
         self.handle.uncached_handle().enable_verity(options).await.map_err(map_to_status)
@@ -1893,6 +1896,83 @@ mod tests {
             assert_eq!(&buffer, &data[start..start + buffer.len()]);
         }
 
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_enabling_verity_on_verified_file_fails() {
+        let reused_device = {
+            let fixture = TestFixture::new().await;
+            let root = fixture.root();
+
+            let file = open_file_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "foo",
+            )
+            .await;
+
+            file.write(&[1; 8192])
+                .await
+                .expect("FIDL call failed")
+                .map_err(Status::from_raw)
+                .expect("write failed");
+
+            let descriptor = fio::VerificationOptions {
+                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                salt: Some(vec![0xFF; 8]),
+                ..Default::default()
+            };
+
+            file.enable_verity(&descriptor)
+                .await
+                .expect("FIDL transport error")
+                .expect("enable verity failed");
+
+            file.enable_verity(&descriptor)
+                .await
+                .expect("FIDL transport error")
+                .expect_err("enabling verity on a verity-enabled file should fail.");
+
+            assert!(file.sync().await.expect("Sync failed").is_ok());
+            close_file_checked(file).await;
+            fixture.close().await
+        };
+
+        let fixture = TestFixture::open(
+            reused_device,
+            TestFixtureOptions {
+                format: false,
+                as_blob: false,
+                encrypted: true,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        let descriptor = fio::VerificationOptions {
+            hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+            salt: Some(vec![0xFF; 8]),
+            ..Default::default()
+        };
+
+        file.enable_verity(&descriptor)
+            .await
+            .expect("FIDL transport error")
+            .expect_err("enabling verity on a verity-enabled file should fail.");
+
+        close_file_checked(file).await;
         fixture.close().await;
     }
 
