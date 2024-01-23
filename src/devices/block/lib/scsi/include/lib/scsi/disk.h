@@ -28,12 +28,16 @@ struct DiskOp {
 };
 
 struct DiskOptions {
-  static DiskOptions Default() { return DiskOptions(/*support_unmap=*/false); }
+  static DiskOptions Default() {
+    return DiskOptions(/*check_unmap_support=*/false, /*use_mode_sense_6*/ true);
+  }
 
-  explicit DiskOptions(bool support_unmap) : check_unmap_support_(support_unmap) {}
+  explicit DiskOptions(bool check_unmap_support, bool use_mode_sense_6)
+      : check_unmap_support_(check_unmap_support), use_mode_sense_6_(use_mode_sense_6) {}
   DiskOptions() = delete;
 
   bool check_unmap_support_;
+  bool use_mode_sense_6_;
 };
 
 class Disk;

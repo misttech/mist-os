@@ -271,28 +271,57 @@ class DiskTest : public zxtest::Test {
               break;
             }
             case 5: {
-              EXPECT_EQ(cdb.iov_len, 6);
-              ModeSense6CDB decoded_cdb = {};
-              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
-              EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
-              EXPECT_EQ(decoded_cdb.page_code, ModeSense6CDB::kAllPageCode);
-              EXPECT_EQ(decoded_cdb.disable_block_descriptors, 0);
-              EXPECT_FALSE(is_write);
-              ModeSense6ParameterHeader response = {};
-              memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
+              if (cdb.iov_len == 6) {
+                ModeSense6CDB decoded_cdb = {};
+                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
+                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kAllPageCode);
+                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
+                EXPECT_FALSE(is_write);
+                ModeSense6ParameterHeader header = {};
+                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
+              } else {
+                EXPECT_EQ(cdb.iov_len, 10);
+                ModeSense10CDB decoded_cdb = {};
+                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_10);
+                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kAllPageCode);
+                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
+                EXPECT_FALSE(is_write);
+                ModeSense10ParameterHeader header = {};
+                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
+              }
               break;
             }
             case 6: {
-              EXPECT_EQ(cdb.iov_len, 6);
-              ModeSense6CDB decoded_cdb = {};
-              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
-              EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
-              EXPECT_EQ(decoded_cdb.page_code, ModeSense6CDB::kCachingPageCode);
-              EXPECT_EQ(decoded_cdb.disable_block_descriptors, 0b1000);
-              EXPECT_FALSE(is_write);
-              CachingModePage response = {};
-              response.page_code = ModeSense6CDB::kCachingPageCode;
-              memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
+              if (cdb.iov_len == 6) {
+                ModeSense6CDB decoded_cdb = {};
+                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
+                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kCachingPageCode);
+                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
+                EXPECT_FALSE(is_write);
+                ModeSense6ParameterHeader header = {};
+                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
+                CachingModePage response = {};
+                response.set_page_code(static_cast<uint8_t>(PageCode::kCachingPageCode));
+                memcpy(static_cast<char*>(data.iov_base) + sizeof(header),
+                       reinterpret_cast<char*>(&response), sizeof(response));
+              } else {
+                EXPECT_EQ(cdb.iov_len, 10);
+                ModeSense10CDB decoded_cdb = {};
+                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_10);
+                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kCachingPageCode);
+                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
+                EXPECT_FALSE(is_write);
+                ModeSense10ParameterHeader header = {};
+                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
+                CachingModePage response = {};
+                response.set_page_code(static_cast<uint8_t>(PageCode::kCachingPageCode));
+                memcpy(static_cast<char*>(data.iov_base) + sizeof(header),
+                       reinterpret_cast<char*>(&response), sizeof(response));
+              }
               break;
             }
             case 7: {
@@ -336,7 +365,15 @@ class DiskTest : public zxtest::Test {
 TEST_F(DiskTest, TestCreateDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
   ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                       DiskOptions(/*support_unmap=*/true)));
+                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true)));
+  ASSERT_EQ(1, fake_parent->child_count());
+}
+
+// Test that we can create a disk when the underlying controller successfully executes CDBs.
+TEST_F(DiskTest, TestCreateDestroyWithModeSense10) {
+  std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
+  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
+                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false)));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
@@ -344,7 +381,7 @@ TEST_F(DiskTest, TestCreateDestroy) {
 TEST_F(DiskTest, TestCreateReadDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
   ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                       DiskOptions(/*support_unmap=*/true)));
+                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true)));
   ASSERT_EQ(1, fake_parent->child_count());
   auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<Disk>();
   block_info_t info;

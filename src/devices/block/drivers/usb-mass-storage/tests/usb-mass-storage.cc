@@ -374,13 +374,15 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           scsi::ModeSense6CDB cmd;
           memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
           // Push reply
-          switch (cmd.page_code) {
-            case 0x3F: {
+          switch (cmd.page_code()) {
+            case scsi::PageCode::kAllPageCode: {
               fbl::Array<unsigned char> reply(
                   new unsigned char[sizeof(scsi::ModeSense6ParameterHeader)],
                   sizeof(scsi::ModeSense6ParameterHeader));
-              scsi::ModeSense6ParameterHeader scsi = {};
-              memcpy(reply.data(), &scsi, sizeof(scsi));
+              scsi::ModeSense6ParameterHeader mode_page = {};
+              mode_page.set_dpo_fua_available(true);
+              mode_page.set_write_protected(false);
+              memcpy(reply.data(), &mode_page, sizeof(mode_page));
               context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
               // Push CSW
               fbl::Array<unsigned char> csw(new unsigned char[sizeof(ums_csw_t)],
@@ -394,21 +396,27 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
               complete_cb->callback(complete_cb->ctx, usb_request);
               break;
             }
-            case 0x08: {
+            case scsi::PageCode::kCachingPageCode: {
               if (context->failure_mode == RejectCacheCbw) {
                 usb_request->response.status = ZX_ERR_IO_REFUSED;
                 usb_request->response.actual = 0;
                 complete_cb->callback(complete_cb->ctx, usb_request);
                 return;
               }
-              fbl::Array<unsigned char> reply(new unsigned char[20], 20);
-              memset(reply.data(), 0, 20);
-              reply[6] = 1 << 2;
               if (context->failure_mode == RejectCacheDataStage) {
                 complete_cb->callback(complete_cb->ctx, usb_request);
                 context->pending_packets.push_back(fbl::MakeRefCounted<Packet>());
                 return;
               } else {
+                size_t mode_page_size =
+                    sizeof(scsi::ModeSense6ParameterHeader) + sizeof(scsi::CachingModePage);
+                fbl::Array<unsigned char> reply(new unsigned char[mode_page_size], mode_page_size);
+                scsi::CachingModePage mode_page = {};
+                mode_page.set_page_code(static_cast<uint8_t>(scsi::PageCode::kCachingPageCode));
+                mode_page.set_write_cache_enabled(true);
+                memset(reply.data(), 0, mode_page_size);
+                memcpy(reply.data() + sizeof(scsi::ModeSense6ParameterHeader), &mode_page,
+                       sizeof(mode_page));
                 context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
               }
               // Push CSW

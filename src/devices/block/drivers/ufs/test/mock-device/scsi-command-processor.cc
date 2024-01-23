@@ -322,22 +322,23 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultInquiryHandler(
   return zx::ok(std::move(data_buffer));
 }
 
-zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultModeSense6Handler(
+zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultModeSense10Handler(
     UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   std::vector<uint8_t> data_buffer;
 
-  auto *mode_sense_6_cdb = reinterpret_cast<scsi::ModeSense6CDB *>(command_upiu.cdb);
+  auto *mode_sense_10_cdb = reinterpret_cast<scsi::ModeSense10CDB *>(command_upiu.cdb);
 
-  if (mode_sense_6_cdb->page_code == scsi::ModeSense6CDB::kAllPageCode) {
-    data_buffer.resize(sizeof(scsi::ModeSense6ParameterHeader));
-    auto *mode_page = reinterpret_cast<scsi::ModeSense6ParameterHeader *>(data_buffer.data());
+  if (mode_sense_10_cdb->page_code() == scsi::PageCode::kAllPageCode) {
+    data_buffer.resize(sizeof(scsi::ModeSense10ParameterHeader));
+    auto *mode_page = reinterpret_cast<scsi::ModeSense10ParameterHeader *>(data_buffer.data());
     mode_page->set_dpo_fua_available(true);
     mode_page->set_write_protected(false);
-  } else if (mode_sense_6_cdb->page_code == scsi::ModeSense6CDB::kCachingPageCode) {
-    data_buffer.resize(sizeof(scsi::CachingModePage));
-    auto *caching_mode_page = reinterpret_cast<scsi::CachingModePage *>(data_buffer.data());
-    caching_mode_page->page_code = scsi::ModeSense6CDB::kCachingPageCode;
+  } else if (mode_sense_10_cdb->page_code() == scsi::PageCode::kCachingPageCode) {
+    data_buffer.resize(sizeof(scsi::ModeSense10ParameterHeader) + sizeof(scsi::CachingModePage));
+    auto *caching_mode_page = reinterpret_cast<scsi::CachingModePage *>(
+        data_buffer.data() + sizeof(scsi::ModeSense10ParameterHeader));
+    caching_mode_page->set_page_code(static_cast<uint8_t>(scsi::PageCode::kCachingPageCode));
     caching_mode_page->set_write_cache_enabled(true);
   } else {
     return zx::error(ZX_ERR_NOT_SUPPORTED);

@@ -70,14 +70,19 @@ zx_status_t Disk::AddDisk() {
     unmap_command_supported_ = unmap_command_supported.value() && maximum_unmap_lba_count;
   }
 
-  zx::result mode_sense_data = controller_->ModeSense(target_, lun_);
-  if (mode_sense_data.is_error()) {
-    return mode_sense_data.status_value();
+  zx::result<std::tuple<bool, bool>> parameter =
+      controller_->ModeSenseDpoFuaAndWriteProtectedEnabled(target_, lun_,
+                                                           disk_options_.use_mode_sense_6_);
+  if (parameter.is_error()) {
+    zxlogf(WARNING,
+           "Failed to get DPO FUA and write protected parameter for target %u, lun %u: %s.",
+           target_, lun_, zx_status_get_string(parameter.status_value()));
+    return parameter.error_value();
   }
-  dpo_fua_available_ = mode_sense_data.value().dpo_fua_available();
-  write_protected_ = mode_sense_data.value().write_protected();
+  std::tie(dpo_fua_available_, write_protected_) = parameter.value();
 
-  zx::result write_cache_enabled = controller_->ModeSenseWriteCacheEnabled(target_, lun_);
+  zx::result write_cache_enabled =
+      controller_->ModeSenseWriteCacheEnabled(target_, lun_, disk_options_.use_mode_sense_6_);
   if (write_cache_enabled.is_error()) {
     zxlogf(WARNING, "Failed to get write cache status for target %u, lun %u: %s.", target_, lun_,
            zx_status_get_string(write_cache_enabled.status_value()));

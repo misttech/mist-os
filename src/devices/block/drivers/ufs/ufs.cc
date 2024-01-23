@@ -306,8 +306,8 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
   fzl::VmoMapper mapper;
   if (data_direction != DataDirection::kNone) {
     // Allocate a response data buffer.
-    // TODO(https://fxbug.dev/124835): We need to pre-allocate a data buffer that will be used in the Sync
-    // command.
+    // TODO(https://fxbug.dev/124835): We need to pre-allocate a data buffer that will be used in
+    // the Sync command.
     if (zx::result<> result = AllocatePages(data_vmo, mapper, data.iov_len); result.is_error()) {
       return result.error_value();
     }
@@ -616,8 +616,10 @@ zx::result<uint8_t> Ufs::AddLogicalUnits() {
       return zx::error(status);
     }
 
-    zx::result disk = scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_,
-                                       scsi::DiskOptions(/*support_unmap=*/true));
+    // UFS does not support the MODE SENSE(6) command. We should use the MODE SENSE(10) command.
+    zx::result disk = scsi::Disk::Bind(
+        zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_,
+        scsi::DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false));
     if (disk.is_error()) {
       zxlogf(ERROR, "UFS: device_add for block device failed: %s", disk.status_string());
       return disk.take_error();
@@ -633,7 +635,8 @@ zx::result<uint8_t> Ufs::AddLogicalUnits() {
     ++lun_count;
   }
 
-  // TODO(https://fxbug.dev/124835): Send a request sense command to clear the UAC of a well-known LU.
+  // TODO(https://fxbug.dev/124835): Send a request sense command to clear the UAC of a well-known
+  // LU.
   // TODO(https://fxbug.dev/124835): We need to implement the processing of a well-known LU.
 
   return zx::ok(lun_count);

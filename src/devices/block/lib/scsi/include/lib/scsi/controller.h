@@ -233,19 +233,28 @@ struct FixedFormatSenseDataHeader {
 
 static_assert(sizeof(FixedFormatSenseDataHeader) == 18,
               "Fixed format Sense data header must be 18 bytes");
+enum class PageCode : uint8_t {
+  kCachingPageCode = 0x08,
+  kAllPageCode = 0x3F,
+};
 
+// SPC-4, section 6.11 "MODE SENSE(6) command".
 struct ModeSense6CDB {
-  static constexpr uint8_t kCachingPageCode = 0x08;
-  static constexpr uint8_t kAllPageCode = 0x3F;
-
   Opcode opcode;
-  // If disable_block_descriptors(3) is '1', device will not return Block Descriptors.
-  uint8_t disable_block_descriptors;
-  // page_code(7 downto 6) is 'page control'. Should be 00h for current devices.
-  uint8_t page_code;
+  // dbd (3) is 'DBD (Disable block descriptors)'
+  uint8_t dbd;
+  // pc_and_page_code (7 downto 6) is 'PC (Page control)'
+  // pc_and_page_code (5 downto 0) is 'PAGE CODE'
+  uint8_t pc_and_page_code;
   uint8_t subpage_code;
   uint8_t allocation_length;
   uint8_t control;
+
+  // If disable_block_descriptors is '1', device will not return Block Descriptors.
+  DEF_SUBBIT(dbd, 3, disable_block_descriptors);
+  // page_control should be 00h for current devices.
+  DEF_SUBFIELD(pc_and_page_code, 7, 6, page_control);
+  DEF_ENUM_SUBFIELD(pc_and_page_code, PageCode, 5, 0, page_code);
 } __PACKED;
 
 static_assert(sizeof(ModeSense6CDB) == 6, "Mode Sense 6 CDB must be 6 bytes");
@@ -266,9 +275,50 @@ struct ModeSense6ParameterHeader {
 
 static_assert(sizeof(ModeSense6ParameterHeader) == 4, "Mode Sense 6 parameters must be 4 bytes");
 
+// SPC-4, section 6.12 "MODE SENSE(10) command".
+struct ModeSense10CDB {
+  Opcode opcode;
+  // dbd (4) is 'LLBAA (Long LBA accepted)'
+  // dbd (3) is 'DBD (Disalbe block descriptors)'
+  uint8_t llbaa_dbd;
+  // pc_and_page_code (7 downto 6) is 'PC (Page control)'
+  // pc_and_page_code (5 downto 0) is 'PAGE CODE'
+  uint8_t pc_and_page_code;
+  uint8_t subpage_code;
+  uint8_t reserved[3];
+  uint16_t allocation_length;
+  uint8_t control;
+
+  DEF_SUBBIT(llbaa_dbd, 4, long_lba_accepted);
+  // If disable_block_descriptors is '1', device will not return Block Descriptors.
+  DEF_SUBBIT(llbaa_dbd, 3, disable_block_descriptors);
+  // page_control should be 00h for current devices.
+  DEF_SUBFIELD(pc_and_page_code, 7, 6, page_control);
+  DEF_ENUM_SUBFIELD(pc_and_page_code, PageCode, 5, 0, page_code);
+} __PACKED;
+
+static_assert(sizeof(ModeSense10CDB) == 10, "Mode Sense 10 CDB must be 10 bytes");
+
+struct ModeSense10ParameterHeader {
+  uint16_t mode_data_length;
+  // 00h is 'Direct Access Block Device'
+  uint8_t medium_type;
+  // For Direct Access Block Devices:
+  // device_specific_parameter(7) is write-protected bit
+  // device_specific_parameter(4) is disable page out/force unit access available
+  uint8_t device_specific_parameter;
+  uint8_t reserved[2];
+  uint16_t block_descriptor_length;
+
+  DEF_SUBBIT(device_specific_parameter, 7, write_protected);
+  DEF_SUBBIT(device_specific_parameter, 4, dpo_fua_available);
+  DEF_SUBBIT(reserved[0], 0, long_lba);
+} __PACKED;
+
+static_assert(sizeof(ModeSense10ParameterHeader) == 8, "Mode Sense 10 parameters must be 8 bytes");
+
 struct CachingModePage {
-  ModeSense6ParameterHeader header;
-  uint8_t page_code;
+  uint8_t ps_spf_and_page_code;
   uint8_t page_length;
   // control_bits (2) is write_cache_enabled.
   uint8_t control_bits;
@@ -283,10 +333,12 @@ struct CachingModePage {
   uint8_t reserved;
   uint8_t obsolete[3];
 
+  DEF_SUBFIELD(ps_spf_and_page_code, 5, 0, page_code);
   DEF_SUBBIT(control_bits, 2, write_cache_enabled);
+  DEF_SUBBIT(control_bits, 0, read_cache_disabled);
 } __PACKED;
 
-static_assert(sizeof(CachingModePage) == 24, "Caching Mode Page must be 24 bytes");
+static_assert(sizeof(CachingModePage) == 20, "Caching Mode Page must be 20 bytes");
 
 struct ReadCapacity10CDB {
   Opcode opcode;
@@ -651,11 +703,17 @@ class Controller {
   // Read Logical Block Provisioning VPD Page (0xB2), check that it supports the UNMAP command.
   zx::result<bool> InquirySupportUnmapCommand(uint8_t target, uint16_t lun);
 
-  // Return ModeSense6ParameterHeader for the specified lun.
-  zx::result<ModeSense6ParameterHeader> ModeSense(uint8_t target, uint16_t lun);
+  // Return ModeSense(6|10)ParameterHeader for the specified lun.
+  zx::result<> ModeSense(uint8_t target, uint16_t lun, PageCode page_code, iovec data,
+                         bool use_mode_sense_6);
+
+  // Determine if the lun has DPO FUA available and Write protected.
+  zx::result<std::tuple<bool, bool>> ModeSenseDpoFuaAndWriteProtectedEnabled(uint8_t target,
+                                                                             uint16_t lun,
+                                                                             bool use_mode_sense_6);
 
   // Determine if the lun has write cache enabled.
-  zx::result<bool> ModeSenseWriteCacheEnabled(uint8_t target, uint16_t lun);
+  zx::result<bool> ModeSenseWriteCacheEnabled(uint8_t target, uint16_t lun, bool use_mode_sense_6);
 
   // Return the block count and block size (in bytes) for the specified lun.
   zx_status_t ReadCapacity(uint8_t target, uint16_t lun, uint64_t* block_count,

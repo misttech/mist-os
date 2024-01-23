@@ -6,6 +6,10 @@
 #include <lib/scsi/controller.h>
 #include <zircon/status.h>
 
+#include <tuple>
+
+#include <safemath/safe_math.h>
+
 namespace scsi {
 
 zx_status_t Controller::TestUnitReady(uint8_t target, uint16_t lun) {
@@ -133,46 +137,102 @@ zx::result<bool> Controller::InquirySupportUnmapCommand(uint8_t target, uint16_t
   return zx::ok(provisioning.lbpu());
 }
 
-zx::result<ModeSense6ParameterHeader> Controller::ModeSense(uint8_t target, uint16_t lun) {
-  ModeSense6CDB cdb = {};
-  cdb.opcode = Opcode::MODE_SENSE_6;
-  cdb.page_code = ModeSense6CDB::kAllPageCode;
-  ModeSense6ParameterHeader data = {};
-  cdb.allocation_length = sizeof(data);
-  zx_status_t status = ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)},
-                                          /*is_write=*/false, {&data, sizeof(data)});
+zx::result<> Controller::ModeSense(uint8_t target, uint16_t lun, PageCode page_code, iovec data,
+                                   bool use_mode_sense_6) {
+  // Allocate as much as the largest mode sense CDB.
+  uint8_t cdb[sizeof(ModeSense10CDB)] = {};
+  size_t cdb_size = 0;
+
+  if (use_mode_sense_6 && data.iov_len <= UINT8_MAX) {  // MODE SENSE 6
+    if (data.iov_len < sizeof(ModeSense6ParameterHeader)) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    ModeSense6CDB* cdb_6 = reinterpret_cast<ModeSense6CDB*>(cdb);
+    cdb_6->opcode = Opcode::MODE_SENSE_6;
+    cdb_6->set_page_code(page_code);
+    cdb_6->allocation_length = safemath::checked_cast<uint8_t>(data.iov_len);
+    // Do not return any block descriptors.
+    cdb_6->set_disable_block_descriptors(true);
+
+    cdb_size = sizeof(ModeSense6CDB);
+  } else {  // MODE SENSE 10
+    if (data.iov_len < sizeof(ModeSense10ParameterHeader) || data.iov_len > UINT16_MAX) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    ModeSense10CDB* cdb_10 = reinterpret_cast<ModeSense10CDB*>(cdb);
+    cdb_10->opcode = Opcode::MODE_SENSE_10;
+    cdb_10->set_page_code(page_code);
+    cdb_10->allocation_length = htobe16(safemath::checked_cast<uint16_t>(data.iov_len));
+    // Do not return any block descriptors.
+    cdb_10->set_disable_block_descriptors(true);
+
+    cdb_size = sizeof(ModeSense10CDB);
+  }
+
+  zx_status_t status = ExecuteCommandSync(target, lun, {&cdb, cdb_size},
+                                          /*is_write=*/false, data);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "MODE_SENSE_6 failed for target %u, lun %u: %s", target, lun,
+    zxlogf(ERROR, "MODE_SENSE_%zu failed for target %u, lun %u: %s", cdb_size, target, lun,
            zx_status_get_string(status));
     return zx::error(status);
   }
 
-  return zx::ok(data);
+  return zx::ok();
 }
 
-zx::result<bool> Controller::ModeSenseWriteCacheEnabled(uint8_t target, uint16_t lun) {
-  ModeSense6CDB cdb = {};
-  cdb.opcode = Opcode::MODE_SENSE_6;
-  // Only fetch the caching mode page and get the current values.
-  cdb.page_code = ModeSense6CDB::kCachingPageCode;
-  CachingModePage data = {};
-  cdb.allocation_length = sizeof(data);
-  // Do not return any block descriptors.
-  cdb.disable_block_descriptors = 0b1000;
-  zx_status_t status = ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)},
-                                          /*is_write=*/false, {&data, sizeof(data)});
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "MODE_SENSE_6 failed for target %u, lun %u: %s", target, lun,
-           zx_status_get_string(status));
-    return zx::error(status);
+zx::result<std::tuple<bool, bool>> Controller::ModeSenseDpoFuaAndWriteProtectedEnabled(
+    uint8_t target, uint16_t lun, bool use_mode_sense_6) {
+  constexpr uint8_t header_size =
+      std::max(sizeof(ModeSense6ParameterHeader), sizeof(ModeSense10ParameterHeader));
+  uint8_t data[header_size];
+
+  zx::result result =
+      ModeSense(target, lun, PageCode::kAllPageCode, {data, sizeof(data)}, use_mode_sense_6);
+  if (result.is_error()) {
+    zxlogf(ERROR, "MODE_SENSE failed for target %u, lun %u: %s", target, lun,
+           result.status_string());
+    return result.take_error();
   }
 
-  if (data.page_code != ModeSense6CDB::kCachingPageCode) {
+  bool dpo_fua_available, write_protected;
+  if (use_mode_sense_6) {
+    ModeSense6ParameterHeader* parameter_header =
+        reinterpret_cast<ModeSense6ParameterHeader*>(data);
+    dpo_fua_available = parameter_header->dpo_fua_available();
+    write_protected = parameter_header->write_protected();
+  } else {
+    ModeSense10ParameterHeader* parameter_header =
+        reinterpret_cast<ModeSense10ParameterHeader*>(data);
+    dpo_fua_available = parameter_header->dpo_fua_available();
+    write_protected = parameter_header->write_protected();
+  }
+
+  return zx::ok(std::make_tuple(dpo_fua_available, write_protected));
+}
+
+zx::result<bool> Controller::ModeSenseWriteCacheEnabled(uint8_t target, uint16_t lun,
+                                                        bool use_mode_sense_6) {
+  constexpr uint8_t header_size =
+      std::max(sizeof(ModeSense6ParameterHeader), sizeof(ModeSense10ParameterHeader));
+  uint8_t data[header_size + sizeof(CachingModePage)];
+
+  zx::result result =
+      ModeSense(target, lun, PageCode::kCachingPageCode, {data, sizeof(data)}, use_mode_sense_6);
+  if (result.is_error()) {
+    zxlogf(ERROR, "MODE_SENSE failed for target %u, lun %u: %s", target, lun,
+           result.status_string());
+    return result.take_error();
+  }
+
+  uint32_t mode_page_offset =
+      use_mode_sense_6 ? sizeof(ModeSense6ParameterHeader) : sizeof(ModeSense10ParameterHeader);
+  CachingModePage* mode_page = reinterpret_cast<CachingModePage*>(data + mode_page_offset);
+  if (mode_page->page_code() != static_cast<uint8_t>(PageCode::kCachingPageCode)) {
     zxlogf(ERROR, "failed for target %u, lun %u to retrieve caching mode page", target, lun);
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  return zx::ok(data.write_cache_enabled());
+  return zx::ok(mode_page->write_cache_enabled());
 }
 
 zx_status_t Controller::ReadCapacity(uint8_t target, uint16_t lun, uint64_t* block_count,
