@@ -12,7 +12,7 @@ use crate::{
         FsString, PathBuilder,
     },
 };
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
 use std::{
     collections::BTreeMap,
@@ -316,6 +316,7 @@ impl FileOps for UEventFile {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -332,6 +333,7 @@ impl FileOps for UEventFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

@@ -16,7 +16,9 @@ use crate::{
         FsNodeInfo, FsStr, MountInfo, SpecialNode,
     },
 };
-use starnix_sync::{Mutex, MutexGuard};
+use starnix_sync::{
+    FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, Locked, Mutex, MutexGuard,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,
@@ -390,6 +392,7 @@ impl FileOps for PipeFileObject {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -408,6 +411,7 @@ impl FileOps for PipeFileObject {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -477,6 +481,7 @@ impl FileOps for PipeFileObject {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -743,44 +748,54 @@ impl PipeFileObject {
     ///
     /// The given file handle must not be a pipe. If you wish to splice between two pipes, use
     /// `lock_pipes` and `Pipe::splice`.
-    pub fn splice_from(
+    pub fn splice_from<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         self_file: &FileHandle,
         from: &FileHandle,
         offset: Option<usize>,
         len: usize,
         non_blocking: bool,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<FileOpsRead>,
+    {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(from.downcast_file::<PipeFileObject>().is_none());
 
         let mut pipe = self.lock_pipe_for_writing(current_task, self_file, non_blocking, len)?;
         let len = std::cmp::min(len, pipe.messages.available_capacity());
         let mut buffer = SpliceOutputBuffer { pipe: &mut pipe, len, available: len };
-        from.read_raw(current_task, offset.unwrap_or(0), &mut buffer)
+        let mut locked = locked.cast_locked::<FileOpsRead>();
+        from.read_raw(&mut locked, current_task, offset.unwrap_or(0), &mut buffer)
     }
 
     /// Splice from this pipe to the given file handle.
     ///
     /// The given file handle must not be a pipe. If you wish to splice between two pipes, use
     /// `lock_pipes` and `Pipe::splice`.
-    pub fn splice_to(
+    pub fn splice_to<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         self_file: &FileHandle,
         to: &FileHandle,
         offset: Option<usize>,
         len: usize,
         non_blocking: bool,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<FileOpsWrite>,
+    {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(to.downcast_file::<PipeFileObject>().is_none());
 
         let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
         let len = std::cmp::min(len, pipe.messages.len());
         let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
-        to.write_raw(current_task, offset.unwrap_or(0), &mut buffer)
+        let mut locked = locked.cast_locked::<FileOpsWrite>();
+        to.write_raw(&mut locked, current_task, offset.unwrap_or(0), &mut buffer)
     }
 
     /// Copy data from the given input buffer into the pipe.

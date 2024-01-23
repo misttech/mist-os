@@ -15,7 +15,7 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
     },
 };
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, ownership::WeakRef, pid_t,
@@ -200,6 +200,7 @@ impl FileOps for ControlGroupFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,

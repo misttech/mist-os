@@ -14,6 +14,7 @@ use crate::{
     },
 };
 use starnix_logging::not_implemented;
+use starnix_sync::{FileOpsWrite, Locked};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::mode,
     open_flags::OpenFlags,
@@ -285,6 +286,7 @@ impl FileOps for ReadAheadKbFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

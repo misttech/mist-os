@@ -316,6 +316,7 @@ macro_rules! fileops_impl_vmo {
 
         fn read(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsRead>,
             file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             offset: usize,
@@ -326,6 +327,7 @@ macro_rules! fileops_impl_vmo {
 
         fn write(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsWrite>,
             file: &crate::vfs::FileObject,
             current_task: &crate::task::CurrentTask,
             offset: usize,

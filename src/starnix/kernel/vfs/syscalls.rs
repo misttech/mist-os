@@ -23,7 +23,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, not_implemented};
-use starnix_sync::{Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_fd_set,
@@ -74,7 +74,7 @@ const UTIME_NOW: i64 = 0x3fffffff;
 const UTIME_OMIT: i64 = 0x3ffffffe;
 
 pub fn sys_read(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     address: UserAddress,
@@ -82,6 +82,7 @@ pub fn sys_read(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     file.read(
+        locked,
         current_task,
         &mut UserBuffersOutputBuffer::unified_new_at(current_task, address, length)?,
     )
@@ -89,14 +90,16 @@ pub fn sys_read(
 }
 
 pub fn sys_write(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     address: UserAddress,
     length: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
+    let mut locked = locked.cast_locked::<FileOpsWrite>();
     file.write(
+        &mut locked,
         current_task,
         &mut UserBuffersInputBuffer::unified_new_at(current_task, address, length)?,
     )
@@ -295,7 +298,7 @@ pub fn sys_fcntl(
 }
 
 pub fn sys_pread64(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     address: UserAddress,
@@ -304,7 +307,9 @@ pub fn sys_pread64(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     let offset = offset.try_into().map_err(|_| errno!(EINVAL))?;
+    let mut locked = locked.cast_locked::<FileOpsRead>();
     file.read_at(
+        &mut locked,
         current_task,
         offset,
         &mut UserBuffersOutputBuffer::unified_new_at(current_task, address, length)?,
@@ -312,7 +317,7 @@ pub fn sys_pread64(
 }
 
 pub fn sys_pwrite64(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     address: UserAddress,
@@ -321,7 +326,9 @@ pub fn sys_pwrite64(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     let offset = offset.try_into().map_err(|_| errno!(EINVAL))?;
+    let mut locked = locked.cast_locked::<FileOpsWrite>();
     file.write_at(
+        &mut locked,
         current_task,
         offset,
         &mut UserBuffersInputBuffer::unified_new_at(current_task, address, length)?,
@@ -329,6 +336,7 @@ pub fn sys_pwrite64(
 }
 
 fn do_readv(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
@@ -346,35 +354,41 @@ fn do_readv(
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersOutputBuffer::unified_new(current_task, iovec)?;
     if let Some(offset) = offset {
-        file.read_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &mut data)
+        let mut locked = locked.cast_locked::<FileOpsRead>();
+        file.read_at(
+            &mut locked,
+            current_task,
+            offset.try_into().map_err(|_| errno!(EINVAL))?,
+            &mut data,
+        )
     } else {
-        file.read(current_task, &mut data)
+        file.read(locked, current_task, &mut data)
     }
 }
 
 pub fn sys_readv(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
     iovec_count: i32,
 ) -> Result<usize, Errno> {
-    do_readv(current_task, fd, iovec_addr, iovec_count, None, 0)
+    do_readv(locked, current_task, fd, iovec_addr, iovec_count, None, 0)
 }
 
 pub fn sys_preadv(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
     iovec_count: i32,
     offset: off_t,
 ) -> Result<usize, Errno> {
-    do_readv(current_task, fd, iovec_addr, iovec_count, Some(offset), 0)
+    do_readv(locked, current_task, fd, iovec_addr, iovec_count, Some(offset), 0)
 }
 
 pub fn sys_preadv2(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
@@ -384,10 +398,11 @@ pub fn sys_preadv2(
     flags: u32,
 ) -> Result<usize, Errno> {
     let offset = if offset == -1 { None } else { Some(offset) };
-    do_readv(current_task, fd, iovec_addr, iovec_count, offset, flags)
+    do_readv(locked, current_task, fd, iovec_addr, iovec_count, offset, flags)
 }
 
 fn do_writev(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
@@ -405,36 +420,42 @@ fn do_writev(
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
+    let mut locked = locked.cast_locked::<FileOpsWrite>();
     if let Some(offset) = offset {
-        file.write_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &mut data)
+        file.write_at(
+            &mut locked,
+            current_task,
+            offset.try_into().map_err(|_| errno!(EINVAL))?,
+            &mut data,
+        )
     } else {
-        file.write(current_task, &mut data)
+        file.write(&mut locked, current_task, &mut data)
     }
 }
 
 pub fn sys_writev(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
     iovec_count: i32,
 ) -> Result<usize, Errno> {
-    do_writev(current_task, fd, iovec_addr, iovec_count, None, 0)
+    do_writev(locked, current_task, fd, iovec_addr, iovec_count, None, 0)
 }
 
 pub fn sys_pwritev(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
     iovec_count: i32,
     offset: off_t,
 ) -> Result<usize, Errno> {
-    do_writev(current_task, fd, iovec_addr, iovec_count, Some(offset), 0)
+    do_writev(locked, current_task, fd, iovec_addr, iovec_count, Some(offset), 0)
 }
 
 pub fn sys_pwritev2(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
@@ -444,7 +465,7 @@ pub fn sys_pwritev2(
     flags: u32,
 ) -> Result<usize, Errno> {
     let offset = if offset == -1 { None } else { Some(offset) };
-    do_writev(current_task, fd, iovec_addr, iovec_count, offset, flags)
+    do_writev(locked, current_task, fd, iovec_addr, iovec_count, offset, flags)
 }
 
 pub fn sys_fstatfs(
@@ -474,14 +495,14 @@ pub fn sys_statfs(
 }
 
 pub fn sys_sendfile(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     out_fd: FdNumber,
     in_fd: FdNumber,
     user_offset: UserRef<off_t>,
     count: i32,
 ) -> Result<usize, Errno> {
-    splice::sendfile(current_task, out_fd, in_fd, user_offset, count)
+    splice::sendfile(locked, current_task, out_fd, in_fd, user_offset, count)
 }
 
 /// A convenient wrapper for Task::open_file_at.
@@ -1322,14 +1343,15 @@ pub fn sys_pipe2(
 }
 
 pub fn sys_ioctl(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     request: u32,
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
     let file = current_task.files.get(fd)?;
-    file.ioctl(current_task, request, arg)
+    let mut locked = locked.cast_locked::<FileOpsIoctl>();
+    file.ioctl(&mut locked, current_task, request, arg)
 }
 
 pub fn sys_symlinkat(
@@ -2469,7 +2491,7 @@ pub fn sys_utimensat(
 }
 
 pub fn sys_splice(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     off_in: UserRef<off_t>,
@@ -2478,7 +2500,7 @@ pub fn sys_splice(
     len: usize,
     flags: u32,
 ) -> Result<usize, Errno> {
-    splice::splice(current_task, fd_in, off_in, fd_out, off_out, len, flags)
+    splice::splice(locked, current_task, fd_in, off_in, fd_out, off_out, len, flags)
 }
 
 pub fn sys_vmsplice(

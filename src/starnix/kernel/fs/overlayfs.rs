@@ -16,7 +16,10 @@ use crate::{
 use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_logging::{log_error, log_warn, not_implemented};
-use starnix_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{
+    FileOpsRead, FileOpsWrite, LockBefore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    Unlocked,
+};
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,
@@ -253,20 +256,33 @@ impl OverlayNode {
 
     /// If the file is currently in the lower FS, then promote it to the upper FS. No-op if the
     /// file is already in the upper FS.
-    fn ensure_upper(&self, current_task: &CurrentTask) -> Result<&ActiveEntry, Errno> {
-        self.ensure_upper_maybe_copy(current_task, UpperCopyMode::CopyAll)
+    fn ensure_upper<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<&ActiveEntry, Errno>
+    where
+        L: LockBefore<FileOpsRead>,
+        L: LockBefore<FileOpsWrite>,
+    {
+        self.ensure_upper_maybe_copy(locked, current_task, UpperCopyMode::CopyAll)
     }
 
     /// Same as `ensure_upper()`, but allows to skip copying of the file content.
-    fn ensure_upper_maybe_copy(
+    fn ensure_upper_maybe_copy<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         copy_mode: UpperCopyMode,
-    ) -> Result<&ActiveEntry, Errno> {
+    ) -> Result<&ActiveEntry, Errno>
+    where
+        L: LockBefore<FileOpsRead>,
+        L: LockBefore<FileOpsWrite>,
+    {
         self.upper.get_or_try_init(|| {
             let lower = self.lower.as_ref().expect("lower is expected when upper is missing");
             let parent = self.parent.as_ref().expect("Parent is expected when upper is missing");
-            let parent_upper = parent.ensure_upper(current_task)?;
+            let parent_upper = parent.ensure_upper(locked, current_task)?;
             let name = lower.entry().local_name();
             let info = {
                 let info = lower.entry().node.info();
@@ -301,7 +317,7 @@ impl OverlayNode {
                             )
                         })
                     },
-                    |entry| copy_file_content(current_task, lower, &entry),
+                    |entry| copy_file_content(locked, current_task, lower, &entry),
                 )
             } else {
                 // TODO(sergeyu): create_node() checks access, but we don't need that here.
@@ -334,16 +350,19 @@ impl OverlayNode {
     /// supposed to change while this method is executed. Note that OveralayFS doesn't handle
     /// the case when the underlying file systems are changed directly, but that restriction
     /// is not enforced.
-    fn create_entry<F>(
+    fn create_entry<F, L>(
         self: &Arc<OverlayNode>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         do_create: F,
     ) -> Result<ActiveEntry, Errno>
     where
         F: Fn(&ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
+        L: LockBefore<FileOpsRead>,
+        L: LockBefore<FileOpsWrite>,
     {
-        let upper = self.ensure_upper(current_task)?;
+        let upper = self.ensure_upper(locked, current_task)?;
 
         match upper.component_lookup(current_task, name) {
             Ok(existing) => {
@@ -423,6 +442,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         if flags.can_write() {
             // Only upper FS can be writable.
             let copy_mode = if flags.contains(OpenFlags::TRUNC) {
@@ -430,7 +450,7 @@ impl FsNodeOps for Arc<OverlayNode> {
             } else {
                 UpperCopyMode::CopyAll
             };
-            self.ensure_upper_maybe_copy(current_task, copy_mode)?;
+            self.ensure_upper_maybe_copy(&mut locked, current_task, copy_mode)?;
         }
 
         let ops: Box<dyn FileOps> = if node.is_dir() {
@@ -514,11 +534,13 @@ impl FsNodeOps for Arc<OverlayNode> {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                dir_node.mknod(current_task, mount, name, mode, dev, owner.clone())
-            })
-        })?;
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
+        let new_upper_node =
+            self.create_entry(&mut locked, current_task, name, |dir, temp_name| {
+                dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+                    dir_node.mknod(current_task, mount, name, mode, dev, owner.clone())
+                })
+            })?;
         Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
@@ -530,16 +552,26 @@ impl FsNodeOps for Arc<OverlayNode> {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            let entry = dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                dir_node.mknod(current_task, mount, name, mode, DeviceType::NONE, owner.clone())
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
+        let new_upper_node =
+            self.create_entry(&mut locked, current_task, name, |dir, temp_name| {
+                let entry =
+                    dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+                        dir_node.mknod(
+                            current_task,
+                            mount,
+                            name,
+                            mode,
+                            DeviceType::NONE,
+                            owner.clone(),
+                        )
+                    })?;
+
+                // Set opaque attribute to ensure the new directory is not merged with lower.
+                entry.set_opaque_xattr(current_task)?;
+
+                Ok(entry)
             })?;
-
-            // Set opaque attribute to ensure the new directory is not merged with lower.
-            entry.set_opaque_xattr(current_task)?;
-
-            Ok(entry)
-        })?;
 
         Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
@@ -552,11 +584,13 @@ impl FsNodeOps for Arc<OverlayNode> {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                dir_node.create_symlink(current_task, mount, name, target, owner.clone())
-            })
-        })?;
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
+        let new_upper_node =
+            self.create_entry(&mut locked, current_task, name, |dir, temp_name| {
+                dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+                    dir_node.create_symlink(current_task, mount, name, target, owner.clone())
+                })
+            })?;
         Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
@@ -571,9 +605,10 @@ impl FsNodeOps for Arc<OverlayNode> {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let child_overlay = OverlayNode::from_fs_node(child)?;
-        let upper_child = child_overlay.ensure_upper(current_task)?;
-        self.create_entry(current_task, name, |dir, temp_name| {
+        let upper_child = child_overlay.ensure_upper(&mut locked, current_task)?;
+        self.create_entry(&mut locked, current_task, name, |dir, temp_name| {
             dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                 dir_node.link(current_task, mount, name, &upper_child.entry().node)
             })
@@ -588,7 +623,8 @@ impl FsNodeOps for Arc<OverlayNode> {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let upper = self.ensure_upper(current_task)?;
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
+        let upper = self.ensure_upper(&mut locked, current_task)?;
         let child_overlay = OverlayNode::from_fs_node(child)?;
         child_overlay.prepare_to_unlink(current_task)?;
 
@@ -630,7 +666,8 @@ impl FsNodeOps for Arc<OverlayNode> {
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
-        let upper = self.ensure_upper(current_task)?;
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
+        let upper = self.ensure_upper(&mut locked, current_task)?;
         upper.entry().node.truncate(current_task, upper.mount(), length)
     }
 
@@ -642,7 +679,13 @@ impl FsNodeOps for Arc<OverlayNode> {
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
-        self.ensure_upper(current_task)?.entry().node.fallocate(current_task, mode, offset, length)
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
+        self.ensure_upper(&mut locked, current_task)?.entry().node.fallocate(
+            current_task,
+            mode,
+            offset,
+            length,
+        )
     }
 }
 struct OverlayDirectory {
@@ -747,6 +790,7 @@ impl FileOps for OverlayFile {
 
     fn read(
         &self,
+        locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -770,24 +814,28 @@ impl FileOps for OverlayFile {
             }
         }
 
-        state.file().read_at(current_task, offset, data)
+        // TODO(mariagl): Drop state here
+        state.file().read_at(locked, current_task, offset, data)
     }
 
     fn write(
         &self,
+        locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let state = self.state.read();
-        match &*state {
-            OverlayFileState::Upper(f) => f.write_at(current_task, offset, data),
+        let file = match &*state {
+            OverlayFileState::Upper(f) => f.clone(),
 
             // `write()` should be called only for files that were opened for write, and that
             // required the file to be promoted to the upper FS.
             OverlayFileState::Lower(_) => panic!("write() called for a lower FS file."),
-        }
+        };
+        std::mem::drop(state);
+        file.write_at(locked, current_task, offset, data)
     }
 
     fn get_vmo(
@@ -931,6 +979,7 @@ impl FileSystemOps for Arc<OverlayFs> {
         renamed: &FsNodeHandle,
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461648): Propagate Locked through FileSystemOps
         let renamed = OverlayNode::from_fs_node(renamed)?;
         if renamed.main_entry().entry().node.is_dir() {
             // Return EXDEV for directory renames. Potentially they may be handled with the
@@ -938,13 +987,13 @@ impl FileSystemOps for Arc<OverlayFs> {
             // See https://docs.kernel.org/filesystems/overlayfs.html#renaming-directories
             return error!(EXDEV);
         }
-        renamed.ensure_upper(current_task)?;
+        renamed.ensure_upper(&mut locked, current_task)?;
 
         let old_parent_overlay = OverlayNode::from_fs_node(old_parent)?;
-        let old_parent_upper = old_parent_overlay.ensure_upper(current_task)?;
+        let old_parent_upper = old_parent_overlay.ensure_upper(&mut locked, current_task)?;
 
         let new_parent_overlay = OverlayNode::from_fs_node(new_parent)?;
-        let new_parent_upper = new_parent_overlay.ensure_upper(current_task)?;
+        let new_parent_upper = new_parent_overlay.ensure_upper(&mut locked, current_task)?;
 
         let need_whiteout = old_parent_overlay.lower_entry_exists(current_task, old_name)?;
 
@@ -996,11 +1045,16 @@ fn resolve_dir_param(
 }
 
 /// Copies file content from one file to another.
-fn copy_file_content(
+fn copy_file_content<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     from: &ActiveEntry,
     to: &ActiveEntry,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockBefore<FileOpsWrite>,
+    L: LockBefore<FileOpsRead>,
+{
     let from_file = from.entry().open_anonymous(current_task, OpenFlags::RDONLY)?;
     let to_file = to.entry().open_anonymous(current_task, OpenFlags::WRONLY)?;
 
@@ -1010,7 +1064,7 @@ fn copy_file_content(
         // TODO(sergeyu): Reuse buffer between iterations.
 
         let mut output_buffer = VecOutputBuffer::new(BUFFER_SIZE);
-        let bytes_read = from_file.read(current_task, &mut output_buffer)?;
+        let bytes_read = from_file.read(locked, current_task, &mut output_buffer)?;
         if bytes_read == 0 {
             break;
         }
@@ -1018,7 +1072,8 @@ fn copy_file_content(
         let buffer: Vec<u8> = output_buffer.into();
         let mut input_buffer = VecInputBuffer::from(buffer);
         while input_buffer.available() > 0 {
-            to_file.write(current_task, &mut input_buffer)?;
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
+            to_file.write(&mut locked, current_task, &mut input_buffer)?;
         }
     }
 

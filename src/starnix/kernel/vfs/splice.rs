@@ -14,7 +14,9 @@ use crate::{
     },
 };
 use starnix_logging::not_implemented;
-use starnix_sync::{ordered_lock, Locked, MutexGuard, Unlocked};
+use starnix_sync::{
+    ordered_lock, FileOpsRead, FileOpsWrite, LockBefore, Locked, MutexGuard, Unlocked,
+};
 use starnix_uapi::{
     errno, error,
     errors::Errno,
@@ -25,13 +27,18 @@ use starnix_uapi::{
     user_buffer::MAX_RW_COUNT,
 };
 
-pub fn sendfile(
+pub fn sendfile<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     out_fd: FdNumber,
     in_fd: FdNumber,
     user_offset: UserRef<off_t>,
     count: i32,
-) -> Result<usize, Errno> {
+) -> Result<usize, Errno>
+where
+    L: LockBefore<FileOpsRead>,
+    L: LockBefore<FileOpsWrite>,
+{
     let out_file = current_task.files.get(out_fd)?;
     let in_file = current_task.files.get(in_fd)?;
 
@@ -88,10 +95,15 @@ pub fn sendfile(
         while count > 0 {
             let limit = std::cmp::min(*PAGE_SIZE as usize, count);
             let mut buffer = VecOutputBuffer::new(limit);
-            let read = in_file.read_at(current_task, offset, &mut buffer)?;
+            let read = {
+                let mut locked = locked.cast_locked::<FileOpsRead>();
+                in_file.read_at(&mut locked, current_task, offset, &mut buffer)?
+            };
             let mut buffer = Vec::from(buffer);
             buffer.truncate(read);
-            let written = out_file.write(current_task, &mut VecInputBuffer::from(buffer))?;
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
+            let written =
+                out_file.write(&mut locked, current_task, &mut VecInputBuffer::from(buffer))?;
             offset += written;
             total_written += written;
             update_offset(offset as off_t)?;
@@ -182,7 +194,8 @@ impl SplicedFile {
     }
 }
 
-pub fn splice(
+pub fn splice<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     off_in: UserRef<off_t>,
@@ -190,7 +203,11 @@ pub fn splice(
     off_out: UserRef<off_t>,
     len: usize,
     flags: u32,
-) -> Result<usize, Errno> {
+) -> Result<usize, Errno>
+where
+    L: LockBefore<FileOpsRead>,
+    L: LockBefore<FileOpsWrite>,
+{
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
@@ -227,6 +244,7 @@ pub fn splice(
             Pipe::splice(&mut read, &mut write, len)
         }
         (None, Some(pipe_out)) => pipe_out.splice_from(
+            locked,
             current_task,
             &file_out.file,
             &file_in.file,
@@ -235,6 +253,7 @@ pub fn splice(
             non_blocking,
         ),
         (Some(pipe_in), None) => pipe_in.splice_to(
+            locked,
             current_task,
             &file_in.file,
             &file_out.file,

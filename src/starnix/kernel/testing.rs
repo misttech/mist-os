@@ -5,7 +5,7 @@
 use crate::task::TaskBuilder;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Unlocked};
 use std::{ffi::CString, mem::MaybeUninit, sync::Arc};
 use zerocopy::{AsBytes, NoCell};
 
@@ -288,6 +288,7 @@ impl FileOps for PanickingFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -298,6 +299,7 @@ impl FileOps for PanickingFile {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -308,6 +310,7 @@ impl FileOps for PanickingFile {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _request: u32,

@@ -19,7 +19,7 @@ use perfetto_consumer_proto::perfetto::protos::{
 };
 use prost::Message;
 use starnix_logging::{log_error, trace_category_atrace, trace_name_perfetto_blob};
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{FileOpsRead, FileOpsWrite, LockBefore, Locked, Unlocked};
 use starnix_uapi::{errno, errors::Errno, AF_UNIX, SOCK_STREAM};
 use std::{
     collections::VecDeque,
@@ -67,10 +67,14 @@ impl FrameReader {
     }
 
     /// Repeatedly reads from the specified file until a full message is available.
-    fn next_frame_blocking(
+    fn next_frame_blocking<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
-    ) -> Result<IpcFrame, anyhow::Error> {
+    ) -> Result<IpcFrame, anyhow::Error>
+    where
+        L: LockBefore<FileOpsRead>,
+    {
         loop {
             if self.next_message_size.is_none() && self.data.len() >= 4 {
                 let len_bytes: [u8; 4] = self
@@ -94,7 +98,7 @@ impl FrameReader {
             while self.file.query_events(current_task)? & FdEvents::POLLIN != FdEvents::POLLIN {
                 waiter.wait(current_task)?;
             }
-            self.file.read(current_task, &mut self.read_buffer)?;
+            self.file.read(locked, current_task, &mut self.read_buffer)?;
             self.data.extend(self.read_buffer.data());
             self.read_buffer.reset();
         }
@@ -146,9 +150,12 @@ impl PerfettoConnection {
         );
         bind_service_message.encode(&mut bind_service_bytes)?;
         let mut bind_service_buffer: VecInputBuffer = bind_service_bytes.into();
-        conn_file.write(current_task, &mut bind_service_buffer)?;
+        {
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
+            conn_file.write(&mut locked, current_task, &mut bind_service_buffer)?;
+        }
 
-        let reply_frame = frame_reader.next_frame_blocking(current_task)?;
+        let reply_frame = frame_reader.next_frame_blocking(locked, current_task)?;
 
         let bind_service_reply = match reply_frame.msg {
             Some(ipc_frame::Msg::MsgBindServiceReply(reply)) => reply,
@@ -158,11 +165,15 @@ impl PerfettoConnection {
         Ok(Self { conn_file, frame_reader, bind_service_reply, request_id })
     }
 
-    fn send_message(
+    fn send_message<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         msg: ipc_frame::Msg,
-    ) -> Result<u64, anyhow::Error> {
+    ) -> Result<u64, anyhow::Error>
+    where
+        L: LockBefore<FileOpsWrite>,
+    {
         let request_id = self.request_id;
         let frame =
             IpcFrame { request_id: Some(request_id), data_for_testing: Vec::new(), msg: Some(msg) };
@@ -173,7 +184,8 @@ impl PerfettoConnection {
         frame_bytes.extend_from_slice(&u32::try_from(frame.encoded_len())?.to_le_bytes());
         frame.encode(&mut frame_bytes)?;
         let mut buffer: VecInputBuffer = frame_bytes.into();
-        self.conn_file.write(current_task, &mut buffer)?;
+        let mut locked = locked.cast_locked::<FileOpsWrite>();
+        self.conn_file.write(&mut locked, current_task, &mut buffer)?;
 
         Ok(request_id)
     }
@@ -196,16 +208,21 @@ impl PerfettoConnection {
         Err(anyhow::anyhow!("Did not find method {}", name))
     }
 
-    fn enable_tracing(
+    fn enable_tracing<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         req: EnableTracingRequest,
-    ) -> Result<u64, anyhow::Error> {
+    ) -> Result<u64, anyhow::Error>
+    where
+        L: LockBefore<FileOpsWrite>,
+    {
         let method_id = self.method_id("EnableTracing")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
         req.encode(&mut encoded_args)?;
 
         self.send_message(
+            locked,
             current_task,
             ipc_frame::Msg::MsgInvokeMethod(ipc_frame::InvokeMethod {
                 service_id: self.bind_service_reply.service_id,
@@ -216,16 +233,21 @@ impl PerfettoConnection {
         )
     }
 
-    fn disable_tracing(
+    fn disable_tracing<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         req: DisableTracingRequest,
-    ) -> Result<u64, anyhow::Error> {
+    ) -> Result<u64, anyhow::Error>
+    where
+        L: LockBefore<FileOpsWrite>,
+    {
         let method_id = self.method_id("DisableTracing")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
         req.encode(&mut encoded_args)?;
 
         self.send_message(
+            locked,
             current_task,
             ipc_frame::Msg::MsgInvokeMethod(ipc_frame::InvokeMethod {
                 service_id: self.bind_service_reply.service_id,
@@ -236,16 +258,21 @@ impl PerfettoConnection {
         )
     }
 
-    fn read_buffers(
+    fn read_buffers<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         req: ReadBuffersRequest,
-    ) -> Result<u64, anyhow::Error> {
+    ) -> Result<u64, anyhow::Error>
+    where
+        L: LockBefore<FileOpsWrite>,
+    {
         let method_id = self.method_id("ReadBuffers")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
         req.encode(&mut encoded_args)?;
 
         self.send_message(
+            locked,
             current_task,
             ipc_frame::Msg::MsgInvokeMethod(ipc_frame::InvokeMethod {
                 service_id: self.bind_service_reply.service_id,
@@ -256,16 +283,21 @@ impl PerfettoConnection {
         )
     }
 
-    fn free_buffers(
+    fn free_buffers<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         req: FreeBuffersRequest,
-    ) -> Result<u64, anyhow::Error> {
+    ) -> Result<u64, anyhow::Error>
+    where
+        L: LockBefore<FileOpsWrite>,
+    {
         let method_id = self.method_id("FreeBuffers")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
         req.encode(&mut encoded_args)?;
 
         self.send_message(
+            locked,
             current_task,
             ipc_frame::Msg::MsgInvokeMethod(ipc_frame::InvokeMethod {
                 service_id: self.bind_service_reply.service_id,
@@ -394,6 +426,7 @@ impl CallbackState {
                     });
                 }
                 connection.enable_tracing(
+                    locked,
                     current_task,
                     EnableTracingRequest {
                         trace_config: Some(TraceConfig {
@@ -423,18 +456,22 @@ impl CallbackState {
                     let blob_name_ref;
                     {
                         let connection = self.connection(locked, current_task)?;
-                        disable_request =
-                            connection.disable_tracing(current_task, DisableTracingRequest {})?;
+                        disable_request = connection.disable_tracing(
+                            locked,
+                            current_task,
+                            DisableTracingRequest {},
+                        )?;
                         loop {
-                            let frame =
-                                connection.frame_reader.next_frame_blocking(current_task)?;
+                            let frame = connection
+                                .frame_reader
+                                .next_frame_blocking(locked, current_task)?;
                             if frame.request_id == Some(disable_request) {
                                 break;
                             }
                         }
 
                         read_buffers_request =
-                            connection.read_buffers(current_task, ReadBuffersRequest {})?;
+                            connection.read_buffers(locked, current_task, ReadBuffersRequest {})?;
                         blob_name_ref = context.as_ref().map(|context| {
                             context.register_string_literal(fuchsia_trace::cstr!(
                                 trace_name_perfetto_blob!()
@@ -450,7 +487,7 @@ impl CallbackState {
                         let frame = self
                             .connection(locked, current_task)?
                             .frame_reader
-                            .next_frame_blocking(current_task)?;
+                            .next_frame_blocking(locked, current_task)?;
                         if frame.request_id != Some(read_buffers_request) {
                             continue;
                         }
@@ -500,9 +537,12 @@ impl CallbackState {
                     // The response to a free buffers request does not have anything meaningful,
                     // so we don't need to worry about tracking the request id to match to the
                     // response.
-                    let _free_buffers_request_id = self
-                        .connection(locked, current_task)?
-                        .free_buffers(current_task, FreeBuffersRequest { buffer_ids: vec![0] })?;
+                    let _free_buffers_request_id =
+                        self.connection(locked, current_task)?.free_buffers(
+                            locked,
+                            current_task,
+                            FreeBuffersRequest { buffer_ids: vec![0] },
+                        )?;
                 }
             }
         }

@@ -22,7 +22,7 @@ use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
     auth::FsCred,
     errno, error,
@@ -268,6 +268,7 @@ impl FileOps for VmoFile {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         mut offset: usize,
@@ -288,6 +289,7 @@ impl FileOps for VmoFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -506,7 +508,7 @@ fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsN
 mod test {
     use crate::{
         fs::fuchsia::RemoteBundle,
-        testing::create_kernel_and_task,
+        testing::create_kernel_task_and_unlocked,
         vfs::{
             buffers::VecOutputBuffer, DirectoryEntryType, DirentSink, FsStr, LookupContext,
             Namespace, SymlinkMode, SymlinkTarget,
@@ -519,7 +521,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_read_image() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let (server, client) = zx::Channel::create();
         fdio::open("/pkg", rights, server).expect("failed to open /pkg");
@@ -544,7 +546,10 @@ mod test {
             .expect("open failed");
 
         let mut buffer = VecOutputBuffer::new(64);
-        assert_eq!(test_file.read(&current_task, &mut buffer).expect("read failed"), 6);
+        assert_eq!(
+            test_file.read(&mut locked, &current_task, &mut buffer).expect("read failed"),
+            6
+        );
         let buffer: Vec<u8> = buffer.into();
         assert_eq!(&buffer[..6], b"hello\n");
 

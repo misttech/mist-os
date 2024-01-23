@@ -24,6 +24,7 @@ use fuchsia_zircon as zx;
 use maplit::btreemap;
 use once_cell::sync::Lazy;
 use starnix_logging::{log_error, not_implemented};
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
     pid_t, time::duration_to_scheduler_clock,
@@ -253,6 +254,7 @@ impl FileOps for ProcKmsgFile {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -267,6 +269,7 @@ impl FileOps for ProcKmsgFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -376,6 +379,7 @@ impl FileOps for PressureFile {
     /// Pressure notifications are configured by writing to the file.
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

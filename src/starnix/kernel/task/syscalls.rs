@@ -21,7 +21,7 @@ use crate::{
     vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer, VecOutputBuffer},
 };
 use starnix_logging::{log_error, log_trace, not_implemented, set_zx_name};
-use starnix_sync::{MmDumpable, TaskRelease};
+use starnix_sync::{FileOpsRead, MmDumpable, TaskRelease};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,
@@ -1587,10 +1587,14 @@ pub fn sys_swapon(
     const MAGIC_OFFSET: usize = 0xff6;
     let swap_magic = b"SWAPSPACE2";
     let mut buffer = VecOutputBuffer::new(swap_magic.len());
-    if file.read_at(current_task, MAGIC_OFFSET, &mut buffer)? != swap_magic.len()
-        || buffer.data() != swap_magic
     {
-        return error!(EINVAL);
+        let mut new_locked = locked.cast_locked::<FileOpsRead>();
+        if file.read_at(&mut new_locked, current_task, MAGIC_OFFSET, &mut buffer)?
+            != swap_magic.len()
+            || buffer.data() != swap_magic
+        {
+            return error!(EINVAL);
+        }
     }
 
     let mut swap_files = current_task.kernel().swap_files.lock(locked);

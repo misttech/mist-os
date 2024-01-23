@@ -28,7 +28,7 @@ use netlink_packet_route::{
     AddressMessage, LinkMessage, RtnlMessage,
 };
 use starnix_logging::log_warn;
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsRead, FileOpsWrite, LockBefore, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -397,13 +397,18 @@ impl Socket {
         self.state.lock().send_timeout
     }
 
-    pub fn ioctl(
+    pub fn ioctl<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
-    ) -> Result<SyscallResult, Errno> {
+    ) -> Result<SyscallResult, Errno>
+    where
+        L: LockBefore<FileOpsRead>,
+        L: LockBefore<FileOpsWrite>,
+    {
         let user_addr = UserAddress::from(arg);
 
         // TODO(https://fxbug.dev/129059): Share this implementation with `fdio`
@@ -422,7 +427,7 @@ impl Socket {
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, address_msgs, _if_index) =
-                    get_netlink_ipv4_addresses(current_task, &in_ifreq, &mut read_buf)?;
+                    get_netlink_ipv4_addresses(locked, current_task, &in_ifreq, &mut read_buf)?;
 
                 let ifru_addr = {
                     let mut addr = sockaddr::default();
@@ -472,7 +477,7 @@ impl Socket {
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (socket, address_msgs, if_index) =
-                    get_netlink_ipv4_addresses(current_task, &in_ifreq, &mut read_buf)?;
+                    get_netlink_ipv4_addresses(locked, current_task, &in_ifreq, &mut read_buf)?;
 
                 let request_header = {
                     let mut header = NetlinkHeader::default();
@@ -507,6 +512,7 @@ impl Socket {
                 // First remove all IPv4 addresses for the requested interface.
                 for addr in address_msgs.into_iter() {
                     let resp = send_netlink_msg_and_wait_response(
+                        locked,
                         current_task,
                         &socket,
                         NetlinkMessage::new(
@@ -528,6 +534,7 @@ impl Socket {
                 .s_addr;
                 if addr != 0 {
                     let resp = send_netlink_msg_and_wait_response(
+                        locked,
                         current_task,
                         &socket,
                         NetlinkMessage::new(
@@ -561,7 +568,7 @@ impl Socket {
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
-                    get_netlink_interface_info(current_task, &in_ifreq, &mut read_buf)?;
+                    get_netlink_interface_info(locked, current_task, &in_ifreq, &mut read_buf)?;
 
                 let hw_addr_and_type = {
                     let hw_type = link_msg.header.link_layer_type;
@@ -608,7 +615,7 @@ impl Socket {
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
-                    get_netlink_interface_info(current_task, &in_ifreq, &mut read_buf)?;
+                    get_netlink_interface_info(locked, current_task, &in_ifreq, &mut read_buf)?;
                 let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
                     ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
                     ifr_ifru.ifru_ivalue: {
@@ -634,7 +641,7 @@ impl Socket {
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
                 let (_socket, link_msg) =
-                    get_netlink_interface_info(current_task, &in_ifreq, &mut read_buf)?;
+                    get_netlink_interface_info(locked, current_task, &in_ifreq, &mut read_buf)?;
                 let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
                     ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
                     ifr_ifru.ifru_flags: {
@@ -653,7 +660,7 @@ impl Socket {
             SIOCSIFFLAGS => {
                 let user_addr = UserAddress::from(arg);
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
-                set_netlink_interface_flags(current_task, &in_ifreq).map(|()| SUCCESS)
+                set_netlink_interface_flags(locked, current_task, &in_ifreq).map(|()| SUCCESS)
             }
             _ => self.ops.ioctl(self, file, current_task, request, arg),
         }
@@ -749,11 +756,16 @@ impl AcceptQueue {
 ///
 /// Returns the netlink socket and the interface's information, or an [`Errno`]
 /// if the operation failed.
-fn get_netlink_interface_info(
+fn get_netlink_interface_info<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     in_ifreq: &ifreq,
     read_buf: &mut VecOutputBuffer,
-) -> Result<(FileHandle, LinkMessage), Errno> {
+) -> Result<(FileHandle, LinkMessage), Errno>
+where
+    L: LockBefore<FileOpsWrite>,
+    L: LockBefore<FileOpsRead>,
+{
     let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
         .to_str()
         .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
@@ -779,7 +791,7 @@ fn get_netlink_interface_info(
             msg
         })),
     );
-    let resp = send_netlink_msg_and_wait_response(current_task, &socket, msg, read_buf)?;
+    let resp = send_netlink_msg_and_wait_response(locked, current_task, &socket, msg, read_buf)?;
     let link_msg = match resp.payload {
         NetlinkPayload::Error(ErrorMessage { code: Some(code), header: _, .. }) => {
             // `code` is an `i32` and may hold negative values so
@@ -803,17 +815,22 @@ fn get_netlink_interface_info(
 ///
 /// Returns the netlink socket, the list of addresses and interface index, or an
 /// [`Errno`] if the operation failed.
-fn get_netlink_ipv4_addresses(
+fn get_netlink_ipv4_addresses<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     in_ifreq: &ifreq,
     read_buf: &mut VecOutputBuffer,
-) -> Result<(FileHandle, Vec<AddressMessage>, u32), Errno> {
+) -> Result<(FileHandle, Vec<AddressMessage>, u32), Errno>
+where
+    L: LockBefore<FileOpsRead>,
+    L: LockBefore<FileOpsWrite>,
+{
     let sockaddr { sa_family, sa_data: _ } = unsafe { in_ifreq.ifr_ifru.ifru_addr };
     if sa_family != AF_INET {
         return error!(EINVAL);
     }
 
-    let (socket, link_msg) = get_netlink_interface_info(current_task, in_ifreq, read_buf)?;
+    let (socket, link_msg) = get_netlink_interface_info(locked, current_task, in_ifreq, read_buf)?;
     let if_index = link_msg.header.index;
 
     // Send the request to dump all IPv4 addresses.
@@ -833,14 +850,18 @@ fn get_netlink_ipv4_addresses(
         msg.finalize();
         let mut buf = vec![0; msg.buffer_len()];
         msg.serialize(&mut buf[..]);
-        assert_eq!(socket.write(current_task, &mut VecInputBuffer::from(buf))?, msg.buffer_len());
+        let mut locked = locked.cast_locked::<FileOpsWrite>();
+        assert_eq!(
+            socket.write(&mut locked, current_task, &mut VecInputBuffer::from(buf))?,
+            msg.buffer_len()
+        );
     }
 
     // Collect all the addresses.
     let mut addrs = Vec::new();
     loop {
         read_buf.reset();
-        let n = socket.read(current_task, read_buf)?;
+        let n = socket.read(locked, current_task, read_buf)?;
 
         let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
             .expect("netlink should always send well-formed messages");
@@ -859,7 +880,15 @@ fn get_netlink_ipv4_addresses(
 }
 
 /// Creates a netlink socket and performs `RTM_SETLINK` to update the flags.
-fn set_netlink_interface_flags(current_task: &CurrentTask, in_ifreq: &ifreq) -> Result<(), Errno> {
+fn set_netlink_interface_flags<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    in_ifreq: &ifreq,
+) -> Result<(), Errno>
+where
+    L: LockBefore<FileOpsWrite>,
+    L: LockBefore<FileOpsRead>,
+{
     let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
         .to_str()
         .map_err(|std::str::Utf8Error { .. }| errno!(EINVAL))?;
@@ -895,7 +924,8 @@ fn set_netlink_interface_flags(current_task: &CurrentTask, in_ifreq: &ifreq) -> 
         })),
     );
     let mut read_buf = VecOutputBuffer::new(NETLINK_ROUTE_BUF_SIZE);
-    let resp = send_netlink_msg_and_wait_response(current_task, &socket, msg, &mut read_buf)?;
+    let resp =
+        send_netlink_msg_and_wait_response(locked, current_task, &socket, msg, &mut read_buf)?;
     match resp.payload {
         NetlinkPayload::Error(ErrorMessage { code: Some(code), header: _, .. }) => {
             // `code` is an `i32` and may hold negative values so
@@ -914,19 +944,30 @@ fn set_netlink_interface_flags(current_task: &CurrentTask, in_ifreq: &ifreq) -> 
 }
 
 /// Sends the msg on the provided NETLINK ROUTE socket, returning the response.
-fn send_netlink_msg_and_wait_response(
+fn send_netlink_msg_and_wait_response<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     socket: &FileHandle,
     mut msg: NetlinkMessage<RtnlMessage>,
     read_buf: &mut VecOutputBuffer,
-) -> Result<NetlinkMessage<RtnlMessage>, Errno> {
+) -> Result<NetlinkMessage<RtnlMessage>, Errno>
+where
+    L: LockBefore<FileOpsWrite>,
+    L: LockBefore<FileOpsRead>,
+{
     msg.finalize();
     let mut buf = vec![0; msg.buffer_len()];
     msg.serialize(&mut buf[..]);
-    assert_eq!(socket.write(current_task, &mut VecInputBuffer::from(buf))?, msg.buffer_len());
+    {
+        let mut locked = locked.cast_locked::<FileOpsWrite>();
+        assert_eq!(
+            socket.write(&mut locked, current_task, &mut VecInputBuffer::from(buf))?,
+            msg.buffer_len()
+        );
+    }
 
     read_buf.reset();
-    let n = socket.read(current_task, read_buf)?;
+    let n = socket.read(locked, current_task, read_buf)?;
     let msg = NetlinkMessage::<RtnlMessage>::deserialize(&read_buf.data()[..n])
         .expect("netlink should always send well-formed messages");
     Ok(msg)

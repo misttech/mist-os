@@ -1948,7 +1948,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn open_device_file() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Create a device file that points to the `zero` device (which is automatically
         // registered in the kernel).
@@ -1964,7 +1964,7 @@ mod tests {
         // Read from the zero device.
         let device_file =
             current_task.open_file("zero".into(), OpenFlags::RDONLY).expect("open device file");
-        device_file.read(&current_task, &mut buffer).expect("read from zero");
+        device_file.read(&mut locked, &current_task, &mut buffer).expect("read from zero");
 
         // Assert the contents.
         assert_eq!(&[0; CONTENT_LEN], buffer.data());

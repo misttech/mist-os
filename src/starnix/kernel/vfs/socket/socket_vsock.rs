@@ -14,7 +14,7 @@ use crate::{
         FdEvents, FileHandle,
     },
 };
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsWrite, Mutex, Unlocked};
 use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred};
 
 // An implementation of AF_VSOCK.
@@ -147,7 +147,8 @@ impl SocketOps for VsockSocket {
 
         match &inner.state {
             VsockSocketState::Connected(file) => {
-                let bytes_read = file.read(current_task, data)?;
+                let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461655): propagate through SocketOps
+                let bytes_read = file.read(&mut locked, current_task, data)?;
                 Ok(MessageReadInfo {
                     bytes_read,
                     message_length: bytes_read,
@@ -168,8 +169,10 @@ impl SocketOps for VsockSocket {
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
         let inner = self.lock();
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461655): propagate through SocketOps
+        let mut locked = locked.cast_locked::<FileOpsWrite>();
         match &inner.state {
-            VsockSocketState::Connected(file) => file.write(current_task, data),
+            VsockSocketState::Connected(file) => file.write(&mut locked, current_task, data),
             _ => error!(EBADF),
         }
     }
@@ -304,6 +307,7 @@ mod tests {
     };
     use fuchsia_zircon as zx;
     use fuchsia_zircon::HandleBased;
+    use starnix_sync::FileOpsWrite;
     use starnix_uapi::epoll_event;
     use syncio::Zxio;
 
@@ -364,7 +368,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_vsock_write_while_read() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (fs1, fs2) = fidl::Socket::create_stream();
         let socket = Socket::new(
             &current_task,
@@ -381,16 +385,20 @@ mod tests {
         const XFER_SIZE: usize = 42;
 
         let socket_clone = socket_file.clone();
-        let thread = kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
-            let bytes_read =
-                socket_clone.read(current_task, &mut VecOutputBuffer::new(XFER_SIZE)).unwrap();
+        let thread = kernel.kthreads.spawner().spawn_and_get_result(move |locked, current_task| {
+            let bytes_read = socket_clone
+                .read(locked, current_task, &mut VecOutputBuffer::new(XFER_SIZE))
+                .unwrap();
             assert_eq!(XFER_SIZE, bytes_read);
         });
 
         // Wait for the thread to become blocked on the read.
         zx::Duration::from_seconds(2).sleep();
 
-        socket_file.write(&current_task, &mut VecInputBuffer::new(&[0; XFER_SIZE])).unwrap();
+        let mut locked = locked.cast_locked::<FileOpsWrite>();
+        socket_file
+            .write(&mut locked, &current_task, &mut VecInputBuffer::new(&[0; XFER_SIZE]))
+            .unwrap();
 
         let mut buffer = [0u8; 1024];
         assert_eq!(XFER_SIZE, fs1.read(&mut buffer).unwrap());
@@ -400,7 +408,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_vsock_poll() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let (client, server) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
@@ -438,7 +446,10 @@ mod tests {
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
-        assert_eq!(socket.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
+        assert_eq!(
+            socket.read(&mut locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
+            1
+        );
 
         assert_eq!(
             socket.query_events(&current_task),

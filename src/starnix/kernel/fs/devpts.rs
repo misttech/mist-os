@@ -20,7 +20,9 @@ use crate::{
     },
 };
 use starnix_logging::not_implemented;
-use starnix_sync::{LockBefore, Locked, ProcessGroupState, Unlocked};
+use starnix_sync::{
+    FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, Locked, ProcessGroupState,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::FsCred,
@@ -332,29 +334,29 @@ impl FileOps for DevPtmxFile {
 
     fn read(
         &self,
+        locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.main_read(&mut locked, current_task, data)
+            self.terminal.main_read(locked, current_task, data)
         })
     }
 
     fn write(
         &self,
+        locked: &mut Locked<'_, FileOpsWrite>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.main_write(&mut locked, current_task, data)
+            self.terminal.main_write(locked, current_task, data)
         })
     }
 
@@ -379,12 +381,12 @@ impl FileOps for DevPtmxFile {
 
     fn ioctl(
         &self,
+        locked: &mut Locked<'_, FileOpsIoctl>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         let user_addr = UserAddress::from(arg);
         match request {
             TIOCGPTN => {
@@ -405,7 +407,7 @@ impl FileOps for DevPtmxFile {
                 self.terminal.write().locked = value != 0;
                 Ok(SUCCESS)
             }
-            _ => shared_ioctl(&mut locked, &self.terminal, true, _file, current_task, request, arg),
+            _ => shared_ioctl(locked, &self.terminal, true, _file, current_task, request, arg),
         }
     }
 }
@@ -430,29 +432,29 @@ impl FileOps for DevPtsFile {
 
     fn read(
         &self,
+        locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_read(&mut locked, current_task, data)
+            self.terminal.replica_read(locked, current_task, data)
         })
     }
 
     fn write(
         &self,
+        locked: &mut Locked<'_, FileOpsWrite>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_write(&mut locked, current_task, data)
+            self.terminal.replica_write(locked, current_task, data)
         })
     }
 
@@ -477,13 +479,13 @@ impl FileOps for DevPtsFile {
 
     fn ioctl(
         &self,
+        locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
-        shared_ioctl(&mut locked, &self.terminal, false, file, current_task, request, arg)
+        shared_ioctl(locked, &self.terminal, false, file, current_task, request, arg)
     }
 }
 
@@ -677,13 +679,18 @@ mod tests {
             MountInfo, NamespaceNode,
         },
     };
+    use starnix_sync::Unlocked;
     use starnix_uapi::{
         auth::{Credentials, FsCred},
         file_mode::FileMode,
         signals::{SIGCHLD, SIGTTOU},
     };
 
-    fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy>(
+    fn ioctl<
+        T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy,
+        L: LockBefore<FileOpsIoctl>,
+    >(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         command: u32,
@@ -693,17 +700,20 @@ mod tests {
             map_memory(current_task, UserAddress::default(), std::mem::size_of::<T>() as u64);
         let address_ref = UserRef::<T>::new(address);
         current_task.write_object(address_ref, value)?;
-        file.ioctl(current_task, command, address.into())?;
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        file.ioctl(&mut locked, current_task, command, address.into())?;
         current_task.read_object(address_ref)
     }
 
-    fn set_controlling_terminal(
+    fn set_controlling_terminal<L: LockBefore<FileOpsIoctl>>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         steal: bool,
     ) -> Result<SyscallResult, Errno> {
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         #[allow(clippy::bool_to_int_with_if)]
-        file.ioctl(current_task, TIOCSCTTY, steal.into())
+        file.ioctl(&mut locked, current_task, TIOCSCTTY, steal.into())
     }
 
     fn lookup_node(
@@ -733,33 +743,34 @@ mod tests {
         open_file_with_flags(current_task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
     }
 
-    fn open_ptmx_and_unlock(
+    fn open_ptmx_and_unlock<L: LockBefore<FileOpsIoctl>>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
     ) -> Result<FileHandle, Errno> {
         let file = open_file_with_flags(current_task, fs, "ptmx".into(), OpenFlags::RDWR)?;
 
         // Unlock terminal
-        ioctl::<i32>(current_task, &file, TIOCSPTLCK, &0)?;
+        ioctl::<i32, L>(locked, current_task, &file, TIOCSPTLCK, &0)?;
 
         Ok(file)
     }
 
     #[::fuchsia::test]
     async fn opening_ptmx_creates_pts() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
         lookup_node(&task, fs, "0".into()).unwrap_err();
-        let _ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        let _ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         lookup_node(&task, fs, "0".into()).expect("pty");
     }
 
     #[::fuchsia::test]
     async fn closing_ptmx_closes_pts() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
         lookup_node(&task, fs, "0".into()).unwrap_err();
-        let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         let _pts = open_file(&task, fs, "0".into()).expect("open file");
         std::mem::drop(ptmx);
         task.trigger_delayed_releaser();
@@ -768,12 +779,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn pts_are_reused() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
 
-        let _ptmx0 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        let mut _ptmx1 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        let _ptmx2 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        let _ptmx0 = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
+        let mut _ptmx1 = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
+        let _ptmx2 = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
 
         lookup_node(&task, fs, "0".into()).expect("component_lookup");
         lookup_node(&task, fs, "1".into()).expect("component_lookup");
@@ -784,7 +795,7 @@ mod tests {
 
         lookup_node(&task, fs, "1".into()).unwrap_err();
 
-        _ptmx1 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        _ptmx1 = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         lookup_node(&task, fs, "1".into()).expect("component_lookup");
     }
 
@@ -814,52 +825,55 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_open_tty() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
         let devfs = crate::fs::devtmpfs::dev_tmp_fs(&task);
 
-        let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        set_controlling_terminal(&task, &ptmx, false).expect("set_controlling_terminal");
+        let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
+        set_controlling_terminal(&mut locked, &task, &ptmx, false)
+            .expect("set_controlling_terminal");
         let tty = open_file_with_flags(&task, devfs, "tty".into(), OpenFlags::RDWR).expect("tty");
         // Check that tty is the main terminal by calling the ioctl TIOCGPTN and checking it is
         // has the same result as on ptmx.
         assert_eq!(
-            ioctl::<i32>(&task, &tty, TIOCGPTN, &0),
-            ioctl::<i32>(&task, &ptmx, TIOCGPTN, &0)
+            ioctl::<i32, Unlocked>(&mut locked, &task, &tty, TIOCGPTN, &0),
+            ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCGPTN, &0)
         );
 
         // Detach the controlling terminal.
-        ioctl::<i32>(&task, &ptmx, TIOCNOTTY, &0).expect("detach terminal");
+        ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCNOTTY, &0).expect("detach terminal");
         let pts = open_file(&task, fs, "0".into()).expect("open file");
-        set_controlling_terminal(&task, &pts, false).expect("set_controlling_terminal");
+        set_controlling_terminal(&mut locked, &task, &pts, false)
+            .expect("set_controlling_terminal");
         let tty = open_file_with_flags(&task, devfs, "tty".into(), OpenFlags::RDWR).expect("tty");
         // TIOCGPTN is not implemented on replica terminals
-        assert!(ioctl::<i32>(&task, &tty, TIOCGPTN, &0).is_err());
+        assert!(ioctl::<i32, Unlocked>(&mut locked, &task, &tty, TIOCGPTN, &0).is_err());
     }
 
     #[::fuchsia::test]
     async fn test_unknown_ioctl() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
 
-        let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        assert_eq!(ptmx.ioctl(&task, 42, Default::default()), error!(ENOTTY));
+        let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        assert_eq!(ptmx.ioctl(&mut locked, &task, 42, Default::default()), error!(ENOTTY));
 
         let pts_file = open_file(&task, fs, "0".into()).expect("open file");
-        assert_eq!(pts_file.ioctl(&task, 42, Default::default()), error!(ENOTTY));
+        assert_eq!(pts_file.ioctl(&mut locked, &task, 42, Default::default()), error!(ENOTTY));
     }
 
     #[::fuchsia::test]
     async fn test_tiocgptn_ioctl() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
-        let ptmx0 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
-        let ptmx1 = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        let ptmx0 = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
+        let ptmx1 = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
 
-        let pts0 = ioctl::<u32>(&task, &ptmx0, TIOCGPTN, &0).expect("ioctl");
+        let pts0 = ioctl::<u32, Unlocked>(&mut locked, &task, &ptmx0, TIOCGPTN, &0).expect("ioctl");
         assert_eq!(pts0, 0);
 
-        let pts1 = ioctl::<u32>(&task, &ptmx1, TIOCGPTN, &0).expect("ioctl");
+        let pts1 = ioctl::<u32, Unlocked>(&mut locked, &task, &ptmx1, TIOCGPTN, &0).expect("ioctl");
         assert_eq!(pts1, 1);
     }
 
@@ -875,30 +889,30 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_lock_ioctls() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
-        let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         let pts = lookup_node(&task, fs, "0".into()).expect("component_lookup");
 
         // Check that the lock is not set.
-        assert_eq!(ioctl::<i32>(&task, &ptmx, TIOCGPTLCK, &0), Ok(0));
+        assert_eq!(ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(0));
         // /dev/pts/0 can be opened
         pts.open(&task, OpenFlags::RDONLY, true).expect("open");
 
         // Lock the terminal
-        ioctl::<i32>(&task, &ptmx, TIOCSPTLCK, &42).expect("ioctl");
+        ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCSPTLCK, &42).expect("ioctl");
         // Check that the lock is set.
-        assert_eq!(ioctl::<i32>(&task, &ptmx, TIOCGPTLCK, &0), Ok(1));
+        assert_eq!(ioctl::<i32, Unlocked>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(1));
         // /dev/pts/0 cannot be opened
         assert_eq!(pts.open(&task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
     }
 
     #[::fuchsia::test]
     async fn test_ptmx_stats() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         task.set_creds(Credentials::with_ids(22, 22));
         let fs = dev_pts_fs(&task, Default::default());
-        let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         let ptmx_stat = ptmx.node().stat(&task).expect("stat");
         assert_eq!(ptmx_stat.st_blksize as usize, BLOCK_SIZE);
         let pts = open_file(&task, fs, "0".into()).expect("open file");
@@ -910,9 +924,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_attach_terminal_when_open() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
-        let _opened_main = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        let _opened_main = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         // Opening the main terminal should not set the terminal of the session.
         assert!(task
             .thread_group
@@ -955,22 +969,31 @@ mod tests {
         task2.thread_group.setsid(&mut locked).expect("setsid");
 
         let fs = dev_pts_fs(&task1, Default::default());
-        let opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");
+        let opened_main = open_ptmx_and_unlock(&mut locked, &task1, fs).expect("ptmx");
         let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
 
-        assert_eq!(ioctl::<i32>(&task1, &opened_main, TIOCGPGRP, &0), error!(ENOTTY));
-        assert_eq!(ioctl::<i32>(&task2, &opened_replica, TIOCGPGRP, &0), error!(ENOTTY));
-
-        set_controlling_terminal(&task1, &opened_main, false).unwrap();
         assert_eq!(
-            ioctl::<i32>(&task1, &opened_main, TIOCGPGRP, &0),
+            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_main, TIOCGPGRP, &0),
+            error!(ENOTTY)
+        );
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
+            error!(ENOTTY)
+        );
+
+        set_controlling_terminal(&mut locked, &task1, &opened_main, false).unwrap();
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_main, TIOCGPGRP, &0),
             Ok(task1.thread_group.read().process_group.leader)
         );
-        assert_eq!(ioctl::<i32>(&task2, &opened_replica, TIOCGPGRP, &0), error!(ENOTTY));
-
-        set_controlling_terminal(&task2, &opened_replica, false).unwrap();
         assert_eq!(
-            ioctl::<i32>(&task2, &opened_replica, TIOCGPGRP, &0),
+            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
+            error!(ENOTTY)
+        );
+
+        set_controlling_terminal(&mut locked, &task2, &opened_replica, false).unwrap();
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
             Ok(task2.thread_group.read().process_group.leader)
         );
     }
@@ -983,39 +1006,57 @@ mod tests {
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         let fs = dev_pts_fs(&task1, Default::default());
-        let _opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");
+        let _opened_main = open_ptmx_and_unlock(&mut locked, &task1, fs).expect("ptmx");
         let wo_opened_replica =
             open_file_with_flags(&task1, fs, "0".into(), OpenFlags::WRONLY | OpenFlags::NOCTTY)
                 .expect("open file");
         assert!(!wo_opened_replica.can_read());
 
         // FD must be readable for setting the terminal.
-        assert_eq!(set_controlling_terminal(&task1, &wo_opened_replica, false), error!(EPERM));
+        assert_eq!(
+            set_controlling_terminal(&mut locked, &task1, &wo_opened_replica, false),
+            error!(EPERM)
+        );
 
         let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
         // Task must be session leader for setting the terminal.
-        assert_eq!(set_controlling_terminal(&task2, &opened_replica, false), error!(EINVAL));
+        assert_eq!(
+            set_controlling_terminal(&mut locked, &task2, &opened_replica, false),
+            error!(EINVAL)
+        );
 
         // Associate terminal to task1.
-        set_controlling_terminal(&task1, &opened_replica, false)
+        set_controlling_terminal(&mut locked, &task1, &opened_replica, false)
             .expect("Associate terminal to task1");
 
         // One cannot associate a terminal to a process that has already one
-        assert_eq!(set_controlling_terminal(&task1, &opened_replica, false), error!(EINVAL));
+        assert_eq!(
+            set_controlling_terminal(&mut locked, &task1, &opened_replica, false),
+            error!(EINVAL)
+        );
 
         task2.thread_group.setsid(&mut locked).expect("setsid");
 
         // One cannot associate a terminal that is already associated with another process.
-        assert_eq!(set_controlling_terminal(&task2, &opened_replica, false), error!(EPERM));
+        assert_eq!(
+            set_controlling_terminal(&mut locked, &task2, &opened_replica, false),
+            error!(EPERM)
+        );
 
         // One cannot steal a terminal without the CAP_SYS_ADMIN capacility
-        assert_eq!(set_controlling_terminal(&task2, &opened_replica, true), error!(EPERM));
+        assert_eq!(
+            set_controlling_terminal(&mut locked, &task2, &opened_replica, true),
+            error!(EPERM)
+        );
 
         // One can steal a terminal with the CAP_SYS_ADMIN capacility
         task2.set_creds(Credentials::with_ids(0, 0));
         // But not without specifying that one wants to steal it.
-        assert_eq!(set_controlling_terminal(&task2, &opened_replica, false), error!(EPERM));
-        set_controlling_terminal(&task2, &opened_replica, true)
+        assert_eq!(
+            set_controlling_terminal(&mut locked, &task2, &opened_replica, false),
+            error!(EPERM)
+        );
+        set_controlling_terminal(&mut locked, &task2, &opened_replica, true)
             .expect("Associate terminal to task2");
 
         assert!(task1
@@ -1040,37 +1081,53 @@ mod tests {
         assert_ne!(task2_pgid, task1.thread_group.read().process_group.leader);
 
         let fs = dev_pts_fs(&task1, Default::default());
-        let _opened_main = open_ptmx_and_unlock(&init, fs).expect("ptmx");
+        let _opened_main = open_ptmx_and_unlock(&mut locked, &init, fs).expect("ptmx");
         let opened_replica = open_file(&task2, fs, "0".into()).expect("open file");
 
         // Cannot change the foreground process group if the terminal is not the controlling
         // terminal
-        assert_eq!(ioctl::<i32>(&task2, &opened_replica, TIOCSPGRP, &task2_pgid), error!(ENOTTY));
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &task2_pgid),
+            error!(ENOTTY)
+        );
 
         // Attach terminal to task1 and task2 session.
-        set_controlling_terminal(&task1, &opened_replica, false).unwrap();
+        set_controlling_terminal(&mut locked, &task1, &opened_replica, false).unwrap();
         // The foreground process group should be the one of task1
         assert_eq!(
-            ioctl::<i32>(&task1, &opened_replica, TIOCGPGRP, &0),
+            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_replica, TIOCGPGRP, &0),
             Ok(task1.thread_group.read().process_group.leader)
         );
 
         // Cannot change the foreground process group to a negative pid.
-        assert_eq!(ioctl::<i32>(&task2, &opened_replica, TIOCSPGRP, &-1), error!(EINVAL));
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &-1),
+            error!(EINVAL)
+        );
 
         // Cannot change the foreground process group to a invalid process group.
-        assert_eq!(ioctl::<i32>(&task2, &opened_replica, TIOCSPGRP, &255), error!(ESRCH));
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &255),
+            error!(ESRCH)
+        );
 
         // Cannot change the foreground process group to a process group in another session.
         let init_pgid = init.thread_group.read().process_group.leader;
-        assert_eq!(ioctl::<i32>(&task2, &opened_replica, TIOCSPGRP, &init_pgid), error!(EPERM));
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &init_pgid),
+            error!(EPERM)
+        );
 
         // Changing the foreground process while being in background generates SIGTTOU and fails.
-        assert_eq!(ioctl::<i32>(&task2, &opened_replica, TIOCSPGRP, &task2_pgid), error!(EINTR));
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCSPGRP, &task2_pgid),
+            error!(EINTR)
+        );
         assert!(task2.read().signals.has_queued(SIGTTOU));
 
         // Set the foregound process to task2 process group
-        ioctl::<i32>(&task1, &opened_replica, TIOCSPGRP, &task2_pgid).unwrap();
+        ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_replica, TIOCSPGRP, &task2_pgid)
+            .unwrap();
 
         // Check that the foreground process has been changed.
         let terminal = Arc::clone(
@@ -1103,19 +1160,27 @@ mod tests {
         task2.thread_group.setsid(&mut locked).expect("setsid");
 
         let fs = dev_pts_fs(&task1, Default::default());
-        let _opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");
+        let _opened_main = open_ptmx_and_unlock(&mut locked, &task1, fs).expect("ptmx");
         let opened_replica = open_file(&task1, fs, "0".into()).expect("open file");
 
         // Cannot detach the controlling terminal when none is attached terminal
-        assert_eq!(ioctl::<i32>(&task1, &opened_replica, TIOCNOTTY, &0), error!(ENOTTY));
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_replica, TIOCNOTTY, &0),
+            error!(ENOTTY)
+        );
 
-        set_controlling_terminal(&task2, &opened_replica, false).expect("set controlling terminal");
+        set_controlling_terminal(&mut locked, &task2, &opened_replica, false)
+            .expect("set controlling terminal");
 
         // Cannot detach the controlling terminal when not the session leader.
-        assert_eq!(ioctl::<i32>(&task1, &opened_replica, TIOCNOTTY, &0), error!(ENOTTY));
+        assert_eq!(
+            ioctl::<i32, Unlocked>(&mut locked, &task1, &opened_replica, TIOCNOTTY, &0),
+            error!(ENOTTY)
+        );
 
         // Detach the terminal
-        ioctl::<i32>(&task2, &opened_replica, TIOCNOTTY, &0).expect("detach terminal");
+        ioctl::<i32, Unlocked>(&mut locked, &task2, &opened_replica, TIOCNOTTY, &0)
+            .expect("detach terminal");
         assert!(task2
             .thread_group
             .read()
@@ -1128,23 +1193,27 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_send_data_back_and_forth() {
-        let (_kernel, task) = create_kernel_and_task();
+        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
-        let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
+        let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         let pts = open_file(&task, fs, "0".into()).expect("open file");
 
         let has_data_ready_to_read = |fd: &FileHandle| {
             fd.query_events(&task).expect("query_events").contains(FdEvents::POLLIN)
         };
 
-        let write_and_assert = |fd: &FileHandle, data: &[u8]| {
-            assert_eq!(fd.write(&task, &mut VecInputBuffer::new(data)).expect("write"), data.len());
+        let write_and_assert = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
+            assert_eq!(
+                fd.write(&mut locked, &task, &mut VecInputBuffer::new(data)).expect("write"),
+                data.len()
+            );
         };
 
-        let read_and_check = |fd: &FileHandle, data: &[u8]| {
+        let read_and_check = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
             assert!(has_data_ready_to_read(fd));
             let mut buffer = VecOutputBuffer::new(data.len() + 1);
-            assert_eq!(fd.read(&task, &mut buffer).expect("read"), data.len());
+            assert_eq!(fd.read(locked, &task, &mut buffer).expect("read"), data.len());
             assert_eq!(data, buffer.data());
         };
 
@@ -1152,15 +1221,15 @@ mod tests {
         let hello_transformed_buffer = b"hello\r\n";
 
         // Main to replica
-        write_and_assert(&ptmx, hello_buffer);
-        read_and_check(&pts, hello_buffer);
+        write_and_assert(&mut locked, &ptmx, hello_buffer);
+        read_and_check(&mut locked, &pts, hello_buffer);
 
         // Data has been echoed
-        read_and_check(&ptmx, hello_transformed_buffer);
+        read_and_check(&mut locked, &ptmx, hello_transformed_buffer);
 
         // Replica to main
-        write_and_assert(&pts, hello_buffer);
-        read_and_check(&ptmx, hello_transformed_buffer);
+        write_and_assert(&mut locked, &pts, hello_buffer);
+        read_and_check(&mut locked, &ptmx, hello_transformed_buffer);
 
         // Data has not been echoed
         assert!(!has_data_ready_to_read(&pts));

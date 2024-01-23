@@ -24,7 +24,7 @@ use starnix_core::{
     },
 };
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{LockBefore, Locked, TaskRelease, Unlocked};
+use starnix_sync::{FileOpsWrite, LockBefore, Locked, TaskRelease, Unlocked};
 use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, sync::Arc};
 
@@ -200,7 +200,7 @@ fn forward_to_pty(
     let mut tx = fuchsia_async::Socket::from_socket(console_out);
     let pty_sink = pty.clone();
     kernel.kthreads.spawn({
-        move |_, current_task| {
+        move |locked, current_task| {
             let _result: Result<(), Error> =
                 fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut buffer = vec![0u8; BUFFER_CAPACITY];
@@ -209,7 +209,12 @@ fn forward_to_pty(
                         if bytes == 0 {
                             return Ok(());
                         }
-                        pty_sink.write(current_task, &mut VecInputBuffer::new(&buffer[..bytes]))?;
+                        let mut locked = locked.cast_locked::<FileOpsWrite>();
+                        pty_sink.write(
+                            &mut locked,
+                            current_task,
+                            &mut VecInputBuffer::new(&buffer[..bytes]),
+                        )?;
                     }
                 });
         }
@@ -217,13 +222,13 @@ fn forward_to_pty(
 
     let pty_source = pty;
     kernel.kthreads.spawn({
-        move |_, current_task| {
+        move |mut locked, current_task| {
             let _result: Result<(), Error> =
                 fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
                     loop {
                         buffer.reset();
-                        let bytes = pty_source.read(current_task, &mut buffer)?;
+                        let bytes = pty_source.read(&mut locked, current_task, &mut buffer)?;
                         if bytes == 0 {
                             return Ok(());
                         }

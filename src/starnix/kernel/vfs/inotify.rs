@@ -12,7 +12,7 @@ use crate::{
         FsString, WdNumber,
     },
 };
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::WeakKey,
@@ -202,6 +202,7 @@ impl FileOps for InotifyFileObject {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -213,6 +214,7 @@ impl FileOps for InotifyFileObject {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -245,6 +247,7 @@ impl FileOps for InotifyFileObject {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -580,7 +583,7 @@ pub type InotifyMaxUserWatches = InotifyLimitProcFile<MaxUserWatchesGetter>;
 mod tests {
     use super::{InotifyEvent, InotifyEventQueue, InotifyFileObject, DATA_SIZE};
     use crate::{
-        testing::create_kernel_and_task,
+        testing::{create_kernel_and_task, create_kernel_task_and_unlocked},
         vfs::{buffers::VecOutputBuffer, OutputBuffer, WdNumber},
     };
     use starnix_uapi::{arc_key::WeakKey, file_mode::FileMode, inotify_mask::InotifyMask};
@@ -704,7 +707,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn notify_from_watchers() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let file = InotifyFileObject::new_file(&current_task, true);
         let inotify =
@@ -740,7 +743,8 @@ mod tests {
 
         // Read 1 event.
         let mut buffer = VecOutputBuffer::new(DATA_SIZE);
-        let bytes_read = file.read(&current_task, &mut buffer).expect("read into buffer");
+        let bytes_read =
+            file.read(&mut locked, &current_task, &mut buffer).expect("read into buffer");
 
         assert_eq!(bytes_read, DATA_SIZE);
         assert_eq!(inotify.available(), DATA_SIZE);
@@ -751,7 +755,8 @@ mod tests {
 
         // Read other event.
         buffer.reset();
-        let bytes_read = file.read(&current_task, &mut buffer).expect("read into buffer");
+        let bytes_read =
+            file.read(&mut locked, &current_task, &mut buffer).expect("read into buffer");
 
         assert_eq!(bytes_read, DATA_SIZE);
         assert_eq!(inotify.available(), 0);

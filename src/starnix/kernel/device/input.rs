@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use starnix_logging::{log_info, log_warn, not_implemented};
+use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::{DeviceType, INPUT_MAJOR},
@@ -497,6 +498,7 @@ impl FileOps for Arc<InputFile> {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -570,6 +572,7 @@ impl FileOps for Arc<InputFile> {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -597,6 +600,7 @@ impl FileOps for Arc<InputFile> {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -891,7 +895,7 @@ mod test {
     use super::*;
     use crate::{
         task::Kernel,
-        testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
+        testing::{create_kernel_task_and_unlocked, map_memory, AutoReleasableTask},
         vfs::{buffers::VecOutputBuffer, FileHandle},
     };
     use anyhow::anyhow;
@@ -902,6 +906,7 @@ mod test {
         EventPhase, TouchEvent, TouchPointerSample, TouchResponse, TouchSourceMarker,
         TouchSourceRequest,
     };
+    use starnix_sync::{LockBefore, Unlocked};
     use starnix_uapi::errors::EAGAIN;
     use test_case::test_case;
     use test_util::assert_near;
@@ -987,8 +992,10 @@ mod test {
         (input_file, device_listener_stream, relay_thread)
     }
 
-    fn make_kernel_objects(file: Arc<InputFile>) -> (Arc<Kernel>, AutoReleasableTask, FileHandle) {
-        let (kernel, current_task) = create_kernel_and_task();
+    fn make_kernel_objects<'l>(
+        file: Arc<InputFile>,
+    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, Locked<'l, Unlocked>) {
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let file_object = FileObject::new(
             Box::new(file),
             // The input node doesn't really live at the root of the filesystem.
@@ -999,17 +1006,22 @@ mod test {
             OpenFlags::empty(),
         )
         .expect("FileObject::new failed");
-        (kernel, current_task, file_object)
+        (kernel, current_task, file_object, locked)
     }
 
-    fn read_uapi_events(
+    fn read_uapi_events<L>(
+        locked: &mut Locked<'_, L>,
         file: Arc<InputFile>,
         file_object: &FileObject,
         current_task: &CurrentTask,
-    ) -> Vec<uapi::input_event> {
+    ) -> Vec<uapi::input_event>
+    where
+        L: LockBefore<FileOpsRead>,
+    {
         std::iter::from_fn(|| {
+            let mut locked = locked.cast_locked::<FileOpsRead>();
             let mut event_bytes = VecOutputBuffer::new(INPUT_EVENT_SIZE);
-            match file.read(file_object, current_task, 0, &mut event_bytes) {
+            match file.read(&mut locked, file_object, current_task, 0, &mut event_bytes) {
                 Ok(INPUT_EVENT_SIZE) => Some(
                     uapi::input_event::read_from(Vec::from(event_bytes).as_slice())
                         .ok_or(anyhow!("failed to read input_event from buffer")),
@@ -1105,7 +1117,7 @@ mod test {
         let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, _) = make_kernel_objects(input_file.clone());
 
         // Ask `input_file` to notify waiters when data is available to read.
         [&waiter1, &waiter2].iter().for_each(|waiter| {
@@ -1143,7 +1155,7 @@ mod test {
         // Set up resources.
         let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let waiter = Waiter::new();
-        let (kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (kernel, current_task, file_object, _) = make_kernel_objects(input_file.clone());
 
         // Ask `input_file` to notify `waiter` when data is available to read.
         input_file.wait_async(
@@ -1195,7 +1207,7 @@ mod test {
         let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, _) = make_kernel_objects(input_file.clone());
 
         // Ask `input_file` to notify `waiter` when data is available to read.
         let waitkeys = [&waiter1, &waiter2]
@@ -1238,7 +1250,7 @@ mod test {
     async fn query_events() {
         // Set up resources.
         let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, _) = make_kernel_objects(input_file.clone());
 
         // Check initial expectation.
         assert_eq!(
@@ -1278,7 +1290,8 @@ mod test {
             y_max,
             inspector.root().create_child("touch_input_file"),
         );
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, mut locked) =
+            make_kernel_objects(input_file.clone());
         let address = map_memory(
             &current_task,
             UserAddress::default(),
@@ -1286,8 +1299,9 @@ mod test {
         );
 
         // Invoke ioctl() for axis details.
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         input_file
-            .ioctl(&file_object, &current_task, ioctl_op, address.into())
+            .ioctl(&mut locked, &file_object, &current_task, ioctl_op, address.into())
             .expect("ioctl() failed");
 
         // Extract minimum and maximum fields for validation.
@@ -1318,7 +1332,8 @@ mod test {
 
         // Set up resources.
         let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, mut locked) =
+            make_kernel_objects(input_file.clone());
 
         // Reply to first `Watch` request.
         answer_next_watch_request(
@@ -1333,7 +1348,7 @@ mod test {
         answer_next_watch_request(&mut touch_source_stream, TouchEvent::default()).await;
 
         // Consume all of the `uapi::input_event`s that are available.
-        let events = read_uapi_events(input_file, &file_object, &current_task);
+        let events = read_uapi_events(&mut locked, input_file, &file_object, &current_task);
 
         // Cleanly tear down the `TouchSource` client.
         std::mem::drop(touch_source_stream); // Close Zircon channel.
@@ -1361,7 +1376,8 @@ mod test {
 
         // Set up resources.
         let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, mut locked) =
+            make_kernel_objects(input_file.clone());
 
         // Reply to first `Watch` request.
         answer_next_watch_request(
@@ -1375,7 +1391,7 @@ mod test {
         answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
 
         // Consume all of the `uapi::input_event`s that are available.
-        let events = read_uapi_events(input_file, &file_object, &current_task);
+        let events = read_uapi_events(&mut locked, input_file, &file_object, &current_task);
 
         // Check that the expected event type and code are in the expected position.
         let position = if position >= 0 {
@@ -1406,7 +1422,8 @@ mod test {
     async fn sends_acceptable_coordinates((x, y): (f32, f32)) {
         // Set up resources.
         let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, mut locked) =
+            make_kernel_objects(input_file.clone());
 
         // Reply to first `Watch` request.
         answer_next_watch_request(&mut touch_source_stream, make_touch_event_with_coords(x, y))
@@ -1417,7 +1434,7 @@ mod test {
         answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
 
         // Consume all of the `uapi::input_event`s that are available.
-        let events = read_uapi_events(input_file, &file_object, &current_task);
+        let events = read_uapi_events(&mut locked, input_file, &file_object, &current_task);
 
         // Check that the reported positions are within the acceptable error. The acceptable
         // error is chosen to allow either rounding or truncation.
@@ -1479,7 +1496,8 @@ mod test {
     #[::fuchsia::test]
     async fn sends_keyboard_events(fkey: fidl_fuchsia_input::Key, lkey: u32) {
         let (keyboard_file, mut keyboard_stream, relay_thread) = start_keyboard_input();
-        let (_kernel, current_task, file_object) = make_kernel_objects(keyboard_file.clone());
+        let (_kernel, current_task, file_object, mut locked) =
+            make_kernel_objects(keyboard_file.clone());
 
         let keyboard_listener = match keyboard_stream.next().await {
             Some(Ok(fuiinput::KeyboardRequest::AddListener {
@@ -1506,7 +1524,7 @@ mod test {
         std::mem::drop(keyboard_stream); // Close Zircon channel.
         std::mem::drop(keyboard_listener); // Close Zircon channel.
         relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
-        let events = read_uapi_events(keyboard_file, &file_object, &current_task);
+        let events = read_uapi_events(&mut locked, keyboard_file, &file_object, &current_task);
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].code, lkey as u16);
     }
@@ -1514,7 +1532,8 @@ mod test {
     #[::fuchsia::test]
     async fn skips_unknown_keyboard_events() {
         let (keyboard_file, mut keyboard_stream, relay_thread) = start_keyboard_input();
-        let (_kernel, current_task, file_object) = make_kernel_objects(keyboard_file.clone());
+        let (_kernel, current_task, file_object, mut locked) =
+            make_kernel_objects(keyboard_file.clone());
 
         let keyboard_listener = match keyboard_stream.next().await {
             Some(Ok(fuiinput::KeyboardRequest::AddListener {
@@ -1541,14 +1560,15 @@ mod test {
         std::mem::drop(keyboard_stream); // Close Zircon channel.
         std::mem::drop(keyboard_listener); // Close Zircon channel.
         relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
-        let events = read_uapi_events(keyboard_file, &file_object, &current_task);
+        let events = read_uapi_events(&mut locked, keyboard_file, &file_object, &current_task);
         assert_eq!(events.len(), 0);
     }
 
     #[::fuchsia::test]
     async fn sends_button_events() {
         let (input_file, mut device_listener_stream, relay_thread) = start_button_input();
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, mut locked) =
+            make_kernel_objects(input_file.clone());
 
         let buttons_listener = match device_listener_stream.next().await {
             Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
@@ -1576,7 +1596,7 @@ mod test {
         std::mem::drop(device_listener_stream); // Close Zircon channel.
         std::mem::drop(buttons_listener); // Close Zircon channel.
         relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
-        let events = read_uapi_events(input_file, &file_object, &current_task);
+        let events = read_uapi_events(&mut locked, input_file, &file_object, &current_task);
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].code, uapi::KEY_POWER as u16);
         assert_eq!(events[0].value, 1);
@@ -1621,7 +1641,8 @@ mod test {
             fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");
         let relay_thread = input_file.start_touch_relay(touch_source_proxy);
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (_kernel, current_task, file_object, mut locked) =
+            make_kernel_objects(input_file.clone());
 
         // Send 2 TouchEvents to proxy that should be counted as `received` by InputFile
         // A TouchEvent::default() has no pointer sample so these events should be discarded.
@@ -1658,7 +1679,7 @@ mod test {
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
         }
 
-        let _events = read_uapi_events(input_file, &file_object, &current_task);
+        let _events = read_uapi_events(&mut locked, input_file, &file_object, &current_task);
 
         assert_data_tree!(inspector, root: {
             touch_input_file: {

@@ -10,7 +10,7 @@ use crate::{
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
 };
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     errno, error, errors::Errno, open_flags::OpenFlags, signalfd_siginfo, signals::SigSet,
     SFD_NONBLOCK,
@@ -41,6 +41,7 @@ impl FileOps for SignalFd {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -139,6 +140,7 @@ impl FileOps for SignalFd {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

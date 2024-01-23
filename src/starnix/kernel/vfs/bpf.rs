@@ -24,7 +24,7 @@ use crate::{
     },
 };
 use starnix_logging::{log_trace, not_implemented};
-use starnix_sync::{BpfMapEntries, Locked, OrderedMutex, Unlocked};
+use starnix_sync::{BpfMapEntries, FileOpsRead, FileOpsWrite, Locked, OrderedMutex, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -62,6 +62,7 @@ impl FileOps for BpfHandle {
     fileops_impl_nonseekable!();
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
         offset: usize,
@@ -72,6 +73,7 @@ impl FileOps for BpfHandle {
     }
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
         offset: usize,

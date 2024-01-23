@@ -19,7 +19,10 @@ use crate::{
 use bstr::B;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, not_implemented};
-use starnix_sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{
+    FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
+    RwLockWriteGuard,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     auth::FsCred,
@@ -66,6 +69,7 @@ impl FileOps for DevFuse {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -77,6 +81,7 @@ impl FileOps for DevFuse {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -371,6 +376,7 @@ impl FileOps for AbortFile {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -381,6 +387,7 @@ impl FileOps for AbortFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -547,6 +554,7 @@ impl FileOps for FuseFileObject {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -576,6 +584,7 @@ impl FileOps for FuseFileObject {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -771,6 +780,7 @@ impl FileOps for FuseFileObject {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

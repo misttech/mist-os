@@ -34,7 +34,9 @@ use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
     log_error, log_trace, log_warn, not_implemented, trace_category_starnix, trace_duration,
 };
-use starnix_sync::{InterruptibleEvent, Mutex, MutexGuard, RwLock};
+use starnix_sync::{
+    FileOpsIoctl, FileOpsRead, FileOpsWrite, InterruptibleEvent, Locked, Mutex, MutexGuard, RwLock,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::ArcKey,
@@ -228,6 +230,7 @@ impl FileOps for BinderConnection {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -276,6 +279,7 @@ impl FileOps for BinderConnection {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -287,6 +291,7 @@ impl FileOps for BinderConnection {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

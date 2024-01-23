@@ -17,7 +17,7 @@ use crate::{
 use bitflags::bitflags;
 use fuchsia_zircon::{Vmo, VmoChildOptions};
 use starnix_logging::not_implemented;
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_old_dev_t,
@@ -274,13 +274,19 @@ impl FileOps for LoopDeviceFile {
 
     fn read(
         &self,
+        locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         if let Some(backing_file) = self.device.backing_file() {
-            backing_file.read_at(current_task, self.device.offset_for_backing_file(offset), data)
+            backing_file.read_at(
+                locked,
+                current_task,
+                self.device.offset_for_backing_file(offset),
+                data,
+            )
         } else {
             Ok(0)
         }
@@ -288,6 +294,7 @@ impl FileOps for LoopDeviceFile {
 
     fn write(
         &self,
+        locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -311,6 +318,7 @@ impl FileOps for LoopDeviceFile {
                 data
             };
             let r = backing_file.write_at(
+                locked,
                 current_task,
                 self.device.offset_for_backing_file(offset),
                 data,
@@ -364,6 +372,7 @@ impl FileOps for LoopDeviceFile {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -640,6 +649,7 @@ impl FileOps for LoopControlDevice {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -694,6 +704,7 @@ mod tests {
     use fidl::endpoints::Proxy;
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
+    use starnix_sync::Unlocked;
 
     #[derive(Clone)]
     struct PassthroughTestFile(Vec<u8>);
@@ -712,6 +723,7 @@ mod tests {
     }
 
     fn bind_simple_loop_device(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         backing_file: FileHandle,
         open_flags: OpenFlags,
@@ -736,7 +748,8 @@ mod tests {
                 ..Default::default()
             },
         );
-        loop_file.ioctl(&current_task, LOOP_CONFIGURE, config_addr.into()).unwrap();
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        loop_file.ioctl(&mut locked, &current_task, LOOP_CONFIGURE, config_addr.into()).unwrap();
 
         loop_file
     }
@@ -744,7 +757,7 @@ mod tests {
     #[::fuchsia::test]
     async fn basic_read() {
         let expected_contents = b"hello, world!";
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let backing_node = FsNode::new_root(PassthroughTestFile::new_node(expected_contents));
         let backing_file = Anon::new_file(
@@ -752,17 +765,18 @@ mod tests {
             backing_node.create_file_ops(&current_task, OpenFlags::RDONLY).unwrap(),
             OpenFlags::RDONLY,
         );
-        let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
+        let loop_file =
+            bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
 
         let mut buf = VecOutputBuffer::new(expected_contents.len());
-        loop_file.read(&current_task, &mut buf).unwrap();
+        loop_file.read(&mut locked, &current_task, &mut buf).unwrap();
 
         assert_eq!(buf.data(), expected_contents);
     }
 
     #[::fuchsia::test]
     async fn offset_works() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let backing_node = FsNode::new_root(PassthroughTestFile::new_node(b"hello, world!"));
         let backing_file = Anon::new_file(
@@ -770,16 +784,22 @@ mod tests {
             backing_node.create_file_ops(&current_task, OpenFlags::RDONLY).unwrap(),
             OpenFlags::RDONLY,
         );
-        let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
+        let loop_file =
+            bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
 
         let info_addr = map_object_anywhere(
             &current_task,
             &uapi::loop_info64 { lo_offset: 3, ..Default::default() },
         );
-        loop_file.ioctl(&current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
+        {
+            let mut locked = locked.cast_locked::<FileOpsIoctl>();
+            loop_file
+                .ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into())
+                .unwrap();
+        }
 
         let mut buf = VecOutputBuffer::new(25);
-        loop_file.read(&current_task, &mut buf).unwrap();
+        loop_file.read(&mut locked, &current_task, &mut buf).unwrap();
 
         assert_eq!(buf.data(), b"lo, world!");
     }
@@ -788,7 +808,7 @@ mod tests {
     async fn basic_get_vmo() {
         let test_data_path = "/pkg/data/testfile.txt";
         let expected_contents = std::fs::read(test_data_path).unwrap();
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let txt_channel: zx::Channel =
             fuchsia_fs::file::open_in_namespace(test_data_path, fio::OpenFlags::RIGHT_READABLE)
@@ -799,7 +819,8 @@ mod tests {
 
         let backing_file =
             new_remote_file(&current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
-        let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
+        let loop_file =
+            bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
 
         let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();
         let size = vmo.get_content_size().unwrap();
@@ -819,7 +840,7 @@ mod tests {
         let expected_contents = &expected_contents
             [expected_offset as usize..(expected_offset + expected_size_limit) as usize];
 
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let txt_channel: zx::Channel =
             fuchsia_fs::file::open_in_namespace(&test_data_path, fio::OpenFlags::RIGHT_READABLE)
@@ -830,7 +851,8 @@ mod tests {
 
         let backing_file =
             new_remote_file(&current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
-        let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
+        let loop_file =
+            bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
 
         let info_addr = map_object_anywhere(
             &current_task,
@@ -840,7 +862,8 @@ mod tests {
                 ..Default::default()
             },
         );
-        loop_file.ioctl(&current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        loop_file.ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
 
         let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();
         let size = vmo.get_content_size().unwrap();

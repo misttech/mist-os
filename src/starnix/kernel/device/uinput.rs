@@ -15,7 +15,7 @@ use bit_vec::BitVec;
 use fidl_fuchsia_ui_test_input::{self as futinput, RegistryRegisterKeyboardRequest};
 use fuchsia_zircon as zx;
 use starnix_logging::{log_info, log_trace, log_warn};
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type, error,
@@ -256,6 +256,7 @@ impl FileOps for Arc<UinputDevice> {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -285,6 +286,7 @@ impl FileOps for Arc<UinputDevice> {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &crate::vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -302,6 +304,7 @@ impl FileOps for Arc<UinputDevice> {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &crate::vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -348,20 +351,21 @@ mod test {
     use crate::{
         mm::MemoryAccessor,
         task::Kernel,
-        testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
+        testing::{create_kernel_task_and_unlocked, map_memory, AutoReleasableTask},
         vfs::FileHandle,
     };
     use fidl::endpoints::create_sync_proxy_and_stream;
     use fuchsia_async as fasync;
     use futures::{channel::mpsc, StreamExt};
+    use starnix_sync::Unlocked;
     use starnix_uapi::user_address::UserAddress;
     use std::thread;
     use test_case::test_case;
 
-    fn make_kernel_objects(
+    fn make_kernel_objects<'l>(
         file: Arc<UinputDevice>,
-    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle) {
-        let (kernel, current_task) = create_kernel_and_task();
+    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, Locked<'l, Unlocked>) {
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let file_object = FileObject::new(
             Box::new(file),
             // The input node doesn't really live at the root of the filesystem.
@@ -372,23 +376,30 @@ mod test {
             OpenFlags::empty(),
         )
         .expect("FileObject::new failed");
-        (kernel, current_task, file_object)
+        (kernel, current_task, file_object, locked)
     }
 
     #[::fuchsia::test]
     async fn ui_get_version() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let version_address =
             map_memory(&current_task, UserAddress::default(), std::mem::size_of::<u32>() as u64);
-        let r =
-            dev.ioctl(&file_object, &current_task, uapi::UI_GET_VERSION, version_address.into());
+        let r = dev.ioctl(
+            &mut locked,
+            &file_object,
+            &current_task,
+            uapi::UI_GET_VERSION,
+            version_address.into(),
+        );
         assert_eq!(r, Ok(SUCCESS));
         let version: u32 = current_task.read_object(version_address.into()).expect("read object");
         assert_eq!(version, UINPUT_VERSION);
 
         // call with invalid buffer.
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_GET_VERSION,
@@ -403,8 +414,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_evbit(bit: u32, expected_evbits: Vec<usize>) -> Result<SyscallResult, Errno> {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_EVBIT,
@@ -419,8 +432,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_evbit_call_multi() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_EVBIT,
@@ -428,6 +443,7 @@ mod test {
         );
         assert_eq!(r, Ok(SUCCESS));
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_EVBIT,
@@ -441,8 +457,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_keybit() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_KEYBIT,
@@ -452,6 +470,7 @@ mod test {
 
         // also test call multi times.
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_KEYBIT,
@@ -463,8 +482,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_absbit() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_ABSBIT,
@@ -474,6 +495,7 @@ mod test {
 
         // also test call multi times.
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_ABSBIT,
@@ -485,8 +507,10 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_propbit() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_PROPBIT,
@@ -496,6 +520,7 @@ mod test {
 
         // also test call multi times.
         let r = dev.ioctl(
+            &mut locked,
             &file_object,
             &current_task,
             uapi::UI_SET_PROPBIT,
@@ -507,24 +532,37 @@ mod test {
     #[::fuchsia::test]
     async fn ui_set_phys() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let phys_name = b"mouse0\0";
         let phys_name_address =
             map_memory(&current_task, UserAddress::default(), phys_name.len() as u64);
         current_task.write_memory(phys_name_address, phys_name).expect("write_memory");
-        let r = dev.ioctl(&file_object, &current_task, uapi::UI_SET_PHYS, phys_name_address.into());
+        let r = dev.ioctl(
+            &mut locked,
+            &file_object,
+            &current_task,
+            uapi::UI_SET_PHYS,
+            phys_name_address.into(),
+        );
         assert_eq!(r, Ok(SUCCESS));
 
         // also test call multi times with invalid argument.
-        let r =
-            dev.ioctl(&file_object, &current_task, uapi::UI_SET_PHYS, SyscallArg::from(0 as u64));
+        let r = dev.ioctl(
+            &mut locked,
+            &file_object,
+            &current_task,
+            uapi::UI_SET_PHYS,
+            SyscallArg::from(0 as u64),
+        );
         assert_eq!(r, Ok(SUCCESS));
     }
 
     #[::fuchsia::test]
     async fn ui_dev_setup() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         let address = map_memory(
             &current_task,
             UserAddress::default(),
@@ -534,7 +572,8 @@ mod test {
             uapi::input_id { vendor: 0x18d1, product: 0xabcd, ..uapi::input_id::default() };
         let setup = uapi::uinput_setup { id: want_input_id, ..uapi::uinput_setup::default() };
         current_task.write_object(address.into(), &setup).expect("write_memory");
-        let r = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        let r =
+            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         assert_eq!(r, Ok(SUCCESS));
         assert_eq!(dev.inner.lock().input_id.unwrap(), want_input_id);
 
@@ -548,13 +587,19 @@ mod test {
             uapi::input_id { vendor: 0x18d1, product: 0x1234, ..uapi::input_id::default() };
         let setup = uapi::uinput_setup { id: want_input_id, ..uapi::uinput_setup::default() };
         current_task.write_object(address.into(), &setup).expect("write_memory");
-        let r = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        let r =
+            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         assert_eq!(r, Ok(SUCCESS));
         assert_eq!(dev.inner.lock().input_id.unwrap(), want_input_id);
 
         // call with invalid argument.
-        let r =
-            dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, SyscallArg::from(0 as u64));
+        let r = dev.ioctl(
+            &mut locked,
+            &file_object,
+            &current_task,
+            uapi::UI_DEV_SETUP,
+            SyscallArg::from(0 as u64),
+        );
         assert_eq!(r, error!(EFAULT));
     }
 
@@ -563,13 +608,15 @@ mod test {
     #[::fuchsia::test]
     async fn ui_dev_create_keyboard() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
         let address = map_memory(
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
-        let _ = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        let _ =
+            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
 
         let (req_sender, mut req_receiver) = mpsc::unbounded();
         let (registry_proxy, mut stream) =
@@ -611,13 +658,15 @@ mod test {
     #[::fuchsia::test]
     async fn ui_dev_create_keyboard_fails_no_registry() {
         let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
         let address = map_memory(
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
-        let _ = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        let _ =
+            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         let res = dev.ui_dev_create_inner(&current_task, None);
         assert_eq!(res, error!(EPERM))
     }

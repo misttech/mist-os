@@ -9,6 +9,7 @@ use crate::{
         SimpleFileNode,
     },
 };
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{errno, error, errors::Errno};
 
 pub struct PowerSyncOnSuspendFile;
@@ -24,6 +25,7 @@ impl FileOps for PowerSyncOnSuspendFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -49,6 +51,7 @@ impl FileOps for PowerSyncOnSuspendFile {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

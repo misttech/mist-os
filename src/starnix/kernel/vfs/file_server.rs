@@ -18,6 +18,7 @@ use fidl::{
 };
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use starnix_sync::{FileOpsRead, FileOpsWrite};
 use starnix_uapi::{
     device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode, ino_t, off_t,
     open_flags::OpenFlags,
@@ -557,9 +558,9 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         Ok(kernel
             .kthreads
             .spawner()
-            .spawn_and_get_result(move |_, current_task| -> Result<Vec<u8>, Errno> {
+            .spawn_and_get_result(move |locked, current_task| -> Result<Vec<u8>, Errno> {
                 let mut data = VecOutputBuffer::new(count as usize);
-                file.read(current_task, &mut data)?;
+                file.read(locked, current_task, &mut data)?;
                 Ok(data.into())
             })
             .await??)
@@ -571,9 +572,10 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         Ok(kernel
             .kthreads
             .spawner()
-            .spawn_and_get_result(move |_, current_task| -> Result<Vec<u8>, Errno> {
+            .spawn_and_get_result(move |locked, current_task| -> Result<Vec<u8>, Errno> {
+                let mut locked = locked.cast_locked::<FileOpsRead>();
                 let mut data = VecOutputBuffer::new(count as usize);
-                file.read_at(current_task, offset as usize, &mut data)?;
+                file.read_at(&mut locked, current_task, offset as usize, &mut data)?;
                 Ok(data.into())
             })
             .await??)
@@ -586,8 +588,9 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         let written = kernel
             .kthreads
             .spawner()
-            .spawn_and_get_result(move |_, current_task| -> Result<usize, Errno> {
-                file.write(current_task, &mut data)
+            .spawn_and_get_result(move |locked, current_task| -> Result<usize, Errno> {
+                let mut locked = locked.cast_locked::<FileOpsWrite>();
+                file.write(&mut locked, current_task, &mut data)
             })
             .await??;
         Ok(written as u64)
@@ -600,8 +603,9 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         let written = kernel
             .kthreads
             .spawner()
-            .spawn_and_get_result(move |_, current_task| -> Result<usize, Errno> {
-                file.write_at(current_task, offset as usize, &mut data)
+            .spawn_and_get_result(move |locked, current_task| -> Result<usize, Errno> {
+                let mut locked = locked.cast_locked::<FileOpsWrite>();
+                file.write_at(&mut locked, current_task, offset as usize, &mut data)
             })
             .await??;
         Ok(written as u64)

@@ -1042,13 +1042,14 @@ mod tests {
             FdEvents,
         },
     };
+    use starnix_sync::FileOpsWrite;
     use starnix_uapi::open_flags::OpenFlags;
 
     const KEY: ReadyItemKey = ReadyItemKey::Usize(1234);
 
     #[::fuchsia::test]
     async fn test_async_wait_exec() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (local_socket, remote_socket) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, remote_socket, OpenFlags::RDWR).unwrap();
 
@@ -1084,7 +1085,7 @@ mod tests {
         });
         queue.lock().iter().for_each(|item| assert!(item.events.contains(FdEvents::POLLIN)));
 
-        let read_size = pipe.read(&current_task, &mut output_buffer).unwrap();
+        let read_size = pipe.read(&mut locked, &current_task, &mut output_buffer).unwrap();
 
         let no_written = write_count.get();
         assert_eq!(no_written, read_size);
@@ -1095,7 +1096,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_async_wait_cancel() {
         for do_cancel in [true, false] {
-            let (_kernel, current_task) = create_kernel_and_task();
+            let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let event = new_eventfd(&current_task, 0, EventFdType::Counter, true);
             let waiter = Waiter::new();
             let queue: Arc<Mutex<VecDeque<ReadyItem>>> = Default::default();
@@ -1112,9 +1113,14 @@ mod tests {
                 wait_canceler.cancel();
             }
             let add_val = 1u64;
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
             assert_eq!(
                 event
-                    .write(&current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes()))
+                    .write(
+                        &mut locked,
+                        &current_task,
+                        &mut VecInputBuffer::new(&add_val.to_ne_bytes())
+                    )
                     .unwrap(),
                 std::mem::size_of::<u64>()
             );

@@ -10,6 +10,7 @@ use crate::{
     },
 };
 
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{as_any::AsAny, errno, error, errors::Errno, open_flags::OpenFlags};
 use std::{
     borrow::Cow,
@@ -101,6 +102,7 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -111,6 +113,7 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

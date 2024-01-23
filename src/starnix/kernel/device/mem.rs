@@ -20,7 +20,7 @@ use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
 use starnix_logging::{log_info, not_implemented};
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, user_address::UserAddress,
@@ -44,6 +44,7 @@ impl FileOps for DevNull {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -71,6 +72,7 @@ impl FileOps for DevNull {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -135,6 +137,7 @@ impl FileOps for DevZero {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -145,6 +148,7 @@ impl FileOps for DevZero {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -161,6 +165,7 @@ impl FileOps for DevFull {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -171,6 +176,7 @@ impl FileOps for DevFull {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -190,6 +196,7 @@ impl FileOps for DevRandom {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -200,6 +207,7 @@ impl FileOps for DevRandom {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -213,6 +221,7 @@ impl FileOps for DevRandom {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -325,6 +334,7 @@ impl FileOps for DevKmsg {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -341,6 +351,7 @@ impl FileOps for DevKmsg {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

@@ -25,7 +25,10 @@ use fuchsia_zircon as zx;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_category_starnix_mm, trace_duration};
-use starnix_sync::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{
+    FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex, RwLock, RwLockReadGuard,
+    RwLockWriteGuard,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
@@ -1375,6 +1378,7 @@ impl FileOps for RemoteFileObject {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1385,6 +1389,7 @@ impl FileOps for RemoteFileObject {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1429,6 +1434,7 @@ impl FileOps for RemoteFileObject {
 
     fn ioctl(
         &self,
+        locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1442,7 +1448,7 @@ impl FileOps for RemoteFileObject {
             sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: vmo });
             let sync_file_name: &[u8; 32] = b"hwc semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
             let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
-            return sync_file.ioctl(file, current_task, request, arg);
+            return sync_file.ioctl(locked, file, current_task, request, arg);
         }
 
         default_ioctl(file, current_task, request, arg)
@@ -1467,6 +1473,7 @@ impl FileOps for RemotePipeObject {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1480,6 +1487,7 @@ impl FileOps for RemotePipeObject {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1620,6 +1628,7 @@ mod test {
     use fuchsia_fs::{directory, file};
     use fuchsia_zircon::HandleBased;
     use fxfs_testing::{TestFixture, TestFixtureOptions};
+    use starnix_sync::FileOpsWrite;
     use starnix_uapi::{auth::Credentials, epoll_event, errors::EINVAL, file_mode::mode};
 
     #[::fuchsia::test]
@@ -1659,8 +1668,11 @@ mod test {
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)?;
 
         let thread = kernel.kthreads.spawner().spawn_and_get_result({
-            move |_, current_task| {
-                assert_eq!(64, pipe.read(&current_task, &mut VecOutputBuffer::new(64)).unwrap());
+            move |locked, current_task| {
+                assert_eq!(
+                    64,
+                    pipe.read(locked, &current_task, &mut VecOutputBuffer::new(64)).unwrap()
+                );
             }
         });
 
@@ -1678,7 +1690,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_poll() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let (client, server) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
@@ -1704,7 +1716,10 @@ mod test {
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
-        assert_eq!(pipe.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
+        assert_eq!(
+            pipe.read(&mut locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
+            1
+        );
 
         assert_eq!(pipe.query_events(&current_task), Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM));
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
@@ -2526,7 +2541,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2553,8 +2568,9 @@ mod test {
                         .expect("refresh info failed")
                         .time_modify;
                     let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
+                    let mut locked = locked.cast_locked::<FileOpsWrite>();
                     let written = file
-                        .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
+                        .write(&mut locked, &current_task, &mut VecInputBuffer::new(&write_bytes))
                         .expect("write failed");
                     assert_eq!(written, write_bytes.len());
                     let last_modified = child
@@ -2725,7 +2741,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2755,8 +2771,9 @@ mod test {
 
                     // Writing to a file should update ctime and mtime
                     let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
+                    let mut locked = locked.cast_locked::<FileOpsWrite>();
                     let written = file
-                        .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
+                        .write(&mut locked, &current_task, &mut VecInputBuffer::new(&write_bytes))
                         .expect("write failed");
                     assert_eq!(written, write_bytes.len());
 

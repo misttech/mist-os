@@ -33,7 +33,7 @@ use starnix_logging::{
     log_error, log_warn, trace_category_starnix, trace_duration, trace_flow_begin, trace_flow_end,
     trace_flow_step,
 };
-use starnix_sync::{Mutex, MutexGuard};
+use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex, MutexGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
@@ -129,6 +129,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn ioctl(
         &self,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -163,6 +164,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -174,6 +176,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

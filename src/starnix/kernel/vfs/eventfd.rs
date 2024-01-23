@@ -11,6 +11,7 @@ use crate::{
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
 };
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags};
 
 const DATA_SIZE: usize = 8;
@@ -61,6 +62,7 @@ impl FileOps for EventFdFileObject {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -90,6 +92,7 @@ impl FileOps for EventFdFileObject {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

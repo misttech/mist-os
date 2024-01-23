@@ -20,6 +20,7 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,
     errno, error,
@@ -586,6 +587,7 @@ impl FileOps for CommFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -704,6 +706,7 @@ impl FileOps for MemFile {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -735,6 +738,7 @@ impl FileOps for MemFile {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

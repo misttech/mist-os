@@ -12,7 +12,7 @@ use crate::{
 use fuchsia_runtime::zx_utc_reference_get;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     error,
     errors::Errno,
@@ -172,6 +172,7 @@ impl FileOps for TimerFile {
     fileops_impl_nonseekable!();
     fn write(
         &self,
+        _locked: &mut Locked<'_, FileOpsWrite>,
         file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -188,6 +189,7 @@ impl FileOps for TimerFile {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, FileOpsRead>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

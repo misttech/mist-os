@@ -350,6 +350,7 @@ mod test {
             FdNumber, UnlinkKind,
         },
     };
+    use starnix_sync::{FileOpsRead, FileOpsWrite};
     use starnix_uapi::{errno, mount_flags::MountFlags};
     use zerocopy::AsBytes;
 
@@ -368,7 +369,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_write_read() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let path = "test.bin";
         let _file = current_task
@@ -383,18 +384,24 @@ mod test {
         let test_vec = test_seq.collect::<Vec<_>>();
         let test_bytes = test_vec.as_slice().as_bytes();
 
-        let written = wr_file.write(&current_task, &mut VecInputBuffer::new(test_bytes)).unwrap();
-        assert_eq!(written, test_bytes.len());
+        {
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
+            let written = wr_file
+                .write(&mut locked, &current_task, &mut VecInputBuffer::new(test_bytes))
+                .unwrap();
+            assert_eq!(written, test_bytes.len());
+        }
 
         let mut read_buffer = VecOutputBuffer::new(test_bytes.len() + 1);
-        let read = wr_file.read_at(&current_task, 0, &mut read_buffer).unwrap();
+        let mut locked = locked.cast_locked::<FileOpsRead>();
+        let read = wr_file.read_at(&mut locked, &current_task, 0, &mut read_buffer).unwrap();
         assert_eq!(read, test_bytes.len());
         assert_eq!(test_bytes, read_buffer.data());
     }
 
     #[::fuchsia::test]
     async fn test_read_past_eof() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Open an empty file
         let path = "test.bin";
@@ -409,13 +416,15 @@ mod test {
         let buffer_size = 0x10000;
         let mut output_buffer = VecOutputBuffer::new(buffer_size);
         let test_offset = 100;
-        let result = rd_file.read_at(&current_task, test_offset, &mut output_buffer).unwrap();
+        let mut locked = locked.cast_locked::<FileOpsRead>();
+        let result =
+            rd_file.read_at(&mut locked, &current_task, test_offset, &mut output_buffer).unwrap();
         assert_eq!(result, 0);
     }
 
     #[::fuchsia::test]
     async fn test_permissions() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let path = "test.bin";
         let file = current_task
@@ -428,35 +437,53 @@ mod test {
             .expect("failed to create file");
         assert_eq!(
             0,
-            file.read(&current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
+            file.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0))
+                .expect("failed to read")
         );
-        assert!(file.write(&current_task, &mut VecInputBuffer::new(&[])).is_err());
+
+        {
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
+            assert!(file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[])).is_err());
+        }
 
         let file = current_task
             .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::WRONLY, FileMode::EMPTY)
             .expect("failed to open file WRONLY");
-        assert!(file.read(&current_task, &mut VecOutputBuffer::new(0)).is_err());
-        assert_eq!(
-            0,
-            file.write(&current_task, &mut VecInputBuffer::new(&[])).expect("failed to write")
-        );
+
+        assert!(file.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0)).is_err());
+
+        {
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
+            assert_eq!(
+                0,
+                file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[]))
+                    .expect("failed to write")
+            );
+        }
 
         let file = current_task
             .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::RDWR, FileMode::EMPTY)
             .expect("failed to open file RDWR");
+
         assert_eq!(
             0,
-            file.read(&current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
+            file.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0))
+                .expect("failed to read")
         );
-        assert_eq!(
-            0,
-            file.write(&current_task, &mut VecInputBuffer::new(&[])).expect("failed to write")
-        );
+
+        {
+            let mut locked = locked.cast_locked::<FileOpsWrite>();
+            assert_eq!(
+                0,
+                file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[]))
+                    .expect("failed to write")
+            );
+        }
     }
 
     #[::fuchsia::test]
     async fn test_persistence() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         {
             let root = &current_task.fs().root().entry;
@@ -507,7 +534,8 @@ mod test {
 
         assert_eq!(
             0,
-            txt.read(&current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
+            txt.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0))
+                .expect("failed to read")
         );
         std::mem::drop(txt);
         assert_eq!(
