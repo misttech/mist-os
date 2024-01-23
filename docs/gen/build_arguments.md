@@ -4541,7 +4541,7 @@ Only for local development. When true the binaries (perfetto, traced, ...)
 are monolithic and don't use a common shared library. This is mainly to
 avoid LD_LIBRARY_PATH dances when testing locally.
 On Windows we default to monolithic executables, because pairing
-dllexport/import adds extra complexity for little benefit. Te only reason
+dllexport/import adds extra complexity for little benefit. The only reason
 for monolithic_binaries=false is saving binary size, which matters mainly on
 Android. See also comments on PERFETTO_EXPORT_ENTRYPOINT in compiler.h.
 
