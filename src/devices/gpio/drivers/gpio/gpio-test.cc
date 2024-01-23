@@ -5,8 +5,7 @@
 #include "gpio.h"
 
 #include <fuchsia/hardware/gpioimpl/cpp/banjo-mock.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
@@ -36,7 +35,7 @@ class GpioDeviceWrapper {
   }
 
   explicit GpioDeviceWrapper()
-      : device_(nullptr, {ddk::GpioImplProtocolClient(gpio_impl_.GetProto()), {}}, 0, "GPIO_0") {}
+      : device_(nullptr, ddk::GpioImplProtocolClient(gpio_impl_.GetProto()), 0, "GPIO_0") {}
 
   ddk::MockGpioImpl gpio_impl_;
   GpioDevice device_;
@@ -120,16 +119,18 @@ class MockGpioImplFidl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioI
 
 class GpioTest : public zxtest::Test {
  public:
+  GpioTest() : runtime_(mock_ddk::GetDriverRuntime()) {}
+
   void SetUp() override {
-    zx::result gpio_client = gpio_.Connect(loop.dispatcher());
+    zx::result gpio_client = gpio_.Connect(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     ASSERT_TRUE(gpio_client.is_ok());
-    gpio_client_.Bind(std::move(*gpio_client), loop.dispatcher());
+    gpio_client_.Bind(std::move(*gpio_client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
   }
 
   void TearDown() override { gpio_.gpio_impl_.VerifyAndClear(); }
 
  protected:
-  async::Loop loop{&kAsyncLoopConfigAttachToCurrentThread};
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime_;
   GpioDeviceWrapper gpio_;
   fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client_;
 };
@@ -137,48 +138,60 @@ class GpioTest : public zxtest::Test {
 TEST_F(GpioTest, TestFidlAll) {
   gpio_.gpio_impl_.ExpectRead(ZX_OK, 0, 20);
   gpio_client_->Read().ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Read>& result) {
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Read>& result) {
         EXPECT_OK(result.status());
         EXPECT_EQ(result->value()->value, 20);
+        runtime_->Quit();
       });
-  ASSERT_OK(loop.RunUntilIdle());
+  runtime_->Run();
+  runtime_->ResetQuit();
 
   gpio_.gpio_impl_.ExpectWrite(ZX_OK, 0, 11);
   gpio_client_->Write(11).ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Write>& result) {
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Write>& result) {
         EXPECT_OK(result.status());
+        runtime_->Quit();
       });
-  ASSERT_OK(loop.RunUntilIdle());
+  runtime_->Run();
+  runtime_->ResetQuit();
 
   gpio_.gpio_impl_.ExpectConfigIn(ZX_OK, 0, 0);
   gpio_client_->ConfigIn(fuchsia_hardware_gpio::wire::GpioFlags::kPullDown)
-      .ThenExactlyOnce([](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigIn>& result) {
+      .ThenExactlyOnce([&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigIn>& result) {
         EXPECT_OK(result.status());
+        runtime_->Quit();
       });
-  ASSERT_OK(loop.RunUntilIdle());
+  runtime_->Run();
+  runtime_->ResetQuit();
 
   gpio_.gpio_impl_.ExpectConfigOut(ZX_OK, 0, 5);
   gpio_client_->ConfigOut(5).ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigOut>& result) {
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigOut>& result) {
         EXPECT_OK(result.status());
+        runtime_->Quit();
       });
-  ASSERT_OK(loop.RunUntilIdle());
+  runtime_->Run();
+  runtime_->ResetQuit();
 
   gpio_.gpio_impl_.ExpectSetDriveStrength(ZX_OK, 0, 2000, 2000);
   gpio_client_->SetDriveStrength(2000).ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetDriveStrength>& result) {
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetDriveStrength>& result) {
         EXPECT_OK(result.status());
         EXPECT_EQ(result->value()->actual_ds_ua, 2000);
+        runtime_->Quit();
       });
-  ASSERT_OK(loop.RunUntilIdle());
+  runtime_->Run();
+  runtime_->ResetQuit();
 
   gpio_.gpio_impl_.ExpectGetDriveStrength(ZX_OK, 0, 2000);
   gpio_client_->GetDriveStrength().ThenExactlyOnce(
-      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetDriveStrength>& result) {
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetDriveStrength>& result) {
         EXPECT_OK(result.status());
         EXPECT_EQ(result->value()->result_ua, 2000);
+        runtime_->Quit();
       });
-  ASSERT_OK(loop.RunUntilIdle());
+  runtime_->Run();
+  runtime_->ResetQuit();
 }
 
 TEST_F(GpioTest, TestBanjoSetDriveStrength) {
@@ -195,7 +208,7 @@ TEST_F(GpioTest, TestBanjoGetDriveStrength) {
   EXPECT_EQ(result, 3000);
 }
 
-TEST_F(GpioTest, ValidateMetadataOk) {
+TEST(GpioTest, ValidateMetadataOk) {
   constexpr gpio_pin_t pins[] = {
       DECL_GPIO_PIN(0),
       DECL_GPIO_PIN(1),
@@ -211,7 +224,7 @@ TEST_F(GpioTest, ValidateMetadataOk) {
   ASSERT_OK(GpioRootDevice::Create(nullptr, parent.get()));
 }
 
-TEST_F(GpioTest, ValidateMetadataRejectDuplicates) {
+TEST(GpioTest, ValidateMetadataRejectDuplicates) {
   constexpr gpio_pin_t pins[] = {
       DECL_GPIO_PIN(2),
       DECL_GPIO_PIN(1),
@@ -228,7 +241,7 @@ TEST_F(GpioTest, ValidateMetadataRejectDuplicates) {
   ASSERT_NOT_OK(GpioRootDevice::Create(nullptr, parent.get()));
 }
 
-TEST_F(GpioTest, ValidateGpioNameGeneration) {
+TEST(GpioTest, ValidateGpioNameGeneration) {
   constexpr gpio_pin_t pins_digit[] = {
       DECL_GPIO_PIN(2),
       DECL_GPIO_PIN(5),
@@ -275,7 +288,7 @@ TEST_F(GpioTest, ValidateGpioNameGeneration) {
 #undef GEN_GPIO1
 }
 
-TEST_F(GpioTest, Init) {
+TEST(GpioTest, Init) {
   namespace fhgpio = fuchsia_hardware_gpio::wire;
   namespace fhgpioimpl = fuchsia_hardware_gpioimpl::wire;
 
@@ -390,7 +403,7 @@ TEST_F(GpioTest, Init) {
   EXPECT_NO_FAILURES(gpio.VerifyAndClear());
 }
 
-TEST_F(GpioTest, InitErrorHandling) {
+TEST(GpioTest, InitErrorHandling) {
   namespace fhgpio = fuchsia_hardware_gpio::wire;
   namespace fhgpioimpl = fuchsia_hardware_gpioimpl::wire;
 
@@ -467,64 +480,99 @@ TEST_F(GpioTest, InitErrorHandling) {
 }
 
 TEST(GpioTest, BanjoPreferredOverFidl) {
-  fdf_testing::DriverRuntime runtime;
+  constexpr gpio_pin_t pins[] = {
+      DECL_GPIO_PIN(100),
+  };
+
+  auto parent = MockDevice::FakeRootParent();
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime = mock_ddk::GetDriverRuntime();
+  fdf::UnownedSynchronizedDispatcher background_dispatcher = runtime->StartBackgroundDispatcher();
 
   ddk::MockGpioImpl gpioimpl_banjo;
-  MockGpioImplFidl gpioimpl_fidl;
+  parent->AddProtocol(ZX_PROTOCOL_GPIO_IMPL, gpioimpl_banjo.GetProto()->ops,
+                      gpioimpl_banjo.GetProto()->ctx);
 
-  zx::result gpioimpl_endpoints = fdf::CreateEndpoints<fuchsia_hardware_gpioimpl::GpioImpl>();
-  ASSERT_TRUE(gpioimpl_endpoints.is_ok());
-  fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(gpioimpl_endpoints->server),
-                  &gpioimpl_fidl);
+  async_patterns::TestDispatcherBound<MockGpioImplFidl> gpioimpl_fidl(
+      background_dispatcher->async_dispatcher(), std::in_place, 0);
 
-  GpioImplProxy proxy(ddk::GpioImplProtocolClient(gpioimpl_banjo.GetProto()),
-                      fdf::WireSyncClient(std::move(gpioimpl_endpoints->client)));
-  GpioDevice dut(nullptr, std::move(proxy), 100, "PIN_100");
+  {
+    auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImplFidl::CreateOutgoingAndServe);
+    ASSERT_TRUE(outgoing_client.is_ok());
+
+    parent->AddFidlService(fuchsia_hardware_gpioimpl::Service::Name, std::move(*outgoing_client));
+  }
+
+  parent->SetMetadata(DEVICE_METADATA_GPIO_PINS, pins, std::size(pins) * sizeof(gpio_pin_t));
+
+  EXPECT_OK(GpioRootDevice::Create(nullptr, parent.get()));
+
+  ASSERT_EQ(parent->child_count(), 1);
+  auto* const root_device = parent->GetLatestChild();
+
+  ASSERT_EQ(root_device->child_count(), 1);
 
   // The dut was provided with Banjo and FIDL clients, but only the Banjo client should receive this
   // call.
   gpioimpl_banjo.ExpectWrite(ZX_OK, 100, 1);
-  EXPECT_OK(dut.GpioWrite(1));
+
+  const ddk::GpioProtocolClient dut(root_device->GetLatestChild());
+  EXPECT_OK(dut.Write(1));
 
   EXPECT_NO_FAILURES(gpioimpl_banjo.VerifyAndClear());
-  EXPECT_NO_FAILURES(gpioimpl_fidl.VerifyAndClear());
+  EXPECT_NO_FAILURES(gpioimpl_fidl.SyncCall(&MockGpioImplFidl::VerifyAndClear));
 }
 
 TEST(GpioTest, FallBackToFidl) {
-  fdf_testing::DriverRuntime runtime;
-  async_dispatcher_t* background_dispatcher =
-      runtime.StartBackgroundDispatcher()->async_dispatcher();
+  constexpr gpio_pin_t pins[] = {
+      DECL_GPIO_PIN(100),
+  };
 
-  // Bind the MockGpioImplFidl to the foreground dispatcher, and the GpioDevice to the background
-  // dispatcher.
+  auto parent = MockDevice::FakeRootParent();
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime = mock_ddk::GetDriverRuntime();
+  fdf::UnownedSynchronizedDispatcher background_dispatcher = runtime->StartBackgroundDispatcher();
 
-  MockGpioImplFidl gpioimpl_fidl;
+  async_patterns::TestDispatcherBound<MockGpioImplFidl> gpioimpl_fidl(
+      background_dispatcher->async_dispatcher(), std::in_place, 0);
 
-  zx::result gpioimpl_endpoints = fdf::CreateEndpoints<fuchsia_hardware_gpioimpl::GpioImpl>();
-  ASSERT_TRUE(gpioimpl_endpoints.is_ok());
-  fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(gpioimpl_endpoints->server),
-                  &gpioimpl_fidl);
+  {
+    auto outgoing_client = gpioimpl_fidl.SyncCall(&MockGpioImplFidl::CreateOutgoingAndServe);
+    ASSERT_TRUE(outgoing_client.is_ok());
 
-  GpioImplProxy proxy({}, fdf::WireSyncClient(std::move(gpioimpl_endpoints->client)));
+    parent->AddFidlService(fuchsia_hardware_gpioimpl::Service::Name, std::move(*outgoing_client));
+  }
 
-  std::string_view pin_name("PIN_100");
-  async_patterns::TestDispatcherBound<GpioDevice> dut(background_dispatcher, std::in_place, nullptr,
-                                                      std::move(proxy), 100, pin_name);
+  parent->SetMetadata(DEVICE_METADATA_GPIO_PINS, pins, std::size(pins) * sizeof(gpio_pin_t));
 
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_gpio::Gpio>();
-  ASSERT_TRUE(endpoints.is_ok());
+  EXPECT_OK(GpioRootDevice::Create(nullptr, parent.get()));
 
-  // Call GpioWrite on the background dispatcher and run the foreground dispatcher until the
-  // MockGpioImplFidl has responded to the underlying gpioimpl call.
-  gpioimpl_fidl.ExpectWrite(ZX_OK, 100, 1);
-  std::future result = dut.AsyncCall(&GpioDevice::GpioWrite, static_cast<uint8_t>(1)).ToFuture();
+  ASSERT_EQ(parent->child_count(), 1);
+  auto* const root_device = parent->GetLatestChild();
 
-  runtime.RunUntil([&]() {
-    return result.wait_for(std::chrono::nanoseconds(1)) != std::future_status::timeout;
+  ASSERT_EQ(root_device->child_count(), 1);
+
+  const auto path =
+      std::string("svc/") +
+      component::MakeServiceMemberPath<fuchsia_hardware_gpio::Service::Device>("default");
+
+  auto client_end = component::ConnectAt<fuchsia_hardware_gpio::Gpio>(
+      root_device->GetLatestChild()->outgoing(), path);
+  ASSERT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  gpioimpl_fidl.SyncCall(
+      [](MockGpioImplFidl* gpio) { gpio->ExpectWrite(ZX_OK, 100, static_cast<uint8_t>(1)); });
+
+  gpio_client->Write(1).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+    runtime->Quit();
   });
 
-  EXPECT_OK(result.get());
-  EXPECT_NO_FAILURES(gpioimpl_fidl.VerifyAndClear());
+  runtime->Run();
+
+  EXPECT_NO_FAILURES(gpioimpl_fidl.SyncCall(&MockGpioImplFidl::VerifyAndClear));
 }
 
 TEST(GpioTest, ControllerId) {
@@ -552,13 +600,11 @@ TEST(GpioTest, ControllerId) {
     parent->AddFidlService(fuchsia_hardware_gpioimpl::Service::Name, std::move(*outgoing_client));
   }
 
-  gpioimpl_fidl.SyncCall([](MockGpioImplFidl* gpio) {
-    gpio->ExpectWrite(ZX_OK, 0, uint8_t{0})
-        .ExpectWrite(ZX_OK, 1, uint8_t{0})
-        .ExpectWrite(ZX_OK, 2, uint8_t{0});
-  });
-
   ASSERT_OK(GpioRootDevice::Create(nullptr, parent.get()));
+
+  const auto path =
+      std::string("svc/") +
+      component::MakeServiceMemberPath<fuchsia_hardware_gpio::Service::Device>("default");
 
   ASSERT_EQ(parent->child_count(), 1);
   auto* const root_device = parent->GetLatestChild();
@@ -575,10 +621,26 @@ TEST(GpioTest, ControllerId) {
     EXPECT_EQ(properties[1].id, BIND_GPIO_CONTROLLER);
     EXPECT_EQ(properties[1].value, kController);
 
+    auto client_end = component::ConnectAt<fuchsia_hardware_gpio::Gpio>(child->outgoing(), path);
+    ASSERT_TRUE(client_end.is_ok());
+
+    fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client(
+        *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+    gpioimpl_fidl.SyncCall([pin = properties[0].value](MockGpioImplFidl* gpio) {
+      gpio->ExpectWrite(ZX_OK, pin, uint8_t{0});
+    });
+
     // Make a call that results in a synchronous FIDL call to the mock GPIO. Without this, it is
     // possible that server binding has not completed by the time the driver runtime goes out of
     // scope.
-    child->GetDeviceContext<GpioDevice>()->GpioWrite(0);
+    gpio_client->Write(0).Then([&](auto& result) {
+      ASSERT_TRUE(result.ok());
+      EXPECT_TRUE(result->is_ok());
+      runtime->Quit();
+    });
+    runtime->Run();
+    runtime->ResetQuit();
   }
 }
 

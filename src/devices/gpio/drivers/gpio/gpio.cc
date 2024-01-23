@@ -19,54 +19,350 @@
 
 namespace gpio {
 
+// Helper functions for converting FIDL result types to zx_status_t and back.
+
+template <typename T>
+inline zx_status_t FidlStatus(const T& result) {
+  if (result.ok()) {
+    return result->is_ok() ? ZX_OK : result->error_value();
+  }
+  return result.status();
+}
+
+inline fit::result<zx_status_t> FidlResult(zx_status_t status) {
+  if (status == ZX_OK) {
+    return fit::success();
+  }
+  return fit::error(status);
+}
+
 zx_status_t GpioDevice::GpioConfigIn(uint32_t flags) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.ConfigIn(pin_, flags);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.ConfigIn(pin_, flags);
 }
 
 zx_status_t GpioDevice::GpioConfigOut(uint8_t initial_value) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.ConfigOut(pin_, initial_value);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.ConfigOut(pin_, initial_value);
 }
 
 zx_status_t GpioDevice::GpioSetAltFunction(uint64_t function) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.SetAltFunction(pin_, function);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.SetAltFunction(pin_, function);
 }
 
 zx_status_t GpioDevice::GpioRead(uint8_t* out_value) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.Read(pin_, out_value);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.Read(pin_, out_value);
 }
 
 zx_status_t GpioDevice::GpioWrite(uint8_t value) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.Write(pin_, value);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.Write(pin_, value);
 }
 
 zx_status_t GpioDevice::GpioGetInterrupt(uint32_t flags, zx::interrupt* out_irq) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.GetInterrupt(pin_, flags, out_irq);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.GetInterrupt(pin_, flags, out_irq);
 }
 
 zx_status_t GpioDevice::GpioReleaseInterrupt() {
   fbl::AutoLock lock(&lock_);
-  return gpio_.ReleaseInterrupt(pin_);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.ReleaseInterrupt(pin_);
 }
 
 zx_status_t GpioDevice::GpioSetPolarity(gpio_polarity_t polarity) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.SetPolarity(pin_, polarity);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.SetPolarity(pin_, polarity);
 }
 
 zx_status_t GpioDevice::GpioGetDriveStrength(uint64_t* ds_ua) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.GetDriveStrength(pin_, ds_ua);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.GetDriveStrength(pin_, ds_ua);
 }
 
 zx_status_t GpioDevice::GpioSetDriveStrength(uint64_t ds_ua, uint64_t* out_actual_ds_ua) {
   fbl::AutoLock lock(&lock_);
-  return gpio_.SetDriveStrength(pin_, ds_ua, out_actual_ds_ua);
+  ZX_DEBUG_ASSERT(gpio_banjo_.is_valid());
+  return gpio_banjo_.SetDriveStrength(pin_, ds_ua, out_actual_ds_ua);
+}
+
+void GpioDevice::GetPin(GetPinCompleter::Sync& completer) { completer.ReplySuccess(pin_); }
+
+void GpioDevice::GetName(GetNameCompleter::Sync& completer) {
+  completer.ReplySuccess(fidl::StringView::FromExternal(name_));
+}
+
+void GpioDevice::ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    return completer.Reply(
+        FidlResult(gpio_banjo_.ConfigIn(pin_, static_cast<uint32_t>(request->flags))));
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)
+      ->ConfigIn(pin_, request->flags)
+      .ThenExactlyOnce(fit::inline_callback<
+                       void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::ConfigIn>&),
+                       sizeof(ConfigInCompleter::Async)>(
+          [completer = completer.ToAsync()](auto& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+            } else if (result->is_error()) {
+              completer.ReplyError(result->error_value());
+            } else {
+              completer.ReplySuccess();
+            }
+          }));
+}
+
+void GpioDevice::ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    return completer.Reply(FidlResult(gpio_banjo_.ConfigOut(pin_, request->initial_value)));
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)
+      ->ConfigOut(pin_, request->initial_value)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::ConfigOut>&),
+              sizeof(ConfigOutCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (!result.ok()) {
+                  completer.ReplyError(result.status());
+                } else if (result->is_error()) {
+                  completer.ReplyError(result->error_value());
+                } else {
+                  completer.ReplySuccess();
+                }
+              }));
+}
+
+void GpioDevice::Read(ReadCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    uint8_t value{};
+    if (zx_status_t status = gpio_banjo_.Read(pin_, &value); status == ZX_OK) {
+      completer.ReplySuccess(value);
+    } else {
+      completer.ReplyError(status);
+    }
+    return;
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)->Read(pin_).ThenExactlyOnce(
+      fit::inline_callback<void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::Read>&),
+                           sizeof(ReadCompleter::Async)>(
+          [completer = completer.ToAsync()](auto& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+            } else if (result->is_error()) {
+              completer.ReplyError(result->error_value());
+            } else {
+              completer.ReplySuccess(result->value()->value);
+            }
+          }));
+}
+
+void GpioDevice::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    return completer.Reply(FidlResult(gpio_banjo_.Write(pin_, request->value)));
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)
+      ->Write(pin_, request->value)
+      .ThenExactlyOnce(fit::inline_callback<
+                       void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::Write>&),
+                       sizeof(WriteCompleter::Async)>(
+          [completer = completer.ToAsync()](auto& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+            } else if (result->is_error()) {
+              completer.ReplyError(result->error_value());
+            } else {
+              completer.ReplySuccess();
+            }
+          }));
+}
+
+void GpioDevice::SetDriveStrength(SetDriveStrengthRequestView request,
+                                  SetDriveStrengthCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    uint64_t actual_ds_ua{};
+    if (zx_status_t status = gpio_banjo_.SetDriveStrength(pin_, request->ds_ua, &actual_ds_ua);
+        status == ZX_OK) {
+      completer.ReplySuccess(actual_ds_ua);
+    } else {
+      completer.ReplyError(status);
+    }
+    return;
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)
+      ->SetDriveStrength(pin_, request->ds_ua)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::SetDriveStrength>&),
+              sizeof(SetDriveStrengthCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (!result.ok()) {
+                  completer.ReplyError(result.status());
+                } else if (result->is_error()) {
+                  completer.ReplyError(result->error_value());
+                } else {
+                  completer.ReplySuccess(result->value()->actual_ds_ua);
+                }
+              }));
+}
+
+void GpioDevice::GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    uint64_t result_ua{};
+    if (zx_status_t status = gpio_banjo_.GetDriveStrength(pin_, &result_ua); status == ZX_OK) {
+      completer.ReplySuccess(result_ua);
+    } else {
+      completer.ReplyError(status);
+    }
+    return;
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)->GetDriveStrength(pin_).ThenExactlyOnce(
+      fit::inline_callback<
+          void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::GetDriveStrength>&),
+          sizeof(GetDriveStrengthCompleter::Async)>(
+          [completer = completer.ToAsync()](auto& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+            } else if (result->is_error()) {
+              completer.ReplyError(result->error_value());
+            } else {
+              completer.ReplySuccess(result->value()->result_ua);
+            }
+          }));
+}
+
+void GpioDevice::GetInterrupt(GetInterruptRequestView request,
+                              GetInterruptCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    zx::interrupt irq{};
+    if (zx_status_t status = gpio_banjo_.GetInterrupt(pin_, request->flags, &irq);
+        status == ZX_OK) {
+      completer.ReplySuccess(std::move(irq));
+    } else {
+      completer.ReplyError(status);
+    }
+    return;
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)
+      ->GetInterrupt(pin_, request->flags)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::GetInterrupt>&),
+              sizeof(GetInterruptCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (!result.ok()) {
+                  completer.ReplyError(result.status());
+                } else if (result->is_error()) {
+                  completer.ReplyError(result->error_value());
+                } else {
+                  completer.ReplySuccess(std::move(result->value()->irq));
+                }
+              }));
+}
+
+void GpioDevice::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    return completer.Reply(FidlResult(gpio_banjo_.ReleaseInterrupt(pin_)));
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)->ReleaseInterrupt(pin_).ThenExactlyOnce(
+      fit::inline_callback<
+          void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::ReleaseInterrupt>&),
+          sizeof(ReleaseInterruptCompleter::Async)>(
+          [completer = completer.ToAsync()](auto& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+            } else if (result->is_error()) {
+              completer.ReplyError(result->error_value());
+            } else {
+              completer.ReplySuccess();
+            }
+          }));
+}
+
+void GpioDevice::SetAltFunction(SetAltFunctionRequestView request,
+                                SetAltFunctionCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    return completer.Reply(FidlResult(gpio_banjo_.SetAltFunction(pin_, request->function)));
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)
+      ->SetAltFunction(pin_, request->function)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::SetAltFunction>&),
+              sizeof(SetAltFunctionCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (!result.ok()) {
+                  completer.ReplyError(result.status());
+                } else if (result->is_error()) {
+                  completer.ReplyError(result->error_value());
+                } else {
+                  completer.ReplySuccess();
+                }
+              }));
+}
+
+void GpioDevice::SetPolarity(SetPolarityRequestView request,
+                             SetPolarityCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+  if (gpio_banjo_.is_valid()) {
+    return completer.Reply(
+        FidlResult(gpio_banjo_.SetPolarity(pin_, static_cast<uint32_t>(request->polarity))));
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)
+      ->SetPolarity(pin_, request->polarity)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::SetPolarity>&),
+              sizeof(SetPolarityCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (!result.ok()) {
+                  completer.ReplyError(result.status());
+                } else if (result->is_error()) {
+                  completer.ReplyError(result->error_value());
+                } else {
+                  completer.ReplySuccess();
+                }
+              }));
 }
 
 zx_status_t GpioDevice::InitAddDevice(const uint32_t controller_id) {
@@ -78,8 +374,7 @@ zx_status_t GpioDevice::InitAddDevice(const uint32_t controller_id) {
       {BIND_GPIO_CONTROLLER, 0, controller_id},
   };
 
-  async_dispatcher_t* dispatcher =
-      fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
+  async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   outgoing_ = component::OutgoingDirectory(dispatcher);
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -197,20 +492,18 @@ zx_status_t GpioRootDevice::AddPinDevices(const uint32_t controller_id,
   }
 
   for (auto pin : *pins) {
-    fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl;
-    if (!gpio_banjo.is_valid()) {
-      zx::result gpio_fidl_client =
+    fbl::AllocChecker ac;
+    std::unique_ptr<GpioDevice> dev;
+
+    if (gpio_banjo.is_valid()) {
+      dev.reset(new (&ac) GpioDevice(zxdev(), gpio_banjo, pin.pin, pin.name));
+    } else {
+      zx::result gpio =
           DdkConnectRuntimeProtocol<fuchsia_hardware_gpioimpl::Service::Device>(parent());
-      ZX_ASSERT_MSG(gpio_fidl_client.is_ok(), "Failed to get additional FIDL client: %s",
-                    gpio_fidl_client.status_string());
-      gpio_fidl = fdf::WireSyncClient(std::move(*gpio_fidl_client));
+      ZX_ASSERT_MSG(gpio.is_ok(), "Failed to get additional FIDL client: %s", gpio.status_string());
+      dev.reset(new (&ac) GpioDevice(zxdev(), *std::move(gpio), pin.pin, pin.name));
     }
 
-    GpioImplProxy gpio(gpio_banjo, std::move(gpio_fidl));
-
-    fbl::AllocChecker ac;
-    std::unique_ptr<GpioDevice> dev(new (&ac)
-                                        GpioDevice(zxdev(), std::move(gpio), pin.pin, pin.name));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }

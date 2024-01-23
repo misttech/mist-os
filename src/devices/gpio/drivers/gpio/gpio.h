@@ -72,10 +72,30 @@ class GpioRootDevice : public GpioRootDeviceType {
   zx_status_t AddPinDevices(uint32_t controller_id, const ddk::GpioImplProtocolClient& gpio_banjo);
 };
 
+// GpioDevice currently implements both the Banjo and FIDL versions of the GPIO protocol, although
+// for Banjo clients, the underlying gpioimpl driver must also use Banjo. This is to support
+// platform-bus-test (which has a Banjo GPIO client and a Banjo gpioimpl driver) and aml-gpio (which
+// is a Banjo gpioimpl driver). All other clients have been converted to FIDL.
+//
+// Protocol support matrix:
+//
+//                           GPIO server
+// gpioimpl driver |     Banjo     |    FIDL   |
+// ----------------|---------------|-----------|
+//           Banjo |   supported   | supported |
+//           FIDL  | not supported | supported |
 class GpioDevice : public GpioDeviceType, public ddk::GpioProtocol<GpioDevice, ddk::base_protocol> {
  public:
-  GpioDevice(zx_device_t* parent, GpioImplProxy gpio, uint32_t pin, std::string_view name)
-      : GpioDeviceType(parent), gpio_(std::move(gpio)), pin_(pin), name_(name) {}
+  GpioDevice(zx_device_t* parent, const ddk::GpioImplProtocolClient& gpio_banjo, uint32_t pin,
+             std::string_view name)
+      : GpioDeviceType(parent), gpio_banjo_(gpio_banjo), pin_(pin), name_(name) {}
+
+  GpioDevice(zx_device_t* parent, fdf::ClientEnd<fuchsia_hardware_gpioimpl::GpioImpl> gpio,
+             uint32_t pin, std::string_view name)
+      : GpioDeviceType(parent),
+        gpio_(std::move(gpio), fdf::Dispatcher::GetCurrent()->get()),
+        pin_(pin),
+        name_(name) {}
 
   zx_status_t InitAddDevice(uint32_t controller_id);
 
@@ -97,102 +117,25 @@ class GpioDevice : public GpioDeviceType, public ddk::GpioProtocol<GpioDevice, d
 
   // FIDL
 
-  void GetPin(GetPinCompleter::Sync& completer) override { completer.ReplySuccess(pin_); }
-  void GetName(GetNameCompleter::Sync& completer) override {
-    completer.ReplySuccess(::fidl::StringView::FromExternal(name_));
-  }
-  void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override {
-    zx_status_t status = GpioConfigIn(static_cast<uint32_t>(request->flags));
-    if (status == ZX_OK) {
-      completer.ReplySuccess();
-    } else {
-      completer.ReplyError(status);
-    }
-  }
-  void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override {
-    zx_status_t status = GpioConfigOut(request->initial_value);
-    if (status == ZX_OK) {
-      completer.ReplySuccess();
-    } else {
-      completer.ReplyError(status);
-    }
-  }
-  void Read(ReadCompleter::Sync& completer) override {
-    uint8_t value = 0;
-    zx_status_t status = GpioRead(&value);
-    if (status == ZX_OK) {
-      completer.ReplySuccess(value);
-    } else {
-      completer.ReplyError(status);
-    }
-  }
-  void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {
-    zx_status_t status = GpioWrite(request->value);
-    if (status == ZX_OK) {
-      completer.ReplySuccess();
-    } else {
-      completer.ReplyError(status);
-    }
-  }
+  void GetPin(GetPinCompleter::Sync& completer) override;
+  void GetName(GetNameCompleter::Sync& completer) override;
+  void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override;
+  void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override;
+  void Read(ReadCompleter::Sync& completer) override;
+  void Write(WriteRequestView request, WriteCompleter::Sync& completer) override;
   void SetDriveStrength(SetDriveStrengthRequestView request,
-                        SetDriveStrengthCompleter::Sync& completer) override {
-    uint64_t actual = 0;
-    zx_status_t status = GpioSetDriveStrength(request->ds_ua, &actual);
-    if (status == ZX_OK) {
-      completer.ReplySuccess(actual);
-    } else {
-      completer.ReplyError(status);
-    }
-  }
-  void GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) override {
-    uint64_t result_ua = 0;
-    zx_status_t status = GpioGetDriveStrength(&result_ua);
-    if (status == ZX_OK) {
-      completer.ReplySuccess(result_ua);
-    } else {
-      completer.ReplyError(status);
-    }
-  }
+                        SetDriveStrengthCompleter::Sync& completer) override;
+  void GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) override;
   void GetInterrupt(GetInterruptRequestView request,
-                    GetInterruptCompleter::Sync& completer) override {
-    zx::interrupt interrupt;
-    zx_status_t status = GpioGetInterrupt(request->flags, &interrupt);
-    if (status == ZX_OK) {
-      completer.ReplySuccess(std::move(interrupt));
-    } else {
-      completer.ReplyError(status);
-    }
-  }
-  void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override {
-    zx_status_t status = GpioReleaseInterrupt();
-    if (status == ZX_OK) {
-      completer.ReplySuccess();
-    } else {
-      completer.ReplyError(status);
-    }
-  }
-
+                    GetInterruptCompleter::Sync& completer) override;
+  void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;
   void SetAltFunction(SetAltFunctionRequestView request,
-                      SetAltFunctionCompleter::Sync& completer) override {
-    zx_status_t status = GpioSetAltFunction(request->function);
-    if (status == ZX_OK) {
-      completer.ReplySuccess();
-    } else {
-      completer.ReplyError(status);
-    }
-  }
-
-  void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override {
-    zx_status_t status = GpioSetPolarity(static_cast<uint32_t>(request->polarity));
-    if (status == ZX_OK) {
-      completer.ReplySuccess();
-    } else {
-      completer.ReplyError(status);
-    }
-  }
+                      SetAltFunctionCompleter::Sync& completer) override;
+  void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override;
 
  private:
-  const GpioImplProxy gpio_ TA_GUARDED(lock_);
+  ddk::GpioImplProtocolClient gpio_banjo_ TA_GUARDED(lock_);
+  fdf::WireClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_ TA_GUARDED(lock_);
   const uint32_t pin_;
   const std::string name_;
   using Binding = struct {
