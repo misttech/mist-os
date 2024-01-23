@@ -136,6 +136,7 @@ test("syscalls_cpp_test_bin") {
     "udev_test.cc",
     "uio_test.cc",
     "vdso_test.cc",
+    "vmsplice_test.cc",
     "waitpid_exit_signal_test.cc",
     "waitpid_flags_test.cc",
   ]

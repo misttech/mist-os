@@ -811,15 +811,23 @@ impl PipeFileObject {
         let data_len = data.available();
         let mut pipe =
             self.lock_pipe_for_writing(current_task, self_file, non_blocking, data_len)?;
+
+        if pipe.reader_count == 0 {
+            send_standard_signal(current_task, SignalInfo::default(SIGPIPE));
+            return error!(EPIPE);
+        }
+
         let mut available = std::cmp::min(data_len, pipe.messages.available_capacity());
 
         let bytes_transferred = data.read_each(&mut |bytes| {
             let actual = std::cmp::min(bytes.len(), available);
             pipe.messages.write_message(bytes[0..actual].to_vec().into());
-            pipe.notify_write();
             available -= actual;
             Ok(actual)
         })?;
+        if bytes_transferred > 0 {
+            pipe.notify_write();
+        }
         Ok(bytes_transferred)
     }
 
@@ -855,11 +863,13 @@ impl PipeFileObject {
             bytes_transferred += actual;
             available -= actual;
             if available == 0 {
-                pipe.notify_read();
-                return Ok(bytes_transferred);
+                break;
             }
         }
-        panic!();
+        if bytes_transferred > 0 {
+            pipe.notify_read();
+        }
+        Ok(bytes_transferred)
     }
 
     /// Obtain the pipe objects from the given file handles, if they are both pipes.
