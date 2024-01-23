@@ -3,89 +3,205 @@
 // found in the LICENSE file.
 
 use crate::test_config;
-use anyhow::{ensure, format_err, Error};
+use anyhow::{ensure, Error};
+use std::env::VarError;
 use std::fs;
 use std::num::ParseIntError;
 use std::path::PathBuf;
-use structopt::StructOpt;
+use thiserror::Error as ThisError;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "Test Pilot")]
-pub struct CommandLineArgs {
+const ENV_TEST_CONFIG: &str = "FUCHSIA_TEST_CONFIG";
+const ENV_TEST_BIN_PATH: &str = "FUCHSIA_TEST_BIN_PATH";
+const ENV_TARGETS: &str = "FUCHSIA_TARGETS";
+const ENV_TIMEOUT_SECONDS: &str = "FUCHSIA_TIMEOUT_SECONDS";
+const ENV_SDK_TOOLS_PATH: &str = "FUCHSIA_SDK_TOOLS_PATH";
+const ENV_RESOURCE_PATH: &str = "FUCHSIA_RESOURCE_PATH";
+const ENV_CUSTOM_TEST_ARGS: &str = "FUCHSIA_CUSTOM_TEST_ARGS";
+const ENV_TEST_FILTER: &str = "FUCHSIA_TEST_FILTER";
+
+const ALL_ENV_VARS: [&str; 8] = [
+    ENV_TEST_CONFIG,
+    ENV_TEST_BIN_PATH,
+    ENV_TARGETS,
+    ENV_TIMEOUT_SECONDS,
+    ENV_SDK_TOOLS_PATH,
+    ENV_RESOURCE_PATH,
+    ENV_CUSTOM_TEST_ARGS,
+    ENV_TEST_FILTER,
+];
+
+/// Error encountered running test manager
+#[derive(Debug, PartialEq, Eq)]
+pub struct EnvironmentArgs {
     /// Path to test configuration.
-    #[structopt(
-        long = "test_config",
-        value_name = "FILEPATH",
-        required = true,
-        parse(try_from_str = "file_parse_path")
-    )]
     pub test_config: PathBuf,
 
     /// Path to the host test binary to execute.
-    #[structopt(
-        long = "test_bin_path",
-        value_name = "FILEPATH",
-        required = true,
-        parse(try_from_str = "file_parse_path")
-    )]
     pub test_bin_path: PathBuf,
 
-    ///  Fuchsia targets. User can pass in multiple targets using multiple --target flags.
-    #[structopt(long = "target", multiple = true)]
+    ///  Fuchsia targets. User can pass in multiple comma separated targets.
     pub targets: Vec<String>,
 
     /// Timeout for the test in seconds. This would be passed to host binary if supported.
-    #[structopt(
-        long = "timeout_seconds",
-        value_name = "SECONDS",
-        parse(try_from_str = "parse_u32")
-    )]
     pub timeout_seconds: Option<u32>,
 
-    /// Override grace timeout period. This timeout gives the Host test binary a certain period to
-    /// exit gracefully after `timeout_seconds`.
-    #[structopt(long = "grace_timeout", value_name = "SECONDS", parse(try_from_str = "parse_u32"))]
-    pub grace_timeout: Option<u32>,
-
     /// Path to the SDK tools directory.
-    #[structopt(
-        long = "sdk_tools_path",
-        value_name = "DIR_PATH",
-        parse(try_from_str = "dir_parse_path")
-    )]
     pub sdk_tools_path: Option<PathBuf>,
 
     /// Path to the resources directory.
-    #[structopt(
-        long = "resource_path",
-        value_name = "DIR_PATH",
-        parse(try_from_str = "dir_parse_path")
-    )]
     pub resource_path: Option<PathBuf>,
 
     /// Comma-separated glob pattern for test cases to run.
-    #[structopt(long = "test_filter")]
     pub test_filter: Option<String>,
 
     ///  Extra arguments to pass to the host test binary as is.
-    #[structopt(long = "extra_test_args")]
-    pub extra_test_args: Option<String>,
+    pub custom_test_args: Option<String>,
+
+    /// Extra environment variables passed as it is to the test binary.
+    pub extra_env_vars: Vec<(String, String)>,
 }
 
-impl CommandLineArgs {
-    pub fn validate(&self, config: &test_config::TestConfiguration) -> Result<(), Error> {
+// allows us to mock std::env for unit tests.
+trait Environment {
+    fn var(&self, key: &str) -> Result<String, VarError>;
+    fn vars(&self) -> impl Iterator<Item = (String, String)>;
+    fn set_var(&mut self, key: &str, value: &str);
+    fn remove_var(&mut self, key: &str);
+}
+
+struct StandardEnvironment;
+
+impl Environment for StandardEnvironment {
+    fn var(&self, key: &str) -> Result<String, VarError> {
+        std::env::var(key)
+    }
+
+    fn vars(&self) -> impl Iterator<Item = (String, String)> {
+        std::env::vars()
+    }
+
+    fn set_var(&mut self, key: &str, value: &str) {
+        std::env::set_var(key, value);
+    }
+
+    fn remove_var(&mut self, key: &str) {
+        std::env::remove_var(key);
+    }
+}
+
+struct MockEnvironment {
+    variables: std::collections::HashMap<String, String>,
+}
+
+impl MockEnvironment {
+    fn new() -> Self {
+        Self { variables: std::collections::HashMap::new() }
+    }
+}
+
+impl Environment for MockEnvironment {
+    fn var(&self, key: &str) -> Result<String, VarError> {
+        self.variables.get(key).cloned().ok_or(VarError::NotPresent)
+    }
+
+    fn vars(&self) -> impl Iterator<Item = (String, String)> {
+        self.variables.clone().into_iter()
+    }
+
+    fn set_var(&mut self, key: &str, value: &str) {
+        self.variables.insert(key.to_string(), value.to_string());
+    }
+
+    fn remove_var(&mut self, key: &str) {
+        self.variables.remove(key);
+    }
+}
+
+/// Error encountered parsing environment variables
+#[derive(Debug, ThisError)]
+pub enum EnvironmentArgsError {
+    #[error("Error with environment variable '{1}': {0:?}")]
+    Var(VarError, &'static str),
+
+    #[error("Error serving test manager protocol: {0:?}")]
+    Validation(anyhow::Error, &'static str),
+}
+
+/// Error encountered validating config
+#[derive(Debug, ThisError, Eq, PartialEq)]
+pub enum ConfigError {
+    #[error("{0} is required for this test.")]
+    Required(&'static str),
+}
+
+macro_rules! parse_req_var {
+    ($env:expr, $key:expr, $parser:expr) => {
+        $env.var($key)
+            .map_err(|err| EnvironmentArgsError::Var(err, $key))
+            .and_then(|v| $parser(&v).map_err(|e| EnvironmentArgsError::Validation(e, $key)))
+    };
+}
+
+macro_rules! parse_optional_var {
+    ($env:expr, $key:expr, $parser:expr) => {
+        $env.var($key)
+            .ok()
+            .map(|v| $parser(&v).map_err(|e| EnvironmentArgsError::Validation(e.into(), $key)))
+            .transpose()
+    };
+}
+
+impl EnvironmentArgs {
+    pub fn validate_config(
+        &self,
+        config: &test_config::TestConfiguration,
+    ) -> Result<(), ConfigError> {
         match config {
             test_config::TestConfiguration::V1 { config } => {
                 if config.requested_features.sdk_tools_path && self.sdk_tools_path.is_none() {
-                    return Err(format_err!("--sdk_tools_path is required for this test"));
+                    return Err(ConfigError::Required(ENV_SDK_TOOLS_PATH));
                 }
 
                 if config.requested_features.requires_target && self.targets.is_empty() {
-                    return Err(format_err!("--target is required for this test"));
+                    return Err(ConfigError::Required(ENV_TARGETS));
                 }
             }
         };
         Ok(())
+    }
+
+    pub fn from_env() -> Result<Self, EnvironmentArgsError> {
+        let mut env = StandardEnvironment;
+        Self::from_env_internal(&mut env)
+    }
+
+    fn from_env_internal<E: Environment>(env: &mut E) -> Result<Self, EnvironmentArgsError> {
+        let mut s = Self {
+            test_config: parse_req_var!(env, ENV_TEST_CONFIG, file_parse_path)?,
+            test_bin_path: parse_req_var!(env, ENV_TEST_BIN_PATH, file_parse_path)?,
+            timeout_seconds: parse_optional_var!(env, ENV_TIMEOUT_SECONDS, parse_u32)?,
+            sdk_tools_path: parse_optional_var!(env, ENV_SDK_TOOLS_PATH, dir_parse_path)?,
+            resource_path: parse_optional_var!(env, ENV_RESOURCE_PATH, dir_parse_path)?,
+            targets: env
+                .var(ENV_TARGETS)
+                .ok()
+                .and_then(|v| Some(v.split(',').map(|s| s.trim().to_string()).collect()))
+                .unwrap_or_default(),
+            test_filter: env.var(ENV_TEST_FILTER).ok(),
+            custom_test_args: env.var(ENV_CUSTOM_TEST_ARGS).ok(),
+            extra_env_vars: vec![],
+        };
+
+        // Remove known env variables so that we can store extra variables to pass them along.
+        for var in ALL_ENV_VARS {
+            env.remove_var(var);
+        }
+
+        for v in env.vars() {
+            s.extra_env_vars.push(v)
+        }
+
+        Ok(s)
     }
 }
 
@@ -170,6 +286,15 @@ mod tests {
         assert!(file_parse_path("/tmp").is_err()); // Directory path
     }
 
+    // Validate that known environment variables are cleared
+    macro_rules! validate_env_cleared {
+        ($var:expr) => {
+            for v in ALL_ENV_VARS {
+                $var.var(v).expect_err(&format!("{} should not be present", v));
+            }
+        };
+    }
+
     #[test]
     fn test_args() {
         let temp_dir = tempdir().expect("Failed to create temporary directory");
@@ -181,48 +306,31 @@ mod tests {
             NamedTempFile::new().expect("Failed to create temporary file in the test");
         let temp_config_file_path = temp_config_file.path();
 
-        let args = vec![
-            "test_pilot",
-            "--target",
-            "arm64",
-            "--timeout_seconds",
-            "10",
-            "--sdk_tools_path",
-            temp_dir_path.to_str().unwrap(),
-            "--resource_path",
-            temp_dir_path.to_str().unwrap(),
-            "--grace_timeout",
-            "5",
-            "--test_config",
-            temp_config_file_path.to_str().unwrap(),
-            "--test_bin_path",
-            temp_file_path.to_str().unwrap(),
-            "--test_filter",
-            "test_filter",
-            "--extra_test_args",
-            "extra_args",
-        ];
+        let mut env = MockEnvironment::new();
 
-        // Convert the arguments to OsString and pass them to the test
-        let args_os: Vec<std::ffi::OsString> =
-            args.iter().map(|arg| std::ffi::OsString::from(*arg)).collect();
-        let args_os_slice: &[std::ffi::OsString] = &args_os;
+        env.set_var(ENV_TEST_CONFIG, temp_config_file_path.to_str().unwrap());
+        env.set_var(ENV_TEST_BIN_PATH, temp_file_path.to_str().unwrap());
+        env.set_var(ENV_TARGETS, "target1, target2");
+        env.set_var(ENV_TIMEOUT_SECONDS, "10");
+        env.set_var(ENV_SDK_TOOLS_PATH, temp_dir_path.to_str().unwrap());
+        env.set_var(ENV_RESOURCE_PATH, temp_dir_path.to_str().unwrap());
+        env.set_var(ENV_TEST_FILTER, "test_filter");
+        env.set_var(ENV_CUSTOM_TEST_ARGS, "custom_args");
 
-        // Parse command-line arguments
-        let parsed_args = CommandLineArgs::from_iter_safe(args_os_slice)
-            .expect("command line args should not fail");
+        let parsed_args =
+            EnvironmentArgs::from_env_internal(&mut env).expect("env args should not fail");
 
         // Check the individual arguments
-        assert_eq!(parsed_args.targets, vec!["arm64".to_string()]);
+        assert_eq!(parsed_args.targets, vec!["target1".to_string(), "target2".to_string()]);
         assert_eq!(parsed_args.timeout_seconds, Some(10));
         assert_eq!(parsed_args.sdk_tools_path, Some(temp_dir_path.to_path_buf()));
         assert_eq!(parsed_args.resource_path, Some(temp_dir_path.to_path_buf()));
-        assert_eq!(parsed_args.grace_timeout, Some(5));
         assert_eq!(parsed_args.test_bin_path, temp_file_path.to_path_buf());
         assert_eq!(parsed_args.test_config, temp_config_file_path.to_path_buf());
         assert_eq!(parsed_args.test_filter, Some("test_filter".to_string()));
-        assert_eq!(parsed_args.extra_test_args, Some("extra_args".to_string()));
-
+        assert_eq!(parsed_args.custom_test_args, Some("custom_args".to_string()));
+        assert_eq!(parsed_args.extra_env_vars, vec![]);
+        validate_env_cleared!(env);
         // Clean up temporary resources after the test
         temp_dir.close().expect("Failed to close temporary directory");
         temp_file.close().expect("Failed to close temporary file");
@@ -230,41 +338,51 @@ mod tests {
 
     #[test]
     fn test_args_missing_required_param() {
-        // Simulate command-line arguments without '--test_bin_path'
-        let args = vec![
-            "test_pilot",
-            "--target",
-            "arm64",
-            "--timeout_seconds",
-            "10",
-            "--sdk_tools_path",
-            "/path/to/sdk_tools",
-            "--resource_path",
-            "/path/to/resources",
-            "--grace_timeout",
-            "5",
-            "--test_filter",
-            "test_filter",
-            "--extra_test_args",
-            "extra_args",
-        ];
+        // Simulate arguments without ENV_TEST_BIN_PATH
+        let temp_config_file =
+            NamedTempFile::new().expect("Failed to create temporary file in the test");
+        let temp_config_file_path = temp_config_file.path();
 
-        // Convert the arguments to OsString and pass them to the test
-        let args_os: Vec<std::ffi::OsString> =
-            args.iter().map(|arg| std::ffi::OsString::from(*arg)).collect();
-        let args_os_slice: &[std::ffi::OsString] = &args_os;
+        let mut env = MockEnvironment::new();
 
-        // Parse command-line arguments
-        let parsed_args = CommandLineArgs::from_iter_safe(args_os_slice);
+        env.set_var(ENV_TEST_CONFIG, temp_config_file_path.to_str().unwrap());
+        env.set_var(ENV_TARGETS, "target1");
+        env.set_var(ENV_TIMEOUT_SECONDS, "10");
+        env.set_var(ENV_SDK_TOOLS_PATH, "/path/to/sdk_tools");
+        env.set_var(ENV_RESOURCE_PATH, "/path/to/resources");
+        env.set_var(ENV_TEST_FILTER, "test_filter");
+        env.set_var(ENV_CUSTOM_TEST_ARGS, "custom_args");
 
-        let err = parsed_args.unwrap_err();
-        assert!(
-            err.message.contains(
-                "The following required arguments were not provided:\n    --test_bin_path"
-            ),
-            "{:?}",
-            err
-        );
+        let parsed_args = EnvironmentArgs::from_env_internal(&mut env);
+
+        match parsed_args.unwrap_err() {
+            EnvironmentArgsError::Var(_e, var) => {
+                assert_eq!(var, ENV_TEST_BIN_PATH);
+            }
+            err => panic!("unexpected error: {}", err),
+        }
+
+        for var in ALL_ENV_VARS {
+            env.remove_var(var);
+        }
+
+        // Simulate arguments without ENV_TEST_CONFIG
+        env.set_var(ENV_TEST_BIN_PATH, temp_config_file_path.to_str().unwrap());
+        env.set_var(ENV_TARGETS, "target1");
+        env.set_var(ENV_TIMEOUT_SECONDS, "10");
+        env.set_var(ENV_SDK_TOOLS_PATH, "/path/to/sdk_tools");
+        env.set_var(ENV_RESOURCE_PATH, "/path/to/resources");
+        env.set_var(ENV_TEST_FILTER, "test_filter");
+        env.set_var(ENV_CUSTOM_TEST_ARGS, "custom_args");
+
+        let parsed_args = EnvironmentArgs::from_env_internal(&mut env);
+
+        match parsed_args.unwrap_err() {
+            EnvironmentArgsError::Var(_e, var) => {
+                assert_eq!(var, ENV_TEST_CONFIG);
+            }
+            err => panic!("unexpected error: {}", err),
+        }
     }
 
     #[test]
@@ -272,62 +390,71 @@ mod tests {
         let temp_file = NamedTempFile::new().expect("Failed to create temporary file in the test");
         let temp_file_path = temp_file.path();
 
-        // Simulate command-line arguments with only '--test_bin_path'
-        let args = vec![
-            "test_pilot",
-            "--test_bin_path",
-            temp_file_path.to_str().unwrap(),
-            "--test_config",
-            temp_file_path.to_str().unwrap(),
-        ];
+        let mut env = MockEnvironment::new();
 
-        // Convert the arguments to OsString and pass them to the test
-        let args_os: Vec<std::ffi::OsString> =
-            args.iter().map(|arg| std::ffi::OsString::from(*arg)).collect();
-        let args_os_slice: &[std::ffi::OsString] = &args_os;
+        env.set_var(ENV_TEST_CONFIG, temp_file_path.to_str().unwrap());
+        env.set_var(ENV_TEST_BIN_PATH, temp_file_path.to_str().unwrap());
 
-        // Parse command-line arguments
-        let parsed_args = CommandLineArgs::from_iter_safe(args_os_slice).unwrap();
+        let parsed_args = EnvironmentArgs::from_env_internal(&mut env).unwrap();
 
         // Check the individual arguments
         assert_eq!(parsed_args.targets, Vec::<String>::new());
         assert_eq!(parsed_args.timeout_seconds, None);
         assert_eq!(parsed_args.sdk_tools_path, None);
         assert_eq!(parsed_args.resource_path, None);
-        assert_eq!(parsed_args.grace_timeout, None);
         assert_eq!(parsed_args.test_filter, None);
-        assert_eq!(parsed_args.extra_test_args, None);
+        assert_eq!(parsed_args.custom_test_args, None);
         assert_eq!(parsed_args.test_bin_path, temp_file_path.to_path_buf());
         assert_eq!(parsed_args.test_config, temp_file_path.to_path_buf());
+        assert_eq!(parsed_args.extra_env_vars, vec![]);
+
+        validate_env_cleared!(env);
     }
 
-    // Test for invalid value for '--timeout_seconds'
+    // Test that extra env variables are not cleared.
+    #[test]
+    fn test_extra_env_vars() {
+        let temp_file = NamedTempFile::new().expect("Failed to create temporary file in the test");
+        let temp_file_path = temp_file.path();
+
+        let mut env = MockEnvironment::new();
+
+        env.set_var(ENV_TEST_CONFIG, temp_file_path.to_str().unwrap());
+        env.set_var(ENV_TEST_BIN_PATH, temp_file_path.to_str().unwrap());
+        env.set_var("EXTRA_VAR1", "some_str1");
+        env.set_var("EXTRA_VAR2", "some_str2");
+
+        let mut parsed_args = EnvironmentArgs::from_env_internal(&mut env).unwrap();
+
+        validate_env_cleared!(env);
+        parsed_args.extra_env_vars.sort();
+        let mut expected = vec![
+            ("EXTRA_VAR1".to_string(), "some_str1".to_string()),
+            ("EXTRA_VAR2".to_string(), "some_str2".to_string()),
+        ];
+        expected.sort();
+        assert_eq!(parsed_args.extra_env_vars, expected);
+    }
+
     #[test]
     fn test_args_invalid_timeout_seconds() {
         let temp_file = NamedTempFile::new().expect("Failed to create temporary file in the test");
         let temp_file_path = temp_file.path();
 
-        // Simulate command-line arguments with invalid '--timeout_seconds'
-        let args = vec![
-            "test_pilot",
-            "--test_bin_path",
-            temp_file_path.to_str().unwrap(),
-            "--test_config",
-            temp_file_path.to_str().unwrap(),
-            "--timeout_seconds",
-            "abc", // Invalid value for u32
-        ];
+        let mut env = MockEnvironment::new();
 
-        // Convert the arguments to OsString and pass them to the test
-        let args_os: Vec<std::ffi::OsString> =
-            args.iter().map(|arg| std::ffi::OsString::from(*arg)).collect();
-        let args_os_slice: &[std::ffi::OsString] = &args_os;
+        env.set_var(ENV_TEST_CONFIG, temp_file_path.to_str().unwrap());
+        env.set_var(ENV_TEST_BIN_PATH, temp_file_path.to_str().unwrap());
+        env.set_var(ENV_TIMEOUT_SECONDS, "abc");
 
-        // Parse command-line arguments
-        let parsed_args = CommandLineArgs::from_iter_safe(args_os_slice);
+        let parsed_args = EnvironmentArgs::from_env_internal(&mut env);
 
-        let err = parsed_args.unwrap_err();
-        assert!(err.message.contains("invalid digit found in string"), "{:?}", err);
+        match parsed_args.unwrap_err() {
+            EnvironmentArgsError::Validation(_e, var) => {
+                assert_eq!(var, ENV_TIMEOUT_SECONDS);
+            }
+            err => panic!("unexpected error: {}", err),
+        }
     }
 
     // Helper function to create a simple TestConfiguration for testing
@@ -345,81 +472,81 @@ mod tests {
 
     #[test]
     fn test_validate_success() {
-        let args = CommandLineArgs {
+        let args = EnvironmentArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
             targets: vec!["target1".to_string()],
             timeout_seconds: Some(30),
-            grace_timeout: Some(5),
             sdk_tools_path: Some(PathBuf::from("sdk_tools")),
             resource_path: Some(PathBuf::from("resources")),
             test_filter: Some("test_filter".to_string()),
-            extra_test_args: Some("extra_args".to_string()),
+            custom_test_args: Some("extra_args".to_string()),
+            extra_env_vars: vec![],
         };
 
         let mut test_config = create_test_config_v1();
         test_config.requested_features.sdk_tools_path = true;
         test_config.requested_features.requires_target = true;
         let test_config = test_config.into();
-        let result = args.validate(&test_config);
+        let result = args.validate_config(&test_config);
         assert!(result.is_ok());
 
-        let args = CommandLineArgs {
+        let args = EnvironmentArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
             targets: vec![],
             timeout_seconds: Some(30),
-            grace_timeout: Some(5),
             sdk_tools_path: None,
             resource_path: None,
             test_filter: Some("test_filter".to_string()),
-            extra_test_args: Some("extra_args".to_string()),
+            custom_test_args: Some("extra_args".to_string()),
+            extra_env_vars: vec![],
         };
 
         let test_config = create_test_config_v1().into();
-        let result = args.validate(&test_config);
+        let result = args.validate_config(&test_config);
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_validate_missing_sdk_tools_path() {
-        let args = CommandLineArgs {
+        let args = EnvironmentArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
             targets: vec!["target1".to_string()],
             timeout_seconds: Some(30),
-            grace_timeout: Some(5),
             sdk_tools_path: None, // Missing sdk_tools_path
             resource_path: Some(PathBuf::from("resources")),
             test_filter: Some("test_filter".to_string()),
-            extra_test_args: Some("extra_args".to_string()),
+            custom_test_args: Some("extra_args".to_string()),
+            extra_env_vars: vec![],
         };
 
         let mut test_config = create_test_config_v1();
         test_config.requested_features.sdk_tools_path = true;
         let test_config = test_config.into();
-        let result = args.validate(&test_config);
-        assert_eq!(result.unwrap_err().to_string(), "--sdk_tools_path is required for this test");
+        let result = args.validate_config(&test_config);
+        assert_eq!(result.unwrap_err(), ConfigError::Required(ENV_SDK_TOOLS_PATH));
     }
 
     #[test]
     fn test_validate_missing_targets() {
-        let args = CommandLineArgs {
+        let args = EnvironmentArgs {
             test_config: PathBuf::from("test_config.json"),
             test_bin_path: PathBuf::from("test_bin"),
             targets: Vec::new(), // Missing targets
             timeout_seconds: Some(30),
-            grace_timeout: Some(5),
             sdk_tools_path: Some(PathBuf::from("sdk_tools")),
             resource_path: Some(PathBuf::from("resources")),
             test_filter: Some("test_filter".to_string()),
-            extra_test_args: Some("extra_args".to_string()),
+            custom_test_args: Some("extra_args".to_string()),
+            extra_env_vars: vec![],
         };
 
         let mut test_config = create_test_config_v1();
         test_config.requested_features.requires_target = true;
         let test_config = test_config.into();
-        let result = args.validate(&test_config);
-        assert_eq!(result.unwrap_err().to_string(), "--target is required for this test");
+        let result = args.validate_config(&test_config);
+        assert_eq!(result.unwrap_err(), ConfigError::Required(ENV_TARGETS));
     }
 }

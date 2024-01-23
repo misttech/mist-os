@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use structopt::StructOpt;
 
 mod errors;
 mod opts;
@@ -15,14 +14,14 @@ const INVALID_ARGS_CONFIG_EXIT_CODE: i32 = 222;
 // We need multiple threads to stream stdout/err in parallel until we can switch this to use tokio.
 #[fuchsia::main(threads = 2)]
 async fn main() {
-    let args: opts::CommandLineArgs = opts::CommandLineArgs::from_args();
+    let args = opts::EnvironmentArgs::from_env().unwrap();
     let test_config = parse_test_config(&args)
         .map_err(|e| {
             eprintln!("Invalid config: {}", e);
             std::process::exit(INVALID_ARGS_CONFIG_EXIT_CODE);
         })
         .unwrap();
-    let _ = args.validate(&test_config).map_err(|e| {
+    let _ = args.validate_config(&test_config).map_err(|e| {
         eprintln!("Invalid args: {}", e);
         std::process::exit(INVALID_ARGS_CONFIG_EXIT_CODE);
     });
@@ -38,7 +37,7 @@ async fn main() {
 }
 
 pub fn parse_test_config(
-    args: &opts::CommandLineArgs,
+    args: &opts::EnvironmentArgs,
 ) -> Result<test_config::TestConfiguration, Error> {
     test_config::TestConfiguration::try_from(args.test_config.as_path())
 }

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::errors::TestRunError;
-use crate::opts::CommandLineArgs;
+use crate::opts::EnvironmentArgs;
 use crate::test_config::{TestConfigV1, TestConfiguration};
 use std::io::{self, Write};
 use std::process::{ExitStatus, Stdio};
@@ -17,11 +17,11 @@ const ENV_TARGETS: &str = "TARGETS";
 const ENV_RESOURCE_PATH: &str = "RESOURCE_PATH";
 const ENV_EXECUTION_JSON: &str = "EXECUTION_JSON";
 const ENV_TEST_FILTER: &str = "TEST_FILTER";
-const ENV_EXTRA_TEST_ARGS: &str = "EXTRA_TEST_ARGS";
+const ENV_CUSTOM_TEST_ARGS: &str = "custom_test_args";
 const ENV_TAGS: &str = "TAGS";
 const BUFFER_SIZE: usize = 2048;
 
-fn create_test_launch_command_v1(args: &CommandLineArgs, config: &TestConfigV1) -> Command {
+fn create_test_launch_command_v1(args: &EnvironmentArgs, config: &TestConfigV1) -> Command {
     let mut cmd = Command::new(&args.test_bin_path);
     cmd.env_clear();
     cmd.env(ENV_PATH, DEFAULT_PATH);
@@ -44,8 +44,8 @@ fn create_test_launch_command_v1(args: &CommandLineArgs, config: &TestConfigV1) 
     if let Some(test_filter) = &args.test_filter {
         cmd.env(ENV_TEST_FILTER, test_filter);
     }
-    if let Some(extra_test_args) = &args.extra_test_args {
-        cmd.env(ENV_EXTRA_TEST_ARGS, extra_test_args);
+    if let Some(custom_test_args) = &args.custom_test_args {
+        cmd.env(ENV_CUSTOM_TEST_ARGS, custom_test_args);
     }
 
     if config.tags.len() > 0 {
@@ -57,6 +57,10 @@ fn create_test_launch_command_v1(args: &CommandLineArgs, config: &TestConfigV1) 
             .join(";");
 
         cmd.env(ENV_TAGS, tags_str);
+    }
+
+    for (key, value) in &args.extra_env_vars {
+        cmd.env(key, value);
     }
 
     cmd
@@ -133,7 +137,7 @@ async fn run_test_and_stream_output_v1<W1: Write + Send, W2: Write + Send>(
 }
 
 pub async fn run_test(
-    args: &CommandLineArgs,
+    args: &EnvironmentArgs,
     config: &TestConfiguration,
 ) -> Result<ExitStatus, TestRunError> {
     match config {
@@ -152,17 +156,17 @@ mod tests {
     use rand::{distributions::Alphanumeric, Rng};
     use std::{collections::HashMap, ffi::OsStr, io::Cursor};
 
-    fn default_args() -> CommandLineArgs {
-        CommandLineArgs {
+    fn default_args() -> EnvironmentArgs {
+        EnvironmentArgs {
             test_bin_path: "/path/to/test_bin".into(),
             sdk_tools_path: None,
             targets: Vec::new(),
             resource_path: None,
             test_filter: None,
-            extra_test_args: None,
+            custom_test_args: None,
             test_config: "/path/to/test_config".into(),
             timeout_seconds: None,
-            grace_timeout: None,
+            extra_env_vars: vec![],
         }
     }
 
@@ -194,7 +198,7 @@ mod tests {
         assert_eq!(env.get(OsStr::new(ENV_RESOURCE_PATH)), None);
         assert_eq!(env.get(OsStr::new(ENV_EXECUTION_JSON)), None);
         assert_eq!(env.get(OsStr::new(ENV_TEST_FILTER)), None);
-        assert_eq!(env.get(OsStr::new(ENV_EXTRA_TEST_ARGS)), None);
+        assert_eq!(env.get(OsStr::new(ENV_CUSTOM_TEST_ARGS)), None);
         assert_eq!(env.get(OsStr::new(ENV_TAGS)), None);
 
         // make sure there are no inherited env variables
@@ -239,7 +243,7 @@ mod tests {
             "{\"key\":\"value\"}"
         );
         assert_eq!(env.get(OsStr::new(ENV_TEST_FILTER)), None);
-        assert_eq!(env.get(OsStr::new(ENV_EXTRA_TEST_ARGS)), None);
+        assert_eq!(env.get(OsStr::new(ENV_CUSTOM_TEST_ARGS)), None);
         assert_eq!(
             env.get(OsStr::new(ENV_TAGS)).unwrap().unwrap(),
             "tag_key1=tag_value1;tag_key2=tag_value2"
@@ -252,7 +256,8 @@ mod tests {
         let config = default_config_v1();
         args.resource_path = Some("/path/to/resource_path".into());
         args.test_filter = Some("test*filter".into());
-        args.extra_test_args = Some("--arg1 --arg2".into());
+        args.custom_test_args = Some("--arg1 --arg2".into());
+        args.extra_env_vars = vec![("key1".into(), "val1".into()), ("key2".into(), "val2".into())];
 
         let cmd = create_test_launch_command_v1(&args, &config);
         let env = cmd.as_std().get_envs().collect::<HashMap<_, _>>();
@@ -266,9 +271,11 @@ mod tests {
             "/path/to/resource_path"
         );
         assert_eq!(env.get(OsStr::new(ENV_EXECUTION_JSON)), None);
-        assert_eq!(env.get(OsStr::new(ENV_EXTRA_TEST_ARGS)).unwrap().unwrap(), "--arg1 --arg2");
+        assert_eq!(env.get(OsStr::new(ENV_CUSTOM_TEST_ARGS)).unwrap().unwrap(), "--arg1 --arg2");
         assert_eq!(env.get(OsStr::new(ENV_TEST_FILTER)).unwrap().unwrap(), "test*filter");
         assert_eq!(env.get(OsStr::new(ENV_TAGS)), None);
+        assert_eq!(env.get(OsStr::new("key1")).unwrap().unwrap(), "val1");
+        assert_eq!(env.get(OsStr::new("key2")).unwrap().unwrap(), "val2");
     }
 
     #[fuchsia::test]
