@@ -13,7 +13,7 @@ use {
             simple_persistent_layer::SimplePersistentLayerWriter,
             types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Value},
         },
-        object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID},
+        object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
         object_store::{
             allocator::{AllocatorKey, AllocatorValue, CoalescingIterator},
             directory::Directory,
@@ -30,8 +30,10 @@ use {
     },
     anyhow::{Context, Error},
     assert_matches::assert_matches,
+    fidl_fuchsia_io as fio,
     fxfs_crypto::{Crypt, WrappedKeys},
     fxfs_insecure_crypto::InsecureCrypt,
+    mundane::hash::{Digest, Hasher, Sha256},
     std::{
         ops::{Bound, Deref},
         sync::{Arc, Mutex},
@@ -1596,6 +1598,191 @@ async fn test_orphaned_link_cycle() {
     test.remount().await.expect("Remount failed");
     test.run(TestOptions::default()).await.expect_err("Fsck should fail");
     assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::LinkCycle(..)), ..]);
+}
+
+#[fuchsia::test]
+async fn test_incorrect_merkle_tree_size_empty_file() {
+    let mut test = FsckTest::new().await;
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let object = root_directory
+            .create_child_file(&mut transaction, "verified file", None)
+            .await
+            .expect("Create child failed");
+        transaction.commit_and_continue().await.expect("commit_and_continue transaction failed");
+
+        object
+            .enable_verity(fio::VerificationOptions {
+                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                salt: Some(vec![]),
+                ..Default::default()
+            })
+            .await
+            .expect("set verified file metadata failed");
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(
+                    object.object_id(),
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    AttributeKey::Attribute,
+                ),
+                ObjectValue::attribute(0),
+            ),
+        );
+        transaction.commit().await.expect("commit transaction failed");
+        store.store_object_id()
+    };
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should have failed");
+    assert_matches!(
+        test.errors()[..],
+        [.., FsckIssue::Error(FsckError::IncorrectMerkleTreeSize(.., expected_size, 0))]
+            if expected_size == <Sha256 as Hasher>::Digest::DIGEST_LEN as u64
+    );
+}
+
+#[fuchsia::test]
+async fn test_incorrect_merkle_tree_size_one_data_block() {
+    let mut test = FsckTest::new().await;
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let object = root_directory
+            .create_child_file(&mut transaction, "verified file", None)
+            .await
+            .expect("Create child failed");
+        transaction.commit_and_continue().await.expect("commit_and_continue transaction failed");
+
+        let mut buf = object.allocate_buffer(fs.block_size() as usize).await;
+        buf.as_mut_slice().fill(1);
+        object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
+        object
+            .enable_verity(fio::VerificationOptions {
+                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                salt: Some(vec![]),
+                ..Default::default()
+            })
+            .await
+            .expect("set verified file metadata failed");
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(
+                    object.object_id(),
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    AttributeKey::Attribute,
+                ),
+                ObjectValue::attribute(2 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64),
+            ),
+        );
+        transaction.commit().await.expect("commit transaction failed");
+        store.store_object_id()
+    };
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should have failed");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::IncorrectMerkleTreeSize(.., expected_size, actual_size)), ..]
+            if expected_size == <Sha256 as Hasher>::Digest::DIGEST_LEN as u64
+                && actual_size == 2 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64
+    );
+}
+
+#[fuchsia::test]
+async fn test_incorrect_merkle_tree_size_data_unaligned() {
+    let mut test = FsckTest::new().await;
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let object = root_directory
+            .create_child_file(&mut transaction, "verified file", None)
+            .await
+            .expect("Create child failed");
+        transaction.commit_and_continue().await.expect("commit_and_continue transaction failed");
+
+        let mut buf = object.allocate_buffer(1 + 5 * fs.block_size() as usize).await;
+        buf.as_mut_slice().fill(1);
+        object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
+        object
+            .enable_verity(fio::VerificationOptions {
+                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                salt: Some(vec![]),
+                ..Default::default()
+            })
+            .await
+            .expect("set verified file metadata failed");
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(
+                    object.object_id(),
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    AttributeKey::Attribute,
+                ),
+                ObjectValue::attribute(10 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64),
+            ),
+        );
+        transaction.commit().await.expect("commit transaction failed");
+        store.store_object_id()
+    };
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should have failed");
+    assert_matches!(
+        test.errors()[..],
+        [
+            FsckIssue::Error(FsckError::IncorrectMerkleTreeSize(
+                ..,
+                expected_size,
+                actual_size,
+            )),
+            ..
+        ] if expected_size ==  6 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64
+            && actual_size == 10 * <Sha256 as Hasher>::Digest::DIGEST_LEN as u64
+    );
 }
 
 #[fuchsia::test]

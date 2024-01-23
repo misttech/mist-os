@@ -15,7 +15,7 @@ use {
             graveyard::Graveyard,
             AttributeKey, ChildValue, EncryptionKeys, ExtendedAttributeValue, ExtentKey,
             ExtentValue, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
-            ObjectStore, ObjectValue, ProjectProperty, DEFAULT_DATA_ATTRIBUTE_ID,
+            ObjectStore, ObjectValue, ProjectProperty, RootDigest, DEFAULT_DATA_ATTRIBUTE_ID,
             EXTENDED_ATTRIBUTE_RANGE_END, EXTENDED_ATTRIBUTE_RANGE_START,
             FSVERITY_MERKLE_ATTRIBUTE_ID,
         },
@@ -59,8 +59,8 @@ struct ScannedFile {
     stored_refs: u64,
     // Attributes for this file.
     attributes: ScannedAttributes,
-    // True if fsverity-enabled.
-    is_verified: bool,
+    // If fsverity-enabled, contains the hash size.
+    is_verified: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -197,7 +197,7 @@ impl<'a> ScannedStore<'a> {
                                     in_graveyard: false,
                                     extended_attributes: Vec::new(),
                                 },
-                                is_verified: false,
+                                is_verified: None,
                             }),
                         );
                     }
@@ -353,7 +353,7 @@ impl<'a> ScannedStore<'a> {
                             }
                         }
                     }
-                    ObjectValue::VerifiedAttribute { size, .. } => {
+                    ObjectValue::VerifiedAttribute { size, fsverity_metadata } => {
                         match self.objects.get_mut(&key.object_id) {
                             Some(ScannedObject::File(ScannedFile {
                                 attributes,
@@ -361,7 +361,11 @@ impl<'a> ScannedStore<'a> {
                                 ..
                             })) => {
                                 attributes.attributes.push((attribute_id, *size));
-                                *is_verified = true;
+                                let hash_size = match &fsverity_metadata.root_digest {
+                                    RootDigest::Sha256(root_hash) => root_hash.len(),
+                                    RootDigest::Sha512(root_hash) => root_hash.len(),
+                                };
+                                *is_verified = Some(hash_size);
                             }
                             Some(ScannedObject::Directory(..) | ScannedObject::Symlink(..)) => {
                                 self.fsck.error(FsckError::NonFileMarkedAsVerified(
@@ -851,7 +855,8 @@ fn validate_attributes(
     object_id: u64,
     attributes: &ScannedAttributes,
     is_file: bool,
-    is_verified: bool,
+    is_verified: Option<usize>,
+    block_size: u64,
 ) -> Result<(), Error> {
     let ScannedAttributes {
         attributes,
@@ -870,17 +875,43 @@ fn validate_attributes(
     }
 
     if is_file {
-        if attributes.iter().find(|(attr_id, _)| *attr_id == DEFAULT_DATA_ATTRIBUTE_ID).is_none() {
-            fsck.error(FsckError::MissingDataAttribute(store_id, object_id))?;
-        }
-        // TODO(b/315016213): Add a check for the expected size of the merkle tree.
-        let merkle_attribute =
-            attributes.iter().find(|(attr_id, _)| *attr_id == FSVERITY_MERKLE_ATTRIBUTE_ID);
+        let data_attribute =
+            attributes.iter().find(|(attr_id, _)| *attr_id == DEFAULT_DATA_ATTRIBUTE_ID);
+        match data_attribute {
+            None => fsck.error(FsckError::MissingDataAttribute(store_id, object_id))?,
+            Some((_, data_size)) => {
+                let merkle_attribute =
+                    attributes.iter().find(|(attr_id, _)| *attr_id == FSVERITY_MERKLE_ATTRIBUTE_ID);
 
-        if (is_verified && merkle_attribute.is_none())
-            || (!is_verified && merkle_attribute.is_some())
-        {
-            fsck.error(FsckError::InconsistentVerifiedFile(store_id, object_id, is_verified))?;
+                if (is_verified.is_some() && merkle_attribute.is_none())
+                    || (is_verified.is_none() && merkle_attribute.is_some())
+                {
+                    fsck.error(FsckError::InconsistentVerifiedFile(
+                        store_id,
+                        object_id,
+                        is_verified.is_some(),
+                    ))?;
+                }
+
+                if let (Some((_, size)), Some(hash_size)) = (merkle_attribute, is_verified) {
+                    // If the file is empty, the merkle tree should just be a single hash.
+                    let expected_size = if *data_size == 0 {
+                        hash_size as u64
+                    // Else, use ceiling integer division in case data_size is not a multiple of
+                    // block size.
+                    } else {
+                        ((data_size + (block_size - 1)) / block_size) * hash_size as u64
+                    };
+                    if *size != expected_size {
+                        fsck.error(FsckError::IncorrectMerkleTreeSize(
+                            store_id,
+                            object_id,
+                            expected_size,
+                            *size,
+                        ))?;
+                    }
+                }
+            }
         }
     }
 
@@ -1043,7 +1074,15 @@ pub(super) async fn scan_store(
                         *stored_refs,
                     ))?;
                 }
-                validate_attributes(fsck, store_id, *object_id, attributes, true, *is_verified)?;
+                validate_attributes(
+                    fsck,
+                    store_id,
+                    *object_id,
+                    attributes,
+                    true,
+                    *is_verified,
+                    store.block_size(),
+                )?;
                 if parents.is_empty() {
                     fsck.warning(FsckWarning::OrphanedObject(store_id, *object_id))?;
                 }
@@ -1073,7 +1112,15 @@ pub(super) async fn scan_store(
                         *stored_sub_dirs,
                     ))?;
                 }
-                validate_attributes(fsck, store_id, *object_id, attributes, false, false)?;
+                validate_attributes(
+                    fsck,
+                    store_id,
+                    *object_id,
+                    attributes,
+                    false,
+                    None,
+                    store.block_size(),
+                )?;
                 if let Some(mut oid) = parent {
                     if attributes.in_graveyard {
                         fsck.error(FsckError::ZombieDir(store_id, *object_id, oid))?;
@@ -1127,7 +1174,15 @@ pub(super) async fn scan_store(
                         *stored_refs,
                     ))?;
                 }
-                validate_attributes(fsck, store_id, *object_id, attributes, false, false)?;
+                validate_attributes(
+                    fsck,
+                    store_id,
+                    *object_id,
+                    attributes,
+                    false,
+                    None,
+                    store.block_size(),
+                )?;
                 if attributes.in_graveyard {
                     if !parents.is_empty() {
                         fsck.error(FsckError::ZombieSymlink(

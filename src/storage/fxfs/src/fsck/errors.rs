@@ -264,6 +264,7 @@ pub enum FsckError {
     ZombieSymlink(u64, u64, Vec<u64>),
     InconsistentVerifiedFile(u64, u64, bool),
     NonFileMarkedAsVerified(u64, u64),
+    IncorrectMerkleTreeSize(u64, u64, u64, u64),
 }
 
 impl FsckError {
@@ -462,6 +463,12 @@ impl FsckError {
                     store_id, object_id
                 )
             }
+            FsckError::IncorrectMerkleTreeSize(store_id, object_id, expected_size, actual_size) => {
+                format!(
+                    "Object {} in store {} has merkle tree of size {} expected {}",
+                    object_id, store_id, actual_size, expected_size
+                )
+            }
         }
     }
 
@@ -592,6 +599,12 @@ impl FsckError {
             }
             FsckError::NonFileMarkedAsVerified(store_id, oid) => {
                 error!(store_id, oid, "Non-file marked as verified")
+            }
+            FsckError::IncorrectMerkleTreeSize(store_id, oid, expected_size, actual_size) => {
+                error!(
+                    store_id,
+                    oid, expected_size, actual_size, "Verified file has incorrect merkle tree size"
+                )
             }
         }
     }
