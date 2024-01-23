@@ -9,7 +9,11 @@ import("//build/test.gni")
 driver_bind_rules("virtio_rng_bind") {
   rules = "virtio_rng.bind"
   tests = "tests.json"
-  deps = [ "//src/devices/bind/fuchsia.pci" ]
+  deps = [
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.pci",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 group("tests") {

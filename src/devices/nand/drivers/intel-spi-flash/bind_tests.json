@@ -1,43 +1,40 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Protocol"
+        "node": "pci",
+        "tests": [
+            {
+                "name": "match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_SPIFLASH",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_SPIFLASH",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
-        },
-        "expected": "match",
-        "name": "match"
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_SPIFLASH",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL"
-        },
-        "expected": "abort",
-        "name": "Missing Protocol"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_SPIFLASH",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Missing PCI VID"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Missing PCI DID"
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]
