@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_TRANSPORT_FAKE_ACL_CONNECTION_H_
+#define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_TRANSPORT_FAKE_ACL_CONNECTION_H_
+
 #include "src/connectivity/bluetooth/core/bt-host/transport/acl_data_channel.h"
 
 namespace bt::hci {
@@ -52,3 +55,5 @@ class FakeAclConnection : public AclDataChannel::ConnectionInterface {
 };
 }  // namespace
 }  // namespace bt::hci
+
+#endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_TRANSPORT_FAKE_ACL_CONNECTION_H_

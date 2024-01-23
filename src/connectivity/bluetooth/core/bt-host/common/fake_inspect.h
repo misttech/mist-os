@@ -5,6 +5,9 @@
 // This file contains a minimal fake implementation of Inspect to enable code to compile when
 // Inspect is not supported.
 
+#ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_COMMON_FAKE_INSPECT_H_
+#define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_COMMON_FAKE_INSPECT_H_
+
 #include <string>
 
 namespace inspect {
@@ -67,3 +70,5 @@ class Inspector final {
 };
 
 }  // namespace inspect
+
+#endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_COMMON_FAKE_INSPECT_H_
