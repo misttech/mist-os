@@ -41,6 +41,8 @@ pub enum Action<I: IpExt, DeviceClass> {
 }
 
 #[derive(Debug)]
+// TODO(https://fxbug.dev/318718273): implement jumping and returning.
+#[allow(dead_code)]
 pub struct UninstalledRoutine<I: IpExt, DeviceClass>(Arc<Routine<I, DeviceClass>>);
 
 /// A set of criteria (matchers) and a resultant action to take if a given
