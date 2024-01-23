@@ -283,6 +283,9 @@ eng_only_platform_aib_names =
       # Audio development/debugging
       "audio_development_support",
       "video_development_support",
+
+      # Suspend/resume Support
+      "power_framework",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names
