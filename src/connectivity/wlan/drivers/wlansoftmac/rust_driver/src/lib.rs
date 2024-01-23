@@ -387,7 +387,6 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
     let mut usme_bootstrap_stream = match server.into_stream() {
         Ok(res) => res,
         Err(e) => {
-            // Failure to unwrap indicates a critical failure in the driver init thread.
             error!("Failed to get usme bootstrap stream: {}", e);
             return Err(zx::Status::INTERNAL);
         }
@@ -450,83 +449,182 @@ mod tests {
         wlan_mlme::{self, device::test_utils::FakeDevice},
     };
 
+    #[derive(Debug)]
+    struct SoftmacHarness<F> {
+        pub start_and_serve_fut: F,
+        pub softmac_handle_receiver: oneshot::Receiver<Result<WlanSoftmacHandle, zx::Status>>,
+        pub generic_sme_proxy: fidl_sme::GenericSmeProxy,
+    }
+
+    /// This function calls start_and_serve() with a FakeDevice and performs the boilerplate initialization
+    /// steps.
+    ///
+    /// A returned Ok value will contain a tuple with the following values if start_and_serve()
+    /// successfully bootstraps SME:
+    ///
+    ///   - start_and_serve() future.
+    ///   - oneshot::Receiver to receive a WlanSoftmacHandle or an error.
+    ///   - GenericSmeProxy
+    ///
+    /// The returned start_and_serve() future will run the WlanSoftmacIfcBridge, MLME, and SME servers when
+    /// run on an executor.
+    ///
+    /// An Err value will be returned if start_and_serve() encounters an error completing the bootstrap
+    /// of the SME server.
     fn start_and_serve_with_device(
         exec: &mut fasync::TestExecutor,
-        handle_sender: oneshot::Sender<Result<WlanSoftmacHandle, zx::Status>>,
         fake_device: FakeDevice,
-    ) -> Result<
-        (
-            Result<Pin<Box<impl Future<Output = Result<(), zx::Status>>>>, Result<(), zx::Status>>,
-            fidl_sme::GenericSmeProxy,
-        ),
-        anyhow::Error,
-    > {
+    ) -> Result<SoftmacHarness<impl Future<Output = Result<(), zx::Status>>>, zx::Status> {
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
-        let main_fut = start_and_serve(
+        let (softmac_handle_sender, mut softmac_handle_receiver) =
+            oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
+        let start_and_serve_fut = start_and_serve(
             move |result: Result<WlanSoftmacHandle, zx::Status>| {
-                handle_sender.send(result).expect("Failed to signal startup completion.")
+                softmac_handle_sender
+                    .send(result)
+                    .expect("Failed to signal initialization complete.")
             },
             fake_device.clone(),
             fake_buf_provider,
         );
-        let mut main_fut = Box::pin(main_fut);
+        let mut start_and_serve_fut = Box::pin(start_and_serve_fut);
 
-        let usme_client_proxy = fake_device
-            .state()
-            .lock()
-            .unwrap()
-            .usme_bootstrap_client_end
-            .take()
-            .unwrap()
-            .into_proxy()?;
-        let legacy_privacy_support =
-            fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
-        let (generic_sme_proxy, generic_sme_server) =
-            fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>()?;
+        let usme_bootstrap_client_end =
+            fake_device.state().lock().unwrap().usme_bootstrap_client_end.take();
+        match usme_bootstrap_client_end {
+            // Simulate an errant initialization case where the UsmeBootstrap client end has been dropped
+            // during initialization.
+            None => match exec.run_until_stalled(&mut start_and_serve_fut) {
+                Poll::Pending => panic!(
+                    "start_and_serve() failed to panic when the UsmeBootstrap client was dropped."
+                ),
+                Poll::Ready(result) => {
+                    // Assert the same initialization error appears in the receiver too.
+                    let status = result.unwrap_err();
+                    assert_eq!(
+                        status,
+                        assert_variant!(
+                            exec.run_until_stalled(&mut softmac_handle_receiver),
+                            Poll::Ready(Ok(Err(status))) => status
+                        )
+                    );
+                    return Err(status);
+                }
+            },
+            // Simulate the normal initialization case where the the UsmeBootstrap client end is active
+            // during initialization.
+            Some(usme_bootstrap_client_end) => {
+                let usme_client_proxy = usme_bootstrap_client_end
+                    .into_proxy()
+                    .expect("Failed to set up the USME client proxy.");
 
-        let inspect_vmo_fut = usme_client_proxy.start(generic_sme_server, &legacy_privacy_support);
-        let main_fut = match exec.run_until_stalled(&mut main_fut) {
-            Poll::Pending => Ok(main_fut),
-            Poll::Ready(result) => Err(result),
+                let legacy_privacy_support =
+                    fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
+                let (generic_sme_proxy, generic_sme_server) =
+                    fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>().unwrap();
+                let inspect_vmo_fut =
+                    usme_client_proxy.start(generic_sme_server, &legacy_privacy_support);
+
+                let start_and_serve_fut = match exec.run_until_stalled(&mut start_and_serve_fut) {
+                    Poll::Pending => start_and_serve_fut,
+                    Poll::Ready(result) => {
+                        // Assert the same initialization error appears in the receiver too.
+                        let status = result.unwrap_err();
+                        assert_eq!(
+                            status,
+                            assert_variant!(
+                                exec.run_until_stalled(&mut softmac_handle_receiver),
+                                Poll::Ready(Ok(Err(status))) => status
+                            )
+                        );
+                        return Err(status);
+                    }
+                };
+
+                let inspect_vmo = exec.run_singlethreaded(inspect_vmo_fut);
+                inspect_vmo.expect("Failed to bootstrap USME.");
+
+                Ok(SoftmacHarness {
+                    start_and_serve_fut,
+                    softmac_handle_receiver,
+                    generic_sme_proxy,
+                })
+            }
+        }
+    }
+
+    #[test]
+    fn wlansoftmac_startup_fails_startup_during_bootstrap() {
+        let mut exec = fasync::TestExecutor::new();
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        fake_device_state.lock().unwrap().usme_bootstrap_client_end = None;
+        match start_and_serve_with_device(&mut exec, fake_device.clone()) {
+            Ok(_) => panic!(
+                "start_and_serve() does not fail when the UsmeBootstrap client end is dropped."
+            ),
+            Err(status) => assert_eq!(status, zx::Status::INTERNAL),
+        }
+    }
+
+    #[test]
+    fn wlansoftmac_fails_startup_with_wrong_mac_implementation_type() {
+        let mut exec = fasync::TestExecutor::new();
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        {
+            let mut fake_device_state = fake_device_state.lock().unwrap();
+            fake_device_state.mac_sublayer_support.device.is_synthetic = true;
+            fake_device_state.mac_sublayer_support.device.mac_implementation_type =
+                fidl_common::MacImplementationType::Fullmac;
+        }
+
+        match start_and_serve_with_device(&mut exec, fake_device) {
+            Ok(_) => panic!(
+                "start_and_serve() future did not terminate before attempting bootstrap SME."
+            ),
+            Err(status) => assert_eq!(status, zx::Status::INTERNAL),
         };
-        let inspect_vmo = exec.run_singlethreaded(inspect_vmo_fut);
-        inspect_vmo.expect("Failed to bootstrap USME.");
+    }
 
-        Ok((main_fut, generic_sme_proxy))
+    #[test]
+    fn wlansoftmac_startup_fails_startup_when_mlme_event_stream_is_missing() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut fake_device, _fake_device_state) = FakeDevice::new(&exec);
+        let _ = fake_device.take_mlme_event_stream();
+        match start_and_serve_with_device(&mut exec, fake_device.clone()) {
+            Ok(_) => {
+                panic!("start_and_serve() does not fail when the MLME event stream is missing.")
+            }
+            Err(status) => assert_eq!(status, zx::Status::INTERNAL),
+        }
     }
 
     #[test]
     fn stop_leads_to_graceful_shutdown() {
         let mut exec = fasync::TestExecutor::new();
-        let (handle_sender, handle_receiver) =
-            oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
-        let (main_fut, generic_sme_proxy) =
-            start_and_serve_with_device(&mut exec, handle_sender, fake_device)
-                .expect("Failed to initiate wlansoftmac setup.");
-        let mut main_fut = main_fut.unwrap();
+        let SoftmacHarness {
+            mut start_and_serve_fut,
+            mut softmac_handle_receiver,
+            generic_sme_proxy,
+        } = start_and_serve_with_device(&mut exec, fake_device)
+            .expect("Failed to initiate wlansoftmac setup.");
         let (sme_telemetry_proxy, sme_telemetry_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
         let (client_proxy, client_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
-        assert_eq!(exec.run_until_stalled(&mut main_fut), Poll::Pending);
-        let handle = exec
-            .run_singlethreaded(handle_receiver)
-            .unwrap()
-            .expect("Failed to start wlansoftmac.");
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
 
         let resp_fut = generic_sme_proxy.get_sme_telemetry(sme_telemetry_server);
         pin_mut!(resp_fut);
         assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_eq!(exec.run_until_stalled(&mut main_fut), Poll::Pending);
-        exec.run_singlethreaded(resp_fut)
-            .expect("Generic SME proxy failed")
-            .expect("SME telemetry request failed");
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(Ok(()))));
 
         let resp_fut = generic_sme_proxy.get_client_sme(client_server);
         pin_mut!(resp_fut);
         assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_eq!(exec.run_until_stalled(&mut main_fut), Poll::Pending);
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
         exec.run_singlethreaded(resp_fut)
             .expect("Generic SME proxy failed")
             .expect("Client SME request failed");
@@ -537,7 +635,9 @@ mod tests {
             shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
         })));
         assert_variant!(
-            exec.run_singlethreaded(async { futures::join!(main_fut, shutdown_receiver) }),
+            exec.run_singlethreaded(async {
+                futures::join!(start_and_serve_fut, shutdown_receiver)
+            }),
             (Ok(()), Ok(()))
         );
 
@@ -545,49 +645,5 @@ mod tests {
         assert!(generic_sme_proxy.is_closed());
         assert!(sme_telemetry_proxy.is_closed());
         assert!(client_proxy.is_closed());
-    }
-
-    #[test]
-    fn wlansoftmac_bad_mac_role_fails_startup_with_bad_features() {
-        let mut exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
-        fake_device_state.lock().unwrap().mac_sublayer_support.device.is_synthetic = true;
-        fake_device_state.lock().unwrap().mac_sublayer_support.device.mac_implementation_type =
-            fidl_common::MacImplementationType::Fullmac;
-        let (handle_sender, mut handle_receiver) =
-            oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
-        let (main_fut, _generic_sme_proxy) =
-            start_and_serve_with_device(&mut exec, handle_sender, fake_device)
-                .expect("Failed to initiate wlansoftmac setup.");
-        assert_variant!(
-            main_fut,
-            Err(Err(zx::Status::INTERNAL)),
-            "Main future did not immediately terminate upon failed setup."
-        );
-
-        exec.run_singlethreaded(&mut handle_receiver)
-            .unwrap()
-            .expect_err("Softmac setup should fail.");
-    }
-
-    #[test]
-    fn wlansoftmac_startup_fails_on_bad_bootstrap() {
-        let mut exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
-        let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
-        let (handle_sender, handle_receiver) =
-            oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
-        let main_fut = start_and_serve(
-            move |result: Result<WlanSoftmacHandle, zx::Status>| {
-                handle_sender.send(result).expect("Failed to signal startup completion.")
-            },
-            fake_device.clone(),
-            fake_buf_provider,
-        );
-        fake_device_state.lock().unwrap().usme_bootstrap_client_end = None; // Drop the client end.
-        assert_variant!(
-            exec.run_singlethreaded(async { futures::join!(main_fut, handle_receiver,) }),
-            (Err(zx::Status::INTERNAL), Ok(Err(zx::Status::INTERNAL)))
-        )
     }
 }
