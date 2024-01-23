@@ -73,8 +73,9 @@ pub(crate) fn device(emu_config: &EmulatorConfiguration) -> ShowDetail {
             memory: emu_config.device.memory.clone(),
             window_size: emu_config.device.screen.clone(),
         },
-        start_up_args_template: Utf8PathBuf::from_path_buf(emu_config.runtime.template.clone())
-            .expect("Converting to utf8"),
+
+        // TODO(wilkinsonclay): Removing the template from the Virtual device.
+        start_up_args_template: Utf8PathBuf::new(),
         ports: None,
     };
 

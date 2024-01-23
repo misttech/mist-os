@@ -11,6 +11,9 @@ use handlebars::{
     RenderContext, RenderError,
 };
 
+//  Actual path is //src/developer/ffx/plugins/emulator/templates/emulator_flags.json.template
+const DEFAULT_FLAGS_TEMPLATE_STR: &str = include_str!("../templates/emulator_flags.json.template");
+
 #[derive(Clone, Copy)]
 pub struct EqHelper {}
 
@@ -196,10 +199,15 @@ impl HelperDef for EnvironmentHelper {
 }
 
 pub fn process_flag_template(emu_config: &EmulatorConfiguration) -> Result<FlagData> {
-    let template_text = std::fs::read_to_string(&emu_config.runtime.template).context(format!(
-        "couldn't locate template file from path {:?}",
-        &emu_config.runtime.template
-    ))?;
+    let template_text = if let Some(template_path) = &emu_config.runtime.template {
+        std::fs::read_to_string(template_path).context(format!(
+            "couldn't locate template file from path {:?}",
+            &emu_config.runtime.template
+        ))?
+    } else {
+        DEFAULT_FLAGS_TEMPLATE_STR.to_string()
+    };
+
     process_flag_template_inner(&template_text, emu_config)
 }
 

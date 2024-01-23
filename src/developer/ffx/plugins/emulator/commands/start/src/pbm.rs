@@ -36,7 +36,7 @@ pub(crate) async fn make_configs(
     // This bypasses the rest of the configuration phase, which means the EmulationConfiguration
     // contents don't actually represent the configuration being used to launch the emulator.
     if let Some(template_file) = &cmd.config {
-        emu_config.runtime.template = PathBuf::from(env::current_dir()?).join(template_file);
+        emu_config.runtime.template = Some(PathBuf::from(env::current_dir()?).join(template_file));
         emu_config.runtime.config_override = true;
     } else {
         if let Some(pb) = product_bundle {

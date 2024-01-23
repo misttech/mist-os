@@ -46,7 +46,11 @@ if (is_host) {
       "//third_party/rust_crates:mockall",
       "//third_party/rust_crates:tempfile",
     ]
-    inputs = [ "test_data/unknown_engine_type_engine.json" ]
+    inputs = [
+      "test_data/unknown_engine_type_engine.json",
+
+      "templates/emulator_flags.json.template",
+    ]
   }
 
   group("tests") {

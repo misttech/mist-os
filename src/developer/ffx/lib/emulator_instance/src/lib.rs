@@ -203,7 +203,8 @@ pub struct RuntimeConfig {
 
     /// Path to an enumeration flags template file, which contains a Handlebars-renderable
     /// set of arguments to be passed to the Command which starts the emulator.
-    pub template: PathBuf,
+    /// If this is None, the internal emulator_flags.json.template is used.
+    pub template: Option<PathBuf>,
 
     /// Optional path to a Tap upscript file, which is passed to the emulator when Tap networking
     /// is enabled.

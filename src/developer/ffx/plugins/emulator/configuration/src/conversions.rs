@@ -127,10 +127,8 @@ fn convert_v2_bundle_to_configs(
         storage: virtual_device.hardware.storage.clone(),
     };
 
-    let template = &virtual_device.start_up_args_template;
-    emulator_configuration.runtime.template = PathBuf::from(template)
-        .canonicalize()
-        .with_context(|| format!("canonicalize template path {:?}", &template))?;
+    // TODO(wilkinsonclay): Remove start_up_args_template from virtual device.
+    emulator_configuration.runtime.template = None;
 
     if let Some(ports) = &virtual_device.ports {
         for (name, port) in ports {
