@@ -276,7 +276,6 @@ pub enum EventPayload {
 #[derive(Clone)]
 pub struct RuntimeInfo {
     pub outgoing_dir: Option<fio::DirectoryProxy>,
-    pub runtime_dir: Option<fio::DirectoryProxy>,
     pub diagnostics_receiver:
         Arc<Mutex<Option<oneshot::Receiver<fdiagnostics::ComponentDiagnostics>>>>,
     pub start_time: zx::Time,
@@ -290,7 +289,6 @@ impl RuntimeInfo {
         let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
         Self {
             outgoing_dir: clone_dir(runtime.outgoing_dir()),
-            runtime_dir: clone_dir(runtime.runtime_dir()),
             diagnostics_receiver,
             start_time: runtime.timestamp,
         }
