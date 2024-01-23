@@ -1405,13 +1405,15 @@ impl NativeIntoFidl<fdecl::ConfigType> for ConfigValueType {
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
     // TODO(https://fxbug.dev/124335) uncomment once bitflags is updated
     // pub struct ConfigMutability: <fdecl::ConfigMutability as bitflags::BitFlags>::Bits {
     pub struct ConfigMutability: u32 {
         const PARENT = fdecl::ConfigMutability::PARENT.bits();
     }
 }
+
+#[cfg(feature = "serde")]
+bitflags_serde_legacy::impl_traits!(ConfigMutability);
 
 impl NativeIntoFidl<fdecl::ConfigMutability> for ConfigMutability {
     fn native_into_fidl(self) -> fdecl::ConfigMutability {

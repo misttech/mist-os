@@ -33,7 +33,10 @@ rustc_library("cm_rust") {
   # non-host builds.
   if (is_host) {
     features += [ "serde" ]
-    deps += [ "//third_party/rust_crates:serde" ]
+    deps += [
+      "//src/sys/lib/bitflags-serde-legacy",
+      "//third_party/rust_crates:serde",
+    ]
     sources += [ "src/serde_ext.rs" ]
     test_deps += [ "//third_party/rust_crates:serde_json" ]
   }

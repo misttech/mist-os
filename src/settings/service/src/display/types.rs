@@ -90,13 +90,14 @@ pub enum ThemeType {
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ThemeMode: u32 {
         /// Product can choose a theme based on ambient cues.
         const AUTO = 0b00000001;
     }
 }
+
+bitflags_serde_legacy::impl_traits!(ThemeMode);
 
 #[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize)]
 pub struct Theme {

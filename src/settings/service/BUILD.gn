@@ -65,6 +65,7 @@ icu_rustc_library("lib") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/settings/inspect_utils:settings_inspect_utils",
     "//src/settings/storage:settings_storage",
+    "//src/sys/lib/bitflags-serde-legacy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:bitflags",

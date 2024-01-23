@@ -387,7 +387,7 @@ impl From<DeviceStateSource> for FidlDeviceStateSource {
 }
 
 bitflags! {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct DeviceState : u64 {
         const AVAILABLE = 0b00000001;
         const ACTIVE = 0b00000010;
@@ -451,6 +451,8 @@ impl From<DeviceState> for FidlDeviceState {
         }
     }
 }
+
+bitflags_serde_legacy::impl_traits!(DeviceState);
 
 #[cfg(test)]
 mod tests {

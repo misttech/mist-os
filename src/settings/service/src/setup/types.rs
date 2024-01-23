@@ -11,13 +11,15 @@ pub struct SetupInfo {
 }
 
 bitflags! {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct ConfigurationInterfaceFlags: u32 {
         const ETHERNET = 1 << 0;
         const WIFI = 1 << 1;
         const DEFAULT = Self::WIFI.bits();
     }
 }
+
+bitflags_serde_legacy::impl_traits!(ConfigurationInterfaceFlags);
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct SetConfigurationInterfacesParams {
