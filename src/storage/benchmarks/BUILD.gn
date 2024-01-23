@@ -50,12 +50,12 @@ group("benchmarks") {
   deps = [
     "fuchsia:benchmark-packages",
     "host:benchmarks",
-    "starnix:benchmarks",
+    "starnix:benchmark-packages",
   ]
 
   # TODO(b/297312145): Remove when Starnix can be built on RISC-V.
   if (current_cpu == "riscv64") {
-    deps -= [ "starnix:benchmarks" ]
+    deps -= [ "starnix:benchmark-packages" ]
   }
 }
 

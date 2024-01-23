@@ -24,10 +24,6 @@ test_list = [
   # keep-sorted end
 ]
 
-if (!is_asan && host_os == "linux") {
-  test_list += [ "storage_starnix_benchmarks_test" ]
-}
-
 foreach(target_name, test_list) {
   dart_test(target_name) {
     sources = [
@@ -204,8 +200,6 @@ if (is_host) {
     "fuchsia.netstack.iperf_benchmarks.ethernet_udp_send.txt",
     "fuchsia.netstack.iperf_benchmarks.localhost_tcp.txt",
     "fuchsia.netstack.iperf_benchmarks.localhost_udp.txt",
-    "fuchsia.storage.starnix_data.txt",
-    "fuchsia.storage.starnix_tmp.txt",
 
     # keep-sorted end
   ]
@@ -243,6 +237,7 @@ _python_benchmarks += [
   "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
   "//src/starnix:benchmarks",
   "//src/storage/benchmarks/fuchsia:benchmarks",
+  "//src/storage/benchmarks/starnix:benchmarks",
   "//src/tests/benchmarks",
   "//src/tests/microbenchmarks:benchmarks",
 ]
@@ -264,13 +259,6 @@ group("test") {
     # These are used by flatland_benchmarks and input_latency_benchmarks
     "//src/ui/examples:flatland-examples",
   ]
-
-  if (!is_asan) {
-    deps += [
-      # This is used by storage_starnix_benchmarks_test.
-      "//src/storage/benchmarks/starnix:benchmarks",
-    ]
-  }
 
   foreach(target_name, test_list) {
     deps += [ ":$target_name($host_toolchain)" ]

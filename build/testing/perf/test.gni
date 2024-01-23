@@ -190,6 +190,14 @@ template("python_perf_test") {
 #     Type: string
 #     Default: ""
 #
+#   use_component_builtin_args (optional)
+#     By default, fuchsia_component_perf_test will pass command line arguments to the component.
+#     Setting this parameter to true overrides that default so that no arguments are passed to the
+#     component, causing it to use its built-in argument list (as defined in the component's CML
+#     manifest file, for ELF components). Note that when this parameter is set to true,
+#     test_component_args and results_path_test_arg will be ignored.
+#     Default: False
+#
 template("fuchsia_component_perf_test") {
   assert(defined(invoker.component_name), "component_name is required")
   assert(defined(invoker.expected_metric_names_filepath),
@@ -230,6 +238,10 @@ template("fuchsia_component_perf_test") {
 
     if (defined(invoker.results_path_test_arg)) {
       results_path_test_arg = invoker.results_path_test_arg
+    }
+
+    if (defined(invoker.use_component_builtin_args)) {
+      use_component_builtin_args = invoker.use_component_builtin_args
     }
   }
 

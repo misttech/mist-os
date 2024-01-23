@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/dist/resource.gni")
+import("//build/testing/perf/test.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 
@@ -50,7 +51,34 @@ fuchsia_test_package("storage-starnix-benchmarks") {
   }
 }
 
-group("benchmarks") {
+fuchsia_component_perf_test("storage_starnix_data_benchmarks") {
+  package = ":storage-starnix-benchmarks"
+  component_name = "storage-starnix-data-benchmarks"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.storage.starnix_data.txt"
+  use_component_builtin_args = true
+  test_type = "starnix"
+}
+
+fuchsia_component_perf_test("storage_starnix_tmp_benchmarks") {
+  package = ":storage-starnix-benchmarks"
+  component_name = "storage-starnix-tmp-benchmarks"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.storage.starnix_tmp.txt"
+  use_component_builtin_args = true
+  test_type = "starnix"
+}
+
+group("benchmark-packages") {
   testonly = true
   deps = [ ":storage-starnix-benchmarks" ]
+}
+
+group("benchmarks") {
+  testonly = true
+  deps = []
+  if (!is_asan && host_os == "linux") {
+    deps += [
+      ":storage_starnix_data_benchmarks",
+      ":storage_starnix_tmp_benchmarks",
+    ]
+  }
 }

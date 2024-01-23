@@ -31,6 +31,12 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
         results_path_test_arg (str): The option to be used by the test for the results path.
             Important: this is just the option (ex: "--out"). The value will be passed by the test.
             Default: None
+        use_component_builtin_args (bool): Setting this parameter to true causes that no arguments
+            are passed to the component using ffx test, causing it to use its built-in argument list
+            (as defined in the component's CML manifest file, for ELF components). Note that when
+            this parameter is set to true, test_component_args and results_path_test_arg will be
+            ignored.
+            Default: False
         process_runs (int): Number of times to run the test component.
             Default: 1
     """
@@ -42,46 +48,49 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
         fuchsiaperf data and then publishes it ensuring that the expected
         metrics are present.
         """
-        self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-        self.ffx_test_args: list[str] = self.user_params["ffx_test_args"]
-        self.ffx_test_url: str = self.user_params["ffx_test_url"]
-        self.expected_metric_names_filepath: str = self.user_params[
+        device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
+        ffx_test_args: list[str] = self.user_params["ffx_test_args"]
+        ffx_test_url: str = self.user_params["ffx_test_url"]
+        expected_metric_names_filepath: str = self.user_params[
             "expected_metric_names_filepath"
         ]
-        self.process_runs = self.user_params.get("process_runs", 1)
-        self.results_path_test_arg = self.user_params.get(
-            "results_path_test_arg"
+        process_runs = self.user_params.get("process_runs", 1)
+        results_path_test_arg = self.user_params.get("results_path_test_arg")
+        use_component_builtin_args = self.user_params.get(
+            "use_component_builtin_args", False
         )
-        self.test_component_args = self.user_params.get(
-            "test_component_args", []
-        )
+        test_component_args = []
+        if not use_component_builtin_args:
+            test_component_args = self.user_params.get(
+                "test_component_args", []
+            )
 
-        results_file_path: str = utils.DEFAULT_TARGET_RESULTS_PATH
-        if self.results_path_test_arg:
-            if self.results_path_test_arg.endswith("="):
-                self.test_component_args.append(
-                    f"{self.results_path_test_arg}{results_file_path}"
-                )
+            results_file_path: str = utils.DEFAULT_TARGET_RESULTS_PATH
+            if results_path_test_arg:
+                if results_path_test_arg.endswith("="):
+                    test_component_args.append(
+                        f"{results_path_test_arg}{results_file_path}"
+                    )
+                else:
+                    test_component_args += [
+                        results_path_test_arg,
+                        results_file_path,
+                    ]
             else:
-                self.test_component_args += [
-                    self.results_path_test_arg,
-                    results_file_path,
-                ]
-        else:
-            self.test_component_args.append(results_file_path)
+                test_component_args.append(results_file_path)
 
         result_files: list[str] = utils.run_test_component(
-            self.device.ffx,
-            self.ffx_test_url,
+            device.ffx,
+            ffx_test_url,
             self.test_case_path,
-            ffx_test_args=self.ffx_test_args,
-            test_component_args=self.test_component_args,
-            process_runs=self.process_runs,
+            ffx_test_args=ffx_test_args,
+            test_component_args=test_component_args,
+            process_runs=process_runs,
         )
 
         publish.publish_fuchsiaperf(
             result_files,
-            os.path.basename(self.expected_metric_names_filepath),
+            os.path.basename(expected_metric_names_filepath),
         )
 
 
