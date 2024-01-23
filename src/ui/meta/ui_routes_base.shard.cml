@@ -18,6 +18,7 @@
                 "fuchsia.input.virtualkeyboard.Manager",
                 "fuchsia.recovery.policy.Device",
                 "fuchsia.recovery.ui.FactoryResetCountdown",
+                "fuchsia.ui.brightness.ColorAdjustment",
                 "fuchsia.ui.brightness.ColorAdjustmentHandler",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",

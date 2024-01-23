@@ -316,6 +316,7 @@
                 "fuchsia.recovery.policy.Device",
                 "fuchsia.recovery.ui.FactoryResetCountdown",
                 "fuchsia.session.scene.Manager",
+                "fuchsia.ui.brightness.ColorAdjustment",
                 "fuchsia.ui.brightness.ColorAdjustmentHandler",
                 "fuchsia.ui.brightness.Control",
                 "fuchsia.ui.composition.Allocator",
